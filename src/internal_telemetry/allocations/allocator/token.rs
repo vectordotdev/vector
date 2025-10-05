@@ -6,8 +6,7 @@ use std::{
 
 use tracing::Span;
 
-use super::stack::GroupStack;
-use super::tracing::WithAllocationGroup;
+use super::{stack::GroupStack, tracing::WithAllocationGroup};
 
 thread_local! {
     /// The currently executing allocation token.
@@ -64,10 +63,10 @@ impl AllocationGroupId {
     /// group.
     pub fn attach_to_span(self, span: &Span) {
         tracing::dispatcher::get_default(move |dispatch| {
-            if let Some(id) = span.id() {
-                if let Some(ctx) = dispatch.downcast_ref::<WithAllocationGroup>() {
-                    (ctx.with_allocation_group)(dispatch, &id, AllocationGroupToken::from(self));
-                }
+            if let Some(id) = span.id()
+                && let Some(ctx) = dispatch.downcast_ref::<WithAllocationGroup>()
+            {
+                (ctx.with_allocation_group)(dispatch, &id, AllocationGroupToken::from(self));
             }
         });
     }

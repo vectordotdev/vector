@@ -83,7 +83,7 @@ where
 
 /// PartitionKey used to partition events by (database, table) pair.
 #[derive(Hash, Eq, PartialEq, Clone, Debug)]
-pub(super) struct PartitionKey {
+pub struct PartitionKey {
     pub database: String,
     pub table: String,
     pub format: Format,

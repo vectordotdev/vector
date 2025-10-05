@@ -172,7 +172,7 @@ impl AddAssign for GroupedCountByteSize {
 
         // For these cases, we know we won't have to change `self` so the match can take ownership.
         match (self, rhs) {
-            (Self::Tagged { sizes: ref mut lhs }, Self::Tagged { sizes: rhs }) => {
+            (&mut Self::Tagged { sizes: ref mut lhs }, Self::Tagged { sizes: rhs }) => {
                 for (key, value) in rhs {
                     match lhs.get_mut(&key) {
                         Some(size) => *size += value,
@@ -187,7 +187,7 @@ impl AddAssign for GroupedCountByteSize {
                 *lhs = *lhs + rhs;
             }
 
-            (Self::Tagged { ref mut sizes }, Self::Untagged { size }) => {
+            (Self::Tagged { sizes }, Self::Untagged { size }) => {
                 match sizes.get_mut(&TaggedEventsSent::new_empty()) {
                     Some(empty_size) => *empty_size += size,
                     None => {
@@ -196,7 +196,7 @@ impl AddAssign for GroupedCountByteSize {
                 }
             }
             (Self::Untagged { .. }, Self::Tagged { .. }) => unreachable!(),
-        };
+        }
     }
 }
 
@@ -356,9 +356,8 @@ pub trait MetaDescriptive {
 mod tests {
     use std::sync::Arc;
 
-    use crate::{config::ComponentKey, internal_event::OptionalTag};
-
     use super::*;
+    use crate::{config::ComponentKey, internal_event::OptionalTag};
 
     struct DummyEvent {
         source: OptionalTag<Arc<ComponentKey>>,

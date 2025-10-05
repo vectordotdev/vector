@@ -1,19 +1,17 @@
 use std::{cell::RefCell, fmt};
 
-use serde::Serializer;
-use serde_json::Value;
-use vector_lib::configurable::attributes::CustomAttribute;
-use vector_lib::configurable::{
-    schema::{
-        apply_base_metadata, generate_const_string_schema, generate_number_schema,
-        generate_one_of_schema, SchemaGenerator, SchemaObject,
-    },
-    Configurable, GenerateError, Metadata, ToValue,
-};
-
 use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
     de::{self, Unexpected, Visitor},
-    Deserialize, Deserializer, Serialize,
+};
+use serde_json::Value;
+use vector_lib::configurable::{
+    Configurable, GenerateError, Metadata, ToValue,
+    attributes::CustomAttribute,
+    schema::{
+        SchemaGenerator, SchemaObject, apply_base_metadata, generate_const_string_schema,
+        generate_number_schema, generate_one_of_schema,
+    },
 };
 
 /// Configuration for outbound request concurrency.
@@ -29,7 +27,7 @@ pub enum Concurrency {
 
     /// Concurrency is managed by the [Adaptive Request Concurrency][arc] feature.
     ///
-    /// [arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+    /// [arc]: https://vector.dev/docs/architecture/arc/
     Adaptive,
 
     /// A fixed amount of concurrency is allowed.
@@ -146,8 +144,7 @@ a fixed concurrency limit.",
         let mut adaptive_metadata = Metadata::with_title(
             "Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.",
         );
-        adaptive_metadata
-            .set_description("[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/");
+        adaptive_metadata.set_description("[arc]: https://vector.dev/docs/architecture/arc/");
         adaptive_metadata.add_custom_attribute(CustomAttribute::kv("logical_name", "Adaptive"));
         apply_base_metadata(&mut adaptive_schema, adaptive_metadata);
 

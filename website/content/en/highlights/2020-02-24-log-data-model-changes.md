@@ -34,4 +34,4 @@ drain your disk buffer before upgrading Vector.
 Note, Vector will discard invalid disk buffer data, bad data will not prevent
 Vector from starting.
 
-[docs.data-model.log]: /docs/about/under-the-hood/architecture/data-model/log/
+[docs.data-model.log]: /docs/architecture/data-model/log/

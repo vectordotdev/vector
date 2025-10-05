@@ -1,0 +1,28 @@
+receivers:
+  otlp:
+    protocols:
+      http:
+        endpoint: "0.0.0.0:4318"
+      grpc:
+
+processors:
+  batch: { }
+
+exporters:
+  otlp:
+    endpoint: vector:4317
+    tls:
+      insecure: true
+  debug: { }
+
+service:
+  pipelines:
+    logs:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ debug, otlp ]
+
+    metrics:
+      receivers: [ otlp ]
+      processors: [ batch ]
+      exporters: [ debug ]

@@ -63,6 +63,20 @@ remap: functions: get_enrichment_table_record: {
 			return: {"id": 1, "firstname": "Bob", "surname": "Smith"}
 		},
 		{
+			title: "Wildcard match"
+			source: #"""
+				find_enrichment_table_records!("test",
+				  {
+				    "firstname": "Bob",
+				  },
+				  wildcard: "fred",
+				  case_sensitive: false)
+				"""#
+			return: [{"id": 1, "firstname": "Bob", "surname": "Smith"},
+				{"id": 2, "firstname": "Fred", "surname": "Smith"},
+			]
+		},
+		{
 			title: "Date range search"
 			source: #"""
 				get_enrichment_table_record!("test",

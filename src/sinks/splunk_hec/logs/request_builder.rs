@@ -1,8 +1,10 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
-use vector_lib::event::{EventFinalizers, Finalizable};
-use vector_lib::request_metadata::RequestMetadata;
+use vector_lib::{
+    event::{EventFinalizers, Finalizable},
+    request_metadata::RequestMetadata,
+};
 
 use super::{
     encoder::HecLogsEncoder,
@@ -11,8 +13,8 @@ use super::{
 use crate::sinks::{
     splunk_hec::common::request::HecRequest,
     util::{
-        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-        RequestBuilder,
+        Compression, RequestBuilder, metadata::RequestMetadataBuilder,
+        request_builder::EncodeResult,
     },
 };
 

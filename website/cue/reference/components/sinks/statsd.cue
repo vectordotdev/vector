@@ -47,5 +47,5 @@ components: sinks: statsd: {
 		traces: false
 	}
 
-	configuration: base.components.sinks.statsd.configuration
+	configuration: generated.components.sinks.statsd.configuration
 }

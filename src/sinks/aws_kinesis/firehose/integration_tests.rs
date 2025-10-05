@@ -1,15 +1,13 @@
-use aws_sdk_elasticsearch::{types::DomainEndpointOptions, Client as EsClient};
+use aws_sdk_elasticsearch::{Client as EsClient, types::DomainEndpointOptions};
 use aws_sdk_firehose::types::ElasticsearchDestinationConfiguration;
-use futures::StreamExt;
-use futures::TryFutureExt;
-use serde_json::{json, Value};
-use tokio::time::{sleep, Duration};
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use futures::{StreamExt, TryFutureExt};
+use serde_json::{Value, json};
+use tokio::time::{Duration, sleep};
+use vector_lib::{codecs::JsonSerializerConfig, lookup::lookup_v2::ConfigValuePath};
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{
-    aws::{create_client, AwsAuthentication, ImdsAuthentication, RegionOrEndpoint},
+    aws::{AwsAuthentication, ImdsAuthentication, RegionOrEndpoint, create_client},
     config::{ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         elasticsearch::{
@@ -19,7 +17,7 @@ use crate::{
     },
     template::Template,
     test_util::{
-        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_events_with_stream, random_string, wait_for_duration,
     },
 };
@@ -299,7 +297,7 @@ async fn ensure_elasticsearch_domain(domain_name: String) -> String {
         .await
     {
         Ok(res) => res.domain_status.expect("no domain status").arn,
-        Err(error) => panic!("Unable to create the Elasticsearch domain {:?}", error),
+        Err(error) => panic!("Unable to create the Elasticsearch domain {error:?}"),
     };
 
     // wait for ES to be available; it starts up when the ES domain is created
@@ -347,7 +345,7 @@ async fn ensure_elasticsearch_delivery_stream(
         .await
     {
         Ok(_) => (),
-        Err(error) => panic!("Unable to create the delivery stream {:?}", error),
+        Err(error) => panic!("Unable to create the delivery stream {error:?}"),
     };
 }
 

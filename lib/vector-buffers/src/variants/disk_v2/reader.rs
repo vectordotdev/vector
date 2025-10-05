@@ -8,23 +8,23 @@ use std::{
 };
 
 use crc32fast::Hasher;
-use rkyv::{archived_root, AlignedVec};
+use rkyv::{AlignedVec, archived_root};
 use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};
 
 use super::{
+    Filesystem,
     common::create_crc32c_hasher,
     ledger::Ledger,
-    record::{validate_record_archive, ArchivedRecord, Record, RecordStatus},
-    Filesystem,
+    record::{ArchivedRecord, Record, RecordStatus, validate_record_archive},
 };
 use crate::{
+    Bufferable,
     encoding::{AsMetadata, Encodable},
     internal_events::BufferReadError,
     topology::acks::{EligibleMarker, EligibleMarkerLength, MarkerError, OrderedAcknowledgements},
     variants::disk_v2::{io::AsyncFile, record::try_as_record_archive},
-    Bufferable,
 };
 
 pub(super) struct ReadToken {
@@ -764,7 +764,10 @@ where
                 Ok(data_file) => data_file,
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {
-                        if reader_file_id == writer_file_id {
+                        // reader is either waiting for writer to create the file which can be current writer_file_id or next writer_file_id (if writer has marked for skip)
+                        if reader_file_id == writer_file_id
+                            || reader_file_id == self.ledger.get_next_writer_file_id()
+                        {
                             debug!(
                                 data_file_path = data_file_path.to_string_lossy().as_ref(),
                                 "Data file does not yet exist. Waiting for writer to create."
@@ -1035,7 +1038,7 @@ where
 
                     return Err(e);
                 }
-            };
+            }
 
             // Fundamentally, when `try_read_record` returns `None`, there's three possible
             // scenarios:

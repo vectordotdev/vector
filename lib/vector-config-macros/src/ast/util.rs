@@ -1,9 +1,9 @@
 use darling::{ast::NestedMeta, error::Accumulator};
-use quote::{quote, ToTokens};
-use serde_derive_internals::{attr as serde_attr, Ctxt};
+use quote::{ToTokens, quote};
+use serde_derive_internals::{Ctxt, attr as serde_attr};
 use syn::{
-    punctuated::Punctuated, spanned::Spanned, token::Comma, Attribute, Expr, ExprLit, ExprPath,
-    Lit, Meta, MetaNameValue,
+    Attribute, Expr, ExprLit, ExprPath, Lit, Meta, MetaNameValue, punctuated::Punctuated,
+    spanned::Spanned, token::Comma,
 };
 
 const ERR_FIELD_MISSING_DESCRIPTION: &str = "field must have a description -- i.e. `/// This is a widget...` or `#[configurable(description = \"...\")] -- or derive it from the underlying type of the field by specifying `#[configurable(derived)]`";
@@ -138,11 +138,7 @@ fn group_doc_lines(ungrouped: &[String]) -> Vec<String> {
 }
 
 fn none_if_empty(s: String) -> Option<String> {
-    if s.is_empty() {
-        None
-    } else {
-        Some(s)
-    }
+    if s.is_empty() { None } else { Some(s) }
 }
 
 pub fn err_field_missing_description<T: Spanned>(field: &T) -> darling::Error {
@@ -218,14 +214,16 @@ fn find_name_value_attribute(
         // Only take attributes whose name matches `attr_name`.
         .filter(|attr| path_matches(attr.path(), attr_name))
         // Derive macro helper attributes will always be in the list form.
-        .filter_map(|attr| match &attr.meta {
+        .flat_map(|attr| match &attr.meta {
             Meta::List(ml) => ml
                 .parse_args_with(Punctuated::<NestedMeta, Comma>::parse_terminated)
                 .map(|nested| nested.into_iter())
-                .ok(),
-            _ => None,
+                // If parsing fails, return an empty iterator. By this point, `serde` has already
+                // emitted its own error, so we don't want to duplicate any error emission here.
+                .unwrap_or_else(|_| Punctuated::<NestedMeta, Comma>::new().into_iter()),
+            // Non-list attributes cannot contain nested meta items; return empty iterator.
+            _ => Punctuated::<NestedMeta, Comma>::new().into_iter(),
         })
-        .flatten()
         // For each nested meta item in the list, find any that are name/value pairs where the
         // name matches `name_key`, and return their value.
         .find_map(|nm| match nm {
@@ -238,6 +236,29 @@ fn find_name_value_attribute(
             },
             _ => None,
         })
+}
+
+/// Checks whether an attribute list contains a flag-style entry.
+///
+/// For example, this returns true when `attributes` contains something like `#[serde(untagged)]`
+/// when called with `attr_name = "serde"` and `flag_name = "untagged"`.
+pub(crate) fn has_flag_attribute(
+    attributes: &[syn::Attribute],
+    attr_name: &str,
+    flag_name: &str,
+) -> bool {
+    attributes
+        .iter()
+        .filter(|attr| path_matches(attr.path(), attr_name))
+        .filter_map(|attr| match &attr.meta {
+            Meta::List(ml) => ml
+                .parse_args_with(Punctuated::<NestedMeta, Comma>::parse_terminated)
+                .map(|nested| nested.into_iter())
+                .ok(),
+            _ => None,
+        })
+        .flatten()
+        .any(|nm| matches!(nm, NestedMeta::Meta(Meta::Path(ref path)) if path_matches(path, flag_name)))
 }
 
 /// Tries to find a delegated (de)serialization type from attributes.

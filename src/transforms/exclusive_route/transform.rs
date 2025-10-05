@@ -1,9 +1,14 @@
 use vector_lib::transform::SyncTransform;
 
-use crate::conditions::Condition;
-use crate::transforms::exclusive_route::config::{ExclusiveRouteConfig, UNMATCHED_ROUTE};
-use crate::transforms::TransformOutputsBuf;
-use crate::{config::TransformContext, event::Event};
+use crate::{
+    conditions::Condition,
+    config::TransformContext,
+    event::Event,
+    transforms::{
+        TransformOutputsBuf,
+        exclusive_route::config::{ExclusiveRouteConfig, UNMATCHED_ROUTE},
+    },
+};
 
 #[derive(Clone)]
 pub struct ResolvedRoute {

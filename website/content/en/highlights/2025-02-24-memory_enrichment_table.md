@@ -8,7 +8,7 @@ release: "0.45.0"
 hide_on_release_notes: false
 badges:
   type: "new feature"
-  domains: [ "enrichment", "sinks" ]
+  domains: [ "enrichment", "table", "memory", "sinks" ]
 ---
 
 We are excited to announce the `memory` enrichment table!
@@ -102,21 +102,12 @@ calculation the first time it encounters a key. Subsequently, every time the sam
 the processing step will be skipped since the pre-computed value is present in the table. The values
 can expire; in that case, the computation step will be repeated.
 
-## Use as a sink
+## Populate with other components
 
-This new table type can also be used as a sink to feed it data, which can then be queried
-like any other enrichment table. For example, here is how to introduce this new component as a sink
-if you have another source that can populate the cache:
+This new table type also accepts `inputs`, meaning that sources and/or transforms can populate it with data, similar to how a sink operates.
+The data can then be queried like any other enrichment table. The configuration above demonstrates this behavior.
 
-```yaml
-  memory_table_sink:
-    inputs: [ "another_source_or_transform" ]
-    type: memory_enrichment_table
-    ttl: 60
-    flush_interval: 5
-```
-
-We plan to make this component even more flexible in the future. For example, it can also act as a
+> We plan to make this component even more flexible in the future. For example, it can also act as a
 source. This exercise raises some important questions on component flexibility. The end goal is
 treating components as nodes in a graph, unlocking even greater possibilities, such as chaining
 sinks.

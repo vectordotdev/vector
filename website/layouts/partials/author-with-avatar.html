@@ -1,0 +1,17 @@
+<div class="flex flex-col space-y-2">
+  {{ range .Params.authors }}
+    {{ $handle := . }}
+    {{ $img := printf "https://github.com/%s.png" $handle }}
+    {{ $link := printf "https://github.com/%s" $handle }}
+    <a href="{{ $link }}" class="flex items-center space-x-3 group" rel="noopener" target="_blank">
+      <img
+        class="h-12 w-12 rounded-full ring-1 ring-white dark:ring-dark"
+        src="{{ $img }}"
+        alt="Author avatar for {{ $handle }}"
+      />
+      <span class="text-md font-bold tracking-tight text-gray-700 group-hover:text-secondary dark:text-gray-200">
+        {{ $handle }}
+      </span>
+    </a>
+  {{ end }}
+</div>

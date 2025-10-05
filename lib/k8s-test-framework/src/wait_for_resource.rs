@@ -86,7 +86,7 @@ where
     command.arg("--for");
     match wait_for {
         WaitFor::Delete => command.arg("delete"),
-        WaitFor::Condition(cond) => command.arg(format!("condition={}", cond)),
+        WaitFor::Condition(cond) => command.arg(format!("condition={cond}")),
     };
 
     command.args(extra);

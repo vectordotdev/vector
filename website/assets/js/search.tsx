@@ -12,10 +12,25 @@ const host = process.env.TYPESENSE_HOST
 
 let searchClient = new Typesense.Client({
   apiKey: apiKey,
+  nearestNode: {
+    host: `${host}.a1.typesense.net`,
+    port: 443,
+    protocol: 'https',
+  },
   nodes: [
     {
-      host: `${host}.a1.typesense.net`,
-      port: '443',
+      host: `${host}-1.a1.typesense.net`,
+      port: 443,
+      protocol: 'https',
+    },
+    {
+      host: `${host}-2.a1.typesense.net`,
+      port: 443,
+      protocol: 'https',
+    },
+    {
+      host: `${host}-3.a1.typesense.net`,
+      port: 443,
       protocol: 'https',
     },
   ],

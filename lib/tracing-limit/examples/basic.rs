@@ -1,4 +1,4 @@
-use tracing::{info, trace, Dispatch};
+use tracing::{Dispatch, info, trace};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::SubscriberExt;
 

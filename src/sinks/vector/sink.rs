@@ -1,18 +1,21 @@
 use std::{fmt, num::NonZeroUsize};
 
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt};
+use futures::{StreamExt, stream::BoxStream};
 use prost::Message;
 use tower::Service;
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::stream::{batcher::data::BatchReduce, BatcherSettings, DriverResponse};
-use vector_lib::{config::telemetry, ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    config::telemetry,
+    request_metadata::GroupedCountByteSize,
+    stream::{BatcherSettings, DriverResponse, batcher::data::BatchReduce},
+};
 
 use super::service::VectorRequest;
 use crate::{
-    event::{proto::EventWrapper, Event, EventFinalizers, Finalizable},
+    event::{Event, EventFinalizers, Finalizable, proto::EventWrapper},
     proto::vector as proto_vector,
-    sinks::util::{metadata::RequestMetadataBuilder, SinkBuilderExt, StreamSink},
+    sinks::util::{SinkBuilderExt, StreamSink, metadata::RequestMetadataBuilder},
 };
 
 /// Data for a single event.

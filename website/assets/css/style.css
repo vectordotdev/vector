@@ -115,11 +115,11 @@ a[type="button"] {
 .aa-DetachedCancelButton {
   opacity: 0.65;
   position: absolute;
-  top: 0;
   right: 3.5%;
   padding: 8px;
   margin: 0;
-  bottom: 0;
+  top: calc(var(--aa-spacing-half) * 1.5 + 4px);
+  bottom: calc(var(--aa-spacing-half) * 1.5 + 4px);
 }
 
 .aa-DetachedCancelButton:hover,

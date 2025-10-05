@@ -1,8 +1,6 @@
 use indoc::indoc;
 use tower::ServiceBuilder;
-use vector_lib::config::proxy::ProxyConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::schema;
+use vector_lib::{config::proxy::ProxyConfig, configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use super::{
@@ -14,9 +12,9 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{
-        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
-        util::{http::HttpStatusRetryLogic, ServiceBuilderExt, TowerRequestConfig},
         Healthcheck, VectorSink,
+        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
+        util::{ServiceBuilderExt, TowerRequestConfig, http::HttpStatusRetryLogic},
     },
     tls::MaybeTlsSettings,
 };

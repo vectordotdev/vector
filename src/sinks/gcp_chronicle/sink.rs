@@ -1,7 +1,9 @@
 use std::fmt;
 
-use crate::sinks::gcp_chronicle::partitioner::{ChroniclePartitionKey, ChroniclePartitioner};
-use crate::sinks::prelude::*;
+use crate::sinks::{
+    gcp_chronicle::partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
+    prelude::*,
+};
 
 pub struct ChronicleSink<Svc, RB> {
     service: Svc,

@@ -1,7 +1,9 @@
 use mlua::prelude::*;
 
-use super::super::{Event, LogEvent, Metric};
-use super::metric::LuaMetric;
+use super::{
+    super::{Event, LogEvent, Metric},
+    metric::LuaMetric,
+};
 
 pub struct LuaEvent {
     pub event: Event,
@@ -27,7 +29,7 @@ impl IntoLua for LuaEvent {
                     from: String::from("Event"),
                     to: "table",
                     message: Some("Trace are not supported".to_string()),
-                })
+                });
             }
         }
         Ok(LuaValue::Table(table))
@@ -67,8 +69,8 @@ impl FromLua for Event {
 mod test {
     use super::*;
     use crate::event::{
-        metric::{MetricKind, MetricValue},
         Metric, Value,
+        metric::{MetricKind, MetricValue},
     };
 
     fn assert_event(event: Event, assertions: Vec<&'static str>) {

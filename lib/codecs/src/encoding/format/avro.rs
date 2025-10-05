@@ -1,9 +1,10 @@
-use crate::encoding::BuildError;
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
+
+use crate::encoding::BuildError;
 
 /// Config used to build a `AvroSerializer`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -23,7 +24,7 @@ impl AvroSerializerConfig {
     /// Build the `AvroSerializer` from this configuration.
     pub fn build(&self) -> Result<AvroSerializer, BuildError> {
         let schema = apache_avro::Schema::parse_str(&self.avro.schema)
-            .map_err(|error| format!("Failed building Avro serializer: {}", error))?;
+            .map_err(|error| format!("Failed building Avro serializer: {error}"))?;
         Ok(AvroSerializer { schema })
     }
 

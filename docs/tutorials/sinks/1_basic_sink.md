@@ -348,7 +348,7 @@ Our sink works!
 
 [event_streams_tracking]: https://github.com/vectordotdev/vector/issues/9261
 [vdev_install]: https://github.com/vectordotdev/vector/tree/master/vdev#installation
-[acknowledgements]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+[acknowledgements]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 [configurable_component]: https://rust-doc.vector.dev/vector_config/attr.configurable_component.html
 [generate_config]: https://rust-doc.vector.dev/vector/config/trait.generateconfig
 [sink_config]: https://rust-doc.vector.dev/vector/config/trait.sinkconfig

@@ -25,12 +25,18 @@ components: transforms: window: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.window.configuration
+	configuration: generated.components.transforms.window.configuration
 
 	input: {
 		logs:    true
 		metrics: null
 		traces:  false
+	}
+
+	output: {
+		logs: "": {
+			description: "The modified input `log` event."
+		}
 	}
 
 	examples: [

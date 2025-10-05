@@ -42,7 +42,7 @@ const manageState = () => {
     // Home page platform tab
     platformTab: '{{ $defaultPlatformTab }}',
     // Config format
-    format: 'toml',
+    format: 'yaml',
 
     // Helper functions
     setFormat(f) {

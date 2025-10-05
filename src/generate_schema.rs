@@ -1,8 +1,8 @@
 //! Vector `generate-schema` command implementation.
 
+use std::{fs, path::PathBuf};
+
 use clap::Parser;
-use std::fs;
-use std::path::PathBuf;
 use vector_lib::configurable::schema::generate_root_schema;
 
 use crate::config::ConfigBuilder;
@@ -46,7 +46,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             exitcode::OK
         }
         Err(e) => {
-            eprintln!("error while generating schema: {:?}", e);
+            eprintln!("error while generating schema: {e:?}");
             exitcode::SOFTWARE
         }
     }

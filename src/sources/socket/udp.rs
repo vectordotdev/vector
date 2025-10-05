@@ -1,36 +1,39 @@
-use super::default_host_key;
+use std::net::{Ipv4Addr, SocketAddr};
+
 use bytes::BytesMut;
 use chrono::Utc;
 use futures::StreamExt;
 use listenfd::ListenFd;
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 
+use super::default_host_key;
 use crate::{
+    SourceSender,
     codecs::Decoder,
     event::Event,
     internal_events::{
-        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
+        SocketBindError, SocketEventsReceived, SocketMode, SocketMulticastGroupJoinError,
+        SocketReceiveError, StreamClosedError,
     },
     net,
     serde::default_decoding,
     shutdown::ShutdownSignal,
     sources::{
-        socket::SocketConfig,
-        util::net::{try_bind_udp_socket, SocketListenAddr},
         Source,
+        socket::SocketConfig,
+        util::net::{SocketListenAddr, try_bind_udp_socket},
     },
-    SourceSender,
 };
 
 /// UDP configuration for the `socket` source.
@@ -40,6 +43,21 @@ use crate::{
 pub struct UdpConfig {
     #[configurable(derived)]
     address: SocketListenAddr,
+
+    /// List of IPv4 multicast groups to join on socket's binding process.
+    ///
+    /// In order to read multicast packets, this source's listening address should be set to `0.0.0.0`.
+    /// If any other address is used (such as `127.0.0.1` or an specific interface address), the
+    /// listening interface will filter out all multicast packets received,
+    /// as their target IP would be the one of the multicast group
+    /// and it will not match the socket's bound IP.
+    ///
+    /// Note that this setting will only work if the source's address
+    /// is an IPv4 address (IPv6 and systemd file descriptor as source's address are not supported
+    /// with multicast groups).
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "['224.0.0.2', '224.0.0.4']"))]
+    pub(super) multicast_groups: Vec<Ipv4Addr>,
 
     /// The maximum buffer size of incoming messages.
     ///
@@ -118,6 +136,7 @@ impl UdpConfig {
     pub fn from_address(address: SocketListenAddr) -> Self {
         Self {
             address,
+            multicast_groups: Vec::new(),
             max_length: default_max_length(),
             host_key: None,
             port_key: default_port_key(),
@@ -128,7 +147,7 @@ impl UdpConfig {
         }
     }
 
-    pub fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
+    pub const fn set_log_namespace(&mut self, val: Option<bool>) -> &mut Self {
         self.log_namespace = val;
         self
     }
@@ -152,10 +171,39 @@ pub(super) fn udp(
                 })
             })?;
 
-        if let Some(receive_buffer_bytes) = config.receive_buffer_bytes {
-            if let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes) {
-                warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
+        if !config.multicast_groups.is_empty() {
+            socket.set_multicast_loop_v4(true).unwrap();
+            let listen_addr = match config.address() {
+                SocketListenAddr::SocketAddr(SocketAddr::V4(addr)) => addr,
+                SocketListenAddr::SocketAddr(SocketAddr::V6(_)) => {
+                    // We could support Ipv6 multicast with the
+                    // https://doc.rust-lang.org/std/net/struct.UdpSocket.html#method.join_multicast_v6 method
+                    // and specifying the interface index as `0`, in order to bind all interfaces.
+                    unimplemented!("IPv6 multicast is not supported")
+                }
+                SocketListenAddr::SystemdFd(_) => {
+                    unimplemented!("Multicast for systemd fd sockets is not supported")
+                }
+            };
+            for group_addr in config.multicast_groups {
+                let interface = *listen_addr.ip();
+                socket
+                    .join_multicast_v4(group_addr, interface)
+                    .map_err(|error| {
+                        emit!(SocketMulticastGroupJoinError {
+                            error,
+                            group_addr,
+                            interface,
+                        })
+                    })?;
+                info!(message = "Joined multicast group.", group = %group_addr);
             }
+        }
+
+        if let Some(receive_buffer_bytes) = config.receive_buffer_bytes
+            && let Err(error) = net::set_receive_buffer_size(&socket, receive_buffer_bytes)
+        {
+            warn!(message = "Failed configuring receive buffer size on UDP socket.", %error);
         }
 
         let mut max_length = config.max_length;
@@ -229,7 +277,7 @@ pub(super) fn udp(
                                 let now = Utc::now();
 
                                 for event in &mut events {
-                                    if let Event::Log(ref mut log) = event {
+                                    if let Event::Log(log) = event {
                                         log_namespace.insert_standard_vector_source_metadata(
                                             log,
                                             SocketConfig::NAME,

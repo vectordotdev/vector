@@ -1,16 +1,13 @@
 use async_trait::async_trait;
-use futures::{stream::BoxStream, StreamExt};
-
-use crate::common::mqtt::MqttConnector;
-use crate::internal_events::MqttConnectionError;
-use crate::sinks::prelude::*;
+use futures::{StreamExt, stream::BoxStream};
 
 use super::{
+    MqttSinkConfig,
     config::MqttQoS,
     request_builder::{MqttEncoder, MqttRequestBuilder},
     service::MqttService,
-    MqttSinkConfig,
 };
+use crate::{common::mqtt::MqttConnector, internal_events::MqttConnectionError, sinks::prelude::*};
 
 pub struct MqttSink {
     transformer: Transformer,

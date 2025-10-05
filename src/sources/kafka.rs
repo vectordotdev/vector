@@ -3,8 +3,8 @@ use std::{
     io::Cursor,
     pin::Pin,
     sync::{
-        mpsc::{sync_channel, SyncSender},
         Arc, OnceLock, Weak,
+        mpsc::{SyncSender, sync_channel},
     },
     time::Duration,
 };
@@ -15,14 +15,14 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::{Stream, StreamExt};
 use futures_util::future::OptionFuture;
 use rdkafka::{
+    ClientConfig, ClientContext, Statistics, TopicPartitionList,
     consumer::{
-        stream_consumer::StreamPartitionQueue, BaseConsumer, CommitMode, Consumer, ConsumerContext,
-        Rebalance, StreamConsumer,
+        BaseConsumer, CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer,
+        stream_consumer::StreamPartitionQueue,
     },
     error::KafkaError,
     message::{BorrowedMessage, Headers as _, Message},
     types::RDKafkaErrorCode,
-    ClientConfig, ClientContext, Statistics, TopicPartitionList,
 };
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
@@ -37,25 +37,25 @@ use tokio::{
 };
 use tokio_util::codec::FramedRead;
 use tracing::{Instrument, Span};
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
-
-use vector_lib::configurable::configurable_component;
-use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    finalizer::OrderedFinalizer,
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
-use vrl::value::{kind::Collection, Kind, ObjectMap};
+use vrl::value::{Kind, ObjectMap, kind::Collection};
 
 use crate::{
+    SourceSender,
     codecs::{Decoder, DecodingConfig},
     config::{
-        log_schema, LogSchema, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
+        LogSchema, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+        log_schema,
     },
     event::{BatchNotifier, BatchStatus, Event, Value},
     internal_events::{
@@ -65,7 +65,6 @@ use crate::{
     kafka,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 #[derive(Debug, Snafu)]
@@ -622,11 +621,10 @@ impl ConsumerStateInner<Consuming> {
 
                     ack = ack_stream.next() => match ack {
                         Some((status, entry)) => {
-                            if status == BatchStatus::Delivered {
-                                if let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
+                            if status == BatchStatus::Delivered
+                                && let Err(error) =  consumer.store_offset(&entry.topic, entry.partition, entry.offset) {
                                     emit!(KafkaOffsetUpdateError { error });
                                 }
-                            }
                         }
                         None if finalizer.is_none() => {
                             debug!("Acknowledgement stream complete for partition {}:{}.", &tp.0, tp.1);
@@ -817,14 +815,14 @@ async fn coordinate_kafka_callbacks(
                         for tp in assigned_partitions.drain(0..) {
                             let topic = tp.0.as_str();
                             let partition = tp.1;
-                            if let Some(pq) = consumer.split_partition_queue(topic, partition) {
+                            match consumer.split_partition_queue(topic, partition) { Some(pq) => {
                                 debug!("Consuming partition {}:{}.", &tp.0, tp.1);
                                 let (end_tx, handle) = consumer_state.consume_partition(&mut partition_consumers, tp.clone(), Arc::clone(&consumer), pq, acks, exit_eof);
                                 abort_handles.insert(tp.clone(), handle);
                                 end_signals.insert(tp, end_tx);
-                            } else {
+                            } _ => {
                                 warn!("Failed to get queue for assigned partition {}:{}.", &tp.0, tp.1);
-                            }
+                            }}
                         }
                         // ensure this is retained until all individual queues are set up
                         drop(done);
@@ -843,12 +841,12 @@ async fn coordinate_kafka_callbacks(
                         let (deadline, mut state) = state.begin_drain(max_drain_ms, drain, false);
 
                         for tp in revoked_partitions.drain(0..) {
-                            if let Some(end) = end_signals.remove(&tp) {
+                            match end_signals.remove(&tp) { Some(end) => {
                                 debug!("Revoking partition {}:{}", &tp.0, tp.1);
                                 state.revoke_partition(tp, end);
-                            } else {
+                            } _ => {
                                 debug!("Consumer task for partition {}:{} already finished.", &tp.0, tp.1);
-                            }
+                            }}
                         }
 
                         state.keep_draining(deadline)
@@ -878,12 +876,12 @@ async fn coordinate_kafka_callbacks(
                                 .for_each(|el| {
 
                                 let tp: TopicPartition = (el.topic().into(), el.partition());
-                                if let Some(end) = end_signals.remove(&tp) {
+                                match end_signals.remove(&tp) { Some(end) => {
                                     debug!("Shutting down and revoking partition {}:{}", &tp.0, tp.1);
                                     state.revoke_partition(tp, end);
-                                } else {
+                                } _ => {
                                     debug!("Consumer task for partition {}:{} already finished.", &tp.0, tp.1);
-                                }
+                                }}
                             });
                         }
                         // If shutdown was initiated by partition EOF mode, the drain phase
@@ -994,7 +992,7 @@ fn parse_stream<'a>(
     decoder: Decoder,
     keys: &'a Keys,
     log_namespace: LogNamespace,
-) -> Option<(usize, impl Stream<Item = Event> + 'a)> {
+) -> Option<(usize, impl Stream<Item = Event> + 'a + use<'a>)> {
     let payload = msg.payload()?; // skip messages with empty payload
 
     let rmsg = ReceivedMessage::from(msg);
@@ -1100,7 +1098,7 @@ impl ReceivedMessage {
     }
 
     fn apply(&self, keys: &Keys, event: &mut Event, log_namespace: LogNamespace) {
-        if let Event::Log(ref mut log) = event {
+        if let Event::Log(log) = event {
             match log_namespace {
                 LogNamespace::Vector => {
                     // We'll only use this function in Vector namespaces because we don't want
@@ -1387,8 +1385,7 @@ impl ConsumerContext for KafkaSourceContext {
 
 #[cfg(test)]
 mod test {
-    use vector_lib::lookup::OwnedTargetPath;
-    use vector_lib::schema::Definition;
+    use vector_lib::{lookup::OwnedTargetPath, schema::Definition};
 
     use super::*;
 
@@ -1544,6 +1541,7 @@ mod integration_test {
     use futures::Stream;
     use futures_util::stream::FuturesUnordered;
     use rdkafka::{
+        Offset, TopicPartitionList,
         admin::{AdminClient, AdminOptions, NewTopic, TopicReplication},
         client::DefaultClientContext,
         config::{ClientConfig, FromClientConfig},
@@ -1551,7 +1549,6 @@ mod integration_test {
         message::{Header, OwnedHeaders},
         producer::{FutureProducer, FutureRecord},
         util::Timeout,
-        Offset, TopicPartitionList,
     };
     use stream_cancel::{Trigger, Tripwire};
     use tokio::time::sleep;
@@ -1560,10 +1557,10 @@ mod integration_test {
 
     use super::{test::*, *};
     use crate::{
+        SourceSender,
         event::{EventArray, EventContainer},
         shutdown::ShutdownSignal,
         test_util::{collect_n, components::assert_source_compliance, random_string},
-        SourceSender,
     };
 
     const KEY: &str = "my key";
@@ -1602,8 +1599,8 @@ mod integration_test {
 
         (0..count)
             .map(|i| async move {
-                let text = format!("{} {:03}", TEXT, i);
-                let key = format!("{} {}", KEY, i);
+                let text = format!("{TEXT} {i:03}");
+                let key = format!("{KEY} {i}");
                 let record = FutureRecord::to(topic_name)
                     .payload(&text)
                     .key(&key)
@@ -1613,7 +1610,7 @@ mod integration_test {
                         value: Some(HEADER_VALUE),
                     }));
                 if let Err(error) = producer.send(record, Timeout::Never).await {
-                    panic!("Cannot send event to Kafka: {:?}", error);
+                    panic!("Cannot send event to Kafka: {error:?}");
                 }
             })
             .collect::<FuturesUnordered<_>>()
@@ -1709,12 +1706,9 @@ mod integration_test {
             if let LogNamespace::Legacy = log_namespace {
                 assert_eq!(
                     event.as_log()[log_schema().message_key().unwrap().to_string()],
-                    format!("{} {:03}", TEXT, i).into()
+                    format!("{TEXT} {i:03}").into()
                 );
-                assert_eq!(
-                    event.as_log()["message_key"],
-                    format!("{} {}", KEY, i).into()
-                );
+                assert_eq!(event.as_log()["message_key"], format!("{KEY} {i}").into());
                 assert_eq!(
                     event.as_log()[log_schema().source_type_key().unwrap().to_string()],
                     "kafka".into()
@@ -1736,10 +1730,11 @@ mod integration_test {
                     meta.get(path!("vector", "source_type")).unwrap(),
                     &value!(KafkaSourceConfig::NAME)
                 );
-                assert!(meta
-                    .get(path!("vector", "ingest_timestamp"))
-                    .unwrap()
-                    .is_timestamp());
+                assert!(
+                    meta.get(path!("vector", "ingest_timestamp"))
+                        .unwrap()
+                        .is_timestamp()
+                );
 
                 assert_eq!(
                     event.as_log().value(),
@@ -1863,10 +1858,10 @@ mod integration_test {
             .expect("create_topics failed");
 
         for result in topic_results {
-            if let Err((topic, err)) = result {
-                if err != rdkafka::types::RDKafkaErrorCode::TopicAlreadyExists {
-                    panic!("Creating a topic failed: {:?}", (topic, err))
-                }
+            if let Err((topic, err)) = result
+                && err != rdkafka::types::RDKafkaErrorCode::TopicAlreadyExists
+            {
+                panic!("Creating a topic failed: {:?}", (topic, err))
             }
         }
     }
@@ -1937,14 +1932,14 @@ mod integration_test {
             Offset::Offset(offset) => {
                 assert!((offset as isize - events1.len() as isize).abs() <= 1)
             }
-            o => panic!("Invalid offset for partition 0 {:?}", o),
+            o => panic!("Invalid offset for partition 0 {o:?}"),
         }
 
         match fetch_tpl_offset(&group_id, &topic, 1) {
             Offset::Offset(offset) => {
                 assert!((offset as isize - events2.len() as isize).abs() <= 1)
             }
-            o => panic!("Invalid offset for partition 0 {:?}", o),
+            o => panic!("Invalid offset for partition 0 {o:?}"),
         }
 
         let mut all_events = events1
@@ -1965,7 +1960,7 @@ mod integration_test {
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
-            .unwrap_or_else(|_| format!("{}", send_count))
+            .unwrap_or_else(|_| format!("{send_count}"))
             .parse()
             .expect("Number of messages to expect consumers to process.");
         let delay_ms: u64 = std::env::var("KAFKA_SHUTDOWN_DELAY")
@@ -2026,7 +2021,11 @@ mod integration_test {
             0,
             "First batch of events should be non-zero (increase KAFKA_SHUTDOWN_DELAY?)"
         );
-        assert_ne!(events2.len(), 0, "Second batch of events should be non-zero (decrease KAFKA_SHUTDOWN_DELAY or increase KAFKA_SEND_COUNT?) ");
+        assert_ne!(
+            events2.len(),
+            0,
+            "Second batch of events should be non-zero (decrease KAFKA_SHUTDOWN_DELAY or increase KAFKA_SEND_COUNT?) "
+        );
         assert_eq!(total, expect_count);
     }
 
@@ -2037,7 +2036,7 @@ mod integration_test {
             .parse()
             .expect("Number of messages to send to kafka.");
         let expect_count: usize = std::env::var("KAFKA_EXPECT_COUNT")
-            .unwrap_or_else(|_| format!("{}", send_count))
+            .unwrap_or_else(|_| format!("{send_count}"))
             .parse()
             .expect("Number of messages to expect consumers to process.");
         let delay_ms: u64 = std::env::var("KAFKA_CONSUMER_DELAY")

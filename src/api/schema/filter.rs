@@ -2,12 +2,12 @@ use std::collections::BTreeSet;
 
 use async_graphql::{InputObject, InputType};
 
-use super::components::{source, ComponentKind};
+use super::components::{ComponentKind, source};
 
 /// Takes an `&Option<bool>` and returns early if false
 #[macro_export]
 macro_rules! filter_check {
-    ($($match:expr),+) => {
+    ($($match:expr_2021),+) => {
         $(
             if matches!($match, Some(t) if !t) {
                 return false;

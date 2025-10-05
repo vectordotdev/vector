@@ -3,8 +3,8 @@ package metadata
 remap: functions: parse_nginx_log: {
 	category:    "Parse"
 	description: """
-			Parses Nginx access and error log lines. Lines can be in [`combined`](\(urls.nginx_combined)),
-			[`ingress_upstreaminfo`](\(urls.nginx_ingress_upstreaminfo)), [`main`](\(urls.nginx_main)) or [`error`](\(urls.nginx_error)) format.
+		Parses Nginx access and error log lines. Lines can be in [`combined`](\(urls.nginx_combined)),
+		[`ingress_upstreaminfo`](\(urls.nginx_ingress_upstreaminfo)), [`main`](\(urls.nginx_main)) or [`error`](\(urls.nginx_error)) format.
 		"""
 	notices: [
 		"""

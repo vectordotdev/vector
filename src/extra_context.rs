@@ -8,7 +8,7 @@ use std::{
 
 /// Structure containing any extra data.
 /// The data is held in an [`Arc`] so is cheap to clone.
-#[derive(Clone, Default)]
+#[derive(Clone, Debug, Default)]
 pub struct ExtraContext(Arc<HashMap<TypeId, ContextItem>>);
 
 type ContextItem = Box<dyn Any + Send + Sync>;

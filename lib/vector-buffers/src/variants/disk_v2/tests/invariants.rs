@@ -4,10 +4,10 @@ use tracing::Instrument;
 
 use super::{create_buffer_v2_with_max_data_file_size, read_next, read_next_some};
 use crate::{
-    assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
-    assert_reader_last_writer_next_positions, assert_reader_writer_v2_file_positions,
-    await_timeout, set_data_file_length,
-    test::{acknowledge, install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
+    EventCount, assert_buffer_is_empty, assert_buffer_records, assert_buffer_size,
+    assert_enough_bytes_written, assert_reader_last_writer_next_positions,
+    assert_reader_writer_v2_file_positions, await_timeout, set_data_file_length,
+    test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{
         common::{DEFAULT_FLUSH_INTERVAL, MAX_FILE_ID},
         tests::{
@@ -15,7 +15,6 @@ use crate::{
             get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload,
         },
     },
-    EventCount,
 };
 
 #[tokio::test]

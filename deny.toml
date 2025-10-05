@@ -8,6 +8,7 @@ allow = [
   "CC0-1.0",
   "ISC",
   "MIT",
+  "MIT-0",
   "OpenSSL",
   "Unicode-3.0",
   "Unicode-DFS-2016",

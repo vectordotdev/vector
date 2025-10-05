@@ -2,11 +2,11 @@ use std::cmp;
 
 use async_graphql::{Enum, InputObject, Object};
 
-use super::{sink, state, transform, Component};
+use super::{Component, sink, state, transform};
 use crate::{
     api::schema::{
         filter,
-        metrics::{self, outputs_by_component_key, IntoSourceMetrics, Output},
+        metrics::{self, IntoSourceMetrics, Output, outputs_by_component_key},
         sort,
     },
     config::{ComponentKey, DataType, OutputId},
@@ -43,7 +43,7 @@ impl Source {
     pub fn get_component_key(&self) -> &ComponentKey {
         &self.0.component_key
     }
-    pub fn get_component_type(&self) -> &str {
+    pub const fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
     }
     pub fn get_output_types(&self) -> Vec<SourceOutputType> {

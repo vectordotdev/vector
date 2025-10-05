@@ -1,11 +1,16 @@
 #![allow(clippy::print_stderr)]
 #![allow(clippy::print_stdout)]
 
-use std::ffi::{OsStr, OsString};
-use std::io::IsTerminal;
-use std::process::{Command, Output};
 use std::{
-    collections::BTreeMap, fmt::Debug, fs, io::ErrorKind, path::Path, process, sync::LazyLock,
+    collections::BTreeMap,
+    ffi::{OsStr, OsString},
+    fmt::Debug,
+    fs,
+    io::{ErrorKind, IsTerminal},
+    path::Path,
+    process,
+    process::{Command, Output},
+    sync::LazyLock,
 };
 
 use anyhow::{Context as _, Result};

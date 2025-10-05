@@ -6,13 +6,12 @@ use lru::LruCache;
 use vector_lib::lookup::lookup_v2::ConfigTargetPath;
 use vrl::path::OwnedTargetPath;
 
+use super::common::FieldMatchConfig;
 use crate::{
     event::{Event, Value},
     internal_events::DedupeEventsDropped,
     transforms::TaskTransform,
 };
-
-use super::common::FieldMatchConfig;
 
 #[derive(Clone)]
 pub struct Dedupe {
@@ -46,7 +45,7 @@ type TypeId = u8;
 /// CacheEntries for 2 equivalent events will always contain the fields in the
 /// same order.
 #[derive(Clone, PartialEq, Eq, Hash)]
-enum CacheEntry {
+pub(crate) enum CacheEntry {
     Match(Vec<Option<(TypeId, Bytes)>>),
     Ignore(Vec<(OwnedTargetPath, TypeId, Bytes)>),
 }
@@ -88,7 +87,7 @@ impl Dedupe {
 /// Takes in an Event and returns a CacheEntry to place into the LRU cache
 /// containing all relevant information for the fields that need matching
 /// against according to the specified FieldMatchConfig.
-fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
+pub(crate) fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
     match &fields {
         FieldMatchConfig::MatchFields(fields) => {
             let mut entry = Vec::new();
@@ -104,18 +103,14 @@ fn build_cache_entry(event: &Event, fields: &FieldMatchConfig) -> CacheEntry {
         FieldMatchConfig::IgnoreFields(fields) => {
             let mut entry = Vec::new();
 
-            if let Some(event_fields) = event.as_log().all_event_fields() {
-                if let Some(metadata_fields) = event.as_log().all_metadata_fields() {
-                    for (field_name, value) in event_fields.chain(metadata_fields) {
-                        if let Ok(path) = ConfigTargetPath::try_from(field_name) {
-                            if !fields.contains(&path) {
-                                entry.push((
-                                    path.0,
-                                    type_id_for_value(value),
-                                    value.coerce_to_bytes(),
-                                ));
-                            }
-                        }
+            if let Some(event_fields) = event.as_log().all_event_fields()
+                && let Some(metadata_fields) = event.as_log().all_metadata_fields()
+            {
+                for (field_name, value) in event_fields.chain(metadata_fields) {
+                    if let Ok(path) = ConfigTargetPath::try_from(field_name)
+                        && !fields.contains(&path)
+                    {
+                        entry.push((path.0, type_id_for_value(value), value.coerce_to_bytes()));
                     }
                 }
             }

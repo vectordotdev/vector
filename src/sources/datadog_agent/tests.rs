@@ -15,46 +15,44 @@ use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
 use vector_lib::{
-    codecs::{decoding::CharacterDelimitedDecoderOptions, CharacterDelimitedDecoderConfig},
-    lookup::{owned_value_path, OwnedTargetPath},
-};
-use vector_lib::{
     codecs::{
-        decoding::{BytesDeserializerConfig, Deserializer, DeserializerConfig, Framer},
-        BytesDecoder, BytesDeserializer,
+        BytesDecoder, BytesDeserializer, CharacterDelimitedDecoderConfig,
+        decoding::{
+            BytesDeserializerConfig, CharacterDelimitedDecoderOptions, Deserializer,
+            DeserializerConfig, Framer,
+        },
     },
-    config::DataType,
-};
-use vector_lib::{
-    config::LogNamespace,
-    event::{metric::TagValue, MetricTags},
+    config::{DataType, LogNamespace},
+    event::{MetricTags, metric::TagValue},
+    lookup::{OwnedTargetPath, owned_value_path},
     metric_tags,
 };
-use vrl::compiler::value::Collection;
-use vrl::value;
-use vrl::value::{Kind, ObjectMap};
+use vrl::{
+    compiler::value::Collection,
+    value,
+    value::{Kind, ObjectMap},
+};
 
-use crate::schema::Definition;
 use crate::{
+    SourceSender,
     common::datadog::{DatadogMetricType, DatadogPoint, DatadogSeriesMetric},
     components::validation::prelude::*,
     config::{SourceConfig, SourceContext},
     event::{
-        into_event_stream,
+        Event, EventStatus, Metric, Value, into_event_stream,
         metric::{MetricKind, MetricSketch, MetricValue},
-        Event, EventStatus, Metric, Value,
     },
     schema,
+    schema::Definition,
     serde::{default_decoding, default_framing_message_based},
     sources::datadog_agent::{
-        ddmetric_proto, ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
-        DatadogAgentConfig, DatadogAgentSource, LogMsg, LOGS, METRICS, TRACES,
+        DatadogAgentConfig, DatadogAgentSource, LOGS, LogMsg, METRICS, TRACES, ddmetric_proto,
+        ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
     },
     test_util::{
-        components::{assert_source_compliance, HTTP_PUSH_SOURCE_TAGS},
+        components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
         next_addr, spawn_collect_n, trace_init, wait_for_tcp,
     },
-    SourceSender,
 };
 
 fn test_logs_schema_definition() -> schema::Definition {
@@ -256,7 +254,7 @@ async fn source(
 
 async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, path: &str) -> u16 {
     reqwest::Client::new()
-        .post(format!("http://{}{}", address, path))
+        .post(format!("http://{address}{path}"))
         .headers(headers)
         .body(body.to_owned())
         .send()

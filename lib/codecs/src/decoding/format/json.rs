@@ -1,16 +1,16 @@
 use bytes::Bytes;
 use chrono::Utc;
 use derivative::Derivative;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::{
-    config::{log_schema, DataType, LogNamespace},
+    config::{DataType, LogNamespace, log_schema},
     event::Event,
     schema,
 };
 use vrl::value::Kind;
 
-use super::{default_lossy, Deserializer};
+use super::{Deserializer, default_lossy};
 
 /// Config used to build a `JsonDeserializer`.
 #[configurable_component]
@@ -67,7 +67,7 @@ impl JsonDeserializerConfig {
 #[derive(Debug, Clone, PartialEq, Eq, Derivative)]
 #[derivative(Default)]
 pub struct JsonDeserializerOptions {
-    /// Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+    /// Determines whether to replace invalid UTF-8 sequences instead of failing.
     ///
     /// When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
     ///
@@ -111,7 +111,7 @@ impl Deserializer for JsonDeserializer {
             true => serde_json::from_str(&String::from_utf8_lossy(&bytes)),
             false => serde_json::from_slice(&bytes),
         }
-        .map_err(|error| format!("Error parsing JSON: {:?}", error))?;
+        .map_err(|error| format!("Error parsing JSON: {error:?}"))?;
 
         // If the root is an Array, split it into multiple events
         let mut events = match json {

@@ -7,24 +7,25 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    time::Duration,
 };
 
-use futures_util::{stream::Map, Stream, StreamExt};
+use futures_util::{Stream, StreamExt, stream::Map};
 use pin_project::pin_project;
 use tower::Service;
 use tracing::Span;
-use vector_lib::stream::{
-    batcher::{config::BatchConfig, Batcher},
-    ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
-};
 use vector_lib::{
+    ByteSizeOf,
     event::{Finalizable, Metric},
     partition::Partitioner,
-    ByteSizeOf,
+    stream::{
+        ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
+        batcher::{Batcher, config::BatchConfig},
+    },
 };
 
 use super::{
-    buffer::metrics::MetricNormalize, IncrementalRequestBuilder, Normalizer, RequestBuilder,
+    IncrementalRequestBuilder, Normalizer, RequestBuilder, buffer::metrics::MetricNormalize,
 };
 
 impl<T: ?Sized> SinkBuilderExt for T where T: Stream {}
@@ -218,6 +219,20 @@ pub trait SinkBuilderExt: Stream {
         N: MetricNormalize + Default,
     {
         Normalizer::new(self, N::default())
+    }
+
+    /// Normalizes a stream of [`Metric`] events with a normalizer and an optional TTL.
+    fn normalized_with_ttl<N>(self, maybe_ttl_secs: Option<f64>) -> Normalizer<Self, N>
+    where
+        Self: Stream<Item = Metric> + Unpin + Sized,
+        N: MetricNormalize + Default,
+    {
+        match maybe_ttl_secs {
+            None => Normalizer::new(self, N::default()),
+            Some(ttl) => {
+                Normalizer::new_with_ttl(self, N::default(), Duration::from_secs(ttl as u64))
+            }
+        }
     }
 
     /// Creates a [`Driver`] that uses the configured event stream as the input to the given

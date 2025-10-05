@@ -1,9 +1,9 @@
-use opendal::{layers::LoggingLayer, services::Webhdfs, Operator};
+use opendal::{Operator, layers::LoggingLayer, services::Webhdfs};
 use tower::ServiceBuilder;
-use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
+    codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer},
     config::{AcknowledgementsConfig, DataType, Input},
+    configurable::configurable_component,
     sink::VectorSink,
 };
 
@@ -11,12 +11,12 @@ use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType},
     config::{GenerateConfig, SinkConfig, SinkContext},
     sinks::{
+        Healthcheck,
         opendal_common::*,
         util::{
-            partitioner::KeyPartitioner, BatchConfig, BulkSizeBasedDefaultBatchSettings,
-            Compression,
+            BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression,
+            partitioner::KeyPartitioner,
         },
-        Healthcheck,
     },
 };
 

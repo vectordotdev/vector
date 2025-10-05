@@ -1,9 +1,9 @@
 use std::collections::HashMap;
 
-use vector_lib::lookup::path;
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     event::Event,
+    lookup::path,
 };
 
 use crate::sources::http_server::HttpConfigParamKind;
@@ -64,11 +64,13 @@ pub fn add_query_parameters(
 
 #[cfg(test)]
 mod tests {
-    use crate::event::LogEvent;
-    use crate::sources::{http_server::HttpConfigParamKind, util::add_query_parameters};
-
     use vector_lib::config::LogNamespace;
     use vrl::{path, value};
+
+    use crate::{
+        event::LogEvent,
+        sources::{http_server::HttpConfigParamKind, util::add_query_parameters},
+    };
 
     #[test]
     fn multiple_query_params() {

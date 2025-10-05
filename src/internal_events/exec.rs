@@ -2,9 +2,10 @@ use std::time::Duration;
 
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
-use vector_lib::internal_event::InternalEvent;
 use vector_lib::{
-    internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{
+        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
 
@@ -153,7 +154,7 @@ impl ExecFailedToSignalChild {
 
         match self {
             #[cfg(unix)]
-            SignalError(err) => format!("errno_{}", err),
+            SignalError(err) => format!("errno_{err}"),
             #[cfg(unix)]
             FailedToMarshalPid(_) => String::from("failed_to_marshal_pid"),
             #[cfg(unix)]
@@ -170,9 +171,9 @@ impl std::fmt::Display for ExecFailedToSignalChild {
 
         match self {
             #[cfg(unix)]
-            SignalError(err) => write!(f, "errno: {}", err),
+            SignalError(err) => write!(f, "errno: {err}"),
             #[cfg(unix)]
-            FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {}", err),
+            FailedToMarshalPid(err) => write!(f, "failed to marshal pid to i32: {err}"),
             #[cfg(unix)]
             NoPid => write!(f, "child had no pid"),
             #[cfg(windows)]

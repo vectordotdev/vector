@@ -26,7 +26,7 @@ components: transforms: aggregate: {
 		warnings: []
 	}
 
-	configuration: base.components.transforms.aggregate.configuration
+	configuration: generated.components.transforms.aggregate.configuration
 
 	input: {
 		logs: false
@@ -39,6 +39,12 @@ components: transforms: aggregate: {
 			summary:      true
 		}
 		traces: false
+	}
+
+	output: {
+		metrics: "": {
+			description: "The modified input `metric` event."
+		}
 	}
 
 	examples: [

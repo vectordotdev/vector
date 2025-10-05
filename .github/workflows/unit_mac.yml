@@ -8,14 +8,14 @@ permissions:
 
 jobs:
   unit-mac:
-    runs-on: macos-13
+    runs-on: macos-14-xlarge
     timeout-minutes: 90
     env:
       CARGO_INCREMENTAL: 0
     steps:
       - name: (PR review) Set latest commit status as pending
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -24,15 +24,15 @@ jobs:
 
       - name: (PR review) Checkout PR branch
         if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
         if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
         name: Cache Cargo registry + index
         with:
           path: |
@@ -45,12 +45,12 @@ jobs:
             ${{ runner.os }}-cargo-
 
       - run: bash scripts/environment/bootstrap-macos.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=cargo-nextest
       - run: echo "::add-matcher::.github/matchers/rust.json"
 
       # Some tests e.g. `reader_exits_cleanly_when_writer_done_and_in_flight_acks` are flaky.
       - name: Run tests
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 45
           max_attempts: 3
@@ -59,7 +59,7 @@ jobs:
       - run: make test-behavior
 
       - name: (PR review) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         if: always() && github.event_name == 'pull_request_review'
         with:
           sha: ${{ github.event.review.commit_id }}

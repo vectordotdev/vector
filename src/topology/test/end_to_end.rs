@@ -1,19 +1,20 @@
 use std::{collections::HashMap, net::SocketAddr, sync::Arc};
 
 use hyper::{
-    service::{make_service_fn, service_fn},
     Body, Request, Response, Server, StatusCode,
+    service::{make_service_fn, service_fn},
 };
 use tokio::{
-    sync::{mpsc, oneshot, Mutex},
+    sync::{Mutex, mpsc, oneshot},
     task::JoinHandle,
-    time::{timeout, Duration},
+    time::{Duration, timeout},
 };
 
 use super::{RunningTopology, TopologyPieces};
 use crate::{
+    Error,
     config::{self, ConfigDiff, Format},
-    test_util, Error,
+    test_util,
 };
 
 type Lock = Arc<Mutex<()>>;
@@ -66,7 +67,7 @@ pub fn http_client(
 
     let sender = tokio::spawn(async move {
         let result = reqwest::Client::new()
-            .post(format!("http://{}/", address))
+            .post(format!("http://{address}/"))
             .body(body)
             .send()
             .await
@@ -96,8 +97,6 @@ inputs = ["in"]
 encoding.codec = "json"
 uri = "http://{address2}/"
 "#,
-            address1 = address1,
-            address2 = address2,
         ),
         Format::Toml,
     )

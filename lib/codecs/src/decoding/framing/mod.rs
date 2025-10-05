@@ -9,6 +9,7 @@ mod chunked_gelf;
 mod length_delimited;
 mod newline_delimited;
 mod octet_counting;
+mod varint_length_delimited;
 
 use std::{any::Any, fmt::Debug};
 
@@ -26,6 +27,9 @@ pub use octet_counting::{
     OctetCountingDecoder, OctetCountingDecoderConfig, OctetCountingDecoderOptions,
 };
 use tokio_util::codec::LinesCodecError;
+pub use varint_length_delimited::{
+    VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
+};
 
 pub use self::bytes::{BytesDecoder, BytesDecoderConfig};
 use super::StreamDecodingError;

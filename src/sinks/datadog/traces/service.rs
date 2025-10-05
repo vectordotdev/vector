@@ -9,9 +9,11 @@ use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
-use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    stream::DriverResponse,
+};
 
 use crate::{
     http::{BuildRequestSnafu, CallRequestSnafu, HttpClient, HttpError},
@@ -23,13 +25,14 @@ pub struct TraceApiRetry;
 
 impl RetryLogic for TraceApiRetry {
     type Error = HttpError;
+    type Request = TraceApiRequest;
     type Response = TraceApiResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         let status = response.status_code;
         match status {
             // Use the same status code/retry policy as the Trace agent, additionally retrying
@@ -46,7 +49,7 @@ impl RetryLogic for TraceApiRetry {
                 format!("{}: {}", status, String::from_utf8_lossy(&response.body)).into(),
             ),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {}", status).into()),
+            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
         }
     }
 }

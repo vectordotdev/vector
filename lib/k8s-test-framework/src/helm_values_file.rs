@@ -9,7 +9,7 @@ pub struct HelmValuesFile(TempFile);
 
 impl HelmValuesFile {
     pub fn new(data: &str) -> std::io::Result<Self> {
-        info!("Using values \n {}", data);
+        info!("Using values \n {data}");
         Ok(Self(TempFile::new("values.yml", data)?))
     }
 

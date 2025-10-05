@@ -1,5 +1,9 @@
 use std::{borrow::Cow, collections::HashMap, fmt};
-use vector_lib::config::LegacyKey;
+
+use vector_lib::{
+    config::LegacyKey,
+    lookup::{OwnedTargetPath, lookup_v2::OptionalValuePath},
+};
 
 use crate::{
     conditions::Condition,
@@ -9,8 +13,6 @@ use crate::{
     template::Template,
     transforms::{FunctionTransform, OutputBuffer},
 };
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::lookup::OwnedTargetPath;
 
 /// Exists only for backwards compatability purposes so that the value of sample_rate_key is
 /// consistent after the internal implementation of the Sample class was modified to work in terms
@@ -80,7 +82,7 @@ impl SampleMode {
     fn hash_within_ratio(&self, value: &[u8]) -> bool {
         let hash = seahash::hash(value);
         match self {
-            Self::Rate { rate, .. } => hash % rate == 0,
+            Self::Rate { rate, .. } => hash.is_multiple_of(*rate),
             Self::Ratio {
                 hash_ratio_threshold,
                 ..

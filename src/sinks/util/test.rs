@@ -1,23 +1,24 @@
-use bytes::{Buf, Bytes};
-use flate2::read::{MultiGzDecoder, ZlibDecoder};
-use futures::{channel::mpsc, stream, FutureExt, SinkExt, TryFutureExt};
-use futures_util::StreamExt;
-use http::request::Parts;
-use hyper::{
-    body::HttpBody,
-    service::{make_service_fn, service_fn},
-    Body, Request, Response, Server, StatusCode,
-};
-use serde::Deserialize;
 use std::{
     io::{BufRead, BufReader},
     net::SocketAddr,
 };
+
+use bytes::{Buf, Bytes};
+use flate2::read::{MultiGzDecoder, ZlibDecoder};
+use futures::{FutureExt, SinkExt, TryFutureExt, channel::mpsc, stream};
+use futures_util::StreamExt;
+use http::request::Parts;
+use hyper::{
+    Body, Request, Response, Server, StatusCode,
+    body::HttpBody,
+    service::{make_service_fn, service_fn},
+};
+use serde::Deserialize;
 use stream_cancel::{Trigger, Tripwire};
 
 use crate::{
-    config::{SinkConfig, SinkContext},
     Error,
+    config::{SinkConfig, SinkContext},
 };
 
 pub fn load_sink<T>(config: &str) -> crate::Result<(T, SinkContext)>
@@ -107,7 +108,7 @@ where
     let server = Server::bind(&addr)
         .serve(service)
         .with_graceful_shutdown(tripwire.then(crate::shutdown::tripwire_handler))
-        .map_err(|error| panic!("Server error: {}", error));
+        .map_err(|error| panic!("Server error: {error}"));
 
     (rx, trigger, server)
 }

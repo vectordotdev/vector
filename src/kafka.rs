@@ -1,14 +1,14 @@
 #![allow(missing_docs)]
 use std::path::{Path, PathBuf};
 
-use rdkafka::{consumer::ConsumerContext, ClientConfig, ClientContext, Statistics};
+use rdkafka::{ClientConfig, ClientContext, Statistics, consumer::ConsumerContext};
 use snafu::Snafu;
 use tracing::Span;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 use crate::{
-    internal_events::KafkaStatisticsReceived, tls::TlsEnableableConfig, tls::PEM_START_MARKER,
+    internal_events::KafkaStatisticsReceived,
+    tls::{PEM_START_MARKER, TlsEnableableConfig},
 };
 
 #[derive(Debug, Snafu)]

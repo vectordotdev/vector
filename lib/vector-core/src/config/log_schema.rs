@@ -1,7 +1,6 @@
 use std::sync::{LazyLock, OnceLock};
 
-use lookup::lookup_v2::OptionalTargetPath;
-use lookup::{OwnedTargetPath, OwnedValuePath};
+use lookup::{OwnedTargetPath, OwnedValuePath, lookup_v2::OptionalTargetPath};
 use vector_config::configurable_component;
 
 static LOG_SCHEMA: OnceLock<LogSchema> = OnceLock::new();
@@ -45,6 +44,7 @@ pub fn log_schema() -> &'static LogSchema {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(default)]
+#[allow(clippy::struct_field_names)]
 pub struct LogSchema {
     /// The name of the event field to treat as the event message.
     ///

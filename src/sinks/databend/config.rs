@@ -1,24 +1,11 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::Arc};
 
 use databend_client::APIClient as DatabendAPIClient;
 use futures::future::FutureExt;
 use tower::ServiceBuilder;
-use vector_lib::codecs::encoding::{Framer, FramingConfig};
-use vector_lib::configurable::{component::GenerateConfig, configurable_component};
-
-use crate::{
-    codecs::{Encoder, EncodingConfig},
-    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
-    http::{Auth, MaybeAuth},
-    sinks::{
-        util::{
-            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
-            TowerRequestConfig, UriSerde,
-        },
-        Healthcheck, VectorSink,
-    },
-    tls::TlsConfig,
-    vector_version,
+use vector_lib::{
+    codecs::encoding::{Framer, FramingConfig},
+    configurable::{component::GenerateConfig, configurable_component},
 };
 
 use super::{
@@ -27,6 +14,20 @@ use super::{
     request_builder::DatabendRequestBuilder,
     service::{DatabendRetryLogic, DatabendService},
     sink::DatabendSink,
+};
+use crate::{
+    codecs::{Encoder, EncodingConfig},
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    http::{Auth, MaybeAuth},
+    sinks::{
+        Healthcheck, VectorSink,
+        util::{
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
+            TowerRequestConfig, UriSerde,
+        },
+    },
+    tls::TlsConfig,
+    vector_version,
 };
 
 /// Configuration for the `databend` sink.
@@ -112,13 +113,13 @@ impl SinkConfig for DatabendConfig {
         let endpoint = match self.endpoint.uri.scheme().map(|s| s.as_str()) {
             Some("databend") => self.endpoint.to_string(),
             // for backward compatibility, build DSN from endpoint
-            Some("http") => format!("databend://{}/?sslmode=disable", authority),
-            Some("https") => format!("databend://{}", authority),
+            Some("http") => format!("databend://{authority}/?sslmode=disable"),
+            Some("https") => format!("databend://{authority}"),
             None => {
                 return Err("Missing scheme for Databend endpoint. Expected `databend`.".into());
             }
             Some(s) => {
-                return Err(format!("Unsupported scheme for Databend endpoint: {}", s).into());
+                return Err(format!("Unsupported scheme for Databend endpoint: {s}").into());
             }
         };
         let mut endpoint = url::Url::parse(&endpoint)?;
@@ -135,7 +136,7 @@ impl SinkConfig for DatabendConfig {
             _ => {}
         }
         if let Some(database) = &self.database {
-            endpoint.set_path(&format!("/{}", database));
+            endpoint.set_path(&format!("/{database}"));
         }
         let endpoint = endpoint.to_string();
         let health_client = DatabendAPIClient::new(&endpoint, Some(ua.clone())).await?;
@@ -204,8 +205,8 @@ impl SinkConfig for DatabendConfig {
     }
 }
 
-async fn select_one(client: DatabendAPIClient) -> crate::Result<()> {
-    client.query("SELECT 1").await?;
+async fn select_one(client: Arc<DatabendAPIClient>) -> crate::Result<()> {
+    client.query_all("SELECT 1").await?;
     Ok(())
 }
 

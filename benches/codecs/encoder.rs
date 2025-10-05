@@ -2,13 +2,16 @@ use std::time::Duration;
 
 use bytes::{BufMut, BytesMut};
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
-    Throughput,
+    BatchSize, BenchmarkGroup, Criterion, SamplingMode, Throughput, criterion_group,
+    measurement::WallTime,
 };
 use tokio_util::codec::Encoder;
 use vector::event::{Event, LogEvent};
-use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoder};
-use vector_lib::{btreemap, byte_size_of::ByteSizeOf};
+use vector_lib::{
+    btreemap,
+    byte_size_of::ByteSizeOf,
+    codecs::{JsonSerializerConfig, NewlineDelimitedEncoder, encoding::Framer},
+};
 
 #[derive(Debug, Clone)]
 pub struct JsonLogSerializer;
@@ -92,7 +95,7 @@ fn encoder(c: &mut Criterion) {
         b.iter_batched(
             || {
                 vector::codecs::Encoder::<Framer>::new(
-                    NewlineDelimitedEncoder::new().into(),
+                    NewlineDelimitedEncoder::default().into(),
                     JsonSerializerConfig::default().build().into(),
                 )
             },

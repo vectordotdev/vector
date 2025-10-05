@@ -73,7 +73,7 @@ components: sinks: aws_cloudwatch_logs: components._aws & {
 		warnings: []
 	}
 
-	configuration: base.components.sinks.aws_cloudwatch_logs.configuration & {
+	configuration: generated.components.sinks.aws_cloudwatch_logs.configuration & {
 		_aws_include: false
 	}
 

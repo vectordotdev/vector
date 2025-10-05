@@ -1,0 +1,59 @@
+{{ define "telemetry_input" }}
+  <div class="py-3 px-5 divide-y divide-gray-200 dark:divide-gray-700">
+    <div class="pb-4 prose dark:prose-dark max-w-none text-sm italic">
+      {{ with .description }}
+        {{ . | markdownify }}
+      {{ else }}
+        The following table lists all telemetry data types supported by the component across possible configurations. Be
+         aware that the available data types may differ based on the specified codec configuration.
+      {{ end }}
+    </div>
+
+    {{ if .logs }}
+      <div class="py-4">
+        <span class="flex items-center">
+          {{ partial "heading.html" (dict "text" "Logs" "level" 3 "id" "input-logs" "href" "#input-logs") }}
+        </span>
+        <div class="mt-2 text-sm text-gray-700 dark:text-gray-300">Log events are supported.</div>
+      </div>
+    {{ end }}
+
+    {{ with .metrics }}
+      {{ $has := slice }}
+      {{ range $k, $v := . }}
+        {{ if $v }}
+          {{ $has = $has | append $k }}
+        {{ end }}
+      {{ end }}
+      {{ if gt (len $has) 0 }}
+        <div class="py-4">
+          <span class="flex items-center">
+            {{ partial "heading.html" (dict "text" "Metrics" "level" 3 "id" "input-metrics" "href" "#input-metrics") }}
+          </span>
+
+          <div class="mt-3 text-sm text-gray-700 dark:text-gray-300">The following metrics are supported:</div>
+
+          <div class="mt-2 border rounded px-4 py-2 dark:border-gray-700">
+            <div class="flex flex-wrap gap-2 text-sm text-gray-700 dark:text-gray-300">
+              {{ range $has }}
+                <span class="bg-gray-100 dark:bg-gray-800 px-2 py-0.5 rounded font-mono">
+                  <code>{{ . }}</code>
+                </span>
+              {{ end }}
+            </div>
+          </div>
+        </div>
+      {{ end }}
+    {{ end }}
+
+    {{ if .traces }}
+      <div class="py-4">
+        <span class="flex items-center">
+          {{ partial "heading.html" (dict "text" "Traces" "level" 3 "id" "input-traces" "href" "#input-traces") }}
+        </span>
+        <div class="mt-2 text-sm text-gray-700 dark:text-gray-300">Trace events are supported.</div>
+      </div>
+    {{ end }}
+
+  </div>
+{{ end }}

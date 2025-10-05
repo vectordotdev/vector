@@ -1,9 +1,11 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
 use vector_lib::{
-    internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
+    internal_event::{
+        ComponentEventsDropped, INTENTIONAL, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
+use vrl::core::Value;
 
 use crate::event::Event;
 
@@ -202,6 +204,38 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
             reason: self.message,
+        });
+    }
+}
+
+#[derive(Debug)]
+pub struct KubernetesMergedLineTooBigError<'a> {
+    pub event: &'a Value,
+    pub configured_limit: usize,
+    pub encountered_size_so_far: usize,
+}
+
+impl InternalEvent for KubernetesMergedLineTooBigError<'_> {
+    fn emit(self) {
+        error!(
+            message = "Found line that exceeds max_merged_line_bytes; discarding.",
+            event = ?self.event,
+            configured_limit = self.configured_limit,
+            encountered_size_so_far = self.encountered_size_so_far,
+            internal_log_rate_limit = true,
+            error_type = error_type::CONDITION_FAILED,
+            stage = error_stage::RECEIVING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "reading_line_from_kubernetes_log",
+            "error_type" => error_type::CONDITION_FAILED,
+            "stage" => error_stage::RECEIVING,
+        )
+        .increment(1);
+        emit!(ComponentEventsDropped::<INTENTIONAL> {
+            count: 1,
+            reason: "Found line that exceeds max_merged_line_bytes; discarding.",
         });
     }
 }

@@ -53,7 +53,7 @@ components: sources: vector: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.vector.configuration
+	configuration: generated.components.sources.vector.configuration
 
 	output: {
 		logs: event: {
@@ -96,6 +96,9 @@ components: sources: vector: {
 			set: output._passthrough_set & {
 				tags: _extra_tags
 			}
+		}
+		traces: "": {
+			description: "The input `trace` event."
 		}
 	}
 

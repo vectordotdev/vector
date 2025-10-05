@@ -65,7 +65,7 @@ components: sinks: gcp_stackdriver_metrics: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.gcp_stackdriver_metrics.configuration
+	configuration: generated.components.sinks.gcp_stackdriver_metrics.configuration
 
 	input: {
 		logs: false

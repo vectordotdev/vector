@@ -54,7 +54,7 @@ Compile Vector:
 
 The `FEATURES` environment variable is optional. You can override the default features using this variable. See [feature flags](#feature-flags) for more info.
 
-When finished, the Vector binary is placed in `target/<target>/release/vector`. If you're building Vector on your Mac, for example, the target triple is `x86_64-apple-darwin` and the Vector binary will be located at `target/x86_64-apple-darwin/release/vector`.
+When finished, the Vector binary is placed in `target/<target>/release/vector`. If you're building Vector on your Mac, for example, the target triple is `arm64-apple-darwin` and the Vector binary will be located at `target/arm64-apple-darwin/release/vector`.
 
 Finally, you can start Vector:
 
@@ -101,7 +101,7 @@ cargo build --no-default-features --features default-msvc --release
 Start Vector. After these steps, a binary `vector.exe` in `target\release` would be created. It can be started by running:
 
 ```powershell
-.\target\release\vector --config config\vector.toml
+.\target\release\vector --config config\vector.yaml
 ```
 
 ### Docker

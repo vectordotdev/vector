@@ -1,9 +1,9 @@
 use std::{fmt, hash::Hash};
 
-use crate::sinks::prelude::*;
+use vector_lib::{event::Event, partition::Partitioner};
 
 use super::partitioner::S3PartitionKey;
-use vector_lib::{event::Event, partition::Partitioner};
+use crate::sinks::prelude::*;
 
 pub struct S3Sink<Svc, RB, P> {
     service: Svc,

@@ -5,10 +5,9 @@ use tower::ServiceBuilder;
 use vector_lib::sensitive_string::SensitiveString;
 
 use super::{
-    healthcheck, NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink,
-    NewRelicSinkError,
+    NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink, NewRelicSinkError,
+    healthcheck, service::NewRelicApiRequest,
 };
-
 use crate::{http::HttpClient, sinks::prelude::*};
 
 /// New Relic region.
@@ -56,6 +55,7 @@ pub struct NewRelicApiRetry;
 
 impl RetryLogic for NewRelicApiRetry {
     type Error = NewRelicSinkError;
+    type Request = NewRelicApiRequest;
     type Response = NewRelicApiResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {

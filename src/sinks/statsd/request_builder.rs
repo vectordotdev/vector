@@ -2,18 +2,18 @@ use std::convert::Infallible;
 
 use bytes::BytesMut;
 use tokio_util::codec::Encoder;
-use vector_lib::request_metadata::RequestMetadata;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::telemetry,
     event::{EventFinalizers, Finalizable, Metric},
-    EstimatedJsonEncodedSizeOf,
+    request_metadata::RequestMetadata,
 };
 
 use super::{encoder::StatsdEncoder, service::StatsdRequest};
 use crate::{
     internal_events::SocketMode,
     sinks::util::{
-        metadata::RequestMetadataBuilder, request_builder::EncodeResult, IncrementalRequestBuilder,
+        IncrementalRequestBuilder, metadata::RequestMetadataBuilder, request_builder::EncodeResult,
     },
 };
 

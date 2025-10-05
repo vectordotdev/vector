@@ -1,33 +1,38 @@
 #![allow(missing_docs)]
-use std::{collections::HashMap, fmt, sync::Arc, time::Instant};
+use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc, time::Instant};
 
 use chrono::Utc;
 use futures::{Stream, StreamExt};
-use metrics::{histogram, Histogram};
+use metrics::{Histogram, histogram};
 use tracing::Span;
-use vector_lib::buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
-use vector_lib::buffers::EventCount;
-use vector_lib::event::array::EventArrayIntoIter;
 #[cfg(any(test, feature = "test-utils"))]
-use vector_lib::event::{into_event_stream, EventStatus};
-use vector_lib::finalization::{AddBatchNotifier, BatchNotifier};
-use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
-use vector_lib::json_size::JsonSize;
+use vector_lib::event::{EventStatus, into_event_stream};
 use vector_lib::{
-    config::{log_schema, SourceOutput},
-    event::{array, Event, EventArray, EventContainer, EventRef},
-    internal_event::{
-        self, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
-    },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    buffers::{
+        EventCount,
+        config::MemoryBufferSize,
+        topology::channel::{self, LimitedReceiver, LimitedSender},
+    },
+    config::{SourceOutput, log_schema},
+    event::{Event, EventArray, EventContainer, EventRef, array, array::EventArrayIntoIter},
+    finalization::{AddBatchNotifier, BatchNotifier},
+    internal_event::{
+        self, ComponentEventsDropped, CountByteSize, DEFAULT_OUTPUT, EventsSent,
+        InternalEventHandle as _, Registered, UNINTENTIONAL,
+    },
+    json_size::JsonSize,
 };
 use vrl::value::Value;
 
 mod errors;
 
-use crate::config::{ComponentKey, OutputId};
-use crate::schema::Definition;
 pub use errors::{ClosedError, StreamSendError};
+
+use crate::{
+    config::{ComponentKey, OutputId},
+    schema::Definition,
+};
 
 pub(crate) const CHUNK_SIZE: usize = 1000;
 
@@ -155,7 +160,7 @@ impl Builder {
 
     pub fn build(self) -> SourceSender {
         SourceSender {
-            default_output: self.default_output.expect("no default output"),
+            default_output: self.default_output,
             named_outputs: self.named_outputs,
         }
     }
@@ -163,7 +168,9 @@ impl Builder {
 
 #[derive(Debug, Clone)]
 pub struct SourceSender {
-    default_output: Output,
+    // The default output is optional because some sources, e.g. `datadog_agent`
+    // and `opentelemetry`, can be configured to only output to named outputs.
+    default_output: Option<Output>,
     named_outputs: HashMap<String, Output>,
 }
 
@@ -183,7 +190,7 @@ impl SourceSender {
             Output::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, None, output_id);
         (
             Self {
-                default_output,
+                default_output: Some(default_output),
                 named_outputs: Default::default(),
             },
             rx,
@@ -245,7 +252,7 @@ impl SourceSender {
         &mut self,
         status: EventStatus,
         name: String,
-    ) -> impl Stream<Item = SourceSenderItem> + Unpin {
+    ) -> impl Stream<Item = SourceSenderItem> + Unpin + use<> {
         // The lag_time parameter here will need to be filled in if this function is ever used for
         // non-test situations.
         let output_id = OutputId {
@@ -265,11 +272,16 @@ impl SourceSender {
         recv
     }
 
+    /// Get a mutable reference to the default output, panicking if none exists.
+    const fn default_output_mut(&mut self) -> &mut Output {
+        self.default_output.as_mut().expect("no default output")
+    }
+
     /// Send an event to the default output.
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
     pub async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
-        self.default_output.send_event(event).await
+        self.default_output_mut().send_event(event).await
     }
 
     /// Send a stream of events to the default output.
@@ -280,7 +292,7 @@ impl SourceSender {
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
     {
-        self.default_output.send_event_stream(events).await
+        self.default_output_mut().send_event_stream(events).await
     }
 
     /// Send a batch of events to the default output.
@@ -292,7 +304,7 @@ impl SourceSender {
         I: IntoIterator<Item = E>,
         <I as IntoIterator>::IntoIter: ExactSizeIterator,
     {
-        self.default_output.send_batch(events).await
+        self.default_output_mut().send_batch(events).await
     }
 
     /// Send a batch of events event to a named output.
@@ -332,11 +344,11 @@ impl UnsentEventCount {
         }
     }
 
-    fn decr(&mut self, count: usize) {
+    const fn decr(&mut self, count: usize) {
         self.count = self.count.saturating_sub(count);
     }
 
-    fn discard(&mut self) {
+    const fn discard(&mut self) {
         self.count = 0;
     }
 }
@@ -383,7 +395,7 @@ impl Output {
         log_definition: Option<Arc<Definition>>,
         output_id: OutputId,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
-        let (tx, rx) = channel::limited(n);
+        let (tx, rx) = channel::limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap()));
         (
             Self {
                 sender: tx,
@@ -521,7 +533,7 @@ const fn get_timestamp_millis(value: &Value) -> Option<i64> {
 #[cfg(test)]
 mod tests {
     use chrono::{DateTime, Duration};
-    use rand::{rng, Rng};
+    use rand::{Rng, rng};
     use tokio::time::timeout;
     use vector_lib::event::{LogEvent, Metric, MetricKind, MetricValue, TraceEvent};
     use vrl::event_path;

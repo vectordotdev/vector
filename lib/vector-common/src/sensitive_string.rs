@@ -1,4 +1,4 @@
-use vector_config::{configurable_component, ConfigurableString};
+use vector_config::{ConfigurableString, configurable_component};
 
 /// Wrapper for sensitive strings containing credentials
 #[configurable_component(no_deser, no_ser)]

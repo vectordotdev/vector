@@ -1,7 +1,8 @@
 ---
 title: The Vector API
 short: API
-weight: 3
+weight: 6
+tags: ["api", "graphql"]
 ---
 
 Vector ships with a [GraphQL] API that allows you to interact with a running Vector instance. This page covers how to configure and enable Vector's API.

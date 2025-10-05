@@ -18,7 +18,7 @@ fn test_labels_injection() {
     );
     // See https://github.com/tokio-rs/tracing/issues/978
     if span.is_disabled() {
-        panic!("test is not configured properly, set TEST_LOG=info env var")
+        panic!("test is not configured properly, set VECTOR_LOG=info env var")
     }
     let _enter = span.enter();
 

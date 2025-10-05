@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 
 if [[ "$(rustup target list --installed | grep wasm32-unknown-unknown)" != "wasm32-unknown-unknown" ]] ; then
     echo "wasm32-unknown-unknown target is not installed"

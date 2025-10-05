@@ -16,7 +16,7 @@ pub use decoding::{
     LengthDelimitedDecoderConfig, NativeDeserializer, NativeDeserializerConfig,
     NativeJsonDeserializer, NativeJsonDeserializerConfig, NewlineDelimitedDecoder,
     NewlineDelimitedDecoderConfig, OctetCountingDecoder, OctetCountingDecoderConfig,
-    StreamDecodingError,
+    StreamDecodingError, VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
 };
 #[cfg(feature = "syslog")]
 pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
@@ -28,7 +28,7 @@ pub use encoding::{
     NativeSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
     RawMessageSerializer, RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
-pub use gelf::{gelf_fields, VALID_FIELD_REGEX};
+pub use gelf::{VALID_FIELD_REGEX, gelf_fields};
 use vector_config_macros::configurable_component;
 
 /// The user configuration to choose the metric tag strategy.

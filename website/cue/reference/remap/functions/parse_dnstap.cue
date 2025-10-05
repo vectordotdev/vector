@@ -123,7 +123,7 @@ remap: functions: parse_dnstap: {
 							"questionTypeId": 6
 						},
 					]
-					"rcodeName": "BADSIG"
+					"rcodeName": "BADVERS"
 				}
 				"responseAddress": "2001:502:7094::30"
 				"responsePort":    53

@@ -1,15 +1,15 @@
 use std::{collections::BTreeSet, iter};
 
 use chrono::{DateTime, Utc};
-use quickcheck::{empty_shrinker, Arbitrary, Gen};
+use quickcheck::{Arbitrary, Gen, empty_shrinker};
 use vrl::value::{ObjectMap, Value};
 
 use super::super::{
+    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
     metric::{
         Bucket, MetricData, MetricName, MetricSeries, MetricSketch, MetricTags, MetricTime,
         Quantile, Sample,
     },
-    Event, EventMetadata, LogEvent, Metric, MetricKind, MetricValue, StatisticKind, TraceEvent,
 };
 use crate::metrics::AgentDDSketch;
 
@@ -58,7 +58,7 @@ impl Arbitrary for Event {
         let choice: u8 = u8::arbitrary(g);
         // Quickcheck can't derive Arbitrary for enums, see
         // https://github.com/BurntSushi/quickcheck/issues/98
-        if choice % 2 == 0 {
+        if choice.is_multiple_of(2) {
             Event::Log(LogEvent::arbitrary(g))
         } else {
             Event::Metric(Metric::arbitrary(g))
@@ -76,8 +76,8 @@ impl Arbitrary for Event {
 
 impl Arbitrary for LogEvent {
     fn arbitrary(g: &mut Gen) -> Self {
-        let mut gen = Gen::new(MAX_MAP_SIZE);
-        let map: ObjectMap = ObjectMap::arbitrary(&mut gen);
+        let mut generator = Gen::new(MAX_MAP_SIZE);
+        let map: ObjectMap = ObjectMap::arbitrary(&mut generator);
         let metadata: EventMetadata = EventMetadata::arbitrary(g);
         LogEvent::from_map(map, metadata)
     }
@@ -154,7 +154,7 @@ impl Arbitrary for MetricKind {
         let choice: u8 = u8::arbitrary(g);
         // Quickcheck can't derive Arbitrary for enums, see
         // https://github.com/BurntSushi/quickcheck/issues/98
-        if choice % 2 == 0 {
+        if choice.is_multiple_of(2) {
             MetricKind::Incremental
         } else {
             MetricKind::Absolute
@@ -201,10 +201,12 @@ impl Arbitrary for MetricValue {
                 // We're working around quickcheck's limitations here, and
                 // should really migrate the tests in question to use proptest
                 let num_samples = u8::arbitrary(g);
-                let samples = std::iter::repeat_with(|| loop {
-                    let f = f64::arbitrary(g);
-                    if f.is_normal() {
-                        return f;
+                let samples = std::iter::repeat_with(|| {
+                    loop {
+                        let f = f64::arbitrary(g);
+                        if f.is_normal() {
+                            return f;
+                        }
                     }
                 })
                 .take(num_samples as usize)
@@ -453,7 +455,7 @@ impl Arbitrary for StatisticKind {
         let choice: u8 = u8::arbitrary(g);
         // Quickcheck can't derive Arbitrary for enums, see
         // https://github.com/BurntSushi/quickcheck/issues/98
-        if choice % 2 == 0 {
+        if choice.is_multiple_of(2) {
             StatisticKind::Histogram
         } else {
             StatisticKind::Summary
@@ -474,11 +476,7 @@ impl Arbitrary for MetricSeries {
                 let value = String::from(Name::arbitrary(g));
                 map.replace(key, value);
             }
-            if map.is_empty() {
-                None
-            } else {
-                Some(map)
-            }
+            if map.is_empty() { None } else { Some(map) }
         } else {
             None
         };

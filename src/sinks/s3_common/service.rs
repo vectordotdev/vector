@@ -1,22 +1,21 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_s3::operation::put_object::PutObjectError;
-use aws_sdk_s3::Client as S3Client;
-use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
-use aws_smithy_runtime_api::client::result::SdkError;
+use aws_sdk_s3::{Client as S3Client, operation::put_object::PutObjectError};
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use aws_smithy_types::byte_stream::ByteStream;
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
 use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
 use tracing::Instrument;
-use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    stream::DriverResponse,
+};
 
-use super::config::S3Options;
-use super::partitioner::S3PartitionKey;
+use super::{config::S3Options, partitioner::S3PartitionKey};
 
 #[derive(Debug, Clone)]
 pub struct S3Request {
@@ -126,11 +125,11 @@ impl Service<S3Request> for S3Service {
         let client = self.client.clone();
 
         Box::pin(async move {
-            let request = client
+            let put_request = client
                 .put_object()
                 .body(bytes_to_bytestream(request.body))
-                .bucket(request.bucket)
-                .key(request.metadata.s3_key)
+                .bucket(request.bucket.clone())
+                .key(request.metadata.s3_key.clone())
                 .set_content_encoding(content_encoding)
                 .set_content_type(content_type)
                 .set_acl(options.acl.map(Into::into))
@@ -144,9 +143,18 @@ impl Service<S3Request> for S3Service {
                 .set_tagging(tagging)
                 .content_md5(content_md5);
 
-            let result = request.send().in_current_span().await;
+            let result = put_request.send().in_current_span().await;
 
-            result.map(|_| S3Response { events_byte_size })
+            result.map(|_| {
+                trace!(
+                    target: "vector::sinks::s3_common::service::put_object",
+                    message = "Put object to s3-compatible storage.",
+                    bucket = request.bucket,
+                    key = request.metadata.s3_key
+                );
+
+                S3Response { events_byte_size }
+            })
         })
     }
 }

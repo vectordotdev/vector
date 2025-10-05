@@ -396,8 +396,9 @@ fn get_repo_root() -> PathBuf {
 fn get_latest_version_from_vector_tags() -> Result<Version> {
     let tags = run_command("git tag --list --sort=-v:refname");
     let latest_tag = tags
-        .lines().next()
-        .ok_or_else(|| anyhow::anyhow!("No tags found starting with 'v'"))?;
+        .lines()
+        .find(|tag| tag.starts_with('v') && !tag.starts_with("vdev-v"))
+        .ok_or_else(|| anyhow::anyhow!("Could not find latest Vector release tag"))?;
 
     let version_str = latest_tag.trim_start_matches('v');
     Version::parse(version_str)

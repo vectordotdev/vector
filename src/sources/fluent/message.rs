@@ -1,6 +1,6 @@
 use std::{collections::BTreeMap, convert::TryInto};
 
-use chrono::{serde::ts_seconds, DateTime, TimeZone, Utc};
+use chrono::{DateTime, TimeZone, Utc, serde::ts_seconds};
 use ordered_float::NotNan;
 use serde::{Deserialize, Serialize};
 use vector_lib::event::{KeyString, ObjectMap, Value};
@@ -96,8 +96,7 @@ impl<'de> serde::de::Deserialize<'de> for FluentEventTime {
 
                 if tag != 0 {
                     return Err(serde::de::Error::custom(format!(
-                        "expected extension type 0 for fluent timestamp, got {}",
-                        tag
+                        "expected extension type 0 for fluent timestamp, got {tag}"
                     )));
                 }
 

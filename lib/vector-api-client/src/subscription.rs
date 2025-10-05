@@ -12,7 +12,7 @@ use tokio::sync::{
     broadcast::{self, Sender},
     mpsc, oneshot,
 };
-use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
+use tokio_stream::{Stream, StreamExt, wrappers::BroadcastStream};
 use tokio_tungstenite::{connect_async, tungstenite::Message};
 use url::Url;
 use uuid::Uuid;

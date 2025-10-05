@@ -4,8 +4,8 @@ use chrono::{DateTime, TimeZone};
 use serde_json::Value;
 
 use crate::{
-    schema::{generate_string_schema, SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
+    schema::{SchemaGenerator, SchemaObject, generate_string_schema},
 };
 
 impl<TZ> Configurable for DateTime<TZ>

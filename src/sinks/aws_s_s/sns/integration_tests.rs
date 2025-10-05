@@ -2,22 +2,20 @@ use std::collections::HashMap;
 
 use aws_config::Region;
 use aws_sdk_sns::Client as SnsClient;
-use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
-use tokio::time::{sleep, Duration};
+use aws_sdk_sqs::{Client as SqsClient, types::QueueAttributeName};
+use tokio::time::{Duration, sleep};
 use vector_lib::codecs::TextSerializerConfig;
 
 use super::{
-    config::SnsClientBuilder,
-    config::{healthcheck, SnsSinkConfig},
     BaseSSSinkConfig,
+    config::{SnsClientBuilder, SnsSinkConfig, healthcheck},
 };
-use crate::common::sqs::SqsClientBuilder;
-use crate::config::{SinkConfig, SinkContext};
 use crate::{
-    aws::{create_client, AwsAuthentication, RegionOrEndpoint},
-    config::ProxyConfig,
+    aws::{AwsAuthentication, RegionOrEndpoint, create_client},
+    common::sqs::SqsClientBuilder,
+    config::{ProxyConfig, SinkConfig, SinkContext},
     test_util::{
-        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,
     },
 };

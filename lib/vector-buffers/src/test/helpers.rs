@@ -2,7 +2,7 @@ use std::{future::Future, path::Path, str::FromStr, sync::LazyLock};
 
 use temp_dir::TempDir;
 use tracing_fluent_assertions::{AssertionRegistry, AssertionsLayer};
-use tracing_subscriber::{filter::LevelFilter, layer::SubscriberExt, Layer, Registry};
+use tracing_subscriber::{Layer, Registry, filter::LevelFilter, layer::SubscriberExt};
 use vector_common::finalization::{EventStatus, Finalizable};
 
 #[macro_export]

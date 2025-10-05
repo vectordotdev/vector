@@ -10,15 +10,14 @@ use super::{
     event::{LokiBatchEncoder, LokiEvent, LokiRecord, PartitionKey},
     service::{LokiRequest, LokiRetryLogic, LokiService},
 };
-use crate::sinks::loki::event::LokiBatchEncoding;
 use crate::{
     common::expansion::pair_expansion,
-    http::{get_http_scheme_from_uri, HttpClient},
+    http::{HttpClient, get_http_scheme_from_uri},
     internal_events::{
         LokiEventUnlabeledError, LokiOutOfOrderEventDroppedError, LokiOutOfOrderEventRewritten,
         LokiTimestampNonParsableEventsDropped, SinkRequestBuildError,
     },
-    sinks::prelude::*,
+    sinks::{loki::event::LokiBatchEncoding, prelude::*},
 };
 
 #[derive(Clone)]
@@ -152,8 +151,7 @@ impl EventEncoder {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
-                                "label_key \"{}\" with label_value \"{}\"",
-                                key_template, value_template
+                                "label_key \"{key_template}\" with label_value \"{value_template}\""
                             )
                             .as_str()
                         ),
@@ -165,8 +163,7 @@ impl EventEncoder {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
-                                "label_value \"{}\" with label_key \"{}\"",
-                                value_template, key_template
+                                "label_value \"{value_template}\" with label_key \"{key_template}\""
                             )
                             .as_str()
                         ),
@@ -229,8 +226,7 @@ impl EventEncoder {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
-                        "structured_metadata_key \"{}\" with structured_metadata_value \"{}\"",
-                        key_template, value_template
+                        "structured_metadata_key \"{key_template}\" with structured_metadata_value \"{value_template}\""
                     )
                             .as_str()
                         ),
@@ -242,8 +238,7 @@ impl EventEncoder {
                     emit!(TemplateRenderingError {
                         field: Some(
                             format!(
-                        "structured_metadata_value \"{}\" with structured_metadata_key \"{}\"",
-                        value_template, key_template
+                        "structured_metadata_value \"{value_template}\" with structured_metadata_key \"{key_template}\""
                     )
                             .as_str()
                         ),
@@ -570,9 +565,11 @@ mod tests {
     use std::{collections::HashMap, convert::TryFrom};
 
     use futures::stream::StreamExt;
-    use vector_lib::codecs::JsonSerializerConfig;
-    use vector_lib::event::{Event, LogEvent, ObjectMap, Value};
-    use vector_lib::lookup::PathPrefix;
+    use vector_lib::{
+        codecs::JsonSerializerConfig,
+        event::{Event, LogEvent, ObjectMap, Value},
+        lookup::PathPrefix,
+    };
 
     use super::{EventEncoder, KeyPartitioner, RecordFilter};
     use crate::{
@@ -599,8 +596,10 @@ mod tests {
             chrono::Utc::now(),
         );
         let record = encoder.encode_event(event).unwrap();
-        assert!(String::from_utf8_lossy(&record.event.event)
-            .contains(log_schema().timestamp_key().unwrap().to_string().as_str()));
+        assert!(
+            String::from_utf8_lossy(&record.event.event)
+                .contains(log_schema().timestamp_key().unwrap().to_string().as_str())
+        );
         assert_eq!(record.labels.len(), 1);
         assert_eq!(
             record.labels[0],
@@ -652,8 +651,10 @@ mod tests {
         log.insert("dict", Value::from(test_dict));
 
         let record = encoder.encode_event(event).unwrap();
-        assert!(String::from_utf8_lossy(&record.event.event)
-            .contains(log_schema().timestamp_key().unwrap().to_string().as_str()));
+        assert!(
+            String::from_utf8_lossy(&record.event.event)
+                .contains(log_schema().timestamp_key().unwrap().to_string().as_str())
+        );
         assert_eq!(record.labels.len(), 4);
 
         let labels: HashMap<String, String> = record.labels.into_iter().collect();
@@ -811,8 +812,10 @@ mod tests {
             chrono::Utc::now(),
         );
         let record = encoder.encode_event(event).unwrap();
-        assert!(!String::from_utf8_lossy(&record.event.event)
-            .contains(log_schema().timestamp_key().unwrap().to_string().as_str()));
+        assert!(
+            !String::from_utf8_lossy(&record.event.event)
+                .contains(log_schema().timestamp_key().unwrap().to_string().as_str())
+        );
     }
 
     #[test]

@@ -928,6 +928,13 @@ def resolve_bare_schema(root_schema, schema)
       fix_grouped_enums_if_numeric!(grouped)
       grouped.transform_values! { |values| { 'enum' => values } }
       grouped
+    when nil
+      # Unconstrained/empty schema (e.g., Value without constraints).
+      # Represent it as accepting any JSON type so downstream code can render it
+      # and attach defaults/examples based on actual values.
+      @logger.debug 'Resolving unconstrained schema (any type).'
+
+      { '*' => {} }
     else
       @logger.error "Failed to resolve the schema. Schema: #{schema}"
       exit 1
@@ -1693,14 +1700,14 @@ def render_and_import_schema(unwrapped_resolved_schema, friendly_name, config_ma
   @logger.info "[✓]   Imported #{friendly_name} schema to '#{cue_output_file}'."
 end
 
-def render_and_import_base_component_schema(root_schema, schema_name, component_type)
-  friendly_name = "base #{component_type} configuration"
+def render_and_import_generated_component_schema(root_schema, schema_name, component_type)
+  friendly_name = "generated #{component_type} configuration"
   unwrapped_resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
   render_and_import_schema(
     unwrapped_resolved_schema,
     friendly_name,
-    ["base", "components", "#{component_type}s"],
-    "components/base/#{component_type}s.cue"
+    ["generated", "components", "#{component_type}s"],
+    "components/generated/#{component_type}s.cue"
   )
 end
 
@@ -1710,12 +1717,12 @@ def render_and_import_component_schema(root_schema, schema_name, component_type,
   render_and_import_schema(
     unwrapped_resolved_schema,
     friendly_name,
-    ["base", "components", "#{component_type}s", component_name],
-    "components/#{component_type}s/base/#{component_name}.cue"
+    ["generated", "components", "#{component_type}s", component_name],
+    "components/#{component_type}s/generated/#{component_name}.cue"
   )
 end
 
-def render_and_import_base_api_schema(root_schema, apis)
+def render_and_import_generated_api_schema(root_schema, apis)
   api_schema = {}
   apis.each do |component_name, schema_name|
     friendly_name = "'#{component_name}' #{schema_name} configuration"
@@ -1726,12 +1733,12 @@ def render_and_import_base_api_schema(root_schema, apis)
   render_and_import_schema(
     api_schema,
     "configuration",
-    ["base", "api"],
-    "base/api.cue"
+    ["generated", "api"],
+    "generated/api.cue"
   )
 end
 
-def render_and_import_base_global_option_schema(root_schema, global_options)
+def render_and_import_generated_global_option_schema(root_schema, global_options)
   global_option_schema = {}
 
   global_options.each do |component_name, schema_name|
@@ -1750,8 +1757,8 @@ def render_and_import_base_global_option_schema(root_schema, global_options)
   render_and_import_schema(
     global_option_schema,
     "configuration",
-    ["base", "configuration"],
-    "base/configuration.cue"
+    ["generated", "configuration"],
+    "generated/configuration.cue"
   )
 end
 
@@ -1774,7 +1781,7 @@ component_types = %w[source transform sink]
 # First off, we generate the component type configuration bases. These are the high-level
 # configuration settings that are universal on a per-component type basis.
 #
-# For example, the "base" configuration for a sink would be the inputs, buffer settings, healthcheck
+# For example, the "generated" configuration for a sink would be the inputs, buffer settings, healthcheck
 # settings, and proxy settings... and then the configuration for a sink would be those, plus
 # whatever the sink itself defines.
 component_bases = root_schema['definitions'].filter_map do |key, definition|
@@ -1784,7 +1791,7 @@ end
 .reduce { |acc, item| nested_merge(acc, item) }
 
 component_bases.each do |component_type, schema_name|
-  render_and_import_base_component_schema(root_schema, schema_name, component_type)
+  render_and_import_generated_component_schema(root_schema, schema_name, component_type)
 end
 
 # Now we'll generate the base configuration for each component.
@@ -1808,7 +1815,7 @@ apis = root_schema['definitions'].filter_map do |key, definition|
 end
 .reduce { |acc, item| nested_merge(acc, item) }
 
-render_and_import_base_api_schema(root_schema, apis)
+render_and_import_generated_api_schema(root_schema, apis)
 
 
 # At last, we generate the global options configuration.
@@ -1819,4 +1826,4 @@ global_options = root_schema['definitions'].filter_map do |key, definition|
 end
 .reduce { |acc, item| nested_merge(acc, item) }
 
-render_and_import_base_global_option_schema(root_schema, global_options)
+render_and_import_generated_global_option_schema(root_schema, global_options)

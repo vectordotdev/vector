@@ -3,30 +3,28 @@ use std::io;
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{channel::mpsc, executor, SinkExt, StreamExt};
+use futures::{SinkExt, StreamExt, channel::mpsc, executor};
 use tokio_util::{codec::FramedRead, io::StreamReader};
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
-use vector_lib::configurable::NamedComponent;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
-};
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
-    event::Event,
     EstimatedJsonEncodedSizeOf,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    config::{LegacyKey, LogNamespace},
+    configurable::NamedComponent,
+    event::Event,
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::Kind;
 
 use crate::{
+    SourceSender,
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, SourceOutput},
+    config::{SourceOutput, log_schema},
     internal_events::{EventsReceived, FileDescriptorReadError, StreamClosedError},
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 #[cfg(all(unix, feature = "sources-file_descriptor"))]

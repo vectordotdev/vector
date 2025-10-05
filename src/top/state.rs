@@ -1,4 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
+use std::{
+    collections::{BTreeMap, HashMap},
+    time::Duration,
+};
 
 use chrono::{DateTime, Local};
 use ratatui::{
@@ -22,6 +25,7 @@ pub struct SentEventsMetric {
 #[derive(Debug)]
 pub enum EventType {
     InitializeState(State),
+    UptimeChanged(f64),
     ReceivedBytesTotals(Vec<IdentifiedMetric>),
     /// Interval + identified metric
     ReceivedBytesThroughputs(i64, Vec<IdentifiedMetric>),
@@ -55,7 +59,7 @@ pub enum ConnectionStatus {
 }
 
 impl ConnectionStatus {
-    pub fn as_ui_spans(&self) -> Vec<Span> {
+    pub fn as_ui_spans(&self) -> Vec<Span<'_>> {
         match self {
             Self::Pending => vec![Span::styled(
                 "Connecting...",
@@ -76,6 +80,7 @@ impl ConnectionStatus {
 #[derive(Debug, Clone)]
 pub struct State {
     pub connection_status: ConnectionStatus,
+    pub uptime: Duration,
     pub components: BTreeMap<ComponentKey, ComponentRow>,
 }
 
@@ -83,6 +88,7 @@ impl State {
     pub const fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
         Self {
             connection_status: ConnectionStatus::Pending,
+            uptime: Duration::from_secs(0),
             components,
         }
     }
@@ -243,6 +249,9 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                 }
                 EventType::ConnectionUpdated(status) => {
                     state.connection_status = status;
+                }
+                EventType::UptimeChanged(uptime) => {
+                    state.uptime = Duration::from_secs_f64(uptime);
                 }
             }
 

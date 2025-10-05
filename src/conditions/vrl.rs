@@ -1,15 +1,17 @@
-use vector_lib::configurable::configurable_component;
-use vector_lib::{compile_vrl, emit, TimeZone};
-use vrl::compiler::runtime::{Runtime, RuntimeResult, Terminate};
-use vrl::compiler::{CompilationResult, CompileConfig, Program, TypeState, VrlRuntime};
-use vrl::diagnostic::Formatter;
-use vrl::value::Value;
+use vector_lib::{TimeZone, compile_vrl, configurable::configurable_component, emit};
+use vrl::{
+    compiler::{
+        CompilationResult, CompileConfig, Program, TypeState, VrlRuntime,
+        runtime::{Runtime, RuntimeResult, Terminate},
+    },
+    diagnostic::Formatter,
+    value::Value,
+};
 
-use crate::config::LogNamespace;
-use crate::event::TargetEvents;
 use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
-    event::{Event, VrlTarget},
+    config::LogNamespace,
+    event::{Event, TargetEvents, VrlTarget},
     internal_events::VrlConditionExecutionError,
 };
 
@@ -142,7 +144,7 @@ impl Conditional for Vrl {
                 )
                 .colored()
                 .to_string();
-                format!("source execution aborted: {}", err)
+                format!("source execution aborted: {err}")
             }
             Terminate::Error(err) => {
                 let err = Formatter::new(
@@ -153,7 +155,7 @@ impl Conditional for Vrl {
                 )
                 .colored()
                 .to_string();
-                format!("source execution failed: {}", err)
+                format!("source execution failed: {err}")
             }
         });
 

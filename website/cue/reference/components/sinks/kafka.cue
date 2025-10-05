@@ -51,7 +51,7 @@ components: sinks: kafka: {
 
 	support: components._kafka.support
 
-	configuration: base.components.sinks.kafka.configuration
+	configuration: generated.components.sinks.kafka.configuration
 
 	input: {
 		logs: true

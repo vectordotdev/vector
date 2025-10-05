@@ -1,14 +1,19 @@
+use std::{sync::Arc, task::Poll};
+
+use greptimedb_ingester::{
+    Client, ClientBuilder, Compression, Database, Error as GreptimeError,
+    api::v1::{auth_header::AuthScheme, *},
+    channel_manager::*,
+};
+use vector_lib::sensitive_string::SensitiveString;
+
 use crate::sinks::{
-    greptimedb::metrics::config::GreptimeDBMetricsConfig,
-    greptimedb::metrics::request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
+    greptimedb::metrics::{
+        config::GreptimeDBMetricsConfig,
+        request::{GreptimeDBGrpcBatchOutput, GreptimeDBGrpcRequest},
+    },
     prelude::*,
 };
-use greptimedb_ingester::{
-    api::v1::auth_header::AuthScheme, api::v1::*, channel_manager::*, Client, ClientBuilder,
-    Compression, Database, Error as GreptimeError,
-};
-use std::{sync::Arc, task::Poll};
-use vector_lib::sensitive_string::SensitiveString;
 
 #[derive(Debug, Clone)]
 pub struct GreptimeDBGrpcService {
@@ -50,7 +55,9 @@ fn try_from_tls_config(tls_config: &TlsConfig) -> crate::Result<ClientTlsOption>
         || tls_config.verify_certificate.is_some()
         || tls_config.verify_hostname.is_some()
     {
-        warn!(message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment.");
+        warn!(
+            message = "TlsConfig: key_pass, alpn_protocols, verify_certificate and verify_hostname are not supported by greptimedb client at the moment."
+        );
     }
 
     Ok(ClientTlsOption {

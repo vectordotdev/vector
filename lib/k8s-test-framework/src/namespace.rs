@@ -7,7 +7,7 @@ use std::{
 
 use k8s_openapi::{api::core::v1::Namespace, apimachinery::pkg::apis::meta::v1::ObjectMeta};
 
-use super::{resource_file::ResourceFile, Result};
+use super::{Result, resource_file::ResourceFile};
 use crate::up_down;
 
 /// A config that holds a test `Namespace` resource file.

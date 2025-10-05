@@ -46,6 +46,9 @@ updates:
         - "metrics"
         - "metrics-tracing-context"
         - "metrics-util"
+      netlink:
+        patterns:
+        - "netlink-*"
       graphql:
         patterns:
         - "async-graphql*"

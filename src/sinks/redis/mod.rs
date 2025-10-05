@@ -16,19 +16,29 @@ mod integration_tests;
 use bytes::Bytes;
 use redis::RedisError;
 use snafu::Snafu;
+use tokio::sync::watch::error::RecvError;
 
-use crate::sinks::prelude::*;
-
-use self::config::Method;
-
+use self::{
+    config::{ListMethod, SortedSetMethod},
+    sink::GenerationCount,
+};
 use super::util::EncodedLength;
+use crate::sinks::prelude::*;
 
 #[derive(Debug, Snafu)]
 pub(super) enum RedisSinkError {
-    #[snafu(display("Creating Redis producer failed: {}", source))]
+    #[snafu(display("Creating Redis producer failed: {source}"))]
     RedisCreateFailed { source: RedisError },
-    #[snafu(display("Error sending query: {}", source))]
-    SendError { source: RedisError },
+    #[snafu(display(
+        "Error sending query: {source}{}",
+        if let Some(generation) = generation { format!(", gen={generation}") } else { String::new() }
+    ))]
+    SendError {
+        source: RedisError,
+        generation: Option<GenerationCount>,
+    },
+    #[snafu(display("Repair channel was closed: {source}"))]
+    RepairChannelError { source: RecvError },
 }
 
 #[derive(Clone, Copy, Debug, Derivative)]
@@ -38,7 +48,12 @@ pub enum DataType {
     ///
     /// This resembles a deque, where messages can be popped and pushed from either end.
     #[derivative(Default)]
-    List(Method),
+    List(ListMethod),
+
+    /// The Redis `sorted set` type.
+    ///
+    /// This resembles a priority queue, where messages can be pushed with a score.
+    SortedSet(SortedSetMethod),
 
     /// The Redis `channel` type.
     ///
@@ -50,6 +65,7 @@ pub enum DataType {
 pub(super) struct RedisEvent {
     event: Event,
     key: String,
+    score: Option<u64>,
 }
 
 impl Finalizable for RedisEvent {
@@ -103,6 +119,7 @@ impl MetaDescriptive for RedisRequest {
 pub(super) struct RedisKvEntry {
     key: String,
     value: Bytes,
+    score: Option<u64>,
 }
 
 impl EncodedLength for RedisKvEntry {

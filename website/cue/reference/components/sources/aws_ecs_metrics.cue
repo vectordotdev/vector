@@ -51,7 +51,7 @@ components: sources: aws_ecs_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.aws_ecs_metrics.configuration
+	configuration: generated.components.sources.aws_ecs_metrics.configuration
 
 	output: metrics: {
 		_awsecs: {

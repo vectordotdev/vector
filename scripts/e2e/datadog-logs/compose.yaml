@@ -1,4 +1,4 @@
-version: '3'
+version: '3.8'
 
 services:
   # Generates random log data for consumption by the custom Agent check
@@ -17,7 +17,9 @@ services:
       - "-o"
       - "/var/log/a_custom.log"
     volumes:
-      - log_path:/var/log/
+      - type: volume
+        source: log_path
+        target: /var/log/
 
   # Tails a custom log created by `log_generator` and sends log data to
   # the `fakeintake-agent` service
@@ -33,11 +35,21 @@ services:
     - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
       # The Agent config file
-      - ../../../tests/data/e2e/datadog/logs/agent_only.yaml:/etc/datadog-agent/datadog.yaml
+      - type: bind
+        source: ../../../tests/data/e2e/datadog/logs/agent_only.yaml
+        target: /etc/datadog-agent/datadog.yaml
+        read_only: true
+
       # The custom logs check
-      - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
+      - type: bind
+        source: ../../../tests/data/e2e/datadog/logs/logs.conf.d
+        target: /conf.d
+        read_only: true
+
       # The custom log to tail, created by the `log_generator` service
-      - log_path:/var/log/
+      - type: volume
+        source: log_path
+        target: /var/log/
 
   # Tails a custom log created by `log_generator` and sends log data to
   # the `vector` service
@@ -53,11 +65,21 @@ services:
     - DD_CONTAINER_EXCLUDE="name:.*"
     volumes:
       # The Agent config file
-      - ../../../tests/data/e2e/datadog/logs/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
+      - type: bind
+        source: ../../../tests/data/e2e/datadog/logs/agent_vector.yaml
+        target: /etc/datadog-agent/datadog.yaml
+        read_only: true
+
       # The custom logs check
-      - ../../../tests/data/e2e/datadog/logs/logs.conf.d:/conf.d:ro
+      - type: bind
+        source: ../../../tests/data/e2e/datadog/logs/logs.conf.d
+        target: /conf.d
+        read_only: true
+
       # The custom log to tail, created by the `log_generator` service
-      - log_path:/var/log/
+      - type: volume
+        source: log_path
+        target: /var/log/
 
   # Receives log data from the `datadog-agent-vector` service and sends
   # to the `fakeintake-vector` service.
@@ -79,7 +101,9 @@ services:
       - "-c"
       - "/home/vector/tests/data/e2e/datadog/logs/vector.toml"
     volumes:
-      - ../../..:/home/vector
+      - type: bind
+        source: ../../..
+        target: /home/vector
 
   # Receives log data from the `datadog-agent` service. Is queried by the test runner
   # which does the validation of consistency with the other fakeintake service.

@@ -77,7 +77,7 @@ More information about buffers and data loss can be found in the [high availabil
 
 ### Vertical Scaling
 
-[Vector’s concurrency model](/docs/about/under-the-hood/architecture/concurrency-model/) automatically scales to take advantage of all vCPUs. There are no configuration changes needed. When vertically scaling, we recommend capping an instance’s size to process no more than 33% of your total volume. This allows for [high availability](/docs/setup/going-to-prod/high-availability/) in the event of a node failure.
+[Vector’s concurrency model](/docs/architecture/concurrency-model/) automatically scales to take advantage of all vCPUs. There are no configuration changes needed. When vertically scaling, we recommend capping an instance’s size to process no more than 33% of your total volume. This allows for [high availability](/docs/setup/going-to-prod/high-availability/) in the event of a node failure.
 
 {{< info >}}
 More information about vertical sizing can be found in the [capacity planning section](#capacity-planning).

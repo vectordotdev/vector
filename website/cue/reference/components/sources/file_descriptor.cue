@@ -40,14 +40,22 @@ components: sources: file_descriptor: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.file_descriptor.configuration
+	configuration: generated.components.sources.file_descriptor.configuration
 
-	output: logs: line: {
-		description: "An individual event from the file descriptor."
-		fields: {
-			host:      fields._local_host
-			message:   fields._raw_line
-			timestamp: fields._current_timestamp
+	output: {
+		logs: line: {
+			description: "An individual event from the file descriptor."
+			fields: {
+				host:      fields._local_host
+				message:   fields._raw_line
+				timestamp: fields._current_timestamp
+			}
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
 		}
 	}
 

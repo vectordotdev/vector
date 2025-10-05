@@ -56,7 +56,7 @@ components: sources: datadog_agent: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.datadog_agent.configuration
+	configuration: generated.components.sources.datadog_agent.configuration
 
 	outputs: [
 		{
@@ -153,7 +153,7 @@ components: sources: datadog_agent: {
 				tags: _extra_tags
 			}
 		}
-		traces: {
+		traces: trace: {
 			description: "A trace received through an HTTP POST request sent by a Datadog Trace Agent."
 			fields: {
 				spans: {

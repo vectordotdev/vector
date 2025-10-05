@@ -33,7 +33,7 @@ pub fn port_forward(
     command.arg("port-forward");
     command.arg("-n").arg(namespace);
     command.arg(resource);
-    command.arg(format!("{}:{}", local_port, resource_port));
+    command.arg(format!("{local_port}:{resource_port}"));
 
     command.kill_on_drop(true);
 

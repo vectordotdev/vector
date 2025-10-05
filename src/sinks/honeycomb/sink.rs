@@ -1,11 +1,10 @@
 //! Implementation of the `honeycomb` sink.
 
+use super::request_builder::HoneycombRequestBuilder;
 use crate::sinks::{
     prelude::*,
     util::http::{HttpJsonBatchSizer, HttpRequest},
 };
-
-use super::request_builder::HoneycombRequestBuilder;
 
 pub(super) struct HoneycombSink<S> {
     service: S,

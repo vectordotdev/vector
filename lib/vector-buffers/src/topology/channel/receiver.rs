@@ -1,7 +1,7 @@
 use std::{
     mem,
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use async_recursion::async_recursion;
@@ -12,12 +12,13 @@ use vector_common::internal_event::emit;
 
 use super::limited_queue::LimitedReceiver;
 use crate::{
+    Bufferable,
     buffer_usage_data::BufferUsageHandle,
     variants::disk_v2::{self, ProductionFilesystem},
-    Bufferable,
 };
 
 /// Adapter for papering over various receiver backends.
+#[allow(clippy::large_enum_variant)]
 #[derive(Debug)]
 pub enum ReceiverAdapter<T: Bufferable> {
     /// The in-memory channel buffer.
@@ -54,7 +55,6 @@ where
                             // If we've hit a recoverable error, we'll emit an event to indicate as much but we'll still
                             // keep trying to read the next available record.
                             emit(re);
-                            continue;
                         }
                         None => panic!("Reader encountered unrecoverable error: {e:?}"),
                     },
@@ -140,13 +140,13 @@ impl<T: Bufferable> BufferReceiver<T> {
 
         // If instrumentation is enabled, and we got the item from the base receiver, then and only
         // then do we track sending the event out.
-        if let Some(handle) = self.instrumentation.as_ref() {
-            if from_base {
-                handle.increment_sent_event_count_and_byte_size(
-                    item.event_count() as u64,
-                    item.size_of() as u64,
-                );
-            }
+        if let Some(handle) = self.instrumentation.as_ref()
+            && from_base
+        {
+            handle.increment_sent_event_count_and_byte_size(
+                item.event_count() as u64,
+                item.size_of() as u64,
+            );
         }
 
         Some(item)
@@ -157,6 +157,7 @@ impl<T: Bufferable> BufferReceiver<T> {
     }
 }
 
+#[allow(clippy::large_enum_variant)]
 enum StreamState<T: Bufferable> {
     Idle(BufferReceiver<T>),
     Polling,

@@ -3,24 +3,22 @@
 use bytes::Bytes;
 use futures::FutureExt;
 use http::{Request, StatusCode, Uri};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
+use super::{
+    encoder::KeepEncoder, request_builder::KeepRequestBuilder, service::KeepSvcRequestBuilder,
+    sink::KeepSink,
+};
 use crate::{
     http::HttpClient,
     sinks::{
         prelude::*,
         util::{
-            http::{http_response_retry_logic, HttpService},
             BatchConfig, BoxedRawValue,
+            http::{HttpService, http_response_retry_logic},
         },
     },
-};
-
-use super::{
-    encoder::KeepEncoder, request_builder::KeepRequestBuilder, service::KeepSvcRequestBuilder,
-    sink::KeepSink,
 };
 
 pub(super) const HTTP_HEADER_KEEP_API_KEY: &str = "x-api-key";
@@ -165,11 +163,7 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
         _ => {
             // Handle other unexpected statuses
             let body = String::from_utf8_lossy(&body[..]);
-            Err(format!(
-                "Server returned unexpected error status: {} body: {}",
-                status, body
-            )
-            .into())
+            Err(format!("Server returned unexpected error status: {status} body: {body}").into())
         }
     }
 }

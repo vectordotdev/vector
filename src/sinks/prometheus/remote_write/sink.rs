@@ -1,15 +1,16 @@
 use std::fmt;
 
-use vector_lib::byte_size_of::ByteSizeOf;
-use vector_lib::event::Metric;
-use vector_lib::stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize};
-
-use crate::sinks::{prelude::*, util::buffer::metrics::MetricSet};
+use vector_lib::{
+    byte_size_of::ByteSizeOf,
+    event::Metric,
+    stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize},
+};
 
 use super::{
-    request_builder::{RemoteWriteEncoder, RemoteWriteRequest, RemoteWriteRequestBuilder},
     PartitionKey, PrometheusMetricNormalize,
+    request_builder::{RemoteWriteEncoder, RemoteWriteRequest, RemoteWriteRequestBuilder},
 };
+use crate::sinks::{prelude::*, util::buffer::metrics::MetricSet};
 
 pub(super) struct RemoteWriteMetric {
     pub(super) metric: Metric,
@@ -149,6 +150,7 @@ pub(super) struct RemoteWriteSink<S> {
     pub(super) default_namespace: Option<String>,
     pub(super) buckets: Vec<f64>,
     pub(super) quantiles: Vec<f64>,
+    pub(super) expire_metrics_secs: Option<f64>,
     pub(super) service: S,
 }
 
@@ -172,10 +174,11 @@ where
         let batch_settings = self.batch_settings;
         let tenant_id = self.tenant_id.clone();
         let service = self.service;
+        let expire_metrics_secs = self.expire_metrics_secs;
 
         input
             .filter_map(|event| future::ready(event.try_into_metric()))
-            .normalized_with_default::<PrometheusMetricNormalize>()
+            .normalized_with_ttl::<PrometheusMetricNormalize>(expire_metrics_secs)
             .filter_map(move |event| {
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
             })

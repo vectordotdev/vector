@@ -74,7 +74,7 @@ components: sinks: gcp_cloud_storage: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.gcp_cloud_storage.configuration
+	configuration: generated.components.sinks.gcp_cloud_storage.configuration
 
 	input: {
 		logs:    true

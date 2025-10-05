@@ -1,6 +1,6 @@
 use std::{fmt, marker::PhantomData};
 
-use serde::{de, Deserialize, Deserializer};
+use serde::{Deserialize, Deserializer, de};
 
 /// Answers "Is this value in it's default state?" which can be used to skip serializing the value.
 #[inline]
@@ -66,7 +66,7 @@ where
 /// }
 /// ```
 pub mod ascii_char {
-    use serde::{de, Deserialize, Deserializer, Serializer};
+    use serde::{Deserialize, Deserializer, Serializer, de};
 
     /// Deserialize an ASCII character as `u8`.
     ///

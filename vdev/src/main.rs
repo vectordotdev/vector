@@ -11,16 +11,17 @@ mod macros;
 mod app;
 mod commands;
 mod config;
+mod environment;
 mod features;
 mod git;
 mod platform;
 mod testing;
 mod util;
 
-use anyhow::Result;
-use clap::Parser;
 use std::env;
 
+use anyhow::Result;
+use clap::Parser;
 use commands::Cli;
 
 fn main() -> Result<()> {

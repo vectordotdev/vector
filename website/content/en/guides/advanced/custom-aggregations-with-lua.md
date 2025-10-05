@@ -285,8 +285,8 @@ pipelines, it makes it possible to write custom aggregations as Lua scripts. Thi
 in a [deployment topology][docs.setup.deployment.topologies] to perform various kinds of aggregations, providing
 alternatives to centralized logs aggregation.
 
-[docs.about.concepts#pipelines]: /docs/about/concepts/#pipeline
-[docs.architecture.data-model.metric#counter]: /docs/about/under-the-hood/architecture/data-model/metric/#counter
+[docs.about.concepts#pipelines]: /docs/introduction/concepts/#pipeline
+[docs.architecture.data-model.metric#counter]: /docs/architecture/data-model/metric/#counter
 [docs.setup.deployment.topologies]: /docs/setup/deployment/topologies/
 [docs.transforms.lua#event-data-model]: /docs/reference/configuration/transforms/lua/#event-data-model
 [docs.transforms.lua#source]: /docs/reference/configuration/transforms/lua/#source

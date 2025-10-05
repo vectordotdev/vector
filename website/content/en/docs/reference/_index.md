@@ -1,10 +1,10 @@
 ---
 title: Reference
-weight: 3
+weight: 4
 ---
 
 This section contains various forms of reference-style documentation for Vector. These docs tend to
-be most useful when you already have a [good grasp][about] of how Vector works and have already
+be most useful when you already have a [good grasp][introduction] of how Vector works and have already
 made your way through the [Vector quickstart][quickstart].
 
 ## Pages
@@ -15,5 +15,5 @@ made your way through the [Vector quickstart][quickstart].
 
 {{< sections >}}
 
-[about]: /docs/about
+[introduction]: /docs/introduction
 [quickstart]: /docs/setup/quickstart

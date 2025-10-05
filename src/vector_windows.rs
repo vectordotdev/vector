@@ -2,13 +2,13 @@
 use std::{ffi::OsString, time::Duration};
 
 use windows_service::{
-    define_windows_service,
+    Result, define_windows_service,
     service::{
         ServiceControl, ServiceControlAccept, ServiceExitCode, ServiceState, ServiceStatus,
         ServiceType,
     },
     service_control_handler::ServiceControlHandlerResult,
-    service_dispatcher, Result,
+    service_dispatcher,
 };
 
 use crate::{app::Application, signal::SignalTo};
@@ -24,12 +24,12 @@ pub mod service_control {
 
     use snafu::ResultExt;
     use windows_service::{
+        Result,
         service::{
             ServiceAccess, ServiceErrorControl, ServiceExitCode, ServiceInfo, ServiceStartType,
             ServiceState, ServiceStatus,
         },
         service_manager::{ServiceManager, ServiceManagerAccess},
-        Result,
     };
 
     use crate::{
@@ -46,15 +46,15 @@ pub mod service_control {
 
     impl fmt::Display for ErrorDisplay<'_> {
         fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-            if let windows_service::Error::Winapi(ref win_error) = &self.error {
-                write!(f, "{}", win_error)
+            if let windows_service::Error::Winapi(win_error) = &self.error {
+                write!(f, "{win_error}")
             } else {
                 write!(f, "{}", &self.error)
             }
         }
     }
 
-    const fn error_display(error: &windows_service::Error) -> ErrorDisplay {
+    const fn error_display(error: &windows_service::Error) -> ErrorDisplay<'_> {
         ErrorDisplay { error }
     }
 

@@ -1,11 +1,10 @@
 use std::sync::Arc;
 
-use metrics::{counter, Counter};
+use metrics::{Counter, counter};
 use tracing::trace;
 
-use crate::config::ComponentKey;
-
 use super::{CountByteSize, OptionalTag, Output, SharedString};
+use crate::config::ComponentKey;
 
 pub const DEFAULT_OUTPUT: &str = "_default";
 

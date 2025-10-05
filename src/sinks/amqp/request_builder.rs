@@ -1,12 +1,13 @@
 //! Request builder for the `AMQP` sink.
 //! Responsible for taking the event (which includes rendered template values) and turning
 //! it into the raw bytes and other data needed to send the request to `AMQP`.
-use crate::sinks::prelude::*;
-use bytes::Bytes;
-use lapin::BasicProperties;
 use std::io;
 
+use bytes::Bytes;
+use lapin::BasicProperties;
+
 use super::{encoder::AmqpEncoder, service::AmqpRequest, sink::AmqpEvent};
+use crate::sinks::prelude::*;
 
 pub(super) struct AmqpMetadata {
     exchange: String,

@@ -1,15 +1,15 @@
-use futures::{Stream, StreamExt};
-use hashbrown::HashMap;
 use std::{future::ready, pin::Pin};
 
-use crate::transforms::tag_cardinality_limit::config::LimitExceededAction;
+use futures::{Stream, StreamExt};
+use hashbrown::HashMap;
+
 use crate::{
     event::Event,
     internal_events::{
         TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
         TagCardinalityValueLimitReached,
     },
-    transforms::TaskTransform,
+    transforms::{TaskTransform, tag_cardinality_limit::config::LimitExceededAction},
 };
 
 mod config;
@@ -18,9 +18,10 @@ mod tag_value_set;
 #[cfg(test)]
 mod tests;
 
-use crate::event::metric::TagValueSet;
 pub use config::{TagCardinalityLimitConfig, TagCardinalityLimitInnerConfig};
 use tag_value_set::AcceptedTagValueSet;
+
+use crate::event::metric::TagValueSet;
 
 type MetricId = (Option<String>, String);
 

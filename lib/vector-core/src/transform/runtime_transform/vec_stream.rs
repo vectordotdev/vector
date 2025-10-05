@@ -27,7 +27,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{stream::Fuse, Stream, StreamExt};
+use futures::{Stream, StreamExt, stream::Fuse};
 use pin_project::pin_project;
 
 impl<T: Stream + ?Sized> VecStreamExt for T {}

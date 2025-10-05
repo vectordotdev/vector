@@ -8,12 +8,12 @@ use std::{
 use bytes::{BufMut, Bytes};
 use chrono::{DateTime, Utc};
 use snafu::{ResultExt, Snafu};
-use vector_lib::request_metadata::GroupedCountByteSize;
 use vector_lib::{
-    config::{log_schema, telemetry, LogSchema},
-    event::{metric::MetricSketch, DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue},
-    metrics::AgentDDSketch,
     EstimatedJsonEncodedSizeOf,
+    config::{LogSchema, log_schema, telemetry},
+    event::{DatadogMetricOriginMetadata, Metric, MetricTags, MetricValue, metric::MetricSketch},
+    metrics::AgentDDSketch,
+    request_metadata::GroupedCountByteSize,
 };
 
 use super::config::{DatadogMetricsEndpoint, SeriesApiVersion};
@@ -22,7 +22,7 @@ use crate::{
         DatadogMetricType, DatadogPoint, DatadogSeriesMetric, DatadogSeriesMetricMetadata,
     },
     proto::fds::protobuf_descriptors,
-    sinks::util::{encode_namespace, request_builder::EncodeResult, Compression, Compressor},
+    sinks::util::{Compression, Compressor, encode_namespace, request_builder::EncodeResult},
 };
 
 const SERIES_PAYLOAD_HEADER: &[u8] = b"{\"series\":[";
@@ -285,7 +285,7 @@ impl DatadogMetricsEncoder {
                     return Err(EncoderError::InvalidMetric {
                         expected: "series",
                         metric_value: value.as_name(),
-                    })
+                    });
                 }
             },
             // Sketches are encoded via ProtoBuf, also in an incremental fashion.
@@ -313,7 +313,7 @@ impl DatadogMetricsEncoder {
                     return Err(EncoderError::InvalidMetric {
                         expected: "sketches",
                         metric_value: value.as_name(),
-                    })
+                    });
                 }
             },
         }
@@ -693,7 +693,7 @@ fn encode_tags(tags: &MetricTags) -> Vec<String> {
     let mut pairs: Vec<_> = tags
         .iter_all()
         .map(|(name, value)| match value {
-            Some(value) => format!("{}:{}", name, value),
+            Some(value) => format!("{name}:{value}"),
             None => name.into(),
         })
         .collect();
@@ -742,7 +742,9 @@ fn source_type_to_service(source_type: &str) -> Option<u32> {
         // But if it does occur, by setting the Service value to be undefined, we at least populate the
         // OriginProduct and OriginCategory.
         _ => {
-            debug!("Source {source_type} OriginService value is undefined! This source needs to be properly mapped to a Service value.");
+            debug!(
+                "Source {source_type} OriginService value is undefined! This source needs to be properly mapped to a Service value."
+            );
             Some(0)
         }
     }
@@ -855,7 +857,7 @@ fn generate_series_metrics(
             return Err(EncoderError::InvalidMetric {
                 expected: "series",
                 metric_value: value.as_name(),
-            })
+            });
         }
     };
 
@@ -996,22 +998,22 @@ mod tests {
     };
     use prost::Message;
     use vector_lib::{
-        config::{log_schema, LogSchema},
+        config::{LogSchema, log_schema},
         event::{
-            metric::{MetricSketch, TagValue},
             DatadogMetricOriginMetadata, EventMetadata, Metric, MetricKind, MetricTags,
             MetricValue,
+            metric::{MetricSketch, TagValue},
         },
         metric_tags,
         metrics::AgentDDSketch,
     };
 
     use super::{
-        ddmetric_proto, encode_proto_key_and_message, encode_tags, encode_timestamp,
-        generate_series_metrics, get_compressor, get_sketch_payload_sketches_field_number,
-        max_compression_overhead_len, max_uncompressed_header_len, series_to_proto_message,
-        sketch_to_proto_message, validate_payload_size_limits, write_payload_footer,
-        write_payload_header, DatadogMetricsEncoder, EncoderError,
+        DatadogMetricsEncoder, EncoderError, ddmetric_proto, encode_proto_key_and_message,
+        encode_tags, encode_timestamp, generate_series_metrics, get_compressor,
+        get_sketch_payload_sketches_field_number, max_compression_overhead_len,
+        max_uncompressed_header_len, series_to_proto_message, sketch_to_proto_message,
+        validate_payload_size_limits, write_payload_footer, write_payload_header,
     };
     use crate::{
         common::datadog::DatadogMetricType,

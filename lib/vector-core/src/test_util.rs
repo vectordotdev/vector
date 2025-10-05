@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{task::noop_waker_ref, Stream, StreamExt};
+use futures::{Stream, StreamExt, task::noop_waker_ref};
 
 use crate::event::{Event, EventArray, EventContainer};
 

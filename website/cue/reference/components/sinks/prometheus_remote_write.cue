@@ -76,7 +76,7 @@ components: sinks: prometheus_remote_write: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.prometheus_remote_write.configuration
+	configuration: generated.components.sinks.prometheus_remote_write.configuration
 
 	input: {
 		logs: false

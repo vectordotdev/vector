@@ -186,9 +186,9 @@ mod tests {
     use std::char::REPLACEMENT_CHARACTER;
 
     use bytes::Bytes;
-    use encoding_rs::{SHIFT_JIS, UTF_16BE, UTF_16LE, UTF_8};
+    use encoding_rs::{SHIFT_JIS, UTF_8, UTF_16BE, UTF_16LE};
 
-    use super::{Decoder, Encoder, BOM_UTF8};
+    use super::{BOM_UTF8, Decoder, Encoder};
 
     // BOM unicode character (U+FEFF) expressed in utf-16
     // http://unicode.org/faq/utf_bom.html#bom4
@@ -290,10 +290,7 @@ mod tests {
 
         assert_eq!(
             d.decode_to_utf8(Bytes::from(problematic_input)),
-            Bytes::from(format!(
-                "{}{}123",
-                REPLACEMENT_CHARACTER, REPLACEMENT_CHARACTER
-            ))
+            Bytes::from(format!("{REPLACEMENT_CHARACTER}{REPLACEMENT_CHARACTER}123"))
         );
     }
 

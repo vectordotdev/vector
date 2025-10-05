@@ -1,4 +1,5 @@
 use futures::FutureExt;
+use sqlx::{Pool, Postgres, postgres::PgPoolOptions};
 use tower::ServiceBuilder;
 use vector_lib::{
     config::AcknowledgementsConfig,
@@ -10,16 +11,14 @@ use super::{
     service::{PostgresRetryLogic, PostgresService},
     sink::PostgresSink,
 };
-use sqlx::{postgres::PgPoolOptions, Pool, Postgres};
-
 use crate::{
     config::{Input, SinkConfig, SinkContext},
     sinks::{
+        Healthcheck,
         util::{
             BatchConfig, RealtimeSizeBasedDefaultBatchSettings, ServiceBuilderExt,
             TowerRequestConfig, UriSerde,
         },
-        Healthcheck,
     },
 };
 
@@ -92,8 +91,7 @@ impl SinkConfig for PostgresConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let connection_pool = PgPoolOptions::new()
             .max_connections(self.pool_size)
-            .connect(&self.endpoint)
-            .await?;
+            .connect_lazy(&self.endpoint)?;
 
         let healthcheck = healthcheck(connection_pool.clone()).boxed();
 

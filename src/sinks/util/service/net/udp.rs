@@ -2,12 +2,10 @@ use std::net::SocketAddr;
 
 use snafu::ResultExt;
 use tokio::net::UdpSocket;
-
 use vector_lib::configurable::configurable_component;
 
+use super::{ConnectorType, HostAndPort, NetError, NetworkConnector, net_error::*};
 use crate::{dns, net};
-
-use super::{net_error::*, ConnectorType, HostAndPort, NetError, NetworkConnector};
 
 /// UDP configuration.
 #[configurable_component]
@@ -63,10 +61,10 @@ impl UdpConnector {
 
         let socket = UdpSocket::bind(bind_address).await.context(FailedToBind)?;
 
-        if let Some(send_buffer_size) = self.send_buffer_size {
-            if let Err(error) = net::set_send_buffer_size(&socket, send_buffer_size) {
-                warn!(%error, "Failed configuring send buffer size on UDP socket.");
-            }
+        if let Some(send_buffer_size) = self.send_buffer_size
+            && let Err(error) = net::set_send_buffer_size(&socket, send_buffer_size)
+        {
+            warn!(%error, "Failed configuring send buffer size on UDP socket.");
         }
 
         socket.connect(addr).await.context(FailedToConnect)?;

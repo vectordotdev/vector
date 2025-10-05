@@ -1,15 +1,18 @@
+use std::sync::Arc;
+
 use bytes::Bytes;
 use snafu::Snafu;
-use std::sync::Arc;
-use vector_lib::event::{EventFinalizers, Finalizable, Metric};
-use vector_lib::request_metadata::RequestMetadata;
+use vector_lib::{
+    event::{EventFinalizers, Finalizable, Metric},
+    request_metadata::RequestMetadata,
+};
 
 use super::{
     config::{DatadogMetricsEndpoint, DatadogMetricsEndpointConfiguration},
     encoder::{CreateError, DatadogMetricsEncoder, EncoderError, FinishError},
     service::DatadogMetricsRequest,
 };
-use crate::sinks::util::{metadata::RequestMetadataBuilder, IncrementalRequestBuilder};
+use crate::sinks::util::{IncrementalRequestBuilder, metadata::RequestMetadataBuilder};
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
@@ -91,7 +94,10 @@ impl DatadogMetricsRequestBuilder {
         })
     }
 
-    fn get_encoder(&mut self, endpoint: DatadogMetricsEndpoint) -> &mut DatadogMetricsEncoder {
+    const fn get_encoder(
+        &mut self,
+        endpoint: DatadogMetricsEndpoint,
+    ) -> &mut DatadogMetricsEncoder {
         match endpoint {
             DatadogMetricsEndpoint::Series { .. } => &mut self.series_encoder,
             DatadogMetricsEndpoint::Sketches => &mut self.sketches_encoder,

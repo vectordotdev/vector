@@ -1,6 +1,7 @@
+use std::path::PathBuf;
+
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 
 const APP_NAME: &str = "vdev";
 const FILE_STEM: &str = "config";

@@ -5,10 +5,12 @@ use serde_json::Value;
 use super::tests::*;
 use crate::{
     config::{SinkConfig, SinkContext},
-    event::{metric::MetricValue, Event},
-    sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
-    sinks::prometheus::remote_write::config::RemoteWriteConfig,
-    test_util::components::{assert_sink_compliance, HTTP_SINK_TAGS},
+    event::{Event, metric::MetricValue},
+    sinks::{
+        influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
+        prometheus::remote_write::config::RemoteWriteConfig,
+    },
+    test_util::components::{HTTP_SINK_TAGS, assert_sink_compliance},
     tls::{self, TlsConfig},
 };
 
@@ -32,7 +34,7 @@ async fn insert_metrics(url: &str) {
         let cx = SinkContext::default();
 
         let config = RemoteWriteConfig {
-            endpoint: format!("{}/api/v1/prom/write?db={}", url, database),
+            endpoint: format!("{url}/api/v1/prom/write?db={database}"),
             tls: Some(TlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
@@ -44,7 +46,7 @@ async fn insert_metrics(url: &str) {
         let (sink, _) = config.build(cx).await.expect("error building config");
         sink.run_events(events.clone()).await.unwrap();
 
-        let result = query(url, &format!("show series on {}", database)).await;
+        let result = query(url, &format!("show series on {database}")).await;
 
         let values = &result["results"][0]["series"][0]["values"];
         assert_eq!(values.as_array().unwrap().len(), 5);
@@ -105,6 +107,6 @@ fn decode_metrics(data: &Value) -> Vec<HashMap<String, Value>> {
 
 fn create_events(name_range: Range<i32>, value: impl Fn(f64) -> f64) -> Vec<Event> {
     name_range
-        .map(move |num| create_event(format!("metric_{}", num), value(num as f64)))
+        .map(move |num| create_event(format!("metric_{num}"), value(num as f64)))
         .collect()
 }

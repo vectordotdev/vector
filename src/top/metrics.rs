@@ -7,8 +7,8 @@ use glob::Pattern;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
 use vector_lib::api_client::{
-    gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
     Client, SubscriptionClient,
+    gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
 };
 
 use super::state::{self, OutputMetrics};
@@ -397,6 +397,20 @@ async fn errors_totals(
     }
 }
 
+async fn uptime_changed(client: Arc<SubscriptionClient>, tx: state::EventTx) {
+    tokio::pin! {
+        let stream = client.uptime_subscription();
+    };
+
+    while let Some(Some(res)) = stream.next().await {
+        if let Some(d) = res.data {
+            _ = tx
+                .send(state::EventType::UptimeChanged(d.uptime.seconds))
+                .await;
+        }
+    }
+}
+
 /// Subscribe to each metrics channel through a separate client. This is a temporary workaround
 /// until client multiplexing is fixed. In future, we should be able to use a single client
 pub fn subscribe(
@@ -475,10 +489,11 @@ pub fn subscribe(
         )),
         tokio::spawn(errors_totals(
             Arc::clone(&client),
-            tx,
+            tx.clone(),
             interval,
             Arc::clone(&components_patterns),
         )),
+        tokio::spawn(uptime_changed(Arc::clone(&client), tx)),
     ]
 }
 

@@ -9,15 +9,15 @@ use futures::StreamExt;
 use tokio::time::timeout;
 
 use crate::{
+    SourceSender,
     aws::{auth::AwsAuthentication, region::RegionOrEndpoint},
-    config::{log_schema, SourceConfig, SourceContext},
+    config::{SourceConfig, SourceContext, log_schema},
     event::Event,
     sources::aws_sqs::config::AwsSqsConfig,
     test_util::{
-        components::{assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
+        components::{HTTP_PULL_SOURCE_TAGS, assert_source_compliance},
         random_string,
     },
-    SourceSender,
 };
 
 fn sqs_address() -> String {
@@ -113,7 +113,7 @@ pub(crate) async fn test() {
                 .unwrap()
                 .to_string_lossy();
             if !expected_messages.remove(message.as_ref()) {
-                panic!("Received unexpected message: {:?}", message);
+                panic!("Received unexpected message: {message:?}");
             }
         }
         assert!(expected_messages.is_empty());
@@ -122,5 +122,5 @@ pub(crate) async fn test() {
 }
 
 fn calculate_message(index: u32) -> String {
-    format!("Test message: {}", index)
+    format!("Test message: {index}")
 }

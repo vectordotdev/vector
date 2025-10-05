@@ -9,17 +9,17 @@
 
 use std::{env, sync::LazyLock, time::Duration};
 
-use futures::{stream, SinkExt, Stream, StreamExt};
+use futures::{SinkExt, Stream, StreamExt, stream};
 use futures_util::Future;
 use tokio::{pin, select, time::sleep};
 use vector_lib::event_test_util;
 
 use crate::{
+    SourceSender,
     config::{SourceConfig, SourceContext},
     event::{Event, EventArray, Metric, MetricValue},
     metrics::Controller,
     sinks::VectorSink,
-    SourceSender,
 };
 
 /// The most basic set of tags for sources, regardless of whether or not they pull data or have it pushed in.
@@ -65,13 +65,13 @@ pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 pub const AWS_SINK_TAGS: [&str; 2] = ["protocol", "region"];
 
 /// This struct is used to describe a set of component tests.
-pub struct ComponentTests {
+pub struct ComponentTests<'a, 'b, 'c> {
     /// The list of event (suffixes) that must be emitted by the component
-    events: &'static [&'static str],
+    events: &'a [&'a str],
     /// The list of counter metrics (with given tags) that must be incremented
-    tagged_counters: &'static [&'static str],
+    tagged_counters: &'b [&'b str],
     /// The list of counter metrics (with no particular tags) that must be incremented
-    untagged_counters: &'static [&'static str],
+    untagged_counters: &'c [&'c str],
 }
 
 /// The component test specification for all sources.
@@ -150,7 +150,7 @@ pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: LazyLock<ComponentTests> =
         untagged_counters: &[],
     });
 
-impl ComponentTests {
+impl ComponentTests<'_, '_, '_> {
     /// Run the test specification, and assert that all tests passed.
     #[track_caller]
     pub fn assert(&self, tags: &[&str]) {
@@ -195,7 +195,7 @@ impl ComponentTester {
             event_test_util::debug_print_events();
             metrics.sort_by(|a, b| a.name().cmp(b.name()));
             for metric in &metrics {
-                println!("{}", metric);
+                println!("{metric}");
             }
         }
 
@@ -204,9 +204,11 @@ impl ComponentTester {
     }
 
     fn emitted_all_counters(&mut self, names: &[&str], tags: &[&str]) {
-        let tag_suffix = (!tags.is_empty())
-            .then(|| format!("{{{}}}", tags.join(",")))
-            .unwrap_or_default();
+        let tag_suffix = if !tags.is_empty() {
+            format!("{{{}}}", tags.join(","))
+        } else {
+            String::new()
+        };
 
         for name in names {
             if !self.metrics.iter().any(|m| {
@@ -234,10 +236,8 @@ impl ComponentTester {
                     .collect::<Vec<_>>();
                 let partial = partial_matches.join("");
 
-                self.errors.push(format!(
-                    "  - Missing metric `{}{}`{}",
-                    name, tag_suffix, partial
-                ));
+                self.errors
+                    .push(format!("  - Missing metric `{name}{tag_suffix}`{partial}"));
             }
         }
     }
@@ -245,7 +245,7 @@ impl ComponentTester {
     fn emitted_all_events(&mut self, names: &[&str]) {
         for name in names {
             if let Err(err_msg) = event_test_util::contains_name_once(name) {
-                self.errors.push(format!("  - {}", err_msg));
+                self.errors.push(format!("  - {err_msg}"));
             }
         }
     }
@@ -253,7 +253,7 @@ impl ComponentTester {
 
 /// Runs and returns a future and asserts that the provided test specification passes.
 pub async fn assert_source<T>(
-    tests: &LazyLock<ComponentTests>,
+    tests: &LazyLock<ComponentTests<'_, '_, '_>>,
     tags: &[&str],
     f: impl Future<Output = T>,
 ) -> T {
@@ -347,7 +347,7 @@ pub async fn run_and_assert_source_advanced<SC>(
     setup: impl FnOnce(&mut SourceContext),
     timeout: Option<Duration>,
     event_count: Option<usize>,
-    tests: &LazyLock<ComponentTests>,
+    tests: &LazyLock<ComponentTests<'_, '_, '_>>,
     tags: &[&str],
 ) -> Vec<Event>
 where
@@ -375,10 +375,10 @@ where
         // the meantime.  We store these locally and return them all at the end.
         loop {
             // If an event count was given, and we've hit it, break out of the loop.
-            if let Some(count) = event_count {
-                if events.len() == count {
-                    break;
-                }
+            if let Some(count) = event_count
+                && events.len() == count
+            {
+                break;
             }
 
             select! {
@@ -396,10 +396,10 @@ where
         // until no more are left, which avoids timing issues with missing events that came in right when the timeout
         // fired.
         while let Some(event) = rx.next().await {
-            if let Some(count) = event_count {
-                if events.len() == count {
-                    break;
-                }
+            if let Some(count) = event_count
+                && events.len() == count
+            {
+                break;
             }
 
             events.push(event);
@@ -499,15 +499,38 @@ pub async fn run_and_assert_nonsending_sink_compliance<S, I>(
     .await;
 }
 
-/// Convenience wrapper for running sink error tests
-pub async fn assert_sink_error<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+// Convenience wrapper for running sink error tests with a specific component test specification
+async fn assert_sink_error_with_component_tests<T>(
+    component_tests: &ComponentTests<'_, '_, '_>,
+    tags: &[&str],
+    f: impl Future<Output = T>,
+) -> T {
     init_test();
 
     let result = f.await;
 
-    COMPONENT_TESTS_ERROR.assert(tags);
+    component_tests.assert(tags);
 
     result
+}
+
+/// Convenience wrapper for running sink error tests
+pub async fn assert_sink_error<T>(tags: &[&str], f: impl Future<Output = T>) -> T {
+    assert_sink_error_with_component_tests(&COMPONENT_TESTS_ERROR, tags, f).await
+}
+
+/// Convenience wrapper for running sink error tests for a specific set of error events
+pub async fn assert_sink_error_with_events<T>(
+    events: &[&str],
+    tags: &[&str],
+    f: impl Future<Output = T>,
+) -> T {
+    let component_tests = ComponentTests {
+        events,
+        tagged_counters: &["component_errors_total"],
+        untagged_counters: &[],
+    };
+    assert_sink_error_with_component_tests(&component_tests, tags, f).await
 }
 
 /// Runs and asserts sink error compliance.
@@ -517,6 +540,23 @@ where
     I: Into<EventArray>,
 {
     assert_sink_error(tags, async move {
+        let events = events.map(Into::into);
+        sink.run(events).await.expect("Running sink failed")
+    })
+    .await;
+}
+
+/// Runs and asserts sink error compliance with a specific set of error events.
+pub async fn run_and_assert_sink_error_with_events<S, I>(
+    sink: VectorSink,
+    events: S,
+    error_events: &[&str],
+    tags: &[&str],
+) where
+    S: Stream<Item = I> + Send,
+    I: Into<EventArray>,
+{
+    assert_sink_error_with_events(error_events, tags, async move {
         let events = events.map(Into::into);
         sink.run(events).await.expect("Running sink failed")
     })

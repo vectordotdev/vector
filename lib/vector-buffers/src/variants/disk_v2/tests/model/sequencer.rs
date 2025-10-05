@@ -1,7 +1,7 @@
 use std::{collections::VecDeque, io, mem, task::Poll};
 
-use futures::{future::BoxFuture, Future, FutureExt};
-use tokio_test::task::{spawn, Spawn};
+use futures::{Future, FutureExt, future::BoxFuture};
+use tokio_test::task::{Spawn, spawn};
 
 use super::{
     action::Action,

@@ -39,32 +39,40 @@ components: sources: nats: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.nats.configuration
+	configuration: generated.components.sources.nats.configuration
 
-	output: logs: record: {
-		description: "An individual NATS record."
-		fields: {
-			message: {
-				description: "The raw line from the NATS message."
-				required:    true
-				type: string: {
-					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+	output: {
+		logs: record: {
+			description: "An individual NATS record."
+			fields: {
+				message: {
+					description: "The raw line from the NATS message."
+					required:    true
+					type: string: {
+						examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+					}
+				}
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["nats"]
+					}
+				}
+				subject: {
+					description: "The subject from the NATS message."
+					required:    true
+					type: string: {
+						examples: ["nats.subject"]
+					}
 				}
 			}
-			source_type: {
-				description: "The name of the source type."
-				required:    true
-				type: string: {
-					examples: ["nats"]
-				}
-			}
-			subject: {
-				description: "The subject from the NATS message."
-				required:    true
-				type: string: {
-					examples: ["nats.subject"]
-				}
-			}
+		}
+		metrics: "": {
+			description: "The input `metric` event."
+		}
+		traces: "": {
+			description: "The input `trace` event."
 		}
 	}
 

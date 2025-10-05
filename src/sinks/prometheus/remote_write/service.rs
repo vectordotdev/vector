@@ -4,7 +4,6 @@ use std::task::{Context, Poll};
 use aws_credential_types::provider::SharedCredentialsProvider;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
-
 use bytes::Bytes;
 use http::Uri;
 

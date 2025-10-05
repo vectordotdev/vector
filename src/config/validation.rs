@@ -1,14 +1,15 @@
-use crate::config::schema;
-use futures_util::{stream, FutureExt, StreamExt, TryFutureExt, TryStreamExt};
+use std::{collections::HashMap, path::PathBuf};
+
+use futures_util::{FutureExt, StreamExt, TryFutureExt, TryStreamExt, stream};
 use heim::{disk::Partition, units::information::byte};
 use indexmap::IndexMap;
-use std::{collections::HashMap, path::PathBuf};
 use vector_lib::{buffers::config::DiskUsage, internal_event::DEFAULT_OUTPUT};
 
 use super::{
-    builder::ConfigBuilder, transform::get_transform_output_ids, ComponentKey, Config, OutputId,
-    Resource,
+    ComponentKey, Config, OutputId, Resource, builder::ConfigBuilder,
+    transform::get_transform_output_ids,
 };
+use crate::config::schema;
 
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
@@ -140,10 +141,7 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
         Err(conflicting_components
             .into_iter()
             .map(|(resource, components)| {
-                format!(
-                    "Resource `{}` is claimed by multiple components: {:?}",
-                    resource, components
-                )
+                format!("Resource `{resource}` is claimed by multiple components: {components:?}")
             })
             .collect())
     }

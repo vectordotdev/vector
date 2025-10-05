@@ -1,5 +1,3 @@
-use std::cmp::Ordering;
-
 use snafu::Snafu;
 
 use crate::event::metric::Sample;
@@ -46,9 +44,7 @@ impl DistributionStatistic {
                 }
             }),
             _ => Some({
-                bins.sort_unstable_by(|a, b| {
-                    a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal)
-                });
+                bins.sort_unstable_by(|a, b| a.value.total_cmp(&b.value));
 
                 let min = bins.first().unwrap().value;
                 let max = bins.last().unwrap().value;
@@ -225,5 +221,24 @@ mod test {
                 ],
             }
         );
+    }
+
+    #[test]
+    fn sort_unstable_doesnt_panic() {
+        let to_float = |v: i32| -> f64 { v as f64 };
+
+        let v: Vec<f64> = (0..=15)
+            .map(to_float)
+            .chain(std::iter::once(f64::NAN))
+            .chain((16..=20).map(to_float))
+            .rev()
+            .collect();
+
+        // For <20 items the internal sort implementation is different and doesn't panic
+        assert!(v.len() > 20);
+
+        let rates: Vec<u32> = std::iter::repeat([1]).flatten().take(v.len()).collect();
+        let s: Vec<(f64, u32)> = v.into_iter().zip(rates).collect();
+        DistributionStatistic::from_samples(&samples(&s), &[0.0, 1.0]);
     }
 }

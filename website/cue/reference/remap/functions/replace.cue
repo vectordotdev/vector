@@ -9,7 +9,7 @@ remap: functions: replace: {
 
 		**Note when using capture groups**:
 		- You will need to escape the `$` by using `$$` to avoid Vector interpreting it as an
-		  [environment variable when loading configuration](/docs/reference/configuration/#escaping)
+		  [environment variable when loading configuration](/docs/reference/environment_variables/#escaping)
 		- If you want a literal `$` in the replacement pattern, you will also need to escape this
 		  with `$$`. When combined with environment variable interpolation in config files this
 		  means you will need to use `$$$$` to have a literal `$` in the replacement pattern.
@@ -69,8 +69,10 @@ remap: functions: replace: {
 			return: "Pineapples and Bananas"
 		},
 		{
-			title: "Replace with capture groups (Note: Use `$$num` in config files)"
+			title: "Replace with capture groups when not set in the configuration file (use `$$num` in config files)"
 			source: #"""
+				# Note that in the context of Vector configuration files, an extra `$` escape character is required
+				# (i.e. `$$num`) to avoid interpreting `num` as an environment variable.
 				replace("foo123bar", r'foo(?P<num>\d+)bar', "$num")
 				"""#
 			return: "123"

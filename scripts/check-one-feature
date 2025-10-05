@@ -55,6 +55,7 @@ then
 else
   exit=$?
   cat $log
+  echo "Error: Failed to run $0 $feature"
 fi
 
 exit $exit

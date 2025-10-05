@@ -61,5 +61,8 @@
   "browserslist": [
     "since 2017-06"
   ],
-  "devDependencies": {}
+  "devDependencies": {
+    "prettier": "^3.5.3",
+    "prettier-plugin-go-template": "^0.0.15"
+  }
 }

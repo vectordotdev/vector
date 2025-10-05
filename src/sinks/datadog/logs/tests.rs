@@ -5,37 +5,39 @@ use std::sync::Arc;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{
-    channel::mpsc::{Receiver, TryRecvError},
     StreamExt,
+    channel::mpsc::{Receiver, TryRecvError},
 };
 use http::request::Parts;
 use indoc::indoc;
 use vector_lib::{
-    config::{init_telemetry, Tags, Telemetry},
+    config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 
-use crate::sinks::datadog::test_utils::{test_server, ApiStatus};
+use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
     extra_context::ExtraContext,
     http::HttpError,
     sinks::{
-        util::retries::RetryLogic,
-        util::test::{load_sink, load_sink_with_context},
+        datadog::test_utils::{ApiStatus, test_server},
+        util::{
+            retries::RetryLogic,
+            test::{load_sink, load_sink_with_context},
+        },
     },
     test_util::{
         components::{
+            COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, SINK_TAGS,
             run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
-            run_and_assert_sink_error, COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, SINK_TAGS,
+            run_and_assert_sink_error,
         },
         next_addr, random_lines_with_stream,
     },
     tls::TlsError,
 };
-
-use super::{super::DatadogApiError, config::DatadogLogsConfig, service::LogApiRetry};
 
 fn event_with_api_key(msg: &str, key: &str) -> Event {
     let mut e = Event::Log(LogEvent::from(msg));
@@ -87,7 +89,7 @@ async fn start_test_detail(
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -242,7 +244,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
 
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -254,7 +256,7 @@ async fn api_key_in_metadata_inner(api_status: ApiStatus) {
 
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
-        println!("EVENT: {:?}", e);
+        println!("EVENT: {e:?}");
         e.iter_logs_mut().for_each(|log| {
             log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
@@ -322,7 +324,7 @@ async fn multiple_api_keys_inner(api_status: ApiStatus) {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -375,7 +377,7 @@ async fn headers_inner(api_status: ApiStatus) {
 
     let addr = next_addr();
     // Swap out the endpoint so we can force send it to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -387,7 +389,7 @@ async fn headers_inner(api_status: ApiStatus) {
 
     let api_key = "0xDECAFBAD";
     let events = events.map(|mut e| {
-        println!("EVENT: {:?}", e);
+        println!("EVENT: {e:?}");
         e.iter_logs_mut().for_each(|log| {
             log.metadata_mut().set_datadog_api_key(Arc::from(api_key));
         });
@@ -445,7 +447,7 @@ async fn does_not_send_too_big_payloads() {
     .unwrap();
 
     let addr = next_addr();
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -478,7 +480,7 @@ async fn does_not_send_too_big_payloads() {
 
     assert!(!sizes.is_empty());
     for size in sizes {
-        assert!(size < 5_000_000, "{} not less than max", size);
+        assert!(size < 5_000_000, "{size} not less than max");
     }
 }
 
@@ -499,7 +501,7 @@ async fn global_options() {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -520,9 +522,10 @@ async fn global_options() {
         .collect::<Vec<_>>()
         .await;
 
-    assert!(keys
-        .iter()
-        .all(|value| value.to_str().unwrap() == "global-key"));
+    assert!(
+        keys.iter()
+            .all(|value| value.to_str().unwrap() == "global-key")
+    );
 }
 
 #[tokio::test]
@@ -545,7 +548,7 @@ async fn override_global_options() {
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -566,7 +569,8 @@ async fn override_global_options() {
         .collect::<Vec<_>>()
         .await;
 
-    assert!(keys
-        .iter()
-        .all(|value| value.to_str().unwrap() == "local-key"));
+    assert!(
+        keys.iter()
+            .all(|value| value.to_str().unwrap() == "local-key")
+    );
 }

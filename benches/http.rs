@@ -1,20 +1,23 @@
 use std::net::SocketAddr;
 
-use criterion::{criterion_group, BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput};
+use criterion::{BatchSize, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group};
 use futures::TryFutureExt;
 use hyper::{
-    service::{make_service_fn, service_fn},
     Body, Response, Server,
+    service::{make_service_fn, service_fn},
 };
 use tokio::runtime::Runtime;
 use vector::{
-    config, sinks,
-    sinks::util::{BatchConfig, Compression},
+    Error, config,
+    sinks::{
+        self,
+        util::{BatchConfig, Compression},
+    },
     sources,
+    template::Template,
     test_util::{next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
-    Error,
 };
-use vector_lib::codecs::{encoding::FramingConfig, TextSerializerConfig};
+use vector_lib::codecs::{TextSerializerConfig, encoding::FramingConfig};
 
 fn benchmark_http(c: &mut Criterion) {
     let num_lines: usize = 1_000;
@@ -48,7 +51,7 @@ fn benchmark_http(c: &mut Criterion) {
                             "out",
                             &["in"],
                             sinks::http::config::HttpSinkConfig {
-                                uri: out_addr.to_string().parse::<http::Uri>().unwrap().into(),
+                                uri: Template::try_from(out_addr.to_string()).unwrap(),
                                 compression: *compression,
                                 method: Default::default(),
                                 auth: Default::default(),

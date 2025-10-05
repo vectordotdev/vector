@@ -9,9 +9,11 @@ pub mod logproto {
 }
 
 pub mod util {
-    use super::logproto;
-    use prost::Message;
     use std::collections::HashMap;
+
+    use prost::Message;
+
+    use super::logproto;
 
     const NANOS_RANGE: i64 = 1_000_000_000;
 
@@ -83,7 +85,7 @@ pub mod util {
         let mut labels: Vec<String> = labels
             .iter()
             .filter(|(k, _)| !RESERVED_LABELS.contains(&k.as_str()))
-            .map(|(k, v)| format!("{}=\"{}\"", k, v))
+            .map(|(k, v)| format!("{k}=\"{v}\""))
             .collect();
         labels.sort();
         format!("{{{}}}", labels.join(", "))
@@ -92,10 +94,12 @@ pub mod util {
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
+    use chrono::prelude::*;
+
     use super::util;
     use crate::util::{Batch, Entry, Stream};
-    use chrono::prelude::*;
-    use std::collections::HashMap;
 
     #[test]
     fn encode_labels() {

@@ -176,7 +176,6 @@ eeyun
 efgh
 Elhage
 emerg
-Enableable
 endianess
 endler
 eni
@@ -199,7 +198,6 @@ extendedstatus
 extrepo
 Failable
 falco
-fanatid
 fanouts
 fastcc
 fastmod
@@ -217,7 +215,6 @@ flamegraph
 Flatbuffers
 flatmaps
 fns
-Fomichev
 foobarfoobarfoo
 footgunning
 Forcepoint
@@ -250,7 +247,6 @@ hec
 heka
 hfs
 highlighters
-Hobden
 hostagent
 hostcall
 hostpath
@@ -295,10 +291,8 @@ JSONAs
 jsonify
 jsonlines
 jszwedko
-kartar
 kebabcase
 kernelmode
-keybase
 keyclock
 keyxxxxx
 Khal
@@ -306,9 +300,7 @@ khvzak
 killall
 kinesisfirehose
 kinit
-Kirill
 klog
-ktff
 labelmap
 lalrpop
 Lamport
@@ -331,7 +323,6 @@ logseverity
 logtypes
 lpop
 lpush
-Luc
 lucperkins
 lukesteensen
 lvl
@@ -518,7 +509,6 @@ serverlogs
 serviceaccount
 servicebus
 sev
-sghall
 shane
 shortcode
 shost
@@ -556,7 +546,6 @@ stackdriver
 stakeholders
 Statds
 statefulset
-Steensen
 streamsink
 strng
 subfooter
@@ -573,7 +562,6 @@ sysinit
 syslogng
 sysv
 Syu
-Szwedko
 tagline
 tagset
 Takeaways
@@ -602,7 +590,6 @@ tocbot
 TOCs
 TODOs
 tokio
-Tomola
 tonydanza
 toolbars
 toproto
@@ -616,7 +603,6 @@ trialled
 Trivago
 trivy
 trl
-Troutwine
 TSIG
 Tsvg
 typechecked

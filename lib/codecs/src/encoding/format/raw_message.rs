@@ -1,8 +1,9 @@
-use crate::encoding::format::common::get_serializer_schema_requirement;
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use vector_core::{config::DataType, event::Event, schema};
+
+use crate::encoding::format::common::get_serializer_schema_requirement;
 
 /// Config used to build a `RawMessageSerializer`.
 #[derive(Debug, Clone, Default, Deserialize, Serialize)]

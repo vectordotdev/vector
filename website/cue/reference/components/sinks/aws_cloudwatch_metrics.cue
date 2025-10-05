@@ -83,7 +83,7 @@ components: sinks: aws_cloudwatch_metrics: components._aws & {
 		]
 	}
 
-	configuration: base.components.sinks.aws_cloudwatch_metrics.configuration & {
+	configuration: generated.components.sinks.aws_cloudwatch_metrics.configuration & {
 		_aws_include: false
 	}
 

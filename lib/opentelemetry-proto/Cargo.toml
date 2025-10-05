@@ -2,20 +2,21 @@
 name = "opentelemetry-proto"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
-edition = "2021"
+edition = "2024"
 publish = false
 
 [build-dependencies]
 prost-build.workspace = true
 tonic-build.workspace = true
+glob.workspace = true
 
 [dependencies]
-bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
+bytes.workspace = true
 chrono.workspace = true
 hex = { version = "0.4.3", default-features = false, features = ["std"] }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false }
-ordered-float = { version = "4.6.0", default-features = false }
-prost .workspace = true
+ordered-float.workspace = true
+prost.workspace = true
 tonic.workspace = true
 vrl.workspace = true
 vector-core = { path = "../vector-core", default-features = false }

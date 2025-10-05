@@ -1,15 +1,19 @@
 #![allow(missing_docs)]
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::{
+    fs::File,
+    io::prelude::*,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use clap::Parser;
 use colored::*;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 
-use crate::config::{self, UnitTestResult};
-use crate::signal;
+use crate::{
+    config::{self, UnitTestResult},
+    signal,
+};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -204,12 +208,12 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
         for (test_name, fails) in aggregated_test_errors {
             #[allow(clippy::print_stdout)]
             {
-                println!("\ntest {}:\n", test_name);
+                println!("\ntest {test_name}:\n");
             }
             for fail in fails {
                 #[allow(clippy::print_stdout)]
                 {
-                    println!("{}\n", fail);
+                    println!("{fail}\n");
                 }
             }
         }

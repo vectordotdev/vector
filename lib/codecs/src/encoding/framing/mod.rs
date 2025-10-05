@@ -7,6 +7,7 @@ mod bytes;
 mod character_delimited;
 mod length_delimited;
 mod newline_delimited;
+mod varint_length_delimited;
 
 use std::fmt::Debug;
 
@@ -18,7 +19,10 @@ pub use length_delimited::{LengthDelimitedEncoder, LengthDelimitedEncoderConfig}
 pub use newline_delimited::{NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig};
 use tokio_util::codec::LinesCodecError;
 
-pub use self::bytes::{BytesEncoder, BytesEncoderConfig};
+pub use self::{
+    bytes::{BytesEncoder, BytesEncoderConfig},
+    varint_length_delimited::{VarintLengthDelimitedEncoder, VarintLengthDelimitedEncoderConfig},
+};
 
 /// An error that occurred while framing bytes.
 pub trait FramingError: std::error::Error + Send + Sync {}
@@ -31,6 +35,12 @@ impl FramingError for LinesCodecError {}
 
 impl From<std::io::Error> for BoxedFramingError {
     fn from(error: std::io::Error) -> Self {
+        Box::new(error)
+    }
+}
+
+impl From<varint_length_delimited::VarintFramingError> for BoxedFramingError {
+    fn from(error: varint_length_delimited::VarintFramingError) -> Self {
         Box::new(error)
     }
 }

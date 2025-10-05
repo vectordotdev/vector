@@ -1,8 +1,8 @@
 use std::pin::Pin;
 
 use futures::{
+    Stream, StreamExt,
     task::{Context, Poll},
-    {Stream, StreamExt},
 };
 
 const DEFAULT_CAPACITY: usize = 1024;
@@ -52,7 +52,7 @@ where
     }
 
     /// Returns a mutable reference to the underlying stream.
-    pub fn get_mut(&mut self) -> &mut T {
+    pub const fn get_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 
@@ -115,7 +115,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use futures::{channel::mpsc, poll, task::Poll, SinkExt, StreamExt};
+    use futures::{SinkExt, StreamExt, channel::mpsc, poll, task::Poll};
 
     use super::ReadyFrames;
 

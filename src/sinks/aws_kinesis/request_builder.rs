@@ -1,8 +1,10 @@
 use std::{io, marker::PhantomData};
 
 use bytes::Bytes;
-use vector_lib::request_metadata::{MetaDescriptive, RequestMetadata};
-use vector_lib::ByteSizeOf;
+use vector_lib::{
+    ByteSizeOf,
+    request_metadata::{MetaDescriptive, RequestMetadata},
+};
 
 use super::{
     record::Record,
@@ -12,8 +14,8 @@ use crate::{
     codecs::{Encoder, Transformer},
     event::{Event, EventFinalizers, Finalizable},
     sinks::util::{
-        metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-        RequestBuilder,
+        Compression, RequestBuilder, metadata::RequestMetadataBuilder,
+        request_builder::EncodeResult,
     },
 };
 

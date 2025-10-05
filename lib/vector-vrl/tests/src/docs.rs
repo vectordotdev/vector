@@ -183,7 +183,7 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
 
     Test {
         name: title,
-        category: format!("docs/{}/{}", category, name),
+        category: format!("docs/{category}/{name}"),
         error: None,
         source,
         object,

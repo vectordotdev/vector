@@ -1,17 +1,16 @@
 use std::collections::HashMap;
 
 use chrono::{DateTime, Utc};
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion};
+use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
 use vector::{
     config::{DataType, TransformOutput},
     event::{Event, LogEvent, Value},
     transforms::{
-        remap::{Remap, RemapConfig},
         SyncTransform, TransformOutputsBuf,
+        remap::{Remap, RemapConfig},
     },
 };
-use vrl::event_path;
-use vrl::prelude::*;
+use vrl::{event_path, prelude::*};
 
 criterion_group!(
     name = benches;
@@ -27,7 +26,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
     let add_fields_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
-            vec![TransformOutput::new(DataType::all(), HashMap::new())],
+            vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
             1,
         );
         tform.transform(event, &mut outputs);
@@ -90,7 +89,7 @@ fn benchmark_remap(c: &mut Criterion) {
 
     let json_parser_runner = |tform: &mut Box<dyn SyncTransform>, event: Event| {
         let mut outputs = TransformOutputsBuf::new_with_capacity(
-            vec![TransformOutput::new(DataType::all(), HashMap::new())],
+            vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
             1,
         );
         tform.transform(event, &mut outputs);
@@ -144,7 +143,7 @@ fn benchmark_remap(c: &mut Criterion) {
     let coerce_runner =
         |tform: &mut Box<dyn SyncTransform>, event: Event, timestamp: DateTime<Utc>| {
             let mut outputs = TransformOutputsBuf::new_with_capacity(
-                vec![TransformOutput::new(DataType::all(), HashMap::new())],
+                vec![TransformOutput::new(DataType::all_bits(), HashMap::new())],
                 1,
             );
             tform.transform(event, &mut outputs);

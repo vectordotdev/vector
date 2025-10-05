@@ -1,21 +1,22 @@
-use vector_lib::codecs::encoding::FramingConfig;
-use vector_lib::codecs::encoding::JsonSerializerConfig;
-use vector_lib::codecs::encoding::JsonSerializerOptions;
-use vector_lib::codecs::encoding::SerializerConfig;
-use vector_lib::codecs::MetricTagValues;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
+    codecs::{
+        MetricTagValues,
+        encoding::{FramingConfig, JsonSerializerConfig, JsonSerializerOptions, SerializerConfig},
+    },
+    configurable::configurable_component,
+    sensitive_string::SensitiveString,
+};
 
 use crate::{
     codecs::{EncodingConfigWithFraming, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     http::Auth as HttpAuthConfig,
     sinks::{
+        Healthcheck, VectorSink,
         http::config::{HttpMethod, HttpSinkConfig},
         util::{
-            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, http::RequestConfig,
         },
-        Healthcheck, VectorSink,
     },
     tls::TlsConfig,
 };
@@ -139,7 +140,7 @@ impl SinkConfig for AxiomConfig {
     }
 
     fn input(&self) -> Input {
-        Input::new(DataType::Metric | DataType::Log)
+        Input::new(DataType::Metric | DataType::Log | DataType::Trace)
     }
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
@@ -186,17 +187,18 @@ mod test {
 #[cfg(feature = "axiom-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use std::env;
+
     use chrono::{DateTime, Duration, Utc};
     use futures::stream;
     use serde::{Deserialize, Serialize};
-    use std::env;
     use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
     use super::*;
     use crate::{
         config::SinkContext,
         sinks::axiom::AxiomConfig,
-        test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+        test_util::components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
     };
 
     #[tokio::test]
@@ -267,16 +269,15 @@ mod integration_tests {
 
         let query_req = QueryRequest {
             apl: format!(
-                "['{}'] | where test_id == '{}' | order by _time desc | limit 2",
-                dataset, test_id
+                "['{dataset}'] | where test_id == '{test_id}' | order by _time desc | limit 2"
             ),
             start_time: Utc::now() - Duration::minutes(10),
             end_time: Utc::now() + Duration::minutes(10),
         };
         let query_res: QueryResponse = client
-            .post(format!("{}/v1/datasets/_apl?format=legacy", url))
+            .post(format!("{url}/v1/datasets/_apl?format=legacy"))
             .header("X-Axiom-Org-Id", org_id)
-            .header("Authorization", format!("Bearer {}", token))
+            .header("Authorization", format!("Bearer {token}"))
             .json(&query_req)
             .send()
             .await

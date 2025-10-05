@@ -1,21 +1,20 @@
 use itertools::Itertools;
-use vector_lib::config::LogNamespace;
-use vector_lib::internal_event::EventsReceived;
+use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    internal_event::EventsReceived,
+    lookup::path,
+};
 
 use crate::{
+    SourceSender,
     codecs::Decoder,
     common::mqtt::MqttConnector,
-    event::BatchNotifier,
-    event::Event,
+    event::{BatchNotifier, Event},
     internal_events::{EndpointBytesReceived, StreamClosedError},
     shutdown::ShutdownSignal,
-    sources::mqtt::MqttSourceConfig,
-    sources::util,
-    SourceSender,
+    sources::{mqtt::MqttSourceConfig, util},
 };
-use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS};
-use vector_lib::config::LegacyKey;
-use vector_lib::lookup::path;
 
 pub struct MqttSource {
     connector: MqttConnector,
@@ -107,7 +106,7 @@ impl MqttSource {
     }
 
     fn apply_metadata(&self, publish: &Publish, event: &mut Event) {
-        if let Event::Log(ref mut log) = event {
+        if let Event::Log(log) = event {
             self.log_namespace.insert_source_metadata(
                 MqttSourceConfig::NAME,
                 log,

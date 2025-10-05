@@ -192,19 +192,20 @@ components: {
 		}
 
 		if Args.kind == "transform" {
-			aggregate?:       #FeaturesAggregate
-			convert?:         #FeaturesConvert
-			enrich?:          #FeaturesEnrich
-			filter?:          #FeaturesFilter
-			parse?:           #FeaturesParse
-			program?:         #FeaturesProgram
-			proxy?:           #FeaturesProxy
-			reduce?:          #FeaturesReduce
-			route?:           #FeaturesRoute
-			exclusive_route?: #FeaturesExclusiveRoute
-			sanitize?:        #FeaturesSanitize
-			shape?:           #FeaturesShape
-			window?:          #FeaturesWindow
+			aggregate?:               #FeaturesAggregate
+			convert?:                 #FeaturesConvert
+			enrich?:                  #FeaturesEnrich
+			filter?:                  #FeaturesFilter
+			parse?:                   #FeaturesParse
+			program?:                 #FeaturesProgram
+			proxy?:                   #FeaturesProxy
+			reduce?:                  #FeaturesReduce
+			route?:                   #FeaturesRoute
+			exclusive_route?:         #FeaturesExclusiveRoute
+			sanitize?:                #FeaturesSanitize
+			shape?:                   #FeaturesShape
+			window?:                  #FeaturesWindow
+			incremental_to_absolute?: #FeaturesIncrementalToAbsolute
 		}
 
 		if Args.kind == "sink" {
@@ -338,6 +339,8 @@ components: {
 
 	#FeaturesWindow: {}
 
+	#FeaturesIncrementalToAbsolute: {}
+
 	#FeaturesSend: {
 		_args: {
 			egress_method: string
@@ -439,20 +442,21 @@ components: {
 	}
 
 	#Input: {
-		logs:    bool
-		metrics: #MetricInput | null
-		traces:  bool
+		description?: string
+		logs:         bool
+		metrics:      #MetricInput | null
+		traces:       bool
 	}
 
 	#LogOutput: [Name=string]: {
 		description: string
-		name:        Name
-		fields:      #Schema
+		name?:       Name
+		fields?:     #Schema
 	}
 
-	#TraceOutput: {
+	#TraceOutput: [Name=string]: {
 		description: string
-		fields:      #Schema
+		fields?:     #Schema
 	}
 
 	#MetricInput: {
@@ -465,12 +469,12 @@ components: {
 	}
 
 	#MetricOutput: [Name=string]: {
-		description:       string
-		relevant_when?:    string
-		tags:              #MetricTags
-		name:              Name
-		type:              #MetricType
-		default_namespace: string
+		description:        string
+		relevant_when?:     string
+		tags?:              #MetricTags
+		name?:              Name
+		type?:              #MetricType
+		default_namespace?: string
 	}
 
 	#OutputData: {
@@ -626,7 +630,7 @@ components: {
 					enabled: {
 						common: false
 						description: """
-							Whether or not to require TLS for incoming/outgoing connections.
+							Whether to require TLS for incoming/outgoing connections.
 
 							When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 							more information.
@@ -741,7 +745,7 @@ components: {
 						enabled: {
 							common: true
 							description: """
-								Whether or not to require TLS for incoming/outgoing connections.
+								Whether to require TLS for incoming/outgoing connections.
 
 								When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 								more information.
@@ -1289,8 +1293,8 @@ components: {
 					authorization code using VRL. Here is an example that looks up the token in an
 					enrichment table backed by a CSV file.
 
-					Currently custom VRL auth has access to `headers` and `address` (IP address of the
-					client).
+					Currently custom VRL auth has access to `headers`, `path`, and `address` (IP
+					address of the client).
 
 					```yaml
 					\(kind)s:

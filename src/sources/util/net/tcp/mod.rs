@@ -3,7 +3,7 @@ pub mod request_limiter;
 use std::{io, mem::drop, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
-use futures::{future::BoxFuture, FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, future::BoxFuture};
 use futures_util::future::OptionFuture;
 use ipnet::IpNet;
 use listenfd::ListenFd;
@@ -16,18 +16,19 @@ use tokio::{
 };
 use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::finalization::AddBatchNotifier;
-use vector_lib::lookup::{path, OwnedValuePath};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
     EstimatedJsonEncodedSizeOf,
+    codecs::StreamDecodingError,
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    finalization::AddBatchNotifier,
+    lookup::{OwnedValuePath, path},
 };
 use vrl::value::ObjectMap;
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
 use crate::{
+    SourceSender,
     codecs::ReadyFrames,
     config::SourceContext,
     event::{BatchNotifier, BatchStatus, Event},
@@ -40,7 +41,6 @@ use crate::{
     sources::util::AfterReadExt,
     tcp::TcpKeepaliveConfig,
     tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-    SourceSender,
 };
 
 pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
@@ -266,16 +266,16 @@ async fn handle_stream<T>(
         }
     };
 
-    if let Some(keepalive) = keepalive {
-        if let Err(error) = socket.set_keepalive(keepalive) {
-            warn!(message = "Failed configuring TCP keepalive.", %error);
-        }
+    if let Some(keepalive) = keepalive
+        && let Err(error) = socket.set_keepalive(keepalive)
+    {
+        warn!(message = "Failed configuring TCP keepalive.", %error);
     }
 
-    if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-        if let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes) {
-            warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
-        }
+    if let Some(receive_buffer_bytes) = receive_buffer_bytes
+        && let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes)
+    {
+        warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
     }
 
     let socket = socket.after_read(move |byte_size| {

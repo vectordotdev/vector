@@ -7,22 +7,23 @@ use std::{
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{
-    channel::mpsc::{unbounded, UnboundedSender},
+    StreamExt, TryStreamExt,
+    channel::mpsc::{UnboundedSender, unbounded},
     future, pin_mut,
     stream::BoxStream,
-    StreamExt, TryStreamExt,
 };
 use http::StatusCode;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
-    handshake::server::{ErrorResponse, Request, Response},
     Message,
+    handshake::server::{ErrorResponse, Request, Response},
 };
 use tokio_util::codec::Encoder as _;
 use tracing::Instrument;
 use url::Url;
 use uuid::Uuid;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     event::{Event, EventStatus},
     finalization::Finalizable,
     internal_event::{
@@ -30,27 +31,25 @@ use vector_lib::{
     },
     sink::StreamSink,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-    EstimatedJsonEncodedSizeOf,
 };
 
+use super::{
+    WebSocketListenerSinkConfig,
+    buffering::MessageBufferingConfig,
+    config::{ExtraMetricTagsConfig, SubProtocolConfig},
+};
 use crate::{
     codecs::{Encoder, Transformer},
     common::http::server_auth::HttpServerAuthMatcher,
     internal_events::{
-        ConnectionOpen, OpenGauge, WsListenerConnectionEstablished,
-        WsListenerConnectionFailedError, WsListenerConnectionShutdown, WsListenerMessageSent,
-        WsListenerSendError,
+        ConnectionOpen, OpenGauge, WebSocketListenerConnectionEstablished,
+        WebSocketListenerConnectionFailedError, WebSocketListenerConnectionShutdown,
+        WebSocketListenerMessageSent, WebSocketListenerSendError,
     },
     sinks::{
         prelude::*,
         websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
     },
-};
-
-use super::{
-    buffering::MessageBufferingConfig,
-    config::{ExtraMetricTagsConfig, SubProtocolConfig},
-    WebSocketListenerSinkConfig,
 };
 
 pub struct WebSocketListenerSink {
@@ -214,7 +213,7 @@ impl WebSocketListenerSink {
                 ));
                 return Ok(response);
             };
-            match auth.handle_auth(Some(&addr), req.headers()) {
+            match auth.handle_auth(Some(&addr), req.headers(), req.uri().path()) {
                 Ok(_) => {
                     extra_tags.append(&mut Self::extract_extra_tags(
                         &extra_tags_config,
@@ -266,7 +265,7 @@ impl WebSocketListenerSink {
             .await
             .map_err(|err| {
                 debug!("Error during websocket handshake: {}", err);
-                emit!(WsListenerConnectionFailedError {
+                emit!(WebSocketListenerConnectionFailedError {
                     error: Box::new(err),
                     extra_tags: extra_tags.clone()
                 })
@@ -283,7 +282,7 @@ impl WebSocketListenerSink {
                 &buffer.lock().expect("mutex poisoned"),
                 |(_, message)| {
                     if let Err(error) = tx.unbounded_send(message.clone()) {
-                        emit!(WsListenerSendError {
+                        emit!(WebSocketListenerSendError {
                             error: Box::new(error)
                         });
                     }
@@ -293,7 +292,7 @@ impl WebSocketListenerSink {
             debug!("WebSocket connection established: {}", addr);
 
             peers.insert(addr, tx);
-            emit!(WsListenerConnectionEstablished {
+            emit!(WebSocketListenerConnectionEstablished {
                 client_count: peers.len(),
                 extra_tags: extra_tags.clone()
             });
@@ -322,7 +321,7 @@ impl WebSocketListenerSink {
         });
         let forward_data_to_client = rx
             .map(|message| {
-                emit!(WsListenerMessageSent {
+                emit!(WebSocketListenerMessageSent {
                     message_size: message.len(),
                     extra_tags: extra_tags.clone()
                 });
@@ -336,7 +335,7 @@ impl WebSocketListenerSink {
             .factor_first()
             .0
         {
-            emit!(WsListenerSendError {
+            emit!(WebSocketListenerSendError {
                 error: Box::new(error)
             })
         }
@@ -345,7 +344,7 @@ impl WebSocketListenerSink {
             let mut peers = peers.lock().expect("mutex poisoned");
             debug!("{} disconnected.", &addr);
             peers.remove(&addr);
-            emit!(WsListenerConnectionShutdown {
+            emit!(WebSocketListenerConnectionShutdown {
                 client_count: peers.len(),
                 extra_tags: extra_tags.clone()
             });
@@ -420,10 +419,10 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     }
 
                     let peers = peers.lock().expect("mutex poisoned");
-                    let broadcast_recipients = peers.iter().map(|(_, ws_sink)| ws_sink);
+                    let broadcast_recipients = peers.values();
                     for recp in broadcast_recipients {
                         if let Err(error) = recp.unbounded_send(message.clone()) {
-                            emit!(WsListenerSendError {
+                            emit!(WebSocketListenerSendError {
                                 error: Box::new(error)
                             });
                         } else {
@@ -445,16 +444,16 @@ impl StreamSink<Event> for WebSocketListenerSink {
 
 #[cfg(test)]
 mod tests {
-    use futures::{channel::mpsc::UnboundedReceiver, SinkExt, Stream, StreamExt};
-    use futures_util::stream;
     use std::{future::ready, num::NonZeroUsize};
-    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
 
+    use futures::{SinkExt, Stream, StreamExt, channel::mpsc::UnboundedReceiver};
+    use futures_util::stream;
     use tokio::{task::JoinHandle, time};
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
     use vector_lib::{
         codecs::{
-            decoding::{DeserializerConfig, JsonDeserializerOptions},
             JsonDeserializerConfig,
+            decoding::{DeserializerConfig, JsonDeserializerOptions},
         },
         lookup::lookup_v2::ConfigValuePath,
         metrics::Controller,
@@ -462,7 +461,6 @@ mod tests {
     };
 
     use super::*;
-
     use crate::{
         event::{Event, LogEvent},
         sinks::websocket_server::{
@@ -470,7 +468,7 @@ mod tests {
             config::InternalMetricsConfig,
         },
         test_util::{
-            components::{run_and_assert_sink_compliance, SINK_TAGS},
+            components::{SINK_TAGS, run_and_assert_sink_compliance},
             next_addr,
         },
     };

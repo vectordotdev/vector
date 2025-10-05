@@ -4,15 +4,17 @@
 //!
 //! [maxmind]: https://dev.maxmind.com/geoip/geoip2/downloadable
 //! [geolite]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
-use std::{collections::BTreeMap, fs, net::IpAddr, sync::Arc, time::SystemTime};
+use std::{collections::BTreeMap, fs, net::IpAddr, path::PathBuf, sync::Arc, time::SystemTime};
 
 use maxminddb::{
-    geoip2::{AnonymousIp, City, ConnectionType, Isp},
     Reader,
+    geoip2::{AnonymousIp, City, ConnectionType, Isp},
 };
 use ordered_float::NotNan;
-use vector_lib::configurable::configurable_component;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use vector_lib::{
+    configurable::configurable_component,
+    enrichment::{Case, Condition, IndexHandle, Table},
+};
 use vrl::value::{ObjectMap, Value};
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
@@ -56,7 +58,7 @@ pub struct GeoipConfig {
     ///
     /// [geoip2]: https://dev.maxmind.com/geoip/geoip2/downloadable
     /// [geolite2]: https://dev.maxmind.com/geoip/geoip2/geolite2/#Download_Access
-    pub path: String,
+    pub path: PathBuf,
 
     /// The locale to use when querying the database.
     ///
@@ -87,7 +89,7 @@ fn default_locale() -> String {
 impl GenerateConfig for GeoipConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            path: "/path/to/GeoLite2-City.mmdb".to_string(),
+            path: "/path/to/GeoLite2-City.mmdb".into(),
             locale: default_locale(),
         })
         .unwrap()
@@ -115,7 +117,7 @@ pub struct Geoip {
 impl Geoip {
     /// Creates a new GeoIP struct from the provided config.
     pub fn new(config: GeoipConfig) -> crate::Result<Self> {
-        let dbreader = Arc::new(Reader::open_readfile(config.path.clone())?);
+        let dbreader = Arc::new(Reader::open_readfile(&config.path)?);
         let dbkind =
             DatabaseKind::try_from(dbreader.metadata.database_type.as_str()).map_err(|_| {
                 format!(
@@ -156,7 +158,7 @@ impl Geoip {
         };
 
         macro_rules! add_field {
-            ($k:expr, $v:expr) => {
+            ($k:expr_2021, $v:expr_2021) => {
                 add_field($k, $v.map(Into::into))
             };
         }
@@ -264,9 +266,10 @@ impl Table for Geoip {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
-        let mut rows = self.find_table_rows(case, condition, select, index)?;
+        let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
@@ -283,6 +286,7 @@ impl Table for Geoip {
         _: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        _wildcard: Option<&Value>,
         _: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         match condition.first() {
@@ -333,7 +337,8 @@ impl std::fmt::Debug for Geoip {
         write!(
             f,
             "Geoip {} database {})",
-            self.config.locale, self.config.path
+            self.config.locale,
+            self.config.path.display()
         )
     }
 }
@@ -468,7 +473,7 @@ mod tests {
     #[test]
     fn custom_mmdb_type_error() {
         let result = Geoip::new(GeoipConfig {
-            path: "tests/data/custom-type.mmdb".to_string(),
+            path: "tests/data/custom-type.mmdb".into(),
             locale: default_locale(),
         });
 
@@ -502,7 +507,7 @@ mod tests {
 
     fn find_select(ip: &str, database: &str, select: Option<&[String]>) -> Option<ObjectMap> {
         Geoip::new(GeoipConfig {
-            path: database.to_string(),
+            path: database.into(),
             locale: default_locale(),
         })
         .unwrap()
@@ -513,6 +518,7 @@ mod tests {
                 value: ip.into(),
             }],
             select,
+            None,
             None,
         )
         .unwrap()

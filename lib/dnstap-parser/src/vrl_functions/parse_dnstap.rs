@@ -1,9 +1,9 @@
-use crate::parser::DnstapParser;
-use crate::schema::DnstapEventSchema;
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
 use vector_lib::event::LogEvent;
 use vrl::prelude::*;
+
+use crate::{parser::DnstapParser, schema::DnstapEventSchema};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseDnstap;
@@ -120,7 +120,7 @@ impl Function for ParseDnstap {
                                     "questionTypeId": 6
                                 }
                             ],
-                            "rcodeName": "BADSIG"
+                            "rcodeName": "BADVERS"
                         },
                         "responseAddress": "2001:502:7094::30",
                         "responsePort": 53,
@@ -191,9 +191,10 @@ impl FunctionExpression for ParseDnstapFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, TimeZone, Utc};
     use vrl::value;
+
+    use super::*;
 
     test_function![
         parse_dnstap => ParseDnstap;
@@ -295,7 +296,7 @@ mod tests {
                             questionTypeId: 6,
                         }
                         ],
-                        rcodeName: "BADSIG",
+                        rcodeName: "BADVERS",
                     },
                     responseAddress: "2001:502:7094::30",
                     responsePort: 53,

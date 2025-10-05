@@ -1,12 +1,12 @@
 use async_trait::async_trait;
-use futures::stream::BoxStream;
-use futures::{FutureExt, StreamExt};
+use futures::{FutureExt, StreamExt, stream::BoxStream};
 use vector_lib::configurable::configurable_component;
 
-use crate::config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext};
-use crate::event::Event;
-use crate::sinks::util::StreamSink;
-use crate::sinks::{Healthcheck, VectorSink};
+use crate::{
+    config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
+    event::Event,
+    sinks::{Healthcheck, VectorSink, util::StreamSink},
+};
 
 #[derive(Debug)]
 struct BackpressureSink {

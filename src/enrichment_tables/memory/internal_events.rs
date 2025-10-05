@@ -1,6 +1,5 @@
 use metrics::{counter, gauge};
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{configurable::configurable_component, internal_event::InternalEvent};
 
 /// Configuration of internal metrics for enrichment memory table.
 #[configurable_component]

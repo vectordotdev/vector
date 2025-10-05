@@ -1,14 +1,19 @@
-use std::collections::HashMap;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
 use bytes::Bytes;
-use pulsar::producer::Message;
-use pulsar::{Error as PulsarError, Executor, MultiTopicProducer, ProducerOptions, Pulsar};
+use pulsar::{
+    Error as PulsarError, Executor, MultiTopicProducer, ProducerOptions, Pulsar, producer::Message,
+};
 use tokio::sync::Mutex;
 
-use crate::internal_events::PulsarSendingError;
-use crate::sinks::{prelude::*, pulsar::request_builder::PulsarMetadata};
+use crate::{
+    internal_events::PulsarSendingError,
+    sinks::{prelude::*, pulsar::request_builder::PulsarMetadata},
+};
 
 #[derive(Clone)]
 pub(super) struct PulsarRequest {

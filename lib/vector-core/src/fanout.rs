@@ -460,26 +460,27 @@ impl Sender {
 
 #[cfg(test)]
 mod tests {
-    use std::mem;
-    use std::num::NonZeroUsize;
+    use std::{mem, num::NonZeroUsize};
 
     use futures::poll;
     use tokio::sync::mpsc::UnboundedSender;
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use tracing::Span;
     use vector_buffers::{
+        WhenFull,
         topology::{
             builder::TopologyBuilder,
             channel::{BufferReceiver, BufferSender},
         },
-        WhenFull,
     };
     use vrl::value::Value;
 
     use super::{ControlMessage, Fanout};
-    use crate::event::{Event, EventArray, LogEvent};
-    use crate::test_util::{collect_ready, collect_ready_events};
-    use crate::{config::ComponentKey, event::EventContainer};
+    use crate::{
+        config::ComponentKey,
+        event::{Event, EventArray, EventContainer, LogEvent},
+        test_util::{collect_ready, collect_ready_events},
+    };
 
     async fn build_sender_pair(
         capacity: usize,
@@ -622,7 +623,10 @@ mod tests {
         fanout.send(clones, None).await.expect("should not fail");
 
         for receiver in receivers {
-            assert_eq!(collect_ready(receiver.into_stream()), &[events.clone()]);
+            assert_eq!(
+                collect_ready(receiver.into_stream()),
+                std::slice::from_ref(&events)
+            );
         }
     }
 

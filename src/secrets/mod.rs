@@ -4,8 +4,10 @@ use std::collections::{HashMap, HashSet};
 use enum_dispatch::enum_dispatch;
 use vector_lib::configurable::configurable_component;
 
-use crate::config::GenerateConfig;
-use crate::{config::SecretBackend, signal};
+use crate::{
+    config::{GenerateConfig, SecretBackend},
+    signal,
+};
 
 #[cfg(feature = "secrets-aws-secrets-manager")]
 mod aws_secrets_manager;

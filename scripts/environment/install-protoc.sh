@@ -1,4 +1,4 @@
-#! /usr/bin/env bash
+#!/usr/bin/env bash
 set -o errexit -o verbose
 
 # A parameter can be optionally passed to this script to specify an alternative
