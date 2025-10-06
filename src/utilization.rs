@@ -5,6 +5,9 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(debug_assertions)]
+use std::sync::Arc;
+
 use futures::{Stream, StreamExt};
 use metrics::Gauge;
 use pin_project::pin_project;
@@ -70,6 +73,8 @@ pub(crate) struct Timer {
     gauge: Gauge,
     #[cfg(debug_assertions)]
     report_count: u32,
+    #[cfg(debug_assertions)]
+    component_id: Arc<str>,
 }
 
 /// A simple, specialized timer for tracking spans of waiting vs not-waiting
@@ -81,7 +86,7 @@ pub(crate) struct Timer {
 /// to be of uniform length and used to aggregate span data into time-weighted
 /// averages.
 impl Timer {
-    pub(crate) fn new(gauge: Gauge) -> Self {
+    pub(crate) fn new(gauge: Gauge, #[cfg(debug_assertions)] component_id: Arc<str>) -> Self {
         Self {
             overall_start: Instant::now(),
             span_start: Instant::now(),
@@ -91,6 +96,8 @@ impl Timer {
             gauge,
             #[cfg(debug_assertions)]
             report_count: 0,
+            #[cfg(debug_assertions)]
+            component_id,
         }
     }
 
@@ -132,8 +139,10 @@ impl Timer {
 
         #[cfg(debug_assertions)]
         {
-            if self.report_count % 6 == 0 {
-                debug!(utilization = %avg_rounded);
+            // Note that changing the reporting interval would also affect the actual metric reporting frequency.
+            // This check reduces debug log spamming.
+            if self.report_count.is_multiple_of(5) {
+                debug!(component_id = %self.component_id, utilization = %avg_rounded);
             }
             self.report_count = self.report_count.wrapping_add(1);
         }
@@ -211,7 +220,14 @@ impl UtilizationEmitter {
         key: ComponentKey,
         gauge: Gauge,
     ) -> UtilizationComponentSender {
-        self.timers.insert(key.clone(), Timer::new(gauge));
+        self.timers.insert(
+            key.clone(),
+            Timer::new(
+                gauge,
+                #[cfg(debug_assertions)]
+                key.id().into(),
+            ),
+        );
         UtilizationComponentSender {
             timer_tx: self.timer_tx.clone(),
             component_key: key,
