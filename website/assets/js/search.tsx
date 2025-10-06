@@ -100,12 +100,7 @@ const Result = ({ hit, components, category }) => {
           {isRootPage && <components.Highlight hit={hit} attribute="title" />}
         </div>
         <p className="text-gray-600 text-sm">
-          {hit.content && (
-            <span dangerouslySetInnerHTML={{__html: hit.content}} />
-          )}
-          {!hit.content && (
-            <span style={{ wordBreak: 'break-word' }}>{hit.document.itemUrl}</span>
-          )}
+          <span style={{ wordBreak: 'break-word' }}>{hit.document.itemUrl}</span>
         </p>
       </div>
     </a>
