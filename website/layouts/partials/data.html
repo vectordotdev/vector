@@ -1791,12 +1791,12 @@
         </div>
       </div>
 
-      {{ with .ctx.return }}
+      {{ if isset .ctx "return" }}
         <div>
           <span class="font-light"> Return </span>
 
           <div class="text-sm">
-            {{ template "code" . }}
+            {{ template "code" .ctx.return }}
           </div>
         </div>
       {{ end }}
@@ -1945,12 +1945,12 @@
         </div>
       {{ end }}
 
-      {{ with .ctx.return }}
+      {{ if isset .ctx "return" }}
         <div>
           <span class="font-semibold text-gray-600 dark:text-gray-300"> Resulting event </span>
 
           <div class="mt-2">
-            {{ template "code" . }}
+            {{ template "code" .ctx.return }}
           </div>
         </div>
       {{ end }}
