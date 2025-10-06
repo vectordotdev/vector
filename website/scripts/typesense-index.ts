@@ -261,7 +261,13 @@ async function buildIndex() {
       path: `${publicPath}/guides/developer/**/**.html`,
       displayPath: "guides/developer",
       ranking: 40,
-    }
+    },
+    {
+      name: "Vector highlights",
+      path: `${publicPath}/highlights/**/**.html`,
+      displayPath: "highlights",
+      ranking: 40,
+    },
   ];
 
   // Recurse through each section and push the resulting records to `allRecords`
