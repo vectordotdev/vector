@@ -186,7 +186,6 @@ jobs:
       - check-fmt
       - check-clippy
       - test
-      - check-version
       - check-scripts
       - check-events
       - check-licenses
