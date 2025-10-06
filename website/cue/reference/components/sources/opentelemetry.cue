@@ -295,14 +295,11 @@ components: sources: opentelemetry: {
 						inputs:
 							- otel.logs
 						type: opentelemetry
-						use_otlp_encoding: true
 						protocol:
 							type: http
 							uri: http://localhost:5318/v1/logs
-							method: post
-							request:
-								headers:
-									content-type: "application/x-protobuf"
+						encoding:
+							codec: otlp
 				```
 				"""
 		}
