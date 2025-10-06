@@ -270,9 +270,9 @@ async function buildIndex() {
     },
     {
       name: "Upgrade guides",
-      path: `${publicPath}/highlights/**/*-upgrade-guide.html`,
+      path: `${publicPath}/highlights/*-upgrade-guide/**.html`,
       displayPath: "highlights/",
-      ranking: 1,
+      ranking: 10,
     },
   ];
 
