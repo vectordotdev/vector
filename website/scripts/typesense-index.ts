@@ -265,8 +265,14 @@ async function buildIndex() {
     {
       name: "Vector highlights",
       path: `${publicPath}/highlights/**/**.html`,
-      displayPath: "highlights",
+      displayPath: "highlights/",
       ranking: 40,
+    },
+    {
+      name: "Upgrade guides",
+      path: `${publicPath}/highlights/**/*-upgrade-guide.html`,
+      displayPath: "highlights/",
+      ranking: 0,
     },
   ];
 
@@ -276,7 +282,7 @@ async function buildIndex() {
 
     // We shouldn't index upgrade guides
     if (section.name === "Vector highlights") {
-      files = files.filter((path) => !path.includes("upgrade-guide"))
+      files = files.filter((path) => !path.includes("-upgrade-guide"))
     }
 
     console.log(chalk.blue(`Indexing ${section.displayPath}...`));
