@@ -25,7 +25,7 @@ impl OtlpSerializerConfig {
 
     /// The data type of events that are accepted by `OtlpSerializer`.
     pub fn input_type(&self) -> DataType {
-        DataType::Log | DataType::Metric | DataType::Trace
+        DataType::Log | DataType::Trace
     }
 
     /// The schema required by the serializer.
@@ -42,13 +42,14 @@ impl OtlpSerializerConfig {
 ///
 /// # Implementation approach
 ///
-/// This serializer converts Vector's internal event representation to the appropriate OTLP message type:
-/// - `Event::Log` → `ExportLogsServiceRequest`
-/// - `Event::Metric` → `ExportMetricsServiceRequest`
-/// - `Event::Trace` → `ExportTraceServiceRequest`
+/// This serializer converts Vector's internal event representation to the appropriate OTLP message type
+/// based on the top-level field in the event:
+/// - `resourceLogs` → `ExportLogsServiceRequest`
+/// - `resourceMetrics` → `ExportMetricsServiceRequest`
+/// - `resourceSpans` → `ExportTraceServiceRequest`
 ///
-/// The implementation should be the inverse of what the `opentelemetry` source does when
-/// `use_otlp_decoding` is enabled, ensuring round-trip compatibility.
+/// The implementation is the inverse of what the `opentelemetry` source does when decoding,
+/// ensuring round-trip compatibility.
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // Fields will be used once encoding is implemented
 pub struct OtlpSerializer {
