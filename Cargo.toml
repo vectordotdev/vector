@@ -577,6 +577,7 @@ enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
 codecs-syslog = ["vector-lib/syslog"]
+codecs-opentelemetry = ["vector-lib/opentelemetry"]
 
 # Secrets
 secrets = ["secrets-aws-secrets-manager"]
@@ -855,7 +856,7 @@ sinks-mqtt = ["dep:rumqttc"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
-sinks-opentelemetry = ["sinks-http"]
+sinks-opentelemetry = ["sinks-http", "codecs-opentelemetry"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-postgres = ["dep:sqlx"]

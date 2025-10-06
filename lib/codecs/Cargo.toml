@@ -20,7 +20,7 @@ flate2.workspace = true
 influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
-opentelemetry-proto = { path = "../opentelemetry-proto" }
+opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
 ordered-float.workspace = true
 prost.workspace = true
 prost-reflect.workspace = true
@@ -54,3 +54,4 @@ vrl.workspace = true
 
 [features]
 syslog = ["dep:syslog_loose"]
+opentelemetry = ["dep:opentelemetry-proto"]
