@@ -9,6 +9,11 @@ pub const RESOURCE_LOGS_ROOT_FIELD: &str = "resource_logs";
 pub const RESOURCE_METRICS_ROOT_FIELD: &str = "resource_metrics";
 pub const RESOURCE_SPANS_ROOT_FIELD: &str = "resource_spans";
 
+// JSON names (camelCase) for the same fields, used when use_json_names is enabled
+pub const RESOURCE_LOGS_JSON_FIELD: &str = "resourceLogs";
+pub const RESOURCE_METRICS_JSON_FIELD: &str = "resourceMetrics";
+pub const RESOURCE_SPANS_JSON_FIELD: &str = "resourceSpans";
+
 /// Service stub and clients.
 pub mod collector {
     pub mod trace {
