@@ -1,4 +1,4 @@
-Added `use_otlp_encoding` option to the `opentelemetry` sink.
-When set to `true` the sink assumes the Vector events are structured based on OTLP.
+Added `otlp` codec for encoding Vector events to OTLP format.
+The codec can be used with sinks that support encoding configuration.
 
 authors: pront
