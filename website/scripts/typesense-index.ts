@@ -1,6 +1,6 @@
 import chalk from "chalk";
 import cheerio from "cheerio";
-import {Element} from "domhandler";
+import { Element } from "domhandler";
 import dotEnv from "dotenv-defaults";
 import fs from "fs";
 import glob from "glob-promise";
@@ -273,6 +273,12 @@ async function buildIndex() {
   // Recurse through each section and push the resulting records to `allRecords`
   for (const section of sections) {
     let files = await glob(section.path);
+
+    // We shouldn't index upgrade guides
+    if (section.name === "Vector highlights") {
+      files = files.filter((path) => !path.includes("upgrade-guide"))
+    }
+
     console.log(chalk.blue(`Indexing ${section.displayPath}...`));
     await indexHTMLFiles(allRecords, section.name, files, section.ranking);
   }
