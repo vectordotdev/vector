@@ -5,6 +5,10 @@ pub const TRACES_REQUEST_MESSAGE_TYPE: &str =
 pub const METRICS_REQUEST_MESSAGE_TYPE: &str =
     "opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest";
 
+pub const RESOURCE_LOGS_ROOT_FIELD: &str = "resource_logs";
+pub const RESOURCE_METRICS_ROOT_FIELD: &str = "resource_metrics";
+pub const RESOURCE_SPANS_ROOT_FIELD: &str = "resource_spans";
+
 /// Service stub and clients.
 pub mod collector {
     pub mod trace {

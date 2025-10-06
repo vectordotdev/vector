@@ -2,6 +2,7 @@ use crate::encoding::ProtobufSerializer;
 use bytes::BytesMut;
 use opentelemetry_proto::proto::{
     DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE,
+    RESOURCE_LOGS_ROOT_FIELD, RESOURCE_METRICS_ROOT_FIELD, RESOURCE_SPANS_ROOT_FIELD,
     TRACES_REQUEST_MESSAGE_TYPE,
 };
 use tokio_util::codec::Encoder;
@@ -95,10 +96,21 @@ impl Encoder<Event> for OtlpSerializer {
     type Error = vector_common::Error;
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
-        match &event {
-            Event::Log(_) => self.logs_descriptor.encode(event, buffer),
-            Event::Metric(_) => self.metrics_descriptor.encode(event, buffer),
-            Event::Trace(_) => self.traces_descriptor.encode(event, buffer),
+        // Determine which descriptor to use based on top-level OTLP fields
+        // This handles events that were decoded with use_otlp_decoding enabled
+        if event.contains(RESOURCE_LOGS_ROOT_FIELD) {
+            self.logs_descriptor.encode(event, buffer)
+        } else if event.contains(RESOURCE_METRICS_ROOT_FIELD) {
+            // Currently the OTLP metrics are Vector logs (not metrics).
+            self.metrics_descriptor.encode(event, buffer)
+        } else if event.contains(RESOURCE_SPANS_ROOT_FIELD) {
+            self.traces_descriptor.encode(event, buffer)
+        } else {
+            Err(format!(
+                "Event does not contain any OTLP top-level fields ({RESOURCE_LOGS_ROOT_FIELD}, \
+                {RESOURCE_METRICS_ROOT_FIELD}, or {RESOURCE_SPANS_ROOT_FIELD})",
+            )
+                .into())
         }
     }
 }
