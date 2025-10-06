@@ -2,8 +2,7 @@ use crate::encoding::ProtobufSerializer;
 use bytes::BytesMut;
 use opentelemetry_proto::proto::{
     DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE,
-    RESOURCE_LOGS_JSON_FIELD, RESOURCE_LOGS_ROOT_FIELD, RESOURCE_METRICS_JSON_FIELD,
-    RESOURCE_METRICS_ROOT_FIELD, RESOURCE_SPANS_JSON_FIELD, RESOURCE_SPANS_ROOT_FIELD,
+    RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, RESOURCE_SPANS_JSON_FIELD,
     TRACES_REQUEST_MESSAGE_TYPE,
 };
 use tokio_util::codec::Encoder;
@@ -99,33 +98,27 @@ impl Encoder<Event> for OtlpSerializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         // Determine which descriptor to use based on top-level OTLP fields
         // This handles events that were decoded with use_otlp_decoding enabled
-        // We check both protobuf field names (snake_case) and JSON field names (camelCase)
-        // because the deserializer may use either depending on the use_json_names option
+        // The deserializer uses use_json_names: true, so fields are in camelCase
         match &event {
             Event::Log(log) => {
-                if log.contains(RESOURCE_LOGS_ROOT_FIELD) || log.contains(RESOURCE_LOGS_JSON_FIELD)
-                {
+                if log.contains(RESOURCE_LOGS_JSON_FIELD) {
                     self.logs_descriptor.encode(event, buffer)
-                } else if log.contains(RESOURCE_METRICS_ROOT_FIELD)
-                    || log.contains(RESOURCE_METRICS_JSON_FIELD)
-                {
+                } else if log.contains(RESOURCE_METRICS_JSON_FIELD) {
                     // Currently the OTLP metrics are Vector logs (not metrics).
                     self.metrics_descriptor.encode(event, buffer)
                 } else {
                     Err(format!(
-                        "Log event does not contain OTLP top-level fields ({RESOURCE_LOGS_ROOT_FIELD}/{RESOURCE_LOGS_JSON_FIELD} or {RESOURCE_METRICS_ROOT_FIELD}/{RESOURCE_METRICS_JSON_FIELD})",
+                        "Log event does not contain OTLP top-level fields ({RESOURCE_LOGS_JSON_FIELD} or {RESOURCE_METRICS_JSON_FIELD})",
                     )
                         .into())
                 }
             }
             Event::Trace(trace) => {
-                if trace.contains(RESOURCE_SPANS_ROOT_FIELD)
-                    || trace.contains(RESOURCE_SPANS_JSON_FIELD)
-                {
+                if trace.contains(RESOURCE_SPANS_JSON_FIELD) {
                     self.traces_descriptor.encode(event, buffer)
                 } else {
                     Err(format!(
-                        "Trace event does not contain OTLP top-level field ({RESOURCE_SPANS_ROOT_FIELD}/{RESOURCE_SPANS_JSON_FIELD})",
+                        "Trace event does not contain OTLP top-level field ({RESOURCE_SPANS_JSON_FIELD})",
                     )
                         .into())
                 }
