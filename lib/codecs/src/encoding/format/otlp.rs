@@ -103,9 +103,12 @@ impl Encoder<Event> for OtlpSerializer {
         // because the deserializer may use either depending on the use_json_names option
         match &event {
             Event::Log(log) => {
-                if log.contains(RESOURCE_LOGS_ROOT_FIELD) || log.contains(RESOURCE_LOGS_JSON_FIELD) {
+                if log.contains(RESOURCE_LOGS_ROOT_FIELD) || log.contains(RESOURCE_LOGS_JSON_FIELD)
+                {
                     self.logs_descriptor.encode(event, buffer)
-                } else if log.contains(RESOURCE_METRICS_ROOT_FIELD) || log.contains(RESOURCE_METRICS_JSON_FIELD) {
+                } else if log.contains(RESOURCE_METRICS_ROOT_FIELD)
+                    || log.contains(RESOURCE_METRICS_JSON_FIELD)
+                {
                     // Currently the OTLP metrics are Vector logs (not metrics).
                     self.metrics_descriptor.encode(event, buffer)
                 } else {
@@ -116,7 +119,9 @@ impl Encoder<Event> for OtlpSerializer {
                 }
             }
             Event::Trace(trace) => {
-                if trace.contains(RESOURCE_SPANS_ROOT_FIELD) || trace.contains(RESOURCE_SPANS_JSON_FIELD) {
+                if trace.contains(RESOURCE_SPANS_ROOT_FIELD)
+                    || trace.contains(RESOURCE_SPANS_JSON_FIELD)
+                {
                     self.traces_descriptor.encode(event, buffer)
                 } else {
                     Err(format!(
