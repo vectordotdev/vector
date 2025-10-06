@@ -98,19 +98,33 @@ impl Encoder<Event> for OtlpSerializer {
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         // Determine which descriptor to use based on top-level OTLP fields
         // This handles events that were decoded with use_otlp_decoding enabled
-        if event.contains(RESOURCE_LOGS_ROOT_FIELD) {
-            self.logs_descriptor.encode(event, buffer)
-        } else if event.contains(RESOURCE_METRICS_ROOT_FIELD) {
-            // Currently the OTLP metrics are Vector logs (not metrics).
-            self.metrics_descriptor.encode(event, buffer)
-        } else if event.contains(RESOURCE_SPANS_ROOT_FIELD) {
-            self.traces_descriptor.encode(event, buffer)
-        } else {
-            Err(format!(
-                "Event does not contain any OTLP top-level fields ({RESOURCE_LOGS_ROOT_FIELD}, \
-                {RESOURCE_METRICS_ROOT_FIELD}, or {RESOURCE_SPANS_ROOT_FIELD})",
-            )
-                .into())
+        match &event {
+            Event::Log(log) => {
+                if log.contains(RESOURCE_LOGS_ROOT_FIELD) {
+                    self.logs_descriptor.encode(event, buffer)
+                } else if log.contains(RESOURCE_METRICS_ROOT_FIELD) {
+                    // Currently the OTLP metrics are Vector logs (not metrics).
+                    self.metrics_descriptor.encode(event, buffer)
+                } else {
+                    Err(format!(
+                        "Log event does not contain OTLP top-level fields ({RESOURCE_LOGS_ROOT_FIELD} or {RESOURCE_METRICS_ROOT_FIELD})",
+                    )
+                        .into())
+                }
+            }
+            Event::Trace(trace) => {
+                if trace.contains(RESOURCE_SPANS_ROOT_FIELD) {
+                    self.traces_descriptor.encode(event, buffer)
+                } else {
+                    Err(format!(
+                        "Trace event does not contain OTLP top-level field ({RESOURCE_SPANS_ROOT_FIELD})",
+                    )
+                        .into())
+                }
+            }
+            Event::Metric(_) => {
+                Err("OTLP serializer does not support native Vector metrics yet.".into())
+            }
         }
     }
 }
