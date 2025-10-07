@@ -1,11 +1,14 @@
 use crate::codecs::Transformer;
 use vector_lib::{
     codecs::{
-        BytesEncoder, CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+        CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
         encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
     },
     configurable::configurable_component,
 };
+
+#[cfg(feature = "codecs-opentelemetry")]
+use vector_lib::codecs::BytesEncoder;
 
 /// Encoding configuration.
 #[configurable_component]
@@ -129,6 +132,7 @@ impl EncodingConfigWithFraming {
                 | Serializer::RawMessage(_)
                 | Serializer::Text(_),
             ) => NewlineDelimitedEncoder::default().into(),
+            #[cfg(feature = "codecs-opentelemetry")]
             (None, Serializer::Otlp(_)) => BytesEncoder.into(),
         };
 

@@ -128,6 +128,7 @@ impl Encoder<Framer> {
                 | Serializer::Text(_),
                 _,
             ) => "text/plain",
+            #[cfg(feature = "codecs-opentelemetry")]
             (Serializer::Otlp(_), _) => "application/x-protobuf",
         }
     }
