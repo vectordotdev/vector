@@ -20,12 +20,14 @@ use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol:
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::encoding::Serializer::Otlp,
     emit,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
 };
+
+#[cfg(feature = "codecs-opentelemetry")]
+use vector_lib::codecs::encoding::Serializer::Otlp;
 
 pub struct WebSocketSink {
     transformer: Transformer,
@@ -82,7 +84,9 @@ impl WebSocketSink {
         };
 
         match self.encoder.serializer() {
-            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) | Otlp(_) => true,
+            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
+            #[cfg(feature = "codecs-opentelemetry")]
+            Otlp(_) => true,
             Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
         }
     }
