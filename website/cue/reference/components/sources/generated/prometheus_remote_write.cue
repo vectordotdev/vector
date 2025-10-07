@@ -112,7 +112,7 @@ generated: components: sources: prometheus_remote_write: configuration: {
 			}
 		}
 	}
-	metadata_conflicts: {
+	metadata_conflict_strategy: {
 		description: "Defines the behavior for handling conflicting metric metadata."
 		required:    false
 		type: string: {

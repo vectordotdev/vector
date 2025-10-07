@@ -60,7 +60,7 @@ pub struct PrometheusRemoteWriteConfig {
     /// Defines the behavior for handling conflicting metric metadata.
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
-    metadata_conflict_strategy: MetadataConflictsStrategy,
+    metadata_conflict_strategy: MetadataConflictStrategy,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -86,7 +86,7 @@ impl PrometheusRemoteWriteConfig {
             address,
             tls: None,
             auth: None,
-            metadata_conflicts: MetadataConflictsStrategy::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: false.into(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -100,7 +100,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             address: "127.0.0.1:9090".parse().unwrap(),
             tls: None,
             auth: None,
-            metadata_conflicts: MetadataConflictsStrategy::default(),
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -114,7 +114,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource {
-            metadata_conflicts: self.metadata_conflicts.clone(),
+            metadata_conflict_strategy: self.metadata_conflict_strategy.clone(),
             skip_nan_values: self.skip_nan_values,
         };
         source.run(
@@ -142,7 +142,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
 
 #[derive(Clone)]
 struct RemoteWriteSource {
-    metadata_conflicts: MetadataConflictsStrategy,
+    metadata_conflict_strategy: MetadataConflictStrategy,
     skip_nan_values: bool,
 }
 
@@ -157,7 +157,7 @@ impl RemoteWriteSource {
                 format!("Could not decode write request: {error}"),
             )
         })?;
-        let reject_on_conflict = self.metadata_conflicts == MetadataConflictsStrategy::Reject;
+        let reject_on_conflict = self.metadata_conflict_strategy == MetadataConflictStrategy::Reject;
         parser::parse_request(request, reject_on_conflict, self.skip_nan_values).map_err(|error| {
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
@@ -228,7 +228,7 @@ mod test {
             address,
             auth: None,
             tls: tls.clone(),
-            metadata_conflicts: Default::default(),
+            metadata_conflict_strategy: Default::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -343,7 +343,7 @@ mod test {
             address,
             auth: None,
             tls: None,
-            metadata_conflicts: Default::default(),
+            metadata_conflict_strategy: Default::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -414,7 +414,7 @@ mod test {
             address,
             auth: None,
             tls: None,
-            metadata_conflicts: Default::default(),
+            metadata_conflict_strategy: Default::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: true,
@@ -484,7 +484,7 @@ mod test {
             address,
             auth: None,
             tls: None,
-            metadata_conflicts: Default::default(),
+            metadata_conflict_strategy: Default::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -568,7 +568,7 @@ mod test {
             address,
             auth: None,
             tls: None,
-            metadata_conflicts: MetadataConflictsStrategy::Ignore,
+            metadata_conflict_strategy: MetadataConflictStrategy::Ignore,
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -655,7 +655,7 @@ mod test {
             address,
             auth: None,
             tls: None,
-            metadata_conflicts: MetadataConflictsStrategy::Reject,
+            metadata_conflict_strategy: MetadataConflictStrategy::Reject,
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -756,7 +756,7 @@ mod integration_tests {
             address: source_receive_address(),
             auth: None,
             tls: None,
-            metadata_conflicts: Default::default(),
+            metadata_conflict_strategy: Default::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
