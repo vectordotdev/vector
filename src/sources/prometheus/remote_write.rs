@@ -29,7 +29,7 @@ use crate::{
 #[configurable_component]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum MetadataConflictsStrategy {
+pub enum MetadataConflictStrategy {
     /// Silently ignore metadata conflicts, keeping the first metadata entry. This aligns with Prometheus/Thanos behavior.
     Ignore,
     /// Reject requests with conflicting metadata by returning an HTTP 400 error. This is the default to preserve backwards compatibility.
