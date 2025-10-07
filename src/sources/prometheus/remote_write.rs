@@ -60,7 +60,7 @@ pub struct PrometheusRemoteWriteConfig {
     /// Defines the behavior for handling conflicting metric metadata.
     #[configurable(metadata(docs::advanced))]
     #[serde(default)]
-    metadata_conflicts: MetadataConflictsStrategy,
+    metadata_conflict_strategy: MetadataConflictsStrategy,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
