@@ -156,7 +156,7 @@ pub fn get_slugified_app_name() -> String {
 /// This should be called once during application startup.
 pub fn set_global_color(enabled: bool) {
     if let Err(e) = USE_COLOR.set(enabled) {
-        error!(message = "Failed to set global color", %e);
+        error!(message = "Failed to set global color.", %e);
     }
 }
 
