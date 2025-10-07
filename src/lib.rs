@@ -169,7 +169,7 @@ pub fn use_color() -> bool {
 /// Formats VRL diagnostics honoring the global color setting.
 pub fn format_vrl_diagnostics(
     source: &str,
-    diagnostics: impl Into<vrl::diagnostic::Diagnostics>,
+    diagnostics: impl Into<vrl::diagnostic::DiagnosticList>,
 ) -> String {
     let formatter = vrl::diagnostic::Formatter::new(source, diagnostics);
     if use_color() {
