@@ -1,7 +1,8 @@
 ---
 title: Using AWS Secrets Manager with Vector
 short: AWS Secrets Manager
-weight: 7
+description: Integrate AWS Secrets Manager with Vector to securely manage sensitive configuration values like API keys and database passwords.
+weight: 2
 tags: ["aws", "secrets", "security", "authentication"]
 domain: enriching
 ---
