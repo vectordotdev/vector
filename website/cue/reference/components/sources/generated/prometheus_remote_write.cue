@@ -118,7 +118,7 @@ generated: components: sources: prometheus_remote_write: configuration: {
 		type: string: {
 			default: "reject"
 			enum: {
-				ignore: "Silently ignore metadata conflicts, keeping the first metadata entry. This aligns with Prometheus/Thanos behavior."
+				ignore: "Silently ignore metadata conflicts and keep the first metadata entry. This aligns with Prometheus/Thanos behavior."
 				reject: "Reject requests with conflicting metadata by returning an HTTP 400 error. This default behavior preserves backwards compatibility."
 			}
 		}
