@@ -41,7 +41,11 @@ enum Watcher {
 impl Watcher {
     fn add_paths(&mut self, config_paths: &[PathBuf]) -> Result<(), Error> {
         for path in config_paths {
-            self.watch(path, RecursiveMode::Recursive)?;
+            if path.exists() {
+                self.watch(path, RecursiveMode::Recursive)?;
+            } else {
+                debug!(message = "Skipping non-existent path.", path = ?path);
+            }
         }
         Ok(())
     }
