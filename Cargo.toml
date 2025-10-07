@@ -669,7 +669,17 @@ sources-mqtt = ["dep:rumqttc"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-okta = ["sources-utils-http-client"]
-sources-opentelemetry = ["dep:hex", "vector-lib/opentelemetry", "dep:prost", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-utils-http-headers", "sources-vector"]
+sources-opentelemetry = [
+  "dep:hex",
+  "codecs-opentelemetry",
+  "vector-lib/opentelemetry",
+  "dep:prost",
+  "dep:prost-types",
+  "sources-http_server",
+  "sources-utils-http",
+  "sources-utils-http-headers",
+  "sources-vector",
+]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["sources-prometheus-scrape", "sources-prometheus-remote-write", "sources-prometheus-pushgateway"]
 sources-prometheus-scrape = ["sinks-prometheus", "sources-utils-http-client", "vector-lib/prometheus"]
