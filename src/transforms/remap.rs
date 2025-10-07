@@ -228,11 +228,24 @@ impl RemapConfig {
         config.set_custom(MeaningList::default());
 
         let res = compile_vrl(&source, &functions, &state, config)
-            .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())
+            .map_err(|diagnostics| {
+                let fmt = Formatter::new(&source, diagnostics);
+                if crate::use_color() {
+                    fmt.colored().to_string()
+                } else {
+                    fmt.to_string()
+                }
+            })
             .map(|result| {
+                let fmt = Formatter::new(&source, result.warnings);
+                let warnings = if crate::use_color() {
+                    fmt.colored().to_string()
+                } else {
+                    fmt.to_string()
+                };
                 (
                     result.program,
-                    Formatter::new(&source, result.warnings).to_string(),
+                    warnings,
                     result.config.get_custom::<MeaningList>().unwrap().clone(),
                 )
             });

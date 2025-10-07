@@ -160,7 +160,12 @@ impl HttpServerAuthConfig {
                     warnings,
                     config: _,
                 } = compile_vrl(source, &functions, &state, config).map_err(|diagnostics| {
-                    Formatter::new(source, diagnostics).colored().to_string()
+                    let fmt = Formatter::new(source, diagnostics);
+                    if crate::use_color() {
+                        fmt.colored().to_string()
+                    } else {
+                        fmt.to_string()
+                    }
                 })?;
 
                 if !program.final_type_info().result.is_boolean() {
@@ -168,7 +173,12 @@ impl HttpServerAuthConfig {
                 }
 
                 if !warnings.is_empty() {
-                    let warnings = Formatter::new(source, warnings).colored().to_string();
+                    let fmt = Formatter::new(source, warnings);
+                    let warnings = if crate::use_color() {
+                        fmt.colored().to_string()
+                    } else {
+                        fmt.to_string()
+                    };
                     warn!(message = "VRL compilation warning.", %warnings);
                 }
 

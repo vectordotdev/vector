@@ -248,17 +248,23 @@ impl Query {
             match compile_vrl(param.value(), functions, &state, config) {
                 Ok(compilation_result) => {
                     if !compilation_result.warnings.is_empty() {
-                        let warnings = Formatter::new(param.value(), compilation_result.warnings)
-                            .colored()
-                            .to_string();
+                        let fmt = Formatter::new(param.value(), compilation_result.warnings);
+                        let warnings = if crate::use_color() {
+                            fmt.colored().to_string()
+                        } else {
+                            fmt.to_string()
+                        };
                         warn!(message = "VRL compilation warnings.", %warnings, internal_log_rate_limit = true);
                     }
                     Some(compilation_result.program)
                 }
                 Err(diagnostics) => {
-                    let error = Formatter::new(param.value(), diagnostics)
-                        .colored()
-                        .to_string();
+                    let fmt = Formatter::new(param.value(), diagnostics);
+                    let error = if crate::use_color() {
+                        fmt.colored().to_string()
+                    } else {
+                        fmt.to_string()
+                    };
                     warn!(message = "VRL compilation failed.", %error, internal_log_rate_limit = true);
                     None
                 }

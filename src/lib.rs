@@ -133,6 +133,7 @@ pub use source_sender::SourceSender;
 pub use vector_lib::{Error, Result, event, metrics, schema, shutdown, tcp, tls};
 
 static APP_NAME_SLUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+static USE_COLOR: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
 /// The name used to identify this Vector application.
 ///
@@ -149,6 +150,18 @@ pub fn get_slugified_app_name() -> String {
     APP_NAME_SLUG
         .get_or_init(|| get_app_name().to_lowercase().replace(' ', "-"))
         .clone()
+}
+
+/// Sets the global color preference for diagnostics and CLI output.
+/// This should be called once during application startup.
+pub fn set_global_color(enabled: bool) {
+    let _ = USE_COLOR.set(enabled);
+}
+
+/// Returns true if color output is globally enabled.
+/// Defaults to false if not set.
+pub fn use_color() -> bool {
+    *USE_COLOR.get_or_init(|| false)
 }
 
 /// The current version of Vector in simplified format.
