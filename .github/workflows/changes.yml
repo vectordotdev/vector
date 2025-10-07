@@ -40,6 +40,8 @@ on:
         value: ${{ jobs.source.outputs.component_docs }}
       markdown:
         value: ${{ jobs.source.outputs.markdown }}
+      scripts:
+        value: ${{ jobs.source.outputs.scripts }}
       website_only:
         value: ${{ jobs.source.outputs.website_only }}
       install:
@@ -142,6 +144,7 @@ jobs:
       cue: ${{ steps.filter.outputs.cue }}
       component_docs: ${{ steps.filter.outputs.component_docs }}
       markdown: ${{ steps.filter.outputs.markdown }}
+      scripts: ${{ steps.filter.outputs.scripts }}
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
@@ -187,6 +190,8 @@ jobs:
           markdown:
             - '**/**.md'
             - "vdev/**"
+          scripts:
+            - '**/**.sh'
           internal_events:
             - 'src/internal_events/**'
             - "vdev/**"

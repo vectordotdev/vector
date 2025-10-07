@@ -32,6 +32,7 @@ jobs:
   check-fmt:
     name: Check code format
     runs-on: ubuntu-24.04
+    if: needs.changes.outputs.source == 'true'
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -77,19 +78,10 @@ jobs:
         run: scripts/upload-test-results.sh
         if: always()
 
-  check-version:
-    name: Check version
-    runs-on: ubuntu-24.04
-    needs: changes
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          fetch-depth: 0
-      - run: make check-version
-
   check-scripts:
     name: Check scripts
     runs-on: ubuntu-24.04
+    if: needs.changes.outputs.scripts == 'true'
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -196,7 +188,6 @@ jobs:
       - check-fmt
       - check-clippy
       - test
-      - check-version
       - check-scripts
       - check-events
       - check-licenses
