@@ -24,7 +24,7 @@ use vrl::{
         runtime::{Runtime, Terminate},
         state::ExternalEnv,
     },
-    diagnostic::{DiagnosticMessage, Formatter, Note},
+    diagnostic::{DiagnosticMessage, Note},
     path,
     path::ValuePath,
     value::{Kind, Value},
@@ -37,6 +37,7 @@ use crate::{
         TransformOutput, log_schema,
     },
     event::{Event, TargetEvents, VrlTarget},
+    format_vrl_diagnostics,
     internal_events::{RemapMappingAbort, RemapMappingError},
     schema,
     transforms::{SyncTransform, Transform, TransformOutputsBuf},
@@ -228,11 +229,11 @@ impl RemapConfig {
         config.set_custom(MeaningList::default());
 
         let res = compile_vrl(&source, &functions, &state, config)
-            .map_err(|diagnostics| Formatter::new(&source, diagnostics).colored().to_string())
+            .map_err(|diagnostics| format_vrl_diagnostics(&source, diagnostics))
             .map(|result| {
                 (
                     result.program,
-                    Formatter::new(&source, result.warnings).to_string(),
+                    format_vrl_diagnostics(&source, result.warnings),
                     result.config.get_custom::<MeaningList>().unwrap().clone(),
                 )
             });
