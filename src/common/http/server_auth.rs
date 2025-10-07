@@ -17,10 +17,11 @@ use vector_lib::{
 use vrl::{
     compiler::{CompilationResult, CompileConfig, Program, runtime::Runtime},
     core::Value,
-    diagnostic::Formatter,
     prelude::TypeState,
     value::{KeyString, ObjectMap},
 };
+
+use crate::format_vrl_diagnostics;
 
 use super::ErrorMessage;
 
@@ -159,26 +160,15 @@ impl HttpServerAuthConfig {
                     program,
                     warnings,
                     config: _,
-                } = compile_vrl(source, &functions, &state, config).map_err(|diagnostics| {
-                    let fmt = Formatter::new(source, diagnostics);
-                    if crate::use_color() {
-                        fmt.colored().to_string()
-                    } else {
-                        fmt.to_string()
-                    }
-                })?;
+                } = compile_vrl(source, &functions, &state, config)
+                    .map_err(|diagnostics| format_vrl_diagnostics(source, diagnostics))?;
 
                 if !program.final_type_info().result.is_boolean() {
                     return Err("VRL conditions must return a boolean.".into());
                 }
 
                 if !warnings.is_empty() {
-                    let fmt = Formatter::new(source, warnings);
-                    let warnings = if crate::use_color() {
-                        fmt.colored().to_string()
-                    } else {
-                        fmt.to_string()
-                    };
+                    let warnings = format_vrl_diagnostics(source, warnings);
                     warn!(message = "VRL compilation warning.", %warnings);
                 }
 

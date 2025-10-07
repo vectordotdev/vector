@@ -23,13 +23,13 @@ use vector_lib::{
 };
 use vrl::{
     compiler::{CompileConfig, Function, Program, runtime::Runtime},
-    diagnostic::Formatter,
     prelude::TypeState,
 };
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
+    format_vrl_diagnostics,
     http::{Auth, ParamType, ParameterValue, QueryParameterValue, QueryParameters},
     serde::{default_decoding, default_framing_message_based},
     sources,
@@ -248,23 +248,14 @@ impl Query {
             match compile_vrl(param.value(), functions, &state, config) {
                 Ok(compilation_result) => {
                     if !compilation_result.warnings.is_empty() {
-                        let fmt = Formatter::new(param.value(), compilation_result.warnings);
-                        let warnings = if crate::use_color() {
-                            fmt.colored().to_string()
-                        } else {
-                            fmt.to_string()
-                        };
+                        let warnings =
+                            format_vrl_diagnostics(param.value(), compilation_result.warnings);
                         warn!(message = "VRL compilation warnings.", %warnings, internal_log_rate_limit = true);
                     }
                     Some(compilation_result.program)
                 }
                 Err(diagnostics) => {
-                    let fmt = Formatter::new(param.value(), diagnostics);
-                    let error = if crate::use_color() {
-                        fmt.colored().to_string()
-                    } else {
-                        fmt.to_string()
-                    };
+                    let error = format_vrl_diagnostics(param.value(), diagnostics);
                     warn!(message = "VRL compilation failed.", %error, internal_log_rate_limit = true);
                     None
                 }

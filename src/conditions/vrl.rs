@@ -4,7 +4,6 @@ use vrl::{
         CompilationResult, CompileConfig, Program, TypeState, VrlRuntime,
         runtime::{Runtime, RuntimeResult, Terminate},
     },
-    diagnostic::Formatter,
     value::Value,
 };
 
@@ -12,6 +11,7 @@ use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
     config::LogNamespace,
     event::{Event, TargetEvents, VrlTarget},
+    format_vrl_diagnostics,
     internal_events::VrlConditionExecutionError,
 };
 
@@ -64,26 +64,15 @@ impl ConditionalConfig for VrlConfig {
             program,
             warnings,
             config: _,
-        } = compile_vrl(&self.source, &functions, &state, config).map_err(|diagnostics| {
-            let fmt = Formatter::new(&self.source, diagnostics);
-            if crate::use_color() {
-                fmt.colored().to_string()
-            } else {
-                fmt.to_string()
-            }
-        })?;
+        } = compile_vrl(&self.source, &functions, &state, config)
+            .map_err(|diagnostics| format_vrl_diagnostics(&self.source, diagnostics))?;
 
         if !program.final_type_info().result.is_boolean() {
             return Err("VRL conditions must return a boolean.".into());
         }
 
         if !warnings.is_empty() {
-            let fmt = Formatter::new(&self.source, warnings);
-            let warnings = if crate::use_color() {
-                fmt.colored().to_string()
-            } else {
-                fmt.to_string()
-            };
+            let warnings = format_vrl_diagnostics(&self.source, warnings);
             warn!(message = "VRL compilation warning.", %warnings);
         }
 
@@ -144,31 +133,21 @@ impl Conditional for Vrl {
 
         let value_result = result.map_err(|err| match err {
             Terminate::Abort(err) => {
-                let fmt = Formatter::new(
+                let err = format_vrl_diagnostics(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
                         Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 );
-                let err = if crate::use_color() {
-                    fmt.colored().to_string()
-                } else {
-                    fmt.to_string()
-                };
                 format!("source execution aborted: {err}")
             }
             Terminate::Error(err) => {
-                let fmt = Formatter::new(
+                let err = format_vrl_diagnostics(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
                         Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
                 );
-                let err = if crate::use_color() {
-                    fmt.colored().to_string()
-                } else {
-                    fmt.to_string()
-                };
                 format!("source execution failed: {err}")
             }
         });

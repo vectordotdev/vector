@@ -155,13 +155,28 @@ pub fn get_slugified_app_name() -> String {
 /// Sets the global color preference for diagnostics and CLI output.
 /// This should be called once during application startup.
 pub fn set_global_color(enabled: bool) {
-    let _ = USE_COLOR.set(enabled);
+    if let Err(e) = USE_COLOR.set(enabled) {
+        error!(message = "Failed to set global color", %e);
+    }
 }
 
 /// Returns true if color output is globally enabled.
 /// Defaults to false if not set.
 pub fn use_color() -> bool {
     *USE_COLOR.get_or_init(|| false)
+}
+
+/// Formats VRL diagnostics honoring the global color setting.
+pub fn format_vrl_diagnostics(
+    source: &str,
+    diagnostics: impl Into<vrl::diagnostic::Diagnostics>,
+) -> String {
+    let formatter = vrl::diagnostic::Formatter::new(source, diagnostics);
+    if use_color() {
+        formatter.colored().to_string()
+    } else {
+        formatter.to_string()
+    }
 }
 
 /// The current version of Vector in simplified format.
