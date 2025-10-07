@@ -14,10 +14,12 @@ pub use format::{
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
     JsonSerializer, JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer,
     LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
-    NativeSerializerConfig, OtlpSerializer, OtlpSerializerConfig, ProtobufSerializer,
+    NativeSerializerConfig, ProtobufSerializer,
     ProtobufSerializerConfig, ProtobufSerializerOptions, RawMessageSerializer,
     RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
 };
+#[cfg(feature = "opentelemetry")]
+pub use format::{OtlpSerializer, OtlpSerializerConfig};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, LengthDelimitedEncoder,
@@ -275,6 +277,7 @@ pub enum SerializerConfig {
     /// `content-type: application/x-protobuf`.
     ///
     /// [otlp]: https://opentelemetry.io/docs/specs/otlp/
+    #[cfg(feature = "opentelemetry")]
     Otlp,
 
     /// Encodes an event as a [Protobuf][protobuf] message.
@@ -356,6 +359,7 @@ impl From<NativeJsonSerializerConfig> for SerializerConfig {
     }
 }
 
+#[cfg(feature = "opentelemetry")]
 impl From<OtlpSerializerConfig> for SerializerConfig {
     fn from(_: OtlpSerializerConfig) -> Self {
         Self::Otlp
@@ -396,6 +400,7 @@ impl SerializerConfig {
             SerializerConfig::NativeJson => {
                 Ok(Serializer::NativeJson(NativeJsonSerializerConfig.build()))
             }
+            #[cfg(feature = "opentelemetry")]
             SerializerConfig::Otlp => {
                 Ok(Serializer::Otlp(OtlpSerializerConfig::default().build()?))
             }
@@ -424,7 +429,9 @@ impl SerializerConfig {
             SerializerConfig::Avro { .. } | SerializerConfig::Native => {
                 FramingConfig::LengthDelimited(LengthDelimitedEncoderConfig::default())
             }
-            SerializerConfig::Otlp | SerializerConfig::Protobuf(_) => {
+            #[cfg(feature = "opentelemetry")]
+            SerializerConfig::Otlp => FramingConfig::Bytes,
+            SerializerConfig::Protobuf(_) => {
                 FramingConfig::VarintLengthDelimited(VarintLengthDelimitedEncoderConfig::default())
             }
             SerializerConfig::Cef(_)
@@ -453,6 +460,7 @@ impl SerializerConfig {
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
+            #[cfg(feature = "opentelemetry")]
             SerializerConfig::Otlp => OtlpSerializerConfig::default().input_type(),
             SerializerConfig::Protobuf(config) => config.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
@@ -473,6 +481,7 @@ impl SerializerConfig {
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
             SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
+            #[cfg(feature = "opentelemetry")]
             SerializerConfig::Otlp => OtlpSerializerConfig::default().schema_requirement(),
             SerializerConfig::Protobuf(config) => config.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
@@ -501,6 +510,7 @@ pub enum Serializer {
     /// Uses a `NativeJsonSerializer` for serialization.
     NativeJson(NativeJsonSerializer),
     /// Uses an `OtlpSerializer` for serialization.
+    #[cfg(feature = "opentelemetry")]
     Otlp(OtlpSerializer),
     /// Uses a `ProtobufSerializer` for serialization.
     Protobuf(ProtobufSerializer),
@@ -521,9 +531,10 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
-            | Serializer::Otlp(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => false,
+            #[cfg(feature = "opentelemetry")]
+            Serializer::Otlp(_) => false,
         }
     }
 
@@ -544,9 +555,12 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
-            | Serializer::Otlp(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => {
+                panic!("Serializer does not support JSON")
+            }
+            #[cfg(feature = "opentelemetry")]
+            Serializer::Otlp(_) => {
                 panic!("Serializer does not support JSON")
             }
         }
@@ -609,6 +623,7 @@ impl From<NativeJsonSerializer> for Serializer {
     }
 }
 
+#[cfg(feature = "opentelemetry")]
 impl From<OtlpSerializer> for Serializer {
     fn from(serializer: OtlpSerializer) -> Self {
         Self::Otlp(serializer)
@@ -646,6 +661,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             Serializer::Logfmt(serializer) => serializer.encode(event, buffer),
             Serializer::Native(serializer) => serializer.encode(event, buffer),
             Serializer::NativeJson(serializer) => serializer.encode(event, buffer),
+            #[cfg(feature = "opentelemetry")]
             Serializer::Otlp(serializer) => serializer.encode(event, buffer),
             Serializer::Protobuf(serializer) => serializer.encode(event, buffer),
             Serializer::RawMessage(serializer) => serializer.encode(event, buffer),
