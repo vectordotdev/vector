@@ -12,7 +12,7 @@ releases: "0.50.0": {
 		## Release highlights
 
 		- The `opentelemetry` source can now decode data according to the standard [OpenTelemetry protocol ](https://opentelemetry.io/docs/specs/otel/protocol)
-		for all telemetry data types (logs, metrics and traces). This eliminates the need for complex event remapping. It
+		 for all telemetry data types (logs, metrics and traces). This eliminates the need for complex event remapping. It
 		greatly simplifies configuration for OTEL -> Vector -> OTEL use cases or when forwarding data to any system that expects OTLP-formatted telemetry.
 		- A new `varint_length_delimited` framing option is now available which enables compatibility with standard protobuf streaming implementations and tools like ClickHouse.
 		- Introduced a new `incremental_to_absolute` transform, useful when metric data might be lost in transit or for creating a historical record of the metric.
