@@ -341,14 +341,8 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 		}
 	}
 	request: {
-		description: """
-			Middleware settings for outbound requests.
-
-			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
-
-			Note that the retry backoff policy follows the Fibonacci sequence.
-			"""
-		required: false
+		description: "Outbound HTTP request settings for the Prometheus remote write sink."
+		required:    false
 		type: object: options: {
 			adaptive_concurrency: {
 				description: """
@@ -445,6 +439,25 @@ generated: components: sinks: prometheus_remote_write: configuration: {
 						}
 					}
 					uint: {}
+				}
+			}
+			headers: {
+				description: """
+					Additional HTTP headers to add to every HTTP request.
+
+					Values are applied verbatim; template expansion is not supported.
+					"""
+				required: false
+				type: object: {
+					examples: [{
+						Accept:               "text/plain"
+						"X-My-Custom-Header": "A-Value"
+					}]
+					options: "*": {
+						description: "An HTTP request header and its static value."
+						required:    true
+						type: string: {}
+					}
 				}
 			}
 			rate_limit_duration_secs: {
