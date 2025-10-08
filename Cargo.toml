@@ -577,6 +577,7 @@ enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
 codecs-syslog = ["vector-lib/syslog"]
+codecs-opentelemetry = ["vector-lib/opentelemetry"]
 
 # Secrets
 secrets = ["secrets-aws-secrets-manager"]
@@ -668,7 +669,17 @@ sources-mqtt = ["dep:rumqttc"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-okta = ["sources-utils-http-client"]
-sources-opentelemetry = ["dep:hex", "vector-lib/opentelemetry", "dep:prost", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-utils-http-headers", "sources-vector"]
+sources-opentelemetry = [
+  "dep:hex",
+  "codecs-opentelemetry",
+  "vector-lib/opentelemetry",
+  "dep:prost",
+  "dep:prost-types",
+  "sources-http_server",
+  "sources-utils-http",
+  "sources-utils-http-headers",
+  "sources-vector",
+]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["sources-prometheus-scrape", "sources-prometheus-remote-write", "sources-prometheus-pushgateway"]
 sources-prometheus-scrape = ["sinks-prometheus", "sources-utils-http-client", "vector-lib/prometheus"]
@@ -855,7 +866,7 @@ sinks-mqtt = ["dep:rumqttc"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
-sinks-opentelemetry = ["sinks-http"]
+sinks-opentelemetry = ["sinks-http", "codecs-opentelemetry"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-postgres = ["dep:sqlx"]
@@ -1004,7 +1015,8 @@ e2e-tests-opentelemetry = [
   "sources-internal_metrics",
   "transforms-remap",
   "sinks-console",
-  "sinks-file"
+  "sinks-file",
+  "codecs-opentelemetry",
 ]
 
 vector-api-tests = [
