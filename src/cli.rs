@@ -345,7 +345,7 @@ impl SubCommand {
             #[cfg(feature = "api-client")]
             Self::Tap(t) => tap::cmd(t, signals.receiver).await,
             Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
-            #[cfg(feature = "api-client")]
+            #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
             Self::Validate(v) => validate::validate(v, color).await,
             Self::Vrl(s) => {

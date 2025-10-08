@@ -548,7 +548,7 @@ api-client-minimal = [
   "vector-lib/api-client",
 ]
 
-top = ["vector-lib/vector-top"]
+top = ["vector-lib/vector-top", "vector-lib/api-client"]
 
 aws-core = [
   "aws-runtime",
