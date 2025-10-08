@@ -15,6 +15,7 @@ bytes.workspace = true
 chrono.workspace = true
 csv-core = { version = "0.1.12", default-features = false }
 derivative.workspace = true
+derive_more = { version = "0.99", optional = true }
 dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
 influxdb-line-protocol = { version = "2", default-features = false }
@@ -28,8 +29,10 @@ regex.workspace = true
 serde.workspace = true
 serde_with = { version = "3.14.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_json.workspace = true
+serde-aux = { version = "4.5", optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu.workspace = true
+strum = { version = "0.26", features = ["derive"], optional = true }
 syslog_loose = { version = "0.23", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tokio = { workspace = true, features = ["full"] }
@@ -39,6 +42,7 @@ vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
+toml = "0.9.4"
 
 [dev-dependencies]
 futures.workspace = true
@@ -52,4 +56,4 @@ uuid.workspace = true
 vrl.workspace = true
 
 [features]
-syslog = ["dep:syslog_loose"]
+syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux"]
