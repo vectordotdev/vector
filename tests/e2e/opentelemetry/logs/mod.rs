@@ -58,9 +58,9 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
         Value::Object(map) => {
             let normalized = map
                 .iter()
-                // Ignore severityNumber field because Vector's json codec serializes it as a number ("9")
-                // while the collector's OTLP JSON format uses the protobuf enum name ("SEVERITY_NUMBER_INFO").
-                // The protobuf encoder is using the int value, which is what we want.
+                // Ignore severityNumber field because Vector's json codec outputs the numeric value ("9")
+                // while the collector's file exporter outputs the protobuf enum name ("SEVERITY_NUMBER_INFO").
+                // Both formats are valid; we compare severityText instead which matches on both sides.
                 .filter(|(k, _)| k.as_str() != "severityNumber")
                 .map(|(k, v)| (k.clone(), normalize_numbers_to_strings(v)))
                 .collect();
