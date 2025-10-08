@@ -40,6 +40,8 @@ use tokio_util::codec::Encoder as _;
 use tracing::Instrument;
 use url::Url;
 use uuid::Uuid;
+#[cfg(feature = "codecs-opentelemetry")]
+use vector_lib::codecs::encoding::Serializer::Otlp;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     event::{Event, EventStatus},
@@ -50,8 +52,6 @@ use vector_lib::{
     sink::StreamSink,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
-#[cfg(feature = "codecs-opentelemetry")]
-use vector_lib::codecs::encoding::Serializer::Otlp;
 
 pub struct WebSocketListenerSink {
     tls: MaybeTlsSettings,
