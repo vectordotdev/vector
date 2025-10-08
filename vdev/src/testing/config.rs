@@ -74,7 +74,7 @@ pub struct ComposeConfig {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub volumes: BTreeMap<String, VolumeDefinition>,
     #[serde(default)]
-    pub networks: BTreeMap<String, BTreeMap<String, String>>,
+    pub networks: BTreeMap<String, BTreeMap<String, Value>>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
