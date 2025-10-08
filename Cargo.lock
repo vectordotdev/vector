@@ -12070,7 +12070,6 @@ dependencies = [
  "colored",
  "console-subscriber",
  "criterion",
- "crossterm 0.29.0",
  "csv",
  "databend-client",
  "deadpool",
@@ -12134,8 +12133,6 @@ dependencies = [
  "nkeys",
  "nom 8.0.0",
  "notify",
- "num-format",
- "number_prefix",
  "opendal",
  "openssl",
  "openssl-probe",
@@ -12157,7 +12154,6 @@ dependencies = [
  "quickcheck",
  "rand 0.9.2",
  "rand_distr",
- "ratatui",
  "rdkafka",
  "redis",
  "regex",
@@ -12462,6 +12458,7 @@ dependencies = [
  "vector-lookup",
  "vector-stream",
  "vector-tap",
+ "vector-top",
  "vrl",
 ]
 
@@ -12516,6 +12513,29 @@ dependencies = [
  "vector-buffers",
  "vector-common",
  "vector-core",
+]
+
+[[package]]
+name = "vector-top"
+version = "0.1.0"
+dependencies = [
+ "chrono",
+ "clap",
+ "crossterm 0.29.0",
+ "exitcode",
+ "futures 0.3.31",
+ "futures-util",
+ "glob",
+ "humantime",
+ "indoc",
+ "num-format",
+ "number_prefix",
+ "ratatui",
+ "tokio",
+ "tokio-stream",
+ "url",
+ "vector-api-client",
+ "vector-common",
 ]
 
 [[package]]

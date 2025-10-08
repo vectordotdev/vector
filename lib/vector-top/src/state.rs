@@ -9,9 +9,9 @@ use ratatui::{
     text::Span,
 };
 use tokio::sync::mpsc;
-use vector_lib::internal_event::DEFAULT_OUTPUT;
+use vector_common::internal_event::DEFAULT_OUTPUT;
 
-use crate::config::ComponentKey;
+use vector_common::config::ComponentKey;
 
 type IdentifiedMetric = (ComponentKey, i64);
 
