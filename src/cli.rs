@@ -8,12 +8,12 @@ use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
 use crate::service;
 #[cfg(feature = "api-client")]
 use crate::tap;
-#[cfg(feature = "api-client")]
-use crate::top;
 use crate::{
     config, convert_config, generate, generate_schema, get_version, graph, list, signal, unit_test,
     validate,
 };
+#[cfg(feature = "top")]
+use vector_lib::top;
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]

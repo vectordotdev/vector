@@ -5,13 +5,28 @@ mod events;
 mod metrics;
 mod state;
 
+use std::net::{Ipv4Addr, SocketAddr};
+
 use clap::Parser;
 pub use cmd::{cmd, top};
 pub use dashboard::is_tty;
 use glob::Pattern;
 use url::Url;
 
-use crate::config::api::default_graphql_url;
+// FIXME duplicated code
+/// By default, the API binds to 127.0.0.1:8686. This function should remain public;
+/// `vector top`  will use it to determine which to connect to by default, if no URL
+/// override is provided.
+pub fn default_address() -> Option<SocketAddr> {
+    Some(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8686))
+}
+
+/// Default GraphQL API address
+pub fn default_graphql_url() -> Url {
+    let addr = default_address().unwrap();
+    Url::parse(&format!("http://{addr}/graphql"))
+        .expect("Couldn't parse default API URL. Please report this.")
+}
 
 /// Top options
 #[derive(Parser, Debug, Clone)]
@@ -59,3 +74,4 @@ impl Opts {
         url
     }
 }
+
