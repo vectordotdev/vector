@@ -147,13 +147,14 @@ static HEADER: [&str; NUM_COLUMNS] = [
 struct Widgets<'a> {
     constraints: Vec<Constraint>,
     url_string: &'a str,
-    opts: &'a super::Opts,
+    interval: u32,
+    human_metrics: bool,
     title: &'a str,
 }
 
 impl<'a> Widgets<'a> {
     /// Creates a new Widgets, containing constraints to re-use across renders.
-    pub fn new(title: &'a str, url_string: &'a str, opts: &'a super::Opts) -> Self {
+    pub fn new(title: &'a str, url_string: &'a str, interval: u32, human_metrics: bool) -> Self {
         let constraints = vec![
             Constraint::Length(3),
             Constraint::Max(90),
@@ -163,7 +164,8 @@ impl<'a> Widgets<'a> {
         Self {
             constraints,
             url_string,
-            opts,
+            interval,
+            human_metrics,
             title,
         }
     }
@@ -179,7 +181,7 @@ impl<'a> Widgets<'a> {
         let mut text = vec![
             Span::from(self.url_string),
             Span::styled(
-                format!(" | Sampling @ {}ms", self.opts.interval.thousands_format()),
+                format!(" | Sampling @ {}ms", self.interval.thousands_format()),
                 Style::default().fg(Color::Gray),
             ),
             Span::from(" | "),
@@ -231,24 +233,24 @@ impl<'a> Widgets<'a> {
                 format_metric(
                     r.received_events_total,
                     r.received_events_throughput_sec,
-                    self.opts.human_metrics,
+                    self.human_metrics,
                 ),
                 format_metric_bytes(
                     r.received_bytes_total,
                     r.received_bytes_throughput_sec,
-                    self.opts.human_metrics,
+                    self.human_metrics,
                 ),
                 format_metric(
                     r.sent_events_total,
                     r.sent_events_throughput_sec,
-                    self.opts.human_metrics,
+                    self.human_metrics,
                 ),
                 format_metric_bytes(
                     r.sent_bytes_total,
                     r.sent_bytes_throughput_sec,
-                    self.opts.human_metrics,
+                    self.human_metrics,
                 ),
-                if self.opts.human_metrics {
+                if self.human_metrics {
                     r.errors.human_format()
                 } else {
                     r.errors.thousands_format()
@@ -266,7 +268,7 @@ impl<'a> Widgets<'a> {
                     let sent_events_metric = format_metric(
                         output.sent_events_total,
                         output.sent_events_throughput_sec,
-                        self.opts.human_metrics,
+                        self.human_metrics,
                     );
                     let mut data = [""; NUM_COLUMNS]
                         .into_iter()
@@ -369,7 +371,8 @@ pub fn is_tty() -> bool {
 pub async fn init_dashboard<'a>(
     title: &'a str,
     url: &'a str,
-    opts: &'a super::Opts,
+    interval: u32,
+    human_metrics: bool,
     mut state_rx: state::StateRx,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -392,7 +395,7 @@ pub async fn init_dashboard<'a>(
     // Clear the screen, readying it for output
     terminal.clear()?;
 
-    let widgets = Widgets::new(title, url, opts);
+    let widgets = Widgets::new(title, url, interval, human_metrics);
 
     loop {
         tokio::select! {
