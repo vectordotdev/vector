@@ -37,7 +37,11 @@ fn read_file_helper(filename: &str) -> Result<String, io::Error> {
 fn extract_timestamp(value: &Value) -> u64 {
     value
         .get("timeUnixNano")
-        .and_then(|v| v.as_str().and_then(|s| s.parse::<u64>().ok()).or_else(|| v.as_u64()))
+        .and_then(|v| {
+            v.as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                .or_else(|| v.as_u64())
+        })
         .expect("Missing or invalid 'timeUnixNano' in log record")
 }
 
