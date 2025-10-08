@@ -42,7 +42,6 @@ use url::Url;
 use uuid::Uuid;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::encoding::Serializer::Otlp,
     event::{Event, EventStatus},
     finalization::Finalizable,
     internal_event::{
@@ -51,6 +50,8 @@ use vector_lib::{
     sink::StreamSink,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
+#[cfg(feature = "codecs-opentelemetry")]
+use vector_lib::codecs::encoding::Serializer::Otlp;
 
 pub struct WebSocketListenerSink {
     tls: MaybeTlsSettings,
@@ -92,7 +93,9 @@ impl WebSocketListenerSink {
         };
 
         match self.encoder.serializer() {
-            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) | Otlp(_) => true,
+            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
+            #[cfg(feature = "codecs-opentelemetry")]
+            Otlp(_) => true,
             Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
         }
     }
