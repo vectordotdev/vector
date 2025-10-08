@@ -26,7 +26,7 @@ use super::{
 };
 
 // FIXME this is duplicated code and should be in a common crate
-pub const fn is_allocation_tracking_enabled() -> bool {
+pub const fn is_allocation_tracing_enabled() -> bool {
     cfg!(feature = "allocation-tracing")
 }
 
@@ -124,7 +124,7 @@ fn format_metric_bytes(total: i64, throughput: i64, human_metrics: bool) -> Stri
     }
 }
 
-const NUM_COLUMNS: usize = if is_allocation_tracking_enabled() {
+const NUM_COLUMNS: usize = if is_allocation_tracing_enabled() {
     10
 } else {
     9
@@ -281,7 +281,7 @@ impl<'a> Widgets<'a> {
             }
         }
 
-        let widths: &[Constraint] = if is_allocation_tracking_enabled() {
+        let widths: &[Constraint] = if is_allocation_tracing_enabled() {
             &[
                 Constraint::Percentage(13), // ID
                 Constraint::Percentage(8),  // Output
