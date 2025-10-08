@@ -9,10 +9,12 @@ publish = false
 clap.workspace = true
 chrono.workspace = true
 exitcode.workspace = true
+futures.workspace = true
 futures-util = { workspace = true, features = ["alloc"] }
 glob.workspace = true
 indoc.workspace = true
 tokio = { workspace = true, features = ["full"] }
+tokio-stream = { version = "0.1.17", default-features = false, features = ["net", "sync", "time"] }
 url.workspace = true
 humantime = { version = "2.2.0", default-features = false }
 crossterm = { version = "0.29.0", default-features = false, features = ["event-stream", "windows"], optional = true }
