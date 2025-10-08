@@ -25,7 +25,6 @@ use super::{
     state::{self, ConnectionStatus},
 };
 
-// FIXME this is duplicated code and should be in a common crate
 pub const fn is_allocation_tracing_enabled() -> bool {
     cfg!(feature = "allocation-tracing")
 }
