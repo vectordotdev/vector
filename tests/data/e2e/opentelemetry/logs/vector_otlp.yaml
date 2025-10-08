@@ -33,8 +33,9 @@ sinks:
     encoding:
       codec: json
 
-  metrics_console_sink:
-    type: console
+  metrics_file_sink:
+    type: file
+    path: "/output/opentelemetry-logs/vector-internal-metrics-sink.log"
     inputs:
       - internal_metrics
     encoding:
