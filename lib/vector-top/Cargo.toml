@@ -19,6 +19,8 @@ crossterm = { version = "0.29.0", default-features = false, features = ["event-s
 number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
 num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"], optional = true }
 ratatui = { version = "0.29.0", optional = true, default-features = false, features = ["crossterm"] }
+vector-common = { path = "../vector-common" }
+vector-api-client = { path = "../vector-api-client" }
 
 [features]
 allocation-tracing = []

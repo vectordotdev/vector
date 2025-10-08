@@ -24,7 +24,11 @@ use super::{
     events::capture_key_press,
     state::{self, ConnectionStatus},
 };
-use crate::internal_telemetry::is_allocation_tracking_enabled;
+
+// FIXME this is duplicated code and should be in a common crate
+pub const fn is_allocation_tracking_enabled() -> bool {
+    cfg!(feature = "allocation-tracing")
+}
 
 /// Format metrics, with thousands separation
 trait ThousandsFormatter {

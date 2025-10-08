@@ -12531,6 +12531,8 @@ dependencies = [
  "ratatui",
  "tokio",
  "url",
+ "vector-api-client",
+ "vector-common",
 ]
 
 [[package]]
