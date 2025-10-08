@@ -206,9 +206,6 @@ impl Application {
             opts.root.internal_log_rate_limit,
         );
 
-        // Set global color preference for downstream modules
-        crate::set_global_color(color);
-
         // Can only log this after initializing the logging subsystem
         if opts.root.openssl_no_probe {
             debug!(
@@ -514,7 +511,7 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
         .unwrap_or_else(|_| panic!("double thread initialization"));
     rt_builder.worker_threads(threads);
 
-    debug!(message = "Building runtime.", worker_threads = threads);
+    debug!(messaged = "Building runtime.", worker_threads = threads);
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
