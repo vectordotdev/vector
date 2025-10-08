@@ -16,20 +16,24 @@ services:
 
   logs-generator:
     container_name: logs-generator
-    build:
-      context: ./generator
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.137.0
     init: true
     depends_on:
-      - otel-collector-source
-      - vector
-      - otel-collector-sink
-    volumes:
-      - type: bind
-        source: ./generator
-        target: /generator
-    environment:
-      - PYTHONUNBUFFERED=1
-    command: [ "python", "/generator/logs_generator.py", "-n", "100" ]
+      otel-collector-source:
+        condition: service_started
+      vector:
+        condition: service_started
+      otel-collector-sink:
+        condition: service_started
+    restart: on-failure:5
+    command: [
+      "logs",
+      "--otlp-endpoint=otel-collector-source:4318",
+      "--otlp-insecure",
+      "--otlp-http",
+      "--logs=100",
+      "--rate=0"
+    ]
 
   otel-collector-sink:
     container_name: otel-collector-sink
