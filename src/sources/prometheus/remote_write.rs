@@ -157,7 +157,8 @@ impl RemoteWriteSource {
                 format!("Could not decode write request: {error}"),
             )
         })?;
-        let reject_on_conflict = self.metadata_conflict_strategy == MetadataConflictStrategy::Reject;
+        let reject_on_conflict =
+            self.metadata_conflict_strategy == MetadataConflictStrategy::Reject;
         parser::parse_request(request, reject_on_conflict, self.skip_nan_values).map_err(|error| {
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
@@ -328,6 +329,56 @@ mod test {
             "Expected success but got: {}",
             response.status()
         );
+    }
+
+    fn create_conflicting_metadata_request_body() -> Vec<u8> {
+        use prost::Message;
+        use vector_lib::prometheus::parser::proto;
+
+        let request = proto::WriteRequest {
+            metadata: vec![
+                proto::MetricMetadata {
+                    r#type: proto::MetricType::Gauge as i32,
+                    metric_family_name: "test_metric".into(),
+                    help: "First definition as gauge".into(),
+                    unit: String::default(),
+                },
+                proto::MetricMetadata {
+                    r#type: proto::MetricType::Counter as i32,
+                    metric_family_name: "test_metric".into(),
+                    help: "Conflicting definition as counter".into(),
+                    unit: String::default(),
+                },
+            ],
+            timeseries: vec![proto::TimeSeries {
+                labels: vec![proto::Label {
+                    name: "__name__".into(),
+                    value: "test_metric".into(),
+                }],
+                samples: vec![proto::Sample {
+                    value: 42.0,
+                    timestamp: chrono::Utc::now().timestamp_millis(),
+                }],
+            }],
+        };
+
+        let mut buf = Vec::new();
+        request.encode(&mut buf).unwrap();
+
+        // Compress with snappy as expected by the remote_write endpoint
+        snap::raw::Encoder::new().compress_vec(&buf).unwrap()
+    }
+
+    async fn send_request(port: u16, request_body: Vec<u8>) -> reqwest::Response {
+        let client = reqwest::Client::new();
+        client
+            .post(format!("http://localhost:{}/", port))
+            .header("Content-Type", "application/x-protobuf")
+            .header("Content-Encoding", "snappy")
+            .body(request_body)
+            .send()
+            .await
+            .unwrap()
     }
 
     /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
@@ -580,55 +631,8 @@ mod test {
         tokio::spawn(source);
         wait_for_tcp(address).await;
 
-        // Create a request with conflicting metadata but valid timeseries data
-        let request_body = {
-            use prost::Message;
-            use vector_lib::prometheus::parser::proto;
-
-            let request = proto::WriteRequest {
-                metadata: vec![
-                    proto::MetricMetadata {
-                        r#type: proto::MetricType::Gauge as i32,
-                        metric_family_name: "test_metric".into(),
-                        help: "First definition as gauge".into(),
-                        unit: String::default(),
-                    },
-                    proto::MetricMetadata {
-                        r#type: proto::MetricType::Counter as i32,
-                        metric_family_name: "test_metric".into(),
-                        help: "Conflicting definition as counter".into(),
-                        unit: String::default(),
-                    },
-                ],
-                timeseries: vec![proto::TimeSeries {
-                    labels: vec![proto::Label {
-                        name: "__name__".into(),
-                        value: "test_metric".into(),
-                    }],
-                    samples: vec![proto::Sample {
-                        value: 42.0,
-                        timestamp: chrono::Utc::now().timestamp_millis(),
-                    }],
-                }],
-            };
-
-            let mut buf = Vec::new();
-            request.encode(&mut buf).unwrap();
-
-            // Compress with snappy as expected by the remote_write endpoint
-            snap::raw::Encoder::new().compress_vec(&buf).unwrap()
-        };
-
-        // Send the request via HTTP POST
-        let client = reqwest::Client::new();
-        let response = client
-            .post(format!("http://localhost:{}/", address.port()))
-            .header("Content-Type", "application/x-protobuf")
-            .header("Content-Encoding", "snappy")
-            .body(request_body)
-            .send()
-            .await
-            .unwrap();
+        let request_body = create_conflicting_metadata_request_body();
+        let response = send_request(address.port(), request_body).await;
 
         // Should succeed (not return 400) despite conflicting metadata
         assert!(
@@ -667,55 +671,8 @@ mod test {
         tokio::spawn(source);
         wait_for_tcp(address).await;
 
-        // Create a request with conflicting metadata but valid timeseries data
-        let request_body = {
-            use prost::Message;
-            use vector_lib::prometheus::parser::proto;
-
-            let request = proto::WriteRequest {
-                metadata: vec![
-                    proto::MetricMetadata {
-                        r#type: proto::MetricType::Gauge as i32,
-                        metric_family_name: "test_metric".into(),
-                        help: "First definition as gauge".into(),
-                        unit: String::default(),
-                    },
-                    proto::MetricMetadata {
-                        r#type: proto::MetricType::Counter as i32,
-                        metric_family_name: "test_metric".into(),
-                        help: "Conflicting definition as counter".into(),
-                        unit: String::default(),
-                    },
-                ],
-                timeseries: vec![proto::TimeSeries {
-                    labels: vec![proto::Label {
-                        name: "__name__".into(),
-                        value: "test_metric".into(),
-                    }],
-                    samples: vec![proto::Sample {
-                        value: 42.0,
-                        timestamp: chrono::Utc::now().timestamp_millis(),
-                    }],
-                }],
-            };
-
-            let mut buf = Vec::new();
-            request.encode(&mut buf).unwrap();
-
-            // Compress with snappy as expected by the remote_write endpoint
-            snap::raw::Encoder::new().compress_vec(&buf).unwrap()
-        };
-
-        // Send the request via HTTP POST
-        let client = reqwest::Client::new();
-        let response = client
-            .post(format!("http://localhost:{}/", address.port()))
-            .header("Content-Type", "application/x-protobuf")
-            .header("Content-Encoding", "snappy")
-            .body(request_body)
-            .send()
-            .await
-            .unwrap();
+        let request_body = create_conflicting_metadata_request_body();
+        let response = send_request(address.port(), request_body).await;
 
         // Should be rejected
         assert_eq!(response.status(), StatusCode::BAD_REQUEST);
