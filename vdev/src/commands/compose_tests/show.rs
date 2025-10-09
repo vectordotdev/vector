@@ -1,5 +1,5 @@
 use anyhow::{Context, Result};
-use std::{collections::HashMap, process::Command};
+use std::{collections::HashSet, process::Command};
 
 use crate::{
     environment::Environment,
@@ -25,7 +25,7 @@ pub fn exec_environments_only(integration: &str, path: &str) -> Result<()> {
 
 struct Show {
     path: String,
-    active_projects: HashMap<String, bool>,
+    active_projects: HashSet<String>,
 }
 
 impl Show {
@@ -39,15 +39,14 @@ impl Show {
             let projects: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)
                 .with_context(|| "Failed to parse docker compose ls output")?;
 
-            let mut map = HashMap::new();
-            for project in projects {
-                if let Some(name) = project.get("Name").and_then(|n| n.as_str()) {
-                    map.insert(name.to_string(), true);
-                }
-            }
-            map
+            projects
+                .iter()
+                .filter_map(|project| {
+                    project.get("Name").and_then(|n| n.as_str()).map(String::from)
+                })
+                .collect()
         } else {
-            HashMap::new()
+            HashSet::new()
         };
 
         Ok(Self {
