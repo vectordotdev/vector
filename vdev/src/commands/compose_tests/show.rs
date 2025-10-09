@@ -126,7 +126,7 @@ impl Show {
     }
 
     fn find_active_environment(&self, prefix: &str, config: &ComposeTestConfig) -> Option<String> {
-        for project_name in self.active_projects.keys() {
+        for project_name in &self.active_projects {
             if let Some(sanitized_env_name) = project_name.strip_prefix(prefix) {
                 // The project name has dots replaced with hyphens, so we need to check
                 // all environments to find a match after applying the same sanitization
@@ -143,7 +143,7 @@ impl Show {
 
 fn print_env(prefix: &str, environment: &Environment) {
     if environment.is_empty() {
-        println!("{prefix}N/A");
+        println!("{prefix} N/A");
     } else {
         for (key, value) in environment {
             match value {
