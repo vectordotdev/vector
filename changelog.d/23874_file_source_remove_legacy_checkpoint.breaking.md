@@ -12,6 +12,6 @@ a Vector version `> 0.14` and `< 0.51`):
 
 * You are using the legacy `checkpoints` folder (Vector < 0.11)
 * Your checkpoints are using the legacy checkpoint checksum CRC format
-* The `checkpoints.fingerprint[].checksum` is present in your `checkpoints.json` (instead of `first_line_checkpoint`).
+* The `checksum` key is present under `checkpoints.fingerprint` in your `checkpoints.json` (instead of `first_line_checkpoint`).
 
 authors: thomasqueirozb
