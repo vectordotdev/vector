@@ -276,8 +276,9 @@ impl Compose {
         let yaml_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
 
         match yaml_path.try_exists() {
-            Err(error) => Err(error)
-                .with_context(|| format!("Could not lookup {}", yaml_path.display())),
+            Err(error) => {
+                Err(error).with_context(|| format!("Could not lookup {}", yaml_path.display()))
+            }
             Ok(false) => Ok(None),
             Ok(true) => {
                 // Parse config only for unix volume permission checking
