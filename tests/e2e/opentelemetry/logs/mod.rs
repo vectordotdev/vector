@@ -62,6 +62,14 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
                 // while the collector's file exporter outputs the protobuf enum name ("SEVERITY_NUMBER_INFO").
                 // Both formats are valid; we compare severityText instead which matches on both sides.
                 .filter(|(k, _)| k.as_str() != "severityNumber")
+                // Ignore empty attributes arrays - some encoders omit the field when empty, others include it.
+                .filter(|(k, v)| {
+                    if k.as_str() == "attributes" {
+                        !matches!(v, Value::Array(arr) if arr.is_empty())
+                    } else {
+                        true
+                    }
+                })
                 .map(|(k, v)| (k.clone(), normalize_numbers_to_strings(v)))
                 .collect();
             Value::Object(normalized)
