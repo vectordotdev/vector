@@ -7,9 +7,10 @@ use crate::{
 };
 
 pub fn exec(integration: Option<&String>, path: &str) -> Result<()> {
+    let show = Show::new(path)?;
     match integration {
-        None => show_all(path),
-        Some(integration) => show_one(integration, path),
+        None => show.show_all(),
+        Some(integration) => show.show_one(integration),
     }
 }
 
@@ -22,76 +23,127 @@ pub fn exec_environments_only(integration: &str, path: &str) -> Result<()> {
     Ok(())
 }
 
-fn show_all(path: &str) -> Result<()> {
-    let entries = ComposeTestConfig::collect_all(path)?;
-    let active_projects = get_active_projects()?;
-
-    let width = entries
-        .keys()
-        .fold(16, |width, entry| width.max(entry.len()));
-    println!("{:width$}  Environment Name(s)", "Integration Name");
-    println!("{:width$}  -------------------", "----------------");
-    for (integration, config) in entries {
-        let prefix = format!("vector-{path}-{integration}-");
-        let active_env = find_active_environment(&active_projects, &prefix, &config);
-        let environments = config
-            .environments()
-            .keys()
-            .map(|environment| format(active_env.as_ref(), environment))
-            .collect::<Vec<_>>()
-            .join("  ");
-        println!("{integration:width$}  {environments}");
-    }
-    Ok(())
+struct Show {
+    path: String,
+    active_projects: HashMap<String, bool>,
 }
 
-fn show_one(integration: &str, path: &str) -> Result<()> {
-    let (_test_dir, config) = ComposeTestConfig::load(path, integration)?;
-    let active_projects = get_active_projects()?;
-    let prefix = format!("vector-{path}-{integration}-");
-    let active_env = find_active_environment(&active_projects, &prefix, &config);
+impl Show {
+    fn new(path: &str) -> Result<Self> {
+        let output = Command::new(CONTAINER_TOOL.clone())
+            .args(["compose", "ls", "--format", "json"])
+            .output()
+            .with_context(|| "Failed to list compose projects")?;
 
-    if let Some(args) = &config.args {
-        println!("Test args: {}", args.join(" "));
-    } else {
-        println!("Test args: N/A");
+        let active_projects = if output.status.success() {
+            let projects: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)
+                .with_context(|| "Failed to parse docker compose ls output")?;
+
+            let mut map = HashMap::new();
+            for project in projects {
+                if let Some(name) = project.get("Name").and_then(|n| n.as_str()) {
+                    map.insert(name.to_string(), true);
+                }
+            }
+            map
+        } else {
+            HashMap::new()
+        };
+
+        Ok(Self {
+            path: path.to_string(),
+            active_projects,
+        })
     }
 
-    if config.features.is_empty() {
-        println!("Features: N/A");
-    } else {
-        println!("Features: {}", config.features.join(","));
-    }
+    fn show_all(&self) -> Result<()> {
+        let entries = ComposeTestConfig::collect_all(&self.path)?;
 
-    println!(
-        "Test filter: {}",
-        config.test_filter.as_deref().unwrap_or("N/A")
-    );
-
-    println!("Environment:");
-    print_env("  ", &config.env);
-    println!("Runner:");
-    println!("  Environment:");
-    print_env("    ", &config.runner.env);
-    println!("  Volumes:");
-    if config.runner.volumes.is_empty() {
-        println!("    N/A");
-    } else {
-        for (target, mount) in &config.runner.volumes {
-            println!("    {target} => {mount}");
+        let width = entries
+            .keys()
+            .fold(16, |width, entry| width.max(entry.len()));
+        println!("{:width$}  Environment Name(s)", "Integration Name");
+        println!("{:width$}  -------------------", "----------------");
+        for (integration, config) in entries {
+            let prefix = format!("vector-{}-{integration}-", self.path);
+            let active_env = self.find_active_environment(&prefix, &config);
+            let environments = config
+                .environments()
+                .keys()
+                .map(|environment| format_env(active_env.as_ref(), environment))
+                .collect::<Vec<_>>()
+                .join("  ");
+            println!("{integration:width$}  {environments}");
         }
-    }
-    println!(
-        "  Needs docker socket: {}",
-        config.runner.needs_docker_socket
-    );
-
-    println!("Environments:");
-    for environment in config.environments().keys() {
-        println!("  {}", format(active_env.as_ref(), environment));
+        Ok(())
     }
 
-    Ok(())
+    fn show_one(&self, integration: &str) -> Result<()> {
+        let (_test_dir, config) = ComposeTestConfig::load(&self.path, integration)?;
+        let prefix = format!("vector-{}-{integration}-", self.path);
+        let active_env = self.find_active_environment(&prefix, &config);
+
+        if let Some(args) = &config.args {
+            println!("Test args: {}", args.join(" "));
+        } else {
+            println!("Test args: N/A");
+        }
+
+        if config.features.is_empty() {
+            println!("Features: N/A");
+        } else {
+            println!("Features: {}", config.features.join(","));
+        }
+
+        println!(
+            "Test filter: {}",
+            config.test_filter.as_deref().unwrap_or("N/A")
+        );
+
+        println!("Environment:");
+        print_env("  ", &config.env);
+        println!("Runner:");
+        println!("  Environment:");
+        print_env("    ", &config.runner.env);
+        println!("  Volumes:");
+        if config.runner.volumes.is_empty() {
+            println!("    N/A");
+        } else {
+            for (target, mount) in &config.runner.volumes {
+                println!("    {target} => {mount}");
+            }
+        }
+        println!(
+            "  Needs docker socket: {}",
+            config.runner.needs_docker_socket
+        );
+
+        println!("Environments:");
+        for environment in config.environments().keys() {
+            println!("  {}", format_env(active_env.as_ref(), environment));
+        }
+
+        Ok(())
+    }
+
+    fn find_active_environment(
+        &self,
+        prefix: &str,
+        config: &ComposeTestConfig,
+    ) -> Option<String> {
+        for project_name in self.active_projects.keys() {
+            if let Some(sanitized_env_name) = project_name.strip_prefix(prefix) {
+                // The project name has dots replaced with hyphens, so we need to check
+                // all environments to find a match after applying the same sanitization
+                for env_name in config.environments().keys() {
+                    if env_name.replace('.', "-") == sanitized_env_name {
+                        return Some(env_name.to_string());
+                    }
+                }
+            }
+        }
+        None
+    }
 }
 
 fn print_env(prefix: &str, environment: &Environment) {
@@ -107,51 +159,9 @@ fn print_env(prefix: &str, environment: &Environment) {
     }
 }
 
-fn format(active_env: Option<&String>, environment: &str) -> String {
+fn format_env(active_env: Option<&String>, environment: &str) -> String {
     match active_env {
         Some(active) if active == environment => format!("{environment} (active)"),
         _ => environment.into(),
     }
-}
-
-fn get_active_projects() -> Result<HashMap<String, bool>> {
-    let output = Command::new(CONTAINER_TOOL.clone())
-        .args(["compose", "ls", "--format", "json"])
-        .output()
-        .with_context(|| "Failed to list compose projects")?;
-
-    if !output.status.success() {
-        return Ok(HashMap::new());
-    }
-
-    let projects: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)
-        .with_context(|| "Failed to parse docker compose ls output")?;
-
-    let mut map = HashMap::new();
-    for project in projects {
-        if let Some(name) = project.get("Name").and_then(|n| n.as_str()) {
-            map.insert(name.to_string(), true);
-        }
-    }
-
-    Ok(map)
-}
-
-fn find_active_environment(
-    active_projects: &HashMap<String, bool>,
-    prefix: &str,
-    config: &ComposeTestConfig,
-) -> Option<String> {
-    for project_name in active_projects.keys() {
-        if let Some(sanitized_env_name) = project_name.strip_prefix(prefix) {
-            // The project name has dots replaced with hyphens, so we need to check
-            // all environments to find a match after applying the same sanitization
-            for env_name in config.environments().keys() {
-                if env_name.replace('.', "-") == sanitized_env_name {
-                    return Some(env_name.to_string());
-                }
-            }
-        }
-    }
-    None
 }
