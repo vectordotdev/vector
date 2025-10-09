@@ -213,7 +213,7 @@ impl ComposeTest {
             self.local_config.directory,
         )?;
 
-        if !was_running {
+        if self.is_running()? {
             self.runner.remove()?;
             self.stop()?;
         }
