@@ -60,8 +60,6 @@ pub enum FingerprintStrategy {
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy, Serialize, Deserialize, Ord, PartialOrd)]
 #[serde(rename_all = "snake_case")]
 pub enum FileFingerprint {
-    #[serde(rename = "checksum")]
-    BytesChecksum(u64),
     #[serde(alias = "first_line_checksum")]
     FirstLinesChecksum(u64),
     DevInode(u64, u64),

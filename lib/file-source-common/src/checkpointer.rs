@@ -86,12 +86,6 @@ impl CheckpointsView {
         }
     }
 
-    pub fn contains_bytes_checksums(&self) -> bool {
-        self.checkpoints
-            .iter()
-            .any(|entry| matches!(entry.key(), FileFingerprint::BytesChecksum(_)))
-    }
-
     pub fn remove_expired(&self) {
         let now = Utc::now();
 
@@ -306,7 +300,6 @@ mod test {
     fn test_checkpointer_basics() {
         let fingerprints = vec![
             FileFingerprint::DevInode(1, 2),
-            FileFingerprint::BytesChecksum(3456),
             FileFingerprint::FirstLinesChecksum(78910),
         ];
         for fingerprint in fingerprints {
@@ -322,10 +315,6 @@ mod test {
     async fn test_checkpointer_ignore_before() {
         let now = Utc::now();
         let newer = (FileFingerprint::DevInode(1, 2), now - Duration::seconds(5));
-        let newish = (
-            FileFingerprint::BytesChecksum(3456),
-            now - Duration::seconds(10),
-        );
         let oldish = (
             FileFingerprint::FirstLinesChecksum(78910),
             now - Duration::seconds(15),
@@ -340,7 +329,7 @@ mod test {
         {
             let chkptr = Checkpointer::new(data_dir.path());
 
-            for (fingerprint, modified) in &[&newer, &newish, &oldish, &older] {
+            for (fingerprint, modified) in &[&newer, &oldish, &older] {
                 chkptr.checkpoints.load(Checkpoint {
                     fingerprint: *fingerprint,
                     position,
@@ -356,7 +345,6 @@ mod test {
             let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.read_checkpoints(ignore_before).await;
 
-            assert_eq!(chkptr.get_checkpoint(newish.0), Some(position));
             assert_eq!(chkptr.get_checkpoint(newer.0), Some(position));
             assert_eq!(chkptr.get_checkpoint(oldish.0), None);
             assert_eq!(chkptr.get_checkpoint(older.0), None);
@@ -367,7 +355,6 @@ mod test {
     async fn test_checkpointer_restart() {
         let fingerprints = vec![
             FileFingerprint::DevInode(1, 2),
-            FileFingerprint::BytesChecksum(3456),
             FileFingerprint::FirstLinesChecksum(78910),
         ];
         for fingerprint in fingerprints {
@@ -439,10 +426,10 @@ mod test {
     async fn test_checkpointer_expiration() {
         let cases = vec![
             // (checkpoint, position, seconds since removed)
-            (FileFingerprint::BytesChecksum(123), 0, 30),
-            (FileFingerprint::BytesChecksum(456), 1, 60),
-            (FileFingerprint::BytesChecksum(789), 2, 90),
-            (FileFingerprint::BytesChecksum(101112), 3, 120),
+            (FileFingerprint::FirstLinesChecksum(123), 0, 30),
+            (FileFingerprint::FirstLinesChecksum(456), 1, 60),
+            (FileFingerprint::FirstLinesChecksum(789), 2, 90),
+            (FileFingerprint::FirstLinesChecksum(101112), 3, 120),
         ];
 
         let data_dir = tempdir().unwrap();
@@ -514,10 +501,6 @@ mod test {
                 r#"{"version":"1","checkpoints":[{"fingerprint":{"dev_inode":[1,2]},"position":1234}]}"#,
             ),
             (
-                FileFingerprint::BytesChecksum(3456),
-                r#"{"version":"1","checkpoints":[{"fingerprint":{"checksum":3456},"position":1234}]}"#,
-            ),
-            (
                 FileFingerprint::FirstLinesChecksum(78910),
                 r#"{"version":"1","checkpoints":[{"fingerprint":{"first_lines_checksum":78910},"position":1234}]}"#,
             ),
@@ -561,11 +544,6 @@ mod test {
       "modified": "2021-07-12T18:19:11.769003Z"
     },
     {
-      "fingerprint": { "checksum": 3456 },
-      "position": 1234,
-      "modified": "2021-07-12T18:19:11.769003Z"
-    },
-    {
       "fingerprint": { "first_line_checksum": 1234 },
       "position": 1234,
       "modified": "2021-07-12T18:19:11.769003Z"
@@ -580,7 +558,6 @@ mod test {
         "#;
         let fingerprints = vec![
             FileFingerprint::DevInode(1, 2),
-            FileFingerprint::BytesChecksum(3456),
             FileFingerprint::FirstLinesChecksum(1234),
             FileFingerprint::FirstLinesChecksum(78910),
         ];
