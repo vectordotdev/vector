@@ -81,3 +81,8 @@ services:
 volumes:
   vector_target:
     external: true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

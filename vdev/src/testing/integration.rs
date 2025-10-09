@@ -1,20 +1,15 @@
 use std::{
-    collections::BTreeMap,
-    fs,
     path::{Path, PathBuf},
     process::Command,
 };
 
 use anyhow::{Context, Result, bail};
-use serde_yaml::Value;
-use tempfile::{Builder, NamedTempFile};
 
 use super::{
     config::{
         ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR, RustToolchainConfig,
     },
     runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _},
-    state::EnvsDir,
 };
 use crate::{
     app::CommandExt as _,
@@ -69,7 +64,6 @@ pub(crate) struct ComposeTest {
     test_name: String,
     environment: String,
     config: ComposeTestConfig,
-    envs_dir: EnvsDir,
     runner: IntegrationTestRunner,
     compose: Option<Compose>,
     env_config: Environment,
@@ -88,7 +82,6 @@ impl ComposeTest {
         let test_name: String = test_name.into();
         let environment = environment.into();
         let (test_dir, config) = ComposeTestConfig::load(local_config.directory, &test_name)?;
-        let envs_dir = EnvsDir::new(&test_name);
         let Some(mut env_config) = config.environments().get(&environment).cloned() else {
             bail!("Could not find environment named {environment:?}");
         };
@@ -112,7 +105,6 @@ impl ComposeTest {
             test_name,
             environment,
             config,
-            envs_dir,
             runner,
             compose,
             env_config: rename_environment_keys(&env_config),
@@ -123,11 +115,48 @@ impl ComposeTest {
         Ok(compose_test)
     }
 
+    fn project_name(&self) -> String {
+        // Docker Compose project names must consist only of lowercase alphanumeric characters,
+        // hyphens, and underscores. Replace any dots with hyphens.
+        let sanitized_env = self.environment.replace('.', "-");
+        format!(
+            "vector-{}-{}-{}",
+            self.local_config.directory, self.test_name, sanitized_env
+        )
+    }
+
+    fn is_running(&self) -> Result<bool> {
+        let Some(compose) = &self.compose else {
+            return Ok(false);
+        };
+
+        let output = Command::new(CONTAINER_TOOL.clone())
+            .args([
+                "compose",
+                "--project-name",
+                &self.project_name(),
+                "ps",
+                "--format",
+                "json",
+                "--status",
+                "running",
+            ])
+            .current_dir(&compose.test_dir)
+            .envs(compose.env.iter().filter_map(|(k, v)| v.as_ref().map(|v| (k, v))))
+            .output()
+            .with_context(|| "Failed to check if compose environment is running")?;
+
+        // If stdout is empty or "[]", no containers are running
+        Ok(!output.stdout.is_empty()
+            && output.stdout != b"[]\n"
+            && output.stdout != b"[]")
+    }
+
     pub(crate) fn test(&self, extra_args: Vec<String>) -> Result<()> {
-        let active = self.envs_dir.check_active(&self.environment)?;
+        let was_running = self.is_running()?;
         self.config.check_required()?;
 
-        if !active {
+        if !was_running {
             self.start()?;
         }
 
@@ -181,7 +210,7 @@ impl ComposeTest {
             self.local_config.directory,
         )?;
 
-        if !active {
+        if !was_running {
             self.runner.remove()?;
             self.stop()?;
         }
@@ -204,28 +233,25 @@ impl ComposeTest {
         if let Some(compose) = &self.compose {
             self.runner.ensure_network()?;
 
-            if self.envs_dir.check_active(&self.environment)? {
+            if self.is_running()? {
                 bail!("environment is already up");
             }
 
-            compose.start(&self.env_config)?;
-
-            self.envs_dir.save(&self.environment, &self.env_config)
-        } else {
-            Ok(())
+            let project_name = self.project_name();
+            compose.start(&self.env_config, &project_name)?;
         }
+        Ok(())
     }
 
     pub(crate) fn stop(&self) -> Result<()> {
         if let Some(compose) = &self.compose {
-            // TODO: Is this check really needed?
-            if self.envs_dir.load()?.is_none() {
+            if !self.is_running()? {
                 bail!("No environment for {} is up.", self.test_name);
             }
 
             self.runner.remove()?;
-            compose.stop()?;
-            self.envs_dir.remove()?;
+            let project_name = self.project_name();
+            compose.stop(&project_name)?;
         }
 
         Ok(())
@@ -240,7 +266,6 @@ struct Compose {
     #[cfg_attr(target_family = "windows", allow(dead_code))]
     config: ComposeConfig,
     network: String,
-    temp_file: NamedTempFile,
 }
 
 impl Compose {
@@ -253,30 +278,8 @@ impl Compose {
             }
             Ok(false) => Ok(None),
             Ok(true) => {
-                let mut config = ComposeConfig::parse(&original_path)?;
-                // Inject the networks block
-                config.networks.insert(
-                    "default".to_string(),
-                    BTreeMap::from_iter([
-                        ("name".to_string(), Value::String(network.clone())),
-                        ("external".to_string(), Value::Bool(true)),
-                    ]),
-                );
-
-                // Create a named tempfile, there may be resource leakage here in case of SIGINT
-                // Tried tempfile::tempfile() but this returns a File object without a usable path
-                // https://docs.rs/tempfile/latest/tempfile/#resource-leaking
-                let temp_file = Builder::new()
-                    .prefix("compose-temp-")
-                    .suffix(".yaml")
-                    .tempfile_in(&test_dir)
-                    .with_context(|| "Failed to create temporary compose file")?;
-
-                fs::write(
-                    temp_file.path(),
-                    serde_yaml::to_string(&config)
-                        .with_context(|| "Failed to serialize modified compose.yaml")?,
-                )?;
+                // Parse config only for unix volume permission checking
+                let config = ComposeConfig::parse(&original_path)?;
 
                 Ok(Some(Self {
                     original_path,
@@ -284,25 +287,25 @@ impl Compose {
                     env,
                     config,
                     network,
-                    temp_file,
                 }))
             }
         }
     }
 
-    fn start(&self, environment: &Environment) -> Result<()> {
+    fn start(&self, environment: &Environment, project_name: &str) -> Result<()> {
         #[cfg(unix)]
         unix::prepare_compose_volumes(&self.config, &self.test_dir, environment)?;
 
-        self.run("Starting", &["up", "--detach"], Some(environment))
+        self.run("Starting", &["up", "--detach"], Some(environment), project_name)
     }
 
-    fn stop(&self) -> Result<()> {
+    fn stop(&self, project_name: &str) -> Result<()> {
         // The config settings are not needed when stopping a compose setup.
         self.run(
             "Stopping",
             &["down", "--timeout", "0", "--volumes", "--remove-orphans"],
             None,
+            project_name,
         )
     }
 
@@ -311,21 +314,14 @@ impl Compose {
         action: &str,
         args: &[&'static str],
         environment: Option<&Environment>,
+        project_name: &str,
     ) -> Result<()> {
         let mut command = Command::new(CONTAINER_TOOL.clone());
         command.arg("compose");
-        // When the integration test environment is already active, the tempfile path does not
-        // exist because `Compose::new()` has not been called. In this case, the `stop` command
-        // needs to use the calculated path from the integration name instead of the nonexistent
-        // tempfile path. This is because `stop` doesn't go through the same logic as `start`
-        // and doesn't create a new tempfile before calling docker compose.
-        // If stop command needs to use some of the injected bits then we need to rebuild it
+        command.arg("--project-name");
+        command.arg(project_name);
         command.arg("--file");
-        if self.temp_file.path().exists() {
-            command.arg(self.temp_file.path());
-        } else {
-            command.arg(&self.original_path);
-        }
+        command.arg(&self.original_path);
 
         command.args(args);
 

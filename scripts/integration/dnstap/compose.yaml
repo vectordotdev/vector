@@ -13,3 +13,8 @@ services:
 
 volumes:
   dnstap-sockets: {}
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

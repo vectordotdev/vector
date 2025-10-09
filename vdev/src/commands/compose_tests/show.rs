@@ -1,8 +1,9 @@
-use anyhow::Result;
+use anyhow::{Context, Result};
+use std::{collections::HashMap, process::Command};
 
 use crate::{
     environment::Environment,
-    testing::{config::ComposeTestConfig, state},
+    testing::{config::ComposeTestConfig, docker::CONTAINER_TOOL},
 };
 
 pub fn exec(integration: Option<&String>, path: &str) -> Result<()> {
@@ -23,14 +24,16 @@ pub fn exec_environments_only(integration: &str, path: &str) -> Result<()> {
 
 fn show_all(path: &str) -> Result<()> {
     let entries = ComposeTestConfig::collect_all(path)?;
+    let active_projects = get_active_projects()?;
+
     let width = entries
         .keys()
         .fold(16, |width, entry| width.max(entry.len()));
     println!("{:width$}  Environment Name(s)", "Integration Name");
     println!("{:width$}  -------------------", "----------------");
     for (integration, config) in entries {
-        let envs_dir = state::EnvsDir::new(&integration);
-        let active_env = envs_dir.active()?;
+        let prefix = format!("vector-{}-{}-", path, integration);
+        let active_env = find_active_environment(&active_projects, &prefix, &config);
         let environments = config
             .environments()
             .keys()
@@ -44,8 +47,9 @@ fn show_all(path: &str) -> Result<()> {
 
 fn show_one(integration: &str, path: &str) -> Result<()> {
     let (_test_dir, config) = ComposeTestConfig::load(path, integration)?;
-    let envs_dir = state::EnvsDir::new(integration);
-    let active_env = envs_dir.active()?;
+    let active_projects = get_active_projects()?;
+    let prefix = format!("vector-{}-{}-", path, integration);
+    let active_env = find_active_environment(&active_projects, &prefix, &config);
 
     if let Some(args) = &config.args {
         println!("Test args: {}", args.join(" "));
@@ -108,4 +112,46 @@ fn format(active_env: Option<&String>, environment: &str) -> String {
         Some(active) if active == environment => format!("{environment} (active)"),
         _ => environment.into(),
     }
+}
+
+fn get_active_projects() -> Result<HashMap<String, bool>> {
+    let output = Command::new(CONTAINER_TOOL.clone())
+        .args(["compose", "ls", "--format", "json"])
+        .output()
+        .with_context(|| "Failed to list compose projects")?;
+
+    if !output.status.success() {
+        return Ok(HashMap::new());
+    }
+
+    let projects: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)
+        .with_context(|| "Failed to parse docker compose ls output")?;
+
+    let mut map = HashMap::new();
+    for project in projects {
+        if let Some(name) = project.get("Name").and_then(|n| n.as_str()) {
+            map.insert(name.to_string(), true);
+        }
+    }
+
+    Ok(map)
+}
+
+fn find_active_environment(
+    active_projects: &HashMap<String, bool>,
+    prefix: &str,
+    config: &ComposeTestConfig,
+) -> Option<String> {
+    for (project_name, _) in active_projects {
+        if let Some(sanitized_env_name) = project_name.strip_prefix(prefix) {
+            // The project name has dots replaced with hyphens, so we need to check
+            // all environments to find a match after applying the same sanitization
+            for env_name in config.environments().keys() {
+                if env_name.replace('.', "-") == sanitized_env_name {
+                    return Some(env_name.to_string());
+                }
+            }
+        }
+    }
+    None
 }
