@@ -1,6 +1,6 @@
-Dropped support for `file` source legacy checkpoints stored in the `checkpoints` folder (Vector `< 0.11`) and
-legacy checkpoint checksum format (Vector `< 0.15`). The intentionally hidden
-`fingerprint.bytes` option was also removed.
+* Dropped support for `file` source legacy checkpoints stored in the `checkpoints` folder (Vector `< 0.11`) which is located inside the `data_dir`. 
+* Removed the legacy checkpoint checksum format (Vector `< 0.15`).
+* The intentionally hidden `fingerprint.bytes` option was also removed.
 
 ### How to upgrade
 
@@ -8,8 +8,7 @@ You can stop reading if you
 
 * have started using the `file` source on or after version `0.15`, or
 * have cleared your `data_dir` on or after version `0.15`, or
-* don't care about the file positions and don't care about current state of your checkpoints,
-meaning you accept that files could be read from the beginning again after the upgrade.
+* don't care about the file positions and don't care about current state of your checkpoints, meaning you accept that files could be read from the beginning again after the upgrade.
   * Vector will re-read all files from the beginning if/when any `checkpoints.json` files nested inside `data_dir` fail to load due to legacy/corrupted data.
 
 You are only affected if any of the following criteria apply:
@@ -25,8 +24,6 @@ For example, if you’re on Vector `0.10` and want to upgrade, keep upgrading Ve
 When upgrading, we recommend stepping through minor versions as these can each contain breaking changes while Vector is pre-1.0. These breaking changes are noted in their respective upgrade guides.
 
 Odds are the `file` source automatically converted checkpoints to the new format if you are using a recent version and you are not affected by this at all.
-
-
 #### If you are affected by `#3`
 
 You should manually delete the `unknown` checkpoint records from all `checkpoints.json` files nested inside `data_dir`
