@@ -464,14 +464,12 @@ mod test {
         let data_dir = tempdir().unwrap();
 
         let mut fingerprinter = crate::Fingerprinter::new(
-            crate::FingerprintStrategy::Checksum {
-                bytes: 16,
+            crate::FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes: 0,
                 lines: 1,
             },
             1024,
             false,
-            1024, // 1024 > 16
         );
 
         let log_path = data_dir.path().join("test.log");

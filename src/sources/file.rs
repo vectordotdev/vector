@@ -289,15 +289,6 @@ const fn default_rotate_wait() -> Duration {
 pub enum FingerprintConfig {
     /// Read lines from the beginning of the file and compute a checksum over them.
     Checksum {
-        /// Maximum number of bytes to use, from the lines that are read, for generating the checksum.
-        ///
-        // TODO: Should we properly expose this in the documentation? There could definitely be value in allowing more
-        // bytes to be used for the checksum generation, but we should commit to exposing it rather than hiding it.
-        #[serde(alias = "fingerprint_bytes")]
-        #[configurable(metadata(docs::hidden))]
-        #[configurable(metadata(docs::type_unit = "bytes"))]
-        bytes: Option<usize>,
-
         /// The number of bytes to skip ahead (or ignore) when reading the data used for generating the checksum.
         /// If the file is compressed, the number of bytes refer to the header in the uncompressed content. Only
         /// gzip is supported at this time.
@@ -328,7 +319,6 @@ pub enum FingerprintConfig {
 impl Default for FingerprintConfig {
     fn default() -> Self {
         Self::Checksum {
-            bytes: None,
             ignored_header_bytes: 0,
             lines: default_lines(),
         }
@@ -347,25 +337,13 @@ impl From<FingerprintConfig> for FingerprintStrategy {
     fn from(config: FingerprintConfig) -> FingerprintStrategy {
         match config {
             FingerprintConfig::Checksum {
+                ignored_header_bytes,
+                lines,
+            } => FingerprintStrategy::FirstLineChecksum {
                 bytes,
                 ignored_header_bytes,
                 lines,
-            } => {
-                let bytes = match bytes {
-                    Some(bytes) => {
-                        warn!(
-                            message = "The `fingerprint.bytes` option will be used to convert old file fingerprints created by vector < v0.11.0, but are not supported for new file fingerprints. The first line will be used instead."
-                        );
-                        bytes
-                    }
-                    None => 256,
-                };
-                FingerprintStrategy::Checksum {
-                    bytes,
-                    ignored_header_bytes,
-                    lines,
-                }
-            }
+            },
             FingerprintConfig::DevInode => FingerprintStrategy::DevInode,
         }
     }
@@ -554,12 +532,6 @@ pub fn file_source(
     let checkpointer = Checkpointer::new(&data_dir);
     let strategy = config.fingerprint.clone().into();
 
-    let internal_buffer_size = if let FingerprintStrategy::Checksum { bytes, .. } = &strategy {
-        std::cmp::max(*bytes, config.max_line_bytes)
-    } else {
-        config.max_line_bytes
-    };
-
     let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
@@ -570,12 +542,7 @@ pub fn file_source(
         line_delimiter: line_delimiter_as_bytes,
         data_dir,
         glob_minimum_cooldown,
-        fingerprinter: Fingerprinter::new(
-            strategy,
-            config.max_line_bytes,
-            config.ignore_not_found,
-            internal_buffer_size,
-        ),
+        fingerprinter: Fingerprinter::new(strategy, config.max_line_bytes, config.ignore_not_found),
         oldest_first: config.oldest_first,
         remove_after: config.remove_after_secs.map(Duration::from_secs),
         emitter,

@@ -45,11 +45,6 @@ impl ResizeSlice<u8> for Vec<u8> {
 
 #[derive(Debug, Clone)]
 pub enum FingerprintStrategy {
-    Checksum {
-        bytes: usize,
-        ignored_header_bytes: usize,
-        lines: usize,
-    },
     FirstLinesChecksum {
         ignored_header_bytes: usize,
         lines: usize,
@@ -162,9 +157,8 @@ impl Fingerprinter {
         strategy: FingerprintStrategy,
         max_line_length: usize,
         ignore_not_found: bool,
-        internal_buffer_size: usize,
     ) -> Fingerprinter {
-        let buffer = vec![0u8; internal_buffer_size];
+        let buffer = vec![0u8; max_line_length];
 
         Fingerprinter {
             strategy,
@@ -186,12 +180,7 @@ impl Fingerprinter {
                 let ino = file_info.portable_ino();
                 Ok(DevInode(dev, ino))
             }
-            FingerprintStrategy::Checksum {
-                ignored_header_bytes,
-                bytes: _,
-                lines,
-            }
-            | FingerprintStrategy::FirstLinesChecksum {
+            FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes,
                 lines,
             } => {
@@ -318,14 +307,12 @@ mod test {
     #[tokio::test]
     async fn test_checksum_fingerprint() {
         let mut fingerprinter = Fingerprinter::new(
-            FingerprintStrategy::Checksum {
-                bytes: 256,
+            FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes: 0,
                 lines: 1,
             },
             1024,
             false,
-            1024, // 1024 > 256
         );
 
         let target_dir = tempdir().unwrap();
@@ -365,7 +352,6 @@ mod test {
             },
             max_line_length,
             false,
-            max_line_length,
         );
 
         let target_dir = tempdir().unwrap();
@@ -477,7 +463,6 @@ mod test {
             },
             max_line_length,
             false,
-            max_line_length,
         );
 
         let target_dir = tempdir().unwrap();
@@ -563,7 +548,6 @@ mod test {
             },
             max_line_length,
             false,
-            max_line_length,
         );
 
         let target_dir = tempdir().unwrap();
@@ -611,7 +595,7 @@ mod test {
 
     #[tokio::test]
     async fn test_inode_fingerprint() {
-        let mut fingerprinter = Fingerprinter::new(FingerprintStrategy::DevInode, 42, false, 42);
+        let mut fingerprinter = Fingerprinter::new(FingerprintStrategy::DevInode, 42, false);
 
         let target_dir = tempdir().unwrap();
         let small_data = vec![b'x'; 1];
@@ -637,14 +621,12 @@ mod test {
     async fn no_error_on_dir() {
         let target_dir = tempdir().unwrap();
         let mut fingerprinter = Fingerprinter::new(
-            FingerprintStrategy::Checksum {
-                bytes: 256,
+            FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes: 0,
                 lines: 1,
             },
             1024,
             false,
-            1024, // 1024 > 256
         );
 
         let mut small_files = HashMap::new();
