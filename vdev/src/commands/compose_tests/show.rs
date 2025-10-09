@@ -1,10 +1,7 @@
 use anyhow::Result;
 use std::collections::HashSet;
 
-use crate::{
-    environment::Environment,
-    testing::config::ComposeTestConfig,
-};
+use crate::{environment::Environment, testing::config::ComposeTestConfig};
 
 use super::active_projects::{find_active_environment, load_active_projects};
 
@@ -107,7 +104,6 @@ impl Show {
 
         Ok(())
     }
-
 }
 
 fn print_env(prefix: &str, environment: &Environment) {

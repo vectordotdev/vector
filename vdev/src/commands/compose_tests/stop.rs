@@ -13,7 +13,8 @@ pub(crate) fn exec(
     all_features: bool,
 ) -> Result<()> {
     let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, test_name)?;
-    let active_environment = find_active_environment_for_integration(local_config.directory, test_name, &config)?;
+    let active_environment =
+        find_active_environment_for_integration(local_config.directory, test_name, &config)?;
 
     if let Some(environment) = active_environment {
         ComposeTest::generate(local_config, test_name, environment, all_features, 0)?.stop()

@@ -20,7 +20,8 @@ pub fn exec(
     let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, integration)?;
     let envs = config.environments();
 
-    let active = find_active_environment_for_integration(local_config.directory, integration, &config)?;
+    let active =
+        find_active_environment_for_integration(local_config.directory, integration, &config)?;
     debug!("Active environment: {active:#?}");
 
     let environments: Box<dyn Iterator<Item = &String>> = match (environment, &active) {

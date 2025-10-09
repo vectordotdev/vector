@@ -19,7 +19,12 @@ pub(super) fn load_active_projects() -> Result<HashSet<String>> {
 
     Ok(projects
         .iter()
-        .filter_map(|project| project.get("Name").and_then(|n| n.as_str()).map(String::from))
+        .filter_map(|project| {
+            project
+                .get("Name")
+                .and_then(|n| n.as_str())
+                .map(String::from)
+        })
         .collect())
 }
 
