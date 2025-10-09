@@ -11,7 +11,7 @@ use vector_lib::{
     configurable::configurable_component,
     event::{
         MetricValue,
-        metric::{Metric, MetricData, MetricKind, MetricSeries},
+        metric::{Metric, MetricData, MetricKind, MetricSeries, Sample, StatisticKind},
     },
 };
 
@@ -73,6 +73,9 @@ pub enum AggregationMode {
 
     /// Stdev value of absolute metric, ignores incremental
     Stdev,
+
+    /// Aggregates absolute metrics into a distribution, ignores incremental
+    Distribution,
 }
 
 const fn default_mode() -> AggregationMode {
@@ -149,18 +152,17 @@ impl Aggregate {
             AggregationMode::Max | AggregationMode::Min => {
                 self.record_comparison(series, data, metadata)
             }
-            AggregationMode::Mean | AggregationMode::Stdev => match data.kind {
+            AggregationMode::Mean | AggregationMode::Stdev | AggregationMode::Distribution => match data.kind {
                 MetricKind::Incremental => (),
                 MetricKind::Absolute => {
-                    if matches!(data.value, MetricValue::Gauge { value: _ }) {
-                        match self.multi_map.entry(series) {
-                            Entry::Occupied(mut entry) => {
-                                let existing = entry.get_mut();
-                                existing.push((data, metadata));
-                            }
-                            Entry::Vacant(entry) => {
-                                entry.insert(vec![(data, metadata)]);
-                            }
+                    // For Distribution mode, we accept any metric value type
+                    match self.multi_map.entry(series) {
+                        Entry::Occupied(mut entry) => {
+                            let existing = entry.get_mut();
+                            existing.push((data, metadata));
+                        }
+                        Entry::Vacant(entry) => {
+                            entry.insert(vec![(data, metadata)]);
                         }
                     }
                 }
@@ -313,12 +315,85 @@ impl Aggregate {
                     let metric = Metric::from_parts(series, final_stdev, final_metadata);
                     output.push(Event::Metric(metric));
                 }
+                AggregationMode::Distribution => {
+                    let distribution_data = self.create_distribution_from_entries(&entries);
+                    let metric = Metric::from_parts(series, distribution_data, final_metadata);
+                    output.push(Event::Metric(metric));
+                }
                 _ => (),
             }
         }
 
         self.prev_map = map;
         emit!(AggregateFlushed);
+    }
+
+    fn create_distribution_from_entries(&self, entries: &[MetricEntry]) -> MetricData {
+        let mut samples = Vec::new();
+        
+        for (data, _) in entries {
+            match data.value() {
+                MetricValue::Gauge { value } => {
+                    samples.push(Sample {
+                        value: *value,
+                        rate: 1,
+                    });
+                }
+                MetricValue::Counter { value } => {
+                    samples.push(Sample {
+                        value: *value,
+                        rate: 1,
+                    });
+                }
+                MetricValue::Set { values } => {
+                    // For sets, create a sample for each unique value with rate 1
+                    for _value in values {
+                        samples.push(Sample {
+                            value: 1.0, // Count each set element as 1
+                            rate: 1,
+                        });
+                    }
+                }
+                MetricValue::Distribution { samples: dist_samples, .. } => {
+                    // If already a distribution, merge the samples
+                    samples.extend(dist_samples.clone());
+                }
+                MetricValue::AggregatedHistogram { count, sum, .. } => {
+                    // Convert histogram to samples using average value
+                    if *count > 0 {
+                        let avg_value = sum / (*count as f64);
+                        for _ in 0..*count {
+                            samples.push(Sample {
+                                value: avg_value,
+                                rate: 1,
+                            });
+                        }
+                    }
+                }
+                MetricValue::AggregatedSummary { count, sum, .. } => {
+                    // Convert summary to samples using average value
+                    if *count > 0 {
+                        let avg_value = sum / (*count as f64);
+                        for _ in 0..*count {
+                            samples.push(Sample {
+                                value: avg_value,
+                                rate: 1,
+                            });
+                        }
+                    }
+                }
+                _ => (),
+            }
+        }
+
+        MetricData {
+            time: entries.first().unwrap().0.time,
+            kind: MetricKind::Absolute,
+            value: MetricValue::Distribution {
+                samples,
+                statistic: StatisticKind::Histogram,
+            },
+        }
     }
 }
 
@@ -1141,5 +1216,88 @@ interval_ms = 999999
             assert_eq!(out.next().await, None);
         })
         .await;
+    }
+
+    #[test]
+    fn absolute_distribution() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Distribution,
+        })
+        .unwrap();
+
+        let gauge_a_1 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 25.0 },
+        );
+        let gauge_a_2 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 30.0 },
+        );
+        let gauge_a_3 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 35.0 },
+        );
+        let gauge_a_4 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 36.0 },
+        );
+        let gauge_a_5 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 37.0 },
+        );
+        let gauge_a_6 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 38.0 },
+        );
+        let gauge_a_7 = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 39.0 },
+        );
+        let counter_a_1 = make_metric(
+            "counter_a",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 110.0 },
+        );
+        // Record four gauge values
+        agg.record(gauge_a_1);
+        agg.record(gauge_a_2);
+        agg.record(gauge_a_3);
+        agg.record(gauge_a_4);
+        agg.record(gauge_a_5);
+        agg.record(gauge_a_6);
+        agg.record(gauge_a_7);
+        // validating that if we add a counter it doesn't end up in the distribution.
+        agg.record(counter_a_1);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+
+        // Verify it's a distribution with 7 metrics
+        if let MetricValue::Distribution { samples, statistic } = out[0].as_metric().value() {
+            assert_eq!(samples.len(), 7);
+            assert_eq!(*statistic, StatisticKind::Histogram);
+            
+            // Check sample values
+            let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
+            assert!(values.contains(&25.0));
+            assert!(values.contains(&30.0));
+            assert!(values.contains(&35.0));
+            assert!(values.contains(&36.0));
+            assert!(values.contains(&37.0));
+            assert!(values.contains(&38.0));
+            assert!(values.contains(&39.0));
+            assert!(!values.contains(&110.0));
+        } else {
+            panic!("Expected Distribution metric value");
+        }
     }
 }
