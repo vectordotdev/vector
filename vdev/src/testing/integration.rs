@@ -142,14 +142,17 @@ impl ComposeTest {
                 "running",
             ])
             .current_dir(&compose.test_dir)
-            .envs(compose.env.iter().filter_map(|(k, v)| v.as_ref().map(|v| (k, v))))
+            .envs(
+                compose
+                    .env
+                    .iter()
+                    .filter_map(|(k, v)| v.as_ref().map(|v| (k, v))),
+            )
             .output()
             .with_context(|| "Failed to check if compose environment is running")?;
 
         // If stdout is empty or "[]", no containers are running
-        Ok(!output.stdout.is_empty()
-            && output.stdout != b"[]\n"
-            && output.stdout != b"[]")
+        Ok(!output.stdout.is_empty() && output.stdout != b"[]\n" && output.stdout != b"[]")
     }
 
     pub(crate) fn test(&self, extra_args: Vec<String>) -> Result<()> {
@@ -296,7 +299,12 @@ impl Compose {
         #[cfg(unix)]
         unix::prepare_compose_volumes(&self.config, &self.test_dir, environment)?;
 
-        self.run("Starting", &["up", "--detach"], Some(environment), project_name)
+        self.run(
+            "Starting",
+            &["up", "--detach"],
+            Some(environment),
+            project_name,
+        )
     }
 
     fn stop(&self, project_name: &str) -> Result<()> {
