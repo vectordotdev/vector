@@ -13,7 +13,7 @@ IFS=$'\n\t'
 #
 #   Only uploads in CI environments. Prints file location when called locally.
 
-JUNIT_FILE="target/nextest/default/junit.xml"
+JUNIT_FILE="$(dirname "${BASH_SOURCE[0]}")/../target/nextest/default/junit.xml"
 
 # Print location locally, upload in CI
 if [[ -z "${CI:-}" ]]; then
