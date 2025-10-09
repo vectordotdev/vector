@@ -7,6 +7,7 @@ mod attrs;
 mod component_name;
 mod configurable;
 mod configurable_component;
+mod internal_event;
 
 /// Designates a type as being part of a Vector configuration.
 ///
@@ -109,4 +110,42 @@ pub fn derive_configurable(input: TokenStream) -> TokenStream {
 )]
 pub fn derive_component_name(input: TokenStream) -> TokenStream {
     component_name::derive_component_name_impl(input)
+}
+
+/// Marks an internal event struct for automatic name reporting.
+///
+/// Apply this attribute to the struct type that implements `InternalEvent`.
+/// It generates an implementation of `NamedInternalEvent` so `InternalEvent::name()`
+/// returns a stable, compile-time string for the event type.
+///
+/// Usage:
+///
+/// ```ignore
+/// use vector_config::internal_event;
+/// use vector_lib::internal_event::InternalEvent;
+///
+/// #[internal_event]
+/// #[derive(Debug)]
+/// pub struct UdpSendIncompleteError {
+///     pub data_size: usize,
+///     pub sent: usize,
+/// }
+///
+/// impl InternalEvent for UdpSendIncompleteError {
+///     fn emit(self) {
+///         // ... emit metrics/logging ...
+///     }
+/// }
+///
+/// // Later, `UdpSendIncompleteError.name()` yields the full type path.
+/// ```
+///
+/// Notes:
+/// - The attribute has no parameters.
+/// - Works with generics and lifetimes on the struct.
+/// - The returned name is the struct identifier, via `stringify!(TypeName)`.
+///   This avoids canonicalized module paths and yields stable event names.
+#[proc_macro_attribute]
+pub fn internal_event(_attrs: TokenStream, item: TokenStream) -> TokenStream {
+    internal_event::internal_event_impl(item)
 }

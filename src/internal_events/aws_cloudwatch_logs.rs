@@ -3,6 +3,7 @@ use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
+#[internal_event]
 #[derive(Debug)]
 pub struct AwsCloudwatchLogsMessageSizeError {
     pub size: usize,

@@ -3,6 +3,7 @@ use std::net::SocketAddr;
 use metrics::counter;
 use vector_lib::internal_event::InternalEvent;
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ApiStarted {
     pub addr: SocketAddr,

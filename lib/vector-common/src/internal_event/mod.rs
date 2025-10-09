@@ -24,13 +24,12 @@ pub use service::{CallError, PollReadyError};
 
 use crate::json_size::JsonSize;
 
-pub trait InternalEvent: Sized {
-    fn emit(self);
+pub trait NamedInternalEvent {
+    fn name(&self) -> &'static str;
+}
 
-    // Optional for backwards compat until all events implement this
-    fn name(&self) -> Option<&'static str> {
-        None
-    }
+pub trait InternalEvent: NamedInternalEvent + Sized {
+    fn emit(self);
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -60,9 +59,11 @@ impl<E: InternalEvent> InternalEvent for DefaultName<E> {
     fn emit(self) {
         self.event.emit();
     }
+}
 
-    fn name(&self) -> Option<&'static str> {
-        Some(self.event.name().unwrap_or(self.name))
+impl<E: NamedInternalEvent> NamedInternalEvent for DefaultName<E> {
+    fn name(&self) -> &'static str {
+        self.event.name()
     }
 }
 
@@ -73,16 +74,12 @@ impl<E: RegisterInternalEvent> RegisterInternalEvent for DefaultName<E> {
         self.event.register()
     }
 
-    fn name(&self) -> Option<&'static str> {
-        Some(self.event.name().unwrap_or(self.name))
-    }
+    fn name(&self) -> Option<&'static str> { Some(self.event.name()) }
 }
 
 #[cfg(any(test, feature = "test"))]
 pub fn emit(event: impl InternalEvent) {
-    if let Some(name) = event.name() {
-        super::event_test_util::record_internal_event(name);
-    }
+    super::event_test_util::record_internal_event(event.name());
     event.emit();
 }
 

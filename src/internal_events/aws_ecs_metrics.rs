@@ -6,6 +6,7 @@ use vector_lib::{
     json_size::JsonSize,
 };
 
+#[internal_event]
 #[derive(Debug)]
 pub struct AwsEcsMetricsEventsReceived<'a> {
     pub byte_size: JsonSize,
@@ -35,6 +36,7 @@ impl InternalEvent for AwsEcsMetricsEventsReceived<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct AwsEcsMetricsParseError<'a> {
     pub error: serde_json::Error,

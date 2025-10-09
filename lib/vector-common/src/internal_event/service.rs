@@ -2,6 +2,7 @@ use metrics::counter;
 
 use super::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL, emit, error_stage, error_type};
 
+#[internal_event]
 #[derive(Debug)]
 pub struct PollReadyError<E> {
     pub error: E,
@@ -23,12 +24,9 @@ impl<E: std::fmt::Debug> InternalEvent for PollReadyError<E> {
         )
         .increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("ServicePollReadyError")
-    }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct CallError<E> {
     pub error: E,
@@ -58,9 +56,5 @@ impl<E: std::fmt::Debug> InternalEvent for CallError<E> {
             reason,
             count: self.count,
         });
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("ServiceCallError")
     }
 }

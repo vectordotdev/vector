@@ -6,6 +6,7 @@ use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
+#[internal_event]
 #[derive(Debug)]
 pub struct EndpointBytesReceived<'a> {
     pub byte_size: usize,
@@ -30,6 +31,7 @@ impl InternalEvent for EndpointBytesReceived<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct EndpointBytesSent<'a> {
     pub byte_size: usize,
@@ -54,6 +56,7 @@ impl InternalEvent for EndpointBytesSent<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct SocketOutgoingConnectionError<E> {
     pub error: E,
@@ -81,6 +84,7 @@ impl<E: std::error::Error> InternalEvent for SocketOutgoingConnectionError<E> {
 
 const STREAM_CLOSED: &str = "stream_closed";
 
+#[internal_event]
 #[derive(Debug)]
 pub struct StreamClosedError {
     pub count: usize,
@@ -109,6 +113,7 @@ impl InternalEvent for StreamClosedError {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct CollectionCompleted {
     pub start: Instant,
@@ -123,6 +128,7 @@ impl InternalEvent for CollectionCompleted {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct SinkRequestBuildError<E> {
     pub error: E,

@@ -1,6 +1,7 @@
 use metrics::counter;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
+#[internal_event]
 #[derive(Debug)]
 pub struct AwsEc2MetadataRefreshSuccessful;
 
@@ -11,6 +12,7 @@ impl InternalEvent for AwsEc2MetadataRefreshSuccessful {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct AwsEc2MetadataRefreshError {
     pub error: crate::Error,
