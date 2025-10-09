@@ -263,7 +263,7 @@ impl ComposeTest {
 
 #[derive(Debug)]
 struct Compose {
-    original_path: PathBuf,
+    compose_yaml_path: PathBuf,
     test_dir: PathBuf,
     env: Environment,
     #[cfg_attr(target_family = "windows", allow(dead_code))]
@@ -273,19 +273,18 @@ struct Compose {
 
 impl Compose {
     fn new(test_dir: PathBuf, env: Environment, network: String) -> Result<Option<Self>> {
-        let original_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
+        let compose_yaml_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
 
-        match original_path.try_exists() {
-            Err(error) => {
-                Err(error).with_context(|| format!("Could not lookup {}", original_path.display()))
-            }
+        match compose_yaml_path.try_exists() {
+            Err(error) => Err(error)
+                .with_context(|| format!("Could not lookup {}", compose_yaml_path.display())),
             Ok(false) => Ok(None),
             Ok(true) => {
                 // Parse config only for unix volume permission checking
-                let config = ComposeConfig::parse(&original_path)?;
+                let config = ComposeConfig::parse(&compose_yaml_path)?;
 
                 Ok(Some(Self {
-                    original_path,
+                    compose_yaml_path,
                     test_dir,
                     env,
                     config,
@@ -329,7 +328,7 @@ impl Compose {
         command.arg("--project-name");
         command.arg(project_name);
         command.arg("--file");
-        command.arg(&self.original_path);
+        command.arg(&self.compose_yaml_path);
 
         command.args(args);
 
