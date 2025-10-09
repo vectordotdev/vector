@@ -21,9 +21,10 @@ pub use config::*;
 pub use encoder::ElasticsearchEncoder;
 use http::{Request, uri::InvalidUri};
 use snafu::Snafu;
-use vector_config::internal_event as internal_event_macro;
+use vector_config::internal_event;
 use vector_lib::{
-    configurable::configurable_component, internal_event, sensitive_string::SensitiveString,
+    configurable::configurable_component, internal_event::InternalEvent,
+    sensitive_string::SensitiveString,
 };
 
 use crate::{
@@ -182,12 +183,12 @@ pub enum ElasticsearchCommonMode {
     DataStream(DataStreamConfig),
 }
 
-#[internal_event_macro]
+#[internal_event]
 struct VersionValueParseError<'a> {
     value: &'a str,
 }
 
-impl internal_event::InternalEvent for VersionValueParseError<'_> {
+impl InternalEvent for VersionValueParseError<'_> {
     fn emit(self) {
         warn!("{self}")
     }
