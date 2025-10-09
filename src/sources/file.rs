@@ -657,6 +657,7 @@ pub fn file_source(
                     file_id: line.file_id,
                     offset: line.end_offset,
                 };
+                // checkpoints.update will be called from ack_stream's thread
                 finalizer.add(entry, receiver);
             } else {
                 checkpoints.update(line.file_id, line.end_offset);
