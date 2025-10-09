@@ -126,11 +126,7 @@ impl Show {
         Ok(())
     }
 
-    fn find_active_environment(
-        &self,
-        prefix: &str,
-        config: &ComposeTestConfig,
-    ) -> Option<String> {
+    fn find_active_environment(&self, prefix: &str, config: &ComposeTestConfig) -> Option<String> {
         for project_name in self.active_projects.keys() {
             if let Some(sanitized_env_name) = project_name.strip_prefix(prefix) {
                 // The project name has dots replaced with hyphens, so we need to check
