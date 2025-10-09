@@ -58,8 +58,8 @@ fn find_active_environment(
         .with_context(|| "Failed to parse docker compose ls output")?;
 
     for project in projects {
-        if let Some(name) = project.get("Name").and_then(|n| n.as_str()) {
-            if let Some(sanitized_env_name) = name.strip_prefix(&prefix) {
+        if let Some(name) = project.get("Name").and_then(|n| n.as_str())
+            && let Some(sanitized_env_name) = name.strip_prefix(&prefix) {
                 // The project name has dots replaced with hyphens, so we need to check
                 // all environments to find a match after applying the same sanitization
                 for env_name in config.environments().keys() {
@@ -68,7 +68,6 @@ fn find_active_environment(
                     }
                 }
             }
-        }
     }
 
     Ok(None)

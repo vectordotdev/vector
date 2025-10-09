@@ -32,7 +32,7 @@ fn show_all(path: &str) -> Result<()> {
     println!("{:width$}  Environment Name(s)", "Integration Name");
     println!("{:width$}  -------------------", "----------------");
     for (integration, config) in entries {
-        let prefix = format!("vector-{}-{}-", path, integration);
+        let prefix = format!("vector-{path}-{integration}-");
         let active_env = find_active_environment(&active_projects, &prefix, &config);
         let environments = config
             .environments()
@@ -48,7 +48,7 @@ fn show_all(path: &str) -> Result<()> {
 fn show_one(integration: &str, path: &str) -> Result<()> {
     let (_test_dir, config) = ComposeTestConfig::load(path, integration)?;
     let active_projects = get_active_projects()?;
-    let prefix = format!("vector-{}-{}-", path, integration);
+    let prefix = format!("vector-{path}-{integration}-");
     let active_env = find_active_environment(&active_projects, &prefix, &config);
 
     if let Some(args) = &config.args {
@@ -142,7 +142,7 @@ fn find_active_environment(
     prefix: &str,
     config: &ComposeTestConfig,
 ) -> Option<String> {
-    for (project_name, _) in active_projects {
+    for project_name in active_projects.keys() {
         if let Some(sanitized_env_name) = project_name.strip_prefix(prefix) {
             // The project name has dots replaced with hyphens, so we need to check
             // all environments to find a match after applying the same sanitization
