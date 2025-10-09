@@ -1,12 +1,13 @@
-use std::{iter::once, process::Command};
+use std::iter::once;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Result, bail};
 
 use crate::testing::{
     config::ComposeTestConfig,
-    docker::CONTAINER_TOOL,
     integration::{ComposeTest, ComposeTestLocalConfig},
 };
+
+use super::active_projects::find_active_environment_for_integration;
 
 pub fn exec(
     local_config: ComposeTestLocalConfig,
@@ -19,7 +20,7 @@ pub fn exec(
     let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, integration)?;
     let envs = config.environments();
 
-    let active = find_active_environment(local_config, integration, &config)?;
+    let active = find_active_environment_for_integration(local_config.directory, integration, &config)?;
     debug!("Active environment: {active:#?}");
 
     let environments: Box<dyn Iterator<Item = &String>> = match (environment, &active) {
@@ -36,40 +37,4 @@ pub fn exec(
             .test(args.to_owned())?;
     }
     Ok(())
-}
-
-fn find_active_environment(
-    local_config: ComposeTestLocalConfig,
-    integration: &str,
-    config: &ComposeTestConfig,
-) -> Result<Option<String>> {
-    let prefix = format!("vector-{}-{}-", local_config.directory, integration);
-
-    let output = Command::new(CONTAINER_TOOL.clone())
-        .args(["compose", "ls", "--format", "json"])
-        .output()
-        .with_context(|| "Failed to list compose projects")?;
-
-    if !output.status.success() {
-        return Ok(None);
-    }
-
-    let projects: Vec<serde_json::Value> = serde_json::from_slice(&output.stdout)
-        .with_context(|| "Failed to parse docker compose ls output")?;
-
-    for project in projects {
-        if let Some(name) = project.get("Name").and_then(|n| n.as_str())
-            && let Some(sanitized_env_name) = name.strip_prefix(&prefix)
-        {
-            // The project name has dots replaced with hyphens, so we need to check
-            // all environments to find a match after applying the same sanitization
-            for env_name in config.environments().keys() {
-                if env_name.replace('.', "-") == sanitized_env_name {
-                    return Ok(Some(env_name.to_string()));
-                }
-            }
-        }
-    }
-
-    Ok(None)
 }
