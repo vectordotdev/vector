@@ -152,21 +152,23 @@ impl Aggregate {
             AggregationMode::Max | AggregationMode::Min => {
                 self.record_comparison(series, data, metadata)
             }
-            AggregationMode::Mean | AggregationMode::Stdev | AggregationMode::Distribution => match data.kind {
-                MetricKind::Incremental => (),
-                MetricKind::Absolute => {
-                    // For Distribution mode, we accept any metric value type
-                    match self.multi_map.entry(series) {
-                        Entry::Occupied(mut entry) => {
-                            let existing = entry.get_mut();
-                            existing.push((data, metadata));
-                        }
-                        Entry::Vacant(entry) => {
-                            entry.insert(vec![(data, metadata)]);
+            AggregationMode::Mean | AggregationMode::Stdev | AggregationMode::Distribution => {
+                match data.kind {
+                    MetricKind::Incremental => (),
+                    MetricKind::Absolute => {
+                        // For Distribution mode, we accept any metric value type
+                        match self.multi_map.entry(series) {
+                            Entry::Occupied(mut entry) => {
+                                let existing = entry.get_mut();
+                                existing.push((data, metadata));
+                            }
+                            Entry::Vacant(entry) => {
+                                entry.insert(vec![(data, metadata)]);
+                            }
                         }
                     }
                 }
-            },
+            }
         }
 
         emit!(AggregateEventRecorded);
@@ -330,7 +332,7 @@ impl Aggregate {
 
     fn create_distribution_from_entries(&self, entries: &[MetricEntry]) -> MetricData {
         let mut samples = Vec::new();
-        
+
         for (data, _) in entries {
             match data.value() {
                 MetricValue::Gauge { value } => {
@@ -354,7 +356,10 @@ impl Aggregate {
                         });
                     }
                 }
-                MetricValue::Distribution { samples: dist_samples, .. } => {
+                MetricValue::Distribution {
+                    samples: dist_samples,
+                    ..
+                } => {
                     // If already a distribution, merge the samples
                     samples.extend(dist_samples.clone());
                 }
@@ -1283,9 +1288,10 @@ interval_ms = 999999
 
         // Verify it's a distribution with 7 metrics
         if let MetricValue::Distribution { samples, statistic } = out[0].as_metric().value() {
+            println!("Samples: {:#?}", samples);
             assert_eq!(samples.len(), 7);
             assert_eq!(*statistic, StatisticKind::Histogram);
-            
+
             // Check sample values
             let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
             assert!(values.contains(&25.0));
@@ -1296,6 +1302,78 @@ interval_ms = 999999
             assert!(values.contains(&38.0));
             assert!(values.contains(&39.0));
             assert!(!values.contains(&110.0));
+        } else {
+            panic!("Expected Distribution metric value");
+        }
+    }
+
+    #[test]
+    fn absolute_distribution_distributions() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Distribution,
+        })
+        .unwrap();
+
+        let distribution_a_1 = make_metric(
+            "dist_a",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: vec![25.0, 30.0, 35.0, 36.0]
+                    .into_iter()
+                    .map(|v| Sample { value: v, rate: 1 })
+                    .collect(),
+                statistic: StatisticKind::Summary,
+            },
+        );
+        let distribution_a_2 = make_metric(
+            "dist_a",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: vec![37.0, 38.0, 39.0]
+                    .into_iter()
+                    .map(|v| Sample { value: v, rate: 1 })
+                    .collect(),
+                statistic: StatisticKind::Summary,
+            },
+        );
+        let distribution_a_3 = make_metric(
+            "dist_a",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: vec![99.0, 113.0, 456.2]
+                    .into_iter()
+                    .map(|v| Sample { value: v, rate: 1 })
+                    .collect(),
+                statistic: StatisticKind::Summary,
+            },
+        );
+        // Record four gauge values
+        agg.record(distribution_a_1);
+        agg.record(distribution_a_2);
+        agg.record(distribution_a_3);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+
+        // Verify it's a distribution with 10 metrics
+        if let MetricValue::Distribution { samples, statistic } = out[0].as_metric().value() {
+            assert_eq!(samples.len(), 10, "expected 10 samples in distribution but got {:#?}", samples.len());
+            assert_eq!(*statistic, StatisticKind::Histogram);
+
+            // Check sample values
+            let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
+            assert!(values.contains(&25.0), "expected value: 25.0 to be present in aggregated value");
+            assert!(values.contains(&30.0), "expected value: 30.0 to be present in aggregated value");
+            assert!(values.contains(&35.0), "expected value: 35.0 to be present in aggregated value");
+            assert!(values.contains(&36.0), "expected value: 36.0 to be present in aggregated value");
+            assert!(values.contains(&37.0), "expected value: 37.0 to be present in aggregated value");
+            assert!(values.contains(&38.0), "expected value: 38.0 to be present in aggregated value");
+            assert!(values.contains(&39.0), "expected value: 39.0 to be present in aggregated value");
+            assert!(values.contains(&99.0), "expected value: 99.0 to be present in aggregated value");
+            assert!(values.contains(&113.0), "expected value: 113.0 to be present in aggregated value");
+            assert!(values.contains(&456.2), "expected value: 456.2 to be present in aggregated value");
         } else {
             panic!("Expected Distribution metric value");
         }
