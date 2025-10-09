@@ -339,8 +339,7 @@ impl From<FingerprintConfig> for FingerprintStrategy {
             FingerprintConfig::Checksum {
                 ignored_header_bytes,
                 lines,
-            } => FingerprintStrategy::FirstLineChecksum {
-                bytes,
+            } => FingerprintStrategy::FirstLinesChecksum {
                 ignored_header_bytes,
                 lines,
             },
@@ -856,7 +855,6 @@ mod tests {
     fn test_default_file_config(dir: &tempfile::TempDir) -> file::FileConfig {
         file::FileConfig {
             fingerprint: FingerprintConfig::Checksum {
-                bytes: Some(8),
                 ignored_header_bytes: 0,
                 lines: 1,
             },
@@ -890,7 +888,6 @@ mod tests {
         assert_eq!(
             config.fingerprint,
             FingerprintConfig::Checksum {
-                bytes: None,
                 ignored_header_bytes: 0,
                 lines: 1
             }
@@ -919,7 +916,6 @@ mod tests {
         assert_eq!(
             config.fingerprint,
             FingerprintConfig::Checksum {
-                bytes: Some(128),
                 ignored_header_bytes: 512,
                 lines: 1
             }
