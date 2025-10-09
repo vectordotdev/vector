@@ -1,4 +1,4 @@
-* Dropped support for `file` source legacy checkpoints stored in the `checkpoints` folder (Vector `< 0.11`) which is located inside the `data_dir`. 
+* Dropped support for `file` source legacy checkpoints stored in the `checkpoints` folder (Vector `< 0.11`) which is located inside the `data_dir`.
 * Removed the legacy checkpoint checksum format (Vector `< 0.15`).
 * The intentionally hidden `fingerprint.bytes` option was also removed.
 
@@ -11,11 +11,11 @@ You can stop reading if you
 * don't care about the file positions and don't care about current state of your checkpoints, meaning you accept that files could be read from the beginning again after the upgrade.
   * Vector will re-read all files from the beginning if/when any `checkpoints.json` files nested inside `data_dir` fail to load due to legacy/corrupted data.
 
-You are only affected if any of the following criteria apply:
+You are only affected if your Vector version is:
 
-1. If your Vector version is `>= 0.11` and `< 0.15` your checkpoints are using the legacy checkpoint checksum CRC format.
-2. If your Vector version is `>= 0.11` and `< 0.15` the `checksum` key is present under `checkpoints.fingerprint` in your `checkpoints.json` (instead of `first_lines_checksum`).
-3. If your Vector version is **or ever was** `< 0.11` and you are using the legacy `checkpoints` folder and/or the `unknown` key is present under `checkpoints.fingerprint` in any `checkpoints.json` files nested inside `data_dir`.
+1. `>= 0.11` and `< 0.15`, then your checkpoints are using the legacy checkpoint checksum CRC format.
+2. `>= 0.11` and `< 0.15`, then the `checksum` key is present under `checkpoints.fingerprint` in your `checkpoints.json` (instead of `first_lines_checksum`).
+3. **or ever was** `< 0.11` and you are using the legacy `checkpoints` folder and/or the `unknown` key is present under `checkpoints.fingerprint` in any `checkpoints.json` files nested inside `data_dir`.
 
 #### If you are affected by `#1` or `#2`
 
