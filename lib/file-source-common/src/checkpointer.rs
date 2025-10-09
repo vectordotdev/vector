@@ -15,10 +15,7 @@ use tokio::{
 };
 use tracing::{error, info, warn};
 
-use super::{
-    FilePosition,
-    fingerprinter::{FileFingerprint, Fingerprinter},
-};
+use super::{FilePosition, fingerprinter::FileFingerprint};
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
 pub const CHECKPOINT_FILE_NAME: &str = "checkpoints.json";
@@ -162,17 +159,6 @@ impl CheckpointsView {
                 .collect(),
         }
     }
-
-    async fn maybe_upgrade(
-        &self,
-        path: &Path,
-        fng: FileFingerprint,
-        fingerprinter: &mut Fingerprinter,
-    ) {
-        if let Ok(Some(old_checksum)) = fingerprinter.bytes_checksum(path).await {
-            self.update_key(old_checksum, fng)
-        }
-    }
 }
 
 impl Checkpointer {
@@ -200,19 +186,6 @@ impl Checkpointer {
     #[cfg(test)]
     pub fn get_checkpoint(&self, fng: FileFingerprint) -> Option<FilePosition> {
         self.checkpoints.get(fng)
-    }
-
-    /// Scan through a given list of fresh fingerprints to see if any match an existing legacy
-    /// fingerprint. If so, upgrade the existing fingerprint.
-    pub async fn maybe_upgrade(
-        &mut self,
-        path: &Path,
-        fresh: FileFingerprint,
-        fingerprinter: &mut Fingerprinter,
-    ) {
-        self.checkpoints
-            .maybe_upgrade(path, fresh, fingerprinter)
-            .await
     }
 
     /// Persist the current checkpoints state to disk, making our best effort to
@@ -325,7 +298,6 @@ mod test {
     use tokio::fs;
 
     use super::{
-        super::{FingerprintStrategy, Fingerprinter},
         CHECKPOINT_FILE_NAME, Checkpoint, Checkpointer, FileFingerprint, FilePosition,
         TMP_FILE_NAME,
     };
@@ -417,141 +389,28 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_checkpointer_fingerprint_upgrades_unknown() {
-        let log_dir = tempdir().unwrap();
-        let path = log_dir.path().join("test.log");
-        let data = "hello\n";
-        fs::write(&path, data).await.unwrap();
-
-        let new_fingerprint = FileFingerprint::DevInode(1, 2);
-        let old_fingerprint = FileFingerprint::BytesChecksum(321);
-        let position: FilePosition = 1234;
-        let mut fingerprinter =
-            Fingerprinter::new(FingerprintStrategy::DevInode, 1000, false, 1000);
-
-        let data_dir = tempdir().unwrap();
-        {
-            let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.update_checkpoint(old_fingerprint, position);
-            assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
-            chkptr.write_checkpoints().await.unwrap();
-        }
-        {
-            let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.read_checkpoints(None).await;
-            assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
-
-            chkptr
-                .maybe_upgrade(&path, new_fingerprint, &mut fingerprinter)
-                .await;
-
-            assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
-            assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
-        }
-    }
-
-    #[tokio::test]
-    async fn test_checkpointer_fingerprint_upgrades_legacy_checksum() {
-        let log_dir = tempdir().unwrap();
-        let path = log_dir.path().join("test.log");
-        let data = "hello\n";
-        fs::write(&path, data).await.unwrap();
-
-        let old_fingerprint = FileFingerprint::FirstLinesChecksum(18057733963141331840);
-        let new_fingerprint = FileFingerprint::FirstLinesChecksum(17791311590754645022);
-        let position: FilePosition = 6;
-
-        let mut fingerprinter = Fingerprinter::new(
-            FingerprintStrategy::FirstLinesChecksum {
-                ignored_header_bytes: 0,
-                lines: 1,
-            },
-            102400,
-            false,
-            102400,
-        );
-
-        let data_dir = tempdir().unwrap();
-        {
-            let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.update_checkpoint(old_fingerprint, position);
-            assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
-            chkptr.write_checkpoints().await.unwrap();
-        }
-        {
-            let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.read_checkpoints(None).await;
-            assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
-
-            chkptr
-                .maybe_upgrade(&path, new_fingerprint, &mut fingerprinter)
-                .await;
-
-            assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
-            assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
-        }
-    }
-
-    #[tokio::test]
-    async fn test_checkpointer_fingerprint_upgrades_legacy_first_lines_checksum() {
-        let log_dir = tempdir().unwrap();
-        let path = log_dir.path().join("test.log");
-        let data = "hello\n";
-        fs::write(&path, data).await.unwrap();
-
-        let old_fingerprint = FileFingerprint::FirstLinesChecksum(17791311590754645022);
-        let new_fingerprint = FileFingerprint::FirstLinesChecksum(11081174131906673079);
-        let position: FilePosition = 6;
-
-        let mut fingerprinter = Fingerprinter::new(
-            FingerprintStrategy::FirstLinesChecksum {
-                ignored_header_bytes: 0,
-                lines: 1,
-            },
-            102400,
-            false,
-            102400,
-        );
-
-        let data_dir = tempdir().unwrap();
-        {
-            let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.update_checkpoint(old_fingerprint, position);
-            assert_eq!(chkptr.get_checkpoint(old_fingerprint), Some(position));
-            chkptr.write_checkpoints().await.unwrap();
-        }
-        {
-            let mut chkptr = Checkpointer::new(data_dir.path());
-            chkptr.read_checkpoints(None).await;
-            assert_eq!(chkptr.get_checkpoint(new_fingerprint), None);
-
-            chkptr
-                .maybe_upgrade(&path, new_fingerprint, &mut fingerprinter)
-                .await;
-
-            assert_eq!(chkptr.get_checkpoint(new_fingerprint), Some(position));
-            assert_eq!(chkptr.get_checkpoint(old_fingerprint), None);
-        }
-    }
-
-    #[tokio::test]
     async fn test_checkpointer_file_upgrades() {
         let fingerprint = FileFingerprint::DevInode(1, 2);
         let position: FilePosition = 1234;
 
         let data_dir = tempdir().unwrap();
 
-        // Write out checkpoints in the legacy file format
         {
             let mut chkptr = Checkpointer::new(data_dir.path());
             chkptr.update_checkpoint(fingerprint, position);
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
-        }
 
-        // Ensure that the new files were not written but the old style of files were
-        assert!(!data_dir.path().join(TMP_FILE_NAME).exists());
-        assert!(!data_dir.path().join(CHECKPOINT_FILE_NAME).exists());
-        assert!(data_dir.path().join("checkpoints").is_dir());
+            // Ensure that the new files were not written but the old style of files were
+            assert!(!data_dir.path().join(TMP_FILE_NAME).exists());
+            assert!(!data_dir.path().join(CHECKPOINT_FILE_NAME).exists());
+            assert!(!data_dir.path().join("checkpoints").is_dir());
+
+            chkptr.write_checkpoints().await.unwrap();
+
+            assert!(!data_dir.path().join(TMP_FILE_NAME).exists());
+            assert!(data_dir.path().join(CHECKPOINT_FILE_NAME).exists());
+            assert!(!data_dir.path().join("checkpoints").is_dir());
+        }
 
         // Read from those old files, ensure the checkpoints were loaded properly, and then write
         // them normally (i.e. in the new format)
@@ -614,7 +473,7 @@ mod test {
     }
 
     #[tokio::test]
-    async fn test_checkpointer_checksum_updates() {
+    async fn test_checkpointer_strategy_checksum_happy_path() {
         let data_dir = tempdir().unwrap();
 
         let mut fingerprinter = crate::Fingerprinter::new(
@@ -634,39 +493,16 @@ mod test {
             .await
             .expect("writing test data");
 
-        let old = fingerprinter
-            .bytes_checksum(&log_path)
-            .await
-            .expect("getting old checksum")
-            .expect("still getting old checksum");
-
         let new = fingerprinter
             .fingerprint(&log_path)
             .await
             .expect("getting new checksum");
 
-        // make sure each is of the expected type and that the inner values are not the same
-        match (old, new) {
-            (FileFingerprint::BytesChecksum(old), FileFingerprint::FirstLinesChecksum(new)) => {
-                assert_ne!(old, new)
-            }
-            _ => panic!("unexpected checksum types"),
-        }
+        assert!(matches!(new, FileFingerprint::FirstLinesChecksum(_)));
 
         let mut chkptr = Checkpointer::new(data_dir.path());
-
-        // pretend that we had loaded this old style checksum from disk after an upgrade
-        chkptr.update_checkpoint(old, 1234);
-
-        assert!(chkptr.checkpoints.contains_bytes_checksums());
-
-        chkptr
-            .maybe_upgrade(&log_path, new, &mut fingerprinter)
-            .await;
-
-        assert!(!chkptr.checkpoints.contains_bytes_checksums());
+        chkptr.update_checkpoint(new, 1234);
         assert_eq!(Some(1234), chkptr.get_checkpoint(new));
-        assert_eq!(None, chkptr.get_checkpoint(old));
     }
 
     // guards against accidental changes to the checkpoint serialization
@@ -736,11 +572,6 @@ mod test {
     },
     {
       "fingerprint": { "first_lines_checksum": 78910 },
-      "position": 1234,
-      "modified": "2021-07-12T18:19:11.769003Z"
-    },
-    {
-      "fingerprint": { "unknown": 1337 },
       "position": 1234,
       "modified": "2021-07-12T18:19:11.769003Z"
     }

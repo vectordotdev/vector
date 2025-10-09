@@ -255,25 +255,6 @@ impl Fingerprinter {
             .ok()
             .flatten()
     }
-
-    pub async fn bytes_checksum(&mut self, path: &Path) -> Result<Option<FileFingerprint>> {
-        match self.strategy {
-            FingerprintStrategy::Checksum {
-                bytes,
-                ignored_header_bytes,
-                lines: _,
-            } => {
-                let buffer = self.buffer.resize_slice_mut(bytes);
-                let mut fp = File::open(path).await?;
-                fp.seek(SeekFrom::Start(ignored_header_bytes as u64))
-                    .await?;
-                fp.read_exact(buffer).await?;
-                let fingerprint = FINGERPRINT_CRC.checksum(buffer);
-                Ok(Some(FileFingerprint::BytesChecksum(fingerprint)))
-            }
-            _ => Ok(None),
-        }
-    }
 }
 
 async fn fingerprinter_read_until(
