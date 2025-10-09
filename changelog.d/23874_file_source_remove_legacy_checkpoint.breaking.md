@@ -24,6 +24,7 @@ For example, if you’re on Vector `0.10` and want to upgrade, keep upgrading Ve
 When upgrading, we recommend stepping through minor versions as these can each contain breaking changes while Vector is pre-1.0. These breaking changes are noted in their respective upgrade guides.
 
 Odds are the `file` source automatically converted checkpoints to the new format if you are using a recent version and you are not affected by this at all.
+
 #### If you are affected by `#3`
 
 You should manually delete the `unknown` checkpoint records from all `checkpoints.json` files nested inside `data_dir`
