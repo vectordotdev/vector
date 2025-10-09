@@ -1,7 +1,9 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::InternalEvent;
 
 #[derive(Debug)]
+#[internal_event]
 pub struct ConfigReloadRejected {
     reason: ReloadRejectReason,
 }
@@ -39,10 +41,6 @@ impl InternalEvent for ConfigReloadRejected {
             }
         }
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("ConfigReloadRejected")
-    }
 }
 
 impl ConfigReloadRejected {
@@ -75,6 +73,7 @@ impl ReloadRejectReason {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct ConfigReloaded;
 
 impl InternalEvent for ConfigReloaded {
@@ -85,9 +84,5 @@ impl InternalEvent for ConfigReloaded {
         );
 
         counter!("config_reloaded",).increment(1);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("ConfigReloaded")
     }
 }

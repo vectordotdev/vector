@@ -7,8 +7,10 @@ use std::{
 };
 
 use metrics::gauge;
+use vector_config::internal_event;
 use vector_lib::internal_event::InternalEvent;
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ConnectionOpen {
     pub count: usize,
@@ -20,6 +22,7 @@ impl InternalEvent for ConnectionOpen {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct EndpointsActive {
     pub count: usize,

@@ -1,8 +1,10 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 use crate::sources::fluent::DecodeError;
 
+#[internal_event]
 #[derive(Debug)]
 pub struct FluentMessageReceived {
     pub byte_size: u64,
@@ -14,6 +16,7 @@ impl InternalEvent for FluentMessageReceived {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct FluentMessageDecodeError<'a> {
     pub error: &'a DecodeError,

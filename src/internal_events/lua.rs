@@ -1,4 +1,5 @@
 use metrics::{counter, gauge};
+use vector_config::internal_event;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
@@ -6,6 +7,7 @@ use vector_lib::internal_event::{
 use crate::transforms::lua::v2::BuildError;
 
 #[derive(Debug)]
+#[internal_event]
 pub struct LuaGcTriggered {
     pub used_memory: usize,
 }
@@ -17,6 +19,7 @@ impl InternalEvent for LuaGcTriggered {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct LuaScriptError {
     pub error: mlua::Error,
 }
@@ -46,6 +49,7 @@ impl InternalEvent for LuaScriptError {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct LuaBuildError {
     pub error: BuildError,
 }

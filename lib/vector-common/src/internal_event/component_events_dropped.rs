@@ -1,4 +1,5 @@
 use metrics::{Counter, counter};
+use vector_config::internal_event;
 
 use super::{Count, InternalEvent, InternalEventHandle, RegisterInternalEvent};
 

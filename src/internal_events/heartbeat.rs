@@ -1,10 +1,12 @@
 use std::time::Instant;
 
 use metrics::gauge;
+use vector_config::internal_event;
 use vector_lib::internal_event::InternalEvent;
 
 use crate::built_info;
 
+#[internal_event]
 #[derive(Debug)]
 pub struct Heartbeat {
     pub since: Instant,

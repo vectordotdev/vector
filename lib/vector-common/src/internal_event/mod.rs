@@ -67,14 +67,14 @@ impl<E: NamedInternalEvent> NamedInternalEvent for DefaultName<E> {
     }
 }
 
-impl<E: RegisterInternalEvent> RegisterInternalEvent for DefaultName<E> {
+impl<E: RegisterInternalEvent + NamedInternalEvent> RegisterInternalEvent for DefaultName<E> {
     type Handle = E::Handle;
 
     fn register(self) -> Self::Handle {
         self.event.register()
     }
 
-    fn name(&self) -> Option<&'static str> { Some(self.event.name()) }
+    fn name(&self) -> Option<&'static str> { Some(NamedInternalEvent::name(&self.event)) }
 }
 
 #[cfg(any(test, feature = "test"))]

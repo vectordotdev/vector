@@ -9,6 +9,7 @@ pub use self::source::*;
 mod sink {
     use metrics::{counter, gauge};
     use serde_json::Error;
+    use vector_config::internal_event;
     use vector_lib::internal_event::{
         ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     };
@@ -18,6 +19,7 @@ mod sink {
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,
     };
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SplunkEventEncodeError {
         pub error: vector_lib::Error,
@@ -45,6 +47,7 @@ mod sink {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub(crate) struct SplunkInvalidMetricReceivedError<'a> {
         pub value: &'a MetricValue,
@@ -78,6 +81,7 @@ mod sink {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SplunkResponseParseError {
         pub error: Error,
@@ -103,6 +107,7 @@ mod sink {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SplunkIndexerAcknowledgementAPIError {
         pub message: &'static str,
@@ -129,6 +134,7 @@ mod sink {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SplunkIndexerAcknowledgementUnavailableError<E> {
         pub error: E,
@@ -154,6 +160,7 @@ mod sink {
         }
     }
 
+    #[internal_event]
     pub struct SplunkIndexerAcknowledgementAckAdded;
 
     impl InternalEvent for SplunkIndexerAcknowledgementAckAdded {
@@ -162,6 +169,7 @@ mod sink {
         }
     }
 
+    #[internal_event]
     pub struct SplunkIndexerAcknowledgementAcksRemoved {
         pub count: f64,
     }
@@ -172,6 +180,7 @@ mod sink {
         }
     }
 
+    #[internal_event]
     pub struct SplunkEventTimestampInvalidType<'a> {
         pub r#type: &'a str,
     }
@@ -187,6 +196,7 @@ mod sink {
         }
     }
 
+    #[internal_event]
     pub struct SplunkEventTimestampMissing;
 
     impl InternalEvent for SplunkEventTimestampMissing {
@@ -202,10 +212,12 @@ mod sink {
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
     use metrics::counter;
+    use vector_config::internal_event;
     use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
     use crate::sources::splunk_hec::ApiError;
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SplunkHecRequestBodyInvalidError {
         pub error: std::io::Error,
@@ -231,6 +243,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SplunkHecRequestError {
         pub(crate) error: ApiError,

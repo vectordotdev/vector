@@ -1,4 +1,5 @@
 use metrics::counter;
+use vector_config::internal_event;
 
 use super::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL, emit, error_stage, error_type};
 

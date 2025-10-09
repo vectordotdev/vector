@@ -3,6 +3,7 @@
 use metrics::counter;
 #[cfg(feature = "sources-aws_s3")]
 pub use s3::*;
+use vector_config::internal_event;
 use vector_lib::internal_event::InternalEvent;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
 use vector_lib::internal_event::{error_stage, error_type};
@@ -283,6 +284,7 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'_, E> {
 
 // AWS s3 source
 
+#[internal_event]
 #[derive(Debug)]
 pub struct SqsS3EventRecordInvalidEventIgnored<'a> {
     pub bucket: &'a str,

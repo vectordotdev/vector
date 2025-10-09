@@ -1,9 +1,11 @@
 use metrics::counter;
 use serde_json::Error;
+use vector_config::internal_event;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
+#[internal_event]
 #[derive(Debug)]
 pub struct MetricToLogSerializeError {
     pub error: Error,

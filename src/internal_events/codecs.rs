@@ -1,8 +1,10 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DecoderFramingError<E> {
     pub error: E,
@@ -28,6 +30,7 @@ impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DecoderDeserializeError<'a> {
     pub error: &'a crate::Error,
@@ -53,6 +56,7 @@ impl InternalEvent for DecoderDeserializeError<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct EncoderFramingError<'a> {
     pub error: &'a vector_lib::codecs::encoding::BoxedFramingError,
@@ -80,6 +84,7 @@ impl InternalEvent for EncoderFramingError<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct EncoderSerializeError<'a> {
     pub error: &'a crate::Error,
@@ -107,6 +112,7 @@ impl InternalEvent for EncoderSerializeError<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct EncoderWriteError<'a, E> {
     pub error: &'a E,

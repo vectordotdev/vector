@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
@@ -20,6 +21,7 @@ fn truncate_string_at(s: &str, maxlen: usize) -> Cow<'_, str> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ParserMatchError<'a> {
     pub value: &'a [u8],
@@ -50,6 +52,7 @@ pub const DROP_EVENT: bool = true;
 #[allow(dead_code)]
 pub const RETAIN_EVENT: bool = false;
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ParserMissingFieldError<'a, const DROP_EVENT: bool> {
     pub field: &'a str,
@@ -81,6 +84,7 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ParserConversionError<'a> {
     pub name: &'a str,

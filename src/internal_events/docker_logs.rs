@@ -1,11 +1,13 @@
 use bollard::errors::Error;
 use chrono::ParseError;
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::{
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DockerLogsEventsReceived<'a> {
     pub byte_size: JsonSize,
@@ -31,6 +33,7 @@ impl InternalEvent for DockerLogsEventsReceived<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DockerLogsContainerEventReceived<'a> {
     pub container_id: &'a str,
@@ -48,6 +51,7 @@ impl InternalEvent for DockerLogsContainerEventReceived<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DockerLogsContainerWatch<'a> {
     pub container_id: &'a str,
@@ -63,6 +67,7 @@ impl InternalEvent for DockerLogsContainerWatch<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DockerLogsContainerUnwatch<'a> {
     pub container_id: &'a str,
@@ -78,6 +83,7 @@ impl InternalEvent for DockerLogsContainerUnwatch<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DockerLogsCommunicationError<'a> {
     pub error: Error,
@@ -103,6 +109,7 @@ impl InternalEvent for DockerLogsCommunicationError<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DockerLogsContainerMetadataFetchError<'a> {
     pub error: Error,
@@ -129,6 +136,7 @@ impl InternalEvent for DockerLogsContainerMetadataFetchError<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DockerLogsTimestampParseError<'a> {
     pub error: ParseError,
@@ -155,6 +163,7 @@ impl InternalEvent for DockerLogsTimestampParseError<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DockerLogsLoggingDriverUnsupportedError<'a> {
     pub container_id: &'a str,

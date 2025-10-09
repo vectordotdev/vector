@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
+use vector_config::internal_event;
 use vector_lib::{
     internal_event::{
         ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
@@ -11,6 +12,7 @@ use vector_lib::{
 
 use super::prelude::io_error_code;
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ExecEventsReceived<'a> {
     pub count: usize,
@@ -39,6 +41,7 @@ impl InternalEvent for ExecEventsReceived<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ExecFailedError<'a> {
     pub command: &'a str,
@@ -67,6 +70,7 @@ impl InternalEvent for ExecFailedError<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ExecTimeoutError<'a> {
     pub command: &'a str,
@@ -95,6 +99,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ExecCommandExecuted<'a> {
     pub command: &'a str,
@@ -182,6 +187,7 @@ impl std::fmt::Display for ExecFailedToSignalChild {
     }
 }
 
+#[internal_event]
 pub struct ExecFailedToSignalChildError<'a> {
     pub command: &'a tokio::process::Command,
     pub error: ExecFailedToSignalChild,
@@ -208,6 +214,7 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
     }
 }
 
+#[internal_event]
 pub struct ExecChannelClosedError;
 
 impl InternalEvent for ExecChannelClosedError {

@@ -1,6 +1,7 @@
 use std::net::SocketAddr;
 
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::InternalEvent;
 
 #[internal_event]

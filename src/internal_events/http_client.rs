@@ -6,9 +6,11 @@ use http::{
 };
 use hyper::{Error, body::HttpBody};
 use metrics::{counter, histogram};
+use vector_config::internal_event;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 #[derive(Debug)]
+#[internal_event]
 pub struct AboutToSendHttpRequest<'a, T> {
     pub request: &'a Request<T>,
 }
@@ -44,6 +46,7 @@ impl<T: HttpBody> InternalEvent for AboutToSendHttpRequest<'_, T> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct GotHttpResponse<'a, T> {
     pub response: &'a Response<T>,
     pub roundtrip: Duration,
@@ -73,6 +76,7 @@ impl<T: HttpBody> InternalEvent for GotHttpResponse<'_, T> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct GotHttpWarning<'a> {
     pub error: &'a Error,
     pub roundtrip: Duration,

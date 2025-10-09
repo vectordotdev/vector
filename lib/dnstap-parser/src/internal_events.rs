@@ -1,6 +1,8 @@
 use tracing::warn;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vector_config::internal_event;
 
+#[internal_event]
 #[derive(Debug)]
 pub(crate) struct DnstapParseWarning<E> {
     pub error: E,

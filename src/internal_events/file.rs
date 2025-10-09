@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 
 use metrics::{counter, gauge};
+use vector_config::internal_event;
 use vector_lib::{
     configurable::configurable_component,
     internal_event::{
@@ -114,6 +115,7 @@ mod source {
 
     use bytes::BytesMut;
     use metrics::counter;
+    use vector_config::internal_event;
     use vector_lib::{
         emit,
         file_source_common::internal_events::FileSourceInternalEvents,

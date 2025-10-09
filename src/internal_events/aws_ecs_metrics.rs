@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::{
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
