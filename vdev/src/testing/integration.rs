@@ -146,7 +146,7 @@ impl ComposeTest {
                 compose
                     .env
                     .iter()
-                    .filter_map(|(k, v)| v.as_ref().map(|v| (k, v))),
+                    .filter_map(|(k, v)| v.as_ref().map(|val| (k, val))),
             )
             .output()
             .with_context(|| "Failed to check if compose environment is running")?;
