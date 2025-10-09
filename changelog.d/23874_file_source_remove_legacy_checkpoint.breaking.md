@@ -14,8 +14,8 @@ meaning you accept that files could be read from the beginning again after the u
 
 You are only affected if any of the following criteria apply:
 
-1. If your Vector version is `>= 0.11` and `< 0.15` Your checkpoints are using the legacy checkpoint checksum CRC format.
-2. If your Vector version is `>= 0.11` and `< 0.15` The `checksum` key is present under `checkpoints.fingerprint` in your `checkpoints.json` (instead of `first_lines_checksum`).
+1. If your Vector version is `>= 0.11` and `< 0.15` your checkpoints are using the legacy checkpoint checksum CRC format.
+2. If your Vector version is `>= 0.11` and `< 0.15` the `checksum` key is present under `checkpoints.fingerprint` in your `checkpoints.json` (instead of `first_lines_checksum`).
 3. If your Vector version is **or ever was** `< 0.11` and you are using the legacy `checkpoints` folder and/or the `unknown` key is present under `checkpoints.fingerprint` in any `checkpoints.json` files nested inside `data_dir`.
 
 #### If you are affected by `#1` or `#2`
