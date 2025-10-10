@@ -66,13 +66,16 @@ mod parser;
 mod partial_events_merger;
 mod path_helpers;
 mod pod_metadata_annotator;
+mod pod_publisher;
+mod pod_subscriber;
 mod transform_utils;
 mod util;
 
 use self::{
     namespace_metadata_annotator::NamespaceMetadataAnnotator,
     node_metadata_annotator::NodeMetadataAnnotator, parser::Parser,
-    pod_metadata_annotator::PodMetadataAnnotator,
+    pod_metadata_annotator::PodMetadataAnnotator, pod_publisher::PodPublisher,
+    pod_subscriber::PodSubscriber,
 };
 
 /// The `self_node_name` value env var key.
@@ -588,6 +591,8 @@ struct Source {
     delay_deletion: Duration,
     include_file_metric_tag: bool,
     rotate_wait: Duration,
+    // TODO: This will be used when implementing K8s logs API integration
+    #[allow(dead_code)]
     api_log: bool,
 }
 
@@ -886,7 +891,7 @@ impl Source {
 
         // Channel for communication between main task and pod monitoring task
         // Similar to Docker logs source pattern: spawned task sends data to main task via channel
-        let (pod_info_tx, mut pod_info_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let (pod_info_tx, pod_info_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
@@ -994,32 +999,8 @@ impl Source {
             // This task monitors pod_state changes and publishes pod information via channel
             let (slot, shutdown) = lifecycle.add();
             let pod_state_clone = pod_state.clone();
-            let fut = async move {
-                let mut interval = tokio::time::interval(Duration::from_secs(5));
-                let mut shutdown = shutdown;
-
-                loop {
-                    tokio::select! {
-                        _ = interval.tick() => {
-                            // Get all current pods
-                            let pods = pod_state_clone.state();
-                            for pod in pods.iter() {
-                                if let Some(name) = pod.metadata.name.as_ref() {
-                                    if let Err(_) = pod_info_tx.send(name.clone()) {
-                                        warn!("Failed to send pod info through channel");
-                                        return;
-                                    }
-                                }
-                            }
-                        }
-                        _ = &mut shutdown => {
-                            info!("Pod monitoring task shutting down");
-                            return;
-                        }
-                    }
-                }
-            }
-            .map(|_| {
+            let publisher = PodPublisher::new(pod_state_clone, pod_info_tx, shutdown);
+            let fut = publisher.run().map(|_| {
                 info!(message = "Pod monitoring task completed gracefully.");
             });
             slot.bind(Box::pin(fut));
@@ -1027,33 +1008,8 @@ impl Source {
 
         // Spawn a task to consume from the pod info channel and print pod names
         // Similar to Docker logs main future pattern: main task receives data from spawned tasks
-        let pod_consumer_task = {
-            let shutdown_signal = global_shutdown.clone();
-            async move {
-                loop {
-                    tokio::select! {
-                        pod_name = pod_info_rx.recv() => {
-                            match pod_name {
-                                Some(name) => {
-                                    info!("Received pod name: {}", name);
-                                }
-                                None => {
-                                    info!("Pod info channel closed");
-                                    break;
-                                }
-                            }
-                        }
-                        _ = shutdown_signal.clone() => {
-                            info!("Pod consumer task shutting down");
-                            break;
-                        }
-                    }
-                }
-            }
-        };
-
-        // Spawn the consumer task
-        tokio::spawn(pod_consumer_task);
+        let subscriber = PodSubscriber::new(pod_info_rx, global_shutdown.clone());
+        tokio::spawn(subscriber.run());
 
         lifecycle.run(global_shutdown).await;
         // Stop Kubernetes object reflectors to avoid their leak on vector reload.
