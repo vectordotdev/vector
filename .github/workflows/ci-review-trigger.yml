@@ -89,10 +89,31 @@ jobs:
     uses: ./.github/workflows/cli.yml
     secrets: inherit
 
-  misc:
+  test-make-behavior:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-misc')
-    uses: ./.github/workflows/misc.yml
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-behavior
+      job_name: Miscellaneous - Behavior
+    secrets: inherit
+
+  test-make-examples:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-misc')
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: check-examples
+      job_name: Miscellaneous - Examples
+    secrets: inherit
+
+  test-make-docs:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-misc')
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-docs
+      job_name: Miscellaneous - Docs
     secrets: inherit
 
   deny:

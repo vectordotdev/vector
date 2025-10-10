@@ -55,9 +55,30 @@ jobs:
     needs: changes
     secrets: inherit
 
-  test-misc:
+  test-make-behavior:
     if: needs.changes.outputs.source == 'true'
-    uses: ./.github/workflows/misc.yml
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-behavior
+      job_name: Miscellaneous - Behavior
+    needs: changes
+    secrets: inherit
+
+  test-make-examples:
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: check-examples
+      job_name: Miscellaneous - Examples
+    needs: changes
+    secrets: inherit
+
+  test-make-docs:
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-docs
+      job_name: Miscellaneous - Docs
     needs: changes
     secrets: inherit
 
@@ -102,7 +123,9 @@ jobs:
     needs:
       - changes
       - test-cli
-      - test-misc
+      - test-make-behavior
+      - test-make-examples
+      - test-make-docs
       - check-msrv
       - cross-linux
       - unit-mac
