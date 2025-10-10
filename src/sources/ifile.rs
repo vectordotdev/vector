@@ -660,8 +660,6 @@ pub fn ifile_source(
         emitter,
         rotate_wait: config.rotate_wait,
         checkpoint_interval,
-        #[cfg(not(test))]
-        test_sender: None,
         #[cfg(test)]
         test_sender: out.test_sender,
     };
