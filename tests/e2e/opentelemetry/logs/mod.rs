@@ -64,7 +64,7 @@ fn parse_line_to_export_logs_request(line: &str) -> Result<ExportLogsServiceRequ
             use_json_names: true,
         },
     )
-        .map_err(|e| format!("Failed to encode VRL value to protobuf: {e}"))?;
+    .map_err(|e| format!("Failed to encode VRL value to protobuf: {e}"))?;
 
     // Encode DynamicMessage to bytes (using prost 0.13.5)
     let mut buf = Vec::new();
