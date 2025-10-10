@@ -42,13 +42,13 @@ fn read_file_helper(filename: &str) -> Result<String, io::Error> {
 
 fn parse_line_to_export_logs_request(line: &str) -> Result<ExportLogsServiceRequest, String> {
     // Parse JSON and convert to VRL Value
-    let json: JsonValue =
-        serde_json::from_str(line).map_err(|e| format!("Failed to parse JSON: {}", e))?;
-    let vrl_value: VrlValue = json.into();
+    let vrl_value: VrlValue = serde_json::from_str::<JsonValue>(line)
+        .map_err(|e| format!("Failed to parse JSON: {e}"))?
+        .into();
 
     // Get the message descriptor from the descriptor pool
     let descriptor_pool = DescriptorPool::decode(DESCRIPTOR_BYTES)
-        .map_err(|e| format!("Failed to decode descriptor pool: {}", e))?;
+        .map_err(|e| format!("Failed to decode descriptor pool: {e}"))?;
 
     let message_descriptor = descriptor_pool
         .get_message_by_name(LOGS_REQUEST_MESSAGE_TYPE)
@@ -64,16 +64,16 @@ fn parse_line_to_export_logs_request(line: &str) -> Result<ExportLogsServiceRequ
             use_json_names: true,
         },
     )
-    .map_err(|e| format!("Failed to encode VRL value to protobuf: {}", e))?;
+        .map_err(|e| format!("Failed to encode VRL value to protobuf: {e}"))?;
 
     // Encode DynamicMessage to bytes (using prost 0.13.5)
     let mut buf = Vec::new();
     ProstReflectMessage::encode(&dynamic_message, &mut buf)
-        .map_err(|e| format!("Failed to encode dynamic message to bytes: {}", e))?;
+        .map_err(|e| format!("Failed to encode dynamic message to bytes: {e}"))?;
 
     // Decode bytes into ExportLogsServiceRequest (using prost 0.12.6)
     ProstMessage::decode(&buf[..])
-        .map_err(|e| format!("Failed to decode ExportLogsServiceRequest: {}", e))
+        .map_err(|e| format!("Failed to decode ExportLogsServiceRequest: {e}"))
 }
 
 fn parse_export_logs_request(content: &str) -> Result<ExportLogsServiceRequest, String> {
@@ -88,11 +88,12 @@ fn parse_export_logs_request(content: &str) -> Result<ExportLogsServiceRequest, 
             continue;
         }
 
-        let request = parse_line_to_export_logs_request(line)
-            .map_err(|e| format!("Line {}: {}", line_num + 1, e))?;
-
         // Merge resource_logs from this request into the accumulated result
-        merged_request.resource_logs.extend(request.resource_logs);
+        merged_request.resource_logs.extend(
+            parse_line_to_export_logs_request(line)
+                .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
+                .resource_logs,
+        );
     }
 
     if merged_request.resource_logs.is_empty() {
@@ -102,36 +103,33 @@ fn parse_export_logs_request(content: &str) -> Result<ExportLogsServiceRequest, 
     Ok(merged_request)
 }
 
-/// Asserts that all resource logs have a `service.name` attribute set to `"opentelemetry-logs"`.
+/// Asserts that all resource logs have a `service.name` attribute set to `"telemetrygen"`.
 fn assert_service_name(request: &ExportLogsServiceRequest) {
     for (i, rl) in request.resource_logs.iter().enumerate() {
         let resource = rl
             .resource
             .as_ref()
-            .unwrap_or_else(|| panic!("resource_logs[{}] missing resource", i));
+            .unwrap_or_else(|| panic!("resource_logs[{i}] missing resource"));
 
         let service_name_attr = resource
             .attributes
             .iter()
-            .find(|kv| kv.key == "service.name");
-
-        let service_name_attr = service_name_attr
-            .unwrap_or_else(|| panic!("resource_logs[{}] missing 'service.name' attribute", i));
+            .find(|kv| kv.key == "service.name")
+            .unwrap_or_else(|| panic!("resource_logs[{i}] missing 'service.name' attribute"));
 
         let actual_value = service_name_attr
             .value
             .as_ref()
             .and_then(|v| v.value.as_ref())
-            .unwrap_or_else(|| panic!("resource_logs[{}] 'service.name' has no value", i));
+            .unwrap_or_else(|| panic!("resource_logs[{i}] 'service.name' has no value"));
 
         if let AnyValueEnum::StringValue(s) = actual_value {
             assert_eq!(
-                s, "opentelemetry-logs",
-                "resource_logs[{}] 'service.name' expected 'opentelemetry-logs', got '{}'",
-                i, s
+                s, "telemetrygen",
+                "resource_logs[{i}] 'service.name' expected 'telemetrygen', got '{s}'"
             );
         } else {
-            panic!("resource_logs[{}] 'service.name' is not a string value", i);
+            panic!("resource_logs[{i}] 'service.name' is not a string value");
         }
     }
 }
@@ -147,14 +145,14 @@ fn assert_log_records_static_fields(request: &ExportLogsServiceRequest) {
                     format!("resource_logs[{rl_idx}].scope_logs[{sl_idx}].log_records[{lr_idx}]");
 
                 // Assert body is "the message"
-                let body = log_record
+                let body_value = log_record
                     .body
                     .as_ref()
-                    .unwrap_or_else(|| panic!("{prefix} missing body"));
-                let body_value = body
+                    .unwrap_or_else(|| panic!("{prefix} missing body"))
                     .value
                     .as_ref()
                     .unwrap_or_else(|| panic!("{prefix} body has no value"));
+
                 if let AnyValueEnum::StringValue(s) = body_value {
                     assert_eq!(
                         s, "the message",
@@ -189,7 +187,7 @@ fn vector_sink_otel_sink_logs_match() {
         .expect("Failed to parse vector logs as ExportLogsServiceRequest");
 
     // Count total log records in collector output
-    let collector_log_count: usize = collector_request
+    let collector_log_count = collector_request
         .resource_logs
         .iter()
         .flat_map(|rl| &rl.scope_logs)
@@ -197,7 +195,7 @@ fn vector_sink_otel_sink_logs_match() {
         .count();
 
     // Count total log records in vector output
-    let vector_log_count: usize = vector_request
+    let vector_log_count = vector_request
         .resource_logs
         .iter()
         .flat_map(|rl| &rl.scope_logs)
@@ -206,14 +204,12 @@ fn vector_sink_otel_sink_logs_match() {
 
     assert_eq!(
         collector_log_count, EXPECTED_LOG_COUNT,
-        "Collector produced {} log records, expected {EXPECTED_LOG_COUNT}",
-        collector_log_count
+        "Collector produced {collector_log_count} log records, expected {EXPECTED_LOG_COUNT}"
     );
 
     assert_eq!(
         vector_log_count, EXPECTED_LOG_COUNT,
-        "Vector produced {} log records, expected {EXPECTED_LOG_COUNT}",
-        vector_log_count
+        "Vector produced {vector_log_count} log records, expected {EXPECTED_LOG_COUNT}"
     );
 
     // Verify service.name attribute
