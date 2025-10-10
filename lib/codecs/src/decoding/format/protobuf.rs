@@ -73,7 +73,7 @@ impl ProtobufDeserializerConfig {
 pub struct ProtobufDeserializerOptions {
     /// The path to the protobuf descriptor set file.
     ///
-    /// This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+    /// This file is the output of `protoc -I <include path> -o <desc output path> <proto>`.
     ///
     /// You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
     pub desc_file: PathBuf,

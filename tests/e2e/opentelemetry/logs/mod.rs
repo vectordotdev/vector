@@ -1,71 +1,48 @@
-use std::{collections::BTreeMap, path::PathBuf};
-
 use serde_json::Value;
+use std::{collections::BTreeMap, io, path::Path, process::Command};
 
 const EXPECTED_LOG_COUNT: usize = 100;
 
-fn log_output_dir() -> PathBuf {
-    std::env::current_dir()
-        .expect("Failed to get current dir")
-        .join("tests")
-        .join("data")
-        .join("e2e")
-        .join("opentelemetry")
-        .join("logs")
-        .join("output")
-}
+fn read_file_helper(filename: &str) -> Result<String, io::Error> {
+    let local_path = Path::new("/output/opentelemetry-logs").join(filename);
+    if local_path.exists() {
+        // Running inside the runner container, volume is mounted
+        std::fs::read_to_string(local_path)
+    } else {
+        // Running on host
+        let out = Command::new("docker")
+            .args([
+                "run",
+                "--rm",
+                "-v",
+                "vector_target:/output",
+                "alpine:3.20",
+                "cat",
+                &format!("/output/{filename}"),
+            ])
+            .output()?;
 
-fn collector_log_path() -> PathBuf {
-    log_output_dir().join("collector-file-exporter.log")
-}
-
-fn vector_log_path() -> PathBuf {
-    log_output_dir().join("vector-file-sink.log")
-}
-
-use std::{fs, io, path::Path, thread, time::Duration};
-
-pub fn read_file_contents(path: &Path) -> Result<String, io::Error> {
-    let max_retries = 5;
-    let retry_delay = Duration::from_secs(2);
-    let mut last_err: Option<io::Error> = None;
-    for attempt in 1..=max_retries {
-        match fs::read_to_string(path) {
-            Ok(contents) => return Ok(contents),
-            Err(e) => {
-                eprintln!(
-                    "Attempt {attempt}/{max_retries}: Failed to read file '{}': {e}",
-                    path.display()
-                );
-                last_err = Some(e);
-                if attempt < max_retries {
-                    thread::sleep(retry_delay);
-                    continue;
-                }
-            }
+        if !out.status.success() {
+            return Err(io::Error::other(format!(
+                "docker run failed: {}\n{}",
+                out.status,
+                String::from_utf8_lossy(&out.stderr)
+            )));
         }
+
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     }
-    Err(last_err.unwrap())
 }
 
-fn extract_count(value: &Value) -> u64 {
+fn extract_timestamp(value: &Value) -> u64 {
     value
-        .get("attributes")
-        .and_then(|attrs| attrs.as_array())
-        .and_then(|arr| {
-            arr.iter().find_map(|attr| {
-                if attr.get("key")?.as_str()? == "count" {
-                    attr.get("value")?
-                        .get("intValue")?
-                        .as_str()
-                        .and_then(|s| s.parse::<u64>().ok())
-                        .or_else(|| attr.get("value")?.get("intValue")?.as_u64())
-                } else {
-                    None
-                }
-            })
+        .get("timeUnixNano")
+        .and_then(|v| {
+            v.as_str()
+                .and_then(|s| s.parse::<u64>().ok())
+                .or_else(|| v.as_u64())
         })
-        .expect("Missing or invalid 'count' attribute in log record")
+        .expect("Missing or invalid 'timeUnixNano' in log record")
 }
 
 fn sanitize(mut value: Value) -> Value {
@@ -81,6 +58,10 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
         Value::Object(map) => {
             let normalized = map
                 .iter()
+                // Ignore severityNumber field because Vector's json codec outputs the numeric value ("9")
+                // while the collector's file exporter outputs the protobuf enum name ("SEVERITY_NUMBER_INFO").
+                // Both formats are valid; we compare severityText instead which matches on both sides.
+                .filter(|(k, _)| k.as_str() != "severityNumber")
                 .map(|(k, v)| (k.clone(), normalize_numbers_to_strings(v)))
                 .collect();
             Value::Object(normalized)
@@ -94,60 +75,35 @@ fn normalize_numbers_to_strings(value: &Value) -> Value {
     }
 }
 
-fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
-    let content = read_file_contents(path).unwrap();
-
+fn parse_log_records(content: String) -> BTreeMap<u64, Value> {
     let mut result = BTreeMap::new();
 
     for (idx, line) in content.lines().enumerate() {
-        let root: Value = serde_json::from_str(line).unwrap_or_else(|_| {
-            panic!(
-                "Malformed JSON on line {} in {}\nLine: {line}",
-                idx + 1,
-                path.display()
-            )
-        });
+        let root: Value = serde_json::from_str(line)
+            .unwrap_or_else(|_| panic!("Line {idx} is malformed: {line}"));
 
         let resource_logs = root
             .get("resourceLogs")
             .and_then(|v| v.as_array())
-            .unwrap_or_else(|| {
-                panic!(
-                    "Missing or invalid 'resourceLogs' in line {} of {}",
-                    idx + 1,
-                    path.display()
-                )
-            });
+            .unwrap_or_else(|| panic!("Missing or invalid 'resourceLogs' in line {idx}"));
 
         for resource in resource_logs {
             let scope_logs = resource
                 .get("scopeLogs")
                 .and_then(|v| v.as_array())
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Missing or invalid 'scopeLogs' in line {} of {}",
-                        idx + 1,
-                        path.display()
-                    )
-                });
+                .unwrap_or_else(|| panic!("Missing or invalid 'scopeLogs' in line {idx}"));
 
             for scope in scope_logs {
                 let log_records = scope
                     .get("logRecords")
                     .and_then(|v| v.as_array())
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "Missing or invalid 'logRecords' in line {} of {}",
-                            idx + 1,
-                            path.display()
-                        )
-                    });
+                    .unwrap_or_else(|| panic!("Missing or invalid 'logRecords' in line {idx}"));
 
                 for record in log_records {
-                    let count = extract_count(record);
+                    let timestamp = extract_timestamp(record);
                     let sanitized = sanitize(record.clone());
-                    if result.insert(count, sanitized).is_some() {
-                        panic!("Duplicate count value {count} in {}", path.display());
+                    if result.insert(timestamp, sanitized).is_some() {
+                        panic!("Duplicate timestamp value {timestamp}");
                     }
                 }
             }
@@ -156,50 +112,37 @@ fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
     result
 }
 
-/// # Panics
-/// After the timeout, this function will panic if both logs are not ready.
-fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
-    let collector_logs = read_log_records(&collector_log_path());
-    let vector_logs = read_log_records(&vector_log_path());
+#[test]
+fn vector_sink_otel_sink_logs_match() {
+    let collector_logs =
+        parse_log_records(read_file_helper("collector-file-exporter.log").unwrap());
+    let vector_logs = parse_log_records(read_file_helper("vector-file-sink.log").unwrap());
 
     assert_eq!(
         collector_logs.len(),
         EXPECTED_LOG_COUNT,
-        "Collector did not produce expected number of log records"
+        "Collector produced {} log records, expected {EXPECTED_LOG_COUNT}",
+        collector_logs.len()
     );
     assert_eq!(
         vector_logs.len(),
         EXPECTED_LOG_COUNT,
-        "Vector did not produce expected number of log records"
+        "Vector produced {} log records, expected {EXPECTED_LOG_COUNT}",
+        vector_logs.len()
     );
 
-    (collector_logs, vector_logs)
-}
+    // Compare logs by matching timestamps
+    for (timestamp, collector_log) in &collector_logs {
+        let vector_log = vector_logs
+            .get(timestamp)
+            .unwrap_or_else(|| panic!("Missing timestamp {timestamp} in vector logs"));
 
-#[test]
-fn vector_sink_otel_sink_logs_match() {
-    let (collector_log_records, vector_log_records) = wait_for_logs();
+        let collector_normalized = normalize_numbers_to_strings(collector_log);
+        let vector_normalized = normalize_numbers_to_strings(vector_log);
 
-    assert_eq!(
-        collector_log_records.len(),
-        EXPECTED_LOG_COUNT,
-        "Collector did not produce expected number of log records"
-    );
-    assert_eq!(
-        vector_log_records.len(),
-        EXPECTED_LOG_COUNT,
-        "Vector did not produce expected number of log records"
-    );
-
-    for count in 0..EXPECTED_LOG_COUNT as u64 {
-        let collector_log = collector_log_records
-            .get(&count)
-            .unwrap_or_else(|| panic!("Missing {count}) key"));
-        let vector_log = vector_log_records
-            .get(&count)
-            .unwrap_or_else(|| panic!("Missing {count}) key"));
-        let collector_log_normalized = normalize_numbers_to_strings(collector_log);
-        let vector_log_normalized = normalize_numbers_to_strings(vector_log);
-        assert_eq!(collector_log_normalized, vector_log_normalized);
+        assert_eq!(
+            collector_normalized, vector_normalized,
+            "Log mismatch for timestamp {timestamp}"
+        );
     }
 }

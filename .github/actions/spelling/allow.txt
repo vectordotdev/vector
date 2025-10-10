@@ -6,6 +6,7 @@ aiohttp
 Airis
 Airpad
 AIXM
+akx
 Alcatel
 alertmanager
 Alexey
@@ -39,6 +40,7 @@ Archos
 Arival
 armhf
 Arnova
+arshiyasolei
 Asus
 Atlassian
 atleastonce
@@ -131,14 +133,17 @@ DOOV
 Douban
 downsides
 downwardapi
+dsmith
 DVB
 ede
 emoji
 emqx
 enableable
 Enot
+envsubst
 EPC
 esbuild
+esensar
 etld
 eventloop
 Evercoss
@@ -163,6 +168,7 @@ fluentd
 Foto
 FQDNs
 Freescale
+fuchsnj
 FUJITSU
 fuzzers
 Galapad
@@ -247,14 +253,19 @@ Jacq
 JAMCRC
 Jameel
 Jaytech
+jchap-pnnl
 jemalloc
 jemallocator
 jetbrains
 JetBrains
+jhbigler-pnnl
 Jia
 Jiayu
+jimmystewpot
+jlambatl
 jndi
 Joda
+jorgehermo9
 journalctl
 jsonnet
 jsontag
@@ -346,6 +357,7 @@ netdata
 Netflix
 netlify
 Neue
+neuronull
 Nextbook
 Nextcloud
 nintendo
@@ -355,6 +367,7 @@ nixpkg
 nixpkgs
 NLB
 nokia
+notchairmk
 NRSC
 nslookup
 nsupdate
@@ -375,6 +388,7 @@ otelcol
 OVH
 Ovi
 Owncloud
+pablosichert
 pacman
 Panasonic
 pantech
@@ -469,6 +483,7 @@ splunk
 ssh
 staticuser
 statsd
+stephenwakely
 sublocation
 sundar
 svcb
@@ -487,6 +502,7 @@ timespan
 timestamped
 Tizen
 Tmobile
+tobz
 Tomtec
 Tooky
 Touchmate
@@ -517,6 +533,7 @@ Wiko
 winapi
 workarounds
 Woxter
+wwang
 XCHACHA
 Xeon
 Xianghe
@@ -525,9 +542,11 @@ Xolo
 Xoro
 Xperia
 XSALSA
+xxh
 yandex
 Yarvik
 Yifang
+yjagdale
 zadd
 zeek
 zookeeper
@@ -536,12 +555,3 @@ zst
 zstandard
 ZTE
 Zync
-envsubst
-jimmystewpot
-esensar
-jchap-pnnl
-jhbigler-pnnl
-jlambatl
-jorgehermo9
-notchairmk
-yjagdale

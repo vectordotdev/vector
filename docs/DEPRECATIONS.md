@@ -15,7 +15,6 @@ For example:
 ## To be deprecated
 
 - `v0.50.0` | `http-server-encoding` | The `encoding` field will be removed. Use `decoding` and `framing` instead.
-- `v0.50.0` | `x86_64-apple-darwin` | macOS x86_64 (AKA x86 macOS, x86_64-apple-darwin or Intel macOS) will no longer be tested nor guaranteed to be able to build Vector.
 - `v0.49.0` | `block_interpolation` | Interpolating _multi-line_ configuration blocks using environment variables is now deprecated.
 
 ## To be migrated

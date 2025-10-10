@@ -21,6 +21,7 @@ vector-core = { path = "../vector-core", default-features = false }
 vector-lookup = { path = "../vector-lookup", features = ["test"] }
 vector-stream = { path = "../vector-stream" }
 vector-tap = { path = "../vector-tap" }
+vector-top = { path = "../vector-top", optional = true }
 vrl = { workspace = true, optional = true }
 
 [features]
@@ -30,9 +31,10 @@ lua = ["vector-core/lua"]
 file-source-common = ["dep:file-source-common"]
 file-source = ["dep:file-source", "dep:file-source-common"]
 ifile-source = ["dep:ifile-source", "dep:file-source-common"]
-opentelemetry = ["dep:opentelemetry-proto"]
+opentelemetry = ["dep:opentelemetry-proto", "codecs/opentelemetry"]
 prometheus = ["dep:prometheus-parser"]
 proptest = ["vector-lookup/proptest", "vrl/proptest"]
 syslog = ["codecs/syslog"]
 test = ["vector-core/test", "ifile-source/test"]
 vrl = ["vector-core/vrl", "dep:vrl"]
+allocation-tracing = ["vector-top?/allocation-tracing"]

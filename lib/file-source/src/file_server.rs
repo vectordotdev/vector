@@ -83,7 +83,7 @@ where
     // checkpoint writer task, which has to wait for all
     // acknowledgements to be completed.
     pub async fn run<C, S1, S2>(
-        self,
+        mut self,
         mut chans: C,
         mut shutdown_data: S1,
         shutdown_checkpointer: S2,
@@ -95,8 +95,6 @@ where
         S1: Future + Unpin + Send + 'static,
         S2: Future + Unpin + Send + 'static,
     {
-        let mut fingerprint_buffer = Vec::new();
-
         let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
 
         let mut backoff_cap: usize = 1;
@@ -110,12 +108,7 @@ where
         for path in self.paths_provider.paths().into_iter() {
             if let Some(file_id) = self
                 .fingerprinter
-                .get_fingerprint_or_log_error(
-                    &path,
-                    &mut fingerprint_buffer,
-                    &mut known_small_files,
-                    &self.emitter,
-                )
+                .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
                 .await
             {
                 existing_files.push((path, file_id));
@@ -146,10 +139,6 @@ where
         let checkpoints = checkpointer.view();
 
         for (_key, path, file_id) in existing_files {
-            checkpointer
-                .maybe_upgrade(&path, file_id, &self.fingerprinter, &mut fingerprint_buffer)
-                .await;
-
             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true)
                 .await;
         }
@@ -198,12 +187,7 @@ where
                 for path in self.paths_provider.paths().into_iter() {
                     if let Some(file_id) = self
                         .fingerprinter
-                        .get_fingerprint_or_log_error(
-                            &path,
-                            &mut fingerprint_buffer,
-                            &mut known_small_files,
-                            &self.emitter,
-                        )
+                        .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
                         .await
                     {
                         if let Some(watcher) = fp_map.get_mut(&file_id) {
@@ -260,7 +244,7 @@ where
 
                 known_small_files
                     .iter()
-                    .filter(|&(_path, last_time_open)| (last_time_open.elapsed() >= grace_period))
+                    .filter(|&(_path, last_time_open)| last_time_open.elapsed() >= grace_period)
                     .map(|(path, _last_time_open)| path.clone())
                     .for_each(|path| set.spawn(path.clone(), remove_file(path)));
 

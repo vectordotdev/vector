@@ -40,10 +40,11 @@ jobs:
     with:
       source: true
       int_tests: true
+      e2e_tests: true
     secrets: inherit
 
   integration-tests:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-8core
     needs:
       - changes
 
@@ -91,8 +92,7 @@ jobs:
             fi
 
             # Check if any of the three conditions is true
-            if [[ "${{ github.event_name }}" == "merge_group" || \
-                  "${{ github.event_name }}" == "workflow_dispatch" || \
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
                   "${{ needs.changes.outputs.dependencies }}" == "true" || \
                   "$should_run" == "true" ]]; then
               # Only install dep if test runs
@@ -104,12 +104,45 @@ jobs:
             fi
 
 
+  e2e-tests:
+    runs-on: ubuntu-24.04-8core
+    needs:
+      - changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+    strategy:
+      matrix:
+        service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs" ]
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          submodules: "recursive"
+
+      - name: Run E2E Tests for ${{ matrix.service }}
+        run: |
+          if [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
+            echo "Skipping ${{ matrix.service }} test since only website changes were detected"
+            exit 0
+          fi
+
+          # Check if any of the three conditions is true
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
+                "${{ needs.changes.outputs.dependencies }}" == "true" ]]; then
+            bash scripts/environment/prepare.sh --modules=datadog-ci
+            echo "Running test for ${{ matrix.service }}"
+            bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+          else
+          echo "Skipping ${{ matrix.service }} test because run conditions were not met."
+          fi
+
   integration-test-suite:
     name: Integration Test Suite
     runs-on: ubuntu-24.04
     if: always()
     needs:
       - integration-tests
+      - e2e-tests
     steps:
       - run: |
           if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
