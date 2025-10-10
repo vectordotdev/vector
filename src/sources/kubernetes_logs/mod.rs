@@ -65,6 +65,7 @@ mod node_metadata_annotator;
 mod parser;
 mod partial_events_merger;
 mod path_helpers;
+mod pod_info;
 mod pod_metadata_annotator;
 mod pod_publisher;
 mod pod_subscriber;
@@ -73,7 +74,7 @@ mod util;
 
 use self::{
     namespace_metadata_annotator::NamespaceMetadataAnnotator,
-    node_metadata_annotator::NodeMetadataAnnotator, parser::Parser,
+    node_metadata_annotator::NodeMetadataAnnotator, parser::Parser, pod_info::PodInfo,
     pod_metadata_annotator::PodMetadataAnnotator, pod_publisher::PodPublisher,
     pod_subscriber::PodSubscriber,
 };
@@ -786,7 +787,7 @@ impl Source {
 
         // -----------------------------------------------------------------
 
-        let nodes = Api::<Node>::all(client);
+        let nodes = Api::<Node>::all(client.clone());
         let node_watcher = watcher(
             nodes,
             watcher::Config {
@@ -891,7 +892,7 @@ impl Source {
 
         // Channel for communication between main task and pod monitoring task
         // Similar to Docker logs source pattern: spawned task sends data to main task via channel
-        let (pod_info_tx, pod_info_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+        let (pod_info_tx, pod_info_rx) = tokio::sync::mpsc::unbounded_channel::<PodInfo>();
 
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
@@ -1006,9 +1007,9 @@ impl Source {
             slot.bind(Box::pin(fut));
         }
 
-        // Spawn a task to consume from the pod info channel and print pod names
+        // Spawn a task to consume from the pod info channel and fetch K8s logs
         // Similar to Docker logs main future pattern: main task receives data from spawned tasks
-        let subscriber = PodSubscriber::new(pod_info_rx, global_shutdown.clone());
+        let subscriber = PodSubscriber::new(pod_info_rx, global_shutdown.clone(), client.clone());
         tokio::spawn(subscriber.run());
 
         lifecycle.run(global_shutdown).await;

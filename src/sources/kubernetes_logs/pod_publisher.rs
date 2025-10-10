@@ -5,7 +5,7 @@ use kube::runtime::reflector::Store;
 use tokio::sync::mpsc;
 use tracing::{info, warn};
 
-use super::lifecycle::ShutdownHandle;
+use super::{lifecycle::ShutdownHandle, pod_info::PodInfo};
 
 /// Pod information publisher that monitors Kubernetes pod state changes
 /// and publishes pod information through a channel.
@@ -14,14 +14,14 @@ use super::lifecycle::ShutdownHandle;
 /// communicate with the main task via channels.
 pub struct PodPublisher {
     pod_state: Store<Pod>,
-    sender: mpsc::UnboundedSender<String>,
+    sender: mpsc::UnboundedSender<PodInfo>,
     shutdown: ShutdownHandle,
 }
 impl PodPublisher {
     /// Create a new pod publisher
     pub fn new(
         pod_state: Store<Pod>,
-        sender: mpsc::UnboundedSender<String>,
+        sender: mpsc::UnboundedSender<PodInfo>,
         shutdown: ShutdownHandle,
     ) -> Self {
         Self {
@@ -46,13 +46,16 @@ impl PodPublisher {
         loop {
             tokio::select! {
                 _ = interval.tick() => {
-                    // Get all current pods and publish their names
+                    // Get all current pods and publish their detailed information
                     let pods = self.pod_state.state();
                     for pod in pods.iter() {
-                        if let Some(name) = pod.metadata.name.as_ref() {
-                            if let Err(_) = self.sender.send(name.clone()) {
-                                warn!("Failed to send pod info through channel");
-                                return;
+                        if let Ok(pod_info) = PodInfo::try_from(pod.as_ref()) {
+                            // Only publish running pods for log fetching
+                            if pod_info.is_running() {
+                                if let Err(_) = self.sender.send(pod_info) {
+                                    warn!("Failed to send pod info through channel");
+                                    return;
+                                }
                             }
                         }
                     }
