@@ -341,19 +341,16 @@ impl Aggregate {
                         rate: 1,
                     });
                 }
-                MetricValue::Counter { value } => {
-                    samples.push(Sample {
-                        value: *value,
-                        rate: 1,
-                    });
-                }
                 MetricValue::Set { values } => {
                     // For sets, create a sample for each unique value with rate 1
-                    for _value in values {
-                        samples.push(Sample {
-                            value: 1.0, // Count each set element as 1
-                            rate: 1,
-                        });
+                    // sets use strings, that means we need to parse them to f64
+                    for value in values {
+                        if let Ok(parsed_value) = value.parse::<f64>() {
+                            samples.push(Sample {
+                                value: parsed_value,
+                                rate: 1,
+                            });
+                        }
                     }
                 }
                 MetricValue::Distribution {
@@ -363,25 +360,13 @@ impl Aggregate {
                     // If already a distribution, merge the samples
                     samples.extend(dist_samples.clone());
                 }
-                MetricValue::AggregatedHistogram { count, sum, .. } => {
-                    // Convert histogram to samples using average value
-                    if *count > 0 {
-                        let avg_value = sum / (*count as f64);
-                        for _ in 0..*count {
+                MetricValue::AggregatedHistogram { buckets, .. } => {
+                    for bucket in buckets {
+                        // For each count in the bucket, add a sample at the bucket's upper limit
+                        // This preserves the distribution shape
+                        for _ in 0..bucket.count {
                             samples.push(Sample {
-                                value: avg_value,
-                                rate: 1,
-                            });
-                        }
-                    }
-                }
-                MetricValue::AggregatedSummary { count, sum, .. } => {
-                    // Convert summary to samples using average value
-                    if *count > 0 {
-                        let avg_value = sum / (*count as f64);
-                        for _ in 0..*count {
-                            samples.push(Sample {
-                                value: avg_value,
+                                value: bucket.upper_limit,
                                 rate: 1,
                             });
                         }
@@ -390,7 +375,11 @@ impl Aggregate {
                 _ => (),
             }
         }
-
+        samples.sort_by(|a, b| {
+            a.value
+                .partial_cmp(&b.value)
+                .unwrap_or(std::cmp::Ordering::Equal)
+        });
         MetricData {
             time: entries.first().unwrap().0.time,
             kind: MetricKind::Absolute,
@@ -458,6 +447,7 @@ mod tests {
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,
     };
+    use vector_lib::event::metric::Bucket;
 
     #[test]
     fn generate_config() {
@@ -1288,8 +1278,12 @@ interval_ms = 999999
 
         // Verify it's a distribution with 7 metrics
         if let MetricValue::Distribution { samples, statistic } = out[0].as_metric().value() {
-            println!("Samples: {:#?}", samples);
-            assert_eq!(samples.len(), 7);
+            assert_eq!(
+                samples.len(),
+                7,
+                "expected 7 samples in distribution but got {:#?}",
+                samples.len()
+            );
             assert_eq!(*statistic, StatisticKind::Histogram);
 
             // Check sample values
@@ -1348,7 +1342,7 @@ interval_ms = 999999
                 statistic: StatisticKind::Summary,
             },
         );
-        // Record four gauge values
+        // Record four Distribution values
         agg.record(distribution_a_1);
         agg.record(distribution_a_2);
         agg.record(distribution_a_3);
@@ -1359,21 +1353,237 @@ interval_ms = 999999
 
         // Verify it's a distribution with 10 metrics
         if let MetricValue::Distribution { samples, statistic } = out[0].as_metric().value() {
-            assert_eq!(samples.len(), 10, "expected 10 samples in distribution but got {:#?}", samples.len());
+            assert_eq!(
+                samples.len(),
+                10,
+                "expected 10 samples in distribution but got {:#?}",
+                samples.len()
+            );
             assert_eq!(*statistic, StatisticKind::Histogram);
 
             // Check sample values
             let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
-            assert!(values.contains(&25.0), "expected value: 25.0 to be present in aggregated value");
-            assert!(values.contains(&30.0), "expected value: 30.0 to be present in aggregated value");
-            assert!(values.contains(&35.0), "expected value: 35.0 to be present in aggregated value");
-            assert!(values.contains(&36.0), "expected value: 36.0 to be present in aggregated value");
-            assert!(values.contains(&37.0), "expected value: 37.0 to be present in aggregated value");
-            assert!(values.contains(&38.0), "expected value: 38.0 to be present in aggregated value");
-            assert!(values.contains(&39.0), "expected value: 39.0 to be present in aggregated value");
-            assert!(values.contains(&99.0), "expected value: 99.0 to be present in aggregated value");
-            assert!(values.contains(&113.0), "expected value: 113.0 to be present in aggregated value");
-            assert!(values.contains(&456.2), "expected value: 456.2 to be present in aggregated value");
+            assert!(values.contains(&25.0));
+            assert!(values.contains(&30.0));
+            assert!(values.contains(&35.0));
+            assert!(values.contains(&36.0));
+            assert!(values.contains(&37.0));
+            assert!(values.contains(&38.0));
+            assert!(values.contains(&39.0));
+            assert!(values.contains(&99.0));
+            assert!(values.contains(&113.0));
+            assert!(values.contains(&456.2));
+        } else {
+            panic!("Expected Distribution metric value");
+        }
+    }
+
+    #[test]
+    fn distribution_histogram() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Distribution,
+        })
+        .unwrap();
+
+        let histogram_a_1 = make_metric(
+            "histogram_a",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 5,
+                sum: 18.0,
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 1,
+                    },
+                    Bucket {
+                        upper_limit: 2.0,
+                        count: 2,
+                    },
+                    Bucket {
+                        upper_limit: 5.0,
+                        count: 1,
+                    },
+                    Bucket {
+                        upper_limit: 10.0,
+                        count: 1,
+                    },
+                ],
+            },
+        );
+        let histogram_a_2 = make_metric(
+            "histogram_a",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 5,
+                sum: 18.0,
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 1,
+                    },
+                    Bucket {
+                        upper_limit: 2.0,
+                        count: 2,
+                    },
+                    Bucket {
+                        upper_limit: 5.0,
+                        count: 1,
+                    },
+                    Bucket {
+                        upper_limit: 10.0,
+                        count: 1,
+                    },
+                ],
+            },
+        );
+        let histogram_a_3 = make_metric(
+            "histogram_a",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 5,
+                sum: 18.0,
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 1.0,
+                        count: 1,
+                    },
+                    Bucket {
+                        upper_limit: 2.0,
+                        count: 2,
+                    },
+                    Bucket {
+                        upper_limit: 5.0,
+                        count: 1,
+                    },
+                    Bucket {
+                        upper_limit: 10.0,
+                        count: 1,
+                    },
+                ],
+            },
+        );
+
+        let expected_vals = vec![
+            1.0, 1.0, 1.0, 2.0, 2.0, 2.0, 2.0, 2.0, 2.0, 5.0, 5.0, 5.0, 10.0, 10.0, 10.0,
+        ];
+
+        // Record Metrics Values
+        agg.record(histogram_a_1);
+        agg.record(histogram_a_2);
+        agg.record(histogram_a_3);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+
+        // Verify it's a distribution with 15 metrics
+        if let MetricValue::Distribution { samples, statistic } = out[0].as_metric().value() {
+            assert_eq!(
+                samples.len(),
+                15,
+                "expected 15 samples in distribution but got {:#?}",
+                samples.len()
+            );
+            assert_eq!(*statistic, StatisticKind::Histogram);
+
+            // Check sample values
+            let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
+            assert_eq!(values, expected_vals);
+        } else {
+            panic!("Expected Distribution metric value");
+        }
+    }
+
+    #[test]
+    fn distribution_set() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Distribution,
+        })
+        .unwrap();
+
+        let set_a_1 = make_metric(
+            "set_a",
+            MetricKind::Absolute,
+            MetricValue::Set {
+                values: vec![
+                    "25".into(),
+                    "30".into(),
+                    "35".into(),
+                    "36".into(),
+                    "37".into(),
+                    "38".into(),
+                    "39".into(),
+                    "39".into(), // duplicate to verify set behavior
+                    "99".into(),
+                    "113".into(),
+                    "456.2".into(),
+                ]
+                .into_iter()
+                .collect(),
+            },
+        );
+
+        let set_a_2 = make_metric(
+            "set_a",
+            MetricKind::Absolute,
+            MetricValue::Set {
+                values: vec![
+                    "26".into(),
+                    "31".into(),
+                    "36".into(),
+                    "37".into(),
+                    "38".into(),
+                    "39".into(),
+                    "40".into(),
+                    "40".into(), // duplicate to verify set behavior
+                    "100".into(),
+                    "114".into(),
+                    "556.2".into(),
+                ]
+                .into_iter()
+                .collect(),
+            },
+        );
+        // Record two set values
+        agg.record(set_a_1);
+        agg.record(set_a_2);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(
+            1,
+            out.len(),
+            "expected 1 output metric but got {:#?}",
+            out.len()
+        );
+
+        // Verify it's a distribution with 10 metrics
+        if let MetricValue::Distribution { samples, statistic } = out[0].as_metric().value() {
+            assert_eq!(
+                samples.len(),
+                20,
+                "expected 20 samples in distribution but got {:#?}",
+                samples.len()
+            );
+            assert_eq!(*statistic, StatisticKind::Histogram);
+
+            // Check sample values
+            let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
+            assert!(values.contains(&25.0));
+            assert!(values.contains(&30.0));
+            assert!(values.contains(&35.0));
+            assert!(values.contains(&36.0));
+            assert!(values.contains(&37.0));
+            assert!(values.contains(&38.0));
+            assert!(values.contains(&39.0));
+            assert!(values.contains(&40.0));
+            assert!(values.contains(&99.0));
+            assert!(values.contains(&113.0));
+            assert!(values.contains(&456.2));
+            assert!(values.contains(&556.2));
         } else {
             panic!("Expected Distribution metric value");
         }
