@@ -11,9 +11,9 @@
 #
 # /ci-run-all                 : runs all of the below
 # /ci-run-cli                 : runs CLI - Linux
-# /ci-run-test-behavior       : runs Miscellaneous - Behavior
-# /ci-run-check-examples      : runs Miscellaneous - Examples
-# /ci-run-test-docs           : runs Miscellaneous - Docs
+# /ci-run-test-behavior       : runs make test-behavior
+# /ci-run-check-examples      : runs make check-examples
+# /ci-run-test-docs           : runs make test-docs
 # /ci-run-deny                : runs Deny - Linux
 # /ci-run-component-features  : runs Component Features - Linux
 # /ci-run-cross               : runs Cross
@@ -93,31 +93,31 @@ jobs:
     uses: ./.github/workflows/cli.yml
     secrets: inherit
 
-  test-make-behavior:
+  make-test-behavior:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-test-behavior')
     uses: ./.github/workflows/test-make-command.yml
     with:
       command: test-behavior
-      job_name: Miscellaneous - Behavior
+      job_name: make test-behavior
     secrets: inherit
 
-  test-make-examples:
+  make-check-examples:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-check-examples')
     uses: ./.github/workflows/test-make-command.yml
     with:
       command: check-examples
-      job_name: Miscellaneous - Examples
+      job_name: make check-examples
     secrets: inherit
 
-  test-make-docs:
+  make-test-docs:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-test-docs')
     uses: ./.github/workflows/test-make-command.yml
     with:
       command: test-docs
-      job_name: Miscellaneous - Docs
+      job_name: make test-docs
     secrets: inherit
 
   deny:
