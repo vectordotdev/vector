@@ -24,7 +24,7 @@ transforms:
           {
             "resource": {
               "attributes": [
-                { "key": "service.name", "value": { "stringValue": "opentelemetry-logs" } }
+                { "key": "service.name", "value": { "stringValue": "telemetrygen" } }
               ]
             },
             "scopeLogs": [
