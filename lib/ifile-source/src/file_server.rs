@@ -68,6 +68,8 @@ where
     pub rotate_wait: Duration,
     /// Duration after which to checkpoint files
     pub checkpoint_interval: Duration,
+    #[cfg(not(any(test, feature = "test")))]
+    pub test_sender: Option<()>,
     #[cfg(any(test, feature = "test"))]
     pub test_sender: Option<mpsc::UnboundedSender<TestEvent>>,
 }

@@ -618,6 +618,7 @@ pub fn ifile_source(
     };
 
     let checkpointer = Checkpointer::new(&data_dir);
+
     let file_server = FileServer {
         paths_provider,
         max_read_bytes: config.max_read_bytes,
@@ -637,6 +638,8 @@ pub fn ifile_source(
         emitter,
         rotate_wait: config.rotate_wait,
         checkpoint_interval,
+        #[cfg(not(test))]
+        test_sender: None,
         #[cfg(test)]
         test_sender: out.test_sender,
     };
