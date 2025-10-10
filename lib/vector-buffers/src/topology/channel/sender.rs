@@ -204,10 +204,38 @@ impl<T: Bufferable> BufferSender<T> {
 
         let mut sent_to_base = true;
         let mut was_dropped = false;
+
         match self.when_full {
-            WhenFull::Block => self.base.send(item).await?,
+            WhenFull::Block => {
+                if let Some(instrumentation) = self.instrumentation.as_ref()
+                    && let Some((item_count, item_size)) = item_sizing
+                {
+                    instrumentation.increment_received_event_count_and_byte_size(
+                        item_count as u64,
+                        item_size as u64,
+                    );
+                }
+                self.base.send(item).await?
+            }
             WhenFull::DropNewest => {
+                if let Some(instrumentation) = self.instrumentation.as_ref()
+                    && let Some((item_count, item_size)) = item_sizing
+                {
+                    instrumentation.increment_received_event_count_and_byte_size(
+                        item_count as u64,
+                        item_size as u64,
+                    );
+                }
                 if self.base.try_send(item).await?.is_some() {
+                    if let Some(instrumentation) = self.instrumentation.as_ref()
+                        && let Some((item_count, item_size)) = item_sizing
+                    {
+                        instrumentation.increment_dropped_event_count_and_byte_size(
+                            item_count as u64,
+                            item_size as u64,
+                            true,
+                        );
+                    }
                     was_dropped = true;
                 }
             }
@@ -228,25 +256,6 @@ impl<T: Bufferable> BufferSender<T> {
                 (self.send_duration.as_ref(), send_reference)
         {
             send_duration.emit(send_reference.elapsed());
-        }
-
-        if let Some(instrumentation) = self.instrumentation.as_ref()
-            && let Some((item_count, item_size)) = item_sizing
-        {
-            if sent_to_base {
-                instrumentation.increment_received_event_count_and_byte_size(
-                    item_count as u64,
-                    item_size as u64,
-                );
-            }
-
-            if was_dropped {
-                instrumentation.increment_dropped_event_count_and_byte_size(
-                    item_count as u64,
-                    item_size as u64,
-                    true,
-                );
-            }
         }
 
         Ok(())
