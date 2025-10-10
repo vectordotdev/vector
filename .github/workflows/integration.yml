@@ -94,6 +94,7 @@ jobs:
             # Check if any of the three conditions is true
             if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
                   "${{ needs.changes.outputs.dependencies }}" == "true" || \
+                  "${{ needs.changes.outputs.integration-yml }}" == "true" || \
                   "$should_run" == "true" ]]; then
               # Only install dep if test runs
               bash scripts/environment/prepare.sh --modules=datadog-ci
@@ -128,7 +129,8 @@ jobs:
 
           # Check if any of the three conditions is true
           if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
-                "${{ needs.changes.outputs.dependencies }}" == "true" ]]; then
+                "${{ needs.changes.outputs.dependencies }}" == "true"|| \
+                "${{ needs.changes.outputs.integration-yml }}" == "true" ]]; then
             bash scripts/environment/prepare.sh --modules=datadog-ci
             echo "Running test for ${{ matrix.service }}"
             bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
