@@ -102,6 +102,7 @@ fn parse_export_logs_request(content: &str) -> Result<ExportLogsServiceRequest, 
     Ok(merged_request)
 }
 
+/// Asserts that all resource logs have a `service.name` attribute set to `"opentelemetry-logs"`.
 fn assert_service_name(request: &ExportLogsServiceRequest) {
     for (i, rl) in request.resource_logs.iter().enumerate() {
         let resource = rl
@@ -135,6 +136,9 @@ fn assert_service_name(request: &ExportLogsServiceRequest) {
     }
 }
 
+/// Asserts that all log records have static field values:
+/// - `body`: `"the message"`
+/// - `severityText`: `"Info"`
 fn assert_log_records_static_fields(request: &ExportLogsServiceRequest) {
     for (rl_idx, rl) in request.resource_logs.iter().enumerate() {
         for (sl_idx, sl) in rl.scope_logs.iter().enumerate() {
