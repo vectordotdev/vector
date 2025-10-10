@@ -139,7 +139,8 @@ fn assert_log_records_static_fields(request: &ExportLogsServiceRequest) {
     for (rl_idx, rl) in request.resource_logs.iter().enumerate() {
         for (sl_idx, sl) in rl.scope_logs.iter().enumerate() {
             for (lr_idx, log_record) in sl.log_records.iter().enumerate() {
-                let prefix = format!("resource_logs[{rl_idx}].scope_logs[{sl_idx}].log_records[{lr_idx}]");
+                let prefix =
+                    format!("resource_logs[{rl_idx}].scope_logs[{sl_idx}].log_records[{lr_idx}]");
 
                 // Assert body is "the message"
                 let body = log_record
