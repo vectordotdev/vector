@@ -278,6 +278,9 @@ pub struct Config {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
     rotate_wait: Duration,
+
+    /// Whether use k8s logs API or not
+    api_log: bool,
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -326,6 +329,7 @@ impl Default for Config {
             log_namespace: None,
             internal_metrics: Default::default(),
             rotate_wait: default_rotate_wait(),
+            api_log: default_api_log(),
         }
     }
 }
@@ -584,6 +588,7 @@ struct Source {
     delay_deletion: Duration,
     include_file_metric_tag: bool,
     rotate_wait: Duration,
+    api_log: bool,
 }
 
 impl Source {
@@ -673,6 +678,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
+            api_log: config.api_log,
         })
     }
 
@@ -710,7 +716,10 @@ impl Source {
             delay_deletion,
             include_file_metric_tag,
             rotate_wait,
+            api_log,
         } = self;
+
+        info!(%api_log);
 
         let mut reflectors = Vec::new();
 
@@ -801,7 +810,8 @@ impl Source {
             exclude_paths,
             insert_namespace_fields,
         );
-        let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec, log_namespace);
+        let annotator =
+            PodMetadataAnnotator::new(pod_state.clone(), pod_fields_spec, log_namespace);
         let ns_annotator =
             NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec, log_namespace);
         let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec, log_namespace);
@@ -873,6 +883,10 @@ impl Source {
         };
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
+
+        // Channel for communication between main task and pod monitoring task
+        // Similar to Docker logs source pattern: spawned task sends data to main task via channel
+        let (pod_info_tx, mut pod_info_rx) = tokio::sync::mpsc::unbounded_channel::<String>();
 
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
@@ -975,6 +989,71 @@ impl Source {
             });
             slot.bind(Box::pin(fut));
         }
+        {
+            // New task: Pod monitoring task - similar to Docker logs EventStreamBuilder pattern
+            // This task monitors pod_state changes and publishes pod information via channel
+            let (slot, shutdown) = lifecycle.add();
+            let pod_state_clone = pod_state.clone();
+            let fut = async move {
+                let mut interval = tokio::time::interval(Duration::from_secs(5));
+                let mut shutdown = shutdown;
+
+                loop {
+                    tokio::select! {
+                        _ = interval.tick() => {
+                            // Get all current pods
+                            let pods = pod_state_clone.state();
+                            for pod in pods.iter() {
+                                if let Some(name) = pod.metadata.name.as_ref() {
+                                    if let Err(_) = pod_info_tx.send(name.clone()) {
+                                        warn!("Failed to send pod info through channel");
+                                        return;
+                                    }
+                                }
+                            }
+                        }
+                        _ = &mut shutdown => {
+                            info!("Pod monitoring task shutting down");
+                            return;
+                        }
+                    }
+                }
+            }
+            .map(|_| {
+                info!(message = "Pod monitoring task completed gracefully.");
+            });
+            slot.bind(Box::pin(fut));
+        }
+
+        // Spawn a task to consume from the pod info channel and print pod names
+        // Similar to Docker logs main future pattern: main task receives data from spawned tasks
+        let pod_consumer_task = {
+            let shutdown_signal = global_shutdown.clone();
+            async move {
+                loop {
+                    tokio::select! {
+                        pod_name = pod_info_rx.recv() => {
+                            match pod_name {
+                                Some(name) => {
+                                    info!("Received pod name: {}", name);
+                                }
+                                None => {
+                                    info!("Pod info channel closed");
+                                    break;
+                                }
+                            }
+                        }
+                        _ = shutdown_signal.clone() => {
+                            info!("Pod consumer task shutting down");
+                            break;
+                        }
+                    }
+                }
+            }
+        };
+
+        // Spawn the consumer task
+        tokio::spawn(pod_consumer_task);
 
         lifecycle.run(global_shutdown).await;
         // Stop Kubernetes object reflectors to avoid their leak on vector reload.
@@ -1092,6 +1171,9 @@ const fn default_delay_deletion_ms() -> Duration {
 
 const fn default_rotate_wait() -> Duration {
     Duration::from_secs(u64::MAX / 2)
+}
+const fn default_api_log() -> bool {
+    false
 }
 
 // This function constructs the patterns we include for file watching, created
