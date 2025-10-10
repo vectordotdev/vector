@@ -24,7 +24,7 @@ transforms:
           {
             "resource": {
               "attributes": [
-                { "key": "service.name", "value": { "stringValue": "telemetrygen" } }
+                { "key": "service.name", "value": { "stringValue": "opentelemetry-logs" } }
               ]
             },
             "scopeLogs": [
@@ -37,7 +37,9 @@ transforms:
                     "timeUnixNano": to_unix_timestamp!(.timestamp),
                     "severityText": .severity_text,
                     "body": { "stringValue": .message },
-                    "attributes": []
+                    "attributes": [
+                      { "key": "count", "value": { "intValue": get!(.attributes, ["count"]) } }
+                    ]
                   }
                 ]
               }
@@ -45,7 +47,6 @@ transforms:
           }
         ]
       }
-
 
 sinks:
   otel_sink:
@@ -73,9 +74,8 @@ sinks:
     encoding:
       codec: json
 
-  metrics_file_sink:
-    type: file
-    path: "/output/opentelemetry-logs/vector-internal-metrics-sink.log"
+  metrics_console_sink:
+    type: console
     inputs:
       - internal_metrics
     encoding:

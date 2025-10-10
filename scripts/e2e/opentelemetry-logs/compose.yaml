@@ -16,9 +16,7 @@ services:
 
   logs-generator:
     container_name: logs-generator
-    build:
-      context: ../../../
-      dockerfile: ./scripts/e2e/opentelemetry-logs/telemetrygen.Dockerfile
+    image: ghcr.io/open-telemetry/opentelemetry-collector-contrib/telemetrygen:v0.137.0
     init: true
     depends_on:
       otel-collector-source:
@@ -27,18 +25,15 @@ services:
         condition: service_started
       otel-collector-sink:
         condition: service_started
-    command:
-      - "-c"
-      - |
-        until nc -z otel-collector-source 4318; do
-          sleep 0.5
-        done
-        telemetrygen logs \
-          --otlp-endpoint=otel-collector-source:4318 \
-          --otlp-insecure \
-          --otlp-http \
-          --logs=100 \
-          --rate=0
+    restart: on-failure:5
+    command: [
+      "logs",
+      "--otlp-endpoint=otel-collector-source:4318",
+      "--otlp-insecure",
+      "--otlp-http",
+      "--logs=100",
+      "--rate=0"
+    ]
 
   otel-collector-sink:
     container_name: otel-collector-sink
