@@ -8,6 +8,7 @@ use vector_lib::{
 use warp::http::{HeaderMap, StatusCode};
 
 use super::parser;
+
 use crate::{
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::{
@@ -23,6 +24,18 @@ use crate::{
     },
     tls::TlsEnableableConfig,
 };
+
+/// Defines the behavior for handling conflicting metric metadata.
+#[configurable_component]
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum MetadataConflictStrategy {
+    /// Silently ignore metadata conflicts, keeping the first metadata entry. This aligns with Prometheus/Thanos behavior.
+    Ignore,
+    /// Reject requests with conflicting metadata by returning an HTTP 400 error. This is the default to preserve backwards compatibility.
+    #[default]
+    Reject,
+}
 
 /// Configuration for the `prometheus_remote_write` source.
 #[configurable_component(source(
@@ -43,6 +56,11 @@ pub struct PrometheusRemoteWriteConfig {
     #[configurable(derived)]
     #[configurable(metadata(docs::advanced))]
     auth: Option<HttpServerAuthConfig>,
+
+    /// Defines the behavior for handling conflicting metric metadata.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    metadata_conflict_strategy: MetadataConflictStrategy,
 
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
@@ -68,6 +86,7 @@ impl PrometheusRemoteWriteConfig {
             address,
             tls: None,
             auth: None,
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: false.into(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -81,6 +100,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             address: "127.0.0.1:9090".parse().unwrap(),
             tls: None,
             auth: None,
+            metadata_conflict_strategy: MetadataConflictStrategy::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -94,6 +114,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource {
+            metadata_conflict_strategy: self.metadata_conflict_strategy.clone(),
             skip_nan_values: self.skip_nan_values,
         };
         source.run(
@@ -121,6 +142,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
 
 #[derive(Clone)]
 struct RemoteWriteSource {
+    metadata_conflict_strategy: MetadataConflictStrategy,
     skip_nan_values: bool,
 }
 
@@ -135,7 +157,9 @@ impl RemoteWriteSource {
                 format!("Could not decode write request: {error}"),
             )
         })?;
-        parser::parse_request(request, self.skip_nan_values).map_err(|error| {
+        let reject_on_conflict =
+            self.metadata_conflict_strategy == MetadataConflictStrategy::Reject;
+        parser::parse_request(request, reject_on_conflict, self.skip_nan_values).map_err(|error| {
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
                 format!("Could not decode write request: {error}"),
@@ -205,6 +229,7 @@ mod test {
             address,
             auth: None,
             tls: tls.clone(),
+            metadata_conflict_strategy: Default::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -306,6 +331,56 @@ mod test {
         );
     }
 
+    fn create_conflicting_metadata_request_body() -> Vec<u8> {
+        use prost::Message;
+        use vector_lib::prometheus::parser::proto;
+
+        let request = proto::WriteRequest {
+            metadata: vec![
+                proto::MetricMetadata {
+                    r#type: proto::MetricType::Gauge as i32,
+                    metric_family_name: "test_metric".into(),
+                    help: "First definition as gauge".into(),
+                    unit: String::default(),
+                },
+                proto::MetricMetadata {
+                    r#type: proto::MetricType::Counter as i32,
+                    metric_family_name: "test_metric".into(),
+                    help: "Conflicting definition as counter".into(),
+                    unit: String::default(),
+                },
+            ],
+            timeseries: vec![proto::TimeSeries {
+                labels: vec![proto::Label {
+                    name: "__name__".into(),
+                    value: "test_metric".into(),
+                }],
+                samples: vec![proto::Sample {
+                    value: 42.0,
+                    timestamp: chrono::Utc::now().timestamp_millis(),
+                }],
+            }],
+        };
+
+        let mut buf = Vec::new();
+        request.encode(&mut buf).unwrap();
+
+        // Compress with snappy as expected by the remote_write endpoint
+        snap::raw::Encoder::new().compress_vec(&buf).unwrap()
+    }
+
+    async fn send_request(port: u16, request_body: Vec<u8>) -> reqwest::Response {
+        let client = reqwest::Client::new();
+        client
+            .post(format!("http://localhost:{}/", port))
+            .header("Content-Type", "application/x-protobuf")
+            .header("Content-Encoding", "snappy")
+            .body(request_body)
+            .send()
+            .await
+            .unwrap()
+    }
+
     /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
     /// > Label names MUST be unique within a LabelSet.
     /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
@@ -319,6 +394,7 @@ mod test {
             address,
             auth: None,
             tls: None,
+            metadata_conflict_strategy: Default::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -389,6 +465,7 @@ mod test {
             address,
             auth: None,
             tls: None,
+            metadata_conflict_strategy: Default::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: true,
@@ -458,6 +535,7 @@ mod test {
             address,
             auth: None,
             tls: None,
+            metadata_conflict_strategy: Default::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
@@ -531,6 +609,74 @@ mod test {
         assert_eq!(valid_metric.name(), "test_metric_valid");
         assert_eq!(valid_metric.value(), &MetricValue::Gauge { value: 42.0 });
     }
+
+    #[tokio::test]
+    async fn accepts_conflicting_metadata() {
+        let address = test_util::next_addr();
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+        let source = PrometheusRemoteWriteConfig {
+            address,
+            auth: None,
+            tls: None,
+            metadata_conflict_strategy: MetadataConflictStrategy::Ignore,
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
+            skip_nan_values: false,
+        };
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        let request_body = create_conflicting_metadata_request_body();
+        let response = send_request(address.port(), request_body).await;
+
+        // Should succeed (not return 400) despite conflicting metadata
+        assert!(
+            response.status().is_success(),
+            "Expected success but got: {}",
+            response.status()
+        );
+
+        // Verify we received the metric data
+        let output = test_util::collect_ready(rx).await;
+        assert_eq!(output.len(), 1);
+
+        let metric = output[0].as_metric();
+        assert_eq!(metric.name(), "test_metric");
+        assert_eq!(metric.value(), &MetricValue::Gauge { value: 42.0 });
+    }
+
+    #[tokio::test]
+    async fn rejects_conflicting_metadata() {
+        let address = test_util::next_addr();
+        let (tx, _rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+        let source = PrometheusRemoteWriteConfig {
+            address,
+            auth: None,
+            tls: None,
+            metadata_conflict_strategy: MetadataConflictStrategy::Reject,
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
+            skip_nan_values: false,
+        };
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        let request_body = create_conflicting_metadata_request_body();
+        let response = send_request(address.port(), request_body).await;
+
+        // Should be rejected
+        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+    }
 }
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
@@ -567,6 +713,7 @@ mod integration_tests {
             address: source_receive_address(),
             auth: None,
             tls: None,
+            metadata_conflict_strategy: Default::default(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
             skip_nan_values: false,
