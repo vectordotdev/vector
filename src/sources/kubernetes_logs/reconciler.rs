@@ -4,15 +4,32 @@ use kube::runtime::reflector::Store;
 use kube::{Api, Client, api::LogParams};
 use tracing::{error, info, warn};
 
+/// Container information for log tailing
+#[derive(Clone, Debug)]
+pub struct ContainerInfo {
+    /// Pod name containing this container
+    pub pod_name: String,
+    /// Pod namespace
+    pub namespace: String,
+    /// Container name
+    pub container_name: String,
+    /// Pod UID for tracking (will be used for future state tracking)
+    #[allow(dead_code)]
+    pub pod_uid: String,
+}
+
 pub struct Reconciler {
     pod_state: Store<Pod>,
-    tailer: LogTailer,
+    container_tailer: ContainerLogTailer,
 }
 
 impl Reconciler {
     pub fn new(pod_state: Store<Pod>, client: Client) -> Self {
-        let tailer = LogTailer::new(client.clone());
-        Self { pod_state, tailer }
+        let container_tailer = ContainerLogTailer::new(client.clone());
+        Self {
+            pod_state,
+            container_tailer,
+        }
     }
 
     pub async fn run(&self) {
@@ -70,16 +87,36 @@ impl Reconciler {
         if running_pods.is_empty() {
             info!("No running pods found to tail logs from");
         } else {
+            // Convert pods to container info and start tailers
+            let containers: Vec<ContainerInfo> = running_pods
+                .iter()
+                .flat_map(|pod_info| {
+                    pod_info
+                        .containers
+                        .iter()
+                        .map(|container_name| ContainerInfo {
+                            pod_name: pod_info.name.clone(),
+                            namespace: pod_info.namespace.clone(),
+                            container_name: container_name.clone(),
+                            pod_uid: pod_info.uid.clone(),
+                        })
+                })
+                .collect();
+
             info!(
-                "Starting log tailing for {} running pods",
+                "Starting log tailing for {} containers across {} running pods",
+                containers.len(),
                 running_pods.len()
             );
-            for pod_info in running_pods {
+
+            for container_info in containers {
                 info!(
-                    "Starting tailer for pod '{}' in namespace '{}'",
-                    pod_info.name, pod_info.namespace
+                    "Starting tailer for container '{}' in pod '{}' (namespace '{}')",
+                    container_info.container_name,
+                    container_info.pod_name,
+                    container_info.namespace
                 );
-                let _status = self.tailer.start(&pod_info);
+                let _status = self.container_tailer.start(&container_info);
                 // TODO: Store tailer status in a thread-safe way
             }
         }
@@ -88,7 +125,7 @@ impl Reconciler {
     }
 }
 
-struct LogTailer {
+struct ContainerLogTailer {
     client: Client,
 }
 
@@ -97,88 +134,84 @@ enum TailStatus {
     // Stopped,
 }
 
-impl LogTailer {
+impl ContainerLogTailer {
     pub fn new(client: Client) -> Self {
         Self { client }
     }
 
-    pub fn start(&self, pod_info: &PodInfo) -> TailStatus {
-        let pod_info = pod_info.clone();
+    pub fn start(&self, container_info: &ContainerInfo) -> TailStatus {
+        let container_info = container_info.clone();
         let client = self.client.clone();
         tokio::spawn(async move {
-            let tailer = LogTailer { client };
-            if let Err(e) = tailer.tail_log(&pod_info).await {
-                error!("Error tailing logs for pod '{}': {}", pod_info.name, e);
+            let tailer = ContainerLogTailer { client };
+            if let Err(e) = tailer.tail_container_logs(&container_info).await {
+                error!(
+                    "Error tailing logs for container '{}' in pod '{}': {}",
+                    container_info.container_name, container_info.pod_name, e
+                );
             }
         });
         TailStatus::Running
     }
 
-    pub async fn tail_log(
+    pub async fn tail_container_logs(
         &self,
-        pod_info: &PodInfo,
+        container_info: &ContainerInfo,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let pods: Api<Pod> = Api::namespaced(self.client.clone(), &pod_info.namespace);
+        let pods: Api<Pod> = Api::namespaced(self.client.clone(), &container_info.namespace);
 
         info!(
-            "Starting log tailing for pod '{}' in namespace '{}' with {} containers",
-            pod_info.name,
-            pod_info.namespace,
-            pod_info.containers.len()
+            "Starting log tailing for container '{}' in pod '{}' (namespace '{}')",
+            container_info.container_name, container_info.pod_name, container_info.namespace
         );
 
-        // For each container in the pod, fetch its logs
-        for container in &pod_info.containers {
-            info!(
-                "Fetching logs for container '{}' in pod '{}'",
-                container, pod_info.name
-            );
+        let log_params = LogParams {
+            container: Some(container_info.container_name.clone()),
+            follow: false,        // For now, just get recent logs, not streaming
+            tail_lines: Some(10), // Get last 10 lines
+            timestamps: true,
+            ..Default::default()
+        };
 
-            let log_params = LogParams {
-                container: Some(container.clone()),
-                follow: false,        // For now, just get recent logs, not streaming
-                tail_lines: Some(10), // Get last 10 lines
-                timestamps: true,
-                ..Default::default()
-            };
+        match pods.logs(&container_info.pod_name, &log_params).await {
+            Ok(logs) => {
+                // Process the logs - for now just print them
+                // In a full implementation, these would be sent to the Vector event pipeline
+                if !logs.is_empty() {
+                    info!(
+                        "=== Logs from container '{}' in pod '{}' ===",
+                        container_info.container_name, container_info.pod_name
+                    );
+                    let line_count = logs.lines().count();
+                    info!("Retrieved {} lines of logs", line_count);
 
-            match pods.logs(&pod_info.name, &log_params).await {
-                Ok(logs) => {
-                    // Process the logs - for now just print them
-                    // In a full implementation, these would be sent to the Vector event pipeline
-                    if !logs.is_empty() {
-                        info!(
-                            "=== Logs from pod '{}', container '{}' ===",
-                            pod_info.name, container
-                        );
-                        let line_count = logs.lines().count();
-                        info!("Retrieved {} lines of logs", line_count);
-
-                        for (idx, line) in logs.lines().take(5).enumerate() {
-                            // Limit output for demo
-                            info!("LOG[{}]: {}", idx + 1, line);
-                        }
-                        if line_count > 5 {
-                            info!("... ({} more lines)", line_count - 5);
-                        }
-                        info!("=== End of logs ===");
-                    } else {
-                        info!(
-                            "No logs available for pod '{}', container '{}'",
-                            pod_info.name, container
-                        );
+                    for (idx, line) in logs.lines().take(5).enumerate() {
+                        // Limit output for demo
+                        info!("LOG[{}]: {}", idx + 1, line);
                     }
-                }
-                Err(e) => {
-                    warn!(
-                        "Failed to fetch logs for pod '{}', container '{}': {}",
-                        pod_info.name, container, e
+                    if line_count > 5 {
+                        info!("... ({} more lines)", line_count - 5);
+                    }
+                    info!("=== End of logs ===");
+                } else {
+                    info!(
+                        "No logs available for container '{}' in pod '{}'",
+                        container_info.container_name, container_info.pod_name
                     );
                 }
             }
+            Err(e) => {
+                warn!(
+                    "Failed to fetch logs for container '{}' in pod '{}': {}",
+                    container_info.container_name, container_info.pod_name, e
+                );
+            }
         }
 
-        info!("Completed log tailing for pod '{}'", pod_info.name);
+        info!(
+            "Completed log tailing for container '{}' in pod '{}'",
+            container_info.container_name, container_info.pod_name
+        );
         Ok(())
     }
 }
