@@ -1,8 +1,5 @@
 #![deny(clippy::pedantic, warnings)]
-#![allow(
-    clippy::unused_self,
-    clippy::unnecessary_wraps
-)]
+#![allow(clippy::unnecessary_wraps)]
 
 #[macro_use]
 mod macros;

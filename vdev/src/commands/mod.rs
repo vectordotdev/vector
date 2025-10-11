@@ -1,5 +1,11 @@
-// We only allow println! and print! in the commands module.
-#![allow(clippy::print_stdout)]
+#![allow(
+    // allows print! and println! in this module for commands to output to terminal
+    clippy::print_stdout,
+
+    // The cli_commands! macro generates exec() methods for all commands. Some commands
+    // use self while others don't, so we allow unused_self to avoid false warnings.
+    clippy::unused_self,
+)]
 
 use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
