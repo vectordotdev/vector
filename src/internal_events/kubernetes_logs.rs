@@ -1,4 +1,5 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::{
     internal_event::{
         ComponentEventsDropped, INTENTIONAL, InternalEvent, UNINTENTIONAL, error_stage, error_type,
@@ -10,6 +11,7 @@ use vrl::core::Value;
 use crate::event::Event;
 
 #[derive(Debug)]
+#[internal_event]
 pub struct KubernetesLogsEventsReceived<'a> {
     pub file: &'a str,
     pub byte_size: JsonSize,
@@ -60,6 +62,7 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
 const ANNOTATION_FAILED: &str = "annotation_failed";
 
 #[derive(Debug)]
+#[internal_event]
 pub struct KubernetesLogsEventAnnotationError<'a> {
     pub event: &'a Event,
 }
@@ -85,6 +88,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub(crate) struct KubernetesLogsEventNamespaceAnnotationError<'a> {
     pub event: &'a Event,
 }
@@ -111,6 +115,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub(crate) struct KubernetesLogsEventNodeAnnotationError<'a> {
     pub event: &'a Event,
 }
@@ -137,6 +142,7 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct KubernetesLogsFormatPickerEdgeCase {
     pub what: &'static str,
 }
@@ -152,6 +158,7 @@ impl InternalEvent for KubernetesLogsFormatPickerEdgeCase {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct KubernetesLogsDockerFormatParseError<'a> {
     pub error: &'a dyn std::error::Error,
 }
@@ -178,6 +185,7 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
 const KUBERNETES_LIFECYCLE: &str = "kubernetes_lifecycle";
 
 #[derive(Debug)]
+#[internal_event]
 pub struct KubernetesLifecycleError<E> {
     pub message: &'static str,
     pub error: E,
@@ -209,6 +217,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct KubernetesMergedLineTooBigError<'a> {
     pub event: &'a Value,
     pub configured_limit: usize,

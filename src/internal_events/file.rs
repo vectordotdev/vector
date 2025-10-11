@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 
 use metrics::{counter, gauge};
+use vector_config::internal_event;
 use vector_lib::{
     configurable::configurable_component,
     internal_event::{
@@ -26,6 +27,7 @@ pub struct FileInternalMetricsConfig {
     pub include_file_tag: bool,
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct FileOpen {
     pub count: usize,
@@ -37,6 +39,7 @@ impl InternalEvent for FileOpen {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct FileBytesSent<'a> {
     pub byte_size: usize,
@@ -68,6 +71,7 @@ impl InternalEvent for FileBytesSent<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct FileIoError<'a, P> {
     pub error: std::io::Error,
@@ -111,6 +115,7 @@ mod source {
 
     use bytes::BytesMut;
     use metrics::counter;
+    use vector_config::internal_event;
     use vector_lib::{
         emit,
         file_source_common::internal_events::FileSourceInternalEvents,
@@ -120,6 +125,7 @@ mod source {
 
     use super::{FileOpen, InternalEvent};
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {
         pub byte_size: usize,
@@ -151,6 +157,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileEventsReceived<'a> {
         pub count: usize,
@@ -186,6 +193,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileChecksumFailed<'a> {
         pub file: &'a Path,
@@ -210,6 +218,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileFingerprintReadError<'a> {
         pub file: &'a Path,
@@ -250,6 +259,7 @@ mod source {
 
     const DELETION_FAILED: &str = "deletion_failed";
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileDeleteError<'a> {
         pub file: &'a Path,
@@ -288,6 +298,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileDeleted<'a> {
         pub file: &'a Path,
@@ -312,6 +323,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileUnwatched<'a> {
         pub file: &'a Path,
@@ -343,6 +355,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     struct FileWatchError<'a> {
         pub file: &'a Path,
@@ -381,6 +394,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileResumed<'a> {
         pub file: &'a Path,
@@ -407,6 +421,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileAdded<'a> {
         pub file: &'a Path,
@@ -431,6 +446,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileCheckpointed {
         pub count: usize,
@@ -448,6 +464,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileCheckpointWriteError {
         pub error: Error,
@@ -473,6 +490,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct PathGlobbingError<'a> {
         pub path: &'a Path,
@@ -500,6 +518,7 @@ mod source {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct FileLineTooBigError<'a> {
         pub truncated_bytes: &'a BytesMut,

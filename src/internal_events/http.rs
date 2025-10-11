@@ -2,6 +2,7 @@ use std::{error::Error, time::Duration};
 
 use http::Response;
 use metrics::{counter, histogram};
+use vector_config::internal_event;
 use vector_lib::{
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
@@ -10,6 +11,7 @@ use vector_lib::{
 const HTTP_STATUS_LABEL: &str = "status";
 
 #[derive(Debug)]
+#[internal_event]
 pub struct HttpServerRequestReceived;
 
 impl InternalEvent for HttpServerRequestReceived {
@@ -23,6 +25,7 @@ impl InternalEvent for HttpServerRequestReceived {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct HttpServerResponseSent<'a, B> {
     pub response: &'a Response<B>,
     pub latency: Duration,
@@ -40,6 +43,7 @@ impl<B> InternalEvent for HttpServerResponseSent<'_, B> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct HttpBytesReceived<'a> {
     pub byte_size: usize,
     pub http_path: &'a str,
@@ -64,6 +68,7 @@ impl InternalEvent for HttpBytesReceived<'_> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct HttpEventsReceived<'a> {
     pub count: usize,
     pub byte_size: JsonSize,
@@ -99,6 +104,7 @@ impl InternalEvent for HttpEventsReceived<'_> {
 
 #[cfg(feature = "sources-utils-http")]
 #[derive(Debug)]
+#[internal_event]
 pub struct HttpBadRequest<'a> {
     code: u16,
     error_code: String,
@@ -139,6 +145,7 @@ impl InternalEvent for HttpBadRequest<'_> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct HttpDecompressError<'a> {
     pub error: &'a dyn Error,
     pub encoding: &'a str,
@@ -165,6 +172,7 @@ impl InternalEvent for HttpDecompressError<'_> {
     }
 }
 
+#[internal_event]
 pub struct HttpInternalError<'a> {
     pub message: &'a str,
 }

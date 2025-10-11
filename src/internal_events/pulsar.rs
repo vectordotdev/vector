@@ -3,10 +3,12 @@
 #[cfg(feature = "sources-pulsar")]
 use metrics::Counter;
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
+#[internal_event]
 #[derive(Debug)]
 pub struct PulsarSendingError {
     pub count: usize,
@@ -36,6 +38,7 @@ impl InternalEvent for PulsarSendingError {
     }
 }
 
+#[internal_event]
 pub struct PulsarPropertyExtractionError<F: std::fmt::Display> {
     pub property_field: F,
 }

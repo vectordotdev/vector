@@ -1,6 +1,8 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::InternalEvent;
 
+#[internal_event]
 pub struct AwsBytesSent {
     pub byte_size: usize,
     pub region: Option<aws_types::region::Region>,

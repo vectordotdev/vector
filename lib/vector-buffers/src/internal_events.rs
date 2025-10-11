@@ -5,7 +5,9 @@ use vector_common::{
     internal_event::{InternalEvent, error_type},
     registered_event,
 };
+use vector_config::internal_event;
 
+#[internal_event]
 pub struct BufferCreated {
     pub buffer_id: String,
     pub idx: usize,
@@ -35,6 +37,7 @@ impl InternalEvent for BufferCreated {
     }
 }
 
+#[internal_event]
 pub struct BufferEventsReceived {
     pub buffer_id: String,
     pub idx: usize,
@@ -75,6 +78,7 @@ impl InternalEvent for BufferEventsReceived {
     }
 }
 
+#[internal_event]
 pub struct BufferEventsSent {
     pub buffer_id: String,
     pub idx: usize,
@@ -114,6 +118,7 @@ impl InternalEvent for BufferEventsSent {
     }
 }
 
+#[internal_event]
 pub struct BufferEventsDropped {
     pub buffer_id: String,
     pub idx: usize,
@@ -180,6 +185,7 @@ impl InternalEvent for BufferEventsDropped {
     }
 }
 
+#[internal_event]
 pub struct BufferReadError {
     pub error_code: &'static str,
     pub error: String,

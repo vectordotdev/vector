@@ -3,6 +3,7 @@
 use std::{io::Error, path::Path};
 
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
@@ -10,6 +11,7 @@ use vector_lib::internal_event::{
 use crate::internal_events::SocketOutgoingConnectionError;
 
 #[derive(Debug)]
+#[internal_event]
 pub struct UnixSocketConnectionEstablished<'a> {
     pub path: &'a std::path::Path,
 }
@@ -22,6 +24,7 @@ impl InternalEvent for UnixSocketConnectionEstablished<'_> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct UnixSocketOutgoingConnectionError<E> {
     pub error: E,
 }
@@ -39,6 +42,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketOutgoingConnectionError<E
     any(feature = "sources-utils-net-unix", feature = "sources-dnstap")
 ))]
 #[derive(Debug)]
+#[internal_event]
 pub struct UnixSocketError<'a, E> {
     pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
@@ -68,6 +72,7 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct UnixSocketSendError<'a, E> {
     pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
@@ -96,6 +101,7 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct UnixSendIncompleteError {
     pub data_size: usize,
     pub sent: usize,
@@ -125,6 +131,7 @@ impl InternalEvent for UnixSendIncompleteError {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct UnixSocketFileDeleteError<'a> {
     pub path: &'a Path,
     pub error: Error,

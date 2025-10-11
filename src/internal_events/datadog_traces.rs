@@ -1,8 +1,10 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DatadogTracesEncodingError {
     pub error_message: &'static str,
@@ -37,6 +39,7 @@ impl InternalEvent for DatadogTracesEncodingError {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct DatadogTracesAPMStatsError<E> {
     pub error: E,

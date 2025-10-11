@@ -1,6 +1,8 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
+#[internal_event]
 #[derive(Debug)]
 pub struct EventStoreDbMetricsHttpError {
     pub error: crate::Error,
@@ -24,6 +26,7 @@ impl InternalEvent for EventStoreDbMetricsHttpError {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct EventStoreDbStatsParsingError {
     pub error: serde_json::Error,

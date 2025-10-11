@@ -1,9 +1,11 @@
 /// Used in both `aws_kinesis_streams` and `aws_kinesis_firehose` sinks
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
+#[internal_event]
 #[derive(Debug)]
 pub struct AwsKinesisStreamNoPartitionKeyError<'a> {
     pub partition_key_field: &'a str,

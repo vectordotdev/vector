@@ -1,10 +1,12 @@
 use std::net::SocketAddr;
 
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 use crate::{internal_events::SocketOutgoingConnectionError, tls::TlsError};
 
+#[internal_event]
 #[derive(Debug)]
 pub struct TcpSocketConnectionEstablished {
     pub peer_addr: Option<SocketAddr>,
@@ -21,6 +23,7 @@ impl InternalEvent for TcpSocketConnectionEstablished {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct TcpSocketOutgoingConnectionError<E> {
     pub error: E,
@@ -34,6 +37,7 @@ impl<E: std::error::Error> InternalEvent for TcpSocketOutgoingConnectionError<E>
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct TcpSocketConnectionShutdown;
 
@@ -45,6 +49,7 @@ impl InternalEvent for TcpSocketConnectionShutdown {
 }
 
 #[cfg(all(unix, feature = "sources-dnstap"))]
+#[internal_event]
 #[derive(Debug)]
 pub struct TcpSocketError<'a, E> {
     pub(crate) error: &'a E,
@@ -71,6 +76,7 @@ impl<E: std::fmt::Display> InternalEvent for TcpSocketError<'_, E> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct TcpSocketTlsConnectionError {
     pub error: TlsError,
@@ -114,6 +120,7 @@ impl InternalEvent for TcpSocketTlsConnectionError {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct TcpSendAckError {
     pub error: std::io::Error,
@@ -140,6 +147,7 @@ impl InternalEvent for TcpSendAckError {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct TcpBytesReceived {
     pub byte_size: usize,
