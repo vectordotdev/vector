@@ -15,3 +15,8 @@ services:
     command:
     - -p
     - /public.pem
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

@@ -5,8 +5,9 @@ use anyhow::{Result, bail};
 use crate::testing::{
     config::ComposeTestConfig,
     integration::{ComposeTest, ComposeTestLocalConfig},
-    state::EnvsDir,
 };
+
+use super::active_projects::find_active_environment_for_integration;
 
 pub fn exec(
     local_config: ComposeTestLocalConfig,
@@ -19,8 +20,9 @@ pub fn exec(
     let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, integration)?;
     let envs = config.environments();
 
-    let active = EnvsDir::new(integration).active()?;
-    debug!("Active environment: {environment:#?}");
+    let active =
+        find_active_environment_for_integration(local_config.directory, integration, &config)?;
+    debug!("Active environment: {active:#?}");
 
     let environments: Box<dyn Iterator<Item = &String>> = match (environment, &active) {
         (Some(environment), Some(active)) if environment != active => {

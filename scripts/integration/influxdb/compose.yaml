@@ -19,3 +19,8 @@ services:
     command: influxd --reporting-disabled
     environment:
     - INFLUXDB_REPORTING_DISABLED=true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
