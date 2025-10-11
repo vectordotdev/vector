@@ -1,3 +1,6 @@
+// We only allow println! and print! in the commands module.
+#![allow(clippy::print_stdout)]
+
 use clap::Parser;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
 
