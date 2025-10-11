@@ -21,6 +21,7 @@ use kube::{
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
+use tokio::sync::oneshot;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
     codecs::{BytesDeserializer, BytesDeserializerConfig},
@@ -748,11 +749,20 @@ impl Source {
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
 
+        // Create oneshot channel to notify when pod store is initialized
+        let (pod_init_tx, pod_init_rx) = if api_log {
+            let (tx, rx) = oneshot::channel();
+            (Some(tx), Some(rx))
+        } else {
+            (None, None)
+        };
+
         reflectors.push(tokio::spawn(custom_reflector(
             pod_store_w,
             pod_cacher,
             pod_watcher,
             delay_deletion,
+            pod_init_tx,
         )));
 
         // -----------------------------------------------------------------
@@ -777,6 +787,7 @@ impl Source {
                 MetaCache::new(),
                 ns_watcher,
                 delay_deletion,
+                None,
             )));
         }
 
@@ -802,6 +813,7 @@ impl Source {
             node_cacher,
             node_watcher,
             delay_deletion,
+            None,
         )));
 
         let paths_provider = K8sPathsProvider::new(
@@ -951,18 +963,27 @@ impl Source {
         let event_processing_loop = out.send_event_stream(&mut stream);
 
         // Only run reconciler when api_log is enabled
-        let reconciler_fut = if api_log {
+        let reconciler_fut = if let Some(pod_init_rx) = pod_init_rx {
             let reconciler = reconciler::Reconciler::new(pod_state, client.clone());
             Some(async move {
-                // Give some time for the pod store to be populated
-                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
-                match reconciler.handle_running_pods().await {
-                    Ok(reconciler) => reconciler.run().await,
-                    Err(error) => emit!(KubernetesLifecycleError {
-                        error,
-                        message: "Reconciler exited with an error.",
-                        count: events_count,
-                    }),
+                // Wait for pod store to be initialized
+                match pod_init_rx.await {
+                    Ok(_) => {
+                        info!("Pod store initialized, starting reconciler");
+                        match reconciler.handle_running_pods().await {
+                            Ok(reconciler) => reconciler.run().await,
+                            Err(error) => emit!(KubernetesLifecycleError {
+                                error,
+                                message: "Reconciler exited with an error.",
+                                count: events_count,
+                            }),
+                        }
+                    }
+                    Err(_) => {
+                        warn!(
+                            "Pod store initialization signal was dropped, reconciler will not start"
+                        );
+                    }
                 }
             })
         } else {

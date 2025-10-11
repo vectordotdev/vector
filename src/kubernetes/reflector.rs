@@ -8,17 +8,19 @@ use kube::{
     Resource,
     runtime::{reflector::store, watcher},
 };
-use tokio::pin;
+use tokio::{pin, sync::oneshot};
 use tokio_util::time::DelayQueue;
 
 use super::meta_cache::{MetaCache, MetaDescribe};
 
 /// Handles events from a [`kube::runtime::watcher()`] to delay the application of Deletion events.
+/// Optionally notifies via `init_notify` when the initial state is loaded (on InitDone event).
 pub async fn custom_reflector<K, W>(
     mut store: store::Writer<K>,
     mut meta_cache: MetaCache,
     stream: W,
     delay_deletion: Duration,
+    init_notify: Option<oneshot::Sender<()>>,
 ) where
     K: Resource + Clone + std::fmt::Debug,
     K::DynamicType: Eq + Hash + Clone,
@@ -27,6 +29,7 @@ pub async fn custom_reflector<K, W>(
     pin!(stream);
     let mut delay_queue = DelayQueue::default();
     let mut init_buffer_meta = Vec::new();
+    let mut init_notify = init_notify;
     loop {
         tokio::select! {
             result = stream.next() => {
@@ -84,6 +87,11 @@ pub async fn custom_reflector<K, W>(
                                 });
 
                                 init_buffer_meta.clear();
+
+                                // Notify initialization complete if requested
+                                if let Some(tx) = init_notify.take() {
+                                    let _ = tx.send(());
+                                }
                             }
                         }
                     },
@@ -159,6 +167,7 @@ mod tests {
             meta_cache,
             rx,
             Duration::from_secs(1),
+            None,
         ));
         tokio::time::sleep(Duration::from_secs(1)).await;
         assert_eq!(store.get(&ObjectRef::from_obj(&cm)).as_deref(), Some(&cm));
@@ -188,6 +197,7 @@ mod tests {
             meta_cache,
             rx,
             Duration::from_secs(2),
+            None,
         ));
         // Ensure the Resource is still available after deletion
         tokio::time::sleep(Duration::from_secs(1)).await;
@@ -225,6 +235,7 @@ mod tests {
             meta_cache,
             rx,
             Duration::from_secs(2),
+            None,
         ));
         tokio::time::sleep(Duration::from_secs(1)).await;
         // Ensure the Resource is still available after deletion
