@@ -5,6 +5,10 @@
     // The cli_commands! macro generates exec() methods for all commands. Some commands
     // use self while others don't, so we allow unused_self to avoid false warnings.
     clippy::unused_self,
+
+    // All command exec() methods return Result<()> for consistency, even when they
+    // cannot fail. This allows uniform error handling across the command interface.
+    clippy::unnecessary_wraps,
 )]
 
 use clap::Parser;

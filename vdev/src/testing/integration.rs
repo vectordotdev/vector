@@ -103,7 +103,7 @@ impl ComposeTest {
             runner_name,
             &config.runner,
             compose.is_some().then_some(network_name),
-        )?;
+        );
 
         env_config.insert("VECTOR_IMAGE".to_string(), Some(runner.image_name()));
 
