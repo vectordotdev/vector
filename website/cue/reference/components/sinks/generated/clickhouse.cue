@@ -204,6 +204,16 @@ generated: components: sinks: clickhouse: configuration: {
 			}
 		}
 	}
+	auto_resolve_dns: {
+		description: """
+			Automatically resolve hostnames to all available IP addresses.
+
+			When enabled, the hostname in the endpoint will be resolved to all its IP addresses,
+			and Vector will load balance across all resolved IPs.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	batch: {
 		description: "Event batching behavior."
 		required:    false
