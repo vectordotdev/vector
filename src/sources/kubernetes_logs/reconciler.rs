@@ -154,12 +154,17 @@ impl Reconciler {
         // Listen to pod watcher events for real-time reconciliation
         while let Some(event) = self.pod_watcher.next().await {
             match event {
-                Ok(watcher::Event::Apply(pod)) => {
+                Ok(watcher::Event::Delete(pod)) => {
+                    let pod_info = PodInfo::from(&pod);
+                    info!("Pod '{}' deleted, cleaning up log tailers", pod_info.name);
+                    self.cleanup_pod_tailers(&pod_info).await;
+                }
+                Ok(watcher::Event::InitApply(pod)) | Ok(watcher::Event::Apply(pod)) => {
                     let pod_info = PodInfo::from(&pod);
                     if let Some(phase) = &pod_info.phase {
                         if phase == "Running" {
                             info!(
-                                "Pod '{}' is now running, starting log reconciliation",
+                                "Pod '{}' is running, starting log reconciliation",
                                 pod_info.name
                             );
                             if let Err(e) = self.reconcile_pod_containers(&pod_info).await {
@@ -168,36 +173,7 @@ impl Reconciler {
                         }
                     }
                 }
-                Ok(watcher::Event::Delete(pod)) => {
-                    let pod_info = PodInfo::from(&pod);
-                    info!("Pod '{}' deleted, cleaning up log tailers", pod_info.name);
-                    self.cleanup_pod_tailers(&pod_info).await;
-                }
-                Ok(watcher::Event::Init) => {
-                    info!("Pod watcher initialized - ready for event-driven reconciliation");
-                }
-                Ok(watcher::Event::InitApply(pod)) => {
-                    let pod_info = PodInfo::from(&pod);
-                    if let Some(phase) = &pod_info.phase {
-                        if phase == "Running" {
-                            info!(
-                                "Pod '{}' is running during init, starting log reconciliation",
-                                pod_info.name
-                            );
-                            if let Err(e) = self.reconcile_pod_containers(&pod_info).await {
-                                warn!(
-                                    "Failed to reconcile pod '{}' during init: {}",
-                                    pod_info.name, e
-                                );
-                            }
-                        }
-                    }
-                }
-                Ok(watcher::Event::InitDone) => {
-                    info!(
-                        "Pod watcher init complete - fully ready for event-driven reconciliation"
-                    );
-                }
+                Ok(_) => {}
                 Err(e) => {
                     warn!("Pod watcher error: {}", e);
                 }
