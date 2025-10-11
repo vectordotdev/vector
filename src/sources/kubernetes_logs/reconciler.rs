@@ -7,7 +7,7 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::runtime::reflector::Store;
 use kube::{Api, Client, api::LogParams};
 use std::collections::HashMap;
-use tracing::{error, info, trace, warn};
+use tracing::{info, trace, warn};
 
 /// Container information for log tailing
 #[derive(Clone, Debug)]
@@ -96,8 +96,8 @@ impl ContainerLogInfo {
 
 pub struct Reconciler {
     pod_state: Store<Pod>,
-    container_tailer: ContainerLogTailer,
-    tailer_state: HashMap<String, ContainerLogInfo>, // Keyed by "namespace/pod/container"
+    esb: EventStreamBuilder,
+    states: HashMap<String, TailerState>, // Keyed by "namespace/pod/container"
 }
 
 impl Reconciler {
@@ -106,11 +106,14 @@ impl Reconciler {
         client: Client,
         log_sender: mpsc::UnboundedSender<String>,
     ) -> Self {
-        let container_tailer = ContainerLogTailer::new(client.clone(), log_sender);
+        let esb = EventStreamBuilder {
+            client: client.clone(),
+            log_sender,
+        };
         Self {
             pod_state,
-            container_tailer,
-            tailer_state: HashMap::new(),
+            esb,
+            states: HashMap::new(),
         }
     }
 
@@ -206,17 +209,17 @@ impl Reconciler {
                     container_info.container_name
                 );
 
-                // Check if we already have tracking info for this container
-                let log_info = if let Some(existing_info) = self.tailer_state.get(&key) {
-                    // Reuse existing timestamp tracking
-                    existing_info.clone()
-                } else {
-                    // Create new tracking info starting from now
-                    ContainerLogInfo::new(container_info.clone(), Utc::now())
-                };
+                // // Check if we already have tracking info for this container
+                // let log_info = if let Some(existing_info) = self.states.get(&key) {
+                //     // Reuse existing timestamp tracking
+                //     existing_info.clone()
+                // } else {
+                //     // Create new tracking info starting from now
+                //     ContainerLogInfo::new(container_info.clone(), Utc::now())
+                // };
 
-                self.container_tailer.start(&log_info);
-                self.tailer_state.insert(key, log_info);
+                self.states
+                    .insert(key, self.esb.start(container_info.clone()));
             }
         }
 
@@ -225,41 +228,29 @@ impl Reconciler {
 }
 
 #[derive(Clone)]
-struct ContainerLogTailer {
+struct EventStreamBuilder {
     client: Client,
     log_sender: mpsc::UnboundedSender<String>,
 }
 
-// #[derive(Clone)]
-// enum TailStatus {
-//     Running,
-//     // Stopped,
-// }
+#[derive(Clone)]
+enum TailerState {
+    Running,
+    // Stopped,
+}
 
-impl ContainerLogTailer {
-    pub fn new(client: Client, log_sender: mpsc::UnboundedSender<String>) -> Self {
-        Self { client, log_sender }
-    }
-
-    pub fn start(&self, log_info: &ContainerLogInfo) {
-        let mut log_info = log_info.clone();
-        let client = self.client.clone();
-        let log_sender = self.log_sender.clone();
+impl EventStreamBuilder {
+    pub fn start(&self, container_info: ContainerInfo) -> TailerState {
+        let this = self.clone();
         tokio::spawn(async move {
-            let mut tailer = ContainerLogTailer { client, log_sender };
-            if let Err(e) = tailer.tail_container_logs(&mut log_info).await {
-                error!(
-                    "Error tailing logs for container '{}' in pod '{}': {}",
-                    log_info.container_info.container_name, log_info.container_info.pod_name, e
-                );
-            }
+            let log_info = ContainerLogInfo::new(container_info, Utc::now());
+            this.run_event_stream(log_info).await;
+            return;
         });
+        TailerState::Running
     }
 
-    pub async fn tail_container_logs(
-        &mut self,
-        log_info: &mut ContainerLogInfo,
-    ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    pub async fn run_event_stream(mut self, mut log_info: ContainerLogInfo) {
         let pods: Api<Pod> =
             Api::namespaced(self.client.clone(), &log_info.container_info.namespace);
 
@@ -291,10 +282,9 @@ impl ContainerLogTailer {
                 );
 
                 let mut lines = log_stream.lines();
-                let mut log_count = 0;
 
                 // Process the stream of log lines continuously
-                while let Some(line_result) = lines.try_next().await? {
+                while let Ok(Some(line_result)) = lines.try_next().await {
                     // Update timestamp tracking before sending
                     let timestamp_updated = log_info.update_last_log_timestamp(&line_result);
                     if timestamp_updated {
@@ -315,19 +305,6 @@ impl ContainerLogTailer {
                         );
                         break;
                     }
-
-                    log_count += 1;
-
-                    // Log progress periodically
-                    if log_count % 100 == 0 {
-                        trace!(
-                            "Processed {} log lines from container '{}' in pod '{}'. Last timestamp: {:?}",
-                            log_count,
-                            log_info.container_info.container_name,
-                            log_info.container_info.pod_name,
-                            log_info.last_log
-                        );
-                    }
                 }
             }
             Err(e) => {
@@ -342,6 +319,5 @@ impl ContainerLogTailer {
             "Completed streaming log tail for container '{}' in pod '{}'",
             log_info.container_info.container_name, log_info.container_info.pod_name
         );
-        Ok(())
     }
 }
