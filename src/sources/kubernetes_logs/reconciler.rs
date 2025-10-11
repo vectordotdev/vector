@@ -1,7 +1,10 @@
 use super::pod_info::PodInfo;
+use futures::SinkExt;
+use futures::channel::mpsc;
 use k8s_openapi::api::core::v1::Pod;
 use kube::runtime::reflector::Store;
 use kube::{Api, Client, api::LogParams};
+use std::collections::HashMap;
 use tracing::{error, info, warn};
 
 /// Container information for log tailing
@@ -21,14 +24,20 @@ pub struct ContainerInfo {
 pub struct Reconciler {
     pod_state: Store<Pod>,
     container_tailer: ContainerLogTailer,
+    tailer_state: HashMap<String, TailStatus>, // Keyed by "namespace/pod/container"
 }
 
 impl Reconciler {
-    pub fn new(pod_state: Store<Pod>, client: Client) -> Self {
-        let container_tailer = ContainerLogTailer::new(client.clone());
+    pub fn new(
+        pod_state: Store<Pod>,
+        client: Client,
+        log_sender: mpsc::UnboundedSender<String>,
+    ) -> Self {
+        let container_tailer = ContainerLogTailer::new(client.clone(), log_sender);
         Self {
             pod_state,
             container_tailer,
+            tailer_state: HashMap::new(),
         }
     }
 
@@ -44,7 +53,7 @@ impl Reconciler {
         }
     }
 
-    pub async fn handle_running_pods(self) -> crate::Result<Self> {
+    pub async fn handle_running_pods(mut self) -> crate::Result<Self> {
         info!("Performing reconciliation of pod states");
 
         let pods: Vec<_> = self
@@ -116,8 +125,16 @@ impl Reconciler {
                     container_info.pod_name,
                     container_info.namespace
                 );
-                let _status = self.container_tailer.start(&container_info);
-                // TODO: Store tailer status in a thread-safe way
+                let status = self.container_tailer.start(&container_info);
+                self.tailer_state.insert(
+                    format!(
+                        "{}/{}/{}",
+                        container_info.namespace,
+                        container_info.pod_name,
+                        container_info.container_name
+                    ),
+                    status,
+                );
             }
         }
 
@@ -125,25 +142,29 @@ impl Reconciler {
     }
 }
 
+#[derive(Clone)]
 struct ContainerLogTailer {
     client: Client,
+    log_sender: mpsc::UnboundedSender<String>,
 }
 
+#[derive(Clone)]
 enum TailStatus {
     Running,
     // Stopped,
 }
 
 impl ContainerLogTailer {
-    pub fn new(client: Client) -> Self {
-        Self { client }
+    pub fn new(client: Client, log_sender: mpsc::UnboundedSender<String>) -> Self {
+        Self { client, log_sender }
     }
 
     pub fn start(&self, container_info: &ContainerInfo) -> TailStatus {
         let container_info = container_info.clone();
         let client = self.client.clone();
+        let log_sender = self.log_sender.clone();
         tokio::spawn(async move {
-            let tailer = ContainerLogTailer { client };
+            let mut tailer = ContainerLogTailer { client, log_sender };
             if let Err(e) = tailer.tail_container_logs(&container_info).await {
                 error!(
                     "Error tailing logs for container '{}' in pod '{}': {}",
@@ -155,7 +176,7 @@ impl ContainerLogTailer {
     }
 
     pub async fn tail_container_logs(
-        &self,
+        &mut self,
         container_info: &ContainerInfo,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
         let pods: Api<Pod> = Api::namespaced(self.client.clone(), &container_info.namespace);
@@ -182,17 +203,10 @@ impl ContainerLogTailer {
                         "=== Logs from container '{}' in pod '{}' ===",
                         container_info.container_name, container_info.pod_name
                     );
-                    let line_count = logs.lines().count();
-                    info!("Retrieved {} lines of logs", line_count);
 
-                    for (idx, line) in logs.lines().take(5).enumerate() {
-                        // Limit output for demo
-                        info!("LOG[{}]: {}", idx + 1, line);
+                    for (_, line) in logs.lines().take(5).enumerate() {
+                        let _ = self.log_sender.send(String::from(line)).await;
                     }
-                    if line_count > 5 {
-                        info!("... ({} more lines)", line_count - 5);
-                    }
-                    info!("=== End of logs ===");
                 } else {
                     info!(
                         "No logs available for container '{}' in pod '{}'",

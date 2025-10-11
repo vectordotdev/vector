@@ -964,19 +964,38 @@ impl Source {
 
         // Only run reconciler when api_log is enabled
         let reconciler_fut = if let Some(pod_init_rx) = pod_init_rx {
-            let reconciler = reconciler::Reconciler::new(pod_state, client.clone());
+            let (api_logs_tx, mut api_logs_rx) = futures::channel::mpsc::unbounded::<String>();
+            let reconciler = reconciler::Reconciler::new(pod_state, client.clone(), api_logs_tx);
             Some(async move {
                 // Wait for pod store to be initialized
                 match pod_init_rx.await {
                     Ok(_) => {
                         info!("Pod store initialized, starting reconciler");
+
+                        // Start the reconciler
                         match reconciler.handle_running_pods().await {
-                            Ok(reconciler) => reconciler.run().await,
-                            Err(error) => emit!(KubernetesLifecycleError {
-                                error,
-                                message: "Reconciler exited with an error.",
-                                count: events_count,
-                            }),
+                            Ok(reconciler) => {
+                                // Spawn reconciler run task
+                                tokio::spawn(async move {
+                                    reconciler.run().await;
+                                });
+
+                                // Process incoming logs from the channel
+                                while let Some(log_line) = api_logs_rx.next().await {
+                                    info!("API Log: {}", log_line);
+                                    // TODO: Convert log_line to Vector event and send to output
+                                    // This is where you would parse the log and send it through the Vector pipeline
+                                }
+
+                                info!("Reconciler log processing completed");
+                            }
+                            Err(error) => {
+                                emit!(KubernetesLifecycleError {
+                                    error,
+                                    message: "Reconciler exited with an error.",
+                                    count: events_count,
+                                });
+                            }
                         }
                     }
                     Err(_) => {
