@@ -1,11 +1,13 @@
 use super::pod_info::PodInfo;
+use chrono::{DateTime, FixedOffset, Utc};
 use futures::SinkExt;
 use futures::channel::mpsc;
+use futures::{AsyncBufReadExt, TryStreamExt};
 use k8s_openapi::api::core::v1::Pod;
 use kube::runtime::reflector::Store;
 use kube::{Api, Client, api::LogParams};
 use std::collections::HashMap;
-use tracing::{error, info, warn};
+use tracing::{error, info, trace, warn};
 
 /// Container information for log tailing
 #[derive(Clone, Debug)]
@@ -21,10 +23,81 @@ pub struct ContainerInfo {
     pub pod_uid: String,
 }
 
+/// Container log information with timestamp tracking
+/// Similar to docker_logs ContainerLogInfo for position tracking
+#[derive(Clone, Debug)]
+struct ContainerLogInfo {
+    /// Container information
+    container_info: ContainerInfo,
+    /// Timestamp of when this tracking started
+    created: DateTime<Utc>,
+    /// Timestamp of last log message processed
+    last_log: Option<DateTime<FixedOffset>>,
+}
+
+impl ContainerLogInfo {
+    fn new(container_info: ContainerInfo, created: DateTime<Utc>) -> Self {
+        Self {
+            container_info,
+            created,
+            last_log: None,
+        }
+    }
+
+    /// Get the timestamp from which logs should be fetched
+    /// Only logs after this point need to be fetched
+    fn log_since(&self) -> DateTime<Utc> {
+        self.last_log
+            .map(|dt| dt.with_timezone(&Utc))
+            .unwrap_or(self.created)
+    }
+
+    /// Update the last log timestamp when processing a log line
+    /// Returns true if the timestamp was successfully parsed and updated
+    fn update_last_log_timestamp(&mut self, log_line: &str) -> bool {
+        // Kubernetes log format typically starts with RFC3339 timestamp
+        // e.g., "2023-10-11T10:30:00.123456789Z message content"
+        if let Some(timestamp_end) = log_line.find(' ') {
+            let timestamp_str = &log_line[..timestamp_end];
+            if let Ok(timestamp) = DateTime::parse_from_rfc3339(timestamp_str) {
+                // Only update if this timestamp is newer than our last recorded timestamp
+                if let Some(last) = self.last_log {
+                    if timestamp > last {
+                        self.last_log = Some(timestamp);
+                        return true;
+                    }
+                } else {
+                    // First timestamp we've seen
+                    self.last_log = Some(timestamp);
+                    return true;
+                }
+            } else {
+                // Try to parse ISO 8601 format without timezone (common in k8s logs)
+                if let Ok(naive_dt) =
+                    chrono::NaiveDateTime::parse_from_str(timestamp_str, "%Y-%m-%dT%H:%M:%S%.f")
+                {
+                    let timestamp =
+                        DateTime::<Utc>::from_naive_utc_and_offset(naive_dt, Utc).fixed_offset();
+                    if let Some(last) = self.last_log {
+                        if timestamp > last {
+                            self.last_log = Some(timestamp);
+                            return true;
+                        }
+                    } else {
+                        self.last_log = Some(timestamp);
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+}
+
 pub struct Reconciler {
     pod_state: Store<Pod>,
     container_tailer: ContainerLogTailer,
-    tailer_state: HashMap<String, TailStatus>, // Keyed by "namespace/pod/container"
+    tailer_state: HashMap<String, ContainerLogInfo>, // Keyed by "namespace/pod/container"
 }
 
 impl Reconciler {
@@ -125,16 +198,25 @@ impl Reconciler {
                     container_info.pod_name,
                     container_info.namespace
                 );
-                let status = self.container_tailer.start(&container_info);
-                self.tailer_state.insert(
-                    format!(
-                        "{}/{}/{}",
-                        container_info.namespace,
-                        container_info.pod_name,
-                        container_info.container_name
-                    ),
-                    status,
+
+                let key = format!(
+                    "{}/{}/{}",
+                    container_info.namespace,
+                    container_info.pod_name,
+                    container_info.container_name
                 );
+
+                // Check if we already have tracking info for this container
+                let log_info = if let Some(existing_info) = self.tailer_state.get(&key) {
+                    // Reuse existing timestamp tracking
+                    existing_info.clone()
+                } else {
+                    // Create new tracking info starting from now
+                    ContainerLogInfo::new(container_info.clone(), Utc::now())
+                };
+
+                self.container_tailer.start(&log_info);
+                self.tailer_state.insert(key, log_info);
             }
         }
 
@@ -148,83 +230,117 @@ struct ContainerLogTailer {
     log_sender: mpsc::UnboundedSender<String>,
 }
 
-#[derive(Clone)]
-enum TailStatus {
-    Running,
-    // Stopped,
-}
+// #[derive(Clone)]
+// enum TailStatus {
+//     Running,
+//     // Stopped,
+// }
 
 impl ContainerLogTailer {
     pub fn new(client: Client, log_sender: mpsc::UnboundedSender<String>) -> Self {
         Self { client, log_sender }
     }
 
-    pub fn start(&self, container_info: &ContainerInfo) -> TailStatus {
-        let container_info = container_info.clone();
+    pub fn start(&self, log_info: &ContainerLogInfo) {
+        let mut log_info = log_info.clone();
         let client = self.client.clone();
         let log_sender = self.log_sender.clone();
         tokio::spawn(async move {
             let mut tailer = ContainerLogTailer { client, log_sender };
-            if let Err(e) = tailer.tail_container_logs(&container_info).await {
+            if let Err(e) = tailer.tail_container_logs(&mut log_info).await {
                 error!(
                     "Error tailing logs for container '{}' in pod '{}': {}",
-                    container_info.container_name, container_info.pod_name, e
+                    log_info.container_info.container_name, log_info.container_info.pod_name, e
                 );
             }
         });
-        TailStatus::Running
     }
 
     pub async fn tail_container_logs(
         &mut self,
-        container_info: &ContainerInfo,
+        log_info: &mut ContainerLogInfo,
     ) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-        let pods: Api<Pod> = Api::namespaced(self.client.clone(), &container_info.namespace);
+        let pods: Api<Pod> =
+            Api::namespaced(self.client.clone(), &log_info.container_info.namespace);
 
         info!(
-            "Starting log tailing for container '{}' in pod '{}' (namespace '{}')",
-            container_info.container_name, container_info.pod_name, container_info.namespace
+            "Starting streaming log tail for container '{}' in pod '{}' (namespace '{}') from timestamp {}",
+            log_info.container_info.container_name,
+            log_info.container_info.pod_name,
+            log_info.container_info.namespace,
+            log_info.log_since()
         );
 
         let log_params = LogParams {
-            container: Some(container_info.container_name.clone()),
-            follow: false,        // For now, just get recent logs, not streaming
-            tail_lines: Some(10), // Get last 10 lines
+            container: Some(log_info.container_info.container_name.clone()),
+            follow: true,
+            since_time: Some(log_info.log_since()),
             timestamps: true,
             ..Default::default()
         };
 
-        match pods.logs(&container_info.pod_name, &log_params).await {
-            Ok(logs) => {
-                // Process the logs - for now just print them
-                // In a full implementation, these would be sent to the Vector event pipeline
-                if !logs.is_empty() {
-                    info!(
-                        "=== Logs from container '{}' in pod '{}' ===",
-                        container_info.container_name, container_info.pod_name
-                    );
+        // Use log_stream for continuous streaming instead of one-shot logs
+        match pods
+            .log_stream(&log_info.container_info.pod_name, &log_params)
+            .await
+        {
+            Ok(log_stream) => {
+                info!(
+                    "Started streaming logs from container '{}' in pod '{}'",
+                    log_info.container_info.container_name, log_info.container_info.pod_name
+                );
 
-                    for (_, line) in logs.lines().take(5).enumerate() {
-                        let _ = self.log_sender.send(String::from(line)).await;
+                let mut lines = log_stream.lines();
+                let mut log_count = 0;
+
+                // Process the stream of log lines continuously
+                while let Some(line_result) = lines.try_next().await? {
+                    // Update timestamp tracking before sending
+                    let timestamp_updated = log_info.update_last_log_timestamp(&line_result);
+                    if timestamp_updated {
+                        trace!(
+                            "Updated last log timestamp for container '{}' in pod '{}' to: {:?}",
+                            log_info.container_info.container_name,
+                            log_info.container_info.pod_name,
+                            log_info.last_log
+                        );
                     }
-                } else {
-                    info!(
-                        "No logs available for container '{}' in pod '{}'",
-                        container_info.container_name, container_info.pod_name
-                    );
+
+                    // Send the log line to the channel
+                    if let Err(_) = self.log_sender.send(line_result).await {
+                        warn!(
+                            "Log channel closed for container '{}' in pod '{}', stopping stream",
+                            log_info.container_info.container_name,
+                            log_info.container_info.pod_name
+                        );
+                        break;
+                    }
+
+                    log_count += 1;
+
+                    // Log progress periodically
+                    if log_count % 100 == 0 {
+                        trace!(
+                            "Processed {} log lines from container '{}' in pod '{}'. Last timestamp: {:?}",
+                            log_count,
+                            log_info.container_info.container_name,
+                            log_info.container_info.pod_name,
+                            log_info.last_log
+                        );
+                    }
                 }
             }
             Err(e) => {
                 warn!(
-                    "Failed to fetch logs for container '{}' in pod '{}': {}",
-                    container_info.container_name, container_info.pod_name, e
+                    "Failed to start log stream for container '{}' in pod '{}': {}",
+                    log_info.container_info.container_name, log_info.container_info.pod_name, e
                 );
             }
         }
 
         info!(
-            "Completed log tailing for container '{}' in pod '{}'",
-            container_info.container_name, container_info.pod_name
+            "Completed streaming log tail for container '{}' in pod '{}'",
+            log_info.container_info.container_name, log_info.container_info.pod_name
         );
         Ok(())
     }
