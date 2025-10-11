@@ -21,7 +21,7 @@ use kube::{
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
-use tokio::sync::oneshot;
+
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
     codecs::{BytesDeserializer, BytesDeserializerConfig},
@@ -764,20 +764,11 @@ impl Source {
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
 
-        // Create oneshot channel to notify when pod store is initialized
-        let (pod_init_tx, pod_init_rx) = if api_log {
-            let (tx, rx) = oneshot::channel();
-            (Some(tx), Some(rx))
-        } else {
-            (None, None)
-        };
-
         reflectors.push(tokio::spawn(custom_reflector(
             pod_store_w,
             pod_cacher,
             pod_watcher,
             delay_deletion,
-            pod_init_tx,
         )));
 
         // -----------------------------------------------------------------
@@ -802,7 +793,6 @@ impl Source {
                 MetaCache::new(),
                 ns_watcher,
                 delay_deletion,
-                None,
             )));
         }
 
@@ -828,7 +818,6 @@ impl Source {
             node_cacher,
             node_watcher,
             delay_deletion,
-            None,
         )));
 
         let paths_provider = K8sPathsProvider::new(
@@ -978,60 +967,30 @@ impl Source {
         let event_processing_loop = out.send_event_stream(&mut stream);
 
         // Only run reconciler when api_log is enabled
-        let reconciler_fut = if let (Some(pod_init_rx), Some(reconciler_watcher)) =
-            (pod_init_rx, reconciler_pod_watcher)
-        {
+        let reconciler_fut = if let Some(reconciler_watcher) = reconciler_pod_watcher {
             let (api_logs_tx, mut api_logs_rx) = futures::channel::mpsc::unbounded::<String>();
-            let reconciler = reconciler::Reconciler::new(
-                pod_state.clone(),
-                client.clone(),
-                api_logs_tx,
-                reconciler_watcher,
-            );
+            let reconciler =
+                reconciler::Reconciler::new(client.clone(), api_logs_tx, reconciler_watcher);
             Some(async move {
-                // Wait for pod store to be initialized
-                match pod_init_rx.await {
-                    Ok(_) => {
-                        info!("Pod store initialized, starting reconciler");
+                info!("Starting event-driven reconciler");
 
-                        // Start the reconciler with initial full reconciliation
-                        let mut reconciler = reconciler;
-                        match reconciler.perform_full_reconciliation().await {
-                            Ok(_) => {
-                                info!("Initial reconciliation completed, starting event-driven reconciler");
-                                // Spawn reconciler run task and log processing in parallel
-                                let reconciler_task = tokio::spawn(async move {
-                                    reconciler.run().await;
-                                });
+                // Spawn reconciler run task and log processing in parallel
+                let reconciler_task = tokio::spawn(async move {
+                    reconciler.run().await;
+                });
 
-                                let log_processing_task = tokio::spawn(async move {
-                                    // Process incoming logs from the channel
-                                    while let Some(log_line) = api_logs_rx.next().await {
-                                        info!("API Log: {}", log_line);
-                                        // TODO: Convert log_line to Vector event and send to output
-                                        // This is where you would parse the log and send it through the Vector pipeline
-                                    }
-                                    info!("Reconciler log processing completed");
-                                });
-
-                                // Wait for both tasks to complete
-                                let _ = tokio::try_join!(reconciler_task, log_processing_task);
-                            }
-                            Err(error) => {
-                                emit!(KubernetesLifecycleError {
-                                    error,
-                                    message: "Initial reconciliation failed.",
-                                    count: events_count,
-                                });
-                            }
-                        }
+                let log_processing_task = tokio::spawn(async move {
+                    // Process incoming logs from the channel
+                    while let Some(log_line) = api_logs_rx.next().await {
+                        info!("API Log: {}", log_line);
+                        // TODO: Convert log_line to Vector event and send to output
+                        // This is where you would parse the log and send it through the Vector pipeline
                     }
-                    Err(_) => {
-                        warn!(
-                            "Pod store initialization signal was dropped, reconciler will not start"
-                        );
-                    }
-                }
+                    info!("Reconciler log processing completed");
+                });
+
+                // Wait for both tasks to complete
+                let _ = tokio::try_join!(reconciler_task, log_processing_task);
             })
         } else {
             None

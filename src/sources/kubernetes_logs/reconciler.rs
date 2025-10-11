@@ -5,7 +5,6 @@ use futures::channel::mpsc;
 use futures::{AsyncBufReadExt, StreamExt, TryStreamExt};
 use futures_util::Stream;
 use k8s_openapi::api::core::v1::Pod;
-use kube::runtime::reflector::Store;
 use kube::runtime::watcher;
 use kube::{Api, Client, api::LogParams};
 use std::collections::HashMap;
@@ -128,19 +127,13 @@ impl ContainerLogInfo {
 }
 
 pub struct Reconciler {
-    pod_state: Store<Pod>,
     esb: EventStreamBuilder,
     states: HashMap<ContainerKey, TailerState>, // Keyed by ContainerKey
     pod_watcher: Pin<Box<dyn Stream<Item = watcher::Result<watcher::Event<Pod>>> + Send>>,
 }
 
 impl Reconciler {
-    pub fn new<S>(
-        pod_state: Store<Pod>,
-        client: Client,
-        log_sender: mpsc::UnboundedSender<String>,
-        pod_watcher: S,
-    ) -> Self
+    pub fn new<S>(client: Client, log_sender: mpsc::UnboundedSender<String>, pod_watcher: S) -> Self
     where
         S: Stream<Item = watcher::Result<watcher::Event<Pod>>> + Send + 'static,
     {
@@ -149,7 +142,6 @@ impl Reconciler {
             log_sender,
         };
         Self {
-            pod_state,
             esb,
             states: HashMap::new(),
             pod_watcher: Box::pin(pod_watcher),
@@ -182,10 +174,7 @@ impl Reconciler {
                     self.cleanup_pod_tailers(&pod_info).await;
                 }
                 Ok(watcher::Event::Init) => {
-                    info!("Pod watcher initialized, performing full reconciliation");
-                    if let Err(e) = self.perform_full_reconciliation().await {
-                        warn!("Failed to perform full reconciliation: {}", e);
-                    }
+                    info!("Pod watcher initialized - ready for event-driven reconciliation");
                 }
                 Ok(watcher::Event::InitApply(pod)) => {
                     let pod_info = PodInfo::from(&pod);
@@ -205,10 +194,9 @@ impl Reconciler {
                     }
                 }
                 Ok(watcher::Event::InitDone) => {
-                    info!("Pod watcher init complete, performing final reconciliation");
-                    if let Err(e) = self.perform_full_reconciliation().await {
-                        warn!("Failed to perform final reconciliation: {}", e);
-                    }
+                    info!(
+                        "Pod watcher init complete - fully ready for event-driven reconciliation"
+                    );
                 }
                 Err(e) => {
                     warn!("Pod watcher error: {}", e);
@@ -258,41 +246,6 @@ impl Reconciler {
                 );
             }
         }
-    }
-
-    /// Perform full reconciliation of all running pods
-    pub async fn perform_full_reconciliation(&mut self) -> crate::Result<()> {
-        info!("Performing full reconciliation of pod states");
-
-        let pods: Vec<_> = self
-            .pod_state
-            .state()
-            .iter()
-            .map(|pod| PodInfo::from(pod.as_ref()))
-            .collect();
-
-        if pods.is_empty() {
-            warn!("No pods found in pod store during full reconciliation");
-            return Ok(());
-        }
-
-        info!("Found {} pods in store for full reconciliation", pods.len());
-
-        // Filter for running pods and reconcile their containers
-        for pod_info in pods {
-            if let Some(phase) = &pod_info.phase {
-                if phase == "Running" {
-                    if let Err(e) = self.reconcile_pod_containers(&pod_info).await {
-                        warn!(
-                            "Failed to reconcile pod '{}' during full reconciliation: {}",
-                            pod_info.name, e
-                        );
-                    }
-                }
-            }
-        }
-
-        Ok(())
     }
 }
 
