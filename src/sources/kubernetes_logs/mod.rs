@@ -722,8 +722,6 @@ impl Source {
             api_log,
         } = self;
 
-        info!(%api_log);
-
         let mut reflectors = Vec::new();
 
         let pods = Api::<Pod>::all(client.clone());
@@ -952,7 +950,24 @@ impl Source {
 
         let event_processing_loop = out.send_event_stream(&mut stream);
 
-        let reconciler = reconciler::Reconciler::new(pod_state, client.clone());
+        // Only run reconciler when api_log is enabled
+        let reconciler_fut = if api_log {
+            let reconciler = reconciler::Reconciler::new(pod_state, client.clone());
+            Some(async move {
+                // Give some time for the pod store to be populated
+                tokio::time::sleep(tokio::time::Duration::from_secs(2)).await;
+                match reconciler.handle_running_pods().await {
+                    Ok(reconciler) => reconciler.run().await,
+                    Err(error) => emit!(KubernetesLifecycleError {
+                        error,
+                        message: "Reconciler exited with an error.",
+                        count: events_count,
+                    }),
+                }
+            })
+        } else {
+            None
+        };
         let mut lifecycle = Lifecycle::new();
         {
             let (slot, shutdown) = lifecycle.add();
@@ -990,20 +1005,21 @@ impl Source {
             slot.bind(Box::pin(fut));
         }
 
-        {
+        // Only add reconciler to lifecycle if api_log is enabled
+        if let Some(reconciler_future) = reconciler_fut {
             let (slot, shutdown) = lifecycle.add();
-            let fut = reconciler.reconcile();
+
             let fut = util::complete_with_deadline_on_signal(
-                fut,
+                reconciler_future,
                 shutdown,
                 Duration::from_secs(30), // more than enough time to propagate
             )
             .map(|result| {
                 match result {
-                    Ok(_) => info!(message = "Event processing loop completed gracefully."),
+                    Ok(_) => info!(message = "Reconciler completed gracefully."),
                     Err(error) => emit!(KubernetesLifecycleError {
                         error,
-                        message: "Event processing loop timed out during the shutdown.",
+                        message: "Reconciler timed out during the shutdown.",
                         count: events_count,
                     }),
                 };
@@ -1129,7 +1145,7 @@ const fn default_rotate_wait() -> Duration {
     Duration::from_secs(u64::MAX / 2)
 }
 const fn default_api_log() -> bool {
-    false
+    true // Enable api_log by default for now to test reconciler functionality
 }
 
 // This function constructs the patterns we include for file watching, created
