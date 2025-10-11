@@ -745,6 +745,21 @@ impl Source {
         )
         .backoff(watcher::DefaultBackoff::default());
 
+        // Create a separate watcher for the reconciler if api_log is enabled
+        let reconciler_pod_watcher = if api_log {
+            let reconciler_pods = Api::<Pod>::all(client.clone());
+            let reconciler_watcher = watcher(
+                reconciler_pods,
+                watcher::Config {
+                    ..Default::default()
+                },
+            )
+            .backoff(watcher::DefaultBackoff::default());
+            Some(reconciler_watcher)
+        } else {
+            None
+        };
+
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
@@ -963,36 +978,49 @@ impl Source {
         let event_processing_loop = out.send_event_stream(&mut stream);
 
         // Only run reconciler when api_log is enabled
-        let reconciler_fut = if let Some(pod_init_rx) = pod_init_rx {
+        let reconciler_fut = if let (Some(pod_init_rx), Some(reconciler_watcher)) =
+            (pod_init_rx, reconciler_pod_watcher)
+        {
             let (api_logs_tx, mut api_logs_rx) = futures::channel::mpsc::unbounded::<String>();
-            let reconciler = reconciler::Reconciler::new(pod_state, client.clone(), api_logs_tx);
+            let reconciler = reconciler::Reconciler::new(
+                pod_state.clone(),
+                client.clone(),
+                api_logs_tx,
+                reconciler_watcher,
+            );
             Some(async move {
                 // Wait for pod store to be initialized
                 match pod_init_rx.await {
                     Ok(_) => {
                         info!("Pod store initialized, starting reconciler");
 
-                        // Start the reconciler
-                        match reconciler.handle_running_pods().await {
-                            Ok(reconciler) => {
-                                // Spawn reconciler run task
-                                tokio::spawn(async move {
+                        // Start the reconciler with initial full reconciliation
+                        let mut reconciler = reconciler;
+                        match reconciler.perform_full_reconciliation().await {
+                            Ok(_) => {
+                                info!("Initial reconciliation completed, starting event-driven reconciler");
+                                // Spawn reconciler run task and log processing in parallel
+                                let reconciler_task = tokio::spawn(async move {
                                     reconciler.run().await;
                                 });
 
-                                // Process incoming logs from the channel
-                                while let Some(log_line) = api_logs_rx.next().await {
-                                    info!("API Log: {}", log_line);
-                                    // TODO: Convert log_line to Vector event and send to output
-                                    // This is where you would parse the log and send it through the Vector pipeline
-                                }
+                                let log_processing_task = tokio::spawn(async move {
+                                    // Process incoming logs from the channel
+                                    while let Some(log_line) = api_logs_rx.next().await {
+                                        info!("API Log: {}", log_line);
+                                        // TODO: Convert log_line to Vector event and send to output
+                                        // This is where you would parse the log and send it through the Vector pipeline
+                                    }
+                                    info!("Reconciler log processing completed");
+                                });
 
-                                info!("Reconciler log processing completed");
+                                // Wait for both tasks to complete
+                                let _ = tokio::try_join!(reconciler_task, log_processing_task);
                             }
                             Err(error) => {
                                 emit!(KubernetesLifecycleError {
                                     error,
-                                    message: "Reconciler exited with an error.",
+                                    message: "Initial reconciliation failed.",
                                     count: events_count,
                                 });
                             }

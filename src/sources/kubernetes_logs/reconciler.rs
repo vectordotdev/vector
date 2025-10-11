@@ -2,12 +2,15 @@ use super::pod_info::PodInfo;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::SinkExt;
 use futures::channel::mpsc;
-use futures::{AsyncBufReadExt, TryStreamExt};
+use futures::{AsyncBufReadExt, StreamExt, TryStreamExt};
+use futures_util::Stream;
 use k8s_openapi::api::core::v1::Pod;
 use kube::runtime::reflector::Store;
+use kube::runtime::watcher;
 use kube::{Api, Client, api::LogParams};
 use std::collections::HashMap;
 use std::fmt;
+use std::pin::Pin;
 use tracing::{info, trace, warn};
 
 /// Container key for identifying unique container instances
@@ -128,14 +131,19 @@ pub struct Reconciler {
     pod_state: Store<Pod>,
     esb: EventStreamBuilder,
     states: HashMap<ContainerKey, TailerState>, // Keyed by ContainerKey
+    pod_watcher: Pin<Box<dyn Stream<Item = watcher::Result<watcher::Event<Pod>>> + Send>>,
 }
 
 impl Reconciler {
-    pub fn new(
+    pub fn new<S>(
         pod_state: Store<Pod>,
         client: Client,
         log_sender: mpsc::UnboundedSender<String>,
-    ) -> Self {
+        pod_watcher: S,
+    ) -> Self
+    where
+        S: Stream<Item = watcher::Result<watcher::Event<Pod>>> + Send + 'static,
+    {
         let esb = EventStreamBuilder {
             client: client.clone(),
             log_sender,
@@ -144,23 +152,117 @@ impl Reconciler {
             pod_state,
             esb,
             states: HashMap::new(),
+            pod_watcher: Box::pin(pod_watcher),
         }
     }
 
-    pub async fn run(&self) {
-        // TODO: replace timer with watcher for pod state changes and reconcile accordingly
-        let mut timer = tokio::time::interval(tokio::time::Duration::from_secs(10));
-        loop {
-            tokio::select! {
-                _ = timer.tick() => {
-                    // self.perform_reconciliation().await;
+    pub async fn run(mut self) {
+        info!("Starting reconciler with pod watcher integration");
+
+        // Listen to pod watcher events for real-time reconciliation
+        while let Some(event) = self.pod_watcher.next().await {
+            match event {
+                Ok(watcher::Event::Apply(pod)) => {
+                    let pod_info = PodInfo::from(&pod);
+                    if let Some(phase) = &pod_info.phase {
+                        if phase == "Running" {
+                            info!(
+                                "Pod '{}' is now running, starting log reconciliation",
+                                pod_info.name
+                            );
+                            if let Err(e) = self.reconcile_pod_containers(&pod_info).await {
+                                warn!("Failed to reconcile pod '{}': {}", pod_info.name, e);
+                            }
+                        }
+                    }
                 }
+                Ok(watcher::Event::Delete(pod)) => {
+                    let pod_info = PodInfo::from(&pod);
+                    info!("Pod '{}' deleted, cleaning up log tailers", pod_info.name);
+                    self.cleanup_pod_tailers(&pod_info).await;
+                }
+                Ok(watcher::Event::Init) => {
+                    info!("Pod watcher initialized, performing full reconciliation");
+                    if let Err(e) = self.perform_full_reconciliation().await {
+                        warn!("Failed to perform full reconciliation: {}", e);
+                    }
+                }
+                Ok(watcher::Event::InitApply(pod)) => {
+                    let pod_info = PodInfo::from(&pod);
+                    if let Some(phase) = &pod_info.phase {
+                        if phase == "Running" {
+                            info!(
+                                "Pod '{}' is running during init, starting log reconciliation",
+                                pod_info.name
+                            );
+                            if let Err(e) = self.reconcile_pod_containers(&pod_info).await {
+                                warn!(
+                                    "Failed to reconcile pod '{}' during init: {}",
+                                    pod_info.name, e
+                                );
+                            }
+                        }
+                    }
+                }
+                Ok(watcher::Event::InitDone) => {
+                    info!("Pod watcher init complete, performing final reconciliation");
+                    if let Err(e) = self.perform_full_reconciliation().await {
+                        warn!("Failed to perform final reconciliation: {}", e);
+                    }
+                }
+                Err(e) => {
+                    warn!("Pod watcher error: {}", e);
+                }
+            }
+        }
+
+        info!("Reconciler pod watcher stream ended");
+    }
+
+    /// Reconcile containers for a specific pod
+    async fn reconcile_pod_containers(&mut self, pod_info: &PodInfo) -> crate::Result<()> {
+        for container_name in &pod_info.containers {
+            let container_info = ContainerInfo {
+                pod_name: pod_info.name.clone(),
+                namespace: pod_info.namespace.clone(),
+                container_name: container_name.clone(),
+                pod_uid: pod_info.uid.clone(),
+            };
+
+            let key = ContainerKey::from(&container_info);
+
+            // Only start tailer if not already running
+            if !self.states.contains_key(&key) {
+                info!(
+                    "Starting tailer for container '{}' in pod '{}' (namespace '{}')",
+                    container_info.container_name,
+                    container_info.pod_name,
+                    container_info.namespace
+                );
+
+                self.states.insert(key, self.esb.start(container_info));
+            }
+        }
+        Ok(())
+    }
+
+    /// Clean up tailers for a deleted pod
+    async fn cleanup_pod_tailers(&mut self, pod_info: &PodInfo) {
+        for container_name in &pod_info.containers {
+            let key = ContainerKey::from((pod_info, container_name.as_str()));
+
+            if self.states.remove(&key).is_some() {
+                info!(
+                    "Cleaned up tailer for container '{}' in deleted pod '{}'",
+                    container_name, pod_info.name
+                );
             }
         }
     }
 
-    pub async fn handle_running_pods(mut self) -> crate::Result<Self> {
-        info!("Performing reconciliation of pod states");
+    /// Perform full reconciliation of all running pods
+    pub async fn perform_full_reconciliation(&mut self) -> crate::Result<()> {
+        info!("Performing full reconciliation of pod states");
 
         let pods: Vec<_> = self
             .pod_state
@@ -170,85 +272,27 @@ impl Reconciler {
             .collect();
 
         if pods.is_empty() {
-            warn!("No pods found in pod store. The store might not be populated yet.");
-            return Ok(self);
+            warn!("No pods found in pod store during full reconciliation");
+            return Ok(());
         }
 
-        info!("Found {} pods in store", pods.len());
+        info!("Found {} pods in store for full reconciliation", pods.len());
 
-        // Filter for running pods and start tailing their logs
-        let running_pods: Vec<_> = pods
-            .into_iter()
-            .filter(|pod_info| match &pod_info.phase {
-                Some(phase) if phase == "Running" => {
-                    info!(
-                        "Pod '{}' is running with {} containers",
-                        pod_info.name,
-                        pod_info.containers.len()
-                    );
-                    true
+        // Filter for running pods and reconcile their containers
+        for pod_info in pods {
+            if let Some(phase) = &pod_info.phase {
+                if phase == "Running" {
+                    if let Err(e) = self.reconcile_pod_containers(&pod_info).await {
+                        warn!(
+                            "Failed to reconcile pod '{}' during full reconciliation: {}",
+                            pod_info.name, e
+                        );
+                    }
                 }
-                Some(phase) => {
-                    info!("Skipping pod '{}' in phase '{}'", pod_info.name, phase);
-                    false
-                }
-                None => {
-                    info!("Skipping pod '{}' with unknown phase", pod_info.name);
-                    false
-                }
-            })
-            .collect();
-
-        if running_pods.is_empty() {
-            info!("No running pods found to tail logs from");
-        } else {
-            // Convert pods to container info and start tailers
-            let containers: Vec<ContainerInfo> = running_pods
-                .iter()
-                .flat_map(|pod_info| {
-                    pod_info
-                        .containers
-                        .iter()
-                        .map(|container_name| ContainerInfo {
-                            pod_name: pod_info.name.clone(),
-                            namespace: pod_info.namespace.clone(),
-                            container_name: container_name.clone(),
-                            pod_uid: pod_info.uid.clone(),
-                        })
-                })
-                .collect();
-
-            info!(
-                "Starting log tailing for {} containers across {} running pods",
-                containers.len(),
-                running_pods.len()
-            );
-
-            for container_info in containers {
-                info!(
-                    "Starting tailer for container '{}' in pod '{}' (namespace '{}')",
-                    container_info.container_name,
-                    container_info.pod_name,
-                    container_info.namespace
-                );
-
-                let key = ContainerKey::from(&container_info);
-
-                // // Check if we already have tracking info for this container
-                // let log_info = if let Some(existing_info) = self.states.get(&key) {
-                //     // Reuse existing timestamp tracking
-                //     existing_info.clone()
-                // } else {
-                //     // Create new tracking info starting from now
-                //     ContainerLogInfo::new(container_info.clone(), Utc::now())
-                // };
-
-                self.states
-                    .insert(key, self.esb.start(container_info.clone()));
             }
         }
 
-        Ok(self)
+        Ok(())
     }
 }
 
@@ -295,7 +339,6 @@ impl EventStreamBuilder {
             ..Default::default()
         };
 
-        // Use log_stream for continuous streaming instead of one-shot logs
         match pods
             .log_stream(&log_info.container_info.pod_name, &log_params)
             .await
