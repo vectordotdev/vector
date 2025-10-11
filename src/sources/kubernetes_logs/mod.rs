@@ -53,8 +53,7 @@ use crate::{
     },
     kubernetes::{custom_reflector, meta_cache::MetaCache},
     shutdown::ShutdownSignal,
-    sources,
-    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
+    sources::{self, kubernetes_logs::partial_events_merger::merge_partial_events},
     transforms::{FunctionTransform, OutputBuffer},
 };
 
@@ -67,16 +66,14 @@ mod partial_events_merger;
 mod path_helpers;
 mod pod_info;
 mod pod_metadata_annotator;
-mod pod_publisher;
-mod pod_subscriber;
+mod reconciler;
 mod transform_utils;
 mod util;
 
 use self::{
     namespace_metadata_annotator::NamespaceMetadataAnnotator,
-    node_metadata_annotator::NodeMetadataAnnotator, parser::Parser, pod_info::PodInfo,
-    pod_metadata_annotator::PodMetadataAnnotator, pod_publisher::PodPublisher,
-    pod_subscriber::PodSubscriber,
+    node_metadata_annotator::NodeMetadataAnnotator, parser::Parser,
+    pod_metadata_annotator::PodMetadataAnnotator,
 };
 
 /// The `self_node_name` value env var key.
@@ -890,10 +887,6 @@ impl Source {
 
         let (file_source_tx, file_source_rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
 
-        // Channel for communication between main task and pod monitoring task
-        // Similar to Docker logs source pattern: spawned task sends data to main task via channel
-        let (pod_info_tx, pod_info_rx) = tokio::sync::mpsc::unbounded_channel::<PodInfo>();
-
         let checkpoints = checkpointer.view();
         let events = file_source_rx.flat_map(futures::stream::iter);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
@@ -959,6 +952,7 @@ impl Source {
 
         let event_processing_loop = out.send_event_stream(&mut stream);
 
+        let reconciler = reconciler::Reconciler::new(pod_state, client.clone());
         let mut lifecycle = Lifecycle::new();
         {
             let (slot, shutdown) = lifecycle.add();
@@ -995,22 +989,27 @@ impl Source {
             });
             slot.bind(Box::pin(fut));
         }
+
         {
-            // New task: Pod monitoring task - similar to Docker logs EventStreamBuilder pattern
-            // This task monitors pod_state changes and publishes pod information via channel
             let (slot, shutdown) = lifecycle.add();
-            let pod_state_clone = pod_state.clone();
-            let publisher = PodPublisher::new(pod_state_clone, pod_info_tx, shutdown);
-            let fut = publisher.run().map(|_| {
-                info!(message = "Pod monitoring task completed gracefully.");
+            let fut = reconciler.reconcile();
+            let fut = util::complete_with_deadline_on_signal(
+                fut,
+                shutdown,
+                Duration::from_secs(30), // more than enough time to propagate
+            )
+            .map(|result| {
+                match result {
+                    Ok(_) => info!(message = "Event processing loop completed gracefully."),
+                    Err(error) => emit!(KubernetesLifecycleError {
+                        error,
+                        message: "Event processing loop timed out during the shutdown.",
+                        count: events_count,
+                    }),
+                };
             });
             slot.bind(Box::pin(fut));
         }
-
-        // Spawn a task to consume from the pod info channel and fetch K8s logs
-        // Similar to Docker logs main future pattern: main task receives data from spawned tasks
-        let subscriber = PodSubscriber::new(pod_info_rx, global_shutdown.clone(), client.clone());
-        tokio::spawn(subscriber.run());
 
         lifecycle.run(global_shutdown).await;
         // Stop Kubernetes object reflectors to avoid their leak on vector reload.
