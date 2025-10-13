@@ -79,3 +79,41 @@ impl Iterator for ExponentialBackoff {
         Some(duration)
     }
 }
+
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_exponential_backoff_sequence() {
+        let mut backoff = ExponentialBackoff::from_millis(500).max_delay(Duration::from_secs(30));
+
+        let expected_delays = [
+            Duration::from_millis(500),
+            Duration::from_secs(1),
+            Duration::from_secs(2),
+            Duration::from_secs(4),
+            Duration::from_secs(8),
+            Duration::from_secs(16),
+            Duration::from_secs(30), // Reached max duration
+            Duration::from_secs(30), // Should stay capped
+        ];
+
+        for expected in expected_delays.iter() {
+            let actual = backoff.next().unwrap();
+            assert_eq!(actual, *expected);
+        }
+    }
+
+    #[test]
+    fn test_backoff_reset() {
+        let mut backoff = ExponentialBackoff::from_millis(500).max_delay(Duration::from_secs(30));
+        for _ in 0..2 {
+            backoff.next();
+        }
+        assert_eq!(backoff.next().unwrap(), Duration::from_secs(2));
+        backoff.reset();
+        assert_eq!(backoff.next().unwrap(), Duration::from_millis(500));
+    }
+}
