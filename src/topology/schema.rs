@@ -4,7 +4,6 @@ use snafu::Snafu;
 use vector_lib::config::SourceOutput;
 
 pub(super) use crate::schema::Definition;
-
 use crate::{
     config::{ComponentKey, Config, OutputId, SinkOuter, TransformOutput},
     topology,
@@ -329,7 +328,7 @@ pub(super) fn validate_sink_expectations(
                     .errors()
                     .iter()
                     .cloned()
-                    .map(|err| format!("schema error in component {}: {}", key, err))
+                    .map(|err| format!("schema error in component {key}: {err}"))
                     .collect(),
             );
         }
@@ -443,8 +442,10 @@ mod tests {
 
     use indexmap::IndexMap;
     use similar_asserts::assert_eq;
-    use vector_lib::config::{DataType, SourceOutput, TransformOutput};
-    use vector_lib::lookup::owned_value_path;
+    use vector_lib::{
+        config::{DataType, SourceOutput, TransformOutput},
+        lookup::owned_value_path,
+    };
     use vrl::value::Kind;
 
     use super::*;

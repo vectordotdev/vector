@@ -3,18 +3,16 @@
 use std::{collections::HashMap, io};
 
 use bytes::BytesMut;
-use serde_json::{json, to_vec, Map};
+use serde_json::{Map, json, to_vec};
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
-use vrl::event_path;
-use vrl::path::PathPrefix;
+use vrl::{event_path, path::PathPrefix};
 
+use super::config::{
+    StackdriverLabelConfig, StackdriverLogName, StackdriverResource, default_labels_key,
+};
 use crate::{
     sinks::{prelude::*, util::encoding::Encoder as SinkEncoder},
     template::TemplateRenderingError,
-};
-
-use super::config::{
-    default_labels_key, StackdriverLabelConfig, StackdriverLogName, StackdriverResource,
 };
 
 #[derive(Clone, Debug)]
@@ -144,10 +142,10 @@ impl StackdriverLogsEncoder {
         let log_id = self.log_id.render_string(event)?;
 
         Ok(match &self.log_name {
-            BillingAccount(acct) => format!("billingAccounts/{}/logs/{}", acct, log_id),
-            Folder(folder) => format!("folders/{}/logs/{}", folder, log_id),
-            Organization(org) => format!("organizations/{}/logs/{}", org, log_id),
-            Project(project) => format!("projects/{}/logs/{}", project, log_id),
+            BillingAccount(acct) => format!("billingAccounts/{acct}/logs/{log_id}"),
+            Folder(folder) => format!("folders/{folder}/logs/{log_id}"),
+            Organization(org) => format!("organizations/{org}/logs/{log_id}"),
+            Project(project) => format!("projects/{project}/logs/{log_id}"),
         })
     }
 }
@@ -173,6 +171,7 @@ pub(super) fn remap_severity(severity: Value) -> Value {
                         warn!(
                             message = "Unknown severity value string, using DEFAULT.",
                             value = %s,
+                            internal_log_rate_limit = true
                         );
                         0
                     }

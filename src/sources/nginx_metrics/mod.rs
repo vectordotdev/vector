@@ -5,15 +5,14 @@ use std::{
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::join_all, StreamExt, TryFutureExt};
+use futures::{StreamExt, TryFutureExt, future::join_all};
 use http::{Request, StatusCode};
-use hyper::{body::to_bytes as body_to_bytes, Body, Uri};
+use hyper::{Body, Uri, body::to_bytes as body_to_bytes};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::configurable::configurable_component;
-use vector_lib::{metric_tags, EstimatedJsonEncodedSizeOf};
+use vector_lib::{EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -31,7 +30,7 @@ use parser::NginxStubStatus;
 use vector_lib::config::LogNamespace;
 
 macro_rules! counter {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Counter {
             value: $value as f64,
         }
@@ -39,7 +38,7 @@ macro_rules! counter {
 }
 
 macro_rules! gauge {
-    ($value:expr) => {
+    ($value:expr_2021) => {
         MetricValue::Gauge {
             value: $value as f64,
         }
@@ -188,7 +187,7 @@ impl NginxMetrics {
         let uri: Uri = endpoint.parse().context(HostInvalidUriSnafu)?;
         Ok(match (uri.host().unwrap_or(""), uri.port()) {
             (host, None) => host.to_owned(),
-            (host, Some(port)) => format!("{}:{}", host, port),
+            (host, Some(port)) => format!("{host}:{port}"),
         })
     }
 
@@ -277,12 +276,13 @@ mod tests {
 
 #[cfg(all(test, feature = "nginx-integration-tests"))]
 mod integration_tests {
+    use tokio::time::Duration;
+
     use super::*;
     use crate::{
         config::ProxyConfig,
-        test_util::components::{run_and_assert_source_compliance_advanced, HTTP_PULL_SOURCE_TAGS},
+        test_util::components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance_advanced},
     };
-    use tokio::time::Duration;
 
     fn nginx_proxy_address() -> String {
         std::env::var("NGINX_PROXY_ADDRESS").unwrap_or_else(|_| "http://nginx-proxy:8000".into())

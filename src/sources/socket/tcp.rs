@@ -1,14 +1,17 @@
 use std::time::Duration;
-use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use chrono::Utc;
 use serde_with::serde_as;
 use smallvec::SmallVec;
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path};
+use vector_lib::{
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    ipallowlist::IpAllowlistConfig,
+    lookup::{lookup_v2::OptionalValuePath, owned_value_path, path},
+};
 
+use super::{SocketConfig, default_host_key};
 use crate::{
     codecs::Decoder,
     event::Event,
@@ -17,8 +20,6 @@ use crate::{
     tcp::TcpKeepaliveConfig,
     tls::TlsSourceConfig,
 };
-
-use super::{default_host_key, SocketConfig};
 
 /// TCP configuration for the `socket` source.
 #[serde_as]
@@ -220,7 +221,7 @@ impl TcpSource for RawTcpSource {
         let now = Utc::now();
 
         for event in events {
-            if let Event::Log(ref mut log) = event {
+            if let Event::Log(log) = event {
                 self.log_namespace.insert_standard_vector_source_metadata(
                     log,
                     SocketConfig::NAME,

@@ -1,17 +1,15 @@
 use std::path::PathBuf;
 
 use bytes::Bytes;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::OwnedValuePath;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, configurable::configurable_component, lookup::OwnedValuePath,
+};
 
-use crate::sources::util::framestream::FrameHandler;
 use crate::{
     event::Event,
     internal_events::{SocketEventsReceived, SocketMode},
-    sources::util::framestream::UnixFrameHandler,
+    sources::util::framestream::{FrameHandler, UnixFrameHandler},
 };
-
-use vector_lib::EstimatedJsonEncodedSizeOf;
 
 /// Unix domain socket configuration for the `dnstap` source.
 #[configurable_component]
@@ -116,7 +114,7 @@ impl<T: FrameHandler + Clone> FrameHandler for DnstapFrameHandler<T> {
         self.frame_handler.multithreaded()
     }
 
-    fn max_frame_handling_tasks(&self) -> u32 {
+    fn max_frame_handling_tasks(&self) -> usize {
         self.frame_handler.max_frame_handling_tasks()
     }
 

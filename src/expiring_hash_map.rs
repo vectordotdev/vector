@@ -10,7 +10,7 @@ use std::{
 };
 
 use futures::StreamExt;
-use tokio_util::time::{delay_queue, DelayQueue};
+use tokio_util::time::{DelayQueue, delay_queue};
 
 /// An expired item, holding the value and the key with an expiration information.
 pub type ExpiredItem<K, V> = (V, delay_queue::Expired<K>);
@@ -48,6 +48,17 @@ where
         Q: ?Sized + Hash + Eq,
     {
         self.map.get(k).map(|(v, _)| v)
+    }
+
+    /// Get a reference to the value by key with the expiration information.
+    pub fn get_with_deadline<Q>(&self, k: &Q) -> Option<(&V, Instant)>
+    where
+        K: Borrow<Q>,
+        Q: ?Sized + Hash + Eq,
+    {
+        let (value, delay_queue_key) = self.map.get(k)?;
+        let deadline = self.expiration_queue.deadline(delay_queue_key);
+        Some((value, deadline.into()))
     }
 
     /// Get a mut reference to the value by key.

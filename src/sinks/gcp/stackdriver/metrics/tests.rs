@@ -9,7 +9,7 @@ use crate::{
     gcp::GcpAuthConfig,
     sinks::{prelude::*, util::test::build_test_server},
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
         next_addr,
     },
@@ -25,8 +25,10 @@ async fn component_spec_compliance() {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
     let config = StackdriverConfig::generate_config().to_string();
-    let mut config = StackdriverConfig::deserialize(toml::de::ValueDeserializer::new(&config))
-        .expect("config should be valid");
+    let mut config = StackdriverConfig::deserialize(
+        toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
+    )
+    .expect("config should be valid");
 
     // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
     // Metadata API, which we clearly don't have in unit tests. :)

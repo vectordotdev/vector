@@ -1,33 +1,38 @@
 #![allow(missing_docs)]
-use std::{collections::HashMap, fmt, sync::Arc, time::Instant};
+use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc, time::Instant};
 
 use chrono::Utc;
 use futures::{Stream, StreamExt};
-use metrics::{histogram, Histogram};
+use metrics::{Histogram, histogram};
 use tracing::Span;
-use vector_lib::buffers::topology::channel::{self, LimitedReceiver, LimitedSender};
-use vector_lib::buffers::EventCount;
-use vector_lib::event::array::EventArrayIntoIter;
 #[cfg(any(test, feature = "test-utils"))]
-use vector_lib::event::{into_event_stream, EventStatus};
-use vector_lib::finalization::{AddBatchNotifier, BatchNotifier};
-use vector_lib::internal_event::{ComponentEventsDropped, UNINTENTIONAL};
-use vector_lib::json_size::JsonSize;
+use vector_lib::event::{EventStatus, into_event_stream};
 use vector_lib::{
-    config::{log_schema, SourceOutput},
-    event::{array, Event, EventArray, EventContainer, EventRef},
-    internal_event::{
-        self, CountByteSize, EventsSent, InternalEventHandle as _, Registered, DEFAULT_OUTPUT,
-    },
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    buffers::{
+        EventCount,
+        config::MemoryBufferSize,
+        topology::channel::{self, LimitedReceiver, LimitedSender},
+    },
+    config::{SourceOutput, log_schema},
+    event::{Event, EventArray, EventContainer, EventRef, array, array::EventArrayIntoIter},
+    finalization::{AddBatchNotifier, BatchNotifier},
+    internal_event::{
+        self, ComponentEventsDropped, CountByteSize, DEFAULT_OUTPUT, EventsSent,
+        InternalEventHandle as _, Registered, UNINTENTIONAL,
+    },
+    json_size::JsonSize,
 };
 use vrl::value::Value;
 
 mod errors;
 
-use crate::config::{ComponentKey, OutputId};
-use crate::schema::Definition;
 pub use errors::{ClosedError, StreamSendError};
+
+use crate::{
+    config::{ComponentKey, OutputId},
+    schema::Definition,
+};
 
 pub(crate) const CHUNK_SIZE: usize = 1000;
 
@@ -247,7 +252,7 @@ impl SourceSender {
         &mut self,
         status: EventStatus,
         name: String,
-    ) -> impl Stream<Item = SourceSenderItem> + Unpin {
+    ) -> impl Stream<Item = SourceSenderItem> + Unpin + use<> {
         // The lag_time parameter here will need to be filled in if this function is ever used for
         // non-test situations.
         let output_id = OutputId {
@@ -390,7 +395,7 @@ impl Output {
         log_definition: Option<Arc<Definition>>,
         output_id: OutputId,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
-        let (tx, rx) = channel::limited(n);
+        let (tx, rx) = channel::limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap()));
         (
             Self {
                 sender: tx,
@@ -528,7 +533,7 @@ const fn get_timestamp_millis(value: &Value) -> Option<i64> {
 #[cfg(test)]
 mod tests {
     use chrono::{DateTime, Duration};
-    use rand::{rng, Rng};
+    use rand::{Rng, rng};
     use tokio::time::timeout;
     use vector_lib::event::{LogEvent, Metric, MetricKind, MetricValue, TraceEvent};
     use vrl::event_path;

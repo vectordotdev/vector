@@ -3,9 +3,7 @@ use std::io;
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
 use uuid::Uuid;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::event::Finalizable;
-use vector_lib::request_metadata::RequestMetadata;
+use vector_lib::{codecs::encoding::Framer, event::Finalizable, request_metadata::RequestMetadata};
 
 use crate::{
     codecs::{Encoder, Transformer},
@@ -17,8 +15,8 @@ use crate::{
             service::{S3Metadata, S3Request},
         },
         util::{
-            metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression,
-            RequestBuilder,
+            Compression, RequestBuilder, metadata::RequestMetadataBuilder,
+            request_builder::EncodeResult,
         },
     },
 };
@@ -82,13 +80,15 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
                     .with_timezone(&offset)
                     .format(self.filename_time_format.as_str()),
                 None => Utc::now()
-                    .with_timezone(&chrono::Utc)
+                    .with_timezone(&Utc)
                     .format(self.filename_time_format.as_str()),
             };
 
-            self.filename_append_uuid
-                .then(|| format!("{}-{}", formatted_ts, Uuid::new_v4().hyphenated()))
-                .unwrap_or_else(|| formatted_ts.to_string())
+            if self.filename_append_uuid {
+                format!("{formatted_ts}-{}", Uuid::new_v4().hyphenated())
+            } else {
+                formatted_ts.to_string()
+            }
         };
 
         let ssekms_key_id = s3metadata.partition_key.ssekms_key_id.clone();
@@ -116,9 +116,9 @@ impl RequestBuilder<(S3PartitionKey, Vec<Event>)> for S3RequestOptions {
 
 fn format_s3_key(s3_key: &str, filename: &str, extension: &str) -> String {
     if extension.is_empty() {
-        format!("{}{}", s3_key, filename)
+        format!("{s3_key}{filename}")
     } else {
-        format!("{}{}.{}", s3_key, filename, extension)
+        format!("{s3_key}{filename}.{extension}")
     }
 }
 

@@ -10,8 +10,10 @@ mod vrl_util;
 
 use dyn_clone::DynClone;
 pub use tables::{TableRegistry, TableSearch};
-use vrl::compiler::Function;
-use vrl::value::{ObjectMap, Value};
+use vrl::{
+    compiler::Function,
+    value::{ObjectMap, Value},
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
@@ -57,6 +59,7 @@ pub trait Table: DynClone {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String>;
 
@@ -68,6 +71,7 @@ pub trait Table: DynClone {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String>;
 

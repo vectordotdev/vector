@@ -56,7 +56,7 @@ components: sources: http_server: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.http_server.configuration
+	configuration: generated.components.sources.http_server.configuration
 
 	output: {
 		logs: {
@@ -125,8 +125,13 @@ components: sources: http_server: {
 			title:       "text/plain"
 
 			configuration: {
-				address:  "0.0.0.0:\(_port)"
-				encoding: "text"
+				address: "0.0.0.0:\(_port)"
+				decoding: {
+					codec: "text"
+				}
+				framing: {
+					method: "newline_delimited"
+				}
 				headers: ["User-Agent"]
 			}
 			input: """
@@ -158,8 +163,13 @@ components: sources: http_server: {
 			title:       "application/json"
 
 			configuration: {
-				address:  "0.0.0.0:\(_port)"
-				encoding: "json"
+				address: "0.0.0.0:\(_port)"
+				decoding: {
+					codec: "json"
+				}
+				framing: {
+					method: "bytes"
+				}
 				headers: ["User-Agent"]
 				_path:    _path
 				path_key: _path_key

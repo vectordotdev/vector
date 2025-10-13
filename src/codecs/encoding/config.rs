@@ -1,9 +1,14 @@
 use crate::codecs::Transformer;
-use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
-    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+use vector_lib::{
+    codecs::{
+        CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+        encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
+    },
+    configurable::configurable_component,
 };
-use vector_lib::configurable::configurable_component;
+
+#[cfg(feature = "codecs-opentelemetry")]
+use vector_lib::codecs::BytesEncoder;
 
 /// Encoding configuration.
 #[configurable_component]
@@ -127,6 +132,8 @@ impl EncodingConfigWithFraming {
                 | Serializer::RawMessage(_)
                 | Serializer::Text(_),
             ) => NewlineDelimitedEncoder::default().into(),
+            #[cfg(feature = "codecs-opentelemetry")]
+            (None, Serializer::Otlp(_)) => BytesEncoder.into(),
         };
 
         Ok((framer, serializer))
@@ -156,7 +163,7 @@ where
 
 #[cfg(test)]
 mod test {
-    use vector_lib::lookup::lookup_v2::{parse_value_path, ConfigValuePath};
+    use vector_lib::lookup::lookup_v2::{ConfigValuePath, parse_value_path};
 
     use super::*;
     use crate::codecs::encoding::TimestampFormat;

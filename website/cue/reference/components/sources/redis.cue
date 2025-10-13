@@ -43,7 +43,6 @@ components: sources: redis: {
 			"aarch64-unknown-linux-musl":     true
 			"armv7-unknown-linux-gnueabihf":  true
 			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
 			"x86_64-pc-windows-msv":          true
 			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      true
@@ -58,7 +57,7 @@ components: sources: redis: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.redis.configuration
+	configuration: generated.components.sources.redis.configuration
 
 	output: {
 		logs: record: {

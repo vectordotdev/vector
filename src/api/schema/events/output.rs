@@ -1,10 +1,7 @@
 use async_graphql::{Object, Union};
+use vector_lib::tap::{controller::TapPayload, notification::Notification};
 
-use crate::api::schema::events::log::Log;
-use crate::api::schema::events::metric::Metric;
-use crate::api::schema::events::trace::Trace;
-use vector_lib::tap::controller::TapPayload;
-use vector_lib::tap::notification::Notification;
+use crate::api::schema::events::{log::Log, metric::Metric, trace::Trace};
 
 /// This wrapper struct hoists `message` up from [`Notification`] for a more
 /// natural querying experience. While ideally [`Notification`] would be a

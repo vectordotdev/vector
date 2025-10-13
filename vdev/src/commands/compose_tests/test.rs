@@ -1,39 +1,39 @@
-use anyhow::{bail, Result};
+use std::iter::once;
 
-use crate::testing::{config::ComposeTestConfig, integration::ComposeTestT, state::EnvsDir};
+use anyhow::{Result, bail};
 
-pub fn exec<T: ComposeTestT>(
+use crate::testing::{
+    config::ComposeTestConfig,
+    integration::{ComposeTest, ComposeTestLocalConfig},
+    state::EnvsDir,
+};
+
+pub fn exec(
+    local_config: ComposeTestLocalConfig,
     integration: &str,
     environment: Option<&String>,
     build_all: bool,
     retries: u8,
     args: &[String],
 ) -> Result<()> {
-    let (_test_dir, config) = ComposeTestConfig::load(T::DIRECTORY, integration)?;
+    let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, integration)?;
     let envs = config.environments();
 
     let active = EnvsDir::new(integration).active()?;
+    debug!("Active environment: {environment:#?}");
 
-    match (environment, &active) {
+    let environments: Box<dyn Iterator<Item = &String>> = match (environment, &active) {
         (Some(environment), Some(active)) if environment != active => {
             bail!("Requested environment {environment:?} does not match active one {active:?}")
         }
-        (Some(environment), _) => T::test(
-            &T::generate(integration, environment, build_all, retries)?,
-            args.to_owned(),
-        ),
-        (None, Some(active)) => T::test(
-            &T::generate(integration, active, build_all, retries)?,
-            args.to_owned(),
-        ),
-        (None, None) => {
-            for env_name in envs.keys() {
-                T::test(
-                    &T::generate(integration, env_name, build_all, retries)?,
-                    args.to_owned(),
-                )?;
-            }
-            Ok(())
-        }
+        (Some(environment), _) => Box::new(once(environment)),
+        (None, Some(active)) => Box::new(once(active)),
+        (None, None) => Box::new(envs.keys()),
+    };
+
+    for environment in environments {
+        ComposeTest::generate(local_config, integration, environment, build_all, retries)?
+            .test(args.to_owned())?;
     }
+    Ok(())
 }

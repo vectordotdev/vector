@@ -47,9 +47,11 @@ components: sources: kubernetes_logs: {
 				Kubernetes cluster this can be provided with a [hostPath](\(urls.kubernetes_host_path)) volume.
 				""",
 		]
-		warnings: ["""
+		warnings: [
+			"""
 				This source is only tested on Linux. Your mileage may vary for clusters on Windows.
-			"""]
+				""",
+		]
 		notices: []
 	}
 
@@ -57,7 +59,7 @@ components: sources: kubernetes_logs: {
 		platform_name: "kubernetes"
 	}
 
-	configuration: base.components.sources.kubernetes_logs.configuration
+	configuration: generated.components.sources.kubernetes_logs.configuration
 
 	output: logs: line: {
 		description: "An individual line from a `Pod` log file."

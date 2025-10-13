@@ -3,12 +3,12 @@ use std::{
     num::NonZeroUsize,
     panic,
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use futures_util::{
-    stream::{Fuse, FuturesOrdered},
     Stream, StreamExt,
+    stream::{Fuse, FuturesOrdered},
 };
 use pin_project::pin_project;
 use tokio::task::JoinHandle;
@@ -108,8 +108,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use futures_util::stream::StreamExt;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_concurrent_map_on_empty_stream() {

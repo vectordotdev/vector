@@ -8,10 +8,13 @@ use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
 use crate::service;
 #[cfg(feature = "api-client")]
 use crate::tap;
-#[cfg(feature = "api-client")]
+#[cfg(feature = "top")]
 use crate::top;
-use crate::{config, convert_config, generate, get_version, graph, list, unit_test, validate};
-use crate::{generate_schema, signal};
+
+use crate::{
+    config, convert_config, generate, generate_schema, get_version, graph, list, signal, unit_test,
+    validate,
+};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -178,7 +181,6 @@ pub struct RootOpts {
     pub watch_config_poll_interval_seconds: NonZeroU64,
 
     /// Set the internal log rate limit
-    /// Note that traces are throttled by default unless tagged with `internal_log_rate_limit = false`.
     #[arg(
         short,
         long,
@@ -310,7 +312,7 @@ pub enum SubCommand {
     Graph(graph::Opts),
 
     /// Display topology and metrics in the console, for a local or remote Vector instance
-    #[cfg(feature = "api-client")]
+    #[cfg(feature = "top")]
     Top(top::Opts),
 
     /// Observe output log events from source or transform components. Logs are sampled at a specified interval.
@@ -343,7 +345,7 @@ impl SubCommand {
             #[cfg(feature = "api-client")]
             Self::Tap(t) => tap::cmd(t, signals.receiver).await,
             Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
-            #[cfg(feature = "api-client")]
+            #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
             Self::Validate(v) => validate::validate(v, color).await,
             Self::Vrl(s) => {

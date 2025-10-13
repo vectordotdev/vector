@@ -1,23 +1,27 @@
-use http::Uri;
 use std::collections::HashMap;
-use tokio::time::Duration;
-use vector_lib::config::LogNamespace;
-use warp::{http::HeaderMap, Filter};
 
-use crate::components::validation::prelude::*;
-use crate::http::{ParamType, ParameterValue, QueryParameterValue};
-use crate::sources::util::http::HttpMethod;
-use crate::{serde::default_decoding, serde::default_framing_message_based};
-use vector_lib::codecs::decoding::{
-    CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig,
+use http::Uri;
+use tokio::time::Duration;
+use vector_lib::{
+    codecs::{
+        CharacterDelimitedDecoderConfig,
+        decoding::{CharacterDelimitedDecoderOptions, DeserializerConfig, FramingConfig},
+    },
+    config::LogNamespace,
+    event::Event,
 };
-use vector_lib::codecs::CharacterDelimitedDecoderConfig;
-use vector_lib::event::Event;
+use warp::{Filter, http::HeaderMap};
 
 use super::HttpClientConfig;
-use crate::test_util::{
-    components::{run_and_assert_source_compliance, HTTP_PULL_SOURCE_TAGS},
-    next_addr, test_generate_config, wait_for_tcp,
+use crate::{
+    components::validation::prelude::*,
+    http::{ParamType, ParameterValue, QueryParameterValue},
+    serde::{default_decoding, default_framing_message_based},
+    sources::util::http::HttpMethod,
+    test_util::{
+        components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
+        next_addr, test_generate_config, wait_for_tcp,
+    },
 };
 
 pub(crate) const INTERVAL: Duration = Duration::from_secs(1);
@@ -86,7 +90,7 @@ async fn bytes_decoding() {
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
 
     run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
@@ -115,7 +119,7 @@ async fn json_decoding_newline_delimited() {
     wait_for_tcp(in_addr).await;
 
     run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
@@ -144,7 +148,7 @@ async fn json_decoding_character_delimited() {
     wait_for_tcp(in_addr).await;
 
     run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
@@ -171,13 +175,13 @@ async fn request_query_applied() {
 
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::query::raw())
-        .map(|query| format!(r#"{{"data" : "{}"}}"#, query));
+        .map(|query| format!(r#"{{"data" : "{query}"}}"#));
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
     let events = run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint?key1=val1", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint?key1=val1"),
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::from([
@@ -238,13 +242,13 @@ async fn request_query_vrl_applied() {
 
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::query::raw())
-        .map(|query| format!(r#"{{"data" : "{}"}}"#, query));
+        .map(|query| format!(r#"{{"data" : "{query}"}}"#));
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
     let events = run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::from([
@@ -368,14 +372,14 @@ async fn request_query_vrl_dynamic_updates() {
     // A handler that returns the query parameters as part of the response
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::query::raw())
-        .map(|query| format!(r#"{{"data" : "{}"}}"#, query));
+        .map(|query| format!(r#"{{"data" : "{query}"}}"#));
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
     // The timestamp should be different for each event
     let events = run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: Duration::from_millis(100),
         timeout: TIMEOUT,
         query: HashMap::from([(
@@ -445,7 +449,7 @@ async fn headers_applied() {
     wait_for_tcp(in_addr).await;
 
     run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),
@@ -477,7 +481,7 @@ async fn accept_header_override() {
     wait_for_tcp(in_addr).await;
 
     run_compliance(HttpClientConfig {
-        endpoint: format!("http://{}/endpoint", in_addr),
+        endpoint: format!("http://{in_addr}/endpoint"),
         interval: INTERVAL,
         timeout: TIMEOUT,
         query: HashMap::new(),

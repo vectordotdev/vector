@@ -1,5 +1,7 @@
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::{
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 
@@ -43,7 +45,7 @@ impl SecretBackend for DirectoryBackend {
                 &contents
             };
             if secret.is_empty() {
-                return Err(format!("secret in file '{}' was empty", k).into());
+                return Err(format!("secret in file '{k}' was empty").into());
             }
             secrets.insert(k, secret.to_string());
         }

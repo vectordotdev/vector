@@ -57,7 +57,7 @@ impl<'a> Encoder<&'a Metric> for StatsdEncoder {
                         buf,
                         &name,
                         tags.as_deref(),
-                        format!("{:+}", value),
+                        format!("{value:+}"),
                         "g",
                         None,
                     ),
@@ -117,7 +117,7 @@ fn encode_tags(tags: &MetricTags) -> String {
     let parts: Vec<_> = tags
         .iter_all()
         .map(|(name, tag_value)| match tag_value {
-            Some(value) => format!("{}:{}", name, value),
+            Some(value) => format!("{name}:{value}"),
             None => name.to_owned(),
         })
         .collect();
@@ -136,16 +136,16 @@ fn encode_and_write_single_event<V: Display>(
 ) {
     let mut writer = buf.writer();
 
-    write!(&mut writer, "{}:{}|{}", metric_name, val, metric_type).unwrap();
+    write!(&mut writer, "{metric_name}:{val}|{metric_type}").unwrap();
 
-    if let Some(sample_rate) = sample_rate {
-        if sample_rate != 1 {
-            write!(&mut writer, "|@{}", 1.0 / f64::from(sample_rate)).unwrap();
-        }
+    if let Some(sample_rate) = sample_rate
+        && sample_rate != 1
+    {
+        write!(&mut writer, "|@{}", 1.0 / f64::from(sample_rate)).unwrap();
     };
 
     if let Some(t) = metric_tags {
-        write!(&mut writer, "|#{}", t).unwrap();
+        write!(&mut writer, "|#{t}").unwrap();
     };
 
     writeln!(&mut writer).unwrap();
@@ -153,15 +153,14 @@ fn encode_and_write_single_event<V: Display>(
 
 #[cfg(test)]
 mod tests {
+    #[cfg(feature = "sources-statsd")]
+    use vector_lib::event::{Metric, MetricKind, MetricValue, StatisticKind};
     use vector_lib::{
-        event::{metric::TagValue, MetricTags},
+        event::{MetricTags, metric::TagValue},
         metric_tags,
     };
 
     use super::encode_tags;
-
-    #[cfg(feature = "sources-statsd")]
-    use vector_lib::event::{Metric, MetricKind, MetricValue, StatisticKind};
 
     #[cfg(feature = "sources-statsd")]
     fn encode_metric(metric: &Metric) -> bytes::BytesMut {
@@ -177,7 +176,7 @@ mod tests {
 
     #[cfg(feature = "sources-statsd")]
     fn parse_encoded_metrics(metric: &[u8]) -> Vec<Metric> {
-        use crate::sources::statsd::{parser::Parser, ConversionUnit};
+        use crate::sources::statsd::{ConversionUnit, parser::Parser};
         let statsd_parser = Parser::new(true, ConversionUnit::Seconds);
 
         let s = std::str::from_utf8(metric).unwrap().trim();

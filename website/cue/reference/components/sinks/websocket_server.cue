@@ -55,7 +55,6 @@ components: sinks: websocket_server: {
 			"aarch64-unknown-linux-musl":     true
 			"armv7-unknown-linux-gnueabihf":  true
 			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
 			"x86_64-pc-windows-msv":          true
 			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      true
@@ -101,7 +100,7 @@ components: sinks: websocket_server: {
 		}
 	}
 
-	configuration: base.components.sinks.websocket_server.configuration
+	configuration: generated.components.sinks.websocket_server.configuration
 
 	how_it_works: {
 		simple_configuration: {

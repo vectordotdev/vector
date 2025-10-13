@@ -1,9 +1,17 @@
 #![allow(missing_docs)]
+use std::{
+    collections::HashMap,
+    fmt,
+    net::SocketAddr,
+    task::{Context, Poll},
+    time::Duration,
+};
+
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
-    header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Response, Uri,
-    Version,
+    HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
+    uri::InvalidUri,
 };
 use hyper::{
     body::{Body, HttpBody},
@@ -15,13 +23,6 @@ use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use std::{
-    collections::HashMap,
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
-};
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -29,16 +30,14 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 #[cfg(feature = "aws-core")]
 use crate::aws::AwsAuthentication;
-
 use crate::{
     config::ProxyConfig,
-    internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent},
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
+    internal_events::{HttpServerRequestReceived, HttpServerResponseSent, http_client},
+    tls::{MaybeTlsSettings, TlsError, tls_connector_builder},
 };
 
 pub mod status {
@@ -105,7 +104,7 @@ where
 
         let app_name = crate::get_app_name();
         let version = crate::get_version();
-        let user_agent = HeaderValue::from_str(&format!("{}/{}", app_name, version))
+        let user_agent = HeaderValue::from_str(&format!("{app_name}/{version}"))
             .expect("Invalid header value for user-agent!");
 
         Ok(HttpClient {
@@ -277,7 +276,7 @@ impl<B> fmt::Debug for HttpClient<B> {
 pub enum Auth {
     /// Basic authentication.
     ///
-    /// The username and password are concatenated and encoded via [base64][base64].
+    /// The username and password are concatenated and encoded using [base64][base64].
     ///
     /// [base64]: https://en.wikipedia.org/wiki/Base64
     Basic {
@@ -363,7 +362,7 @@ pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
         // it also supports arbitrary schemes, which is where we bomb out down here, since we can't generate a static
         // string for an arbitrary input string... and anything other than "http" and "https" makes no sense for an HTTP
         // client anyways.
-        s => panic!("invalid URI scheme for HTTP client: {}", s),
+        s => panic!("invalid URI scheme for HTTP client: {s}"),
     })
 }
 
@@ -682,13 +681,12 @@ pub type QueryParameters = HashMap<String, QueryParameterValue>;
 mod tests {
     use std::convert::Infallible;
 
-    use hyper::{server::conn::AddrStream, service::make_service_fn, Server};
+    use hyper::{Server, server::conn::AddrStream, service::make_service_fn};
     use proptest::prelude::*;
     use tower::ServiceBuilder;
 
-    use crate::test_util::next_addr;
-
     use super::*;
+    use crate::test_util::next_addr;
 
     #[test]
     fn test_default_request_headers_defaults() {
@@ -902,13 +900,13 @@ mod tests {
 
         // Responses generated before the client's max connection age has elapsed do not
         // include a `Connection: close` header in the response.
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();
         assert_eq!(response.headers().get("Connection"), None);
 
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();
@@ -917,7 +915,7 @@ mod tests {
         // The first response generated after the client's max connection age has elapsed should
         // include the `Connection: close` header.
         tokio::time::sleep(Duration::from_secs(1)).await;
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();
@@ -929,7 +927,7 @@ mod tests {
         // The next request should establish a new connection.
         // Importantly, this also confirms that each connection has its own independent
         // connection age timer.
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();

@@ -28,13 +28,11 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
   PROFILE: debug
@@ -57,14 +55,30 @@ jobs:
     needs: changes
     secrets: inherit
 
-  test-misc:
+  make-test-behavior:
     if: needs.changes.outputs.source == 'true'
-    uses: ./.github/workflows/misc.yml
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-behavior
+      job_name: make test-behavior
     needs: changes
     secrets: inherit
 
-  test-environment:
-    uses: ./.github/workflows/environment.yml
+  make-check-examples:
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: check-examples
+      job_name: make check-examples
+    needs: changes
+    secrets: inherit
+
+  make-test-docs:
+    if: needs.changes.outputs.source == 'true'
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-docs
+      job_name: make test-docs
     needs: changes
     secrets: inherit
 
@@ -109,21 +123,20 @@ jobs:
     needs:
       - changes
       - test-cli
-      - test-misc
-      - test-environment
+      - make-test-behavior
+      - make-check-examples
+      - make-test-docs
       - check-msrv
       - cross-linux
       - unit-mac
       - unit-windows
       - install-sh
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
     steps:
-      - name: exit
+      - name: Check all jobs status
         run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi

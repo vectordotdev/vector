@@ -6,8 +6,8 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use codecs::{
-    decoding::format::Deserializer, encoding::format::Serializer, NativeDeserializerConfig,
-    NativeJsonDeserializerConfig, NativeJsonSerializerConfig, NativeSerializerConfig,
+    NativeDeserializerConfig, NativeJsonDeserializerConfig, NativeJsonSerializerConfig,
+    NativeSerializerConfig, decoding::format::Deserializer, encoding::format::Serializer,
 };
 use similar_asserts::assert_eq;
 use vector_core::{config::LogNamespace, event::Event};
@@ -314,7 +314,7 @@ fn rebuild_fixtures(proto: &str, deserializer: &dyn Deserializer, serializer: &m
         .into_iter()
         .collect();
         let mut out = File::create(&new_path).unwrap_or_else(|error| {
-            panic!("Could not create rebuilt file {:?}: {:?}", new_path, error)
+            panic!("Could not create rebuilt file {new_path:?}: {error:?}")
         });
         out.write_all(&buf).expect("Could not write rebuilt data");
         out.flush().expect("Could not write rebuilt data");

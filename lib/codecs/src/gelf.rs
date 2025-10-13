@@ -3,8 +3,7 @@
 use std::sync::LazyLock;
 
 use regex::Regex;
-use vrl::owned_value_path;
-use vrl::path::OwnedTargetPath;
+use vrl::{owned_value_path, path::OwnedTargetPath};
 
 /// GELF Message fields. Definitions from <https://docs.graylog.org/docs/gelf>.
 pub mod gelf_fields {

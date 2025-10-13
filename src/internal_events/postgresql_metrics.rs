@@ -1,6 +1,5 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 #[derive(Debug)]
 pub struct PostgresqlMetricsCollectError<'a> {
@@ -16,7 +15,7 @@ impl InternalEvent for PostgresqlMetricsCollectError<'_> {
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
             endpoint = %self.endpoint,
-
+            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

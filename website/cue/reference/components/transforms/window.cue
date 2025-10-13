@@ -25,7 +25,7 @@ components: transforms: window: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.window.configuration
+	configuration: generated.components.transforms.window.configuration
 
 	input: {
 		logs:    true
