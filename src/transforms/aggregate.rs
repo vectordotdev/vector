@@ -75,7 +75,7 @@ pub enum AggregationMode {
     Stdev,
 
     /// Aggregates absolute metrics into a distribution, ignores incremental.
-    /// Histograms: For each count in the bucket, add a sample at the bucket's upper limit
+    /// Histograms: For each count in the bucket, a sample is added at the bucket's upper limit
     /// This preserves the distribution shape.
     Distribution,
 }
