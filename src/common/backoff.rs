@@ -80,7 +80,6 @@ impl Iterator for ExponentialBackoff {
     }
 }
 
-
 #[cfg(test)]
 mod tests {
     use super::*;
