@@ -29,7 +29,7 @@ use crate::config::{ComponentKey, OutputId};
 use crate::schema::Definition;
 pub use errors::{ClosedError, StreamSendError};
 
-pub(crate) const CHUNK_SIZE: usize = 1000;
+pub(crate) const CHUNK_SIZE: usize = 500;
 
 #[cfg(any(test, feature = "test-utils"))]
 const TEST_BUFFER_SIZE: usize = 100;

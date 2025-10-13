@@ -13,6 +13,7 @@ use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive};
 use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
 
 use super::FuturesUnorderedCount;
+use std::sync::{Arc, atomic::{AtomicI32, Ordering}};
 
 pub trait DriverResponse {
     fn event_status(&self) -> EventStatus;
@@ -92,13 +93,13 @@ where
             mut service,
             protocol,
         } = self;
-
-        let batched_input = input.ready_chunks(1024);
+        let batched_input = input.ready_chunks(512);
         pin!(batched_input);
 
         let bytes_sent = protocol.map(|protocol| register(BytesSent { protocol }));
         let events_sent = RegisteredEventCache::new(());
-
+        // set the max in flight request data is 100M
+        let max_in_flight_batch_size = Arc::new(AtomicI32::new(100 * 1024 * 1024));
         loop {
             // Core behavior of the loop:
             // - always check to see if we have any response futures that have completed
@@ -166,7 +167,21 @@ where
                         let bytes_sent = bytes_sent.clone();
                         let events_sent = events_sent.clone();
                         let event_count = req.get_metadata().event_count();
-
+                        let events_byte_size = req.get_metadata().events_byte_size() as i32;
+                        let max_in_flight_batch_size_clone = max_in_flight_batch_size.clone();
+                        loop {
+                            let current_value = max_in_flight_batch_size_clone.load(Ordering::Acquire);
+                            let updated_value = current_value - events_byte_size;
+                            match max_in_flight_batch_size_clone.compare_exchange(
+                                current_value,
+                                updated_value, 
+                                Ordering::SeqCst,
+                                Ordering::Relaxed
+                            ) {
+                                Ok(_) => break,
+                                Err(_) => continue,
+                            }
+                        };
                         let fut = svc.call(req)
                             .err_into()
                             .map(move |result| Self::handle_response(
@@ -174,8 +189,10 @@ where
                                 request_id,
                                 finalizers,
                                 event_count,
+                                events_byte_size,
                                 &bytes_sent,
                                 &events_sent,
+                                max_in_flight_batch_size_clone.clone(),
                             ))
                             .instrument(info_span!("request", request_id).or_current());
 
@@ -184,7 +201,7 @@ where
                 }
 
                 // We've received some items from the input stream.
-                Some(reqs) = batched_input.next(), if next_batch.is_none() => {
+                Some(reqs) = batched_input.next(), if next_batch.is_none() && max_in_flight_batch_size.load(Ordering::Acquire) > 0  => {
                     next_batch = Some(reqs.into());
                 }
 
@@ -200,8 +217,10 @@ where
         request_id: usize,
         finalizers: EventFinalizers,
         event_count: usize,
+        events_byte_size: i32,
         bytes_sent: &Option<Registered<BytesSent>>,
         events_sent: &RegisteredEventCache<(), TaggedEventsSent>,
+        max_in_flight_batch_size: Arc<AtomicI32>
     ) {
         match result {
             Err(error) => {
@@ -228,6 +247,20 @@ where
             }
         };
         drop(finalizers); // suppress "argument not consumed" warning
+        // update in_flight batch buffer left size
+        loop {
+            let current_value = max_in_flight_batch_size.load(Ordering::Acquire);
+            let updated_value = current_value + events_byte_size;
+            match max_in_flight_batch_size.compare_exchange(
+                current_value,
+            updated_value, 
+        Ordering::SeqCst,
+        Ordering::Relaxed
+            ) {
+                Ok(_) => break,
+                Err(_) => continue,
+            }
+        };
     }
 
     /// Emit the `Error` and `EventsDropped` internal events.
