@@ -4,6 +4,7 @@ use std::{
     num::NonZeroUsize,
     panic,
     sync::{Arc, LazyLock},
+    time::Duration,
 };
 
 use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
@@ -43,6 +44,7 @@ use crate::{
     SourceSender,
     aws::AwsTimeout,
     codecs::Decoder,
+    common::backoff::ExponentialBackoff,
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
@@ -381,6 +383,7 @@ pub struct IngestorProcess {
     log_namespace: LogNamespace,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    backoff: ExponentialBackoff,
 }
 
 impl IngestorProcess {
@@ -399,22 +402,29 @@ impl IngestorProcess {
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
             events_received: register!(EventsReceived),
+            backoff: ExponentialBackoff::from_millis(500).max_delay(Duration::from_secs(30)),
         }
     }
 
     async fn run(mut self) {
         let shutdown = self.shutdown.clone().fuse();
         pin!(shutdown);
-        let delay = Duration::from_millis(500);
 
         loop {
             select! {
                 _ = &mut shutdown => break,
                 result = self.run_once() => {
                     match result {
-                        Ok(()) => {}
+                        Ok(()) => {
+                            // Reset backoff on successful receive
+                            self.backoff.reset();
+                        }
                         Err(_) => {
-                            trace!("run_once failed, will retry after delay");
+                            let delay = self.backoff.next().expect("backoff never ends");
+                            trace!(
+                                message = "run_once failed, will retry after delay",
+                                delay_ms = delay.as_millis()
+                            );
                             tokio::time::sleep(delay).await;
                         }
                     }
