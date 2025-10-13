@@ -91,14 +91,14 @@ mod tests {
             .max_delay(Duration::from_secs(30));
 
         let expected_delays = [
-            Duration::from_millis(500),  // 2 * 250
-            Duration::from_secs(1),      // 4 * 250
-            Duration::from_secs(2),      // 8 * 250
-            Duration::from_secs(4),      // 16 * 250
-            Duration::from_secs(8),      // 32 * 250
-            Duration::from_secs(16),     // 64 * 250
-            Duration::from_secs(30),     // 128 * 250 = 32s, capped at 30s
-            Duration::from_secs(30),     // Should stay capped
+            Duration::from_millis(500), // 2 * 250
+            Duration::from_secs(1),     // 4 * 250
+            Duration::from_secs(2),     // 8 * 250
+            Duration::from_secs(4),     // 16 * 250
+            Duration::from_secs(8),     // 32 * 250
+            Duration::from_secs(16),    // 64 * 250
+            Duration::from_secs(30),    // 128 * 250 = 32s, capped at 30s
+            Duration::from_secs(30),    // Should stay capped
         ];
 
         for expected in expected_delays.iter() {
