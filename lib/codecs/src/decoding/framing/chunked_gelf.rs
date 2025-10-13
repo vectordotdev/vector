@@ -182,7 +182,7 @@ impl ChunkedGelfDecompression {
         if data.starts_with(ZLIB_MAGIC) {
             // Based on https://datatracker.ietf.org/doc/html/rfc1950#section-2.2
             if let Some([first_byte, second_byte]) = data.get(0..2)
-                && (*first_byte as u16 * 256 + *second_byte as u16) % 31 == 0
+                && (*first_byte as u16 * 256 + *second_byte as u16).is_multiple_of(31)
             {
                 trace!("Detected Zlib compression");
                 return Self::Zlib;

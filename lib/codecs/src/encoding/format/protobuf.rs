@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use crate::encoding::BuildError;
 use bytes::BytesMut;
 use prost_reflect::{MessageDescriptor, prost::Message as _};
 use tokio_util::codec::Encoder;
@@ -9,9 +10,10 @@ use vector_core::{
     event::{Event, Value},
     schema,
 };
-use vrl::protobuf::{descriptor::get_message_descriptor, encode::encode_message};
-
-use crate::encoding::BuildError;
+use vrl::protobuf::{
+    descriptor::{get_message_descriptor, get_message_descriptor_from_bytes},
+    encode::{Options, encode_message},
+};
 
 /// Config used to build a `ProtobufSerializer`.
 #[configurable_component]
@@ -26,7 +28,10 @@ impl ProtobufSerializerConfig {
     pub fn build(&self) -> Result<ProtobufSerializer, BuildError> {
         let message_descriptor =
             get_message_descriptor(&self.protobuf.desc_file, &self.protobuf.message_type)?;
-        Ok(ProtobufSerializer { message_descriptor })
+        Ok(ProtobufSerializer {
+            message_descriptor,
+            options: Options::default(),
+        })
     }
 
     /// The data type of events that are accepted by `ProtobufSerializer`.
@@ -64,12 +69,29 @@ pub struct ProtobufSerializerOptions {
 pub struct ProtobufSerializer {
     /// The protobuf message definition to use for serialization.
     message_descriptor: MessageDescriptor,
+    options: Options,
 }
 
 impl ProtobufSerializer {
     /// Creates a new `ProtobufSerializer`.
     pub fn new(message_descriptor: MessageDescriptor) -> Self {
-        Self { message_descriptor }
+        Self {
+            message_descriptor,
+            options: Options::default(),
+        }
+    }
+
+    /// Creates a new serializer instance using the descriptor bytes directly.
+    pub fn new_from_bytes(
+        desc_bytes: &[u8],
+        message_type: &str,
+        options: &Options,
+    ) -> vector_common::Result<Self> {
+        let message_descriptor = get_message_descriptor_from_bytes(desc_bytes, message_type)?;
+        Ok(Self {
+            message_descriptor,
+            options: options.clone(),
+        })
     }
 
     /// Get a description of the message type used in serialization.
@@ -83,11 +105,14 @@ impl Encoder<Event> for ProtobufSerializer {
 
     fn encode(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         let message = match event {
-            Event::Log(log) => encode_message(&self.message_descriptor, log.into_parts().0),
+            Event::Log(log) => {
+                encode_message(&self.message_descriptor, log.into_parts().0, &self.options)
+            }
             Event::Metric(_) => unimplemented!(),
             Event::Trace(trace) => encode_message(
                 &self.message_descriptor,
                 Value::Object(trace.into_parts().0),
+                &self.options,
             ),
         }?;
         message.encode(buffer).map_err(Into::into)
