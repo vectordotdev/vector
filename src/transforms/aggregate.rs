@@ -74,7 +74,9 @@ pub enum AggregationMode {
     /// Stdev value of absolute metric, ignores incremental
     Stdev,
 
-    /// Aggregates absolute metrics into a distribution, ignores incremental
+    /// Aggregates absolute metrics into a distribution, ignores incremental.
+    /// Histograms: For each count in the bucket, add a sample at the bucket's upper limit
+    /// This preserves the distribution shape.
     Distribution,
 }
 
@@ -330,6 +332,13 @@ impl Aggregate {
         emit!(AggregateFlushed);
     }
 
+    // Creates a distribution metric from a collection of metric entries by converting various metric types into samples.
+    // This function handles Gauge, Set, Distribution, and AggregatedHistogram metric types.
+    // For Gauge and Set types, it creates samples directly from their values.
+    // For Distribution types, it merges existing samples.
+    // For AggregatedHistogram types, it generates samples based on bucket counts and upper limits.
+    // The resulting samples are sorted and used to create a new Distribution metric.
+    // The distribution is sorted.
     fn create_distribution_from_entries(&self, entries: &[MetricEntry]) -> MetricData {
         let mut samples = Vec::new();
 
@@ -385,7 +394,7 @@ impl Aggregate {
             kind: MetricKind::Absolute,
             value: MetricValue::Distribution {
                 samples,
-                statistic: StatisticKind::Histogram,
+                statistic: StatisticKind::Summary,
             },
         }
     }
