@@ -118,13 +118,11 @@ impl OtlpDeserializer {
         bytes: &Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<Option<SmallVec<[Event; 1]>>> {
-        if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace) {
-            if let Some(Event::Log(log)) = events.first() {
-                if log.get(RESOURCE_LOGS_JSON_FIELD).is_some() {
+        if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace)
+            && let Some(Event::Log(log)) = events.first()
+                && log.get(RESOURCE_LOGS_JSON_FIELD).is_some() {
                     return Ok(Some(events));
                 }
-            }
-        }
         Ok(None)
     }
 
@@ -138,13 +136,10 @@ impl OtlpDeserializer {
         if let Ok(events) = self
             .metrics_deserializer
             .parse(bytes.clone(), log_namespace)
-        {
-            if let Some(Event::Log(log)) = events.first() {
-                if log.get(RESOURCE_METRICS_JSON_FIELD).is_some() {
+            && let Some(Event::Log(log)) = events.first()
+                && log.get(RESOURCE_METRICS_JSON_FIELD).is_some() {
                     return Ok(Some(events));
                 }
-            }
-        }
         Ok(None)
     }
 
@@ -156,17 +151,15 @@ impl OtlpDeserializer {
         log_namespace: LogNamespace,
     ) -> vector_common::Result<Option<SmallVec<[Event; 1]>>> {
         // Parse as a log event first to get the VRL value
-        if let Ok(mut events) = self.traces_deserializer.parse(bytes.clone(), log_namespace) {
-            if let Some(Event::Log(log)) = events.first() {
-                if log.get(RESOURCE_SPANS_JSON_FIELD).is_some() {
+        if let Ok(mut events) = self.traces_deserializer.parse(bytes.clone(), log_namespace)
+            && let Some(Event::Log(log)) = events.first()
+                && log.get(RESOURCE_SPANS_JSON_FIELD).is_some() {
                     // Convert the log event to a trace event by taking ownership
                     if let Some(Event::Log(log)) = events.pop() {
                         let trace_event = Event::Trace(log.into());
                         return Ok(Some(smallvec![trace_event]));
                     }
                 }
-            }
-        }
         Ok(None)
     }
 }
