@@ -4,6 +4,7 @@ use std::{
     num::NonZeroUsize,
     panic,
     sync::{Arc, LazyLock},
+    time::Duration,
 };
 
 use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
@@ -43,6 +44,7 @@ use crate::{
     SourceSender,
     aws::AwsTimeout,
     codecs::Decoder,
+    common::backoff::ExponentialBackoff,
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
@@ -381,6 +383,7 @@ pub struct IngestorProcess {
     log_namespace: LogNamespace,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    backoff: ExponentialBackoff,
 }
 
 impl IngestorProcess {
@@ -399,6 +402,9 @@ impl IngestorProcess {
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
             events_received: register!(EventsReceived),
+            backoff: ExponentialBackoff::from_millis(2)
+                .factor(250)
+                .max_delay(Duration::from_secs(30)),
         }
     }
 
@@ -409,23 +415,39 @@ impl IngestorProcess {
         loop {
             select! {
                 _ = &mut shutdown => break,
-                _ = self.run_once() => {},
+                result = self.run_once() => {
+                    match result {
+                        Ok(()) => {
+                            // Reset backoff on successful receive
+                            self.backoff.reset();
+                        }
+                        Err(_) => {
+                            let delay = self.backoff.next().expect("backoff never ends");
+                            trace!(
+                                delay_ms = delay.as_millis(),
+                                "`run_once` failed, will retry after delay.",
+                            );
+                            tokio::time::sleep(delay).await;
+                        }
+                    }
+                },
             }
         }
     }
 
-    async fn run_once(&mut self) {
-        let messages = self.receive_messages().await;
-        let messages = messages
-            .inspect(|messages| {
+    async fn run_once(&mut self) -> Result<(), ()> {
+        let messages = match self.receive_messages().await {
+            Ok(messages) => {
                 emit!(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
-            })
-            .inspect_err(|err| {
-                emit!(SqsMessageReceiveError { error: err });
-            })
-            .unwrap_or_default();
+                messages
+            }
+            Err(err) => {
+                emit!(SqsMessageReceiveError { error: &err });
+                return Err(());
+            }
+        };
 
         let mut delete_entries = Vec::new();
         let mut deferred_entries = Vec::new();
@@ -521,7 +543,7 @@ impl IngestorProcess {
                     message = "Deferred queue not configured, but received deferred entries.",
                     internal_log_rate_limit = true
                 );
-                return;
+                return Ok(());
             };
             let cloned_entries = deferred_entries.clone();
             match self
@@ -576,6 +598,7 @@ impl IngestorProcess {
                 }
             }
         }
+        Ok(())
     }
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
