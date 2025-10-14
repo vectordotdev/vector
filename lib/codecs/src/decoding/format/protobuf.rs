@@ -8,7 +8,7 @@ use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LogNamespace, log_schema},
-    event::{Event, LogEvent, TraceEvent},
+    event::{Event, LogEvent},
     schema,
 };
 use vrl::{
@@ -152,12 +152,6 @@ impl Deserializer for ProtobufDeserializer {
         };
 
         Ok(smallvec![event])
-    }
-
-    fn parse_traces(&self, bytes: Bytes) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        let vrl_value = extract_vrl_value(bytes, &self.message_descriptor, &self.options)?;
-        let trace_event = Event::Trace(TraceEvent::from(vrl_value));
-        Ok(smallvec![trace_event])
     }
 }
 
