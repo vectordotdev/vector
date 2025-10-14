@@ -119,7 +119,7 @@ bash scripts/environment/install-protoc.sh
 if ! [ -x "$(command -v node)" ]; then
     apt-get install --yes nodejs
     # enable corepack (enables the yarn and pnpm package managers)
-    # ref: https://nodejs.org/docs/latest-v18.x/api/corepack.htmlyea
+    # ref: https://nodejs.org/docs/latest-v18.x/api/corepack.html
     corepack enable
 fi
 
