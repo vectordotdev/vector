@@ -1,0 +1,18 @@
+features:
+  - sentry-integration-tests
+
+test_filter: "::sentry::"
+
+env:
+  SENTRY_MOCK_ENDPOINT: http://sentry-mock:8080
+
+matrix:
+  version: [latest]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "src/internal_events/sentry.rs"
+  - "src/sinks/sentry/**"
+  - "src/sinks/util/**"
+  - "scripts/integration/sentry/**"
