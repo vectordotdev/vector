@@ -11,10 +11,7 @@ use vector_core::{
     event::Event,
     schema,
 };
-use vrl::{
-    protobuf::parse::Options,
-    value::Kind,
-};
+use vrl::{protobuf::parse::Options, value::Kind};
 
 use super::{Deserializer, ProtobufDeserializer};
 
@@ -138,7 +135,10 @@ impl OtlpDeserializer {
         bytes: &Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<Option<SmallVec<[Event; 1]>>> {
-        if let Ok(events) = self.metrics_deserializer.parse(bytes.clone(), log_namespace) {
+        if let Ok(events) = self
+            .metrics_deserializer
+            .parse(bytes.clone(), log_namespace)
+        {
             if let Some(Event::Log(log)) = events.first() {
                 if log.get(RESOURCE_METRICS_JSON_FIELD).is_some() {
                     return Ok(Some(events));
