@@ -18,9 +18,7 @@ use super::{Deserializer, ProtobufDeserializer};
 /// Config used to build an `OtlpDeserializer`.
 #[configurable_component]
 #[derive(Debug, Clone, Default)]
-pub struct OtlpDeserializerConfig {
-    // No configuration options needed - OTLP deserialization is opinionated
-}
+pub struct OtlpDeserializerConfig {}
 
 impl OtlpDeserializerConfig {
     /// Build the `OtlpDeserializer` from this configuration.
@@ -111,60 +109,6 @@ impl OtlpDeserializer {
             traces_deserializer,
         })
     }
-
-    /// Try to parse as logs and verify it has the expected top-level field.
-    fn try_parse_logs(
-        &self,
-        bytes: &Bytes,
-        log_namespace: LogNamespace,
-    ) -> vector_common::Result<Option<SmallVec<[Event; 1]>>> {
-        if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace)
-            && let Some(Event::Log(log)) = events.first()
-            && log.get(RESOURCE_LOGS_JSON_FIELD).is_some()
-        {
-            return Ok(Some(events));
-        }
-        Ok(None)
-    }
-
-    /// Try to parse as metrics and verify it has the expected top-level field.
-    /// Note: These are parsed as Log events (not Metric events) to preserve the OTLP structure.
-    fn try_parse_metrics(
-        &self,
-        bytes: &Bytes,
-        log_namespace: LogNamespace,
-    ) -> vector_common::Result<Option<SmallVec<[Event; 1]>>> {
-        if let Ok(events) = self
-            .metrics_deserializer
-            .parse(bytes.clone(), log_namespace)
-            && let Some(Event::Log(log)) = events.first()
-            && log.get(RESOURCE_METRICS_JSON_FIELD).is_some()
-        {
-            return Ok(Some(events));
-        }
-        Ok(None)
-    }
-
-    /// Try to parse as traces and verify it has the expected top-level field.
-    /// This creates TraceEvent instead of LogEvent.
-    fn try_parse_traces(
-        &self,
-        bytes: &Bytes,
-        log_namespace: LogNamespace,
-    ) -> vector_common::Result<Option<SmallVec<[Event; 1]>>> {
-        // Parse as a log event first to get the VRL value
-        if let Ok(mut events) = self.traces_deserializer.parse(bytes.clone(), log_namespace)
-            && let Some(Event::Log(log)) = events.first()
-            && log.get(RESOURCE_SPANS_JSON_FIELD).is_some()
-        {
-            // Convert the log event to a trace event by taking ownership
-            if let Some(Event::Log(log)) = events.pop() {
-                let trace_event = Event::Trace(log.into());
-                return Ok(Some(smallvec![trace_event]));
-            }
-        }
-        Ok(None)
-    }
 }
 
 impl Deserializer for OtlpDeserializer {
@@ -173,21 +117,200 @@ impl Deserializer for OtlpDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        // Try parsing as logs first
-        if let Some(events) = self.try_parse_logs(&bytes, log_namespace)? {
-            return Ok(events);
+        // Try parsing as logs and check for resourceLogs field
+        if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace) {
+            if let Some(Event::Log(log)) = events.first() {
+                if log.get(RESOURCE_LOGS_JSON_FIELD).is_some() {
+                    return Ok(events);
+                }
+            }
         }
 
-        // Try parsing as metrics
-        if let Some(events) = self.try_parse_metrics(&bytes, log_namespace)? {
-            return Ok(events);
+        // Try parsing as metrics and check for resourceMetrics field
+        if let Ok(events) = self
+            .metrics_deserializer
+            .parse(bytes.clone(), log_namespace)
+        {
+            if let Some(Event::Log(log)) = events.first() {
+                if log.get(RESOURCE_METRICS_JSON_FIELD).is_some() {
+                    return Ok(events);
+                }
+            }
         }
 
-        // Try parsing as traces
-        if let Some(events) = self.try_parse_traces(&bytes, log_namespace)? {
-            return Ok(events);
+        // Try parsing as traces and check for resourceSpans field
+        if let Ok(mut events) = self.traces_deserializer.parse(bytes, log_namespace) {
+            if let Some(Event::Log(log)) = events.first() {
+                if log.get(RESOURCE_SPANS_JSON_FIELD).is_some() {
+                    // Convert the log event to a trace event by taking ownership
+                    if let Some(Event::Log(log)) = events.pop() {
+                        let trace_event = Event::Trace(log.into());
+                        return Ok(smallvec![trace_event]);
+                    }
+                }
+            }
         }
 
-        Err("Failed to decode bytes as any OTLP message type (logs, metrics, or traces)".into())
+        Err(format!(
+            "Invalid OTLP data: expected '{RESOURCE_LOGS_JSON_FIELD}', '{RESOURCE_METRICS_JSON_FIELD}', or '{RESOURCE_SPANS_JSON_FIELD}'",
+        )
+            .into())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use opentelemetry_proto::proto::{
+        collector::{
+            logs::v1::ExportLogsServiceRequest, metrics::v1::ExportMetricsServiceRequest,
+            trace::v1::ExportTraceServiceRequest,
+        },
+        logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
+        metrics::v1::{Metric, ResourceMetrics, ScopeMetrics},
+        resource::v1::Resource,
+        trace::v1::{ResourceSpans, ScopeSpans, Span},
+    };
+    use prost::Message;
+
+    use super::*;
+
+    fn create_logs_request_bytes() -> Bytes {
+        let request = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                resource: Some(Resource {
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                }),
+                scope_logs: vec![ScopeLogs {
+                    scope: None,
+                    log_records: vec![LogRecord {
+                        time_unix_nano: 1234567890,
+                        severity_number: 9,
+                        severity_text: "INFO".to_string(),
+                        body: None,
+                        attributes: vec![],
+                        dropped_attributes_count: 0,
+                        flags: 0,
+                        trace_id: vec![],
+                        span_id: vec![],
+                        observed_time_unix_nano: 0,
+                    }],
+                    schema_url: String::new(),
+                }],
+                schema_url: String::new(),
+            }],
+        };
+
+        Bytes::from(request.encode_to_vec())
+    }
+
+    fn create_metrics_request_bytes() -> Bytes {
+        let request = ExportMetricsServiceRequest {
+            resource_metrics: vec![ResourceMetrics {
+                resource: Some(Resource {
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                }),
+                scope_metrics: vec![ScopeMetrics {
+                    scope: None,
+                    metrics: vec![Metric {
+                        name: "test_metric".to_string(),
+                        description: String::new(),
+                        unit: String::new(),
+                        data: None,
+                    }],
+                    schema_url: String::new(),
+                }],
+                schema_url: String::new(),
+            }],
+        };
+
+        Bytes::from(request.encode_to_vec())
+    }
+
+    fn create_traces_request_bytes() -> Bytes {
+        let request = ExportTraceServiceRequest {
+            resource_spans: vec![ResourceSpans {
+                resource: Some(Resource {
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                }),
+                scope_spans: vec![ScopeSpans {
+                    scope: None,
+                    spans: vec![Span {
+                        trace_id: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
+                        span_id: vec![1, 2, 3, 4, 5, 6, 7, 8],
+                        trace_state: String::new(),
+                        parent_span_id: vec![],
+                        name: "test_span".to_string(),
+                        kind: 0,
+                        start_time_unix_nano: 1234567890,
+                        end_time_unix_nano: 1234567900,
+                        attributes: vec![],
+                        dropped_attributes_count: 0,
+                        events: vec![],
+                        dropped_events_count: 0,
+                        links: vec![],
+                        dropped_links_count: 0,
+                        status: None,
+                    }],
+                    schema_url: String::new(),
+                }],
+                schema_url: String::new(),
+            }],
+        };
+
+        Bytes::from(request.encode_to_vec())
+    }
+
+    fn assert_otlp_event(bytes: Bytes, field: &str, is_trace: bool) {
+        let deserializer = OtlpDeserializer::new().unwrap();
+        let events = deserializer.parse(bytes, LogNamespace::Legacy).unwrap();
+
+        assert_eq!(events.len(), 1);
+        if is_trace {
+            assert!(matches!(events[0], Event::Trace(_)));
+            assert!(events[0].as_trace().get(field).is_some());
+        } else {
+            assert!(events[0].as_log().get(field).is_some());
+        }
+    }
+
+    #[test]
+    fn deserialize_otlp_logs() {
+        assert_otlp_event(create_logs_request_bytes(), RESOURCE_LOGS_JSON_FIELD, false);
+    }
+
+    #[test]
+    fn deserialize_otlp_metrics() {
+        assert_otlp_event(
+            create_metrics_request_bytes(),
+            RESOURCE_METRICS_JSON_FIELD,
+            false,
+        );
+    }
+
+    #[test]
+    fn deserialize_otlp_traces() {
+        assert_otlp_event(
+            create_traces_request_bytes(),
+            RESOURCE_SPANS_JSON_FIELD,
+            true,
+        );
+    }
+
+    #[test]
+    fn deserialize_invalid_otlp() {
+        let deserializer = OtlpDeserializer::new().unwrap();
+        let bytes = Bytes::from("invalid protobuf data");
+        let result = deserializer.parse(bytes, LogNamespace::Legacy);
+
+        assert!(result.is_err());
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid OTLP data")
+        );
     }
 }
