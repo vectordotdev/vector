@@ -554,3 +554,4 @@ zst
 zstandard
 ZTE
 Zync
+medzin
