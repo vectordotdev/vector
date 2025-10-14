@@ -74,7 +74,7 @@ mod util;
 use self::{
     namespace_metadata_annotator::NamespaceMetadataAnnotator,
     node_metadata_annotator::NodeMetadataAnnotator, parser::Parser,
-    pod_metadata_annotator::PodMetadataAnnotator,
+    pod_metadata_annotator::PodMetadataAnnotator, reconciler::LogWithMetadata,
 };
 
 /// The `self_node_name` value env var key.
@@ -969,7 +969,8 @@ impl Source {
 
         // Only run reconciler when api_log is enabled
         let reconciler_fut = if let Some(reconciler_watcher) = reconciler_pod_watcher {
-            let (api_logs_tx, mut api_logs_rx) = futures::channel::mpsc::unbounded::<String>();
+            let (api_logs_tx, mut api_logs_rx) =
+                futures::channel::mpsc::unbounded::<LogWithMetadata>();
             let reconciler =
                 reconciler::Reconciler::new(client.clone(), api_logs_tx, reconciler_watcher);
 
@@ -986,13 +987,16 @@ impl Source {
                 let log_processing_task = tokio::spawn(async move {
                     let mut file_source_tx = file_source_tx_clone;
                     // Process incoming logs from the channel
-                    while let Some(log_line) = api_logs_rx.next().await {
-                        // Create a simple Line struct to reuse the existing pipeline
-                        // TODO: Extract proper metadata from reconciler context
-                        let filename = "k8s-api://unknown/unknown/unknown".to_string();
-                        let text = Bytes::from(log_line);
+                    while let Some(log_with_metadata) = api_logs_rx.next().await {
+                        // Create a filename that includes the container metadata for proper annotation
+                        let filename = format!(
+                            "k8s-api://{}/{}/{}",
+                            log_with_metadata.namespace_name,
+                            log_with_metadata.pod_name,
+                            log_with_metadata.container_name
+                        );
+                        let text = log_with_metadata.log_line;
                         let text_len = text.len() as u64;
-
                         let line = vector_lib::file_source::file_server::Line {
                             text,
                             filename,

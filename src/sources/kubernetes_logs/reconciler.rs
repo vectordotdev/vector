@@ -1,8 +1,9 @@
 use super::pod_info::PodInfo;
+use bytes::Bytes;
 use chrono::{DateTime, FixedOffset, Utc};
 use futures::SinkExt;
 use futures::channel::mpsc;
-use futures::{AsyncBufReadExt, StreamExt, TryStreamExt};
+use futures::{AsyncBufReadExt, StreamExt};
 use futures_util::Stream;
 use k8s_openapi::api::core::v1::Pod;
 use kube::runtime::watcher;
@@ -11,6 +12,19 @@ use std::collections::HashMap;
 use std::fmt;
 use std::pin::Pin;
 use tracing::{info, trace, warn};
+
+/// Log line with associated container metadata
+#[derive(Clone, Debug)]
+pub struct LogWithMetadata {
+    /// The actual log content
+    pub log_line: Bytes,
+    /// Pod name
+    pub pod_name: String,
+    /// Namespace name
+    pub namespace_name: String,
+    /// Container name
+    pub container_name: String,
+}
 
 /// Container key for identifying unique container instances
 /// Format: "{namespace}/{pod_name}/{container_name}"
@@ -86,38 +100,40 @@ impl ContainerLogInfo {
 
     /// Update the last log timestamp when processing a log line
     /// Returns true if the timestamp was successfully parsed and updated
-    fn update_last_log_timestamp(&mut self, log_line: &str) -> bool {
+    fn update_last_log_timestamp(&mut self, log_line: &[u8]) -> bool {
         // Kubernetes log format typically starts with RFC3339 timestamp
         // e.g., "2023-10-11T10:30:00.123456789Z message content"
-        if let Some(timestamp_end) = log_line.find(' ') {
-            let timestamp_str = &log_line[..timestamp_end];
-            if let Ok(timestamp) = DateTime::parse_from_rfc3339(timestamp_str) {
-                // Only update if this timestamp is newer than our last recorded timestamp
-                if let Some(last) = self.last_log {
-                    if timestamp > last {
-                        self.last_log = Some(timestamp);
-                        return true;
-                    }
-                } else {
-                    // First timestamp we've seen
-                    self.last_log = Some(timestamp);
-                    return true;
-                }
-            } else {
-                // Try to parse ISO 8601 format without timezone (common in k8s logs)
-                if let Ok(naive_dt) =
-                    chrono::NaiveDateTime::parse_from_str(timestamp_str, "%Y-%m-%dT%H:%M:%S%.f")
-                {
-                    let timestamp =
-                        DateTime::<Utc>::from_naive_utc_and_offset(naive_dt, Utc).fixed_offset();
+        if let Some(timestamp_end) = log_line.iter().position(|&b| b == b' ') {
+            let timestamp_bytes = &log_line[..timestamp_end];
+            if let Ok(timestamp_str) = std::str::from_utf8(timestamp_bytes) {
+                if let Ok(timestamp) = DateTime::parse_from_rfc3339(timestamp_str) {
+                    // Only update if this timestamp is newer than our last recorded timestamp
                     if let Some(last) = self.last_log {
                         if timestamp > last {
                             self.last_log = Some(timestamp);
                             return true;
                         }
                     } else {
+                        // First timestamp we've seen
                         self.last_log = Some(timestamp);
                         return true;
+                    }
+                } else {
+                    // Try to parse ISO 8601 format without timezone (common in k8s logs)
+                    if let Ok(naive_dt) =
+                        chrono::NaiveDateTime::parse_from_str(timestamp_str, "%Y-%m-%dT%H:%M:%S%.f")
+                    {
+                        let timestamp = DateTime::<Utc>::from_naive_utc_and_offset(naive_dt, Utc)
+                            .fixed_offset();
+                        if let Some(last) = self.last_log {
+                            if timestamp > last {
+                                self.last_log = Some(timestamp);
+                                return true;
+                            }
+                        } else {
+                            self.last_log = Some(timestamp);
+                            return true;
+                        }
                     }
                 }
             }
@@ -133,7 +149,11 @@ pub struct Reconciler {
 }
 
 impl Reconciler {
-    pub fn new<S>(client: Client, log_sender: mpsc::UnboundedSender<String>, pod_watcher: S) -> Self
+    pub fn new<S>(
+        client: Client,
+        log_sender: mpsc::UnboundedSender<LogWithMetadata>,
+        pod_watcher: S,
+    ) -> Self
     where
         S: Stream<Item = watcher::Result<watcher::Event<Pod>>> + Send + 'static,
     {
@@ -228,7 +248,7 @@ impl Reconciler {
 #[derive(Clone)]
 struct EventStreamBuilder {
     client: Client,
-    log_sender: mpsc::UnboundedSender<String>,
+    log_sender: mpsc::UnboundedSender<LogWithMetadata>,
 }
 
 #[derive(Clone)]
@@ -278,29 +298,63 @@ impl EventStreamBuilder {
                     log_info.container_info.container_name, log_info.container_info.pod_name
                 );
 
-                let mut lines = log_stream.lines();
+                let mut buffer = Vec::new();
+                let mut log_stream = log_stream;
 
-                // Process the stream of log lines continuously
-                while let Ok(Some(line_result)) = lines.try_next().await {
-                    // Update timestamp tracking before sending
-                    let timestamp_updated = log_info.update_last_log_timestamp(&line_result);
-                    if timestamp_updated {
-                        trace!(
-                            "Updated last log timestamp for container '{}' in pod '{}' to: {:?}",
-                            log_info.container_info.container_name,
-                            log_info.container_info.pod_name,
-                            log_info.last_log
-                        );
-                    }
+                // Process the stream by reading line by line
+                loop {
+                    buffer.clear();
+                    match log_stream.read_until(b'\n', &mut buffer).await {
+                        Ok(0) => break, // EOF
+                        Ok(_) => {
+                            // Remove trailing newline if present
+                            if buffer.ends_with(&[b'\n']) {
+                                buffer.pop();
+                            }
+                            // Remove trailing carriage return if present (for CRLF)
+                            if buffer.ends_with(&[b'\r']) {
+                                buffer.pop();
+                            }
 
-                    // Send the log line to the channel
-                    if let Err(_) = self.log_sender.send(line_result).await {
-                        warn!(
-                            "Log channel closed for container '{}' in pod '{}', stopping stream",
-                            log_info.container_info.container_name,
-                            log_info.container_info.pod_name
-                        );
-                        break;
+                            let line_bytes = Bytes::from(buffer.clone());
+
+                            // Update timestamp tracking before sending
+                            let timestamp_updated = log_info.update_last_log_timestamp(&buffer);
+                            if timestamp_updated {
+                                trace!(
+                                    "Updated last log timestamp for container '{}' in pod '{}' to: {:?}",
+                                    log_info.container_info.container_name,
+                                    log_info.container_info.pod_name,
+                                    log_info.last_log
+                                );
+                            }
+
+                            // Send the log line with metadata to the channel
+                            let log_with_metadata = LogWithMetadata {
+                                log_line: line_bytes,
+                                pod_name: log_info.container_info.pod_name.clone(),
+                                namespace_name: log_info.container_info.namespace.clone(),
+                                container_name: log_info.container_info.container_name.clone(),
+                            };
+
+                            if let Err(_) = self.log_sender.send(log_with_metadata).await {
+                                warn!(
+                                    "Log channel closed for container '{}' in pod '{}', stopping stream",
+                                    log_info.container_info.container_name,
+                                    log_info.container_info.pod_name
+                                );
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            warn!(
+                                "Error reading from log stream for container '{}' in pod '{}': {}",
+                                log_info.container_info.container_name,
+                                log_info.container_info.pod_name,
+                                e
+                            );
+                            break;
+                        }
                     }
                 }
             }
