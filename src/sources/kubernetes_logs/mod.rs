@@ -9,7 +9,7 @@ use std::{cmp::min, path::PathBuf, time::Duration};
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::FutureExt, stream::StreamExt};
-use futures_util::Stream;
+use futures_util::{SinkExt, Stream};
 use http_1::{HeaderName, HeaderValue};
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use k8s_paths_provider::K8sPathsProvider;
@@ -915,33 +915,34 @@ impl Source {
                 log_namespace,
             );
 
-            let file_info = annotator.annotate(&mut event, &line.filename);
+            if !api_log {
+                let file_info = annotator.annotate(&mut event, &line.filename);
+                emit!(KubernetesLogsEventsReceived {
+                    file: &line.filename,
+                    byte_size: event.estimated_json_encoded_size_of(),
+                    pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
+                        name: info.pod_name.to_owned(),
+                        namespace: info.pod_namespace.to_owned(),
+                    }),
+                });
 
-            emit!(KubernetesLogsEventsReceived {
-                file: &line.filename,
-                byte_size: event.estimated_json_encoded_size_of(),
-                pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
-                    name: info.pod_name.to_owned(),
-                    namespace: info.pod_namespace.to_owned(),
-                }),
-            });
+                if file_info.is_none() {
+                    emit!(KubernetesLogsEventAnnotationError { event: &event });
+                } else {
+                    let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
-            if file_info.is_none() {
-                emit!(KubernetesLogsEventAnnotationError { event: &event });
-            } else {
-                let namespace = file_info.as_ref().map(|info| info.pod_namespace);
+                    if insert_namespace_fields
+                        && let Some(name) = namespace
+                        && ns_annotator.annotate(&mut event, name).is_none()
+                    {
+                        emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
+                    }
 
-                if insert_namespace_fields
-                    && let Some(name) = namespace
-                    && ns_annotator.annotate(&mut event, name).is_none()
-                {
-                    emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
-                }
+                    let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
 
-                let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
-
-                if node_info.is_none() {
-                    emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
+                    if node_info.is_none() {
+                        emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
+                    }
                 }
             }
 
@@ -971,6 +972,9 @@ impl Source {
             let (api_logs_tx, mut api_logs_rx) = futures::channel::mpsc::unbounded::<String>();
             let reconciler =
                 reconciler::Reconciler::new(client.clone(), api_logs_tx, reconciler_watcher);
+
+            let file_source_tx_clone = file_source_tx.clone();
+
             Some(async move {
                 info!("Starting event-driven reconciler");
 
@@ -980,11 +984,28 @@ impl Source {
                 });
 
                 let log_processing_task = tokio::spawn(async move {
+                    let mut file_source_tx = file_source_tx_clone;
                     // Process incoming logs from the channel
                     while let Some(log_line) = api_logs_rx.next().await {
-                        info!("API Log: {}", log_line);
-                        // TODO: Convert log_line to Vector event and send to output
-                        // This is where you would parse the log and send it through the Vector pipeline
+                        // Create a simple Line struct to reuse the existing pipeline
+                        // TODO: Extract proper metadata from reconciler context
+                        let filename = "k8s-api://unknown/unknown/unknown".to_string();
+                        let text = Bytes::from(log_line);
+                        let text_len = text.len() as u64;
+
+                        let line = vector_lib::file_source::file_server::Line {
+                            text,
+                            filename,
+                            file_id: vector_lib::file_source_common::FileFingerprint::Unknown(0),
+                            start_offset: 0,
+                            end_offset: text_len,
+                        };
+
+                        // Send through existing file processing pipeline
+                        if let Err(e) = file_source_tx.send(vec![line]).await {
+                            warn!("Failed to send API log through file pipeline: {}", e);
+                            break;
+                        }
                     }
                     info!("Reconciler log processing completed");
                 });
