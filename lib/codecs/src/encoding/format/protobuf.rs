@@ -30,7 +30,9 @@ impl ProtobufSerializerConfig {
             get_message_descriptor(&self.protobuf.desc_file, &self.protobuf.message_type)?;
         Ok(ProtobufSerializer {
             message_descriptor,
-            options: Options::default(),
+            options: Options {
+                use_json_names: self.protobuf.use_json_names,
+            },
         })
     }
 
@@ -62,6 +64,17 @@ pub struct ProtobufSerializerOptions {
     /// The name of the message type to use for serializing.
     #[configurable(metadata(docs::examples = "package.Message"))]
     pub message_type: String,
+
+    /// Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+    ///
+    /// When enabled, the serializer will look for fields using their JSON names as defined
+    /// in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+    ///
+    /// This is useful when working with data that has already been converted from JSON or
+    /// when interfacing with systems that use JSON naming conventions.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = true))]
+    pub use_json_names: bool,
 }
 
 /// Serializer that converts an `Event` to bytes using the Protobuf format.

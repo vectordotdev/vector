@@ -437,6 +437,22 @@ generated: components: sinks: websocket_server: configuration: {
 						required:    true
 						type: string: examples: ["package.Message"]
 					}
+					use_json_names: {
+						description: """
+																Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+
+																When enabled, the serializer will look for fields using their JSON names as defined
+																in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+
+																This is useful when working with data that has already been converted from JSON or
+																when interfacing with systems that use JSON naming conventions.
+																"""
+						required: false
+						type: bool: {
+							default: false
+							examples: [true]
+						}
+					}
 				}
 			}
 			timestamp_format: {
@@ -716,6 +732,22 @@ generated: components: sinks: websocket_server: configuration: {
 										type: string: {
 											default: ""
 											examples: ["package.Message"]
+										}
+									}
+									use_json_names: {
+										description: """
+																								Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+
+																								When enabled, the deserializer will output fields using their JSON names as defined
+																								in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+
+																								This is useful when working with data that needs to be converted to JSON or
+																								when interfacing with systems that use JSON naming conventions.
+																								"""
+										required: false
+										type: bool: {
+											default: false
+											examples: [true]
 										}
 									}
 								}

@@ -31,6 +31,7 @@ fn build_serializer_pair(
         protobuf: ProtobufSerializerOptions {
             desc_file: desc_file.clone(),
             message_type: message_type.clone(),
+            use_json_names: false,
         },
     }
     .build()
@@ -39,6 +40,7 @@ fn build_serializer_pair(
         protobuf: ProtobufDeserializerOptions {
             desc_file,
             message_type,
+            use_json_names: false,
         },
     }
     .build()
@@ -66,5 +68,56 @@ fn roundtrip_coding() {
     let events_encoded = deserializer
         .parse(protobuf_message, LogNamespace::Vector)
         .unwrap();
+    assert_eq!(events_original, events_encoded);
+}
+
+#[test]
+fn roundtrip_coding_with_json_names() {
+    let protobuf_message =
+        read_protobuf_bin_message(&test_data_dir().join("pbs/person_someone3.pb"));
+    let desc_file = test_data_dir().join("protos/test_protobuf3.desc");
+    let message_type: String = "test_protobuf3.Person".into();
+
+    // Create serializer with use_json_names enabled
+    let mut serializer = ProtobufSerializerConfig {
+        protobuf: ProtobufSerializerOptions {
+            desc_file: desc_file.clone(),
+            message_type: message_type.clone(),
+            use_json_names: true,
+        },
+    }
+    .build()
+    .unwrap();
+
+    // Create deserializer with use_json_names enabled
+    let deserializer = ProtobufDeserializerConfig {
+        protobuf: ProtobufDeserializerOptions {
+            desc_file,
+            message_type,
+            use_json_names: true,
+        },
+    }
+    .build()
+    .unwrap();
+
+    // Parse the original message
+    let events_original = deserializer
+        .parse(protobuf_message, LogNamespace::Vector)
+        .unwrap();
+    assert_eq!(1, events_original.len());
+
+    // Encode it back
+    let mut new_message = BytesMut::new();
+    serializer
+        .encode(events_original[0].clone(), &mut new_message)
+        .unwrap();
+
+    // Decode the re-encoded message
+    let protobuf_message: Bytes = new_message.into();
+    let events_encoded = deserializer
+        .parse(protobuf_message, LogNamespace::Vector)
+        .unwrap();
+
+    // Should be the same
     assert_eq!(events_original, events_encoded);
 }
