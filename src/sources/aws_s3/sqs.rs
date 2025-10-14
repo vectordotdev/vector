@@ -424,8 +424,8 @@ impl IngestorProcess {
                         Err(_) => {
                             let delay = self.backoff.next().expect("backoff never ends");
                             trace!(
-                                message = "run_once failed, will retry after delay",
-                                delay_ms = delay.as_millis()
+                                delay_ms = delay.as_millis(),
+                                "run_once failed, will retry after delay",
                             );
                             tokio::time::sleep(delay).await;
                         }
