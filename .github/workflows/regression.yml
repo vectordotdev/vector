@@ -269,7 +269,7 @@ jobs:
       - resolve-inputs
     steps:
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        uses: aws-actions/configure-aws-credentials@a03048d87541d1d9fcf2ecf528a4a65ba9bd7838 # v5.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -294,7 +294,7 @@ jobs:
       - build-baseline
     steps:
       - name: 'Download baseline image'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: baseline-image
 
@@ -303,7 +303,7 @@ jobs:
           docker load --input baseline-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        uses: aws-actions/configure-aws-credentials@a03048d87541d1d9fcf2ecf528a4a65ba9bd7838 # v5.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -314,7 +314,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
 
       - name: Docker Login to ECR
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           registry: ${{ steps.login-ecr.outputs.registry }}
 
@@ -334,7 +334,7 @@ jobs:
       - build-comparison
     steps:
       - name: 'Download comparison image'
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: comparison-image
 
@@ -343,7 +343,7 @@ jobs:
           docker load --input comparison-image.tar
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        uses: aws-actions/configure-aws-credentials@a03048d87541d1d9fcf2ecf528a4a65ba9bd7838 # v5.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -354,7 +354,7 @@ jobs:
         uses: aws-actions/amazon-ecr-login@062b18b96a7aff071d4dc91bc00c4c1a7945b076 # v2.0.1
 
       - name: Docker Login to ECR
-        uses: docker/login-action@184bdaa0721073962dff0199f1fb9940f07167d1 # v3.5.0
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
           registry: ${{ steps.login-ecr.outputs.registry }}
 
@@ -378,7 +378,7 @@ jobs:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        uses: aws-actions/configure-aws-credentials@a03048d87541d1d9fcf2ecf528a4a65ba9bd7838 # v5.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -451,7 +451,7 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        uses: aws-actions/configure-aws-credentials@a03048d87541d1d9fcf2ecf528a4a65ba9bd7838 # v5.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -462,7 +462,7 @@ jobs:
           aws s3 cp s3://smp-cli-releases/v${{ needs.resolve-inputs.outputs.smp-version }}/x86_64-unknown-linux-musl/smp ${{ runner.temp }}/bin/smp
 
       - name: Download submission metadata
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/
@@ -490,7 +490,7 @@ jobs:
           ref: ${{ needs.resolve-inputs.outputs.comparison-sha }}
 
       - name: Configure AWS Credentials
-        uses: aws-actions/configure-aws-credentials@b47578312673ae6fa5b5096b330d9fbac3d116df # v4.2.1
+        uses: aws-actions/configure-aws-credentials@a03048d87541d1d9fcf2ecf528a4a65ba9bd7838 # v5.0.0
         with:
           aws-access-key-id: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.SINGLE_MACHINE_PERFORMANCE_BOT_SECRET_ACCESS_KEY }}
@@ -501,7 +501,7 @@ jobs:
           aws s3 cp s3://smp-cli-releases/v${{ needs.resolve-inputs.outputs.smp-version }}/x86_64-unknown-linux-musl/smp ${{ runner.temp }}/bin/smp
 
       - name: Download submission metadata
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/
@@ -547,7 +547,7 @@ jobs:
     steps:
       - name: Download capture-artifacts
         continue-on-error: true
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: capture-artifacts
 

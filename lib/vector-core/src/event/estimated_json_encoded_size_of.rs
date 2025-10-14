@@ -212,9 +212,9 @@ impl EstimatedJsonEncodedSizeOf for DateTime<Utc> {
         let ns = self.nanosecond() % 1_000_000_000;
         let epoch = if ns == 0 {
             EPOCH_RFC3339_0
-        } else if ns % 1_000_000 == 0 {
+        } else if ns.is_multiple_of(1_000_000) {
             EPOCH_RFC3339_3
-        } else if ns % 1_000 == 0 {
+        } else if ns.is_multiple_of(1_000) {
             EPOCH_RFC3339_6
         } else {
             EPOCH_RFC3339_9
@@ -442,10 +442,11 @@ mod tests {
 
     use std::collections::HashMap;
 
-    use super::*;
     use quickcheck::{Arbitrary, Gen, TestResult};
     use quickcheck_macros::quickcheck;
     use serde::Serialize;
+
+    use super::*;
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash, Serialize)]
     struct ValidString(String);

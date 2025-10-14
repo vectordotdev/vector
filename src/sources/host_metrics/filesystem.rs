@@ -2,12 +2,10 @@ use futures::StreamExt;
 use heim::units::information::byte;
 #[cfg(not(windows))]
 use heim::units::ratio::ratio;
-use vector_lib::configurable::configurable_component;
-use vector_lib::metric_tags;
-
-use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
+use vector_lib::{configurable::configurable_component, metric_tags};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
+use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
 
 /// Options for the filesystem metrics collector.
 #[configurable_component]
@@ -163,7 +161,7 @@ mod tests {
             .await;
         let metrics = buffer.metrics;
         assert!(!metrics.is_empty());
-        assert!(metrics.len() % 4 == 0);
+        assert!(metrics.len().is_multiple_of(4));
         assert!(all_gauges(&metrics));
 
         // There are exactly three filesystem_* names

@@ -1,10 +1,7 @@
 use std::{path::Path, time::Duration};
 
 use indexmap::IndexMap;
-use vector_lib::config::GlobalOptions;
-use vector_lib::configurable::configurable_component;
-
-use crate::{enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends};
+use vector_lib::{config::GlobalOptions, configurable::configurable_component};
 
 #[cfg(feature = "api")]
 use super::api;
@@ -12,6 +9,7 @@ use super::{
     BoxedSink, BoxedSource, BoxedTransform, ComponentKey, Config, EnrichmentTableOuter,
     HealthcheckOptions, SinkOuter, SourceOuter, TestDefinition, TransformOuter, compiler, schema,
 };
+use crate::{enrichment_tables::EnrichmentTables, providers::Providers, secrets::SecretBackends};
 
 /// A complete Vector configuration.
 #[configurable_component]

@@ -5,7 +5,6 @@ use rumqttc::{MqttOptions, QoS, TlsConfiguration, Transport};
 use snafu::ResultExt;
 use vector_lib::codecs::JsonSerializerConfig;
 
-use crate::template::Template;
 use crate::{
     codecs::EncodingConfig,
     common::mqtt::{
@@ -14,6 +13,7 @@ use crate::{
     },
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     sinks::{Healthcheck, VectorSink, mqtt::sink::MqttSink, prelude::*},
+    template::Template,
     tls::MaybeTlsSettings,
 };
 
@@ -163,7 +163,7 @@ impl MqttSinkConfig {
         }
         if let Some(tls) = tls.tls() {
             let ca = tls.authorities_pem().flatten().collect();
-            let client_auth = None;
+            let client_auth = tls.identity_pem();
             let alpn = Some(vec!["mqtt".into()]);
             options.set_transport(Transport::Tls(TlsConfiguration::Simple {
                 ca,

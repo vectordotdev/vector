@@ -4,6 +4,15 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::{
+    codecs::{Encoder, Transformer},
+    common::websocket::{PingInterval, WebSocketConnector, is_closed},
+    event::{Event, EventStatus, Finalizable},
+    internal_events::{
+        ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
+    },
+    sinks::{util::StreamSink, websocket::config::WebSocketSinkConfig},
+};
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt, stream::BoxStream};
@@ -16,16 +25,8 @@ use vector_lib::{
     },
 };
 
-use crate::{
-    codecs::{Encoder, Transformer},
-    common::websocket::{PingInterval, WebSocketConnector, is_closed},
-    event::{Event, EventStatus, Finalizable},
-    internal_events::{
-        ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
-    },
-    sinks::util::StreamSink,
-    sinks::websocket::config::WebSocketSinkConfig,
-};
+#[cfg(feature = "codecs-opentelemetry")]
+use vector_lib::codecs::encoding::Serializer::Otlp;
 
 pub struct WebSocketSink {
     transformer: Transformer,
@@ -83,6 +84,8 @@ impl WebSocketSink {
 
         match self.encoder.serializer() {
             RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
+            #[cfg(feature = "codecs-opentelemetry")]
+            Otlp(_) => true,
             Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
         }
     }

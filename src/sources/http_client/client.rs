@@ -1,46 +1,47 @@
 //! Generalized HTTP client source.
 //! Calls an endpoint at an interval, decoding the HTTP responses into events.
 
+use std::{collections::HashMap, time::Duration};
+
 use bytes::{Bytes, BytesMut};
 use chrono::Utc;
 use futures_util::FutureExt;
 use http::{Uri, response::Parts};
 use serde_with::serde_as;
 use snafu::ResultExt;
-use std::{collections::HashMap, time::Duration};
 use tokio_util::codec::Decoder as _;
-use vrl::diagnostic::Formatter;
+use vector_lib::{
+    TimeZone,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    compile_vrl,
+    config::{LogNamespace, SourceOutput, log_schema},
+    configurable::configurable_component,
+    event::{Event, LogEvent, VrlTarget},
+};
+use vrl::{
+    compiler::{CompileConfig, Function, Program, runtime::Runtime},
+    prelude::TypeState,
+};
 
-use crate::http::{ParamType, ParameterValue, QueryParameterValue, QueryParameters};
-use crate::sources::util::http_client;
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
-    http::Auth,
+    format_vrl_diagnostics,
+    http::{Auth, ParamType, ParameterValue, QueryParameterValue, QueryParameters},
     serde::{default_decoding, default_framing_message_based},
     sources,
     sources::util::{
         http::HttpMethod,
+        http_client,
         http_client::{
             GenericHttpClientInputs, HttpClientBuilder, build_url, call, default_interval,
             default_timeout, warn_if_interval_too_low,
         },
     },
     tls::{TlsConfig, TlsSettings},
-};
-use vector_lib::codecs::{
-    StreamDecodingError,
-    decoding::{DeserializerConfig, FramingConfig},
-};
-use vector_lib::config::{LogNamespace, SourceOutput, log_schema};
-use vector_lib::configurable::configurable_component;
-use vector_lib::{
-    TimeZone, compile_vrl,
-    event::{Event, LogEvent, VrlTarget},
-};
-use vrl::{
-    compiler::{CompileConfig, Function, Program, runtime::Runtime},
-    prelude::TypeState,
 };
 
 /// Configuration for the `http_client` source.
@@ -247,17 +248,14 @@ impl Query {
             match compile_vrl(param.value(), functions, &state, config) {
                 Ok(compilation_result) => {
                     if !compilation_result.warnings.is_empty() {
-                        let warnings = Formatter::new(param.value(), compilation_result.warnings)
-                            .colored()
-                            .to_string();
+                        let warnings =
+                            format_vrl_diagnostics(param.value(), compilation_result.warnings);
                         warn!(message = "VRL compilation warnings.", %warnings, internal_log_rate_limit = true);
                     }
                     Some(compilation_result.program)
                 }
                 Err(diagnostics) => {
-                    let error = Formatter::new(param.value(), diagnostics)
-                        .colored()
-                        .to_string();
+                    let error = format_vrl_diagnostics(param.value(), diagnostics);
                     warn!(message = "VRL compilation failed.", %error, internal_log_rate_limit = true);
                     None
                 }

@@ -1,7 +1,6 @@
 use std::{
     cmp,
     collections::{BTreeMap, HashMap},
-    fs::{self, remove_file},
     path::PathBuf,
     sync::Arc,
     time::{self, Duration},
@@ -9,18 +8,23 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{DateTime, Utc};
-use futures::{
-    Future, Sink, SinkExt,
-    future::{Either, select},
-};
-use indexmap::IndexMap;
-use tokio::time::sleep;
-use tracing::{debug, error, info, trace};
-
 use file_source_common::{
     FileFingerprint, FileSourceInternalEvents, Fingerprinter, ReadFrom,
     checkpointer::{Checkpointer, CheckpointsView},
 };
+use futures::{
+    Future, Sink, SinkExt,
+    future::{Either, select},
+};
+use futures_util::future::join_all;
+use indexmap::IndexMap;
+use tokio::{
+    fs::{self, remove_file},
+    task::{Id, JoinSet},
+    time::sleep,
+};
+
+use tracing::{debug, error, info, trace};
 
 use crate::{
     file_watcher::{FileWatcher, RawLineResult},
@@ -53,7 +57,6 @@ where
     pub oldest_first: bool,
     pub remove_after: Option<Duration>,
     pub emitter: E,
-    pub handle: tokio::runtime::Handle,
     pub rotate_wait: Duration,
 }
 
@@ -80,8 +83,8 @@ where
     // `shutdown_checkpointer` is for finishing the background
     // checkpoint writer task, which has to wait for all
     // acknowledgements to be completed.
-    pub fn run<C, S1, S2>(
-        self,
+    pub async fn run<C, S1, S2>(
+        mut self,
         mut chans: C,
         mut shutdown_data: S1,
         shutdown_checkpointer: S2,
@@ -93,54 +96,59 @@ where
         S1: Future + Unpin + Send + 'static,
         S2: Future + Unpin + Send + 'static,
     {
-        let mut fingerprint_buffer = Vec::new();
-
         let mut fp_map: IndexMap<FileFingerprint, FileWatcher> = Default::default();
 
         let mut backoff_cap: usize = 1;
         let mut lines = Vec::new();
 
-        checkpointer.read_checkpoints(self.ignore_before);
+        checkpointer.read_checkpoints(self.ignore_before).await;
 
         let mut known_small_files = HashMap::new();
 
         let mut existing_files = Vec::new();
         for path in self.paths_provider.paths().into_iter() {
-            if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
-                &path,
-                &mut fingerprint_buffer,
-                &mut known_small_files,
-                &self.emitter,
-            ) {
+            if let Some(file_id) = self
+                .fingerprinter
+                .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
+                .await
+            {
                 existing_files.push((path, file_id));
             }
         }
 
-        existing_files.sort_by_key(|(path, _file_id)| {
-            fs::metadata(path)
-                .and_then(|m| m.created())
+        let metadata = join_all(
+            existing_files
+                .iter()
+                .map(|(path, _file_id)| fs::metadata(path)),
+        )
+        .await;
+
+        let created = metadata.into_iter().map(|m| {
+            m.and_then(|m| m.created())
                 .map(DateTime::<Utc>::from)
                 .unwrap_or_else(|_| Utc::now())
         });
 
+        let mut existing_files: Vec<(DateTime<Utc>, PathBuf, FileFingerprint)> = existing_files
+            .into_iter()
+            .zip(created)
+            .map(|((path, file_id), key)| (key, path, file_id))
+            .collect();
+
+        existing_files.sort_by_key(|(key, _, _)| *key);
+
         let checkpoints = checkpointer.view();
 
-        for (path, file_id) in existing_files {
-            checkpointer.maybe_upgrade(
-                &path,
-                file_id,
-                &self.fingerprinter,
-                &mut fingerprint_buffer,
-            );
-
-            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true);
+        for (_key, path, file_id) in existing_files {
+            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true)
+                .await;
         }
         self.emitter.emit_files_open(fp_map.len());
 
         let mut stats = TimingStats::default();
 
         // Spawn the checkpoint writer task
-        let checkpoint_task_handle = self.handle.spawn(checkpoint_writer(
+        let checkpoint_task_handle = tokio::spawn(checkpoint_writer(
             checkpointer,
             self.glob_minimum_cooldown,
             shutdown_checkpointer,
@@ -178,12 +186,11 @@ where
                     watcher.set_file_findable(false); // assume not findable until found
                 }
                 for path in self.paths_provider.paths().into_iter() {
-                    if let Some(file_id) = self.fingerprinter.get_fingerprint_or_log_error(
-                        &path,
-                        &mut fingerprint_buffer,
-                        &mut known_small_files,
-                        &self.emitter,
-                    ) {
+                    if let Some(file_id) = self
+                        .fingerprinter
+                        .fingerprint_or_emit(&path, &mut known_small_files, &self.emitter)
+                        .await
+                    {
                         if let Some(watcher) = fp_map.get_mut(&file_id) {
                             // file fingerprint matches a watched file
                             let was_found_this_cycle = watcher.file_findable();
@@ -200,7 +207,7 @@ where
                                     path = ?path,
                                     old_path = ?watcher.path
                                 );
-                                watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
+                                watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
                             } else {
                                 info!(
                                     message = "More than one file has the same fingerprint.",
@@ -209,8 +216,8 @@ where
                                 );
                                 let (old_path, new_path) = (&watcher.path, &path);
                                 if let (Ok(old_modified_time), Ok(new_modified_time)) = (
-                                    fs::metadata(old_path).and_then(|m| m.modified()),
-                                    fs::metadata(new_path).and_then(|m| m.modified()),
+                                    fs::metadata(old_path).await.and_then(|m| m.modified()),
+                                    fs::metadata(new_path).await.and_then(|m| m.modified()),
                                 ) && old_modified_time < new_modified_time
                                 {
                                     info!(
@@ -218,12 +225,13 @@ where
                                         new_modified_time = ?new_modified_time,
                                         old_modified_time = ?old_modified_time,
                                     );
-                                    watcher.update_path(path).ok(); // ok if this fails: might fix next cycle
+                                    watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
                                 }
                             }
                         } else {
                             // untracked file fingerprint
-                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false);
+                            self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, false)
+                                .await;
                             self.emitter.emit_files_open(fp_map.len());
                         }
                     }
@@ -233,25 +241,42 @@ where
 
             // Cleanup the known_small_files
             if let Some(grace_period) = self.remove_after {
-                known_small_files.retain(|path, last_time_open| {
-                    // Should the file be removed
-                    if last_time_open.elapsed() >= grace_period {
-                        // Try to remove
-                        match remove_file(path) {
-                            Ok(()) => {
-                                self.emitter.emit_file_deleted(path);
-                                false
-                            }
-                            Err(error) => {
-                                // We will try again after some time.
-                                self.emitter.emit_file_delete_error(path, error);
-                                true
+                let mut set = JoinSet::new();
+
+                let remove_file_tasks: HashMap<Id, PathBuf> = known_small_files
+                    .iter()
+                    .filter(|&(_path, last_time_open)| last_time_open.elapsed() >= grace_period)
+                    .map(|(path, _last_time_open)| path.clone())
+                    .map(|path| {
+                        let path_ = path.clone();
+                        let abort_handle =
+                            set.spawn(async move { (path_.clone(), remove_file(&path_).await) });
+                        (abort_handle.id(), path)
+                    })
+                    .collect();
+
+                while let Some(res) = set.join_next().await {
+                    match res {
+                        Ok((path, Ok(()))) => {
+                            let removed = known_small_files.remove(&path);
+
+                            if removed.is_some() {
+                                self.emitter.emit_file_deleted(&path);
                             }
                         }
-                    } else {
-                        true
+                        Ok((path, Err(err))) => {
+                            self.emitter.emit_file_delete_error(&path, err);
+                        }
+                        Err(join_err) => {
+                            self.emitter.emit_file_delete_error(
+                                remove_file_tasks
+                                    .get(&join_err.id())
+                                    .expect("panicked/cancelled task id not in task id pool"),
+                                std::io::Error::other(join_err),
+                            );
+                        }
                     }
-                });
+                }
             }
 
             // Collect lines by polling files.
@@ -267,7 +292,7 @@ where
                 while let Ok(RawLineResult {
                     raw_line: Some(line),
                     discarded_for_size_and_truncated,
-                }) = watcher.read_line()
+                }) = watcher.read_line().await
                 {
                     discarded_for_size_and_truncated.iter().for_each(|buf| {
                         self.emitter.emit_file_line_too_long(
@@ -310,7 +335,7 @@ where
                         && watcher.last_read_success().elapsed() >= grace_period
                     {
                         // Try to remove
-                        match remove_file(&watcher.path) {
+                        match remove_file(&watcher.path).await {
                             Ok(()) => {
                                 self.emitter.emit_file_deleted(&watcher.path);
                                 watcher.set_dead();
@@ -351,7 +376,8 @@ where
 
             let start = time::Instant::now();
             let to_send = std::mem::take(&mut lines);
-            let result = self.handle.block_on(chans.send(to_send));
+
+            let result = chans.send(to_send).await;
             match result {
                 Ok(()) => {}
                 Err(error) => {
@@ -384,16 +410,16 @@ where
                 }
             };
             futures::pin_mut!(sleep);
-            match self.handle.block_on(select(shutdown_data, sleep)) {
+            match select(shutdown_data, sleep).await {
                 Either::Left((_, _)) => {
-                    self.handle
-                        .block_on(chans.close())
+                    chans
+                        .close()
+                        .await
                         .expect("error closing file_server data channel.");
-                    let checkpointer = self
-                        .handle
-                        .block_on(checkpoint_task_handle)
+                    let checkpointer = checkpoint_task_handle
+                        .await
                         .expect("checkpoint task has panicked");
-                    if let Err(error) = checkpointer.write_checkpoints() {
+                    if let Err(error) = checkpointer.write_checkpoints().await {
                         error!(?error, "Error writing checkpoints before shutdown");
                     }
                     return Ok(Shutdown);
@@ -404,7 +430,7 @@ where
         }
     }
 
-    fn watch_new_file(
+    async fn watch_new_file(
         &self,
         path: PathBuf,
         file_id: FileFingerprint,
@@ -444,7 +470,9 @@ where
             self.ignore_before,
             self.max_line_bytes,
             self.line_delimiter.clone(),
-        ) {
+        )
+        .await
+        {
             Ok(mut watcher) => {
                 if let ReadFrom::Checkpoint(file_position) = read_from {
                     self.emitter.emit_file_resumed(&path, file_position);
@@ -475,15 +503,11 @@ async fn checkpoint_writer(
 
         let emitter = emitter.clone();
         let checkpointer = Arc::clone(&checkpointer);
-        tokio::task::spawn_blocking(move || {
-            let start = time::Instant::now();
-            match checkpointer.write_checkpoints() {
-                Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
-                Err(error) => emitter.emit_file_checkpoint_write_error(error),
-            }
-        })
-        .await
-        .ok();
+        let start = time::Instant::now();
+        match checkpointer.write_checkpoints().await {
+            Ok(count) => emitter.emit_file_checkpointed(count, start.elapsed()),
+            Err(error) => emitter.emit_file_checkpoint_write_error(error),
+        };
     }
     checkpointer
 }
@@ -519,9 +543,12 @@ impl TimingStats {
     }
 
     fn report(&self) {
+        if !tracing::level_enabled!(tracing::Level::DEBUG) {
+            return;
+        }
         let total = self.started_at.elapsed();
         let counted: Duration = self.segments.values().sum();
-        let other: Duration = self.started_at.elapsed() - counted;
+        let other: Duration = total.saturating_sub(counted);
         let mut ratios = self
             .segments
             .iter()

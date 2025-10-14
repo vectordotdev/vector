@@ -1,4 +1,8 @@
 #![allow(missing_docs)]
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
+#[cfg(windows)]
+use std::os::windows::process::ExitStatusExt;
 use std::{
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
@@ -9,15 +13,18 @@ use std::{
 
 use exitcode::ExitCode;
 use futures::StreamExt;
-use tokio::runtime::{self, Runtime};
-use tokio::sync::{MutexGuard, broadcast::error::RecvError};
+use tokio::{
+    runtime::{self, Handle, Runtime},
+    sync::{MutexGuard, broadcast::error::RecvError},
+};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
-    config::{self, ComponentConfig, Config, ConfigPath},
+    config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
+    extra_context::ExtraContext,
     heartbeat,
     internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
@@ -27,13 +34,6 @@ use crate::{
     },
     trace,
 };
-use crate::{config::ComponentType, extra_context::ExtraContext};
-
-#[cfg(unix)]
-use std::os::unix::process::ExitStatusExt;
-#[cfg(windows)]
-use std::os::windows::process::ExitStatusExt;
-use tokio::runtime::Handle;
 
 static WORKER_THREADS: AtomicUsize = AtomicUsize::new(0);
 
@@ -205,6 +205,9 @@ impl Application {
             opts.log_level(),
             opts.root.internal_log_rate_limit,
         );
+
+        // Set global color preference for downstream modules
+        crate::set_global_color(color);
 
         // Can only log this after initializing the logging subsystem
         if opts.root.openssl_no_probe {
@@ -511,7 +514,7 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
         .unwrap_or_else(|_| panic!("double thread initialization"));
     rt_builder.worker_threads(threads);
 
-    debug!(messaged = "Building runtime.", worker_threads = threads);
+    debug!(message = "Building runtime.", worker_threads = threads);
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 

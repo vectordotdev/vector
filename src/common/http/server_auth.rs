@@ -17,10 +17,11 @@ use vector_lib::{
 use vrl::{
     compiler::{CompilationResult, CompileConfig, Program, runtime::Runtime},
     core::Value,
-    diagnostic::Formatter,
     prelude::TypeState,
     value::{KeyString, ObjectMap},
 };
+
+use crate::format_vrl_diagnostics;
 
 use super::ErrorMessage;
 
@@ -159,16 +160,15 @@ impl HttpServerAuthConfig {
                     program,
                     warnings,
                     config: _,
-                } = compile_vrl(source, &functions, &state, config).map_err(|diagnostics| {
-                    Formatter::new(source, diagnostics).colored().to_string()
-                })?;
+                } = compile_vrl(source, &functions, &state, config)
+                    .map_err(|diagnostics| format_vrl_diagnostics(source, diagnostics))?;
 
                 if !program.final_type_info().result.is_boolean() {
                     return Err("VRL conditions must return a boolean.".into());
                 }
 
                 if !warnings.is_empty() {
-                    let warnings = Formatter::new(source, warnings).colored().to_string();
+                    let warnings = format_vrl_diagnostics(source, warnings);
                     warn!(message = "VRL compilation warning.", %warnings);
                 }
 
@@ -286,10 +286,10 @@ impl HttpServerAuthMatcher {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::{next_addr, random_string};
     use indoc::indoc;
 
     use super::*;
+    use crate::test_util::{next_addr, random_string};
 
     impl HttpServerAuthMatcher {
         fn auth_header(self) -> (HeaderValue, &'static str) {

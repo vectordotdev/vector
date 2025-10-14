@@ -40,6 +40,8 @@ on:
         value: ${{ jobs.source.outputs.component_docs }}
       markdown:
         value: ${{ jobs.source.outputs.markdown }}
+      scripts:
+        value: ${{ jobs.source.outputs.scripts }}
       website_only:
         value: ${{ jobs.source.outputs.website_only }}
       install:
@@ -142,6 +144,7 @@ jobs:
       cue: ${{ steps.filter.outputs.cue }}
       component_docs: ${{ steps.filter.outputs.component_docs }}
       markdown: ${{ steps.filter.outputs.markdown }}
+      scripts: ${{ steps.filter.outputs.scripts }}
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
@@ -187,6 +190,8 @@ jobs:
           markdown:
             - '**/**.md'
             - "vdev/**"
+          scripts:
+            - '**/**.sh'
           internal_events:
             - 'src/internal_events/**'
             - "vdev/**"
@@ -325,12 +330,13 @@ jobs:
     outputs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
+      opentelemetry-logs: ${{ steps.filter.outputs.opentelemetry-logs }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       # creates a yaml file that contains the filters for each test,
       # extracted from the output of the `vdev int ci-paths` command, which
-      # sources the paths from the scripts/integration/.../test.yaml files
+      # sources the paths from the scripts/e2e/.../test.yaml files
       - name: Create filter rules for e2e tests
         run: cargo vdev e2e ci-paths > int_test_filters.yaml
 

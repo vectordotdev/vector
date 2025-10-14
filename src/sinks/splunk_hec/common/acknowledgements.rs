@@ -1,17 +1,17 @@
+use hyper::Body;
+use serde::{Deserialize, Serialize};
+use std::io::Write;
 use std::{
     collections::HashMap,
     num::{NonZeroU8, NonZeroU64},
     sync::Arc,
     time::Duration,
 };
-
-use hyper::Body;
-use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::EventStatus;
+use vector_lib::{configurable::configurable_component, event::EventStatus};
 
 use super::service::{HttpRequestBuilder, MetadataFields};
+use crate::sinks::util::Compressor;
 use crate::{
     config::AcknowledgementsConfig,
     http::HttpClient,
@@ -216,10 +216,18 @@ impl HecAckClient {
         let request_body_bytes = crate::serde::json::to_bytes(request_body)
             .map_err(|_| HecAckApiError::ClientBuildRequest)?
             .freeze();
+        let mut compressor = Compressor::from(self.http_request_builder.compression);
+        compressor
+            .write_all(request_body_bytes.as_ref())
+            .map_err(|_| HecAckApiError::ClientBuildRequest)?;
+        let payload = compressor
+            .finish()
+            .map_err(|_| HecAckApiError::ClientBuildRequest)?
+            .freeze();
         let request = self
             .http_request_builder
             .build_request(
-                request_body_bytes,
+                payload,
                 "/services/collector/ack",
                 None,
                 MetadataFields::default(),

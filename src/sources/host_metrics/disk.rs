@@ -1,10 +1,9 @@
-use crate::internal_events::HostMetricsScrapeDetailError;
 use futures::StreamExt;
 use heim::units::information::byte;
-use vector_lib::configurable::configurable_component;
-use vector_lib::metric_tags;
+use vector_lib::{configurable::configurable_component, metric_tags};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
+use crate::internal_events::HostMetricsScrapeDetailError;
 
 /// Options for the disk metrics collector.
 #[configurable_component]
@@ -93,7 +92,7 @@ mod tests {
         // The Windows test runner doesn't generate any disk metrics on the VM.
         #[cfg(not(windows))]
         assert!(!metrics.is_empty());
-        assert!(metrics.len() % 4 == 0);
+        assert!(metrics.len().is_multiple_of(4));
         assert!(all_counters(&metrics));
 
         // There are exactly four disk_* names

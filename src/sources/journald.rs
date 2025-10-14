@@ -25,22 +25,22 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{CharacterDelimitedDecoder, decoding::BoxedFramingError};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{metadata_path, owned_value_path, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::{CharacterDelimitedDecoder, decoding::BoxedFramingError},
     config::{LegacyKey, LogNamespace},
-    schema::Definition,
-};
-use vector_lib::{
+    configurable::configurable_component,
     finalizer::OrderedFinalizer,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
+    lookup::{metadata_path, owned_value_path, path},
+    schema::Definition,
 };
-use vrl::event_path;
-use vrl::value::{Kind, Value, kind::Collection};
+use vrl::{
+    event_path,
+    value::{Kind, Value, kind::Collection},
+};
 
 use crate::{
     SourceSender,
@@ -1118,7 +1118,8 @@ mod tests {
 
     use super::*;
     use crate::{
-        config::ComponentKey, event::Event, event::EventStatus,
+        config::ComponentKey,
+        event::{Event, EventStatus},
         test_util::components::assert_source_compliance,
     };
 

@@ -148,8 +148,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::TimeZone;
+
+    use super::*;
 
     /// Ensures that serialized `GcpSeries` matches the format that GCP expects (https://cloud.google.com/monitoring/api/ref_v3/rest/v3/TimeSeries).
     #[test]

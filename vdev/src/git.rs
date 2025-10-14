@@ -1,8 +1,9 @@
-use crate::app::CommandExt as _;
+use std::{collections::HashSet, process::Command};
+
 use anyhow::{Result, anyhow, bail};
 use git2::{BranchType, ErrorCode, Repository};
-use std::path::{Path, PathBuf};
-use std::{collections::HashSet, process::Command};
+
+use crate::app::CommandExt as _;
 
 pub fn current_branch() -> Result<String> {
     let output = run_and_check_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;

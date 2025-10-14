@@ -1,12 +1,17 @@
-use crate::app;
-use crate::app::CommandExt;
-use crate::environment::{Environment, extract_present};
-use crate::testing::config::RustToolchainConfig;
-use crate::testing::docker::docker_command;
-use crate::util::IS_A_TTY;
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+};
+
 use anyhow::Result;
-use std::path::PathBuf;
-use std::{path::Path, process::Command};
+
+use crate::{
+    app,
+    app::CommandExt,
+    environment::{Environment, extract_present},
+    testing::{config::RustToolchainConfig, docker::docker_command},
+    util::IS_A_TTY,
+};
 
 pub const ALL_INTEGRATIONS_FEATURE_FLAG: &str = "all-integration-tests";
 
@@ -52,7 +57,6 @@ pub fn prepare_build_command(
     command
 }
 
-#[allow(dead_code)]
 /// Build the integration test‐runner image from `scripts/integration/Dockerfile`
 pub fn build_integration_image() -> Result<()> {
     let dockerfile: PathBuf = [app::path(), "scripts", "integration", "Dockerfile"]

@@ -3,11 +3,10 @@ use std::time::Duration;
 use metrics::Key;
 use regex::Regex;
 
+use super::recency::KeyMatcher;
 use crate::config::metrics_expiration::{
     MetricLabelMatcher, MetricLabelMatcherConfig, MetricNameMatcherConfig, PerMetricSetExpiration,
 };
-
-use super::recency::KeyMatcher;
 
 pub(super) struct MetricKeyMatcher {
     name: Option<MetricNameMatcher>,

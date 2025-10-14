@@ -6,15 +6,16 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    internal_event::{CountByteSize, InternalEventHandle as _},
+};
 use vrl::event_path;
 use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
-use vector_lib::EstimatedJsonEncodedSizeOf;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
-
-use crate::common::http::ErrorMessage;
 use crate::{
     SourceSender,
+    common::http::ErrorMessage,
     event::{Event, ObjectMap, TraceEvent, Value},
     sources::datadog_agent::{
         ApiKeyQueryParams, DatadogAgentSource, ddtrace_proto, handle_request,

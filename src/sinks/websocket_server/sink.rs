@@ -4,6 +4,24 @@ use std::{
     sync::{Arc, Mutex},
 };
 
+use super::{
+    WebSocketListenerSinkConfig,
+    buffering::MessageBufferingConfig,
+    config::{ExtraMetricTagsConfig, SubProtocolConfig},
+};
+use crate::{
+    codecs::{Encoder, Transformer},
+    common::http::server_auth::HttpServerAuthMatcher,
+    internal_events::{
+        ConnectionOpen, OpenGauge, WebSocketListenerConnectionEstablished,
+        WebSocketListenerConnectionFailedError, WebSocketListenerConnectionShutdown,
+        WebSocketListenerMessageSent, WebSocketListenerSendError,
+    },
+    sinks::{
+        prelude::*,
+        websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
+    },
+};
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{
@@ -22,6 +40,8 @@ use tokio_util::codec::Encoder as _;
 use tracing::Instrument;
 use url::Url;
 use uuid::Uuid;
+#[cfg(feature = "codecs-opentelemetry")]
+use vector_lib::codecs::encoding::Serializer::Otlp;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     event::{Event, EventStatus},
@@ -31,26 +51,6 @@ use vector_lib::{
     },
     sink::StreamSink,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
-};
-
-use crate::{
-    codecs::{Encoder, Transformer},
-    common::http::server_auth::HttpServerAuthMatcher,
-    internal_events::{
-        ConnectionOpen, OpenGauge, WebSocketListenerConnectionEstablished,
-        WebSocketListenerConnectionFailedError, WebSocketListenerConnectionShutdown,
-        WebSocketListenerMessageSent, WebSocketListenerSendError,
-    },
-    sinks::{
-        prelude::*,
-        websocket_server::buffering::{BufferReplayRequest, WsMessageBufferConfig},
-    },
-};
-
-use super::{
-    WebSocketListenerSinkConfig,
-    buffering::MessageBufferingConfig,
-    config::{ExtraMetricTagsConfig, SubProtocolConfig},
 };
 
 pub struct WebSocketListenerSink {
@@ -94,6 +94,8 @@ impl WebSocketListenerSink {
 
         match self.encoder.serializer() {
             RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
+            #[cfg(feature = "codecs-opentelemetry")]
+            Otlp(_) => true,
             Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
         }
     }
@@ -445,12 +447,12 @@ impl StreamSink<Event> for WebSocketListenerSink {
 
 #[cfg(test)]
 mod tests {
+    use std::{future::ready, num::NonZeroUsize};
+
     use futures::{SinkExt, Stream, StreamExt, channel::mpsc::UnboundedReceiver};
     use futures_util::stream;
-    use std::{future::ready, num::NonZeroUsize};
-    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
-
     use tokio::{task::JoinHandle, time};
+    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
     use vector_lib::{
         codecs::{
             JsonDeserializerConfig,
@@ -462,7 +464,6 @@ mod tests {
     };
 
     use super::*;
-
     use crate::{
         event::{Event, LogEvent},
         sinks::websocket_server::{

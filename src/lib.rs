@@ -114,8 +114,7 @@ pub mod stats;
 pub mod tap;
 pub mod template;
 pub mod test_util;
-#[cfg(feature = "api-client")]
-#[allow(unreachable_pub)]
+#[cfg(feature = "top")]
 pub mod top;
 #[allow(unreachable_pub)]
 pub mod topology;
@@ -130,10 +129,10 @@ pub mod validate;
 pub mod vector_windows;
 
 pub use source_sender::SourceSender;
-pub use vector_lib::{Error, Result, shutdown};
-pub use vector_lib::{event, metrics, schema, tcp, tls};
+pub use vector_lib::{Error, Result, event, metrics, schema, shutdown, tcp, tls};
 
 static APP_NAME_SLUG: std::sync::OnceLock<String> = std::sync::OnceLock::new();
+static USE_COLOR: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
 
 /// The name used to identify this Vector application.
 ///
@@ -150,6 +149,33 @@ pub fn get_slugified_app_name() -> String {
     APP_NAME_SLUG
         .get_or_init(|| get_app_name().to_lowercase().replace(' ', "-"))
         .clone()
+}
+
+/// Sets the global color preference for diagnostics and CLI output.
+/// This should be called once during application startup.
+pub fn set_global_color(enabled: bool) {
+    if let Err(e) = USE_COLOR.set(enabled) {
+        error!(message = "Failed to set global color.", %e);
+    }
+}
+
+/// Returns true if color output is globally enabled.
+/// Defaults to false if not set.
+pub fn use_color() -> bool {
+    *USE_COLOR.get_or_init(|| false)
+}
+
+/// Formats VRL diagnostics honoring the global color setting.
+pub fn format_vrl_diagnostics(
+    source: &str,
+    diagnostics: impl Into<vrl::diagnostic::DiagnosticList>,
+) -> String {
+    let formatter = vrl::diagnostic::Formatter::new(source, diagnostics);
+    if use_color() {
+        formatter.colored().to_string()
+    } else {
+        formatter.to_string()
+    }
 }
 
 /// The current version of Vector in simplified format.

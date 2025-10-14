@@ -1,6 +1,8 @@
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
-use std::{env, fs};
+use std::{
+    collections::BTreeMap,
+    env, fs,
+    path::{Path, PathBuf},
+};
 
 use anyhow::{Context, Result, bail};
 use indexmap::IndexMap;
@@ -8,8 +10,7 @@ use itertools::{self, Itertools};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-use crate::environment::Environment;
-use crate::{app, util};
+use crate::{app, environment::Environment, util};
 
 const FILE_NAME: &str = "test.yaml";
 
@@ -73,7 +74,21 @@ pub struct ComposeConfig {
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub volumes: BTreeMap<String, VolumeDefinition>,
     #[serde(default)]
-    pub networks: BTreeMap<String, BTreeMap<String, String>>,
+    pub networks: BTreeMap<String, BTreeMap<String, Value>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum DependsOn {
+    Simple(Vec<String>),
+    Conditional(BTreeMap<String, DependencyCondition>),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DependencyCondition {
+    pub condition: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -97,7 +112,7 @@ pub struct ComposeService {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub environment: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<DependsOn>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub healthcheck: Option<Value>,
 }

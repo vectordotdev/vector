@@ -1,14 +1,13 @@
 use std::{collections::HashMap, future::ready, pin::Pin, time::Duration};
 
 use futures::{Stream, StreamExt};
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
+use vector_lib::{config::LogNamespace, configurable::configurable_component};
 
-use crate::sinks::util::buffer::metrics::{MetricSet, NormalizerConfig, NormalizerSettings};
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
     event::Event,
     schema,
+    sinks::util::buffer::metrics::{MetricSet, NormalizerConfig, NormalizerSettings},
     transforms::{TaskTransform, Transform},
 };
 
@@ -99,9 +98,10 @@ impl TaskTransform<Event> for IncrementalToAbsolute {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
     use futures_util::SinkExt;
     use similar_asserts::assert_eq;
-    use std::sync::Arc;
     use vector_lib::config::ComponentKey;
 
     use super::*;

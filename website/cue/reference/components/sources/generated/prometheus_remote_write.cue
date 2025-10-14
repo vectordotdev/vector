@@ -112,6 +112,16 @@ generated: components: sources: prometheus_remote_write: configuration: {
 			}
 		}
 	}
+	skip_nan_values: {
+		description: """
+			Whether to skip/discard received samples with NaN values.
+
+			When enabled, any metric sample with a NaN value will be filtered out
+			during parsing, preventing downstream processing of invalid metrics.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false

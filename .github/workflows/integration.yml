@@ -25,7 +25,7 @@ env:
   TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
   RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
   PROFILE: debug
@@ -35,38 +35,20 @@ env:
 
 jobs:
   changes:
-    if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+    if: github.event_name == 'merge_group'
     uses: ./.github/workflows/changes.yml
     with:
       source: true
       int_tests: true
+      e2e_tests: true
     secrets: inherit
 
-  check-secrets:
-    runs-on: ubuntu-latest
-    outputs:
-      can_access_secrets: ${{ steps.secret_check.outputs.can_access_secrets }}
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-
-      - name: Determine if secrets are defined (PR author is team member)
-        id: secret_check
-        env:
-          GH_APP_DATADOG_VECTOR_CI_APP_ID: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_ID }}
-        run: |
-          if [[ "$GH_APP_DATADOG_VECTOR_CI_APP_ID" != "" ]]; then
-            echo "can_access_secrets=true" >> $GITHUB_OUTPUT
-          else
-            echo "can_access_secrets=false" >> $GITHUB_OUTPUT
-          fi
-
   integration-tests:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-8core
     needs:
       - changes
-      - check-secrets
 
-    if: ${{ !failure() && !cancelled() && (needs.check-secrets.outputs.can_access_secrets == 'true' || github.event_name == 'merge_group') }}
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
@@ -85,8 +67,8 @@ jobs:
           submodules: "recursive"
 
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
-        if: github.event_name == 'pull_request' || github.event_name == 'merge_group'
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        if: github.event_name == 'merge_group'
         with:
           name: int_tests_changes
 
@@ -110,8 +92,7 @@ jobs:
             fi
 
             # Check if any of the three conditions is true
-            if [[ "${{ github.event_name }}" == "merge_group" || \
-                  "${{ github.event_name }}" == "workflow_dispatch" || \
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
                   "${{ needs.changes.outputs.dependencies }}" == "true" || \
                   "$should_run" == "true" ]]; then
               # Only install dep if test runs
@@ -123,12 +104,45 @@ jobs:
             fi
 
 
+  e2e-tests:
+    runs-on: ubuntu-24.04-8core
+    needs:
+      - changes
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+    strategy:
+      matrix:
+        service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs" ]
+    timeout-minutes: 90
+
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          submodules: "recursive"
+
+      - name: Run E2E Tests for ${{ matrix.service }}
+        run: |
+          if [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
+            echo "Skipping ${{ matrix.service }} test since only website changes were detected"
+            exit 0
+          fi
+
+          # Check if any of the three conditions is true
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
+                "${{ needs.changes.outputs.dependencies }}" == "true" ]]; then
+            bash scripts/environment/prepare.sh --modules=datadog-ci
+            echo "Running test for ${{ matrix.service }}"
+            bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+          else
+          echo "Skipping ${{ matrix.service }} test because run conditions were not met."
+          fi
+
   integration-test-suite:
     name: Integration Test Suite
     runs-on: ubuntu-24.04
     if: always()
     needs:
       - integration-tests
+      - e2e-tests
     steps:
       - run: |
           if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then

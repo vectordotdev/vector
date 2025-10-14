@@ -16,13 +16,14 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::Encoder;
-use vector_lib::json_size::JsonSize;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
 use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
     configurable::configurable_component,
     internal_event::{BytesSent, Protocol},
+    json_size::JsonSize,
 };
 
+use super::datagram::{DatagramSocket, send_datagrams};
 use crate::{
     codecs::Transformer,
     common::backoff::ExponentialBackoff,
@@ -41,8 +42,6 @@ use crate::{
         },
     },
 };
-
-use super::datagram::{DatagramSocket, send_datagrams};
 
 #[derive(Debug, Snafu)]
 pub enum UnixError {
@@ -279,6 +278,7 @@ where
                 DatagramSocket::Unix(socket, self.connector.path.clone()),
                 &self.transformer,
                 &mut encoder,
+                &None,
                 &bytes_sent,
             )
             .await;

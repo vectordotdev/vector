@@ -128,6 +128,8 @@ impl Encoder<Framer> {
                 | Serializer::Text(_),
                 _,
             ) => "text/plain",
+            #[cfg(feature = "codecs-opentelemetry")]
+            (Serializer::Otlp(_), _) => "application/x-protobuf",
         }
     }
 }
@@ -189,8 +191,7 @@ mod tests {
     use bytes::BufMut;
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
-    use vector_lib::codecs::encoding::BoxedFramingError;
-    use vector_lib::event::LogEvent;
+    use vector_lib::{codecs::encoding::BoxedFramingError, event::LogEvent};
 
     use super::*;
 

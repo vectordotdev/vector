@@ -1,205 +1,228 @@
-use serde_json::Value;
-use std::collections::BTreeMap;
-use std::path::PathBuf;
+use prost::Message as ProstMessage;
+use prost_reflect::{DescriptorPool, prost::Message as ProstReflectMessage};
+use serde_json::Value as JsonValue;
+use std::{io, path::Path, process::Command};
+use vector_lib::opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
+use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEnum;
+use vector_lib::opentelemetry::proto::{DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE};
+use vrl::value::Value as VrlValue;
 
 const EXPECTED_LOG_COUNT: usize = 100;
 
-fn log_output_dir() -> PathBuf {
-    std::env::current_dir()
-        .expect("Failed to get current dir")
-        .join("tests")
-        .join("data")
-        .join("e2e")
-        .join("opentelemetry")
-        .join("logs")
-        .join("output")
-}
+fn read_file_helper(filename: &str) -> Result<String, io::Error> {
+    let local_path = Path::new("/output/opentelemetry-logs").join(filename);
+    if local_path.exists() {
+        // Running inside the runner container, volume is mounted
+        std::fs::read_to_string(local_path)
+    } else {
+        // Running on host
+        let out = Command::new("docker")
+            .args([
+                "run",
+                "--rm",
+                "-v",
+                "opentelemetry-logs_vector_target:/output",
+                "alpine:3.20",
+                "cat",
+                &format!("/output/{filename}"),
+            ])
+            .output()?;
 
-fn collector_log_path() -> PathBuf {
-    log_output_dir().join("collector-file-exporter.log")
-}
-
-fn vector_log_path() -> PathBuf {
-    log_output_dir().join("vector-file-sink.log")
-}
-
-use std::{fs, io, path::Path, thread, time::Duration};
-
-pub fn read_file_contents(path: &Path) -> Result<String, io::Error> {
-    let max_retries = 5;
-    let retry_delay = Duration::from_secs(2);
-    let mut last_err: Option<io::Error> = None;
-    for attempt in 1..=max_retries {
-        match fs::read_to_string(path) {
-            Ok(contents) => return Ok(contents),
-            Err(e) => {
-                eprintln!(
-                    "Attempt {attempt}/{max_retries}: Failed to read file '{}': {e}",
-                    path.display()
-                );
-                last_err = Some(e);
-                if attempt < max_retries {
-                    thread::sleep(retry_delay);
-                    continue;
-                }
-            }
+        if !out.status.success() {
+            return Err(io::Error::other(format!(
+                "docker run failed: {}\n{}",
+                out.status,
+                String::from_utf8_lossy(&out.stderr)
+            )));
         }
+
+        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
     }
-    Err(last_err.unwrap())
 }
 
-fn extract_count(value: &Value) -> u64 {
-    value
-        .get("attributes")
-        .and_then(|attrs| attrs.as_array())
-        .and_then(|arr| {
-            arr.iter().find_map(|attr| {
-                if attr.get("key")?.as_str()? == "count" {
-                    attr.get("value")?
-                        .get("intValue")?
-                        .as_str()
-                        .and_then(|s| s.parse::<u64>().ok())
-                        .or_else(|| attr.get("value")?.get("intValue")?.as_u64())
-                } else {
-                    None
-                }
-            })
-        })
-        .expect("Missing or invalid 'count' attribute in log record")
+fn parse_line_to_export_logs_request(line: &str) -> Result<ExportLogsServiceRequest, String> {
+    // Parse JSON and convert to VRL Value
+    let vrl_value: VrlValue = serde_json::from_str::<JsonValue>(line)
+        .map_err(|e| format!("Failed to parse JSON: {e}"))?
+        .into();
+
+    // Get the message descriptor from the descriptor pool
+    let descriptor_pool = DescriptorPool::decode(DESCRIPTOR_BYTES)
+        .map_err(|e| format!("Failed to decode descriptor pool: {e}"))?;
+
+    let message_descriptor = descriptor_pool
+        .get_message_by_name(LOGS_REQUEST_MESSAGE_TYPE)
+        .ok_or_else(|| {
+            format!("Message type '{LOGS_REQUEST_MESSAGE_TYPE}' not found in descriptor pool",)
+        })?;
+
+    // Encode VRL Value to DynamicMessage using VRL's encode_message with JSON names enabled
+    let dynamic_message = vrl::protobuf::encode::encode_message(
+        &message_descriptor,
+        vrl_value,
+        &vrl::protobuf::encode::Options {
+            use_json_names: true,
+        },
+    )
+    .map_err(|e| format!("Failed to encode VRL value to protobuf: {e}"))?;
+
+    // Encode DynamicMessage to bytes (using prost 0.13.5)
+    let mut buf = Vec::new();
+    ProstReflectMessage::encode(&dynamic_message, &mut buf)
+        .map_err(|e| format!("Failed to encode dynamic message to bytes: {e}"))?;
+
+    // Decode bytes into ExportLogsServiceRequest (using prost 0.12.6)
+    ProstMessage::decode(&buf[..])
+        .map_err(|e| format!("Failed to decode ExportLogsServiceRequest: {e}"))
 }
 
-fn sanitize(mut value: Value) -> Value {
-    if let Some(obj) = value.as_object_mut() {
-        obj.remove("traceId");
-        obj.remove("spanId");
+fn parse_export_logs_request(content: &str) -> Result<ExportLogsServiceRequest, String> {
+    // The file may contain multiple lines, each with a JSON object containing an array of resourceLogs
+    let mut merged_request = ExportLogsServiceRequest {
+        resource_logs: Vec::new(),
     };
-    value
+
+    for (line_num, line) in content.lines().enumerate() {
+        let line = line.trim();
+        if line.is_empty() {
+            continue;
+        }
+
+        // Merge resource_logs from this request into the accumulated result
+        merged_request.resource_logs.extend(
+            parse_line_to_export_logs_request(line)
+                .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
+                .resource_logs,
+        );
+    }
+
+    if merged_request.resource_logs.is_empty() {
+        return Err("No resource logs found in file".to_string());
+    }
+
+    Ok(merged_request)
 }
 
-fn normalize_numbers_to_strings(value: &Value) -> Value {
-    match value {
-        Value::Object(map) => {
-            let normalized = map
-                .iter()
-                .map(|(k, v)| (k.clone(), normalize_numbers_to_strings(v)))
-                .collect();
-            Value::Object(normalized)
+/// Asserts that all resource logs have a `service.name` attribute set to `"telemetrygen"`.
+fn assert_service_name(request: &ExportLogsServiceRequest) {
+    for (i, rl) in request.resource_logs.iter().enumerate() {
+        let resource = rl
+            .resource
+            .as_ref()
+            .unwrap_or_else(|| panic!("resource_logs[{i}] missing resource"));
+
+        let service_name_attr = resource
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "service.name")
+            .unwrap_or_else(|| panic!("resource_logs[{i}] missing 'service.name' attribute"));
+
+        let actual_value = service_name_attr
+            .value
+            .as_ref()
+            .and_then(|v| v.value.as_ref())
+            .unwrap_or_else(|| panic!("resource_logs[{i}] 'service.name' has no value"));
+
+        if let AnyValueEnum::StringValue(s) = actual_value {
+            assert_eq!(
+                s, "telemetrygen",
+                "resource_logs[{i}] 'service.name' expected 'telemetrygen', got '{s}'"
+            );
+        } else {
+            panic!("resource_logs[{i}] 'service.name' is not a string value");
         }
-        Value::Array(arr) => {
-            let normalized = arr.iter().map(normalize_numbers_to_strings).collect();
-            Value::Array(normalized)
-        }
-        Value::Number(n) => Value::String(n.to_string()),
-        other => other.clone(),
     }
 }
 
-fn read_log_records(path: &Path) -> BTreeMap<u64, Value> {
-    let content = read_file_contents(path).unwrap();
+/// Asserts that all log records have static field values:
+/// - `body`: `"the message"`
+/// - `severityText`: `"Info"`
+fn assert_log_records_static_fields(request: &ExportLogsServiceRequest) {
+    for (rl_idx, rl) in request.resource_logs.iter().enumerate() {
+        for (sl_idx, sl) in rl.scope_logs.iter().enumerate() {
+            for (lr_idx, log_record) in sl.log_records.iter().enumerate() {
+                let prefix =
+                    format!("resource_logs[{rl_idx}].scope_logs[{sl_idx}].log_records[{lr_idx}]");
 
-    let mut result = BTreeMap::new();
+                // Assert body is "the message"
+                let body_value = log_record
+                    .body
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{prefix} missing body"))
+                    .value
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{prefix} body has no value"));
 
-    for (idx, line) in content.lines().enumerate() {
-        let root: Value = serde_json::from_str(line).unwrap_or_else(|_| {
-            panic!(
-                "Malformed JSON on line {} in {}\nLine: {line}",
-                idx + 1,
-                path.display()
-            )
-        });
-
-        let resource_logs = root
-            .get("resourceLogs")
-            .and_then(|v| v.as_array())
-            .unwrap_or_else(|| {
-                panic!(
-                    "Missing or invalid 'resourceLogs' in line {} of {}",
-                    idx + 1,
-                    path.display()
-                )
-            });
-
-        for resource in resource_logs {
-            let scope_logs = resource
-                .get("scopeLogs")
-                .and_then(|v| v.as_array())
-                .unwrap_or_else(|| {
-                    panic!(
-                        "Missing or invalid 'scopeLogs' in line {} of {}",
-                        idx + 1,
-                        path.display()
-                    )
-                });
-
-            for scope in scope_logs {
-                let log_records = scope
-                    .get("logRecords")
-                    .and_then(|v| v.as_array())
-                    .unwrap_or_else(|| {
-                        panic!(
-                            "Missing or invalid 'logRecords' in line {} of {}",
-                            idx + 1,
-                            path.display()
-                        )
-                    });
-
-                for record in log_records {
-                    let count = extract_count(record);
-                    let sanitized = sanitize(record.clone());
-                    if result.insert(count, sanitized).is_some() {
-                        panic!("Duplicate count value {count} in {}", path.display());
-                    }
+                if let AnyValueEnum::StringValue(s) = body_value {
+                    assert_eq!(
+                        s, "the message",
+                        "{prefix} body expected 'the message', got '{s}'"
+                    );
+                } else {
+                    panic!("{prefix} body is not a string value");
                 }
+
+                // Assert severityText is "Info"
+                assert_eq!(
+                    log_record.severity_text, "Info",
+                    "{prefix} severityText expected 'Info', got '{}'",
+                    log_record.severity_text
+                );
+                // timeUnixNano is ignored as it varies
             }
         }
     }
-    result
-}
-
-/// # Panics
-/// After the timeout, this function will panic if both logs are not ready.
-fn wait_for_logs() -> (BTreeMap<u64, Value>, BTreeMap<u64, Value>) {
-    let collector_logs = read_log_records(&collector_log_path());
-    let vector_logs = read_log_records(&vector_log_path());
-
-    assert_eq!(
-        collector_logs.len(),
-        EXPECTED_LOG_COUNT,
-        "Collector did not produce expected number of log records"
-    );
-    assert_eq!(
-        vector_logs.len(),
-        EXPECTED_LOG_COUNT,
-        "Vector did not produce expected number of log records"
-    );
-
-    (collector_logs, vector_logs)
 }
 
 #[test]
 fn vector_sink_otel_sink_logs_match() {
-    let (collector_log_records, vector_log_records) = wait_for_logs();
+    let collector_content =
+        read_file_helper("collector-file-exporter.log").expect("Failed to read collector file");
+    let vector_content =
+        read_file_helper("vector-file-sink.log").expect("Failed to read vector file");
+
+    let collector_request = parse_export_logs_request(&collector_content)
+        .expect("Failed to parse collector logs as ExportLogsServiceRequest");
+    let vector_request = parse_export_logs_request(&vector_content)
+        .expect("Failed to parse vector logs as ExportLogsServiceRequest");
+
+    // Count total log records in collector output
+    let collector_log_count = collector_request
+        .resource_logs
+        .iter()
+        .flat_map(|rl| &rl.scope_logs)
+        .flat_map(|sl| &sl.log_records)
+        .count();
+
+    // Count total log records in vector output
+    let vector_log_count = vector_request
+        .resource_logs
+        .iter()
+        .flat_map(|rl| &rl.scope_logs)
+        .flat_map(|sl| &sl.log_records)
+        .count();
 
     assert_eq!(
-        collector_log_records.len(),
-        EXPECTED_LOG_COUNT,
-        "Collector did not produce expected number of log records"
-    );
-    assert_eq!(
-        vector_log_records.len(),
-        EXPECTED_LOG_COUNT,
-        "Vector did not produce expected number of log records"
+        collector_log_count, EXPECTED_LOG_COUNT,
+        "Collector produced {collector_log_count} log records, expected {EXPECTED_LOG_COUNT}"
     );
 
-    for count in 0..EXPECTED_LOG_COUNT as u64 {
-        let collector_log = collector_log_records
-            .get(&count)
-            .unwrap_or_else(|| panic!("Missing {count}) key"));
-        let vector_log = vector_log_records
-            .get(&count)
-            .unwrap_or_else(|| panic!("Missing {count}) key"));
-        let collector_log_normalized = normalize_numbers_to_strings(collector_log);
-        let vector_log_normalized = normalize_numbers_to_strings(vector_log);
-        assert_eq!(collector_log_normalized, vector_log_normalized);
-    }
+    assert_eq!(
+        vector_log_count, EXPECTED_LOG_COUNT,
+        "Vector produced {vector_log_count} log records, expected {EXPECTED_LOG_COUNT}"
+    );
+
+    // Verify service.name attribute
+    assert_service_name(&collector_request);
+    assert_service_name(&vector_request);
+
+    // Verify static log record fields
+    assert_log_records_static_fields(&collector_request);
+    assert_log_records_static_fields(&vector_request);
+
+    // Compare the requests - this compares the full protobuf structure
+    assert_eq!(
+        collector_request, vector_request,
+        "ExportLogsServiceRequest mismatch between collector and vector"
+    );
 }

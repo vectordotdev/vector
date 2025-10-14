@@ -12,7 +12,7 @@ generated: components: sinks: aws_s3: configuration: {
 		required: false
 		type: object: options: enabled: {
 			description: """
-				Whether or not end-to-end acknowledgements are enabled.
+				Controls whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source that supports end-to-end
 				acknowledgements that is connected to that sink waits for events
@@ -378,7 +378,7 @@ generated: components: sinks: aws_s3: configuration: {
 					}
 					device_version: {
 						description: """
-																Identifies the version of the problem. The combination of the device product, vendor and this value make up the unique id of the device that sends messages.
+																Identifies the version of the problem. The combination of the device product, vendor, and this value make up the unique id of the device that sends messages.
 																The value length must be less than or equal to 31.
 																"""
 						required: true
@@ -408,7 +408,6 @@ generated: components: sinks: aws_s3: configuration: {
 					severity: {
 						description: """
 																This is a path that points to the field of a log event that reflects importance of the event.
-																Reflects importance of the event.
 
 																It must point to a number from 0 to 10.
 																0 = lowest_importance, 10 = highest_importance.
@@ -489,6 +488,15 @@ generated: components: sinks: aws_s3: configuration: {
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
+					otlp: """
+						Encodes an event in the [OTLP (OpenTelemetry Protocol)][otlp] format.
+
+						This codec uses protobuf encoding, which is the recommended format for OTLP.
+						The output is suitable for sending to OTLP-compatible endpoints with
+						`content-type: application/x-protobuf`.
+
+						[otlp]: https://opentelemetry.io/docs/specs/otlp/
+						"""
 					protobuf: """
 						Encodes an event as a [Protobuf][protobuf] message.
 
@@ -523,7 +531,7 @@ generated: components: sinks: aws_s3: configuration: {
 					capacity: {
 						description: """
 																Sets the capacity (in bytes) of the internal buffer used in the CSV writer.
-																This defaults to 8KB.
+																This defaults to 8192 bytes (8KB).
 																"""
 						required: false
 						type: uint: default: 8192
@@ -602,6 +610,20 @@ generated: components: sinks: aws_s3: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			gelf: {
+				description:   "The GELF Serializer Options."
+				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: max_chunk_size: {
+					description: """
+						Maximum size for each GELF chunked datagram (including 12-byte header).
+						Chunking starts when datagrams exceed this size.
+						For Graylog target, keep at or below 8192 bytes; for Vector target (`gelf` decoding with `chunked_gelf` framing), up to 65,500 bytes is recommended.
+						"""
+					required: false
+					type: uint: default: 8192
+				}
+			}
 			json: {
 				description:   "Options for the JsonSerializer."
 				relevant_when: "codec = \"json\""
@@ -617,7 +639,7 @@ generated: components: sinks: aws_s3: configuration: {
 					Controls how metric tag values are encoded.
 
 					When set to `single`, only the last non-bare value of tags are displayed with the
-					metric.  When set to `full`, all metric tags are exposed as separate assignments.
+					metric. When set to `full`, all metric tags are exposed as separate assignments.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
@@ -670,7 +692,7 @@ generated: components: sinks: aws_s3: configuration: {
 					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
 					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
 					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
-					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
 				}
 			}
 		}
@@ -941,12 +963,12 @@ generated: components: sinks: aws_s3: configuration: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
-																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
+																Valid values are greater than or equal to `0`, and reasonable values range from `1.0` to `3.0`.
 
-																When calculating the past RTT average, we also compute a secondary “deviation” value that indicates how variable
-																those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
+																When calculating the past RTT average, a secondary “deviation” value is also computed that indicates how variable
+																those values are. That deviation is used when comparing the past RTT average to the current measurements, so we
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
-																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
+																an appropriate range. Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
 						required: false
 						type: float: default: 2.5
@@ -1008,7 +1030,7 @@ generated: components: sinks: aws_s3: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
+					After the first retry has failed, the Fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -1061,7 +1083,7 @@ generated: components: sinks: aws_s3: configuration: {
 	}
 	retry_strategy: {
 		description: """
-			Specifies errors to retry
+			Specifies retry strategy for failed requests.
 
 			By default, the sink only retries attempts it deems possible to retry.
 			These settings extend the default behavior.
@@ -1078,11 +1100,25 @@ generated: components: sinks: aws_s3: configuration: {
 				description: "The retry strategy enum."
 				required:    false
 				type: string: {
-					default: "none"
+					default: "default"
 					enum: {
 						all:    "Retry on *all* errors"
 						custom: "Custom retry strategy"
-						none:   "Don't retry any errors"
+						default: """
+															Default strategy. The following error types will be retried:
+															- `TimeoutError`
+															- `DispatchFailure`
+															- `ResponseError` or `ServiceError` when:
+															  - HTTP status is 5xx
+															  - Status is 429 (Too Many Requests)
+															  - `x-amz-retry-after` header is present
+															  - HTTP status is 4xx and response body contains one of:
+															    - `"RequestTimeout"`
+															    - `"RequestExpired"`
+															    - `"ThrottlingException"`
+															- Fallback: Any unknown error variant
+															"""
+						none: "Don't retry any errors"
 					}
 				}
 			}
