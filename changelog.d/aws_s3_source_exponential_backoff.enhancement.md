@@ -2,4 +2,4 @@ The `aws_s3` source now uses exponential backoff when retrying failed SQS `recei
 
 The new behavior starts at 500ms and doubles with each consecutive failure, capping at 30 seconds. This prevents excessive API calls during prolonged AWS SQS outages, invalid IAM permissions, or throttling scenarios, while still being responsive when the service recovers.
 
-authors: @medzin @pront
+authors: medzin pront
