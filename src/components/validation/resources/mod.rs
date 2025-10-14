@@ -157,6 +157,7 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
                 protobuf: vector_lib::codecs::encoding::ProtobufSerializerOptions {
                     desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
+                    use_json_names: config.protobuf.use_json_names,
                 },
             })
         }
@@ -229,6 +230,7 @@ fn serializer_config_to_deserializer(
                 protobuf: vector_lib::codecs::decoding::ProtobufDeserializerOptions {
                     desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
+                    use_json_names: config.protobuf.use_json_names,
                 },
             })
         }
