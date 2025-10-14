@@ -15,10 +15,12 @@ export DEBIAN_FRONTEND=noninteractive
 export ACCEPT_EULA=Y
 
 # Configure apt for speed and efficiency
-echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
-echo 'Acquire::Queue-Mode "host";' > /etc/apt/apt.conf.d/90-parallel
-echo 'Acquire::Languages "none";' > /etc/apt/apt.conf.d/90-nolang
-echo 'APT::Install-Recommends "false";' > /etc/apt/apt.conf.d/90-norecommends
+cat > /etc/apt/apt.conf.d/90-vector-optimizations <<EOF
+Acquire::Retries "5";
+Acquire::Queue-Mode "host";
+Acquire::Languages "none";
+APT::Install-Recommends "false";
+EOF
 
 apt-get update --yes
 
