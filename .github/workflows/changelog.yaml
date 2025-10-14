@@ -62,9 +62,7 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name }}
           ref: ${{ github.event.pull_request.head.sha }}
           path: tmp
-          sparse-checkout: |
-            changelog.d/
-            scripts/environment/prepare.sh # FIXME DO NOT MERGE
+          sparse-checkout: changelog.d/
 
       - name: Prepare vdev
         if: env.SHOULD_RUN == 'true'
