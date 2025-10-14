@@ -222,10 +222,7 @@ generated: components: sources: mqtt: configuration: {
 																when interfacing with systems that use JSON naming conventions.
 																"""
 						required: false
-						type: bool: {
-							default: false
-							examples: [true]
-						}
+						type: bool: default: false
 					}
 				}
 			}
