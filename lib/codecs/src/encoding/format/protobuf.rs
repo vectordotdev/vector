@@ -72,8 +72,7 @@ pub struct ProtobufSerializerOptions {
     ///
     /// This is useful when working with data that has already been converted from JSON or
     /// when interfacing with systems that use JSON naming conventions.
-    #[serde(default)]
-    #[configurable(metadata(docs::examples = true))]
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub use_json_names: bool,
 }
 

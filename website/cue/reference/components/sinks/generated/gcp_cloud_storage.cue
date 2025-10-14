@@ -553,10 +553,7 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 																when interfacing with systems that use JSON naming conventions.
 																"""
 						required: false
-						type: bool: {
-							default: false
-							examples: [true]
-						}
+						type: bool: default: false
 					}
 				}
 			}

@@ -406,6 +406,7 @@ mod tests {
             protobuf: ProtobufSerializerOptions {
                 desc_file: test_data_dir().join("test_proto.desc"),
                 message_type: "test_proto.User".to_string(),
+                ..Default::default()
             },
         };
 
