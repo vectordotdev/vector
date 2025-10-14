@@ -9,7 +9,7 @@ use std::{cmp::min, path::PathBuf, time::Duration};
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{future::FutureExt, stream::StreamExt};
-use futures_util::{SinkExt, Stream};
+use futures_util::Stream;
 use http_1::{HeaderName, HeaderValue};
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use k8s_paths_provider::K8sPathsProvider;
@@ -74,7 +74,7 @@ mod util;
 use self::{
     namespace_metadata_annotator::NamespaceMetadataAnnotator,
     node_metadata_annotator::NodeMetadataAnnotator, parser::Parser,
-    pod_metadata_annotator::PodMetadataAnnotator, reconciler::LogWithMetadata,
+    pod_metadata_annotator::PodMetadataAnnotator,
 };
 
 /// The `self_node_name` value env var key.
@@ -969,53 +969,15 @@ impl Source {
 
         // Only run reconciler when api_log is enabled
         let reconciler_fut = if let Some(reconciler_watcher) = reconciler_pod_watcher {
-            let (api_logs_tx, mut api_logs_rx) =
-                futures::channel::mpsc::unbounded::<LogWithMetadata>();
-            let reconciler =
-                reconciler::Reconciler::new(client.clone(), api_logs_tx, reconciler_watcher);
-
-            let file_source_tx_clone = file_source_tx.clone();
+            let reconciler = reconciler::Reconciler::new(
+                client.clone(),
+                file_source_tx.clone(),
+                reconciler_watcher,
+            );
 
             Some(async move {
                 info!("Starting event-driven reconciler");
-
-                // Spawn reconciler run task and log processing in parallel
-                let reconciler_task = tokio::spawn(async move {
-                    reconciler.run().await;
-                });
-
-                let log_processing_task = tokio::spawn(async move {
-                    let mut file_source_tx = file_source_tx_clone;
-                    // Process incoming logs from the channel
-                    while let Some(log_with_metadata) = api_logs_rx.next().await {
-                        // Create a filename that includes the container metadata for proper annotation
-                        let filename = format!(
-                            "k8s-api://{}/{}/{}",
-                            log_with_metadata.namespace_name,
-                            log_with_metadata.pod_name,
-                            log_with_metadata.container_name
-                        );
-                        let text = log_with_metadata.log_line;
-                        let text_len = text.len() as u64;
-                        let line = vector_lib::file_source::file_server::Line {
-                            text,
-                            filename,
-                            file_id: vector_lib::file_source_common::FileFingerprint::Unknown(0),
-                            start_offset: 0,
-                            end_offset: text_len,
-                        };
-
-                        // Send through existing file processing pipeline
-                        if let Err(e) = file_source_tx.send(vec![line]).await {
-                            warn!("Failed to send API log through file pipeline: {}", e);
-                            break;
-                        }
-                    }
-                    info!("Reconciler log processing completed");
-                });
-
-                // Wait for both tasks to complete
-                let _ = tokio::try_join!(reconciler_task, log_processing_task);
+                reconciler.run().await;
             })
         } else {
             None

@@ -12,19 +12,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::pin::Pin;
 use tracing::{info, trace, warn};
-
-/// Log line with associated container metadata
-#[derive(Clone, Debug)]
-pub struct LogWithMetadata {
-    /// The actual log content
-    pub log_line: Bytes,
-    /// Pod name
-    pub pod_name: String,
-    /// Namespace name
-    pub namespace_name: String,
-    /// Container name
-    pub container_name: String,
-}
+use vector_lib::{file_source::file_server::Line, file_source_common::FileFingerprint};
 
 /// Container key for identifying unique container instances
 /// Format: "{namespace}/{pod_name}/{container_name}"
@@ -149,17 +137,13 @@ pub struct Reconciler {
 }
 
 impl Reconciler {
-    pub fn new<S>(
-        client: Client,
-        log_sender: mpsc::UnboundedSender<LogWithMetadata>,
-        pod_watcher: S,
-    ) -> Self
+    pub fn new<S>(client: Client, line_sender: mpsc::Sender<Vec<Line>>, pod_watcher: S) -> Self
     where
         S: Stream<Item = watcher::Result<watcher::Event<Pod>>> + Send + 'static,
     {
         let esb = EventStreamBuilder {
             client: client.clone(),
-            log_sender,
+            line_sender,
         };
         Self {
             esb,
@@ -248,7 +232,7 @@ impl Reconciler {
 #[derive(Clone)]
 struct EventStreamBuilder {
     client: Client,
-    log_sender: mpsc::UnboundedSender<LogWithMetadata>,
+    line_sender: mpsc::Sender<Vec<Line>>,
 }
 
 #[derive(Clone)]
@@ -329,17 +313,25 @@ impl EventStreamBuilder {
                                 );
                             }
 
-                            // Send the log line with metadata to the channel
-                            let log_with_metadata = LogWithMetadata {
-                                log_line: line_bytes,
-                                pod_name: log_info.container_info.pod_name.clone(),
-                                namespace_name: log_info.container_info.namespace.clone(),
-                                container_name: log_info.container_info.container_name.clone(),
+                            // Create filename for proper annotation
+                            let filename = format!(
+                                "k8s-api://{}/{}/{}",
+                                log_info.container_info.namespace,
+                                log_info.container_info.pod_name,
+                                log_info.container_info.container_name
+                            );
+                            let text_len = line_bytes.len() as u64;
+                            let line = Line {
+                                text: line_bytes,
+                                filename,
+                                file_id: FileFingerprint::Unknown(0),
+                                start_offset: 0,
+                                end_offset: text_len,
                             };
 
-                            if let Err(_) = self.log_sender.send(log_with_metadata).await {
+                            if let Err(_) = self.line_sender.send(vec![line]).await {
                                 warn!(
-                                    "Log channel closed for container '{}' in pod '{}', stopping stream",
+                                    "Line channel closed for container '{}' in pod '{}', stopping stream",
                                     log_info.container_info.container_name,
                                     log_info.container_info.pod_name
                                 );
