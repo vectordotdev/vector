@@ -262,7 +262,7 @@ impl EventStreamBuilder {
                             let line = Line {
                                 text: line_bytes,
                                 filename: String::new(), // Filename is not applicable for k8s logs
-                                file_id: FileFingerprint::Unknown(0),
+                                file_id: FileFingerprint::FirstLinesChecksum(0),
                                 start_offset: 0,
                                 end_offset: text_len,
                             };
