@@ -59,18 +59,18 @@ pub struct ContainerInfo {
 
 /// Container log information with timestamp tracking
 /// Similar to docker_logs ContainerLogInfo for position tracking
-#[derive(Clone, Debug)]
-struct ContainerLogInfo {
-    /// Container information
-    container_info: ContainerInfo,
+#[derive(Debug)]
+struct ContainerLogInfo<'a> {
+    /// Container information reference
+    container_info: &'a ContainerInfo,
     /// Timestamp of when this tracking started
     created: DateTime<Utc>,
     /// Timestamp of last log message processed
     last_log: Option<DateTime<FixedOffset>>,
 }
 
-impl ContainerLogInfo {
-    fn new(container_info: ContainerInfo, created: DateTime<Utc>) -> Self {
+impl<'a> ContainerLogInfo<'a> {
+    fn new(container_info: &'a ContainerInfo, created: DateTime<Utc>) -> Self {
         Self {
             container_info,
             created,
@@ -193,21 +193,20 @@ struct EventStreamBuilder {
 #[derive(Clone)]
 enum TailerState {
     Running,
-    // Stopped,
 }
 
 impl EventStreamBuilder {
     pub fn start(&self, container_info: ContainerInfo) -> TailerState {
         let this = self.clone();
         tokio::spawn(async move {
-            let log_info = ContainerLogInfo::new(container_info, Utc::now());
+            let log_info = ContainerLogInfo::new(&container_info, Utc::now());
             this.run_event_stream(log_info).await;
             return;
         });
         TailerState::Running
     }
 
-    pub async fn run_event_stream(mut self, log_info: ContainerLogInfo) {
+    pub async fn run_event_stream(mut self, log_info: ContainerLogInfo<'_>) {
         let pods: Api<Pod> =
             Api::namespaced(self.client.clone(), &log_info.container_info.namespace);
 
