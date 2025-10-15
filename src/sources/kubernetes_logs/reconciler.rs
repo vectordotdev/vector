@@ -7,7 +7,37 @@ use k8s_openapi::api::core::v1::Pod;
 use kube::runtime::reflector::Store;
 use kube::{Api, Client, api::LogParams};
 use std::collections::HashMap;
+use std::fmt;
 use tracing::{info, trace, warn};
+
+/// Container key for identifying unique container instances
+/// Format: "{namespace}/{pod_name}/{container_name}"
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct ContainerKey(String);
+
+impl fmt::Display for ContainerKey {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl From<&ContainerInfo> for ContainerKey {
+    fn from(container_info: &ContainerInfo) -> Self {
+        ContainerKey(format!(
+            "{}/{}/{}",
+            container_info.namespace, container_info.pod_name, container_info.container_name
+        ))
+    }
+}
+
+impl From<(&PodInfo, &str)> for ContainerKey {
+    fn from((pod_info, container_name): (&PodInfo, &str)) -> Self {
+        ContainerKey(format!(
+            "{}/{}/{}",
+            pod_info.namespace, pod_info.name, container_name
+        ))
+    }
+}
 
 /// Container information for log tailing
 #[derive(Clone, Debug)]
@@ -97,7 +127,7 @@ impl ContainerLogInfo {
 pub struct Reconciler {
     pod_state: Store<Pod>,
     esb: EventStreamBuilder,
-    states: HashMap<String, TailerState>, // Keyed by "namespace/pod/container"
+    states: HashMap<ContainerKey, TailerState>, // Keyed by ContainerKey
 }
 
 impl Reconciler {
@@ -202,12 +232,7 @@ impl Reconciler {
                     container_info.namespace
                 );
 
-                let key = format!(
-                    "{}/{}/{}",
-                    container_info.namespace,
-                    container_info.pod_name,
-                    container_info.container_name
-                );
+                let key = ContainerKey::from(&container_info);
 
                 // // Check if we already have tracking info for this container
                 // let log_info = if let Some(existing_info) = self.states.get(&key) {
