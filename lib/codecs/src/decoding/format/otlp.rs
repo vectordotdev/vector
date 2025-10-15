@@ -35,19 +35,7 @@ impl OtlpDeserializerConfig {
     pub fn schema_definition(&self, log_namespace: LogNamespace) -> schema::Definition {
         match log_namespace {
             LogNamespace::Legacy => {
-                let mut definition =
-                    schema::Definition::empty_legacy_namespace().unknown_fields(Kind::any());
-
-                if let Some(timestamp_key) = log_schema().timestamp_key() {
-                    definition = definition.try_with_field(
-                        timestamp_key,
-                        // The OTLP decoder will try to insert a new `timestamp`-type value into the
-                        // "timestamp_key" field, but only if that field doesn't already exist.
-                        Kind::any().or_timestamp(),
-                        Some("timestamp"),
-                    );
-                }
-                definition
+                schema::Definition::empty_legacy_namespace().unknown_fields(Kind::any())
             }
             LogNamespace::Vector => {
                 schema::Definition::new_with_default_metadata(Kind::any(), [log_namespace])
@@ -118,38 +106,31 @@ impl Deserializer for OtlpDeserializer {
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         // Try parsing as logs and check for resourceLogs field
-        if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace) {
-            if let Some(Event::Log(log)) = events.first() {
-                if log.get(RESOURCE_LOGS_JSON_FIELD).is_some() {
+        if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace)
+            && let Some(Event::Log(log)) = events.first()
+            && log.get(RESOURCE_LOGS_JSON_FIELD).is_some() {
                     return Ok(events);
                 }
-            }
-        }
 
         // Try parsing as metrics and check for resourceMetrics field
         if let Ok(events) = self
             .metrics_deserializer
             .parse(bytes.clone(), log_namespace)
-        {
-            if let Some(Event::Log(log)) = events.first() {
-                if log.get(RESOURCE_METRICS_JSON_FIELD).is_some() {
+            && let Some(Event::Log(log)) = events.first()
+            && log.get(RESOURCE_METRICS_JSON_FIELD).is_some() {
                     return Ok(events);
                 }
-            }
-        }
 
         // Try parsing as traces and check for resourceSpans field
-        if let Ok(mut events) = self.traces_deserializer.parse(bytes, log_namespace) {
-            if let Some(Event::Log(log)) = events.first() {
-                if log.get(RESOURCE_SPANS_JSON_FIELD).is_some() {
+        if let Ok(mut events) = self.traces_deserializer.parse(bytes, log_namespace)
+            && let Some(Event::Log(log)) = events.first()
+            && log.get(RESOURCE_SPANS_JSON_FIELD).is_some() {
                     // Convert the log event to a trace event by taking ownership
                     if let Some(Event::Log(log)) = events.pop() {
                         let trace_event = Event::Trace(log.into());
                         return Ok(smallvec![trace_event]);
                     }
                 }
-            }
-        }
 
         Err(format!(
             "Invalid OTLP data: expected '{RESOURCE_LOGS_JSON_FIELD}', '{RESOURCE_METRICS_JSON_FIELD}', or '{RESOURCE_SPANS_JSON_FIELD}'",
