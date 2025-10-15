@@ -159,6 +159,14 @@ mod tests {
 
     use super::*;
 
+    // trace_id: 0102030405060708090a0b0c0d0e0f10 (16 bytes)
+    const TEST_TRACE_ID: [u8; 16] = [
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
+        0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+    ];
+    // span_id: 0102030405060708 (8 bytes)
+    const TEST_SPAN_ID: [u8; 8] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
+
     fn create_logs_request_bytes() -> Bytes {
         let request = ExportLogsServiceRequest {
             resource_logs: vec![ResourceLogs {
@@ -223,8 +231,8 @@ mod tests {
                 scope_spans: vec![ScopeSpans {
                     scope: None,
                     spans: vec![Span {
-                        trace_id: vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16],
-                        span_id: vec![1, 2, 3, 4, 5, 6, 7, 8],
+                        trace_id: TEST_TRACE_ID.to_vec(),
+                        span_id: TEST_SPAN_ID.to_vec(),
                         trace_state: String::new(),
                         parent_span_id: vec![],
                         name: "test_span".to_string(),
@@ -248,6 +256,54 @@ mod tests {
         Bytes::from(request.encode_to_vec())
     }
 
+    fn validate_trace_ids(trace: &vrl::value::Value) {
+        // Navigate to the span and check traceId and spanId
+        let resource_spans = trace
+            .get("resourceSpans")
+            .and_then(|v| v.as_array())
+            .expect("resourceSpans should be an array");
+
+        let first_rs = resource_spans.first().expect("should have at least one resource span");
+
+        let scope_spans = first_rs
+            .get("scopeSpans")
+            .and_then(|v| v.as_array())
+            .expect("scopeSpans should be an array");
+
+        let first_ss = scope_spans.first().expect("should have at least one scope span");
+
+        let spans = first_ss
+            .get("spans")
+            .and_then(|v| v.as_array())
+            .expect("spans should be an array");
+
+        let span = spans.first().expect("should have at least one span");
+
+        // Verify traceId - should be raw bytes (16 bytes for trace_id)
+        let trace_id = span
+            .get("traceId")
+            .and_then(|v| v.as_bytes())
+            .expect("traceId should exist and be bytes");
+
+        assert_eq!(
+            trace_id.as_ref(),
+            &TEST_TRACE_ID,
+            "traceId should match the expected 16 bytes (0102030405060708090a0b0c0d0e0f10)"
+        );
+
+        // Verify spanId - should be raw bytes (8 bytes for span_id)
+        let span_id = span
+            .get("spanId")
+            .and_then(|v| v.as_bytes())
+            .expect("spanId should exist and be bytes");
+
+        assert_eq!(
+            span_id.as_ref(),
+            &TEST_SPAN_ID,
+            "spanId should match the expected 8 bytes (0102030405060708)"
+        );
+    }
+
     fn assert_otlp_event(bytes: Bytes, field: &str, is_trace: bool) {
         let deserializer = OtlpDeserializer::new().unwrap();
         let events = deserializer.parse(bytes, LogNamespace::Legacy).unwrap();
@@ -255,7 +311,9 @@ mod tests {
         assert_eq!(events.len(), 1);
         if is_trace {
             assert!(matches!(events[0], Event::Trace(_)));
-            assert!(events[0].as_trace().get(field).is_some());
+            let trace = events[0].as_trace();
+            assert!(trace.get(field).is_some());
+            validate_trace_ids(trace.value());
         } else {
             assert!(events[0].as_log().get(field).is_some());
         }
