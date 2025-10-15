@@ -72,7 +72,7 @@ components: sources: opentelemetry: {
 
 	output: {
 		logs: event: {
-			description: "An individual log event from a batch of events received through an OTLP request"
+			description: "An individual log event from a batch of events received through an OTLP request. The following applies only when the `use_otlp_decoding` option is `false`."
 			fields: {
 				attributes: {
 					description: "Attributes that describe the specific event occurrence."
@@ -241,10 +241,10 @@ components: sources: opentelemetry: {
 			}
 		}
 		metrics: "": {
-			description: "The input `metric` event."
+			description: "Metric events that may be emitted by this source."
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 
