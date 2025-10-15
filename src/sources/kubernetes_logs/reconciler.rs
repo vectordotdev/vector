@@ -70,7 +70,7 @@ struct ContainerLogInfo<'a> {
 }
 
 impl<'a> ContainerLogInfo<'a> {
-    fn new(container_info: &'a ContainerInfo, created: DateTime<Utc>) -> Self {
+    const fn new(container_info: &'a ContainerInfo, created: DateTime<Utc>) -> Self {
         Self {
             container_info,
             created,
@@ -120,15 +120,15 @@ impl Reconciler {
                 }
                 Ok(watcher::Event::InitApply(pod)) | Ok(watcher::Event::Apply(pod)) => {
                     let pod_info = PodInfo::from(&pod);
-                    if let Some(phase) = &pod_info.phase {
-                        if phase == "Running" {
-                            info!(
-                                "Pod '{}' is running, starting log reconciliation",
-                                pod_info.name
-                            );
-                            if let Err(e) = self.reconcile_pod_containers(&pod_info).await {
-                                warn!("Failed to reconcile pod '{}': {}", pod_info.name, e);
-                            }
+                    if let Some(phase) = &pod_info.phase
+                        && phase == "Running"
+                    {
+                        info!(
+                            "Pod '{}' is running, starting log reconciliation",
+                            pod_info.name
+                        );
+                        if let Err(e) = self.reconcile_pod_containers(&pod_info).await {
+                            warn!("Failed to reconcile pod '{}': {}", pod_info.name, e);
                         }
                     }
                 }
@@ -201,7 +201,6 @@ impl EventStreamBuilder {
         tokio::spawn(async move {
             let log_info = ContainerLogInfo::new(&container_info, Utc::now());
             this.run_event_stream(log_info).await;
-            return;
         });
         TailerState::Running
     }
@@ -246,11 +245,11 @@ impl EventStreamBuilder {
                         Ok(0) => break, // EOF
                         Ok(_) => {
                             // Remove trailing newline if present
-                            if buffer.ends_with(&[b'\n']) {
+                            if buffer.ends_with(b"\n") {
                                 buffer.pop();
                             }
                             // Remove trailing carriage return if present (for CRLF)
-                            if buffer.ends_with(&[b'\r']) {
+                            if buffer.ends_with(b"\r") {
                                 buffer.pop();
                             }
 
@@ -267,7 +266,7 @@ impl EventStreamBuilder {
                                 end_offset: text_len,
                             };
 
-                            if let Err(_) = self.line_sender.send(vec![line]).await {
+                            if self.line_sender.send(vec![line]).await.is_err() {
                                 warn!(
                                     "Line channel closed for container '{}' in pod '{}', stopping stream",
                                     log_info.container_info.container_name,
