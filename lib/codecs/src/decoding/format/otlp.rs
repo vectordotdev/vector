@@ -7,7 +7,7 @@ use opentelemetry_proto::proto::{
 use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::{
-    config::{DataType, LogNamespace, log_schema},
+    config::{DataType, LogNamespace},
     event::Event,
     schema,
 };
