@@ -11,7 +11,7 @@ use kube::{Api, Client, api::LogParams};
 use std::collections::HashMap;
 use std::fmt;
 use std::pin::Pin;
-use tracing::{info, trace, warn};
+use tracing::{info, warn};
 use vector_lib::{file_source::file_server::Line, file_source_common::FileFingerprint};
 
 /// Container key for identifying unique container instances
@@ -78,55 +78,10 @@ impl ContainerLogInfo {
         }
     }
 
-    /// Get the timestamp from which logs should be fetched
-    /// Only logs after this point need to be fetched
     fn log_since(&self) -> DateTime<Utc> {
         self.last_log
             .map(|dt| dt.with_timezone(&Utc))
             .unwrap_or(self.created)
-    }
-
-    /// Update the last log timestamp when processing a log line
-    /// Returns true if the timestamp was successfully parsed and updated
-    fn update_last_log_timestamp(&mut self, log_line: &[u8]) -> bool {
-        // Kubernetes log format typically starts with RFC3339 timestamp
-        // e.g., "2023-10-11T10:30:00.123456789Z message content"
-        if let Some(timestamp_end) = log_line.iter().position(|&b| b == b' ') {
-            let timestamp_bytes = &log_line[..timestamp_end];
-            if let Ok(timestamp_str) = std::str::from_utf8(timestamp_bytes) {
-                if let Ok(timestamp) = DateTime::parse_from_rfc3339(timestamp_str) {
-                    // Only update if this timestamp is newer than our last recorded timestamp
-                    if let Some(last) = self.last_log {
-                        if timestamp > last {
-                            self.last_log = Some(timestamp);
-                            return true;
-                        }
-                    } else {
-                        // First timestamp we've seen
-                        self.last_log = Some(timestamp);
-                        return true;
-                    }
-                } else {
-                    // Try to parse ISO 8601 format without timezone (common in k8s logs)
-                    if let Ok(naive_dt) =
-                        chrono::NaiveDateTime::parse_from_str(timestamp_str, "%Y-%m-%dT%H:%M:%S%.f")
-                    {
-                        let timestamp = DateTime::<Utc>::from_naive_utc_and_offset(naive_dt, Utc)
-                            .fixed_offset();
-                        if let Some(last) = self.last_log {
-                            if timestamp > last {
-                                self.last_log = Some(timestamp);
-                                return true;
-                            }
-                        } else {
-                            self.last_log = Some(timestamp);
-                            return true;
-                        }
-                    }
-                }
-            }
-        }
-        false
     }
 }
 
@@ -252,7 +207,7 @@ impl EventStreamBuilder {
         TailerState::Running
     }
 
-    pub async fn run_event_stream(mut self, mut log_info: ContainerLogInfo) {
+    pub async fn run_event_stream(mut self, log_info: ContainerLogInfo) {
         let pods: Api<Pod> =
             Api::namespaced(self.client.clone(), &log_info.container_info.namespace);
 
@@ -302,28 +257,12 @@ impl EventStreamBuilder {
 
                             let line_bytes = Bytes::from(buffer.clone());
 
-                            // Update timestamp tracking before sending
-                            let timestamp_updated = log_info.update_last_log_timestamp(&buffer);
-                            if timestamp_updated {
-                                trace!(
-                                    "Updated last log timestamp for container '{}' in pod '{}' to: {:?}",
-                                    log_info.container_info.container_name,
-                                    log_info.container_info.pod_name,
-                                    log_info.last_log
-                                );
-                            }
+                            // TODO: track last log timestamp
 
-                            // Create filename for proper annotation
-                            let filename = format!(
-                                "k8s-api://{}/{}/{}",
-                                log_info.container_info.namespace,
-                                log_info.container_info.pod_name,
-                                log_info.container_info.container_name
-                            );
                             let text_len = line_bytes.len() as u64;
                             let line = Line {
                                 text: line_bytes,
-                                filename,
+                                filename: String::new(), // Filename is not applicable for k8s logs
                                 file_id: FileFingerprint::Unknown(0),
                                 start_offset: 0,
                                 end_offset: text_len,

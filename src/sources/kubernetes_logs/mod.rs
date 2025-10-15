@@ -915,34 +915,36 @@ impl Source {
                 log_namespace,
             );
 
-            if !api_log {
-                let file_info = annotator.annotate(&mut event, &line.filename);
-                emit!(KubernetesLogsEventsReceived {
-                    file: &line.filename,
-                    byte_size: event.estimated_json_encoded_size_of(),
-                    pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
-                        name: info.pod_name.to_owned(),
-                        namespace: info.pod_namespace.to_owned(),
-                    }),
-                });
+            // TODO: annotate the logs with pods's metadata
+            if api_log {
+                return event;
+            }
+            let file_info = annotator.annotate(&mut event, &line.filename);
+            emit!(KubernetesLogsEventsReceived {
+                file: &line.filename,
+                byte_size: event.estimated_json_encoded_size_of(),
+                pod_info: file_info.as_ref().map(|info| KubernetesLogsPodInfo {
+                    name: info.pod_name.to_owned(),
+                    namespace: info.pod_namespace.to_owned(),
+                }),
+            });
 
-                if file_info.is_none() {
-                    emit!(KubernetesLogsEventAnnotationError { event: &event });
-                } else {
-                    let namespace = file_info.as_ref().map(|info| info.pod_namespace);
+            if file_info.is_none() {
+                emit!(KubernetesLogsEventAnnotationError { event: &event });
+            } else {
+                let namespace = file_info.as_ref().map(|info| info.pod_namespace);
 
-                    if insert_namespace_fields
-                        && let Some(name) = namespace
-                        && ns_annotator.annotate(&mut event, name).is_none()
-                    {
-                        emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
-                    }
+                if insert_namespace_fields
+                    && let Some(name) = namespace
+                    && ns_annotator.annotate(&mut event, name).is_none()
+                {
+                    emit!(KubernetesLogsEventNamespaceAnnotationError { event: &event });
+                }
 
-                    let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
+                let node_info = node_annotator.annotate(&mut event, self_node_name.as_str());
 
-                    if node_info.is_none() {
-                        emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
-                    }
+                if node_info.is_none() {
+                    emit!(KubernetesLogsEventNodeAnnotationError { event: &event });
                 }
             }
 
