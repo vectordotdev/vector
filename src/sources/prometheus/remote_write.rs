@@ -51,6 +51,14 @@ pub struct PrometheusRemoteWriteConfig {
     #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
+
+    /// Whether to skip/discard received samples with NaN values.
+    ///
+    /// When enabled, any metric sample with a NaN value will be filtered out
+    /// during parsing, preventing downstream processing of invalid metrics.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default)]
+    skip_nan_values: bool,
 }
 
 impl PrometheusRemoteWriteConfig {
@@ -62,6 +70,7 @@ impl PrometheusRemoteWriteConfig {
             auth: None,
             acknowledgements: false.into(),
             keepalive: KeepaliveConfig::default(),
+            skip_nan_values: false,
         }
     }
 }
@@ -74,6 +83,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
             auth: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
+            skip_nan_values: false,
         })
         .unwrap()
     }
@@ -83,7 +93,9 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 #[typetag::serde(name = "prometheus_remote_write")]
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let source = RemoteWriteSource;
+        let source = RemoteWriteSource {
+            skip_nan_values: self.skip_nan_values,
+        };
         source.run(
             self.address,
             "",
@@ -108,7 +120,9 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
 }
 
 #[derive(Clone)]
-struct RemoteWriteSource;
+struct RemoteWriteSource {
+    skip_nan_values: bool,
+}
 
 impl RemoteWriteSource {
     fn decode_body(&self, body: Bytes) -> Result<Vec<Event>, ErrorMessage> {
@@ -121,7 +135,7 @@ impl RemoteWriteSource {
                 format!("Could not decode write request: {error}"),
             )
         })?;
-        parser::parse_request(request).map_err(|error| {
+        parser::parse_request(request, self.skip_nan_values).map_err(|error| {
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
                 format!("Could not decode write request: {error}"),
@@ -193,6 +207,7 @@ mod test {
             tls: tls.clone(),
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
+            skip_nan_values: false,
         };
         let source = source
             .build(SourceContext::new_test(tx, None))
@@ -271,6 +286,26 @@ mod test {
         ]
     }
 
+    async fn send_request_and_assert(port: u16, request_body: Vec<u8>) {
+        // Send the request via HTTP POST
+        let client = reqwest::Client::new();
+        let response = client
+            .post(format!("http://localhost:{}/", port))
+            .header("Content-Type", "application/x-protobuf")
+            .header("Content-Encoding", "snappy")
+            .body(request_body)
+            .send()
+            .await
+            .unwrap();
+
+        // Should succeed (not return 400) despite conflicting metadata
+        assert!(
+            response.status().is_success(),
+            "Expected success but got: {}",
+            response.status()
+        );
+    }
+
     /// According to the [spec](https://github.com/OpenObservability/OpenMetrics/blob/main/specification/OpenMetrics.md?plain=1#L115)
     /// > Label names MUST be unique within a LabelSet.
     /// Prometheus itself will reject the metric with an error. Largely to remain backward compatible with older versions of Vector,
@@ -286,6 +321,7 @@ mod test {
             tls: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
+            skip_nan_values: false,
         };
         let source = source
             .build(SourceContext::new_test(tx, None))
@@ -343,6 +379,158 @@ mod test {
 
         vector_lib::assert_event_data_eq!(expected, output);
     }
+
+    #[tokio::test]
+    async fn test_skip_nan_values_enabled() {
+        let address = test_util::next_addr();
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+        let source = PrometheusRemoteWriteConfig {
+            address,
+            auth: None,
+            tls: None,
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
+            skip_nan_values: true,
+        };
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        // Create a request with NaN values
+        let request_body = {
+            use prost::Message;
+            use vector_lib::prometheus::parser::proto;
+
+            let request = proto::WriteRequest {
+                metadata: vec![],
+                timeseries: vec![
+                    proto::TimeSeries {
+                        labels: vec![proto::Label {
+                            name: "__name__".into(),
+                            value: "test_metric_valid".into(),
+                        }],
+                        samples: vec![proto::Sample {
+                            value: 42.0,
+                            timestamp: chrono::Utc::now().timestamp_millis(),
+                        }],
+                    },
+                    proto::TimeSeries {
+                        labels: vec![proto::Label {
+                            name: "__name__".into(),
+                            value: "test_metric_nan".into(),
+                        }],
+                        samples: vec![proto::Sample {
+                            value: f64::NAN,
+                            timestamp: chrono::Utc::now().timestamp_millis(),
+                        }],
+                    },
+                ],
+            };
+
+            let mut buf = Vec::new();
+            request.encode(&mut buf).unwrap();
+
+            // Compress with snappy as expected by the remote_write endpoint
+            snap::raw::Encoder::new().compress_vec(&buf).unwrap()
+        };
+
+        send_request_and_assert(address.port(), request_body).await;
+
+        // Verify we only received the valid metric (NaN metric should be filtered)
+        let output = test_util::collect_ready(rx).await;
+        assert_eq!(output.len(), 1);
+
+        let metric = output[0].as_metric();
+        assert_eq!(metric.name(), "test_metric_valid");
+        assert_eq!(metric.value(), &MetricValue::Gauge { value: 42.0 });
+    }
+
+    #[tokio::test]
+    async fn test_skip_nan_values_disabled() {
+        let address = test_util::next_addr();
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+        let source = PrometheusRemoteWriteConfig {
+            address,
+            auth: None,
+            tls: None,
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
+            skip_nan_values: false,
+        };
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        // Create a request with NaN values
+        let request_body = {
+            use prost::Message;
+            use vector_lib::prometheus::parser::proto;
+
+            let request = proto::WriteRequest {
+                metadata: vec![],
+                timeseries: vec![
+                    proto::TimeSeries {
+                        labels: vec![proto::Label {
+                            name: "__name__".into(),
+                            value: "test_metric_valid".into(),
+                        }],
+                        samples: vec![proto::Sample {
+                            value: 42.0,
+                            timestamp: chrono::Utc::now().timestamp_millis(),
+                        }],
+                    },
+                    proto::TimeSeries {
+                        labels: vec![proto::Label {
+                            name: "__name__".into(),
+                            value: "test_metric_nan".into(),
+                        }],
+                        samples: vec![proto::Sample {
+                            value: f64::NAN,
+                            timestamp: chrono::Utc::now().timestamp_millis(),
+                        }],
+                    },
+                ],
+            };
+
+            let mut buf = Vec::new();
+            request.encode(&mut buf).unwrap();
+
+            // Compress with snappy as expected by the remote_write endpoint
+            snap::raw::Encoder::new().compress_vec(&buf).unwrap()
+        };
+
+        send_request_and_assert(address.port(), request_body).await;
+
+        // Verify we received both metrics (including NaN metric)
+        let mut output = test_util::collect_ready(rx).await;
+        assert_eq!(output.len(), 2);
+
+        // Sort by name for predictable testing
+        output.sort_by(|a, b| a.as_metric().name().cmp(b.as_metric().name()));
+
+        // Check the NaN metric
+        let nan_metric = output[0].as_metric();
+        assert_eq!(nan_metric.name(), "test_metric_nan");
+        match nan_metric.value() {
+            MetricValue::Gauge { value } => {
+                assert!(value.is_nan());
+            }
+            _ => panic!("Expected gauge metric"),
+        }
+
+        // Check the valid metric
+        let valid_metric = output[1].as_metric();
+        assert_eq!(valid_metric.name(), "test_metric_valid");
+        assert_eq!(valid_metric.value(), &MetricValue::Gauge { value: 42.0 });
+    }
 }
 
 #[cfg(all(test, feature = "prometheus-integration-tests"))]
@@ -381,6 +569,7 @@ mod integration_tests {
             tls: None,
             acknowledgements: SourceAcknowledgementsConfig::default(),
             keepalive: KeepaliveConfig::default(),
+            skip_nan_values: false,
         };
 
         let events = run_and_assert_source_compliance(

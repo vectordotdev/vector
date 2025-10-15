@@ -264,7 +264,7 @@ generated: components: sources: heroku_logs: configuration: {
 						description: """
 																The path to the protobuf descriptor set file.
 
-																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`.
 
 																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
 																"""
@@ -278,6 +278,19 @@ generated: components: sources: heroku_logs: configuration: {
 							default: ""
 							examples: ["package.Message"]
 						}
+					}
+					use_json_names: {
+						description: """
+																Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+
+																When enabled, the deserializer will output fields using their JSON names as defined
+																in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+
+																This is useful when working with data that needs to be converted to JSON or
+																when interfacing with systems that use JSON naming conventions.
+																"""
+						required: false
+						type: bool: default: false
 					}
 				}
 			}

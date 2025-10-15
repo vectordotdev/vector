@@ -204,7 +204,9 @@ async fn get_v2_series_from_pipeline(address: String) -> SeriesIntake {
         get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SERIES_ENDPOINT_V2).await;
 
     info!("unpacking payloads");
-    let payloads = unpack_proto_payloads::<MetricPayload>(&payloads).await;
+    let payloads = unpack_proto_payloads::<MetricPayload>(&payloads)
+        .await
+        .expect("Failed to unpack v2 series payloads");
 
     info!("generating series intake");
     let intake = generate_series_intake(&payloads);

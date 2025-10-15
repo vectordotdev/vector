@@ -73,7 +73,7 @@ impl ProtobufDeserializerConfig {
 pub struct ProtobufDeserializerOptions {
     /// The path to the protobuf descriptor set file.
     ///
-    /// This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+    /// This file is the output of `protoc -I <include path> -o <desc output path> <proto>`.
     ///
     /// You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
     pub desc_file: PathBuf,
@@ -81,6 +81,16 @@ pub struct ProtobufDeserializerOptions {
     /// The name of the message type to use for serializing.
     #[configurable(metadata(docs::examples = "package.Message"))]
     pub message_type: String,
+
+    /// Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+    ///
+    /// When enabled, the deserializer will output fields using their JSON names as defined
+    /// in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+    ///
+    /// This is useful when working with data that needs to be converted to JSON or
+    /// when interfacing with systems that use JSON naming conventions.
+    #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
+    pub use_json_names: bool,
 }
 
 /// Deserializer that builds `Event`s from a byte frame containing protobuf.
@@ -166,7 +176,12 @@ impl TryFrom<&ProtobufDeserializerConfig> for ProtobufDeserializer {
     fn try_from(config: &ProtobufDeserializerConfig) -> vector_common::Result<Self> {
         let message_descriptor =
             get_message_descriptor(&config.protobuf.desc_file, &config.protobuf.message_type)?;
-        Ok(Self::new(message_descriptor))
+        Ok(Self {
+            message_descriptor,
+            options: Options {
+                use_json_names: config.protobuf.use_json_names,
+            },
+        })
     }
 }
 

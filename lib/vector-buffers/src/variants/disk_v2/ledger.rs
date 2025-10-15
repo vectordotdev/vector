@@ -316,7 +316,6 @@ where
     ///
     /// This is purely a future-looking operation i.e. what would the file ID be if it was
     /// incremented from its current value.  It does not alter the current writer file ID.
-    #[cfg(test)]
     pub fn get_next_writer_file_id(&self) -> u16 {
         self.state().get_next_writer_file_id()
     }

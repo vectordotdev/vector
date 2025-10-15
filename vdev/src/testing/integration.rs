@@ -6,6 +6,7 @@ use std::{
 };
 
 use anyhow::{Context, Result, bail};
+use serde_yaml::Value;
 use tempfile::{Builder, NamedTempFile};
 
 use super::{
@@ -136,7 +137,7 @@ impl ComposeTest {
             env_vars.insert(key, value);
         }
 
-        env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
+        env_vars.insert("VECTOR_LOG".to_string(), Some("info".into()));
         let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
@@ -257,8 +258,8 @@ impl Compose {
                 config.networks.insert(
                     "default".to_string(),
                     BTreeMap::from_iter([
-                        ("name".to_string(), network.clone()),
-                        ("external".to_string(), "true".to_string()),
+                        ("name".to_string(), Value::String(network.clone())),
+                        ("external".to_string(), Value::Bool(true)),
                     ]),
                 );
 

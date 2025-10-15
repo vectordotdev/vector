@@ -12,6 +12,8 @@ mod json;
 mod logfmt;
 mod native;
 mod native_json;
+#[cfg(feature = "opentelemetry")]
+mod otlp;
 mod protobuf;
 mod raw_message;
 mod text;
@@ -26,6 +28,8 @@ pub use json::{JsonSerializer, JsonSerializerConfig, JsonSerializerOptions};
 pub use logfmt::{LogfmtSerializer, LogfmtSerializerConfig};
 pub use native::{NativeSerializer, NativeSerializerConfig};
 pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
+#[cfg(feature = "opentelemetry")]
+pub use otlp::{OtlpSerializer, OtlpSerializerConfig};
 pub use protobuf::{ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
 pub use text::{TextSerializer, TextSerializerConfig};
