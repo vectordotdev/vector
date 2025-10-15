@@ -44,18 +44,19 @@ impl OtlpDeserializerConfig {
     }
 }
 
-/// Deserializer that builds `Event`s from a byte frame containing OTLP (OpenTelemetry Protocol) protobuf data.
+/// Deserializer that builds `Event`s from a byte frame containing [OTLP](https://opentelemetry.io/docs/specs/otlp/) protobuf data.
 ///
 /// This deserializer decodes events using the OTLP protobuf specification. It handles the three
 /// OTLP signal types: logs, metrics, and traces.
 ///
-/// # Implementation approach
-///
-/// This deserializer converts OTLP protobuf messages to Vector's internal event representation.
 /// The implementation supports three OTLP message types:
 /// - `ExportLogsServiceRequest` → Log events with `resourceLogs` field
-/// - `ExportMetricsServiceRequest` → Log events with `resourceMetrics` field (metrics as logs)
+/// - `ExportMetricsServiceRequest` → Log events with `resourceMetrics` field
 /// - `ExportTraceServiceRequest` → Trace events with `resourceSpans` field
+///
+/// One major caveat here is that the incoming metrics will be parsed as logs but they will preserve the OTLP format.
+/// This means that components that work on metrics, will not be compatible with this output.
+/// However, these events can be forwarded directly to a downstream OTEL collector.
 ///
 /// This is the inverse of what the OTLP encoder does, ensuring round-trip compatibility
 /// with the `opentelemetry` source when `use_otlp_decoding` is enabled.
