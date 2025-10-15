@@ -10,6 +10,7 @@ use crate::{app, config, platform};
 pub struct Cli {}
 
 impl Cli {
+    #[allow(clippy::unnecessary_wraps)]
     pub fn exec(self) -> Result<()> {
         println!("Container tool:  {}", CONTAINER_TOOL.display());
         println!("Data path:       {}", platform::data_dir().display());
