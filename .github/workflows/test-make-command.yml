@@ -16,7 +16,7 @@ permissions:
   statuses: write
 
 jobs:
-  test-make:
+  run-make-command:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     env:
@@ -53,7 +53,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      - run: sudo -E bash scripts/ci-free-disk-space.sh
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: echo "::add-matcher::.github/matchers/rust.json"

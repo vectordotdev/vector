@@ -40,8 +40,6 @@ use tokio_util::codec::Encoder as _;
 use tracing::Instrument;
 use url::Url;
 use uuid::Uuid;
-#[cfg(feature = "codecs-opentelemetry")]
-use vector_lib::codecs::encoding::Serializer::Otlp;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     event::{Event, EventStatus},
@@ -85,19 +83,6 @@ impl WebSocketListenerSink {
             message_buffering: config.message_buffering,
             subprotocol: config.subprotocol,
         })
-    }
-
-    const fn should_encode_as_binary(&self) -> bool {
-        use vector_lib::codecs::encoding::Serializer::{
-            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text,
-        };
-
-        match self.encoder.serializer() {
-            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            #[cfg(feature = "codecs-opentelemetry")]
-            Otlp(_) => true,
-            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
-        }
     }
 
     fn extract_extra_tags(
@@ -365,7 +350,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
 
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
         let events_sent = register!(EventsSent::from(Output(None)));
-        let encode_as_binary = self.should_encode_as_binary();
+        let encode_as_binary = self.encoder.serializer().is_binary();
 
         let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
 

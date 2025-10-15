@@ -260,36 +260,7 @@ components: sources: opentelemetry: {
 				metrics are converted to Vector log events while preserving the OTLP format. This prohibits the use of metric
 				transforms like `aggregate` but it enables easy shipping to OTEL collectors.
 
-				```yaml
-						sources:
-							source0:
-								type: opentelemetry
-								grpc:
-									address: 0.0.0.0:4317
-								http:
-									address: 0.0.0.0:4318
-								use_otlp_decoding: true
-						sinks:
-							otel_sink:
-								inputs:
-									- source0.logs
-								type: opentelemetry
-								protocol:
-									type: http
-									uri: http://otel-collector-sink:5318/v1/logs
-									method: post
-									encoding:
-										codec: json
-									framing:
-										method: newline_delimited
-									batch:
-										max_events: 1
-									request:
-										headers:
-											content-type: application/json
-				```
-
-				Here is another sink configuration that can achieve the same:
+				The recommended `opentelemetry` sink configuration is the following:
 				```yaml
 					otel_sink:
 						inputs:
