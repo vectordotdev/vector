@@ -108,29 +108,32 @@ impl Deserializer for OtlpDeserializer {
         // Try parsing as logs and check for resourceLogs field
         if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace)
             && let Some(Event::Log(log)) = events.first()
-            && log.get(RESOURCE_LOGS_JSON_FIELD).is_some() {
-                    return Ok(events);
-                }
+            && log.get(RESOURCE_LOGS_JSON_FIELD).is_some()
+        {
+            return Ok(events);
+        }
 
         // Try parsing as metrics and check for resourceMetrics field
         if let Ok(events) = self
             .metrics_deserializer
             .parse(bytes.clone(), log_namespace)
             && let Some(Event::Log(log)) = events.first()
-            && log.get(RESOURCE_METRICS_JSON_FIELD).is_some() {
-                    return Ok(events);
-                }
+            && log.get(RESOURCE_METRICS_JSON_FIELD).is_some()
+        {
+            return Ok(events);
+        }
 
         // Try parsing as traces and check for resourceSpans field
         if let Ok(mut events) = self.traces_deserializer.parse(bytes, log_namespace)
             && let Some(Event::Log(log)) = events.first()
-            && log.get(RESOURCE_SPANS_JSON_FIELD).is_some() {
-                    // Convert the log event to a trace event by taking ownership
-                    if let Some(Event::Log(log)) = events.pop() {
-                        let trace_event = Event::Trace(log.into());
-                        return Ok(smallvec![trace_event]);
-                    }
-                }
+            && log.get(RESOURCE_SPANS_JSON_FIELD).is_some()
+        {
+            // Convert the log event to a trace event by taking ownership
+            if let Some(Event::Log(log)) = events.pop() {
+                let trace_event = Event::Trace(log.into());
+                return Ok(smallvec![trace_event]);
+            }
+        }
 
         Err(format!(
             "Invalid OTLP data: expected '{RESOURCE_LOGS_JSON_FIELD}', '{RESOURCE_METRICS_JSON_FIELD}', or '{RESOURCE_SPANS_JSON_FIELD}'",
