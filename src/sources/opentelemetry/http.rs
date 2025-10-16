@@ -93,7 +93,9 @@ pub(crate) fn build_warp_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
-    deserializer: Option<OtlpDeserializer>,
+    logs_deserializer: Option<OtlpDeserializer>,
+    metrics_deserializer: Option<OtlpDeserializer>,
+    traces_deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let log_filters = build_warp_log_filter(
         acknowledgements,
@@ -102,21 +104,21 @@ pub(crate) fn build_warp_filter(
         bytes_received.clone(),
         events_received.clone(),
         headers.clone(),
-        deserializer.clone(),
+        logs_deserializer,
     );
     let metrics_filters = build_warp_metrics_filter(
         acknowledgements,
         out.clone(),
         bytes_received.clone(),
         events_received.clone(),
-        deserializer.clone(),
+        metrics_deserializer,
     );
     let trace_filters = build_warp_trace_filter(
         acknowledgements,
         out.clone(),
         bytes_received,
         events_received,
-        deserializer,
+        traces_deserializer,
     );
     log_filters
         .or(trace_filters)

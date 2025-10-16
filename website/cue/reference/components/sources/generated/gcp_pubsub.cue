@@ -305,6 +305,27 @@ generated: components: sources: gcp_pubsub: configuration: {
 					}
 				}
 			}
+			signal_types: {
+				description: """
+					Signal types to attempt parsing, in priority order.
+
+					The deserializer will try parsing in the order specified. This allows you to optimize
+					performance when you know the expected signal types. For example, if you only receive
+					traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
+
+					If not specified, defaults to trying all types in order: logs, metrics, traces.
+					"""
+				relevant_when: "codec = \"otlp\""
+				required:      false
+				type: array: {
+					default: ["logs", "metrics", "traces"]
+					items: type: string: enum: {
+						logs:    "OTLP logs signal (ExportLogsServiceRequest)"
+						metrics: "OTLP metrics signal (ExportMetricsServiceRequest)"
+						traces:  "OTLP traces signal (ExportTraceServiceRequest)"
+					}
+				}
+			}
 			syslog: {
 				description:   "Syslog-specific decoding options."
 				relevant_when: "codec = \"syslog\""

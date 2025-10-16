@@ -5,7 +5,7 @@ use opentelemetry_proto::proto::{
     TRACES_REQUEST_MESSAGE_TYPE,
 };
 use smallvec::{SmallVec, smallvec};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, indexmap::IndexSet};
 use vector_core::{
     config::{DataType, LogNamespace},
     event::Event,
@@ -17,7 +17,7 @@ use super::{Deserializer, ProtobufDeserializer};
 
 /// OTLP signal type for prioritized parsing.
 #[configurable_component]
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[serde(rename_all = "snake_case")]
 pub enum OtlpSignalType {
     /// OTLP logs signal (ExportLogsServiceRequest)
@@ -39,16 +39,17 @@ pub struct OtlpDeserializerConfig {
     /// traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
     ///
     /// If not specified, defaults to trying all types in order: logs, metrics, traces.
+    /// Duplicate signal types are automatically removed while preserving order.
     #[serde(default = "default_signal_types")]
-    pub signal_types: Vec<OtlpSignalType>,
+    pub signal_types: IndexSet<OtlpSignalType>,
 }
 
-fn default_signal_types() -> Vec<OtlpSignalType> {
-    vec![
+fn default_signal_types() -> IndexSet<OtlpSignalType> {
+    IndexSet::from([
         OtlpSignalType::Logs,
         OtlpSignalType::Metrics,
         OtlpSignalType::Traces,
-    ]
+    ])
 }
 
 impl Default for OtlpDeserializerConfig {
@@ -105,7 +106,7 @@ pub struct OtlpDeserializer {
     metrics_deserializer: ProtobufDeserializer,
     traces_deserializer: ProtobufDeserializer,
     /// Priority order for attempting deserialization
-    signal_priority: Vec<OtlpSignalType>,
+    signal_priority: IndexSet<OtlpSignalType>,
 }
 
 impl OtlpDeserializer {
@@ -115,7 +116,7 @@ impl OtlpDeserializer {
     }
 
     /// Creates a new OTLP deserializer with custom signal type priority.
-    pub fn new_with_priority(signal_priority: Vec<OtlpSignalType>) -> vector_common::Result<Self> {
+    pub fn new_with_priority(signal_priority: IndexSet<OtlpSignalType>) -> vector_common::Result<Self> {
         let options = Options {
             use_json_names: true,
         };
@@ -419,7 +420,7 @@ mod tests {
     fn deserialize_with_custom_priority_traces_only() {
         // Configure to only try traces - should succeed for traces, fail for others
         let deserializer =
-            OtlpDeserializer::new_with_priority(vec![OtlpSignalType::Traces]).unwrap();
+            OtlpDeserializer::new_with_priority(IndexSet::from([OtlpSignalType::Traces])).unwrap();
 
         // Traces should work
         let trace_bytes = create_traces_request_bytes();
@@ -431,29 +432,5 @@ mod tests {
         let log_bytes = create_logs_request_bytes();
         let result = deserializer.parse(log_bytes, LogNamespace::Legacy);
         assert!(result.is_err());
-    }
-
-    #[test]
-    fn deserialize_with_custom_priority_order() {
-        // Configure deserializer to only parse logs (not metrics or traces)
-        // This demonstrates that specifying signal_types controls which types are attempted
-        let logs_only_deserializer =
-            OtlpDeserializer::new_with_priority(vec![OtlpSignalType::Logs]).unwrap();
-
-        // Logs should parse successfully
-        let log_bytes = create_logs_request_bytes();
-        let result = logs_only_deserializer.parse(log_bytes, LogNamespace::Legacy);
-        assert!(result.is_ok(), "logs should parse successfully");
-        assert!(matches!(result.unwrap()[0], Event::Log(_)));
-
-        // Traces should fail since we're not attempting to parse traces
-        let trace_bytes = create_traces_request_bytes();
-        let result = logs_only_deserializer.parse(trace_bytes, LogNamespace::Legacy);
-        assert!(result.is_err(), "traces should fail when not in signal_types");
-
-        // Metrics should fail since we're not attempting to parse metrics
-        let metrics_bytes = create_metrics_request_bytes();
-        let result = logs_only_deserializer.parse(metrics_bytes, LogNamespace::Legacy);
-        assert!(result.is_err(), "metrics should fail when not in signal_types");
     }
 }

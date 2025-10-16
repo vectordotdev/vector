@@ -158,9 +158,37 @@ impl GenerateConfig for OpentelemetryConfig {
 }
 
 impl OpentelemetryConfig {
-    fn get_deserializer(&self) -> vector_common::Result<Option<OtlpDeserializer>> {
+    fn get_logs_deserializer(&self) -> vector_common::Result<Option<OtlpDeserializer>> {
         if self.use_otlp_decoding {
-            Ok(Some(OtlpDeserializer::new()?))
+            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
+            use vector_config::indexmap::IndexSet;
+            Ok(Some(OtlpDeserializer::new_with_priority(
+                IndexSet::from([OtlpSignalType::Logs]),
+            )?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn get_metrics_deserializer(&self) -> vector_common::Result<Option<OtlpDeserializer>> {
+        if self.use_otlp_decoding {
+            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
+            use vector_config::indexmap::IndexSet;
+            Ok(Some(OtlpDeserializer::new_with_priority(
+                IndexSet::from([OtlpSignalType::Metrics]),
+            )?))
+        } else {
+            Ok(None)
+        }
+    }
+
+    fn get_traces_deserializer(&self) -> vector_common::Result<Option<OtlpDeserializer>> {
+        if self.use_otlp_decoding {
+            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
+            use vector_config::indexmap::IndexSet;
+            Ok(Some(OtlpDeserializer::new_with_priority(
+                IndexSet::from([OtlpSignalType::Traces]),
+            )?))
         } else {
             Ok(None)
         }
@@ -177,14 +205,16 @@ impl SourceConfig for OpentelemetryConfig {
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
 
-        let deserializer = self.get_deserializer()?;
+        let logs_deserializer = self.get_logs_deserializer()?;
+        let metrics_deserializer = self.get_metrics_deserializer()?;
+        let traces_deserializer = self.get_traces_deserializer()?;
 
         let log_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
-            deserializer: deserializer.clone(),
+            deserializer: logs_deserializer.clone(),
         })
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
@@ -194,7 +224,7 @@ impl SourceConfig for OpentelemetryConfig {
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
-            deserializer: deserializer.clone(),
+            deserializer: metrics_deserializer.clone(),
         })
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
@@ -204,7 +234,7 @@ impl SourceConfig for OpentelemetryConfig {
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
-            deserializer: deserializer.clone(),
+            deserializer: traces_deserializer.clone(),
         })
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
@@ -238,7 +268,9 @@ impl SourceConfig for OpentelemetryConfig {
             bytes_received,
             events_received,
             headers,
-            deserializer,
+            logs_deserializer,
+            metrics_deserializer,
+            traces_deserializer,
         );
 
         let http_source = run_http_server(
