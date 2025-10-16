@@ -193,6 +193,14 @@ generated: components: sources: nats: configuration: {
 															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
+						otlp: """
+															Decodes the raw bytes as [OTLP (OpenTelemetry Protocol)][otlp] protobuf format.
+
+															This decoder handles the three OTLP signal types: logs, metrics, and traces.
+															It automatically detects which type of OTLP message is being decoded.
+
+															[otlp]: https://opentelemetry.io/docs/specs/otlp/
+															"""
 						protobuf: """
 															Decodes the raw bytes as [protobuf][protobuf].
 

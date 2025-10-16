@@ -21,7 +21,7 @@ use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
 use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
 use vector_lib::{
-    codecs::decoding::ProtobufDeserializer,
+    codecs::decoding::OtlpDeserializer,
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
     internal_event::{BytesReceived, EventsReceived, Protocol},
@@ -31,22 +31,16 @@ use vector_lib::{
             ATTRIBUTES_KEY, DROPPED_ATTRIBUTES_COUNT_KEY, FLAGS_KEY, OBSERVED_TIMESTAMP_KEY,
             RESOURCE_KEY, SEVERITY_NUMBER_KEY, SEVERITY_TEXT_KEY, SPAN_ID_KEY, TRACE_ID_KEY,
         },
-        proto::{
-            LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE, TRACES_REQUEST_MESSAGE_TYPE,
-            collector::{
-                logs::v1::logs_service_server::LogsServiceServer,
-                metrics::v1::metrics_service_server::MetricsServiceServer,
-                trace::v1::trace_service_server::TraceServiceServer,
-            },
+        proto::collector::{
+            logs::v1::logs_service_server::LogsServiceServer,
+            metrics::v1::metrics_service_server::MetricsServiceServer,
+            trace::v1::trace_service_server::TraceServiceServer,
         },
     },
     schema::Definition,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
-use vrl::{
-    protobuf::parse::Options,
-    value::{Kind, kind::Collection},
-};
+use vrl::value::{Kind, kind::Collection};
 
 pub const LOGS: &str = "logs";
 pub const METRICS: &str = "metrics";
@@ -164,19 +158,9 @@ impl GenerateConfig for OpentelemetryConfig {
 }
 
 impl OpentelemetryConfig {
-    fn get_deserializer(
-        &self,
-        message_type: &str,
-    ) -> vector_common::Result<Option<ProtobufDeserializer>> {
+    fn get_deserializer(&self) -> vector_common::Result<Option<OtlpDeserializer>> {
         if self.use_otlp_decoding {
-            let deserializer = ProtobufDeserializer::new_from_bytes(
-                vector_lib::opentelemetry::proto::DESCRIPTOR_BYTES,
-                message_type,
-                Options {
-                    use_json_names: true,
-                },
-            )?;
-            Ok(Some(deserializer))
+            Ok(Some(OtlpDeserializer::new()?))
         } else {
             Ok(None)
         }
@@ -193,35 +177,34 @@ impl SourceConfig for OpentelemetryConfig {
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
 
-        let log_deserializer = self.get_deserializer(LOGS_REQUEST_MESSAGE_TYPE)?;
+        let deserializer = self.get_deserializer()?;
+
         let log_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
-            deserializer: log_deserializer.clone(),
+            deserializer: deserializer.clone(),
         })
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
-        let metric_deserializer = self.get_deserializer(METRICS_REQUEST_MESSAGE_TYPE)?;
         let metrics_service = MetricsServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
-            deserializer: metric_deserializer,
+            deserializer: deserializer.clone(),
         })
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
 
-        let trace_deserializer = self.get_deserializer(TRACES_REQUEST_MESSAGE_TYPE)?;
         let trace_service = TraceServiceServer::new(Service {
             pipeline: cx.out.clone(),
             acknowledgements,
             log_namespace,
             events_received: events_received.clone(),
-            deserializer: trace_deserializer,
+            deserializer: deserializer.clone(),
         })
         .accept_compressed(CompressionEncoding::Gzip)
         .max_decoding_message_size(usize::MAX);
@@ -255,7 +238,7 @@ impl SourceConfig for OpentelemetryConfig {
             bytes_received,
             events_received,
             headers,
-            log_deserializer,
+            deserializer,
         );
 
         let http_source = run_http_server(
