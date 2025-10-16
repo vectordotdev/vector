@@ -235,6 +235,7 @@ impl ComposeTest {
         self.config.check_required()?;
         if let Some(compose) = &self.compose {
             self.runner.ensure_network()?;
+            self.runner.ensure_external_volumes()?;
 
             if self.is_running()? {
                 bail!("environment is already up");
