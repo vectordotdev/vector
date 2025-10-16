@@ -331,7 +331,6 @@ jobs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
       opentelemetry-logs: ${{ steps.filter.outputs.opentelemetry-logs }}
-      all-changes-json: ${{ steps.aggregate.outputs.all-changes-json }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
