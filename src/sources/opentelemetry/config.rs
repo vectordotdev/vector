@@ -160,11 +160,11 @@ impl GenerateConfig for OpentelemetryConfig {
 impl OpentelemetryConfig {
     fn get_logs_deserializer(&self) -> vector_common::Result<Option<OtlpDeserializer>> {
         if self.use_otlp_decoding {
-            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
             use vector_config::indexmap::IndexSet;
-            Ok(Some(OtlpDeserializer::new_with_priority(
-                IndexSet::from([OtlpSignalType::Logs]),
-            )?))
+            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
+            Ok(Some(OtlpDeserializer::new_with_priority(IndexSet::from(
+                [OtlpSignalType::Logs],
+            ))?))
         } else {
             Ok(None)
         }
@@ -172,11 +172,11 @@ impl OpentelemetryConfig {
 
     fn get_metrics_deserializer(&self) -> vector_common::Result<Option<OtlpDeserializer>> {
         if self.use_otlp_decoding {
-            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
             use vector_config::indexmap::IndexSet;
-            Ok(Some(OtlpDeserializer::new_with_priority(
-                IndexSet::from([OtlpSignalType::Metrics]),
-            )?))
+            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
+            Ok(Some(OtlpDeserializer::new_with_priority(IndexSet::from(
+                [OtlpSignalType::Metrics],
+            ))?))
         } else {
             Ok(None)
         }
@@ -184,11 +184,11 @@ impl OpentelemetryConfig {
 
     fn get_traces_deserializer(&self) -> vector_common::Result<Option<OtlpDeserializer>> {
         if self.use_otlp_decoding {
-            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
             use vector_config::indexmap::IndexSet;
-            Ok(Some(OtlpDeserializer::new_with_priority(
-                IndexSet::from([OtlpSignalType::Traces]),
-            )?))
+            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
+            Ok(Some(OtlpDeserializer::new_with_priority(IndexSet::from(
+                [OtlpSignalType::Traces],
+            ))?))
         } else {
             Ok(None)
         }

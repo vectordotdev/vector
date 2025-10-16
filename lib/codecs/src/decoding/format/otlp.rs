@@ -116,7 +116,9 @@ impl OtlpDeserializer {
     }
 
     /// Creates a new OTLP deserializer with custom signal type priority.
-    pub fn new_with_priority(signal_priority: IndexSet<OtlpSignalType>) -> vector_common::Result<Self> {
+    pub fn new_with_priority(
+        signal_priority: IndexSet<OtlpSignalType>,
+    ) -> vector_common::Result<Self> {
         let options = Options {
             use_json_names: true,
         };
@@ -176,7 +178,8 @@ impl Deserializer for OtlpDeserializer {
                     }
                 }
                 OtlpSignalType::Traces => {
-                    if let Ok(mut events) = self.traces_deserializer.parse(bytes.clone(), log_namespace)
+                    if let Ok(mut events) =
+                        self.traces_deserializer.parse(bytes.clone(), log_namespace)
                         && let Some(Event::Log(log)) = events.first()
                         && log.get(RESOURCE_SPANS_JSON_FIELD).is_some()
                     {
@@ -194,7 +197,7 @@ impl Deserializer for OtlpDeserializer {
             "Invalid OTLP data: expected one of {:?}",
             self.signal_priority
         )
-            .into())
+        .into())
     }
 }
 
