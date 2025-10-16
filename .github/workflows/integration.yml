@@ -43,10 +43,50 @@ jobs:
       e2e_tests: true
     secrets: inherit
 
+  build-test-runner:
+    runs-on: ubuntu-24.04-8core
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+    permissions:
+      packages: write
+      contents: read
+    outputs:
+      image-tag: ${{ steps.build.outputs.image-tag }}
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          submodules: "recursive"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push test runner image
+        id: build
+        run: |
+          IMAGE_TAG="run-${{ github.run_id }}"
+          IMAGE_NAME="ghcr.io/${{ github.repository }}/test-runner:${IMAGE_TAG}"
+
+          # Build the integration test runner image
+          cargo vdev -v int build-runner
+
+          # Get the local image name that vdev created
+          LOCAL_IMAGE=$(docker images --format "{{.Repository}}:{{.Tag}}" | grep "vector-test-runner" | head -n 1)
+
+          # Tag and push to GHCR
+          docker tag "${LOCAL_IMAGE}" "${IMAGE_NAME}"
+          docker push "${IMAGE_NAME}"
+
+          echo "image-tag=${IMAGE_TAG}" >> "$GITHUB_OUTPUT"
+          echo "Pushed image: ${IMAGE_NAME}"
+
   integration-tests:
     runs-on: ubuntu-24.04-8core
     needs:
       - changes
+      - build-test-runner
 
     if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
@@ -65,6 +105,28 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: "recursive"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull test runner image
+        run: |
+          IMAGE_TAG="${{ needs.build-test-runner.outputs.image-tag }}"
+          IMAGE_NAME="ghcr.io/${{ github.repository }}/test-runner:${IMAGE_TAG}"
+
+          docker pull "${IMAGE_NAME}"
+
+          # Tag it with the expected local name that vdev uses
+          # The format is: vector-test-runner-<rust-version>
+          RUST_VERSION=$(grep '^channel' rust-toolchain.toml | cut -d'"' -f2)
+          LOCAL_TAG="vector-test-runner-${RUST_VERSION}"
+
+          docker tag "${IMAGE_NAME}" "${LOCAL_TAG}"
+          echo "Tagged ${IMAGE_NAME} as ${LOCAL_TAG}"
 
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
@@ -108,6 +170,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     needs:
       - changes
+      - build-test-runner
     if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
@@ -118,6 +181,28 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: "recursive"
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull test runner image
+        run: |
+          IMAGE_TAG="${{ needs.build-test-runner.outputs.image-tag }}"
+          IMAGE_NAME="ghcr.io/${{ github.repository }}/test-runner:${IMAGE_TAG}"
+
+          docker pull "${IMAGE_NAME}"
+
+          # Tag it with the expected local name that vdev uses
+          # The format is: vector-test-runner-<rust-version>
+          RUST_VERSION=$(grep '^channel' rust-toolchain.toml | cut -d'"' -f2)
+          LOCAL_TAG="vector-test-runner-${RUST_VERSION}"
+
+          docker tag "${IMAGE_NAME}" "${LOCAL_TAG}"
+          echo "Tagged ${IMAGE_NAME} as ${LOCAL_TAG}"
 
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
@@ -171,3 +256,34 @@ jobs:
           else
             echo "All jobs completed successfully"
           fi
+
+  cleanup-test-runner:
+    name: Cleanup test runner image
+    runs-on: ubuntu-24.04
+    if: always()
+    needs:
+      - build-test-runner
+      - integration-tests
+      - e2e-tests
+    permissions:
+      packages: write
+    steps:
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@9780b0c442fbb1117ed29e0efdff1e18412f7567 # v3.3.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Delete test runner image from GHCR
+        run: |
+          IMAGE_TAG="${{ needs.build-test-runner.outputs.image-tag }}"
+          PACKAGE_NAME="test-runner"
+
+          # Delete the image using GitHub API
+          # Note: This requires the GITHUB_TOKEN to have packages:write permission
+          curl -X DELETE \
+            -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            "https://api.github.com/user/packages/container/${PACKAGE_NAME}/versions" \
+            || echo "Failed to delete image, it may have already been removed"
