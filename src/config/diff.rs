@@ -232,65 +232,69 @@ mod tests {
 
     #[test]
     fn new_tables_uses_correct_keys() {
-        let old_config: Config = toml::from_str::<ConfigBuilder>(indoc! {r#"
-            [enrichment_tables.memory_table]
-            type = "memory"
-            ttl = 10
-            inputs = []
+        let old_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            enrichment_tables:
+              memory_table:
+                type: "memory"
+                ttl: 10
+                inputs: []
+                source_config:
+                  source_key: "memory_table_source"
+                  export_expired_items: true
+                  export_interval: 50
 
-            [enrichment_tables.memory_table.source_config]
-            source_key = "memory_table_source"
-            export_expired_items = true
-            export_interval = 50
+              memory_table_unchanged:
+                type: "memory"
+                ttl: 10
+                inputs: []
 
-            [enrichment_tables.memory_table_unchanged]
-            type = "memory"
-            ttl = 10
-            inputs = []
+              memory_table_old:
+                type: "memory"
+                ttl: 10
+                inputs: []
 
-            [enrichment_tables.memory_table_old]
-            type = "memory"
-            ttl = 10
-            inputs = []
+            sources:
+              test:
+                type: "test_basic"
 
-            [sources.demo]
-            type = "test_basic"
-
-            [sinks.demo_sink]
-            type = "test_basic"
-            inputs = ["demo"]
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
         "#})
         .unwrap()
         .build()
         .unwrap();
 
-        let new_config: Config = toml::from_str::<ConfigBuilder>(indoc! {r#"
-            [enrichment_tables.memory_table]
-            type = "memory"
-            ttl = 20
-            inputs = []
+        let new_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            enrichment_tables:
+              memory_table:
+                type: "memory"
+                ttl: 20
+                inputs: []
+                source_config:
+                  source_key: "memory_table_source"
+                  export_expired_items: true
+                  export_interval: 50
 
-            [enrichment_tables.memory_table.source_config]
-            source_key = "memory_table_source"
-            export_expired_items = true
-            export_interval = 50
+              memory_table_unchanged:
+                type: "memory"
+                ttl: 10
+                inputs: []
 
-            [enrichment_tables.memory_table_unchanged]
-            type = "memory"
-            ttl = 10
-            inputs = []
+              memory_table_new:
+                type: "memory"
+                ttl: 1000
+                inputs: []
 
-            [enrichment_tables.memory_table_new]
-            type = "memory"
-            ttl = 1000
-            inputs = []
+            sources:
+              test:
+                type: "test_basic"
 
-            [sources.demo]
-            type = "test_basic"
-
-            [sinks.demo_sink]
-            type = "test_basic"
-            inputs = ["demo"]
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
         "#})
         .unwrap()
         .build()
