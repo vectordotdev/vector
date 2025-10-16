@@ -94,7 +94,6 @@ services:
     environment:
       - FEATURES=e2e-tests-datadog
     working_dir: /home/vector
-    network_mode: host
     command:
       - "/usr/bin/vector"
       - "-vvv"
