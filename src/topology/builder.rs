@@ -225,7 +225,7 @@ impl<'a> Builder<'a> {
             .chain(
                 table_sources
                     .iter()
-                    .map(|(key, sink)| (key, sink))
+                    .map(|(key, source)| (key, source))
                     .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
             )
         {
