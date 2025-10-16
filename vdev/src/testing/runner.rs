@@ -312,11 +312,8 @@ impl IntegrationTestRunner {
     pub(super) fn ensure_external_volumes(&self) -> Result<()> {
         // Get list of existing volumes
         let mut command = docker_command(["volume", "ls", "--format", "{{.Name}}"]);
-        let existing_volumes: HashSet<String> = command
-            .check_output()?
-            .lines()
-            .map(String::from)
-            .collect();
+        let existing_volumes: HashSet<String> =
+            command.check_output()?.lines().map(String::from).collect();
 
         // Extract volume names from self.volumes (format is "volume_name:/mount/path")
         for volume_spec in &self.volumes {
