@@ -50,7 +50,7 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
 }
 
 /// General monitoring
-async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> exitcode::ExitCode {
+pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> exitcode::ExitCode {
     // Channel for updating state via event messages
     let (tx, rx) = tokio::sync::mpsc::channel(20);
     let state_rx = state::updater(rx).await;

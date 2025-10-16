@@ -111,6 +111,14 @@ generated: components: sources: redis: configuration: {
 															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
+						otlp: """
+															Decodes the raw bytes as [OTLP (OpenTelemetry Protocol)][otlp] protobuf format.
+
+															This decoder handles the three OTLP signal types: logs, metrics, and traces.
+															It automatically detects which type of OTLP message is being decoded.
+
+															[otlp]: https://opentelemetry.io/docs/specs/otlp/
+															"""
 						protobuf: """
 															Decodes the raw bytes as [protobuf][protobuf].
 
@@ -220,6 +228,19 @@ generated: components: sources: redis: configuration: {
 							default: ""
 							examples: ["package.Message"]
 						}
+					}
+					use_json_names: {
+						description: """
+																Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+
+																When enabled, the deserializer will output fields using their JSON names as defined
+																in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+
+																This is useful when working with data that needs to be converted to JSON or
+																when interfacing with systems that use JSON naming conventions.
+																"""
+						required: false
+						type: bool: default: false
 					}
 				}
 			}
