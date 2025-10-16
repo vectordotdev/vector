@@ -222,3 +222,91 @@ impl Difference {
         self.to_change.iter().chain(self.to_remove.iter())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use crate::config::ConfigBuilder;
+    use indoc::indoc;
+
+    use super::*;
+
+    #[test]
+    fn new_tables_uses_correct_keys() {
+        let old_config: Config = toml::from_str::<ConfigBuilder>(indoc! {r#"
+            [enrichment_tables.memory_table]
+            type = "memory"
+            ttl = 10
+            inputs = []
+
+            [enrichment_tables.memory_table.source_config]
+            source_key = "memory_table_source"
+            export_expired_items = true
+            export_interval = 50
+
+            [enrichment_tables.memory_table_unchanged]
+            type = "memory"
+            ttl = 10
+            inputs = []
+
+            [enrichment_tables.memory_table_old]
+            type = "memory"
+            ttl = 10
+            inputs = []
+
+            [sources.demo]
+            type = "test_basic"
+
+            [sinks.demo_sink]
+            type = "test_basic"
+            inputs = ["demo"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let new_config: Config = toml::from_str::<ConfigBuilder>(indoc! {r#"
+            [enrichment_tables.memory_table]
+            type = "memory"
+            ttl = 20
+            inputs = []
+
+            [enrichment_tables.memory_table.source_config]
+            source_key = "memory_table_source"
+            export_expired_items = true
+            export_interval = 50
+
+            [enrichment_tables.memory_table_unchanged]
+            type = "memory"
+            ttl = 10
+            inputs = []
+
+            [enrichment_tables.memory_table_new]
+            type = "memory"
+            ttl = 1000
+            inputs = []
+
+            [sources.demo]
+            type = "test_basic"
+
+            [sinks.demo_sink]
+            type = "test_basic"
+            inputs = ["demo"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let diff =
+            Difference::new_tables(&old_config.enrichment_tables, &new_config.enrichment_tables);
+
+        assert_eq!(diff.to_add, HashSet::from_iter(["memory_table_new".into()]));
+        assert_eq!(
+            diff.to_remove,
+            HashSet::from_iter(["memory_table_old".into()])
+        );
+        assert_eq!(
+            diff.to_change,
+            HashSet::from_iter(["memory_table".into(), "memory_table_source".into()])
+        );
+    }
+}
