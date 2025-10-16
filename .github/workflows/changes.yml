@@ -238,9 +238,9 @@ jobs:
             - "lib/k8s-e2e-tests/**"
             - "lib/k8s-test-framework/**"
             - ".github/workflows/k8s_e2e.yml"
+            - ".github/workflows/changes.yml"
           website:
             - "website/**"
-            - ".github/workflows/changes.yml"
           not_website:
             - "!website/**"
           test-yml:
