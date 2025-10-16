@@ -63,7 +63,7 @@ impl Default for OtlpDeserializerConfig {
 impl OtlpDeserializerConfig {
     /// Build the `OtlpDeserializer` from this configuration.
     pub fn build(&self) -> vector_common::Result<OtlpDeserializer> {
-        OtlpDeserializer::new_with_priority(self.signal_types.clone())
+        OtlpDeserializer::new_with_signals(self.signal_types.clone())
     }
 
     /// Return the type of event build by this deserializer.
@@ -105,20 +105,21 @@ pub struct OtlpDeserializer {
     logs_deserializer: ProtobufDeserializer,
     metrics_deserializer: ProtobufDeserializer,
     traces_deserializer: ProtobufDeserializer,
-    /// Priority order for attempting deserialization
-    signal_priority: IndexSet<OtlpSignalType>,
+    /// Signal types to parse, in priority order
+    signals: IndexSet<OtlpSignalType>,
+}
+
+impl Default for OtlpDeserializer {
+    fn default() -> Self {
+        Self::new_with_signals(default_signal_types())
+            .expect("Failed to create default OTLP deserializer")
+    }
 }
 
 impl OtlpDeserializer {
-    /// Creates a new OTLP deserializer with the default priority (logs, metrics, traces).
-    pub fn new() -> vector_common::Result<Self> {
-        Self::new_with_priority(default_signal_types())
-    }
-
-    /// Creates a new OTLP deserializer with custom signal type priority.
-    pub fn new_with_priority(
-        signal_priority: IndexSet<OtlpSignalType>,
-    ) -> vector_common::Result<Self> {
+    /// Creates a new OTLP deserializer with custom signal support.
+    /// During parsing, each signal type is tried in order until one succeeds.
+    pub fn new_with_signals(signals: IndexSet<OtlpSignalType>) -> vector_common::Result<Self> {
         let options = Options {
             use_json_names: true,
         };
@@ -145,7 +146,7 @@ impl OtlpDeserializer {
             logs_deserializer,
             metrics_deserializer,
             traces_deserializer,
-            signal_priority,
+            signals,
         })
     }
 }
@@ -157,7 +158,7 @@ impl Deserializer for OtlpDeserializer {
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
         // Try parsing in the priority order specified
-        for signal_type in &self.signal_priority {
+        for signal_type in &self.signals {
             match signal_type {
                 OtlpSignalType::Logs => {
                     if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace)
@@ -193,11 +194,7 @@ impl Deserializer for OtlpDeserializer {
             }
         }
 
-        Err(format!(
-            "Invalid OTLP data: expected one of {:?}",
-            self.signal_priority
-        )
-        .into())
+        Err(format!("Invalid OTLP data: expected one of {:?}", self.signals).into())
     }
 }
 
@@ -367,7 +364,7 @@ mod tests {
     }
 
     fn assert_otlp_event(bytes: Bytes, field: &str, is_trace: bool) {
-        let deserializer = OtlpDeserializer::new().unwrap();
+        let deserializer = OtlpDeserializer::default();
         let events = deserializer.parse(bytes, LogNamespace::Legacy).unwrap();
 
         assert_eq!(events.len(), 1);
@@ -406,7 +403,7 @@ mod tests {
 
     #[test]
     fn deserialize_invalid_otlp() {
-        let deserializer = OtlpDeserializer::new().unwrap();
+        let deserializer = OtlpDeserializer::default();
         let bytes = Bytes::from("invalid protobuf data");
         let result = deserializer.parse(bytes, LogNamespace::Legacy);
 
@@ -423,7 +420,7 @@ mod tests {
     fn deserialize_with_custom_priority_traces_only() {
         // Configure to only try traces - should succeed for traces, fail for others
         let deserializer =
-            OtlpDeserializer::new_with_priority(IndexSet::from([OtlpSignalType::Traces])).unwrap();
+            OtlpDeserializer::new_with_signals(IndexSet::from([OtlpSignalType::Traces])).unwrap();
 
         // Traces should work
         let trace_bytes = create_traces_request_bytes();

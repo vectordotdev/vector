@@ -20,8 +20,9 @@ use crate::{
 use futures::FutureExt;
 use futures_util::{TryFutureExt, future::join};
 use tonic::{codec::CompressionEncoding, transport::server::RoutesBuilder};
+use vector_config::indexmap::IndexSet;
 use vector_lib::{
-    codecs::decoding::OtlpDeserializer,
+    codecs::decoding::{OtlpDeserializer, OtlpSignalType},
     config::{LegacyKey, LogNamespace, log_schema},
     configurable::configurable_component,
     internal_event::{BytesReceived, EventsReceived, Protocol},
@@ -158,37 +159,14 @@ impl GenerateConfig for OpentelemetryConfig {
 }
 
 impl OpentelemetryConfig {
-    fn get_logs_deserializer(&self) -> vector_common::Result<Option<OtlpDeserializer>> {
+    fn get_signal_deserializer(
+        &self,
+        signal_type: OtlpSignalType,
+    ) -> vector_common::Result<Option<OtlpDeserializer>> {
         if self.use_otlp_decoding {
-            use vector_config::indexmap::IndexSet;
-            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
-            Ok(Some(OtlpDeserializer::new_with_priority(IndexSet::from(
-                [OtlpSignalType::Logs],
-            ))?))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn get_metrics_deserializer(&self) -> vector_common::Result<Option<OtlpDeserializer>> {
-        if self.use_otlp_decoding {
-            use vector_config::indexmap::IndexSet;
-            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
-            Ok(Some(OtlpDeserializer::new_with_priority(IndexSet::from(
-                [OtlpSignalType::Metrics],
-            ))?))
-        } else {
-            Ok(None)
-        }
-    }
-
-    fn get_traces_deserializer(&self) -> vector_common::Result<Option<OtlpDeserializer>> {
-        if self.use_otlp_decoding {
-            use vector_config::indexmap::IndexSet;
-            use vector_lib::codecs::decoding::{OtlpDeserializer, OtlpSignalType};
-            Ok(Some(OtlpDeserializer::new_with_priority(IndexSet::from(
-                [OtlpSignalType::Traces],
-            ))?))
+            Ok(Some(OtlpDeserializer::new_with_signals(IndexSet::from([
+                signal_type,
+            ]))?))
         } else {
             Ok(None)
         }
@@ -205,9 +183,9 @@ impl SourceConfig for OpentelemetryConfig {
 
         let grpc_tls_settings = MaybeTlsSettings::from_config(self.grpc.tls.as_ref(), true)?;
 
-        let logs_deserializer = self.get_logs_deserializer()?;
-        let metrics_deserializer = self.get_metrics_deserializer()?;
-        let traces_deserializer = self.get_traces_deserializer()?;
+        let logs_deserializer = self.get_signal_deserializer(OtlpSignalType::Logs)?;
+        let metrics_deserializer = self.get_signal_deserializer(OtlpSignalType::Metrics)?;
+        let traces_deserializer = self.get_signal_deserializer(OtlpSignalType::Traces)?;
 
         let log_service = LogsServiceServer::new(Service {
             pipeline: cx.out.clone(),
