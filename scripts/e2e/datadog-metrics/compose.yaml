@@ -47,8 +47,6 @@ services:
   vector:
     depends_on:
       - fakeintake-vector
-    build:
-      context: ../../..
     # re-using the integration test runner image since it already has
     # compiled vector on it.
     image: ${CONFIG_VECTOR_IMAGE}
