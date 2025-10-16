@@ -255,7 +255,7 @@ impl ComposeTest {
 
             self.runner.remove()?;
             let project_name = self.project_name();
-            compose.stop(&project_name)?;
+            compose.stop(&self.env_config, &project_name)?;
         }
 
         Ok(())
@@ -308,12 +308,11 @@ impl Compose {
         )
     }
 
-    fn stop(&self, project_name: &str) -> Result<()> {
-        // The config settings are not needed when stopping a compose setup.
+    fn stop(&self, environment: &Environment, project_name: &str) -> Result<()> {
         self.run(
             "Stopping",
             &["down", "--timeout", "0", "--volumes", "--remove-orphans"],
-            None,
+            Some(environment),
             project_name,
         )
     }
