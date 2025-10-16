@@ -405,3 +405,25 @@ jobs:
           base: ${{ env.BASE_SHA }}
           ref:  ${{ env.HEAD_SHA }}
           filters: int_test_filters.yaml
+
+      # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
+      # `if` section of a job or step. In return, we can reduce a lot of redundant job configuration in integration.yml.
+      - name: Generate JSON for all outputs
+        id: aggregate
+        run: |
+          json=$(cat <<EOF
+          {
+            "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
+            "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
+            "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }}
+          }
+          EOF
+          )
+
+          echo "$json" > e2e_tests_changes.json
+
+      - name: Upload JSON artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e_tests_changes
+          path: e2e_tests_changes.json

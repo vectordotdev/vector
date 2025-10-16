@@ -11,7 +11,7 @@ use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::decoding::{ProtobufDeserializer, format::Deserializer},
+    codecs::decoding::{OtlpDeserializer, format::Deserializer},
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus},
     internal_event::{
@@ -93,7 +93,7 @@ pub(crate) fn build_warp_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
-    deserializer: Option<ProtobufDeserializer>,
+    deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let log_filters = build_warp_log_filter(
         acknowledgements,
@@ -188,7 +188,7 @@ fn build_warp_log_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers_cfg: Vec<HttpConfigParamKind>,
-    deserializer: Option<ProtobufDeserializer>,
+    deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
         if let Some(d) = deserializer.as_ref() {
@@ -220,7 +220,7 @@ fn build_warp_metrics_filter(
     source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
-    deserializer: Option<ProtobufDeserializer>,
+    deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
         if let Some(d) = deserializer.as_ref() {
@@ -248,11 +248,11 @@ fn build_warp_trace_filter(
     source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
-    deserializer: Option<ProtobufDeserializer>,
+    deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
         if let Some(d) = deserializer.as_ref() {
-            d.parse_traces(body)
+            d.parse(body, LogNamespace::default())
                 .map(|r| r.into_vec())
                 .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
         } else {
