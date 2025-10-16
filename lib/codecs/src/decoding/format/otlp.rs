@@ -161,8 +161,8 @@ mod tests {
 
     // trace_id: 0102030405060708090a0b0c0d0e0f10 (16 bytes)
     const TEST_TRACE_ID: [u8; 16] = [
-        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08,
-        0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f, 0x10,
+        0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0a, 0x0b, 0x0c, 0x0d, 0x0e, 0x0f,
+        0x10,
     ];
     // span_id: 0102030405060708 (8 bytes)
     const TEST_SPAN_ID: [u8; 8] = [0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08];
@@ -263,14 +263,18 @@ mod tests {
             .and_then(|v| v.as_array())
             .expect("resourceSpans should be an array");
 
-        let first_rs = resource_spans.first().expect("should have at least one resource span");
+        let first_rs = resource_spans
+            .first()
+            .expect("should have at least one resource span");
 
         let scope_spans = first_rs
             .get("scopeSpans")
             .and_then(|v| v.as_array())
             .expect("scopeSpans should be an array");
 
-        let first_ss = scope_spans.first().expect("should have at least one scope span");
+        let first_ss = scope_spans
+            .first()
+            .expect("should have at least one scope span");
 
         let spans = first_ss
             .get("spans")
