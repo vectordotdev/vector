@@ -212,7 +212,9 @@ jobs:
           rust: true
           protoc: true
       - run: |
-          make generate-component-docs
+
+          cargo build --quiet
+          target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
           ./scripts/generate-component-docs.rb "/tmp/vector-config-schema.json"
 
   check-rust-docs:
