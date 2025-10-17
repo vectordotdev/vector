@@ -86,6 +86,7 @@ pub(crate) async fn run_http_server(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)] // TODO change to a builder struct
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
     log_namespace: LogNamespace,

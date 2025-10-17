@@ -62,7 +62,7 @@ impl Default for OtlpDeserializerConfig {
 
 impl OtlpDeserializerConfig {
     /// Build the `OtlpDeserializer` from this configuration.
-    pub fn build(&self) -> vector_common::Result<OtlpDeserializer> {
+    pub fn build(&self) -> OtlpDeserializer {
         OtlpDeserializer::new_with_signals(self.signal_types.clone())
     }
 
@@ -112,14 +112,13 @@ pub struct OtlpDeserializer {
 impl Default for OtlpDeserializer {
     fn default() -> Self {
         Self::new_with_signals(default_signal_types())
-            .expect("Failed to create default OTLP deserializer")
     }
 }
 
 impl OtlpDeserializer {
     /// Creates a new OTLP deserializer with custom signal support.
     /// During parsing, each signal type is tried in order until one succeeds.
-    pub fn new_with_signals(signals: IndexSet<OtlpSignalType>) -> vector_common::Result<Self> {
+    pub fn new_with_signals(signals: IndexSet<OtlpSignalType>) -> Self {
         let options = Options {
             use_json_names: true,
         };
@@ -128,26 +127,26 @@ impl OtlpDeserializer {
             DESCRIPTOR_BYTES,
             LOGS_REQUEST_MESSAGE_TYPE,
             options.clone(),
-        )?;
+        ).expect("Failed to create logs deserializer");
 
         let metrics_deserializer = ProtobufDeserializer::new_from_bytes(
             DESCRIPTOR_BYTES,
             METRICS_REQUEST_MESSAGE_TYPE,
             options.clone(),
-        )?;
+        ).expect("Failed to create metrics deserializer");
 
         let traces_deserializer = ProtobufDeserializer::new_from_bytes(
             DESCRIPTOR_BYTES,
             TRACES_REQUEST_MESSAGE_TYPE,
             options,
-        )?;
+        ).expect("Failed to create traces deserializer");
 
-        Ok(Self {
+        Self {
             logs_deserializer,
             metrics_deserializer,
             traces_deserializer,
             signals,
-        })
+        }
     }
 }
 
@@ -420,7 +419,7 @@ mod tests {
     fn deserialize_with_custom_priority_traces_only() {
         // Configure to only try traces - should succeed for traces, fail for others
         let deserializer =
-            OtlpDeserializer::new_with_signals(IndexSet::from([OtlpSignalType::Traces])).unwrap();
+            OtlpDeserializer::new_with_signals(IndexSet::from([OtlpSignalType::Traces]));
 
         // Traces should work
         let trace_bytes = create_traces_request_bytes();
