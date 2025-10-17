@@ -215,12 +215,13 @@ jobs:
           sudo chmod 777 /var/lib/vector
 
 
-
       - uses: ./.github/actions/setup
         with:
           rust: true
           protoc: true
-      - run: make check-component-docs
+      - run: |
+          make generate-component-docs
+          ./scripts/generate-component-docs.rb "/tmp/vector-config-schema.json"
 
   check-rust-docs:
     name: Check Rust Docs
