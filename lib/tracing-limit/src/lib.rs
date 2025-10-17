@@ -1,6 +1,6 @@
 #![deny(warnings)]
 
-use std::fmt;
+use std::{collections::BTreeMap, fmt};
 
 use dashmap::DashMap;
 use tracing_core::{
@@ -62,6 +62,19 @@ where
         }
     }
 
+    /// Sets the default rate limit window in seconds.
+    ///
+    /// This controls how long logs are suppressed before they can be emitted again.
+    /// Within each window:
+    /// - 1st occurrence: Emitted normally
+    /// - 2nd occurrence: Shows "suppressing" warning
+    /// - 3rd+ occurrences: Silent until window expires
+    ///
+    /// # Examples
+    /// ```ignore
+    /// RateLimitedLayer::new(layer)
+    ///     .with_default_limit(10)  // 10-second windows
+    /// ```
     pub fn with_default_limit(mut self, internal_log_rate_limit: u64) -> Self {
         self.internal_log_rate_limit = internal_log_rate_limit;
         self
@@ -350,14 +363,29 @@ impl From<String> for TraceValue {
 struct RateLimitedSpanKeys {
     component_id: Option<TraceValue>,
     vrl_position: Option<TraceValue>,
+    other_fields: BTreeMap<String, TraceValue>,
 }
 
 impl RateLimitedSpanKeys {
     fn record(&mut self, field: &Field, value: TraceValue) {
-        match field.name() {
+        let field_name = field.name();
+
+        // Skip internal rate limiting control fields
+        if field_name == RATE_LIMIT_FIELD
+            || field_name == RATE_LIMIT_SECS_FIELD
+            || field_name == MESSAGE_FIELD
+        {
+            return;
+        }
+
+        // Track known semantic fields explicitly
+        match field_name {
             COMPONENT_ID_FIELD => self.component_id = Some(value),
             VRL_POSITION => self.vrl_position = Some(value),
-            _ => {}
+            // Everything else goes into the catch-all bucket
+            _ => {
+                self.other_fields.insert(field_name.to_string(), value);
+            }
         }
     }
 
@@ -367,6 +395,10 @@ impl RateLimitedSpanKeys {
         }
         if let Some(vrl_position) = &other.vrl_position {
             self.vrl_position = Some(vrl_position.clone());
+        }
+        // Merge other fields, with 'other' taking precedence
+        for (key, value) in &other.other_fields {
+            self.other_fields.insert(key.clone(), value.clone());
         }
     }
 }
@@ -456,6 +488,61 @@ mod test {
     use super::*;
 
     #[derive(Default)]
+    struct AllFieldsVisitor {
+        fields: BTreeMap<String, String>,
+    }
+
+    impl Visit for AllFieldsVisitor {
+        fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
+            self.fields
+                .insert(field.name().to_string(), format!("{value:?}"));
+        }
+
+        fn record_str(&mut self, field: &Field, value: &str) {
+            self.fields
+                .insert(field.name().to_string(), value.to_string());
+        }
+
+        fn record_i64(&mut self, field: &Field, value: i64) {
+            self.fields
+                .insert(field.name().to_string(), value.to_string());
+        }
+
+        fn record_u64(&mut self, field: &Field, value: u64) {
+            self.fields
+                .insert(field.name().to_string(), value.to_string());
+        }
+
+        fn record_bool(&mut self, field: &Field, value: bool) {
+            self.fields
+                .insert(field.name().to_string(), value.to_string());
+        }
+    }
+
+    impl AllFieldsVisitor {
+        fn format(&self) -> String {
+            let mut parts: Vec<String> = Vec::new();
+
+            // Always show message first if present
+            if let Some(msg) = self.fields.get("message") {
+                parts.push(msg.clone());
+            }
+
+            // Then show other fields in sorted order
+            for (key, value) in &self.fields {
+                if key != "message"
+                    && key != "internal_log_rate_limit"
+                    && key != "internal_log_rate_secs"
+                {
+                    parts.push(format!("{key}={value}"));
+                }
+            }
+
+            parts.join(" ")
+        }
+    }
+
+    #[derive(Default)]
     struct RecordingLayer<S> {
         events: Arc<Mutex<Vec<String>>>,
 
@@ -484,12 +571,45 @@ mod test {
             true
         }
 
-        fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-            let mut visitor = MessageVisitor::default();
+        fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
+            let mut visitor = AllFieldsVisitor::default();
             event.record(&mut visitor);
 
+            // Also capture fields from span context
+            if let Some(span) = ctx.lookup_current() {
+                for span_ref in span.scope().from_root() {
+                    let extensions = span_ref.extensions();
+                    if let Some(span_keys) = extensions.get::<RateLimitedSpanKeys>() {
+                        // Add component_id
+                        if let Some(TraceValue::String(ref s)) = span_keys.component_id {
+                            visitor.fields.insert("component_id".to_string(), s.clone());
+                        }
+                        // Add vrl_position
+                        if let Some(val) = &span_keys.vrl_position {
+                            let formatted = match val {
+                                TraceValue::String(s) => s.clone(),
+                                TraceValue::Int(i) => i.to_string(),
+                                TraceValue::Uint(u) => u.to_string(),
+                                TraceValue::Bool(b) => b.to_string(),
+                            };
+                            visitor.fields.insert("vrl_position".to_string(), formatted);
+                        }
+                        // Add other_fields
+                        for (key, value) in &span_keys.other_fields {
+                            let formatted = match value {
+                                TraceValue::String(s) => s.clone(),
+                                TraceValue::Int(i) => i.to_string(),
+                                TraceValue::Uint(u) => u.to_string(),
+                                TraceValue::Bool(b) => b.to_string(),
+                            };
+                            visitor.fields.insert(key.clone(), formatted);
+                        }
+                    }
+                }
+            }
+
             let mut events = self.events.lock().unwrap();
-            events.push(visitor.message.unwrap_or_default());
+            events.push(visitor.format());
         }
     }
 
@@ -590,34 +710,34 @@ mod test {
         assert_eq!(
             *events,
             vec![
-                "Hello foo on line_number 1!",
-                "Hello foo on line_number 2!",
-                "Hello bar on line_number 1!",
-                "Hello bar on line_number 2!",
-                "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding.",
-                "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding.",
-                "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding.",
-                "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding.",
-                "Internal log [Hello foo on line_number 1!] has been suppressed 9 times.",
-                "Hello foo on line_number 1!",
-                "Internal log [Hello foo on line_number 2!] has been suppressed 9 times.",
-                "Hello foo on line_number 2!",
-                "Internal log [Hello bar on line_number 1!] has been suppressed 9 times.",
-                "Hello bar on line_number 1!",
-                "Internal log [Hello bar on line_number 2!] has been suppressed 9 times.",
-                "Hello bar on line_number 2!",
-                "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding.",
-                "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding.",
-                "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding.",
-                "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding.",
-                "Internal log [Hello foo on line_number 1!] has been suppressed 9 times.",
-                "Hello foo on line_number 1!",
-                "Internal log [Hello foo on line_number 2!] has been suppressed 9 times.",
-                "Hello foo on line_number 2!",
-                "Internal log [Hello bar on line_number 1!] has been suppressed 9 times.",
-                "Hello bar on line_number 1!",
-                "Internal log [Hello bar on line_number 2!] has been suppressed 9 times.",
-                "Hello bar on line_number 2!",
+                "Hello foo on line_number 1! component_id=foo vrl_position=1",
+                "Hello foo on line_number 2! component_id=foo vrl_position=2",
+                "Hello bar on line_number 1! component_id=bar vrl_position=1",
+                "Hello bar on line_number 2! component_id=bar vrl_position=2",
+                "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding. component_id=foo vrl_position=1",
+                "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding. component_id=foo vrl_position=2",
+                "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding. component_id=bar vrl_position=1",
+                "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding. component_id=bar vrl_position=2",
+                "Internal log [Hello foo on line_number 1!] has been suppressed 9 times. component_id=foo vrl_position=1",
+                "Hello foo on line_number 1! component_id=foo vrl_position=1",
+                "Internal log [Hello foo on line_number 2!] has been suppressed 9 times. component_id=foo vrl_position=2",
+                "Hello foo on line_number 2! component_id=foo vrl_position=2",
+                "Internal log [Hello bar on line_number 1!] has been suppressed 9 times. component_id=bar vrl_position=1",
+                "Hello bar on line_number 1! component_id=bar vrl_position=1",
+                "Internal log [Hello bar on line_number 2!] has been suppressed 9 times. component_id=bar vrl_position=2",
+                "Hello bar on line_number 2! component_id=bar vrl_position=2",
+                "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding. component_id=foo vrl_position=1",
+                "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding. component_id=foo vrl_position=2",
+                "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding. component_id=bar vrl_position=1",
+                "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding. component_id=bar vrl_position=2",
+                "Internal log [Hello foo on line_number 1!] has been suppressed 9 times. component_id=foo vrl_position=1",
+                "Hello foo on line_number 1! component_id=foo vrl_position=1",
+                "Internal log [Hello foo on line_number 2!] has been suppressed 9 times. component_id=foo vrl_position=2",
+                "Hello foo on line_number 2! component_id=foo vrl_position=2",
+                "Internal log [Hello bar on line_number 1!] has been suppressed 9 times. component_id=bar vrl_position=1",
+                "Hello bar on line_number 1! component_id=bar vrl_position=1",
+                "Internal log [Hello bar on line_number 2!] has been suppressed 9 times. component_id=bar vrl_position=2",
+                "Hello bar on line_number 2! component_id=bar vrl_position=2",
             ]
             .into_iter()
             .map(std::borrow::ToOwned::to_owned)
@@ -653,34 +773,34 @@ mod test {
         assert_eq!(
             *events,
             vec![
-                "Hello foo on line_number 1!",
-                "Hello foo on line_number 2!",
-                "Hello bar on line_number 1!",
-                "Hello bar on line_number 2!",
+                "Hello foo on line_number 1! component_id=foo vrl_position=1",
+                "Hello foo on line_number 2! component_id=foo vrl_position=2",
+                "Hello bar on line_number 1! component_id=bar vrl_position=1",
+                "Hello bar on line_number 2! component_id=bar vrl_position=2",
                 "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding.",
                 "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding.",
                 "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding.",
                 "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding.",
                 "Internal log [Hello foo on line_number 1!] has been suppressed 9 times.",
-                "Hello foo on line_number 1!",
+                "Hello foo on line_number 1! component_id=foo vrl_position=1",
                 "Internal log [Hello foo on line_number 2!] has been suppressed 9 times.",
-                "Hello foo on line_number 2!",
+                "Hello foo on line_number 2! component_id=foo vrl_position=2",
                 "Internal log [Hello bar on line_number 1!] has been suppressed 9 times.",
-                "Hello bar on line_number 1!",
+                "Hello bar on line_number 1! component_id=bar vrl_position=1",
                 "Internal log [Hello bar on line_number 2!] has been suppressed 9 times.",
-                "Hello bar on line_number 2!",
+                "Hello bar on line_number 2! component_id=bar vrl_position=2",
                 "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding.",
                 "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding.",
                 "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding.",
                 "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding.",
                 "Internal log [Hello foo on line_number 1!] has been suppressed 9 times.",
-                "Hello foo on line_number 1!",
+                "Hello foo on line_number 1! component_id=foo vrl_position=1",
                 "Internal log [Hello foo on line_number 2!] has been suppressed 9 times.",
-                "Hello foo on line_number 2!",
+                "Hello foo on line_number 2! component_id=foo vrl_position=2",
                 "Internal log [Hello bar on line_number 1!] has been suppressed 9 times.",
-                "Hello bar on line_number 1!",
+                "Hello bar on line_number 1! component_id=bar vrl_position=1",
                 "Internal log [Hello bar on line_number 2!] has been suppressed 9 times.",
-                "Hello bar on line_number 2!",
+                "Hello bar on line_number 2! component_id=bar vrl_position=2",
             ]
             .into_iter()
             .map(std::borrow::ToOwned::to_owned)
@@ -708,5 +828,63 @@ mod test {
         // All 21 events should be emitted since rate limiting is disabled
         assert_eq!(events.len(), 21);
         assert!(events.iter().all(|e| e == "Hello world!"));
+    }
+
+    #[test]
+    #[serial]
+    fn rate_limit_by_other_fields() {
+        // This test demonstrates the fix for the bug where logs with different
+        // contextual fields (like fanout_id, output_id, etc.) were being incorrectly
+        // suppressed together. The fix uses a catch-all BTreeMap to ensure logs with
+        // different field values create separate rate limit buckets.
+        let events: Arc<Mutex<Vec<String>>> = Default::default();
+
+        let recorder = RecordingLayer::new(Arc::clone(&events));
+        let sub = tracing_subscriber::registry::Registry::default()
+            .with(RateLimitedLayer::new(recorder).with_default_limit(1));
+        tracing::subscriber::with_default(sub, || {
+            for _ in 0..21 {
+                // Same component_id but different fanout_id values should be rate limited independently
+                info!(
+                    message = "Configuring outputs for source.",
+                    component_id = "demo_logs_1",
+                    fanout_id = "input_1"
+                );
+                info!(
+                    message = "Configuring outputs for source.",
+                    component_id = "demo_logs_1",
+                    fanout_id = "input_2"
+                );
+                MockClock::advance(Duration::from_millis(100));
+            }
+        });
+
+        let events = events.lock().unwrap();
+
+        // Each unique combination of fields should be rate limited independently
+        // So we should see both logs emit initially, then both show suppression warnings
+        // The output now clearly shows the component_id and fanout_id values
+        assert_eq!(
+            *events,
+            vec![
+                "Configuring outputs for source. component_id=demo_logs_1 fanout_id=input_1",
+                "Configuring outputs for source. component_id=demo_logs_1 fanout_id=input_2",
+                "Internal log [Configuring outputs for source.] is being suppressed to avoid flooding.",
+                "Internal log [Configuring outputs for source.] is being suppressed to avoid flooding.",
+                "Internal log [Configuring outputs for source.] has been suppressed 9 times.",
+                "Configuring outputs for source. component_id=demo_logs_1 fanout_id=input_1",
+                "Internal log [Configuring outputs for source.] has been suppressed 9 times.",
+                "Configuring outputs for source. component_id=demo_logs_1 fanout_id=input_2",
+                "Internal log [Configuring outputs for source.] is being suppressed to avoid flooding.",
+                "Internal log [Configuring outputs for source.] is being suppressed to avoid flooding.",
+                "Internal log [Configuring outputs for source.] has been suppressed 9 times.",
+                "Configuring outputs for source. component_id=demo_logs_1 fanout_id=input_1",
+                "Internal log [Configuring outputs for source.] has been suppressed 9 times.",
+                "Configuring outputs for source. component_id=demo_logs_1 fanout_id=input_2",
+            ]
+            .into_iter()
+            .map(std::borrow::ToOwned::to_owned)
+            .collect::<Vec<String>>()
+        );
     }
 }
