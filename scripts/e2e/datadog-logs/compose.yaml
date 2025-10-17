@@ -92,7 +92,6 @@ services:
     environment:
       - FEATURES=e2e-tests-datadog
     working_dir: /home/vector
-    network_mode: host
     command:
       - "/usr/bin/vector"
       - "-vvv"
@@ -118,6 +117,7 @@ services:
 networks:
   default:
     name: ${VECTOR_NETWORK}
+    external: true
 
 volumes:
   log_path: {}
