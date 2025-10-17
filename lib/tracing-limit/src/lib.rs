@@ -124,12 +124,12 @@ where
     }
 
     fn on_event(&self, event: &Event<'_>, ctx: Context<'_, S>) {
-        // Visit the event, grabbing the limit status if one is defined. If we can't find a rate limit field, or the rate limit
-        // is set as false, then we let it pass through untouched.
+        // Visit the event, grabbing the limit status if one is defined. Rate limiting is ON by default
+        // unless explicitly disabled by setting `internal_log_rate_limit = false`.
         let mut limit_visitor = LimitVisitor::default();
         event.record(&mut limit_visitor);
 
-        let limit_exists = limit_visitor.limit.unwrap_or(false);
+        let limit_exists = limit_visitor.limit.unwrap_or(true);
         if !limit_exists {
             return self.inner.on_event(event, ctx);
         }
@@ -445,14 +445,13 @@ impl Visit for MessageVisitor {
 #[cfg(test)]
 mod test {
     use std::{
-        sync::{Arc, LazyLock, Mutex},
+        sync::{Arc, Mutex},
         time::Duration,
     };
 
     use mock_instant::global::MockClock;
+    use serial_test::serial;
     use tracing_subscriber::layer::SubscriberExt;
-
-    static TRACING_DEFAULT_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
     use super::*;
 
@@ -495,9 +494,8 @@ mod test {
     }
 
     #[test]
+    #[serial]
     fn rate_limits() {
-        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
-
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -505,7 +503,7 @@ mod test {
             .with(RateLimitedLayer::new(recorder).with_default_limit(1));
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
-                info!(message = "Hello world!", internal_log_rate_limit = true);
+                info!(message = "Hello world!");
                 MockClock::advance(Duration::from_millis(100));
             }
         });
@@ -530,9 +528,8 @@ mod test {
     }
 
     #[test]
+    #[serial]
     fn override_rate_limit_at_callsite() {
-        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
-
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -542,7 +539,6 @@ mod test {
             for _ in 0..21 {
                 info!(
                     message = "Hello world!",
-                    internal_log_rate_limit = true,
                     internal_log_rate_secs = 1
                 );
                 MockClock::advance(Duration::from_millis(100));
@@ -569,9 +565,8 @@ mod test {
     }
 
     #[test]
+    #[serial]
     fn rate_limit_by_span_key() {
-        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
-
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -585,8 +580,7 @@ mod test {
                             info_span!("span", component_id = &key, vrl_position = &line_number);
                         let _enter = span.enter();
                         info!(
-                            message = format!("Hello {key} on line_number {line_number}!").as_str(),
-                            internal_log_rate_limit = true
+                            message = format!("Hello {key} on line_number {line_number}!").as_str()
                         );
                     }
                 }
@@ -635,9 +629,8 @@ mod test {
     }
 
     #[test]
+    #[serial]
     fn rate_limit_by_event_key() {
-        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
-
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -649,7 +642,6 @@ mod test {
                     for line_number in &[1, 2] {
                         info!(
                             message = format!("Hello {key} on line_number {line_number}!").as_str(),
-                            internal_log_rate_limit = true,
                             component_id = &key,
                             vrl_position = &line_number
                         );
@@ -697,5 +689,27 @@ mod test {
             .map(std::borrow::ToOwned::to_owned)
             .collect::<Vec<String>>()
         );
+    }
+
+    #[test]
+    #[serial]
+    fn disabled_rate_limit() {
+        let events: Arc<Mutex<Vec<String>>> = Default::default();
+
+        let recorder = RecordingLayer::new(Arc::clone(&events));
+        let sub = tracing_subscriber::registry::Registry::default()
+            .with(RateLimitedLayer::new(recorder).with_default_limit(1));
+        tracing::subscriber::with_default(sub, || {
+            for _ in 0..21 {
+                info!(message = "Hello world!", internal_log_rate_limit = false);
+                MockClock::advance(Duration::from_millis(100));
+            }
+        });
+
+        let events = events.lock().unwrap();
+
+        // All 21 events should be emitted since rate limiting is disabled
+        assert_eq!(events.len(), 21);
+        assert!(events.iter().all(|e| e == "Hello world!"));
     }
 }
