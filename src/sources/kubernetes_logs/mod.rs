@@ -8,7 +8,11 @@ use std::{cmp::min, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures_util::{Stream, future::FutureExt, stream::StreamExt};
+use futures_util::{
+    Stream,
+    future::{FutureExt, ready},
+    stream::StreamExt,
+};
 use http_1::{HeaderName, HeaderValue};
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use k8s_paths_provider::K8sPathsProvider;
@@ -768,7 +772,7 @@ impl Source {
         };
 
         // Spawn task to forward pod events to broadcast channel
-        tokio::spawn(async move {
+        let pod_forwarder = tokio::spawn(async move {
             pin!(pod_watcher);
             while let Some(event_result) = pod_watcher.next().await {
                 match event_result {
@@ -786,16 +790,14 @@ impl Source {
                 }
             }
         });
+        reflectors.push(pod_forwarder);
 
         // Convert broadcast receiver to stream for reflector
-        let reflector_stream = BroadcastStream::new(reflector_rx).filter_map(|result| async move {
-            match result {
+        let reflector_stream = BroadcastStream::new(reflector_rx).filter_map(|result| {
+            ready(match result {
                 Ok(event) => Some(Ok(event)),
-                Err(tokio_stream::wrappers::errors::BroadcastStreamRecvError::Lagged(_)) => {
-                    warn!("Reflector lagged behind pod events");
-                    None
-                }
-            }
+                Err(_) => None,
+            })
         });
 
         let pod_store_w = reflector::store::Writer::default();
