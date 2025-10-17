@@ -14,7 +14,7 @@ use std::{
     sync::Arc,
     task::{Context, Poll},
 };
-use tracing::info;
+use tracing::{info, warn};
 use vector_common::{
     finalization::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
@@ -41,20 +41,19 @@ impl DorisService {
     }
     pub(crate) async fn reporter_run(
         &self,
-        log_request: bool,
         response: DorisStreamLoadResponse,
     ) -> Result<(), crate::Error> {
         let reporter = Arc::clone(&self.reporter);
         let stream_load_status = response.stream_load_status;
         let http_status_code = response.http_status_code;
         let response_json = response.response_json;
-        if log_request {
+        if self.log_request {
             // Format the JSON with proper indentation for better readability
             let formatted_json = match serde_json::to_string_pretty(&response_json) {
                 Ok(pretty_json) => pretty_json,
                 Err(err) => {
                     // Log the error but continue with the original format
-                    tracing::warn!(message = "Failed to prettify JSON response", error = %err);
+                    warn!(message = "Failed to prettify JSON response", error = %err, internal_log_rate_limit = true);
                     response_json.to_string()
                 }
             };
@@ -63,7 +62,8 @@ impl DorisService {
                 message = "Doris stream load response received.",
                 status_code = %http_status_code,
                 stream_load_status = %stream_load_status,
-                response = %formatted_json
+                response = %formatted_json,
+                internal_log_rate_limit = true
             );
         }
         if http_status_code.is_success() {
@@ -124,7 +124,6 @@ impl Service<HttpRequest<DorisPartitionKey>> for DorisService {
     }
 
     fn call(&mut self, req: HttpRequest<DorisPartitionKey>) -> Self::Future {
-        let log_request = self.log_request;
         let service = self.clone();
 
         let future = async move {
@@ -136,7 +135,7 @@ impl Service<HttpRequest<DorisPartitionKey>> for DorisService {
                 .send_stream_load(database, table, request.take_payload())
                 .await?;
             let report_response = doris_response.clone();
-            let _ = service.reporter_run(log_request, report_response).await;
+            let _ = service.reporter_run(report_response).await;
 
             let event_status = if doris_response.stream_load_status == StreamLoadStatus::Successful
             {

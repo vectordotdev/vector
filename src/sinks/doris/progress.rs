@@ -66,7 +66,8 @@ impl ProgressReporter {
         info!(
             message = "Starting progress reporter.",
             interval_seconds = self.interval,
-            interval = ?Duration::from_secs(self.interval)
+            interval = ?Duration::from_secs(self.interval),
+            internal_log_rate_limit = true
         );
 
         loop {
@@ -77,7 +78,8 @@ impl ProgressReporter {
                 // Exit the loop if shutdown signal is received
                 _ = async { if let Some(ref mut signal) = shutdown { signal.await } else { std::future::pending().await } } => {
                     info!(
-                        message = "Shutting down progress reporter."
+                        message = "Shutting down progress reporter.",
+                        internal_log_rate_limit = true
                     );
                     break;
                 }
@@ -125,7 +127,8 @@ impl ProgressReporter {
                 total_speed_rps = total_speed_rps,
                 last_seconds = inc_time,
                 last_speed_mbps = inc_speed_mbps,
-                last_speed_rps = inc_speed_rps
+                last_speed_rps = inc_speed_rps,
+                internal_log_rate_limit = true
             );
 
             last_time = now;

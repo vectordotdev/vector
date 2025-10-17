@@ -3,7 +3,11 @@ use tracing::{debug, error};
 
 use crate::{
     http::HttpError,
-    sinks::{doris::service::DorisResponse, prelude::*, util::retries::RetryAction},
+    sinks::{
+        doris::{service::DorisResponse, sink::DorisPartitionKey},
+        prelude::*,
+        util::{http::HttpRequest, retries::RetryAction},
+    },
 };
 
 /// Internal struct for parsing Doris Stream Load API responses
@@ -21,13 +25,14 @@ pub struct DorisRetryLogic;
 
 impl RetryLogic for DorisRetryLogic {
     type Error = HttpError;
+    type Request = HttpRequest<DorisPartitionKey>;
     type Response = DorisResponse;
 
     fn is_retriable_error(&self, _error: &Self::Error) -> bool {
         true
     }
 
-    fn should_retry_response(&self, response: &Self::Response) -> RetryAction {
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         let status = response.http_response.status();
         let body = response.http_response.body();
         let body_str = String::from_utf8_lossy(body);

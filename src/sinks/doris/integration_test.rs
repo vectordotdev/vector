@@ -4,9 +4,13 @@ use sqlx::{
     ConnectOptions, Connection, Executor as _, MySqlConnection, Row, mysql::MySqlConnectOptions,
 };
 use std::collections::HashMap;
+use tracing::{info, warn};
+use vector_lib::{
+    codecs::{JsonSerializerConfig, MetricTagValues, encoding::FramingConfig},
+    event::{BatchNotifier, BatchStatusReceiver, Event, LogEvent, Value},
+};
 // use vector_common::finalization::BatchStatus;
 use vector_common::sensitive_string::SensitiveString;
-use vector_lib::event::{BatchNotifier, BatchStatusReceiver, Event, LogEvent, Value};
 
 use super::*;
 use crate::{
@@ -102,7 +106,10 @@ async fn insert_events() {
     let table = format!("test_table_{}", random_string(5).to_lowercase());
 
     let client = DorisTestClient::new(doris_mysql_address_port()).await;
-    tracing::info!("DorisTestClient created successfully, creating database...");
+    info!(
+        "DorisTestClient created successfully, creating database...",
+        internal_log_rate_limit = true
+    );
 
     client.create_database(&database).await;
 
@@ -118,12 +125,15 @@ async fn insert_events() {
         database: database.clone().try_into().unwrap(),
         table: table.clone().try_into().unwrap(),
         label_prefix: "vector_test".to_string(),
-        line_delimiter: "".to_string(),
-        log_request: true,
+        log_request: true, // Explicitly enable for integration tests
         log_progress_interval: 10,
+        encoding: (
+            Some(FramingConfig::NewlineDelimited),
+            JsonSerializerConfig::new(MetricTagValues::Full, Default::default()),
+        )
+            .into(),
         headers: default_headers(),
         batch: batch,
-        buffer_bound: 1,
         auth: Some(crate::http::Auth::Basic {
             user: config_auth().user.clone(),
             password: SensitiveString::from(config_auth().password.clone()),
@@ -183,11 +193,12 @@ impl DorisTestClient {
         let auth = config_auth();
         let (host, port) = query_address_port;
 
-        tracing::info!(
+        info!(
             "Connecting to Doris MySQL interface: {}:{} User: {}",
             host,
             port,
-            auth.user
+            auth.user,
+            internal_log_rate_limit = true
         );
 
         // Configure MySQL connection parameters - For Doris specifically adjusted
@@ -202,7 +213,10 @@ impl DorisTestClient {
             .ssl_mode(sqlx::mysql::MySqlSslMode::Disabled)
             .disable_statement_logging();
 
-        tracing::info!("DorisTestClient initialized successfully");
+        info!(
+            "DorisTestClient initialized successfully",
+            internal_log_rate_limit = true
+        );
         DorisTestClient { connect_options }
     }
 
@@ -215,22 +229,32 @@ impl DorisTestClient {
 
     /// Execute a query that doesn't return data (DDL/DML operations)
     async fn execute_query(&self, query: &str) {
-        tracing::info!("Executing SQL query: {}", query);
+        info!(
+            "Executing SQL query: {}",
+            query,
+            internal_log_rate_limit = true
+        );
 
         let mut conn = self.create_connection().await;
 
         match conn.execute(query).await {
             Ok(result) => {
-                tracing::info!(
+                info!(
                     "SQL query execution successful: {} - Affected rows: {}",
                     query,
-                    result.rows_affected()
+                    result.rows_affected(),
+                    internal_log_rate_limit = true
                 );
             }
             Err(e) => {
                 // Handle specific ignorable errors
                 if self.is_ignorable_error(query, &e) {
-                    tracing::warn!("Ignoring expected error for query '{}': {}", query, e);
+                    warn!(
+                        "Ignoring expected error for query '{}': {}",
+                        query,
+                        e,
+                        internal_log_rate_limit = true
+                    );
                     return;
                 }
                 panic!("SQL query execution failed: {} - {}", query, e);
@@ -248,7 +272,12 @@ impl DorisTestClient {
 
     /// Execute a query that returns a single row
     async fn fetch_one_query(&self, query: &str, operation_name: &str) -> sqlx::mysql::MySqlRow {
-        tracing::info!("{}: {}", operation_name, query);
+        info!(
+            "{}: {}",
+            operation_name,
+            query,
+            internal_log_rate_limit = true
+        );
 
         let mut conn = self.create_connection().await;
 
@@ -270,7 +299,13 @@ impl DorisTestClient {
         let mut conn = self.create_connection().await;
 
         let result = conn.fetch_all(query).await.unwrap_or_else(|e| {
-            tracing::warn!("{} failed: {} - {}", operation_name, query, e);
+            warn!(
+                "{} failed: {} - {}",
+                operation_name,
+                query,
+                e,
+                internal_log_rate_limit = true
+            );
             Vec::new()
         });
 
@@ -313,7 +348,11 @@ impl DorisTestClient {
         let row = self.fetch_one_query(&query, "Counting rows").await;
 
         let count: i64 = row.get(0);
-        tracing::info!("Count result: {} rows", count);
+        info!(
+            "Count result: {} rows",
+            count,
+            internal_log_rate_limit = true
+        );
         count
     }
 
@@ -366,7 +405,10 @@ impl DorisTestClient {
             result.insert(column.clone(), db_value);
         }
 
-        tracing::info!("Getting first row data successful");
+        info!(
+            "Getting first row data successful",
+            internal_log_rate_limit = true
+        );
         result
     }
 }

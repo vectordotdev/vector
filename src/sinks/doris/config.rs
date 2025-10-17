@@ -3,6 +3,7 @@
 use super::{progress::ProgressReporter, sink::DorisSink};
 
 use crate::{
+    codecs::EncodingConfigWithFraming,
     http::{Auth, HttpClient},
     sinks::{
         doris::{
@@ -16,11 +17,10 @@ use crate::{
 use futures;
 use futures_util::TryFutureExt;
 use std::{collections::HashMap, sync::Arc};
-use vector_lib::codecs::JsonSerializerConfig;
 
 /// Configuration for the `doris` sink.
 #[configurable_component(sink("doris", "Deliver log data to an Apache Doris database."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct DorisConfig {
     /// A list of Doris endpoints to send logs to.
@@ -45,13 +45,8 @@ pub struct DorisConfig {
     #[serde(default = "default_label_prefix")]
     pub label_prefix: String,
 
-    /// The line delimiter for batch data.
-    #[configurable(metadata(docs::examples = "\\n"))]
-    #[serde(default = "default_line_delimiter")]
-    pub line_delimiter: String,
-
     /// Enable request logging.
-    #[serde(default = "default_log_request")]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub log_request: bool,
 
     /// Progress reporting interval in seconds.
@@ -64,13 +59,8 @@ pub struct DorisConfig {
     #[configurable(metadata(docs::additional_props_description = "An HTTP header value."))]
     pub headers: HashMap<String, String>,
 
-    /// The codec configuration. This configures how events are encoded before being sent to Doris.
-    #[serde(default)]
-    pub codec: JsonSerializerConfig,
-
-    #[configurable(derived)]
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    pub encoding: Transformer,
+    #[serde(flatten)]
+    pub encoding: EncodingConfigWithFraming,
 
     /// Compression algorithm to use for HTTP requests.
     #[serde(default)]
@@ -83,16 +73,6 @@ pub struct DorisConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeSizeBasedDefaultBatchSettings>,
-
-    /// Controls the buffer size for requests sent to Doris endpoints.
-    ///
-    /// This sets the maximum number of stream load requests that can be queued for sending to
-    /// Doris endpoints before backpressure is applied. A value of 1 ensures requests are sent
-    /// sequentially to the endpoint.
-    #[configurable(metadata(docs::examples = 1))]
-    #[configurable(metadata(docs::human_name = "Request Buffer Size"))]
-    #[serde(default = "default_buffer_bound")]
-    pub buffer_bound: usize,
 
     #[configurable(derived)]
     pub auth: Option<Auth>,
@@ -123,14 +103,6 @@ fn default_label_prefix() -> String {
     "vector".to_string()
 }
 
-fn default_line_delimiter() -> String {
-    "\n".to_string()
-}
-
-fn default_log_request() -> bool {
-    true
-}
-
 fn default_log_progress_interval() -> u64 {
     10
 }
@@ -139,8 +111,31 @@ fn default_max_retries() -> isize {
     -1
 }
 
-fn default_buffer_bound() -> usize {
-    1
+impl Default for DorisConfig {
+    fn default() -> Self {
+        Self {
+            endpoints: Vec::new(),
+            database: Template::try_from("").unwrap(),
+            table: Template::try_from("").unwrap(),
+            label_prefix: default_label_prefix(),
+            log_request: false,
+            log_progress_interval: default_log_progress_interval(),
+            headers: HashMap::new(),
+            encoding: (
+                Some(vector_lib::codecs::encoding::FramingConfig::NewlineDelimited),
+                vector_lib::codecs::JsonSerializerConfig::default(),
+            )
+                .into(),
+            compression: Compression::default(),
+            max_retries: default_max_retries(),
+            batch: BatchConfig::default(),
+            auth: None,
+            request: TowerRequestConfig::default(),
+            tls: None,
+            endpoint_health: None,
+            acknowledgements: AcknowledgementsConfig::default(),
+        }
+    }
 }
 
 impl_generate_config_from_default!(DorisConfig);
@@ -224,7 +219,7 @@ impl SinkConfig for DorisConfig {
             services,
             health_config,
             DorisHealthLogic,
-            self.buffer_bound,
+            1, // Buffer bound is hardcoded to 1 for sinks
         );
 
         // Create DorisSink with the configured service
@@ -278,8 +273,6 @@ mod tests {
     #[test]
     fn test_default_values() {
         assert_eq!(default_label_prefix(), "vector");
-        assert_eq!(default_line_delimiter(), "\n");
-        assert_eq!(default_log_request(), true);
         assert_eq!(default_log_progress_interval(), 10);
         assert_eq!(default_max_retries(), -1);
     }
@@ -299,8 +292,7 @@ mod tests {
         assert_eq!(config.database.to_string(), "test_db");
         assert_eq!(config.table.to_string(), "test_table");
         assert_eq!(config.label_prefix, "vector");
-        assert_eq!(config.line_delimiter, "\n");
-        assert!(config.log_request);
+        assert!(!config.log_request); // Default is false (opt-in)
         assert_eq!(config.log_progress_interval, 10);
         assert_eq!(config.max_retries, -1);
     }
@@ -313,7 +305,6 @@ mod tests {
             database = "custom_db"
             table = "custom_table"
             label_prefix = "custom_prefix"
-            line_delimiter = "\r\n"
             log_request = false
             log_progress_interval = 30
             max_retries = 5
@@ -328,8 +319,7 @@ mod tests {
         assert_eq!(config.database.to_string(), "custom_db");
         assert_eq!(config.table.to_string(), "custom_table");
         assert_eq!(config.label_prefix, "custom_prefix");
-        assert_eq!(config.line_delimiter, "\r\n");
-        assert!(!config.log_request);
+        assert!(!config.log_request); // Explicitly set to false in config
         assert_eq!(config.log_progress_interval, 30);
         assert_eq!(config.max_retries, 5);
     }

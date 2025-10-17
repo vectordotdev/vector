@@ -12,7 +12,7 @@ use crate::{
 };
 use http::Uri;
 use snafu::prelude::*;
-use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
+use vector_lib::codecs::encoding::Framer;
 
 #[derive(Debug, Snafu)]
 pub enum ParseError {
@@ -52,15 +52,17 @@ impl DorisCommon {
         let auth = config.auth.choose_one(&uri.auth)?;
         let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
         let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
+
+        // Build encoder from the encoding configuration
+        let transformer = config.encoding.transformer();
+        let (framer, serializer) = config
+            .encoding
+            .build(crate::codecs::SinkType::StreamBased)?;
+        let encoder = Encoder::<Framer>::new(framer, serializer);
+
         let request_builder = DorisRequestBuilder {
             compression: Compression::None,
-            encoder: (
-                config.encoding.clone(),
-                Encoder::<Framer>::new(
-                    NewlineDelimitedEncoderConfig.build().into(),
-                    JsonSerializerConfig::default().build().into(),
-                ),
-            ),
+            encoder: (transformer, encoder),
         };
 
         Ok(Self {
