@@ -239,7 +239,6 @@ impl EventStreamBuilder {
 
                 // Process the stream by reading line by line
                 loop {
-                    buffer.clear();
                     match log_stream.read_until(b'\n', &mut buffer).await {
                         Ok(0) => break, // EOF
                         Ok(_) => {
@@ -252,7 +251,7 @@ impl EventStreamBuilder {
                                 buffer.pop();
                             }
 
-                            let line_bytes = Bytes::from(buffer.clone());
+                            let line_bytes = Bytes::from(std::mem::take(&mut buffer));
 
                             // TODO: track last log timestamp
 
