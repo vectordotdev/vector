@@ -119,29 +119,50 @@ impl Difference {
     ) -> Self {
         let old_names = old
             .iter()
-            .flat_map(|(k, t)| vec![t.as_source(k).map(|(k, _)| k), t.as_sink(k).map(|(k, _)| k)])
+            .flat_map(|(original_key, t)| {
+                vec![
+                    t.as_source(original_key).map(|(k, _)| (original_key, k)),
+                    t.as_sink(original_key).map(|(k, _)| (original_key, k)),
+                ]
+            })
             .flatten()
             .collect::<HashSet<_>>();
         let new_names = new
             .iter()
-            .flat_map(|(k, t)| vec![t.as_source(k).map(|(k, _)| k), t.as_sink(k).map(|(k, _)| k)])
+            .flat_map(|(original_key, t)| {
+                vec![
+                    t.as_source(original_key).map(|(k, _)| (original_key, k)),
+                    t.as_sink(original_key).map(|(k, _)| (original_key, k)),
+                ]
+            })
             .flatten()
             .collect::<HashSet<_>>();
 
         let to_change = old_names
             .intersection(&new_names)
-            .filter(|&n| {
+            .filter(|(original_key, _)| {
                 // This is a hack around the issue of comparing two
                 // trait objects. Json is used here over toml since
                 // toml does not support serializing `None`
                 // to_value is used specifically (instead of string)
                 // to avoid problems comparing serialized HashMaps,
                 // which can iterate in varied orders.
-                let old_value = serde_json::to_value(&old[n]).unwrap();
-                let new_value = serde_json::to_value(&new[n]).unwrap();
+                let old_value = serde_json::to_value(&old[*original_key]).unwrap();
+                let new_value = serde_json::to_value(&new[*original_key]).unwrap();
                 old_value != new_value
             })
             .cloned()
+            .map(|(_, key)| key)
+            .collect::<HashSet<_>>();
+
+        // Remove the original key, since it is no longer needed for changed lookup
+        let old_names = old_names
+            .into_iter()
+            .map(|(_, key)| key)
+            .collect::<HashSet<_>>();
+        let new_names = new_names
+            .into_iter()
+            .map(|(_, key)| key)
             .collect::<HashSet<_>>();
 
         let to_remove = &old_names - &new_names;
@@ -199,5 +220,97 @@ impl Difference {
 
     pub fn removed_and_changed(&self) -> impl Iterator<Item = &ComponentKey> {
         self.to_change.iter().chain(self.to_remove.iter())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::config::ConfigBuilder;
+    use indoc::indoc;
+
+    use super::*;
+
+    #[test]
+    fn new_tables_uses_correct_keys() {
+        let old_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            enrichment_tables:
+              memory_table:
+                type: "memory"
+                ttl: 10
+                inputs: []
+                source_config:
+                  source_key: "memory_table_source"
+                  export_expired_items: true
+                  export_interval: 50
+
+              memory_table_unchanged:
+                type: "memory"
+                ttl: 10
+                inputs: []
+
+              memory_table_old:
+                type: "memory"
+                ttl: 10
+                inputs: []
+
+            sources:
+              test:
+                type: "test_basic"
+
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let new_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
+            enrichment_tables:
+              memory_table:
+                type: "memory"
+                ttl: 20
+                inputs: []
+                source_config:
+                  source_key: "memory_table_source"
+                  export_expired_items: true
+                  export_interval: 50
+
+              memory_table_unchanged:
+                type: "memory"
+                ttl: 10
+                inputs: []
+
+              memory_table_new:
+                type: "memory"
+                ttl: 1000
+                inputs: []
+
+            sources:
+              test:
+                type: "test_basic"
+
+            sinks:
+              test_sink:
+                type: "test_basic"
+                inputs: ["test"]
+        "#})
+        .unwrap()
+        .build()
+        .unwrap();
+
+        let diff =
+            Difference::new_tables(&old_config.enrichment_tables, &new_config.enrichment_tables);
+
+        assert_eq!(diff.to_add, HashSet::from_iter(["memory_table_new".into()]));
+        assert_eq!(
+            diff.to_remove,
+            HashSet::from_iter(["memory_table_old".into()])
+        );
+        assert_eq!(
+            diff.to_change,
+            HashSet::from_iter(["memory_table".into(), "memory_table_source".into()])
+        );
     }
 }
