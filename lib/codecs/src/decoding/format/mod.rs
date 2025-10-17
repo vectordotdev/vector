@@ -28,7 +28,7 @@ pub use native_json::{
     NativeJsonDeserializer, NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,
 };
 #[cfg(feature = "opentelemetry")]
-pub use otlp::{OtlpDeserializer, OtlpDeserializerConfig};
+pub use otlp::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType};
 pub use protobuf::{ProtobufDeserializer, ProtobufDeserializerConfig, ProtobufDeserializerOptions};
 use smallvec::SmallVec;
 #[cfg(feature = "syslog")]
