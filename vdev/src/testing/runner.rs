@@ -39,11 +39,11 @@ pub enum RunnerState {
     Unknown,
 }
 
-pub fn get_agent_test_runner(container: bool) -> Result<Box<dyn TestRunner>> {
+pub fn get_agent_test_runner(container: bool) -> Box<dyn TestRunner> {
     if container {
-        Ok(Box::new(DockerTestRunner))
+        Box::new(DockerTestRunner)
     } else {
-        Ok(Box::new(LocalTestRunner))
+        Box::new(LocalTestRunner)
     }
 }
 
@@ -274,7 +274,7 @@ impl IntegrationTestRunner {
         integration: Option<String>,
         config: &IntegrationRunnerConfig,
         network: Option<String>,
-    ) -> Result<Self> {
+    ) -> Self {
         let mut volumes: Vec<String> = config
             .volumes
             .iter()
@@ -283,12 +283,12 @@ impl IntegrationTestRunner {
 
         volumes.push(format!("{VOLUME_TARGET}:/output"));
 
-        Ok(Self {
+        Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,
             network,
             volumes,
-        })
+        }
     }
 
     pub(super) fn ensure_network(&self) -> Result<()> {
