@@ -270,6 +270,7 @@ impl EventStreamBuilder {
                                 end_offset: text_len,
                             };
 
+                            // TODO: Send batches of lines instead of one by one
                             if self.line_sender.send(vec![line]).await.is_err() {
                                 warn!(
                                     "Line channel closed for container '{}' in pod '{}', stopping stream",
