@@ -54,9 +54,6 @@ pub struct ContainerInfo {
     pub namespace: String,
     /// Container name
     pub container_name: String,
-    /// Pod UID for tracking (will be used for future state tracking)
-    #[allow(dead_code)]
-    pub pod_uid: String,
 }
 
 /// Container log information with timestamp tracking
@@ -104,7 +101,6 @@ impl Reconciler {
             line_sender,
         };
 
-        // Convert broadcast receiver to stream, ignoring errors like TraceSubscription
         let pod_stream = BroadcastStream::new(pod_receiver).filter_map(|event| ready(event.ok()));
 
         Self {
@@ -153,7 +149,6 @@ impl Reconciler {
                 pod_name: pod_info.name.clone(),
                 namespace: pod_info.namespace.clone(),
                 container_name: container_name.clone(),
-                pod_uid: pod_info.uid.clone(),
             };
 
             let key = ContainerKey::from(&container_info);

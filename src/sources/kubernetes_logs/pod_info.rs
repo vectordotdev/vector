@@ -8,8 +8,6 @@ pub struct PodInfo {
     pub name: String,
     /// Pod namespace
     pub namespace: String,
-    /// Pod UID for uniqueness
-    pub uid: String,
     /// Pod phase (Running, Pending, etc.)
     pub phase: Option<String>,
     /// Container names within the pod
@@ -23,8 +21,6 @@ impl From<&Pod> for PodInfo {
         let name = metadata.name.as_ref().cloned().unwrap_or_default();
 
         let namespace = metadata.namespace.as_ref().cloned().unwrap_or_default();
-
-        let uid = metadata.uid.as_ref().cloned().unwrap_or_default();
 
         let phase = pod.status.as_ref().and_then(|status| status.phase.clone());
 
@@ -42,7 +38,6 @@ impl From<&Pod> for PodInfo {
         PodInfo {
             name,
             namespace,
-            uid,
             phase,
             containers,
         }

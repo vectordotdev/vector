@@ -860,8 +860,7 @@ impl Source {
             exclude_paths,
             insert_namespace_fields,
         );
-        let annotator =
-            PodMetadataAnnotator::new(pod_state.clone(), pod_fields_spec, log_namespace);
+        let annotator = PodMetadataAnnotator::new(pod_state, pod_fields_spec, log_namespace);
         let ns_annotator =
             NamespaceMetadataAnnotator::new(ns_state, namespace_fields_spec, log_namespace);
         let node_annotator = NodeMetadataAnnotator::new(node_state, node_field_spec, log_namespace);
