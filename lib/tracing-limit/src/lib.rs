@@ -537,10 +537,7 @@ mod test {
             .with(RateLimitedLayer::new(recorder).with_default_limit(100));
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
-                info!(
-                    message = "Hello world!",
-                    internal_log_rate_secs = 1
-                );
+                info!(message = "Hello world!", internal_log_rate_secs = 1);
                 MockClock::advance(Duration::from_millis(100));
             }
         });
