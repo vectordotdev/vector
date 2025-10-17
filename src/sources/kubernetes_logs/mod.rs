@@ -1008,24 +1008,10 @@ impl Source {
         let event_processing_loop = out.send_event_stream(&mut stream);
 
         let reconciler = if let Some(rx) = reconciler_rx {
-            let reconciler_stream = futures_util::StreamExt::filter_map(
-                BroadcastStream::new(rx),
-                |result| async move {
-                    match result {
-                        Ok(event) => Some(Ok(event)),
-                        Err(tokio_stream::wrappers::errors::BroadcastStreamRecvError::Lagged(
-                            _,
-                        )) => {
-                            warn!("Reconciler lagged behind pod events");
-                            None
-                        }
-                    }
-                },
-            );
             Some(reconciler::Reconciler::new(
                 client.clone(),
                 file_source_tx.clone(),
-                reconciler_stream,
+                rx,
             ))
         } else {
             None

@@ -4,13 +4,15 @@ use chrono::{DateTime, FixedOffset, Utc};
 use futures::SinkExt;
 use futures::channel::mpsc;
 use futures::{AsyncBufReadExt, StreamExt};
-use futures_util::Stream;
+use futures_util::{Stream, future::ready};
 use k8s_openapi::api::core::v1::Pod;
 use kube::runtime::watcher;
 use kube::{Api, Client, api::LogParams};
 use std::collections::HashMap;
 use std::fmt;
 use std::pin::Pin;
+use tokio::sync::broadcast;
+use tokio_stream::wrappers::BroadcastStream;
 use tracing::{info, warn};
 use vector_lib::{file_source::file_server::Line, file_source_common::FileFingerprint};
 
@@ -88,22 +90,27 @@ impl<'a> ContainerLogInfo<'a> {
 pub struct Reconciler {
     esb: EventStreamBuilder,
     states: HashMap<ContainerKey, TailerState>, // Keyed by ContainerKey
-    pod_watcher: Pin<Box<dyn Stream<Item = watcher::Result<watcher::Event<Pod>>> + Send>>,
+    pod_watcher: Pin<Box<dyn Stream<Item = watcher::Event<Pod>> + Send>>,
 }
 
 impl Reconciler {
-    pub fn new<S>(client: Client, line_sender: mpsc::Sender<Vec<Line>>, pod_watcher: S) -> Self
-    where
-        S: Stream<Item = watcher::Result<watcher::Event<Pod>>> + Send + 'static,
-    {
+    pub fn new(
+        client: Client,
+        line_sender: mpsc::Sender<Vec<Line>>,
+        pod_receiver: broadcast::Receiver<watcher::Event<Pod>>,
+    ) -> Self {
         let esb = EventStreamBuilder {
             client: client.clone(),
             line_sender,
         };
+
+        // Convert broadcast receiver to stream, ignoring errors like TraceSubscription
+        let pod_stream = BroadcastStream::new(pod_receiver).filter_map(|event| ready(event.ok()));
+
         Self {
             esb,
             states: HashMap::new(),
-            pod_watcher: Box::pin(pod_watcher),
+            pod_watcher: Box::pin(pod_stream),
         }
     }
 
@@ -113,12 +120,12 @@ impl Reconciler {
         // Listen to pod watcher events for real-time reconciliation
         while let Some(event) = self.pod_watcher.next().await {
             match event {
-                Ok(watcher::Event::Delete(pod)) => {
+                watcher::Event::Delete(pod) => {
                     let pod_info = PodInfo::from(&pod);
                     info!("Pod '{}' deleted, cleaning up log tailers", pod_info.name);
                     self.cleanup_pod_tailers(&pod_info).await;
                 }
-                Ok(watcher::Event::InitApply(pod)) | Ok(watcher::Event::Apply(pod)) => {
+                watcher::Event::InitApply(pod) | watcher::Event::Apply(pod) => {
                     let pod_info = PodInfo::from(&pod);
                     if let Some(phase) = &pod_info.phase
                         && phase == "Running"
@@ -132,10 +139,7 @@ impl Reconciler {
                         }
                     }
                 }
-                Ok(_) => {}
-                Err(e) => {
-                    warn!("Pod watcher error: {}", e);
-                }
+                _ => {}
             }
         }
 
