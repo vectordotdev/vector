@@ -1,6 +1,5 @@
-use std::{collections::HashSet, env, path::PathBuf, process::Command};
-
 use anyhow::Result;
+use std::{collections::HashSet, env, path::PathBuf, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::{
@@ -116,7 +115,6 @@ pub trait ContainerTestRunner: TestRunner {
             }
             RunnerState::Missing => {
                 self.build(features, directory, config_environment_variables)?;
-                self.ensure_volumes()?;
                 self.create()?;
                 self.start()?;
             }
@@ -161,6 +159,7 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn start(&self) -> Result<()> {
+        self.ensure_volumes()?;
         docker_command(["start", &self.container_name()])
             .wait(format!("Starting container {}", self.container_name()))
     }
@@ -195,6 +194,7 @@ pub trait ContainerTestRunner: TestRunner {
             .flat_map(|volume| ["--volume", volume])
             .collect();
 
+        self.ensure_volumes()?;
         docker_command(
             [
                 "create",
@@ -275,15 +275,19 @@ impl IntegrationTestRunner {
         config: &IntegrationRunnerConfig,
         network: Option<String>,
     ) -> Result<Self> {
+        let mut volumes: Vec<String> = config
+            .volumes
+            .iter()
+            .map(|(a, b)| format!("{a}:{b}"))
+            .collect();
+
+        volumes.push(format!("{VOLUME_TARGET}:/output"));
+
         Ok(Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,
             network,
-            volumes: config
-                .volumes
-                .iter()
-                .map(|(a, b)| format!("{a}:{b}"))
-                .collect(),
+            volumes,
         })
     }
 
@@ -303,6 +307,26 @@ impl IntegrationTestRunner {
         } else {
             Ok(())
         }
+    }
+
+    pub(super) fn ensure_external_volumes(&self) -> Result<()> {
+        // Get list of existing volumes
+        let mut command = docker_command(["volume", "ls", "--format", "{{.Name}}"]);
+        let existing_volumes: HashSet<String> =
+            command.check_output()?.lines().map(String::from).collect();
+
+        // Extract volume names from self.volumes (format is "volume_name:/mount/path")
+        for volume_spec in &self.volumes {
+            if let Some((volume_name, _)) = volume_spec.split_once(':') {
+                // Only create named volumes (not paths like /host/path)
+                if !volume_name.starts_with('/') && !existing_volumes.contains(volume_name) {
+                    docker_command(["volume", "create", volume_name])
+                        .wait(format!("Creating volume {volume_name}"))?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 

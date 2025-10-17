@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 #[cfg(feature = "sources-http_server")]
 mod body_decoding;
+#[cfg(feature = "sources-file")]
 mod encoding_config;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;

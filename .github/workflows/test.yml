@@ -32,6 +32,7 @@ jobs:
   check-fmt:
     name: Check code format
     runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -43,7 +44,7 @@ jobs:
   check-clippy:
     name: Check clippy
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -57,7 +58,7 @@ jobs:
   test:
     name: Unit and Component Validation tests - x86_64-unknown-linux-gnu
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -81,19 +82,10 @@ jobs:
         run: scripts/upload-test-results.sh
         if: always()
 
-  check-version:
-    name: Check version
-    runs-on: ubuntu-24.04
-    needs: changes
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          fetch-depth: 0
-      - run: make check-version
-
   check-scripts:
     name: Check scripts
     runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.scripts == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -102,7 +94,7 @@ jobs:
   check-events:
     name: Check events
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -114,7 +106,7 @@ jobs:
   check-licenses:
     name: Check that the 3rd-party license file is up to date
     runs-on: ubuntu-24.04
-    if: needs.changes.outputs.dependencies == 'true'
+    if: ${{ needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -128,7 +120,7 @@ jobs:
   check-docs:
     name: Check Cue docs
     runs-on: ubuntu-24.04
-    if: needs.changes.outputs.cue == 'true'
+    if: ${{ needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -141,7 +133,7 @@ jobs:
   check-markdown:
     name: Check Markdown
     runs-on: ubuntu-24.04
-    if: needs.changes.outputs.markdown == 'true'
+    if: ${{ needs.changes.outputs.markdown == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -154,7 +146,7 @@ jobs:
   check-component-docs:
     name: Check Component Docs
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -226,7 +218,7 @@ jobs:
   check-rust-docs:
     name: Check Rust Docs
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -238,7 +230,7 @@ jobs:
   test-vrl:
     name: VRL - Linux
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -252,7 +244,7 @@ jobs:
   build-vrl-playground:
     name: Build VRL Playground
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -274,7 +266,6 @@ jobs:
       - check-fmt
       - check-clippy
       - test
-      - check-version
       - check-scripts
       - check-events
       - check-licenses

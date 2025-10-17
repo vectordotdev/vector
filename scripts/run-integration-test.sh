@@ -10,8 +10,6 @@ if [[ "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
   set -x
 fi
 
-SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
-
 print_compose_logs_on_failure() {
   local LAST_RETURN_CODE=$1
   if [[ "$LAST_RETURN_CODE" -ne 0 || "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
@@ -54,7 +52,7 @@ while getopts ":hr:v:e:" opt; do
     r)
       RETRIES="$OPTARG"
       if ! [[ "$RETRIES" =~ ^[0-9]+$ ]] || [[ "$RETRIES" -lt 0 ]]; then
-        echo "error: -r requires a non-negative integer (got: $RETRIES)" >&2
+        echo "ERROR: -r requires a non-negative integer (got: $RETRIES)" >&2
         exit 2
       fi
       ;;
@@ -65,12 +63,12 @@ while getopts ":hr:v:e:" opt; do
       TEST_ENV="$OPTARG"
       ;;
     \?)
-      echo "error: unknown option: -$OPTARG" >&2
+      echo "ERROR: unknown option: -$OPTARG" >&2
       usage
       exit 2
       ;;
     :)
-      echo "error: option -$OPTARG requires an argument" >&2
+      echo "ERROR: option -$OPTARG requires an argument" >&2
       usage
       exit 2
       ;;
@@ -83,7 +81,7 @@ VERBOSITY=${VERBOSITY:-'-v'}
 
 # Validate required positional args
 if [[ $# -ne 2 ]]; then
-  echo "error: missing required positional arguments" >&2
+  echo "ERROR: missing required positional arguments" >&2
   usage
   exit 1
 fi
@@ -94,7 +92,7 @@ TEST_NAME=$2
 case "$TEST_TYPE" in
   int|e2e) ;;
   *)
-    echo "error: TEST_TYPE must be 'int' or 'e2e' (got: $TEST_TYPE)" >&2
+    echo "ERROR: TEST_TYPE must be 'int' or 'e2e' (got: $TEST_TYPE)" >&2
     usage
     exit 1
     ;;
@@ -107,18 +105,29 @@ if [[ ${#TEST_ENV} -gt 0 ]]; then
 else
   # Collect all available environments via auto-discovery
   mapfile -t TEST_ENVIRONMENTS < <(cargo vdev "${VERBOSITY}" "${TEST_TYPE}" show -e "${TEST_NAME}")
+  if [[ ${#TEST_ENVIRONMENTS[@]} -eq 0 ]]; then
+    echo "ERROR: no environments found for ${TEST_TYPE} test '${TEST_NAME}'" >&2
+    exit 1
+  fi
 fi
 
 for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
-  # Pre-run cleanup
-  if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
-    # TODO use Docker compose volumes
-    find "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" -type f -name '*.log' -delete
-    # Like 777, but users can only delete their own files. This allows the docker instances to write output files.
-    chmod 1777 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output"
-  fi
+  # Execution flow for each environment:
+  # 1. Clean up previous test output
+  # 2. Start environment
+  # 3. If start succeeded:
+  #    - Run tests
+  #    - Upload results to Datadog CI
+  # 4. If start failed:
+  #    - Skip test phase
+  #    - Exit with error code
+  # 5. Stop environment (always, best effort)
+  # 6. Exit if there was a failure
 
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" "${TEST_ENV}" || true
+  docker run --rm -v vector_target:/output/"${TEST_NAME}" alpine:3.20 \
+    sh -c "rm -rf /output/${TEST_NAME}/*"
+
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start -a "${TEST_NAME}" "${TEST_ENV}"
   START_RET=$?
   print_compose_logs_on_failure "$START_RET"
 
@@ -126,22 +135,21 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
     cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" -a "${TEST_NAME}" "${TEST_ENV}"
     RET=$?
     print_compose_logs_on_failure "$RET"
+
+    # Upload test results only if the vdev test step ran
+    ./scripts/upload-test-results.sh
   else
     echo "Skipping test phase because 'vdev start' failed"
     RET=$START_RET
   fi
 
+  # Always stop the environment (best effort cleanup)
   cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop -a "${TEST_NAME}" || true
 
-  # Post-run cleanup
-  if [[ "$TEST_NAME" == "opentelemetry-logs" ]]; then
-    chmod 0755 "${SCRIPT_DIR}/../tests/data/e2e/opentelemetry/logs/output" # revert to default permissions
-  fi
-
-  # Only upload test results if CI is defined
-  if [[ -n "${CI:-}" ]]; then
-    ./scripts/upload-test-results.sh
+  # Exit early on first failure
+  if [[ "$RET" -ne 0 ]]; then
+    exit "$RET"
   fi
 done
 
-exit "$RET"
+exit 0

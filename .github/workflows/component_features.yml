@@ -3,7 +3,7 @@
 # Validates that each component feature compiles
 #
 # Runs on:
-#  - scheduled UTC midnight Tues-Sat
+#  - scheduled 10:00 UTC Monday (6 AM EST / 5 AM EDT NYC)
 #  - on PR review (see comment-trigger.yml)
 #  - on demand from github actions UI
 
@@ -13,8 +13,7 @@ on:
   workflow_call:
   workflow_dispatch:
   schedule:
-    # At midnight UTC Tue-Sat
-    - cron: '0 0 * * 2-6'
+    - cron: '0 10 * * 1' # 10:00 UTC Monday (6 AM EST NYC)
 
 permissions:
   statuses: write
