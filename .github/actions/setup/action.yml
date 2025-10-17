@@ -172,7 +172,7 @@ runs:
         tar \
           -xvf "${TEMP}/cue_v0.10.0_linux_amd64.tar.gz" \
           -C "${TEMP}"
-        cp "${TEMP}/cue" /usr/bin/cue
+        sudo cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
 
     - name: Install ruby
