@@ -18,7 +18,7 @@ use crate::{
     AsyncFileInfo, internal_events::FileSourceInternalEvents, metadata_ext::PortableFileExt,
 };
 
-const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
+pub const FINGERPRINT_CRC: Crc<u64> = Crc::<u64>::new(&crc::CRC_64_ECMA_182);
 
 #[derive(Debug, Clone)]
 pub struct Fingerprinter {
@@ -283,7 +283,7 @@ mod test {
     use bytes::BytesMut;
     use tempfile::{TempDir, tempdir};
 
-    use super::{FileSourceInternalEvents, FingerprintStrategy, Fingerprinter};
+    use crate::{FingerprintStrategy, Fingerprinter, internal_events::FileSourceInternalEvents};
 
     use tokio::io::AsyncReadExt;
 

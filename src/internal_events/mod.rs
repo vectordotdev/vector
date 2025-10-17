@@ -144,11 +144,14 @@ mod window;
 
 #[cfg(any(
     feature = "sources-file",
+    feature = "sources-ifile",
     feature = "sources-kubernetes_logs",
     feature = "sinks-file",
 ))]
 mod file;
 
+#[cfg(feature = "sources-ifile")]
+pub mod ifile;
 #[cfg(windows)]
 mod windows;
 
@@ -206,6 +209,7 @@ pub(crate) use self::exec::*;
 pub use self::expansion::*;
 #[cfg(any(
     feature = "sources-file",
+    feature = "sources-ifile",
     feature = "sources-kubernetes_logs",
     feature = "sinks-file",
 ))]

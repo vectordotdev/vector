@@ -7,6 +7,9 @@ mod fingerprinter;
 pub mod internal_events;
 mod metadata_ext;
 
+use std::collections::HashMap;
+
+use tokio::task::{Id, JoinError, JoinSet};
 use vector_config::configurable_component;
 
 pub use self::{
@@ -44,5 +47,43 @@ impl From<ReadFromConfig> for ReadFrom {
             ReadFromConfig::Beginning => ReadFrom::Beginning,
             ReadFromConfig::End => ReadFrom::End,
         }
+    }
+}
+
+pub struct TaskSet<K, T> {
+    ids: HashMap<Id, K>,
+    set: JoinSet<(K, T)>,
+}
+
+impl<K: Clone + Send + Sync + 'static, T: 'static> TaskSet<K, T> {
+    pub fn new() -> TaskSet<K, T> {
+        TaskSet {
+            ids: HashMap::new(),
+            set: JoinSet::new(),
+        }
+    }
+
+    #[track_caller]
+    pub fn spawn<F>(&mut self, key: K, task: F)
+    where
+        F: Future<Output = T> + Send + 'static,
+        T: Send,
+    {
+        let key_ = key.clone();
+        let abort_handle = self.set.spawn(async move { (key_, task.await) });
+        self.ids.insert(abort_handle.id(), key);
+    }
+
+    pub async fn join_next(&mut self) -> Option<(K, Result<T, JoinError>)> {
+        Some(match self.set.join_next().await? {
+            Ok((key, result)) => (key, Ok(result)),
+            Err(join_err) => {
+                let key = self
+                    .ids
+                    .remove(&join_err.id())
+                    .expect("panicked/cancelled task id not in task id pool");
+                (key, Err(join_err))
+            }
+        })
     }
 }

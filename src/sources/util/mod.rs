@@ -1,7 +1,7 @@
 #![allow(missing_docs)]
 #[cfg(feature = "sources-http_server")]
 mod body_decoding;
-#[cfg(feature = "sources-file")]
+#[cfg(any(feature = "sources-file", feature = "sources-ifile"))]
 mod encoding_config;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;
@@ -41,7 +41,7 @@ mod unix_datagram;
 mod unix_stream;
 mod wrappers;
 
-#[cfg(feature = "sources-file")]
+#[cfg(any(feature = "sources-file", feature = "sources-ifile"))]
 pub use encoding_config::EncodingConfig;
 pub use multiline_config::MultilineConfig;
 #[cfg(all(

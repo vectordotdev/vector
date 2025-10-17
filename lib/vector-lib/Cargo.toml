@@ -9,6 +9,7 @@ publish = false
 codecs = { path = "../codecs", default-features = false }
 enrichment = { path = "../enrichment" }
 file-source = { path = "../file-source", optional = true }
+ifile-source = { path = "../ifile-source", optional = true }
 file-source-common = { path = "../file-source-common", optional = true }
 opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
 prometheus-parser = { path = "../prometheus-parser", optional = true }
@@ -27,11 +28,13 @@ vrl = { workspace = true, optional = true }
 api = ["vector-tap/api"]
 api-client = ["dep:vector-api-client"]
 lua = ["vector-core/lua"]
+file-source-common = ["dep:file-source-common"]
 file-source = ["dep:file-source", "dep:file-source-common"]
+ifile-source = ["dep:ifile-source", "dep:file-source-common"]
 opentelemetry = ["dep:opentelemetry-proto", "codecs/opentelemetry"]
 prometheus = ["dep:prometheus-parser"]
 proptest = ["vector-lookup/proptest", "vrl/proptest"]
 syslog = ["codecs/syslog"]
-test = ["vector-core/test"]
+test = ["vector-core/test", "ifile-source/test"]
 vrl = ["vector-core/vrl", "dep:vrl"]
 allocation-tracing = ["vector-top?/allocation-tracing"]

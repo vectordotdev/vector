@@ -1,21 +1,14 @@
-#![allow(dead_code)] // TODO requires optional feature compilation
-
-use std::borrow::Cow;
-
+#![allow(dead_code)] // FIXME
 use metrics::{counter, gauge};
+use std::borrow::Cow;
 use vector_lib::{
     configurable::configurable_component,
-    internal_event::{
-        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
-    },
+    internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL},
 };
 
-#[cfg(any(
-    feature = "sources-ifile",
-    feature = "sources-file",
-    feature = "sources-kubernetes_logs"
-))]
 pub use self::source::*;
+
+use vector_lib::internal_event::{error_stage, error_type};
 
 /// Configuration of internal metrics for file-based components.
 #[configurable_component]
@@ -109,24 +102,22 @@ impl<P: std::fmt::Debug> InternalEvent for FileIoError<'_, P> {
     }
 }
 
-#[cfg(any(
-    feature = "sources-file",
-    feature = "sources-ifile",
-    feature = "sources-kubernetes_logs"
-))]
 mod source {
     use std::{io::Error, path::Path, time::Duration};
 
-    use bytes::BytesMut;
     use metrics::counter;
-    use vector_lib::{
-        emit,
-        file_source_common::internal_events::FileSourceInternalEvents,
-        internal_event::{ComponentEventsDropped, INTENTIONAL, error_stage, error_type},
-        json_size::JsonSize,
+    use vector_lib::file_source_common::internal_events::{
+        FileSourceExtendedInternalEvents, FileSourceInternalEvents,
     };
 
+    use crate::internal_events::FileLineTooBigError;
+
     use super::{FileOpen, InternalEvent};
+    use vector_lib::emit;
+    use vector_lib::{
+        internal_event::{error_stage, error_type},
+        json_size::JsonSize,
+    };
 
     #[derive(Debug)]
     pub struct FileBytesReceived<'a> {
@@ -140,19 +131,19 @@ mod source {
             trace!(
                 message = "Bytes received.",
                 byte_size = %self.byte_size,
-                protocol = "file",
+                protocol = "ifile",
                 file = %self.file,
             );
             if self.include_file_metric_tag {
                 counter!(
                     "component_received_bytes_total",
-                    "protocol" => "file",
-                    "file" => self.file.to_owned()
+                    "protocol" => "ifile",
+                    "ifile" => self.file.to_owned()
                 )
             } else {
                 counter!(
                     "component_received_bytes_total",
-                    "protocol" => "file",
+                    "protocol" => "ifile",
                 )
             }
             .increment(self.byte_size as u64);
@@ -508,38 +499,6 @@ mod source {
         }
     }
 
-    #[derive(Debug)]
-    pub struct FileLineTooBigError<'a> {
-        pub truncated_bytes: &'a BytesMut,
-        pub configured_limit: usize,
-        pub encountered_size_so_far: usize,
-    }
-
-    impl InternalEvent for FileLineTooBigError<'_> {
-        fn emit(self) {
-            error!(
-                message = "Found line that exceeds max_line_bytes; discarding.",
-                truncated_bytes = ?self.truncated_bytes,
-                configured_limit = self.configured_limit,
-                encountered_size_so_far = self.encountered_size_so_far,
-                internal_log_rate_limit = true,
-                error_type = error_type::CONDITION_FAILED,
-                stage = error_stage::RECEIVING,
-            );
-            counter!(
-                "component_errors_total",
-                "error_code" => "reading_line_from_file",
-                "error_type" => error_type::CONDITION_FAILED,
-                "stage" => error_stage::RECEIVING,
-            )
-            .increment(1);
-            emit!(ComponentEventsDropped::<INTENTIONAL> {
-                count: 1,
-                reason: "Found line that exceeds max_line_bytes; discarding.",
-            });
-        }
-    }
-
     #[derive(Clone)]
     pub struct FileSourceInternalEventsEmitter {
         pub include_file_metric_tag: bool,
@@ -634,6 +593,42 @@ mod source {
                 configured_limit,
                 encountered_size_so_far
             });
+        }
+    }
+
+    impl FileSourceExtendedInternalEvents for FileSourceInternalEventsEmitter {
+        fn emit_file_switched_to_passive(&self, file: &Path, file_position: u64) {
+            debug!(
+                message = "File switched to passive watching mode.",
+                file = %file.display(),
+                position = %file_position,
+            );
+            if self.include_file_metric_tag {
+                counter!(
+                    "files_passive_total",
+                    "file" => file.to_string_lossy().into_owned(),
+                )
+            } else {
+                counter!("files_passive_total")
+            }
+            .increment(1);
+        }
+
+        fn emit_file_switched_to_active(&self, file: &Path, file_position: u64) {
+            debug!(
+                message = "File switched to active watching mode.",
+                file = %file.display(),
+                position = %file_position,
+            );
+            if self.include_file_metric_tag {
+                counter!(
+                    "files_active_total",
+                    "file" => file.to_string_lossy().into_owned(),
+                )
+            } else {
+                counter!("files_active_total")
+            }
+            .increment(1);
         }
     }
 }
