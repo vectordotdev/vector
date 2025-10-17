@@ -281,8 +281,19 @@ pub struct Config {
     #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
     rotate_wait: Duration,
 
-    /// Whether use k8s logs API or not
-    api_log: bool,
+    /// The strategy to use for log collection.
+    log_collection_strategy: LogCollectionStrategy,
+}
+
+/// Configuration for the log collection strategy.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+enum LogCollectionStrategy {
+    /// Collect logs by reading log files from the filesystem.
+    File,
+    /// Collect logs via the Kubernetes Logs API.
+    Api,
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -331,7 +342,7 @@ impl Default for Config {
             log_namespace: None,
             internal_metrics: Default::default(),
             rotate_wait: default_rotate_wait(),
-            api_log: default_api_log(),
+            log_collection_strategy: default_log_collection_strategy(),
         }
     }
 }
@@ -590,9 +601,7 @@ struct Source {
     delay_deletion: Duration,
     include_file_metric_tag: bool,
     rotate_wait: Duration,
-    // TODO: This will be used when implementing K8s logs API integration
-    #[allow(dead_code)]
-    api_log: bool,
+    log_collection_strategy: LogCollectionStrategy,
 }
 
 impl Source {
@@ -682,7 +691,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
-            api_log: config.api_log,
+            log_collection_strategy: config.log_collection_strategy.clone(),
         })
     }
 
@@ -720,7 +729,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag,
             rotate_wait,
-            api_log,
+            log_collection_strategy,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -745,8 +754,8 @@ impl Source {
         )
         .backoff(watcher::DefaultBackoff::default());
 
-        // Create a separate watcher for the reconciler if api_log is enabled
-        let reconciler_pod_watcher = if api_log {
+        // Create a separate watcher for the reconciler if log_collection_strategy is Api
+        let reconciler_pod_watcher = if log_collection_strategy == LogCollectionStrategy::Api {
             let reconciler_pods = Api::<Pod>::all(client.clone());
             let reconciler_watcher = watcher(
                 reconciler_pods,
@@ -916,7 +925,7 @@ impl Source {
             );
 
             // TODO: annotate the logs with pods's metadata
-            if api_log {
+            if log_collection_strategy == LogCollectionStrategy::Api {
                 return event;
             }
             let file_info = annotator.annotate(&mut event, &line.filename);
@@ -1160,8 +1169,8 @@ const fn default_delay_deletion_ms() -> Duration {
 const fn default_rotate_wait() -> Duration {
     Duration::from_secs(u64::MAX / 2)
 }
-const fn default_api_log() -> bool {
-    true // Enable api_log by default for now to test reconciler functionality
+const fn default_log_collection_strategy() -> LogCollectionStrategy {
+    LogCollectionStrategy::File
 }
 
 // This function constructs the patterns we include for file watching, created
