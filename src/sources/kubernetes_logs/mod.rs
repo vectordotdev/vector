@@ -287,7 +287,7 @@ pub struct Config {
 
 /// Configuration for the log collection strategy.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 enum LogCollectionStrategy {
     /// Collect logs by reading log files from the filesystem.
@@ -701,6 +701,9 @@ impl Source {
         global_shutdown: ShutdownSignal,
         log_namespace: LogNamespace,
     ) -> crate::Result<()> {
+        // Store log_collection_strategy before destructuring self
+        let strategy = self.log_collection_strategy.clone();
+
         let Self {
             client,
             data_dir,
@@ -729,7 +732,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag,
             rotate_wait,
-            log_collection_strategy,
+            log_collection_strategy: _,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -755,19 +758,14 @@ impl Source {
         .backoff(watcher::DefaultBackoff::default());
 
         // Create a separate watcher for the reconciler if log_collection_strategy is Api
-        let reconciler_pod_watcher = if log_collection_strategy == LogCollectionStrategy::Api {
-            let reconciler_pods = Api::<Pod>::all(client.clone());
-            let reconciler_watcher = watcher(
-                reconciler_pods,
-                watcher::Config {
-                    ..Default::default()
-                },
-            )
-            .backoff(watcher::DefaultBackoff::default());
-            Some(reconciler_watcher)
-        } else {
-            None
-        };
+        let reconciler_pods = Api::<Pod>::all(client.clone());
+        let reconciler_watcher = watcher(
+            reconciler_pods,
+            watcher::Config {
+                ..Default::default()
+            },
+        )
+        .backoff(watcher::DefaultBackoff::default());
 
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
@@ -925,7 +923,7 @@ impl Source {
             );
 
             // TODO: annotate the logs with pods's metadata
-            if log_collection_strategy == LogCollectionStrategy::Api {
+            if strategy == LogCollectionStrategy::Api {
                 return event;
             }
             let file_info = annotator.annotate(&mut event, &line.filename);
@@ -978,33 +976,45 @@ impl Source {
 
         let event_processing_loop = out.send_event_stream(&mut stream);
 
-        // Only run reconciler when api_log is enabled
-        let reconciler_fut = if let Some(reconciler_watcher) = reconciler_pod_watcher {
-            let reconciler = reconciler::Reconciler::new(
-                client.clone(),
-                file_source_tx.clone(),
-                reconciler_watcher,
-            );
+        let reconciler =
+            reconciler::Reconciler::new(client.clone(), file_source_tx.clone(), reconciler_watcher);
 
-            Some(async move {
-                info!("Starting event-driven reconciler");
-                reconciler.run().await;
-            })
-        } else {
-            None
-        };
         let mut lifecycle = Lifecycle::new();
-        {
+        // Only add file server when log_collection_strategy is File
+        if strategy == LogCollectionStrategy::File {
             let (slot, shutdown) = lifecycle.add();
-            let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
-                .map(|result| match result {
-                    Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
+            let fut =
+                util::run_file_server(file_server, file_source_tx.clone(), shutdown, checkpointer)
+                    .map(|result| match result {
+                        Ok(FileServerShutdown) => {
+                            info!(message = "File server completed gracefully.")
+                        }
+                        Err(error) => emit!(KubernetesLifecycleError {
+                            message: "File server exited with an error.",
+                            error,
+                            count: events_count,
+                        }),
+                    });
+            slot.bind(Box::pin(fut));
+        }
+        // Only add reconciler to lifecycle if log_collection_strategy is Api
+        if strategy == LogCollectionStrategy::Api {
+            let (slot, shutdown) = lifecycle.add();
+            let fut = util::complete_with_deadline_on_signal(
+                reconciler.run(),
+                shutdown,
+                Duration::from_secs(30), // more than enough time to propagate
+            )
+            .map(|result| {
+                match result {
+                    Ok(_) => info!(message = "Reconciler completed gracefully."),
                     Err(error) => emit!(KubernetesLifecycleError {
-                        message: "File server exited with an error.",
                         error,
+                        message: "Reconciler timed out during the shutdown.",
                         count: events_count,
                     }),
-                });
+                };
+            });
             slot.bind(Box::pin(fut));
         }
         {
@@ -1023,28 +1033,6 @@ impl Source {
                     Err(error) => emit!(KubernetesLifecycleError {
                         error,
                         message: "Event processing loop timed out during the shutdown.",
-                        count: events_count,
-                    }),
-                };
-            });
-            slot.bind(Box::pin(fut));
-        }
-
-        // Only add reconciler to lifecycle if api_log is enabled
-        if let Some(reconciler_future) = reconciler_fut {
-            let (slot, shutdown) = lifecycle.add();
-
-            let fut = util::complete_with_deadline_on_signal(
-                reconciler_future,
-                shutdown,
-                Duration::from_secs(30), // more than enough time to propagate
-            )
-            .map(|result| {
-                match result {
-                    Ok(_) => info!(message = "Reconciler completed gracefully."),
-                    Err(error) => emit!(KubernetesLifecycleError {
-                        error,
-                        message: "Reconciler timed out during the shutdown.",
                         count: events_count,
                     }),
                 };
