@@ -706,9 +706,6 @@ impl Source {
         global_shutdown: ShutdownSignal,
         log_namespace: LogNamespace,
     ) -> crate::Result<()> {
-        // Store log_collection_strategy before destructuring self
-        let strategy = self.log_collection_strategy.clone();
-
         let Self {
             client,
             data_dir,
@@ -737,7 +734,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag,
             rotate_wait,
-            log_collection_strategy: _,
+            log_collection_strategy,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -952,7 +949,7 @@ impl Source {
             );
 
             // TODO: annotate the logs with pods's metadata
-            if strategy == LogCollectionStrategy::Api {
+            if log_collection_strategy == LogCollectionStrategy::Api {
                 return event;
             }
             let file_info = annotator.annotate(&mut event, &line.filename);
@@ -1007,7 +1004,7 @@ impl Source {
 
         let mut lifecycle = Lifecycle::new();
         // Only add file server when log_collection_strategy is File
-        if strategy == LogCollectionStrategy::File {
+        if log_collection_strategy == LogCollectionStrategy::File {
             let (slot, shutdown) = lifecycle.add();
             let fut =
                 util::run_file_server(file_server, file_source_tx.clone(), shutdown, checkpointer)
@@ -1023,7 +1020,7 @@ impl Source {
                     });
             slot.bind(Box::pin(fut));
         }
-        if strategy == LogCollectionStrategy::Api {
+        if log_collection_strategy == LogCollectionStrategy::Api {
             let reconciler_rx = pod_event_tx.subscribe();
             let reconciler =
                 reconciler::Reconciler::new(client.clone(), file_source_tx.clone(), reconciler_rx);
