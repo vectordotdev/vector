@@ -127,19 +127,22 @@ impl OtlpDeserializer {
             DESCRIPTOR_BYTES,
             LOGS_REQUEST_MESSAGE_TYPE,
             options.clone(),
-        ).expect("Failed to create logs deserializer");
+        )
+        .expect("Failed to create logs deserializer");
 
         let metrics_deserializer = ProtobufDeserializer::new_from_bytes(
             DESCRIPTOR_BYTES,
             METRICS_REQUEST_MESSAGE_TYPE,
             options.clone(),
-        ).expect("Failed to create metrics deserializer");
+        )
+        .expect("Failed to create metrics deserializer");
 
         let traces_deserializer = ProtobufDeserializer::new_from_bytes(
             DESCRIPTOR_BYTES,
             TRACES_REQUEST_MESSAGE_TYPE,
             options,
-        ).expect("Failed to create traces deserializer");
+        )
+        .expect("Failed to create traces deserializer");
 
         Self {
             logs_deserializer,

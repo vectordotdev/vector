@@ -164,7 +164,9 @@ impl OpentelemetryConfig {
         signal_type: OtlpSignalType,
     ) -> vector_common::Result<Option<OtlpDeserializer>> {
         if self.use_otlp_decoding {
-            Ok(Some(OtlpDeserializer::new_with_signals(IndexSet::from([signal_type]))))
+            Ok(Some(OtlpDeserializer::new_with_signals(IndexSet::from([
+                signal_type,
+            ]))))
         } else {
             Ok(None)
         }
