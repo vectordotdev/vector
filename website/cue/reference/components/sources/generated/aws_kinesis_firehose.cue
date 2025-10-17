@@ -286,6 +286,7 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 					traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
 
 					If not specified, defaults to trying all types in order: logs, metrics, traces.
+					Duplicate signal types are automatically removed while preserving order.
 					"""
 				relevant_when: "codec = \"otlp\""
 				required:      false
