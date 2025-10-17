@@ -765,20 +765,16 @@ impl Source {
         // Create shared broadcast channel for pod events
         let (pod_event_tx, _) = tokio::sync::broadcast::channel(1000);
         let reflector_rx = pod_event_tx.subscribe();
-        let reconciler_rx = if strategy == LogCollectionStrategy::Api {
-            Some(pod_event_tx.subscribe())
-        } else {
-            None
-        };
 
         // Spawn task to forward pod events to broadcast channel
+        let pod_forwarder_tx = pod_event_tx.clone();
         let pod_forwarder = tokio::spawn(async move {
             pin!(pod_watcher);
             while let Some(event_result) = pod_watcher.next().await {
                 match event_result {
                     Ok(event) => {
                         // Only broadcast successful events
-                        if pod_event_tx.send(event).is_err() {
+                        if pod_forwarder_tx.send(event).is_err() {
                             // All receivers have been dropped
                             break;
                         }
@@ -1009,16 +1005,6 @@ impl Source {
 
         let event_processing_loop = out.send_event_stream(&mut stream);
 
-        let reconciler = if let Some(rx) = reconciler_rx {
-            Some(reconciler::Reconciler::new(
-                client.clone(),
-                file_source_tx.clone(),
-                rx,
-            ))
-        } else {
-            None
-        };
-
         let mut lifecycle = Lifecycle::new();
         // Only add file server when log_collection_strategy is File
         if strategy == LogCollectionStrategy::File {
@@ -1037,8 +1023,10 @@ impl Source {
                     });
             slot.bind(Box::pin(fut));
         }
-        // Only add reconciler to lifecycle if log_collection_strategy is Api
-        if let Some(reconciler) = reconciler {
+        if strategy == LogCollectionStrategy::Api {
+            let reconciler_rx = pod_event_tx.subscribe();
+            let reconciler =
+                reconciler::Reconciler::new(client.clone(), file_source_tx.clone(), reconciler_rx);
             let (slot, shutdown) = lifecycle.add();
             let fut = util::complete_with_deadline_on_signal(
                 reconciler.run(),
