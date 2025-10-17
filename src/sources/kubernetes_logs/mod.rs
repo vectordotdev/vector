@@ -21,6 +21,7 @@ use kube::{
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
+use tokio_stream::wrappers::BroadcastStream;
 
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
@@ -757,15 +758,50 @@ impl Source {
         )
         .backoff(watcher::DefaultBackoff::default());
 
-        // Create a separate watcher for the reconciler if log_collection_strategy is Api
-        let reconciler_pods = Api::<Pod>::all(client.clone());
-        let reconciler_watcher = watcher(
-            reconciler_pods,
-            watcher::Config {
-                ..Default::default()
+        // Create shared broadcast channel for pod events
+        let (pod_event_tx, _) = tokio::sync::broadcast::channel(1000);
+        let reflector_rx = pod_event_tx.subscribe();
+        let reconciler_rx = if strategy == LogCollectionStrategy::Api {
+            Some(pod_event_tx.subscribe())
+        } else {
+            None
+        };
+
+        // Spawn task to forward pod events to broadcast channel
+        tokio::spawn(async move {
+            use futures_util::StreamExt;
+            use tokio::pin;
+            pin!(pod_watcher);
+            while let Some(event_result) = pod_watcher.next().await {
+                match event_result {
+                    Ok(event) => {
+                        // Only broadcast successful events
+                        if pod_event_tx.send(event).is_err() {
+                            // All receivers have been dropped
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Pod watcher error: {}", e);
+                        // Continue on errors to maintain resilience
+                    }
+                }
+            }
+        });
+
+        // Convert broadcast receiver to stream for reflector
+        let reflector_stream = futures_util::StreamExt::filter_map(
+            BroadcastStream::new(reflector_rx),
+            |result| async move {
+                match result {
+                    Ok(event) => Some(Ok(event)),
+                    Err(tokio_stream::wrappers::errors::BroadcastStreamRecvError::Lagged(_)) => {
+                        warn!("Reflector lagged behind pod events");
+                        None
+                    }
+                }
             },
-        )
-        .backoff(watcher::DefaultBackoff::default());
+        );
 
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
@@ -774,7 +810,7 @@ impl Source {
         reflectors.push(tokio::spawn(custom_reflector(
             pod_store_w,
             pod_cacher,
-            pod_watcher,
+            reflector_stream,
             delay_deletion,
         )));
 
@@ -976,8 +1012,29 @@ impl Source {
 
         let event_processing_loop = out.send_event_stream(&mut stream);
 
-        let reconciler =
-            reconciler::Reconciler::new(client.clone(), file_source_tx.clone(), reconciler_watcher);
+        let reconciler = if let Some(rx) = reconciler_rx {
+            let reconciler_stream = futures_util::StreamExt::filter_map(
+                BroadcastStream::new(rx),
+                |result| async move {
+                    match result {
+                        Ok(event) => Some(Ok(event)),
+                        Err(tokio_stream::wrappers::errors::BroadcastStreamRecvError::Lagged(
+                            _,
+                        )) => {
+                            warn!("Reconciler lagged behind pod events");
+                            None
+                        }
+                    }
+                },
+            );
+            Some(reconciler::Reconciler::new(
+                client.clone(),
+                file_source_tx.clone(),
+                reconciler_stream,
+            ))
+        } else {
+            None
+        };
 
         let mut lifecycle = Lifecycle::new();
         // Only add file server when log_collection_strategy is File
@@ -998,7 +1055,7 @@ impl Source {
             slot.bind(Box::pin(fut));
         }
         // Only add reconciler to lifecycle if log_collection_strategy is Api
-        if strategy == LogCollectionStrategy::Api {
+        if let Some(reconciler) = reconciler {
             let (slot, shutdown) = lifecycle.add();
             let fut = util::complete_with_deadline_on_signal(
                 reconciler.run(),
