@@ -208,8 +208,8 @@ fn set_uri_query(
 
 #[cfg(test)]
 mod tests {
+    use super::super::config::AsyncInsertSettingsConfig;
     use super::*;
-    use crate::sinks::clickhouse::config::*;
 
     #[test]
     fn encode_valid() {

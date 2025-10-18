@@ -11,6 +11,9 @@ use super::{
     service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
     sink::{ClickhouseSink, PartitionKey},
 };
+
+#[cfg(feature = "sinks-clickhouse")]
+use super::schema;
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
@@ -219,6 +222,52 @@ impl SinkConfig for ClickhouseConfig {
                 .expect("'default' should be a valid template")
         });
 
+        #[cfg(feature = "sinks-clickhouse")]
+        let arrow_schema = if self.format == Format::ArrowStream {
+            let table_str = self.table.get_ref();
+            let database_str = database.get_ref();
+
+            if !table_str.contains("{{") && !database_str.contains("{{") {
+                tracing::info!(
+                    "Fetching schema for table {}.{} at startup",
+                    database_str,
+                    table_str
+                );
+                match schema::fetch_table_schema(
+                    &client,
+                    &endpoint.to_string(),
+                    database_str,
+                    table_str,
+                    auth.as_ref(),
+                )
+                .await
+                {
+                    Ok(schema) => {
+                        tracing::info!(
+                            "Successfully fetched schema with {} fields",
+                            schema.fields().len()
+                        );
+                        Some(schema)
+                    }
+                    Err(e) => {
+                        return Err(format!(
+                            "Failed to fetch schema for {}.{}: {}. Schema inference is not supported for ArrowStream format.",
+                            database_str,
+                            table_str,
+                            e
+                        ).into());
+                    }
+                }
+            } else {
+                return Err(
+                    "ArrowStream format requires a static table and database (no templates). Schema inference is not supported."
+                        .into(),
+                );
+            }
+        } else {
+            None
+        };
+
         let request_builder = ClickhouseRequestBuilder {
             compression: self.compression,
             encoding: (
@@ -229,6 +278,8 @@ impl SinkConfig for ClickhouseConfig {
                 ),
             ),
             format: self.format,
+            #[cfg(feature = "sinks-clickhouse")]
+            arrow_schema,
         };
 
         let sink = ClickhouseSink::new(

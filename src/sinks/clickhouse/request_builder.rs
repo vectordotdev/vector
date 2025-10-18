@@ -1,5 +1,7 @@
 //! `RequestBuilder` implementation for the `Clickhouse` sink.
 
+use std::sync::Arc;
+
 use bytes::Bytes;
 use vector_lib::codecs::encoding::Framer;
 
@@ -14,6 +16,8 @@ pub(super) struct ClickhouseRequestBuilder {
     pub(super) compression: Compression,
     pub(super) encoding: (Transformer, Encoder<Framer>),
     pub(super) format: Format,
+    #[cfg(feature = "sinks-clickhouse")]
+    pub(super) arrow_schema: Option<Arc<arrow::datatypes::Schema>>,
 }
 
 impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
@@ -97,13 +101,16 @@ impl ClickhouseRequestBuilder {
         &self,
         events: Vec<Event>,
     ) -> Result<EncodeResult<Bytes>, std::io::Error> {
-        // Encode events to Arrow IPC format
-        let arrow_bytes = encoder::encode_events_to_arrow_stream(&events).map_err(|e| {
-            std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("Failed to encode events to Arrow: {}", e),
-            )
-        })?;
+        // Encode events to Arrow IPC format using provided schema
+        let arrow_bytes =
+            encoder::encode_events_to_arrow_stream(&events, self.arrow_schema.clone()).map_err(
+                |e| {
+                    std::io::Error::new(
+                        std::io::ErrorKind::InvalidData,
+                        format!("Failed to encode events to Arrow: {}", e),
+                    )
+                },
+            )?;
 
         let uncompressed_byte_size = arrow_bytes.len();
 

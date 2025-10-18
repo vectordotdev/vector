@@ -15,5 +15,7 @@ mod encoder;
 #[cfg(all(test, feature = "clickhouse-integration-tests"))]
 mod integration_tests;
 mod request_builder;
+#[cfg(feature = "sinks-clickhouse")]
+mod schema;
 mod service;
 mod sink;

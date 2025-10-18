@@ -7,7 +7,7 @@ use arrow::{
         ArrayRef, BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder,
         TimestampMillisecondBuilder,
     },
-    datatypes::{DataType, Field, Schema, TimeUnit},
+    datatypes::{DataType, Schema, TimeUnit},
     ipc::writer::StreamWriter,
     record_batch::RecordBatch,
 };
@@ -26,22 +26,42 @@ pub enum ArrowEncodingError {
 
     #[snafu(display("No events provided for encoding"))]
     NoEvents,
+
+    #[snafu(display(
+        "Schema inference is not supported for ArrowStream format. Table schema must be known before insertion time."
+    ))]
+    NoSchemaProvided,
+
+    #[snafu(display(
+        "Unsupported Arrow data type for field '{}': {:?}",
+        field_name,
+        data_type
+    ))]
+    UnsupportedType {
+        field_name: String,
+        data_type: DataType,
+    },
 }
 
 /// Encodes a batch of events into Arrow IPC format
-pub fn encode_events_to_arrow_stream(events: &[Event]) -> Result<Bytes, ArrowEncodingError> {
+pub fn encode_events_to_arrow_stream(
+    events: &[Event],
+    schema: Option<Arc<Schema>>,
+) -> Result<Bytes, ArrowEncodingError> {
     if events.is_empty() {
         return Err(ArrowEncodingError::NoEvents);
     }
 
-    tracing::debug!(
-        "Encoding {} events to Arrow IPC stream format",
-        events.len()
-    );
-
-    // Build schema from first event's structure
-    let schema = build_schema_from_events(events)?;
-    let schema_ref = Arc::new(schema);
+    // Use provided schema - schema inference is not supported
+    let schema_ref = if let Some(provided_schema) = schema {
+        tracing::debug!(
+            "Using provided schema with {} fields",
+            provided_schema.fields().len()
+        );
+        provided_schema
+    } else {
+        return Err(ArrowEncodingError::NoSchemaProvided);
+    };
 
     tracing::debug!(
         "Built Arrow schema with {} fields: {:?}",
@@ -86,51 +106,6 @@ pub fn encode_events_to_arrow_stream(events: &[Event]) -> Result<Bytes, ArrowEnc
     Ok(encoded_bytes)
 }
 
-/// Builds an Arrow schema from the structure of events
-fn build_schema_from_events(events: &[Event]) -> Result<Schema, ArrowEncodingError> {
-    let mut fields = Vec::new();
-
-    // Collect field names from all events
-    let mut field_names = std::collections::BTreeSet::new();
-    for event in events {
-        if let Event::Log(log) = event {
-            for (key, _) in log.all_event_fields().expect("Failed to get event fields") {
-                field_names.insert(key.to_string());
-            }
-        }
-    }
-
-    // Create fields for each unique field name
-    for field_name in field_names {
-        // Infer type from first occurrence
-        let field_type = infer_field_type(events, &field_name);
-        fields.push(Field::new(&field_name, field_type, true));
-    }
-
-    Ok(Schema::new(fields))
-}
-
-/// Infers the Arrow data type for a field based on the first non-null value found
-fn infer_field_type(events: &[Event], field_name: &str) -> DataType {
-    for event in events {
-        if let Event::Log(log) = event
-            && let Some(value) = log.get(field_name)
-        {
-            return match value {
-                Value::Bytes(_) => DataType::Utf8,
-                Value::Integer(_) => DataType::Int64,
-                Value::Float(_) => DataType::Float64,
-                Value::Boolean(_) => DataType::Boolean,
-                Value::Timestamp(_) => DataType::Timestamp(TimeUnit::Millisecond, None),
-                Value::Object(_) => DataType::Utf8, // Serialize as JSON string
-                Value::Array(_) => DataType::Utf8,  // Serialize as JSON string
-                _ => DataType::Utf8,                // Default to string
-            };
-        }
-    }
-    DataType::Utf8 // Default to string if no value found
-}
-
 /// Builds an Arrow RecordBatch from events
 fn build_record_batch(
     schema: Arc<Schema>,
@@ -149,7 +124,12 @@ fn build_record_batch(
             DataType::Float64 => build_float64_array(events, field_name)?,
             DataType::Boolean => build_boolean_array(events, field_name)?,
             DataType::Binary => build_binary_array(events, field_name)?,
-            _ => build_string_array(events, field_name)?, // Fallback to string
+            other_type => {
+                return Err(ArrowEncodingError::UnsupportedType {
+                    field_name: field_name.to_string(),
+                    data_type: other_type.clone(),
+                });
+            }
         };
 
         columns.push(array);
@@ -167,13 +147,9 @@ fn build_timestamp_array(
 
     for event in events {
         if let Event::Log(log) = event {
-            if let Some(value) = log.get(field_name) {
-                match value {
-                    Value::Timestamp(ts) => builder.append_value(ts.timestamp_millis()),
-                    _ => builder.append_null(),
-                }
-            } else {
-                builder.append_null();
+            match log.get(field_name) {
+                Some(Value::Timestamp(ts)) => builder.append_value(ts.timestamp_millis()),
+                _ => builder.append_null(),
             }
         }
     }
@@ -187,13 +163,22 @@ fn build_string_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
     for event in events {
         if let Event::Log(log) = event {
             if let Some(value) = log.get(field_name) {
-                let string_value = match value {
-                    Value::Bytes(bytes) => String::from_utf8_lossy(bytes).to_string(),
-                    Value::Object(obj) => serde_json::to_string(&obj).unwrap_or_default(),
-                    Value::Array(arr) => serde_json::to_string(&arr).unwrap_or_default(),
-                    _ => value.to_string_lossy().to_string(),
-                };
-                builder.append_value(string_value);
+                match value {
+                    Value::Bytes(bytes) => {
+                        builder.append_value(&String::from_utf8_lossy(bytes));
+                    }
+                    Value::Object(obj) => match serde_json::to_string(&obj) {
+                        Ok(s) => builder.append_value(s),
+                        Err(_) => builder.append_null(),
+                    },
+                    Value::Array(arr) => match serde_json::to_string(&arr) {
+                        Ok(s) => builder.append_value(s),
+                        Err(_) => builder.append_null(),
+                    },
+                    _ => {
+                        builder.append_value(&value.to_string_lossy());
+                    }
+                }
             } else {
                 builder.append_null();
             }
@@ -208,14 +193,9 @@ fn build_int64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
 
     for event in events {
         if let Event::Log(log) = event {
-            if let Some(value) = log.get(field_name) {
-                match value {
-                    Value::Integer(i) => builder.append_value(*i),
-                    Value::Float(f) => builder.append_value(f.into_inner() as i64),
-                    _ => builder.append_null(),
-                }
-            } else {
-                builder.append_null();
+            match log.get(field_name) {
+                Some(Value::Integer(i)) => builder.append_value(*i),
+                _ => builder.append_null(),
             }
         }
     }
@@ -228,14 +208,10 @@ fn build_float64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
 
     for event in events {
         if let Event::Log(log) = event {
-            if let Some(value) = log.get(field_name) {
-                match value {
-                    Value::Float(f) => builder.append_value(f.into_inner()),
-                    Value::Integer(i) => builder.append_value(*i as f64),
-                    _ => builder.append_null(),
-                }
-            } else {
-                builder.append_null();
+            match log.get(field_name) {
+                Some(Value::Float(f)) => builder.append_value(f.into_inner()),
+                Some(Value::Integer(i)) => builder.append_value(*i as f64),
+                _ => builder.append_null(),
             }
         }
     }
@@ -248,13 +224,9 @@ fn build_boolean_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
 
     for event in events {
         if let Event::Log(log) = event {
-            if let Some(value) = log.get(field_name) {
-                match value {
-                    Value::Boolean(b) => builder.append_value(*b),
-                    _ => builder.append_null(),
-                }
-            } else {
-                builder.append_null();
+            match log.get(field_name) {
+                Some(Value::Boolean(b)) => builder.append_value(*b),
+                _ => builder.append_null(),
             }
         }
     }
@@ -267,13 +239,9 @@ fn build_binary_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
 
     for event in events {
         if let Event::Log(log) = event {
-            if let Some(value) = log.get(field_name) {
-                match value {
-                    Value::Bytes(bytes) => builder.append_value(bytes),
-                    _ => builder.append_null(),
-                }
-            } else {
-                builder.append_null();
+            match log.get(field_name) {
+                Some(Value::Bytes(bytes)) => builder.append_value(bytes),
+                _ => builder.append_null(),
             }
         }
     }
@@ -285,6 +253,7 @@ fn build_binary_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
 mod tests {
     use super::*;
     use crate::event::LogEvent;
+    use arrow::datatypes::Field;
 
     #[test]
     fn test_encode_simple_events() {
@@ -298,7 +267,12 @@ mod tests {
 
         let events = vec![Event::Log(log1), Event::Log(log2)];
 
-        let result = encode_events_to_arrow_stream(&events);
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("message", DataType::Utf8, true),
+            Field::new("count", DataType::Int64, true),
+        ]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(schema));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -306,9 +280,24 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_without_schema_fails() {
+        let mut log1 = LogEvent::default();
+        log1.insert("message", "hello");
+
+        let events = vec![Event::Log(log1)];
+
+        let result = encode_events_to_arrow_stream(&events, None);
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ArrowEncodingError::NoSchemaProvided
+        ));
+    }
+
+    #[test]
     fn test_encode_empty_events() {
         let events: Vec<Event> = vec![];
-        let result = encode_events_to_arrow_stream(&events);
+        let result = encode_events_to_arrow_stream(&events, None);
         assert!(result.is_err());
     }
 }
