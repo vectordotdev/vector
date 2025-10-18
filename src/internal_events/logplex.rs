@@ -1,9 +1,11 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 use super::prelude::io_error_code;
 
 #[derive(Debug)]
+#[internal_event]
 pub struct HerokuLogplexRequestReceived<'a> {
     pub msg_count: usize,
     pub frame_id: &'a str,
@@ -23,6 +25,7 @@ impl InternalEvent for HerokuLogplexRequestReceived<'_> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct HerokuLogplexRequestReadError {
     pub error: std::io::Error,
 }

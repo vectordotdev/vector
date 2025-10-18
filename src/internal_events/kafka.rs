@@ -1,6 +1,7 @@
 #![allow(dead_code)] // TODO requires optional feature compilation
 
 use metrics::{counter, gauge};
+use vector_config::internal_event;
 use vector_lib::{
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
@@ -8,6 +9,7 @@ use vector_lib::{
 use vrl::path::OwnedTargetPath;
 
 #[derive(Debug)]
+#[internal_event]
 pub struct KafkaBytesReceived<'a> {
     pub byte_size: usize,
     pub protocol: &'static str,
@@ -35,6 +37,7 @@ impl InternalEvent for KafkaBytesReceived<'_> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct KafkaEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub count: usize,
@@ -67,6 +70,7 @@ impl InternalEvent for KafkaEventsReceived<'_> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct KafkaOffsetUpdateError {
     pub error: rdkafka::error::KafkaError,
 }
@@ -92,6 +96,7 @@ impl InternalEvent for KafkaOffsetUpdateError {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct KafkaReadError {
     pub error: rdkafka::error::KafkaError,
 }
@@ -117,6 +122,7 @@ impl InternalEvent for KafkaReadError {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct KafkaStatisticsReceived<'a> {
     pub statistics: &'a rdkafka::Statistics,
     pub expose_lag_metrics: bool,
@@ -152,6 +158,7 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
     }
 }
 
+#[internal_event]
 pub struct KafkaHeaderExtractionError<'a> {
     pub header_field: &'a OwnedTargetPath,
 }

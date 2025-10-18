@@ -1,10 +1,12 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::{
     codecs::decoding::BoxedFramingError,
     internal_event::{InternalEvent, error_stage, error_type},
 };
 
 #[derive(Debug)]
+#[internal_event]
 pub struct JournaldInvalidRecordError {
     pub error: serde_json::Error,
     pub text: String,
@@ -30,6 +32,7 @@ impl InternalEvent for JournaldInvalidRecordError {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct JournaldStartJournalctlError {
     pub error: crate::Error,
 }
@@ -53,6 +56,7 @@ impl InternalEvent for JournaldStartJournalctlError {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct JournaldReadError {
     pub error: BoxedFramingError,
 }
@@ -76,6 +80,7 @@ impl InternalEvent for JournaldReadError {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct JournaldCheckpointSetError {
     pub error: std::io::Error,
     pub filename: String,
@@ -101,6 +106,7 @@ impl InternalEvent for JournaldCheckpointSetError {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct JournaldCheckpointFileOpenError {
     pub error: std::io::Error,
     pub path: String,

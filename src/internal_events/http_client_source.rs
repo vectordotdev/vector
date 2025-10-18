@@ -1,6 +1,7 @@
 #![allow(dead_code)] // TODO requires optional feature compilation
 
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::{
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
@@ -9,6 +10,7 @@ use vector_lib::{
 use super::prelude::http_error_code;
 
 #[derive(Debug)]
+#[internal_event]
 pub struct HttpClientEventsReceived {
     pub byte_size: JsonSize,
     pub count: usize,
@@ -37,6 +39,7 @@ impl InternalEvent for HttpClientEventsReceived {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct HttpClientHttpResponseError {
     pub code: hyper::StatusCode,
     pub url: String,
@@ -64,6 +67,7 @@ impl InternalEvent for HttpClientHttpResponseError {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct HttpClientHttpError {
     pub error: crate::Error,
     pub url: String,

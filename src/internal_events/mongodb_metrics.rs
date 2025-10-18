@@ -1,10 +1,12 @@
 use metrics::counter;
 use mongodb::{bson, error::Error as MongoError};
+use vector_config::internal_event;
 use vector_lib::{
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
+#[internal_event]
 #[derive(Debug)]
 pub struct MongoDbMetricsEventsReceived<'a> {
     pub count: usize,
@@ -34,6 +36,7 @@ impl InternalEvent for MongoDbMetricsEventsReceived<'_> {
     }
 }
 
+#[internal_event]
 pub struct MongoDbMetricsRequestError<'a> {
     pub error: MongoError,
     pub endpoint: &'a str,
@@ -58,6 +61,7 @@ impl InternalEvent for MongoDbMetricsRequestError<'_> {
     }
 }
 
+#[internal_event]
 pub struct MongoDbMetricsBsonParseError<'a> {
     pub error: bson::de::Error,
     pub endpoint: &'a str,

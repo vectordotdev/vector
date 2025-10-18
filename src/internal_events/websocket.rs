@@ -11,11 +11,13 @@ use vector_common::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
+use vector_config::internal_event;
 use vector_lib::internal_event::InternalEvent;
 
 pub const PROTOCOL: &str = "websocket";
 
 #[derive(Debug)]
+#[internal_event]
 pub struct WebSocketConnectionEstablished;
 
 impl InternalEvent for WebSocketConnectionEstablished {
@@ -23,13 +25,10 @@ impl InternalEvent for WebSocketConnectionEstablished {
         debug!(message = "Connected.");
         counter!("connection_established_total").increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketConnectionEstablished")
-    }
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct WebSocketConnectionFailedError {
     pub error: Box<dyn Error>,
 }
@@ -52,13 +51,10 @@ impl InternalEvent for WebSocketConnectionFailedError {
         )
         .increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketConnectionFailedError")
-    }
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct WebSocketConnectionShutdown;
 
 impl InternalEvent for WebSocketConnectionShutdown {
@@ -66,13 +62,10 @@ impl InternalEvent for WebSocketConnectionShutdown {
         warn!(message = "Closed by the server.");
         counter!("connection_shutdown_total").increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketConnectionShutdown")
-    }
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct WebSocketConnectionError {
     pub error: tokio_tungstenite::tungstenite::Error,
 }
@@ -96,10 +89,6 @@ impl InternalEvent for WebSocketConnectionError {
         )
         .increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketConnectionError")
-    }
 }
 
 #[allow(dead_code)]
@@ -120,6 +109,7 @@ impl Display for WebSocketKind {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct WebSocketBytesReceived<'a> {
     pub byte_size: usize,
     pub url: &'a str,
@@ -147,6 +137,7 @@ impl InternalEvent for WebSocketBytesReceived<'_> {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct WebSocketMessageReceived<'a> {
     pub count: usize,
     pub byte_size: JsonSize,
@@ -183,13 +174,10 @@ impl InternalEvent for WebSocketMessageReceived<'_> {
         );
         counter.increment(self.byte_size.get() as u64);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketMessageReceived")
-    }
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct WebSocketReceiveError<'a> {
     pub error: &'a TungsteniteError,
 }
@@ -213,13 +201,10 @@ impl InternalEvent for WebSocketReceiveError<'_> {
         )
         .increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketReceiveError")
-    }
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct WebSocketSendError<'a> {
     pub error: &'a TungsteniteError,
 }
@@ -241,9 +226,5 @@ impl InternalEvent for WebSocketSendError<'_> {
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketSendError")
     }
 }

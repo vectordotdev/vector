@@ -1,9 +1,11 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 use super::prelude::{http_error_code, io_error_code};
 use crate::sources::aws_kinesis_firehose::Compression;
 
+#[internal_event]
 #[derive(Debug)]
 pub struct AwsKinesisFirehoseRequestReceived<'a> {
     pub request_id: Option<&'a str>,
@@ -21,6 +23,7 @@ impl InternalEvent for AwsKinesisFirehoseRequestReceived<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct AwsKinesisFirehoseRequestError<'a> {
     request_id: Option<&'a str>,
@@ -59,6 +62,7 @@ impl InternalEvent for AwsKinesisFirehoseRequestError<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct AwsKinesisFirehoseAutomaticRecordDecodeError {
     pub compression: Compression,
