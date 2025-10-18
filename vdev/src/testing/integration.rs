@@ -1,28 +1,69 @@
-use std::{collections::BTreeMap, fs, path::Path, path::PathBuf, process::Command};
-
-use anyhow::{bail, Context, Result};
-use tempfile::{Builder, NamedTempFile};
-
-use super::config::{
-    ComposeConfig, ComposeTestConfig, Environment, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR,
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
 };
-use super::runner::{
-    ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _, CONTAINER_TOOL, DOCKER_SOCKET,
+
+use anyhow::{Context, Result, bail};
+
+use super::{
+    config::{
+        ComposeConfig, ComposeTestConfig, E2E_TESTS_DIR, INTEGRATION_TESTS_DIR, RustToolchainConfig,
+    },
+    runner::{ContainerTestRunner as _, IntegrationTestRunner, TestRunner as _},
 };
-use super::state::EnvsDir;
-use crate::app::CommandExt as _;
-use crate::testing::config::get_rust_version;
+use crate::{
+    app::CommandExt as _,
+    environment::{Environment, extract_present, rename_environment_keys},
+    testing::{
+        build::ALL_INTEGRATIONS_FEATURE_FLAG,
+        docker::{CONTAINER_TOOL, DOCKER_SOCKET},
+    },
+};
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
-
-const INTEGRATION_FEATURE_FLAG: &str = "all-integration-tests";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum ComposeTestKind {
+    E2E,
+    Integration,
+}
+
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ComposeTestLocalConfig {
+    pub(crate) kind: ComposeTestKind,
+    pub(crate) directory: &'static str,
+    pub(crate) feature_flag: &'static str,
+}
+
+impl ComposeTestLocalConfig {
+    /// Integration tests are located in the `scripts/integration` dir,
+    /// and are the full feature flag is `all-integration-tests`.
+    pub(crate) fn integration() -> Self {
+        Self {
+            kind: ComposeTestKind::Integration,
+            directory: INTEGRATION_TESTS_DIR,
+            feature_flag: ALL_INTEGRATIONS_FEATURE_FLAG,
+        }
+    }
+
+    /// E2E tests are located in the `scripts/e2e` dir,
+    /// and are the full feature flag is `all-e2e-tests`.
+    pub(crate) fn e2e() -> Self {
+        Self {
+            kind: ComposeTestKind::E2E,
+            directory: E2E_TESTS_DIR,
+            feature_flag: E2E_FEATURE_FLAG,
+        }
+    }
+}
+
+#[derive(Debug)]
 pub(crate) struct ComposeTest {
+    local_config: ComposeTestLocalConfig,
     test_name: String,
     environment: String,
     config: ComposeTestConfig,
-    envs_dir: EnvsDir,
     runner: IntegrationTestRunner,
     compose: Option<Compose>,
     env_config: Environment,
@@ -30,21 +71,17 @@ pub(crate) struct ComposeTest {
     retries: u8,
 }
 
-pub(crate) trait ComposeTestT {
-    const DIRECTORY: &'static str;
-
-    const FEATURE_FLAG: &'static str;
-
-    fn generate(
+impl ComposeTest {
+    pub(crate) fn generate(
+        local_config: ComposeTestLocalConfig,
         test_name: impl Into<String>,
         environment: impl Into<String>,
         build_all: bool,
         retries: u8,
     ) -> Result<ComposeTest> {
-        let test_name = test_name.into();
+        let test_name: String = test_name.into();
         let environment = environment.into();
-        let (test_dir, config) = ComposeTestConfig::load(Self::DIRECTORY, &test_name)?;
-        let envs_dir = EnvsDir::new(&test_name);
+        let (test_dir, config) = ComposeTestConfig::load(local_config.directory, &test_name)?;
         let Some(mut env_config) = config.environments().get(&environment).cloned() else {
             bail!("Could not find environment named {environment:?}");
         };
@@ -63,48 +100,88 @@ pub(crate) trait ComposeTestT {
 
         env_config.insert("VECTOR_IMAGE".to_string(), Some(runner.image_name()));
 
-        Ok(ComposeTest {
+        let compose_test = ComposeTest {
+            local_config,
             test_name,
             environment,
             config,
-            envs_dir,
             runner,
             compose,
-            env_config,
+            env_config: rename_environment_keys(&env_config),
             build_all,
             retries,
-        })
+        };
+        trace!("Generated {compose_test:#?}");
+        Ok(compose_test)
     }
 
-    fn test(compose_test: &ComposeTest, extra_args: Vec<String>) -> Result<()> {
-        let active = compose_test
-            .envs_dir
-            .check_active(&compose_test.environment)?;
-        compose_test.config.check_required()?;
+    fn project_name(&self) -> String {
+        // Docker Compose project names must consist only of lowercase alphanumeric characters,
+        // hyphens, and underscores. Replace any dots with hyphens.
+        let sanitized_env = self.environment.replace('.', "-");
+        format!(
+            "vector-{}-{}-{}",
+            self.local_config.directory, self.test_name, sanitized_env
+        )
+    }
 
-        if !active {
-            Self::start(compose_test)?;
+    fn is_running(&self) -> Result<bool> {
+        let Some(compose) = &self.compose else {
+            return Ok(false);
+        };
+
+        let output = Command::new(CONTAINER_TOOL.clone())
+            .args([
+                "compose",
+                "--project-name",
+                &self.project_name(),
+                "ps",
+                "--format",
+                "json",
+                "--status",
+                "running",
+            ])
+            .current_dir(&compose.test_dir)
+            .envs(
+                compose
+                    .env
+                    .iter()
+                    .filter_map(|(k, v)| v.as_ref().map(|val| (k, val))),
+            )
+            .output()
+            .with_context(|| "Failed to check if compose environment is running")?;
+
+        // If stdout is empty or "[]", no containers are running
+        Ok(!output.stdout.is_empty() && output.stdout != b"[]\n" && output.stdout != b"[]")
+    }
+
+    pub(crate) fn test(&self, extra_args: Vec<String>) -> Result<()> {
+        let was_running = self.is_running()?;
+        self.config.check_required()?;
+
+        if !was_running {
+            self.start()?;
         }
 
-        let mut env_vars = compose_test.config.env.clone();
+        let mut env_vars = self.config.env.clone();
         // Make sure the test runner has the same config environment vars as the services do.
-        for (key, value) in config_env(&compose_test.env_config) {
-            env_vars.insert(key, Some(value));
+        for (key, value) in self.env_config.clone() {
+            env_vars.insert(key, value);
         }
 
-        env_vars.insert("TEST_LOG".to_string(), Some("info".into()));
-        let mut args = compose_test.config.args.clone().unwrap_or_default();
+        env_vars.insert("VECTOR_LOG".to_string(), Some("info".into()));
+        let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
 
-        args.push(if compose_test.build_all {
-            Self::FEATURE_FLAG.to_string()
+        args.push(if self.build_all {
+            self.local_config.feature_flag.to_string()
         } else {
-            compose_test.config.features.join(",")
+            self.config.features.join(",")
         });
 
         // If the test field is not present then use the --lib flag
-        match compose_test.config.test {
+        match self.config.test {
             Some(ref test_arg) => {
                 args.push("--test".to_string());
                 args.push(test_arg.to_string());
@@ -113,7 +190,7 @@ pub(crate) trait ComposeTestT {
         }
 
         // Ensure the test_filter args are passed as well
-        if let Some(ref filter) = compose_test.config.test_filter {
+        if let Some(ref filter) = self.config.test_filter {
             args.push(filter.to_string());
         }
         args.extend(extra_args);
@@ -123,173 +200,136 @@ pub(crate) trait ComposeTestT {
             args.push("--no-capture".to_string());
         }
 
-        if compose_test.retries > 0 {
+        if self.retries > 0 {
             args.push("--retries".to_string());
-            args.push(compose_test.retries.to_string());
+            args.push(self.retries.to_string());
         }
 
-        compose_test.runner.test(
+        self.runner.test(
             &env_vars,
-            &compose_test.config.runner.env,
-            Some(&compose_test.config.features),
+            &self.config.runner.env,
+            Some(&self.config.features),
             &args,
-            Self::DIRECTORY,
+            self.local_config.directory,
         )?;
 
-        if !active {
-            compose_test.runner.remove()?;
-            Self::stop(compose_test)?;
+        if self.is_running()? {
+            self.runner.remove()?;
+            self.stop()?;
         }
         Ok(())
     }
 
-    fn start(compose_test: &ComposeTest) -> Result<()> {
+    pub(crate) fn start(&self) -> Result<()> {
         // For end-to-end tests, we want to run vector as a service, leveraging the
         // image for the runner. So we must build that image before starting the
         // compose so that it is available.
-        if Self::DIRECTORY == E2E_TESTS_DIR {
-            compose_test
-                .runner
-                .build(Some(&compose_test.config.features), Self::DIRECTORY)?;
+        if self.local_config.kind == ComposeTestKind::E2E {
+            self.runner.build(
+                Some(&self.config.features),
+                self.local_config.directory,
+                &self.env_config,
+            )?;
         }
 
-        compose_test.config.check_required()?;
-        if let Some(compose) = &compose_test.compose {
-            compose_test.runner.ensure_network()?;
+        self.config.check_required()?;
+        if let Some(compose) = &self.compose {
+            self.runner.ensure_network()?;
+            self.runner.ensure_external_volumes()?;
 
-            if compose_test
-                .envs_dir
-                .check_active(&compose_test.environment)?
-            {
+            if self.is_running()? {
                 bail!("environment is already up");
             }
 
-            compose.start(&compose_test.env_config)?;
-
-            compose_test
-                .envs_dir
-                .save(&compose_test.environment, &compose_test.env_config)
-        } else {
-            Ok(())
+            let project_name = self.project_name();
+            compose.start(&self.env_config, &project_name)?;
         }
+        Ok(())
     }
 
-    fn stop(compose_test: &ComposeTest) -> Result<()> {
-        if let Some(compose) = &compose_test.compose {
-            // TODO: Is this check really needed?
-            if compose_test.envs_dir.load()?.is_none() {
-                bail!("No environment for {} is up.", compose_test.test_name);
+    pub(crate) fn stop(&self) -> Result<()> {
+        if let Some(compose) = &self.compose {
+            if !self.is_running()? {
+                bail!("No environment for {} is up.", self.test_name);
             }
 
-            compose_test.runner.remove()?;
-            compose.stop()?;
-            compose_test.envs_dir.remove()?;
+            self.runner.remove()?;
+            let project_name = self.project_name();
+            compose.stop(&self.env_config, &project_name)?;
         }
 
         Ok(())
     }
 }
 
-/// Integration tests are located in the `scripts/integration` dir,
-/// and are the full feature flag is `all-integration-tests`.
-pub(crate) struct IntegrationTest;
-
-impl ComposeTestT for IntegrationTest {
-    const DIRECTORY: &'static str = INTEGRATION_TESTS_DIR;
-
-    const FEATURE_FLAG: &'static str = INTEGRATION_FEATURE_FLAG;
-}
-
-/// E2E tests are located in the `scripts/e2e` dir,
-/// and are the full feature flag is `all-e2e-tests`.
-pub(crate) struct E2ETest;
-
-impl ComposeTestT for E2ETest {
-    const DIRECTORY: &'static str = E2E_TESTS_DIR;
-
-    const FEATURE_FLAG: &'static str = E2E_FEATURE_FLAG;
-}
-
+#[derive(Debug)]
 struct Compose {
-    original_path: PathBuf,
+    yaml_path: PathBuf,
     test_dir: PathBuf,
     env: Environment,
     #[cfg_attr(target_family = "windows", allow(dead_code))]
     config: ComposeConfig,
     network: String,
-    temp_file: NamedTempFile,
 }
 
 impl Compose {
     fn new(test_dir: PathBuf, env: Environment, network: String) -> Result<Option<Self>> {
-        let original_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
+        let yaml_path: PathBuf = [&test_dir, Path::new("compose.yaml")].iter().collect();
 
-        match original_path.try_exists() {
-            Err(error) => Err(error).with_context(|| format!("Could not lookup {original_path:?}")),
+        match yaml_path.try_exists() {
+            Err(error) => {
+                Err(error).with_context(|| format!("Could not lookup {}", yaml_path.display()))
+            }
             Ok(false) => Ok(None),
             Ok(true) => {
-                let mut config = ComposeConfig::parse(&original_path)?;
-                // Inject the networks block
-                config.networks.insert(
-                    "default".to_string(),
-                    BTreeMap::from_iter([
-                        ("name".to_string(), network.clone()),
-                        ("external".to_string(), "true".to_string()),
-                    ]),
-                );
-
-                // Create a named tempfile, there may be resource leakage here in case of SIGINT
-                // Tried tempfile::tempfile() but this returns a File object without a usable path
-                // https://docs.rs/tempfile/latest/tempfile/#resource-leaking
-                let temp_file = Builder::new()
-                    .prefix("compose-temp-")
-                    .suffix(".yaml")
-                    .tempfile_in(&test_dir)
-                    .with_context(|| "Failed to create temporary compose file")?;
-
-                fs::write(
-                    temp_file.path(),
-                    serde_yaml::to_string(&config)
-                        .with_context(|| "Failed to serialize modified compose.yaml")?,
-                )?;
+                // Parse config only for unix volume permission checking
+                let config = ComposeConfig::parse(&yaml_path)?;
 
                 Ok(Some(Self {
-                    original_path,
+                    yaml_path,
                     test_dir,
                     env,
                     config,
                     network,
-                    temp_file,
                 }))
             }
         }
     }
 
-    fn start(&self, config: &Environment) -> Result<()> {
-        self.prepare()?;
-        self.run("Starting", &["up", "--detach"], Some(config))
+    fn start(&self, environment: &Environment, project_name: &str) -> Result<()> {
+        #[cfg(unix)]
+        unix::prepare_compose_volumes(&self.config, &self.test_dir, environment)?;
+
+        self.run(
+            "Starting",
+            &["up", "--detach"],
+            Some(environment),
+            project_name,
+        )
     }
 
-    fn stop(&self) -> Result<()> {
-        // The config settings are not needed when stopping a compose setup.
-        self.run("Stopping", &["down", "--timeout", "0", "--volumes"], None)
+    fn stop(&self, environment: &Environment, project_name: &str) -> Result<()> {
+        self.run(
+            "Stopping",
+            &["down", "--timeout", "0", "--volumes", "--remove-orphans"],
+            Some(environment),
+            project_name,
+        )
     }
 
-    fn run(&self, action: &str, args: &[&'static str], config: Option<&Environment>) -> Result<()> {
+    fn run(
+        &self,
+        action: &str,
+        args: &[&'static str],
+        environment: Option<&Environment>,
+        project_name: &str,
+    ) -> Result<()> {
         let mut command = Command::new(CONTAINER_TOOL.clone());
         command.arg("compose");
-        // When the integration test environment is already active, the tempfile path does not
-        // exist because `Compose::new()` has not been called. In this case, the `stop` command
-        // needs to use the calculated path from the integration name instead of the nonexistent
-        // tempfile path. This is because `stop` doesn't go through the same logic as `start`
-        // and doesn't create a new tempfile before calling docker compose.
-        // If stop command needs to use some of the injected bits then we need to rebuild it
+        command.arg("--project-name");
+        command.arg(project_name);
         command.arg("--file");
-        if config.is_none() {
-            command.arg(&self.original_path);
-        } else {
-            command.arg(self.temp_file.path());
-        }
+        command.arg(&self.yaml_path);
 
         command.args(args);
 
@@ -299,48 +339,37 @@ impl Compose {
         command.env(NETWORK_ENV_VAR, &self.network);
 
         // some services require this in order to build Vector
-        command.env("RUST_VERSION", get_rust_version());
+        command.env("RUST_VERSION", RustToolchainConfig::rust_version());
 
         for (key, value) in &self.env {
             if let Some(value) = value {
                 command.env(key, value);
             }
         }
-        if let Some(config) = config {
-            command.envs(config_env(config));
+        if let Some(environment) = environment {
+            command.envs(extract_present(environment));
         }
 
         waiting!("{action} service environment");
         command.check_run()
     }
-
-    fn prepare(&self) -> Result<()> {
-        #[cfg(unix)]
-        unix::prepare_compose_volumes(&self.config, &self.test_dir)?;
-        Ok(())
-    }
-}
-
-fn config_env(config: &Environment) -> impl Iterator<Item = (String, String)> + '_ {
-    config.iter().filter_map(|(var, value)| {
-        value.as_ref().map(|value| {
-            (
-                format!("CONFIG_{}", var.replace('-', "_").to_uppercase()),
-                value.to_string(),
-            )
-        })
-    })
 }
 
 #[cfg(unix)]
 mod unix {
-    use std::fs::{self, Metadata, Permissions};
-    use std::os::unix::fs::PermissionsExt as _;
-    use std::path::{Path, PathBuf};
+    use std::{
+        fs::{self, Metadata, Permissions},
+        os::unix::fs::PermissionsExt as _,
+        path::{Path, PathBuf},
+    };
 
     use anyhow::{Context, Result};
 
     use super::super::config::ComposeConfig;
+    use crate::{
+        environment::{Environment, resolve_placeholders},
+        testing::config::VolumeMount,
+    };
 
     /// Unix permissions mask to allow everybody to read a file
     const ALL_READ: u32 = 0o444;
@@ -348,21 +377,28 @@ mod unix {
     const ALL_READ_DIR: u32 = 0o555;
 
     /// Fix up potential issues before starting a compose container
-    pub fn prepare_compose_volumes(config: &ComposeConfig, test_dir: &Path) -> Result<()> {
+    pub fn prepare_compose_volumes(
+        config: &ComposeConfig,
+        test_dir: &Path,
+        environment: &Environment,
+    ) -> Result<()> {
         for service in config.services.values() {
-            // Make sure all volume files are world readable
             if let Some(volumes) = &service.volumes {
                 for volume in volumes {
-                    let source = volume
-                        .split_once(':')
-                        .expect("Invalid volume in compose file")
-                        .0;
-                    // Only fixup relative paths, i.e. within our source tree.
-                    if !config.volumes.contains_key(source)
+                    let source = match volume {
+                        VolumeMount::Short(s) => {
+                            s.split_once(':').map(|(s, _)| s).ok_or_else(|| {
+                                anyhow::anyhow!("Invalid short volume mount format: {s}")
+                            })?
+                        }
+                        VolumeMount::Long { source, .. } => source,
+                    };
+                    let source = resolve_placeholders(source, environment);
+                    if !config.volumes.contains_key(&source)
                         && !source.starts_with('/')
                         && !source.starts_with('$')
                     {
-                        let path: PathBuf = [test_dir, Path::new(source)].iter().collect();
+                        let path: PathBuf = [test_dir, Path::new(&source)].iter().collect();
                         add_read_permission(&path)?;
                     }
                 }
@@ -375,7 +411,7 @@ mod unix {
     fn add_read_permission(path: &Path) -> Result<()> {
         let metadata = path
             .metadata()
-            .with_context(|| format!("Could not get permissions on {path:?}"))?;
+            .with_context(|| format!("Could not get permissions on {}", path.display()))?;
 
         if metadata.is_file() {
             add_permission(path, &metadata, ALL_READ)
@@ -383,10 +419,11 @@ mod unix {
             if metadata.is_dir() {
                 add_permission(path, &metadata, ALL_READ_DIR)?;
                 for entry in fs::read_dir(path)
-                    .with_context(|| format!("Could not read directory {path:?}"))?
+                    .with_context(|| format!("Could not read directory {}", path.display()))?
                 {
-                    let entry = entry
-                        .with_context(|| format!("Could not read directory entry in {path:?}"))?;
+                    let entry = entry.with_context(|| {
+                        format!("Could not read directory entry in {}", path.display())
+                    })?;
                     add_read_permission(&entry.path())?;
                 }
             }
@@ -399,7 +436,7 @@ mod unix {
         let new_perms = Permissions::from_mode(perms.mode() | bits);
         if new_perms != perms {
             fs::set_permissions(path, new_perms)
-                .with_context(|| format!("Could not set permissions on {path:?}"))?;
+                .with_context(|| format!("Could not set permissions on {}", path.display()))?;
         }
         Ok(())
     }

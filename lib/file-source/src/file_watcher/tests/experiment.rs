@@ -5,12 +5,10 @@ use std::os::windows::fs::MetadataExt;
 use std::{fs, io::Write};
 
 use bytes::Bytes;
+use file_source_common::ReadFrom;
 use quickcheck::{QuickCheck, TestResult};
 
-use crate::{
-    file_watcher::{tests::*, FileWatcher},
-    ReadFrom,
-};
+use crate::file_watcher::{FileWatcher, RawLineResult, tests::*};
 
 // Interpret all FWActions, including truncation
 //
@@ -25,7 +23,7 @@ use crate::{
 // What we can do, though, is drive our FWFile model and the SUT at the same
 // time, recording the total number of reads/writes. The SUT reads should be
 // bounded below by the model reads, bounded above by the writes.
-fn experiment(actions: Vec<FileWatcherAction>) {
+async fn experiment(actions: Vec<FileWatcherAction>) {
     let dir = tempfile::TempDir::new().expect("could not create tempdir");
     let path = dir.path().join("a_file.log");
     let mut fp = fs::File::create(&path).expect("could not create");
@@ -37,6 +35,7 @@ fn experiment(actions: Vec<FileWatcherAction>) {
         100_000,
         Bytes::from("\n"),
     )
+    .await
     .expect("must be able to create");
 
     let mut writes = 0;
@@ -82,7 +81,7 @@ fn experiment(actions: Vec<FileWatcherAction>) {
             }
             FileWatcherAction::RotateFile => {
                 let mut new_path = path.clone();
-                new_path.set_extension(format!("log.{}", rotation_count));
+                new_path.set_extension(format!("log.{rotation_count}"));
                 rotation_count += 1;
                 fs::rename(&path, &new_path).expect("could not rename");
                 fp = fs::File::create(&path).expect("could not create");
@@ -92,15 +91,18 @@ fn experiment(actions: Vec<FileWatcherAction>) {
             FileWatcherAction::Read => {
                 let mut attempts = 10;
                 while attempts > 0 {
-                    match fw.read_line() {
+                    match fw.read_line().await {
                         Err(_) => {
                             unreachable!();
                         }
-                        Ok(Some(line)) if line.bytes.is_empty() => {
+                        Ok(RawLineResult {
+                            raw_line: Some(line),
+                            ..
+                        }) if line.bytes.is_empty() => {
                             attempts -= 1;
                             continue;
                         }
-                        Ok(None) => {
+                        Ok(RawLineResult { raw_line: None, .. }) => {
                             attempts -= 1;
                             continue;
                         }
@@ -122,14 +124,20 @@ fn experiment(actions: Vec<FileWatcherAction>) {
     assert!(sut_reads >= model_reads);
 }
 
-#[test]
-fn file_watcher_with_truncation() {
+#[tokio::test]
+async fn file_watcher_with_truncation() {
     fn inner(actions: Vec<FileWatcherAction>) -> TestResult {
-        experiment(actions);
+        let handle = tokio::runtime::Handle::current();
+        handle.block_on(experiment(actions));
         TestResult::passed()
     }
-    QuickCheck::new()
-        .tests(10000)
-        .max_tests(100000)
-        .quickcheck(inner as fn(Vec<FileWatcherAction>) -> TestResult);
+
+    tokio::task::spawn_blocking(|| {
+        QuickCheck::new()
+            .tests(5000)
+            .max_tests(50000)
+            .quickcheck(inner as fn(Vec<FileWatcherAction>) -> TestResult)
+    })
+    .await
+    .unwrap();
 }

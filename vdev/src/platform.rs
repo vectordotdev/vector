@@ -1,13 +1,15 @@
-use directories::ProjectDirs;
+use std::{
+    env::consts::ARCH,
+    path::{Path, PathBuf},
+    sync::OnceLock,
+};
 
-use std::env::consts::ARCH;
-use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
+use directories::ProjectDirs;
 
 pub fn canonicalize_path(path: impl AsRef<Path>) -> String {
     let path = path.as_ref();
     dunce::canonicalize(path)
-        .unwrap_or_else(|err| panic!("Could not canonicalize path {path:?}: {err}"))
+        .unwrap_or_else(|err| panic!("Could not canonicalize path {}: {err}", path.display()))
         .display()
         .to_string()
 }

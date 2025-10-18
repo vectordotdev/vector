@@ -123,22 +123,21 @@ pub use self::metadata::Metadata;
 mod named;
 pub use self::named::NamedComponent;
 mod num;
-pub use self::num::ConfigurableNumber;
+pub use self::num::{ConfigurableNumber, NumberClass};
 pub mod schema;
 pub mod ser;
 mod stdlib;
 mod str;
-pub use self::str::ConfigurableString;
-
-// Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
-pub use vector_config_macros::*;
-
 // Re-export of both `Format` and `Validation` from `vector_config_common`.
 //
 // The crate exists so that both `vector_config_macros` and `vector_config` can import the types and work with them
 // natively, but from a codegen and usage perspective, it's much cleaner to export everything needed to use
 // `Configurable` from `vector_config` itself, and not leak out the crate arrangement as an impl detail.
 pub use vector_config_common::{attributes, validation};
+// Re-export of the `#[configurable_component]` and `#[derive(Configurable)]` proc macros.
+pub use vector_config_macros::*;
+
+pub use self::str::ConfigurableString;
 
 #[doc(hidden)]
 pub fn __ensure_numeric_validation_bounds<N>(metadata: &Metadata) -> Result<(), GenerateError>
@@ -159,26 +158,26 @@ where
 
     for validation in metadata.validations() {
         if let validation::Validation::Range { minimum, maximum } = validation {
-            if let Some(min_bound) = minimum {
-                if *min_bound < mechanical_min_bound {
-                    return Err(GenerateError::IncompatibleNumericBounds {
-                        numeric_type: std::any::type_name::<N>(),
-                        bound_direction: BoundDirection::Minimum,
-                        mechanical_bound: mechanical_min_bound,
-                        specified_bound: *min_bound,
-                    });
-                }
+            if let Some(min_bound) = minimum
+                && *min_bound < mechanical_min_bound
+            {
+                return Err(GenerateError::IncompatibleNumericBounds {
+                    numeric_type: std::any::type_name::<N>(),
+                    bound_direction: BoundDirection::Minimum,
+                    mechanical_bound: mechanical_min_bound,
+                    specified_bound: *min_bound,
+                });
             }
 
-            if let Some(max_bound) = maximum {
-                if *max_bound > mechanical_max_bound {
-                    return Err(GenerateError::IncompatibleNumericBounds {
-                        numeric_type: std::any::type_name::<N>(),
-                        bound_direction: BoundDirection::Maximum,
-                        mechanical_bound: mechanical_max_bound,
-                        specified_bound: *max_bound,
-                    });
-                }
+            if let Some(max_bound) = maximum
+                && *max_bound > mechanical_max_bound
+            {
+                return Err(GenerateError::IncompatibleNumericBounds {
+                    numeric_type: std::any::type_name::<N>(),
+                    bound_direction: BoundDirection::Maximum,
+                    mechanical_bound: mechanical_max_bound,
+                    specified_bound: *max_bound,
+                });
             }
         }
     }

@@ -1,28 +1,31 @@
-use std::collections::HashMap;
-use std::num::NonZeroUsize;
-use std::time::Duration;
+use std::{collections::HashMap, num::NonZeroUsize, time::Duration};
 
 use indexmap::IndexMap;
 use serde_with::serde_as;
-use vrl::path::{parse_target_path, PathPrefix};
-use vrl::prelude::{Collection, KeyString, Kind};
-
 use vector_lib::configurable::configurable_component;
-
-use crate::conditions::AnyCondition;
-use crate::config::{
-    schema, DataType, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
-    TransformOutput,
+use vrl::{
+    path::{PathPrefix, parse_target_path},
+    prelude::{Collection, KeyString, Kind},
 };
-use crate::schema::Definition;
-use crate::transforms::reduce::merge_strategy::MergeStrategy;
-use crate::transforms::{reduce::transform::Reduce, Transform};
+
+use crate::{
+    conditions::AnyCondition,
+    config::{
+        DataType, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
+        TransformOutput, schema,
+    },
+    schema::Definition,
+    transforms::{
+        Transform,
+        reduce::{merge_strategy::MergeStrategy, transform::Reduce},
+    },
+};
 
 /// Configuration for the `reduce` transform.
 #[serde_as]
 #[configurable_component(transform(
-"reduce",
-"Collapse multiple log events into a single event based on a set of conditions and merge strategies.",
+    "reduce",
+    "Collapse multiple log events into a single event based on a set of conditions and merge strategies.",
 ))]
 #[derive(Clone, Debug, Derivative)]
 #[derivative(Default)]
@@ -56,8 +59,11 @@ pub struct ReduceConfig {
     /// An ordered list of fields by which to group events.
     ///
     /// Each group with matching values for the specified keys is reduced independently, allowing
-    /// you to keep independent event streams separate. When no fields are specified, all events
-    /// are combined in a single group.
+    /// you to keep independent event streams separate. Note that each field specified, will be reduced
+    /// with the default merge strategy based on its type unless a merge strategy is explicitly defined
+    /// in `merge_strategies`.
+    ///
+    /// This field is optional and when not specified, all events are reduced in a single group.
     ///
     /// For example, if `group_by = ["host", "region"]`, then all incoming events that have the same
     /// host and region are grouped together before being reduced.

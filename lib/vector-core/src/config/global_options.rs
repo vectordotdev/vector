@@ -4,10 +4,10 @@ use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
 use vector_config::{configurable_component, impl_generate_config_from_default};
 
-use super::super::default_data_dir;
-use super::metrics_expiration::PerMetricSetExpiration;
-use super::Telemetry;
-use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
+use super::{
+    super::default_data_dir, AcknowledgementsConfig, LogSchema, Telemetry,
+    metrics_expiration::PerMetricSetExpiration, proxy::ProxyConfig,
+};
 use crate::serde::bool_or_struct;
 
 #[derive(Debug, Snafu)]
@@ -31,6 +31,19 @@ pub(crate) enum DataDirError {
     },
 }
 
+/// Specifies the wildcard matching mode, relaxed allows configurations where wildcard doesn not match any existing inputs
+#[configurable_component]
+#[derive(Clone, Debug, Copy, PartialEq, Eq, Default)]
+#[serde(rename_all = "lowercase")]
+pub enum WildcardMatching {
+    /// Strict matching (must match at least one existing input)
+    #[default]
+    Strict,
+
+    /// Relaxed matching (must match 0 or more inputs)
+    Relaxed,
+}
+
 /// Global configuration options.
 //
 // If this is modified, make sure those changes are reflected in the `ConfigBuilder::append`
@@ -47,6 +60,14 @@ pub struct GlobalOptions {
     #[serde(default = "crate::default_data_dir")]
     #[configurable(metadata(docs::common = false))]
     pub data_dir: Option<PathBuf>,
+
+    /// Set wildcard matching mode for inputs
+    ///
+    /// Setting this to "relaxed" allows configurations with wildcards that do not match any inputs
+    /// to be accepted without causing an error.
+    #[serde(skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false, docs::required = false))]
+    pub wildcard_matching: Option<WildcardMatching>,
 
     /// Default log schema for all events.
     ///
@@ -86,7 +107,7 @@ pub struct GlobalOptions {
     /// See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event
     /// acknowledgement.
     ///
-    /// [e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+    /// [e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
     #[serde(
         default,
         deserialize_with = "bool_or_struct",
@@ -98,7 +119,7 @@ pub struct GlobalOptions {
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
     ///
-    /// Deprecated: use expire_metrics_secs instead
+    /// Deprecated: use `expire_metrics_secs` instead
     #[configurable(deprecated)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::hidden))]
@@ -182,6 +203,13 @@ impl GlobalOptions {
     pub fn merge(&self, with: Self) -> Result<Self, Vec<String>> {
         let mut errors = Vec::new();
 
+        if conflicts(
+            self.wildcard_matching.as_ref(),
+            with.wildcard_matching.as_ref(),
+        ) {
+            errors.push("conflicting values for 'wildcard_matching' found".to_owned());
+        }
+
         if conflicts(self.proxy.http.as_ref(), with.proxy.http.as_ref()) {
             errors.push("conflicting values for 'proxy.http' found".to_owned());
         }
@@ -250,6 +278,7 @@ impl GlobalOptions {
         if errors.is_empty() {
             Ok(Self {
                 data_dir,
+                wildcard_matching: self.wildcard_matching.or(with.wildcard_matching),
                 log_schema,
                 telemetry,
                 acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),
@@ -267,6 +296,39 @@ impl GlobalOptions {
     /// Get the configured time zone, using "local" time if none is set.
     pub fn timezone(&self) -> TimeZone {
         self.timezone.unwrap_or(TimeZone::Local)
+    }
+
+    /// Returns a list of top-level field names that differ between two [`GlobalOptions`] values.
+    ///
+    /// This function performs a shallow comparison by serializing both configs to JSON
+    /// and comparing their top-level keys.
+    ///
+    /// Useful for logging which global fields changed during config reload attempts.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`serde_json::Error`] if either of the [`GlobalOptions`] values
+    /// cannot be serialized into a JSON object. This is unlikely under normal usage,
+    /// but may occur if serialization fails due to unexpected data structures or changes
+    /// in the type definition.
+    pub fn diff(&self, other: &Self) -> Result<Vec<String>, serde_json::Error> {
+        let old_value = serde_json::to_value(self)?;
+        let new_value = serde_json::to_value(other)?;
+
+        let serde_json::Value::Object(old_map) = old_value else {
+            return Ok(vec![]);
+        };
+        let serde_json::Value::Object(new_map) = new_value else {
+            return Ok(vec![]);
+        };
+
+        Ok(old_map
+            .iter()
+            .filter_map(|(k, v_old)| match new_map.get(k) {
+                Some(v_new) if v_new != v_old => Some(k.clone()),
+                _ => None,
+            })
+            .collect())
     }
 }
 
@@ -383,6 +445,22 @@ mod tests {
             Err(vec![
                 "conflicting values for 'expire_metrics_secs' found".into()
             ])
+        );
+    }
+
+    #[test]
+    fn diff_detects_changed_keys() {
+        let old = GlobalOptions {
+            data_dir: Some(std::path::PathBuf::from("/path1")),
+            ..Default::default()
+        };
+        let new = GlobalOptions {
+            data_dir: Some(std::path::PathBuf::from("/path2")),
+            ..Default::default()
+        };
+        assert_eq!(
+            old.diff(&new).expect("diff failed"),
+            vec!["data_dir".to_string()]
         );
     }
 

@@ -200,7 +200,9 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             }
         },
         None => {
-            error!("You must specify a sub command. Valid sub commands are [start, stop, restart, install, uninstall].");
+            error!(
+                "You must specify a sub command. Valid sub commands are [start, stop, restart, install, uninstall]."
+            );
             exitcode::USAGE
         }
     }

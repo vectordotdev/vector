@@ -1,9 +1,12 @@
 //! Utilities shared between both VRL functions.
 use std::collections::BTreeMap;
 
+use vrl::{
+    diagnostic::{Label, Span},
+    prelude::*,
+};
+
 use crate::{Case, Condition, IndexHandle, TableRegistry};
-use vrl::diagnostic::{Label, Span};
-use vrl::prelude::*;
 
 #[derive(Debug)]
 pub enum Error {
@@ -38,7 +41,7 @@ impl DiagnosticMessage for Error {
 }
 
 /// Evaluates the condition object to search the enrichment tables with.
-pub(crate) fn evaluate_condition(key: &str, value: Value) -> ExpressionResult<Condition> {
+pub(crate) fn evaluate_condition(key: &str, value: Value) -> ExpressionResult<Condition<'_>> {
     Ok(match value {
         Value::Object(map) if map.contains_key("from") && map.contains_key("to") => {
             Condition::BetweenDates {
@@ -55,6 +58,22 @@ pub(crate) fn evaluate_condition(key: &str, value: Value) -> ExpressionResult<Co
                     .ok_or("to in condition must be a timestamp")?,
             }
         }
+        Value::Object(map) if map.contains_key("from") => Condition::FromDate {
+            field: key,
+            from: *map
+                .get("from")
+                .expect("should contain from")
+                .as_timestamp()
+                .ok_or("from in condition must be a timestamp")?,
+        },
+        Value::Object(map) if map.contains_key("to") => Condition::ToDate {
+            field: key,
+            to: *map
+                .get("to")
+                .expect("should contain to")
+                .as_timestamp()
+                .ok_or("to in condition must be a timestamp")?,
+        },
         _ => Condition::Equals { field: key, value },
     })
 }
@@ -71,7 +90,12 @@ pub(crate) fn add_index(
         .filter_map(|(field, value)| match value {
             expression::Expr::Container(expression::Container {
                 variant: expression::Variant::Object(map),
-            }) if map.contains_key("from") && map.contains_key("to") => None,
+            }) if (map.contains_key("from") && map.contains_key("to"))
+                || map.contains_key("from")
+                || map.contains_key("to") =>
+            {
+                None
+            }
             _ => Some(field.as_ref()),
         })
         .collect::<Vec<_>>();
@@ -80,6 +104,7 @@ pub(crate) fn add_index(
     Ok(index)
 }
 
+#[allow(clippy::result_large_err)]
 pub(crate) fn is_case_sensitive(
     arguments: &ArgumentList,
     state: &TypeState,

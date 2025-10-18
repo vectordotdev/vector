@@ -1,0 +1,31 @@
+<div class="flex flex-col space-y-2">
+  {{ range .Params.authors }}
+    {{ $handle := . }}
+    {{ $img := printf "https://github.com/%s.png" $handle }}
+    {{ $link := printf "https://github.com/%s" $handle }}
+    {{ $apiUrl := printf "https://api.github.com/users/%s" $handle }}
+    {{ $name := $handle }}
+    {{ $displayName := $handle }}
+    {{ with resources.GetRemote $apiUrl }}
+      {{ with .Err }}
+        {{/* Silently fall back to GitHub handle on error */}}
+      {{ else }}
+        {{ $data := . | transform.Unmarshal }}
+        {{ if $data.name }}
+          {{ $name = $data.name }}
+          {{ $displayName = printf "%s (%s)" $data.name $handle }}
+        {{ end }}
+      {{ end }}
+    {{ end }}
+    <a href="{{ $link }}" class="flex items-center space-x-3 group" rel="noopener" target="_blank">
+      <img
+        class="h-12 w-12 rounded-full ring-1 ring-white dark:ring-dark"
+        src="{{ $img }}"
+        alt="Author avatar for {{ $handle }}"
+      />
+      <span class="text-md font-bold tracking-tight text-gray-700 group-hover:text-secondary dark:text-gray-200">
+        {{ $displayName }}
+      </span>
+    </a>
+  {{ end }}
+</div>

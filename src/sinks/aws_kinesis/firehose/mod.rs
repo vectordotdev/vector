@@ -6,18 +6,17 @@ mod record;
 mod tests;
 
 use aws_sdk_firehose::{
-    operation::put_record_batch::PutRecordBatchError, types::Record as FRecord, Client,
+    Client, operation::put_record_batch::PutRecordBatchError, types::Record as FRecord,
 };
 
+pub use self::config::KinesisFirehoseSinkConfig;
 pub use super::{
-    config::{build_sink, KinesisSinkBaseConfig},
+    config::{KinesisSinkBaseConfig, build_sink},
     record::{Record, SendRecord},
     request_builder,
     service::{KinesisResponse, KinesisService},
     sink,
 };
-
-pub use self::config::KinesisFirehoseSinkConfig;
 
 pub type KinesisError = PutRecordBatchError;
 pub type KinesisRecord = FRecord;

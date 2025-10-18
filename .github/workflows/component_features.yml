@@ -3,7 +3,7 @@
 # Validates that each component feature compiles
 #
 # Runs on:
-#  - scheduled UTC midnight Tues-Sat
+#  - scheduled 10:00 UTC Monday (6 AM EST / 5 AM EDT NYC)
 #  - on PR review (see comment-trigger.yml)
 #  - on demand from github actions UI
 
@@ -13,8 +13,7 @@ on:
   workflow_call:
   workflow_dispatch:
   schedule:
-    # At midnight UTC Tue-Sat
-    - cron: '0 0 * * 2-6'
+    - cron: '0 10 * * 1' # 10:00 UTC Monday (6 AM EST NYC)
 
 permissions:
   statuses: write
@@ -23,11 +22,12 @@ jobs:
   check-component-features:
     # use free tier on schedule and 8 core to expedite results on demand invocation
     runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-24.04' || 'ubuntu-24.04-8core' }}
+    timeout-minutes: 180 # Usually takes 2h but this prevents it from hanging for an indefinite time
     if: github.event_name == 'pull_request_review' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     steps:
       - name: (PR review) Set latest commit status as pending
         if: github.event_name == 'pull_request_review'
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
@@ -36,22 +36,22 @@ jobs:
 
       - name: (PR review) Checkout PR branch
         if: github.event_name == 'pull_request_review'
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           ref: ${{ github.event.review.commit_id }}
 
       - name: Checkout branch
         if: github.event_name != 'pull_request_review'
-        uses: actions/checkout@v4
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: echo "::add-matcher::.github/matchers/rust.json"
       - run: make check-component-features
 
       - name: (PR review) Set latest commit status as ${{ job.status }}
         if: always() && github.event_name == 'pull_request_review'
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}

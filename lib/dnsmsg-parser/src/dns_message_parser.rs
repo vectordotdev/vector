@@ -1,33 +1,32 @@
-use hickory_proto::dnssec::{PublicKey, Verifier};
-use std::fmt::Write as _;
-use std::str::Utf8Error;
+use std::{fmt::Write as _, str::Utf8Error};
 
 use data_encoding::{BASE32HEX_NOPAD, BASE64, HEXUPPER};
-use hickory_proto::dnssec::rdata::{DNSSECRData, CDNSKEY, CDS, DNSKEY, DS};
-use hickory_proto::dnssec::SupportedAlgorithms;
 use hickory_proto::{
-    op::{message::Message as TrustDnsMessage, Query},
+    ProtoError,
+    dnssec::{
+        PublicKey, SupportedAlgorithms, Verifier,
+        rdata::{CDNSKEY, CDS, DNSKEY, DNSSECRData, DS},
+    },
+    op::{Query, message::Message as TrustDnsMessage},
     rr::{
+        Name, RecordType,
         rdata::{
-            caa::Value,
-            opt::{EdnsCode, EdnsOption},
             A, AAAA, NULL, OPT, SVCB,
+            caa::Property,
+            opt::{EdnsCode, EdnsOption},
         },
         record_data::RData,
         resource::Record,
-        Name, RecordType,
     },
     serialize::binary::{BinDecodable, BinDecoder},
-    ProtoError,
 };
 use snafu::Snafu;
-
-use crate::ede::{EDE, EDE_OPTION_CODE};
 
 use super::dns_message::{
     self, DnsQueryMessage, DnsRecord, DnsUpdateMessage, EdnsOptionEntry, OptPseudoSection,
     QueryHeader, QueryQuestion, UpdateHeader, ZoneInfo,
 };
+use crate::ede::{EDE, EDE_OPTION_CODE};
 
 /// Error type for DNS message parsing
 #[derive(Debug, Snafu)]
@@ -241,8 +240,7 @@ impl DnsMessageParser {
                 }
                 for _i in 0..8 {
                     if current_byte & 0b1000_0000 == 0b1000_0000 {
-                        write!(port_string, "{} ", current_bit)
-                            .expect("can always write to String");
+                        write!(port_string, "{current_bit} ").expect("can always write to String");
                     }
                     current_byte <<= 1;
                     current_bit += 1;
@@ -263,6 +261,11 @@ impl DnsMessageParser {
         let mut decoder = BinDecoder::new(raw_rdata);
         let prefix = parse_u8(&mut decoder)?;
         let ipv6_address = {
+            if prefix > 128 {
+                return Err(DnsMessageParserError::SimpleError {
+                    cause: String::from("IPV6 prefix can't be greater than 128."),
+                });
+            }
             let address_length = (128 - prefix) / 8;
             let mut address_vec = parse_vec(&mut decoder, address_length)?;
             if address_vec.len() < 16 {
@@ -275,10 +278,7 @@ impl DnsMessageParser {
             parse_ipv6_address(&mut dec)?
         };
         let domain_name = Self::parse_domain_name(&mut decoder, &self.options)?;
-        Ok((
-            Some(format!("{} {} {}", prefix, ipv6_address, domain_name)),
-            None,
-        ))
+        Ok((Some(format!("{prefix} {ipv6_address} {domain_name}")), None))
     }
 
     fn parse_loc_rdata(
@@ -325,8 +325,7 @@ impl DnsMessageParser {
 
         Ok((
             Some(format!(
-                "{} {} {:.2}m {}m {}m {}m",
-                latitude, longitude, altitude, size, horizontal_precision, vertical_precision
+                "{latitude} {longitude} {altitude:.2}m {size}m {horizontal_precision}m {vertical_precision}m"
             )),
             None,
         ))
@@ -362,12 +361,8 @@ impl DnsMessageParser {
                 let mut dec = BinDecoder::new(&address_vec);
                 parse_ipv6_address(&mut dec)?
             };
-            write!(
-                apl_rdata,
-                "{}{}:{}/{}",
-                negation, address_family, address, prefix
-            )
-            .expect("can always write to String");
+            write!(apl_rdata, "{negation}{address_family}:{address}/{prefix}")
+                .expect("can always write to String");
             apl_rdata.push(' ');
         }
         Ok((Some(apl_rdata.trim_end().to_string()), None))
@@ -407,7 +402,7 @@ impl DnsMessageParser {
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let rmailbx = Self::parse_domain_name(&mut decoder, &options)?;
                 let emailbx = Self::parse_domain_name(&mut decoder, &options)?;
-                Ok((Some(format!("{} {}", rmailbx, emailbx)), None))
+                Ok((Some(format!("{rmailbx} {emailbx}")), None))
             }
 
             dns_message::RTYPE_RP => {
@@ -415,7 +410,7 @@ impl DnsMessageParser {
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let mbox = Self::parse_domain_name(&mut decoder, &options)?;
                 let txt = Self::parse_domain_name(&mut decoder, &options)?;
-                Ok((Some(format!("{} {}", mbox, txt)), None))
+                Ok((Some(format!("{mbox} {txt}")), None))
             }
 
             dns_message::RTYPE_AFSDB => {
@@ -423,7 +418,7 @@ impl DnsMessageParser {
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let subtype = parse_u16(&mut decoder)?;
                 let hostname = Self::parse_domain_name(&mut decoder, &options)?;
-                Ok((Some(format!("{} {}", subtype, hostname)), None))
+                Ok((Some(format!("{subtype} {hostname}")), None))
             }
 
             dns_message::RTYPE_X25 => {
@@ -467,7 +462,7 @@ impl DnsMessageParser {
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let preference = parse_u16(&mut decoder)?;
                 let intermediate_host = Self::parse_domain_name(&mut decoder, &options)?;
-                Ok((Some(format!("{} {}", preference, intermediate_host)), None))
+                Ok((Some(format!("{preference} {intermediate_host}")), None))
             }
 
             dns_message::RTYPE_NSAP => {
@@ -475,7 +470,7 @@ impl DnsMessageParser {
                 let mut decoder = BinDecoder::new(raw_rdata);
                 let rdata_len = raw_rdata.len() as u16;
                 let nsap_rdata = HEXUPPER.encode(&parse_vec_with_u16_len(&mut decoder, rdata_len)?);
-                Ok((Some(format!("0x{}", nsap_rdata)), None))
+                Ok((Some(format!("0x{nsap_rdata}")), None))
             }
 
             dns_message::RTYPE_PX => {
@@ -484,7 +479,7 @@ impl DnsMessageParser {
                 let preference = parse_u16(&mut decoder)?;
                 let map822 = Self::parse_domain_name(&mut decoder, &options)?;
                 let mapx400 = Self::parse_domain_name(&mut decoder, &options)?;
-                Ok((Some(format!("{} {} {}", preference, map822, mapx400)), None))
+                Ok((Some(format!("{preference} {map822} {mapx400}")), None))
             }
 
             dns_message::RTYPE_LOC => self.parse_loc_rdata(rdata.anything()),
@@ -494,7 +489,7 @@ impl DnsMessageParser {
                 let mut decoder = self.get_rdata_decoder_with_raw_message(rdata.anything());
                 let preference = parse_u16(&mut decoder)?;
                 let exchanger = Self::parse_domain_name(&mut decoder, &options)?;
-                Ok((Some(format!("{} {}", preference, exchanger)), None))
+                Ok((Some(format!("{preference} {exchanger}")), None))
             }
 
             dns_message::RTYPE_A6 => self.parse_a6_rdata(rdata.anything()),
@@ -508,10 +503,7 @@ impl DnsMessageParser {
                 let data_len = raw_rdata.len() as u16 - 3;
                 let data = BASE64.encode(&parse_vec_with_u16_len(&mut decoder, data_len)?);
 
-                Ok((
-                    Some(format!("{} {} {} {}", meaning, coding, subcoding, data)),
-                    None,
-                ))
+                Ok((Some(format!("{meaning} {coding} {subcoding} {data}")), None))
             }
 
             dns_message::RTYPE_APL => self.parse_apl_rdata(rdata.anything()),
@@ -561,7 +553,7 @@ impl DnsMessageParser {
 
             RData::CSYNC(csync) => {
                 // Using CSYNC's formatter since not all data is exposed otherwise
-                let csync_rdata = format!("{}", csync);
+                let csync_rdata = format!("{csync}");
                 Ok((Some(csync_rdata), None))
             }
             RData::MX(mx) => {
@@ -628,11 +620,19 @@ impl DnsMessageParser {
                     "{} {} \"{}\"",
                     caa.issuer_critical() as u8,
                     caa.tag().as_str(),
-                    match caa.value() {
-                        Value::Url(url) => {
+                    match caa.tag() {
+                        Property::Iodef => {
+                            let url = caa.value_as_iodef().map_err(|source| {
+                                DnsMessageParserError::TrustDnsError { source }
+                            })?;
                             url.as_str().to_string()
                         }
-                        Value::Issuer(option_name, vec_keyvalue) => {
+                        Property::Issue | Property::IssueWild => {
+                            let (option_name, vec_keyvalue) =
+                                caa.value_as_issue().map_err(|source| {
+                                    DnsMessageParserError::TrustDnsError { source }
+                                })?;
+
                             let mut final_issuer = String::new();
                             if let Some(name) = option_name {
                                 final_issuer.push_str(&name.to_string_with_options(&self.options));
@@ -645,9 +645,14 @@ impl DnsMessageParser {
                             }
                             final_issuer.trim_end().to_string()
                         }
-                        Value::Unknown(unknown) => std::str::from_utf8(unknown)
-                            .map_err(|source| DnsMessageParserError::Utf8ParsingError { source })?
-                            .to_string(),
+                        Property::Unknown(_) => {
+                            let unknown = caa.raw_value();
+                            std::str::from_utf8(unknown)
+                                .map_err(|source| DnsMessageParserError::Utf8ParsingError {
+                                    source,
+                                })?
+                                .to_string()
+                        }
                     }
                 );
                 Ok((Some(caa_rdata), None))
@@ -833,11 +838,11 @@ impl DnsMessageParser {
                     Ok((None, Some(rdata.anything().to_vec())))
                 }
                 _ => Err(DnsMessageParserError::SimpleError {
-                    cause: format!("Unsupported rdata {:?}", rdata),
+                    cause: format!("Unsupported rdata {rdata:?}"),
                 }),
             },
             _ => Err(DnsMessageParserError::SimpleError {
-                cause: format!("Unsupported rdata {:?}", rdata),
+                cause: format!("Unsupported rdata {rdata:?}"),
             }),
         }
     }
@@ -940,8 +945,8 @@ fn parse_response_code(rcode: u16) -> Option<&'static str> {
         9 => Some("NotAuth"),  // 9    NotAuth    Server Not Authoritative for zone    [RFC2136]
         10 => Some("NotZone"), // 10   NotZone    Name not contained in zone           [RFC2136]
         // backwards compat for 4 bit ResponseCodes so far.
-        // 16    BADVERS    Bad OPT Version    [RFC6891]
-        16 => Some("BADSIG"), // 16    BADSIG    TSIG Signature Failure               [RFC2845]
+        16 => Some("BADVERS"), // 16    BADVERS    Bad OPT Version    [RFC6891]
+        // 16    BADSIG    TSIG Signature Failure               [RFC2845]
         17 => Some("BADKEY"), // 17    BADKEY    Key not recognized                   [RFC2845]
         18 => Some("BADTIME"), // 18    BADTIME   Signature out of time window         [RFC2845]
         19 => Some("BADMODE"), // 19    BADMODE   Bad TKEY Mode                        [RFC2930]
@@ -1037,7 +1042,7 @@ fn parse_edns_opt_dnssec_algorithms(
     let algorithm_names: Vec<String> = algorithms.iter().map(|alg| alg.to_string()).collect();
     EdnsOptionEntry {
         opt_code: Into::<u16>::into(opt_code),
-        opt_name: format!("{:?}", opt_code),
+        opt_name: format!("{opt_code:?}"),
         opt_data: algorithm_names.join(" "),
     }
 }
@@ -1045,7 +1050,7 @@ fn parse_edns_opt_dnssec_algorithms(
 fn parse_edns_opt(opt_code: EdnsCode, opt_data: &[u8]) -> EdnsOptionEntry {
     EdnsOptionEntry {
         opt_code: Into::<u16>::into(opt_code),
-        opt_name: format!("{:?}", opt_code),
+        opt_name: format!("{opt_code:?}"),
         opt_data: BASE64.encode(opt_data),
     }
 }
@@ -1054,17 +1059,14 @@ fn parse_loc_rdata_size(data: u8) -> DnsParserResult<f64> {
     let base = (data & 0xF0) >> 4;
     if base > 9 {
         return Err(DnsMessageParserError::SimpleError {
-            cause: format!("The base shouldn't be greater than 9. Base: {}", base),
+            cause: format!("The base shouldn't be greater than 9. Base: {base}"),
         });
     }
 
     let exponent = data & 0x0F;
     if exponent > 9 {
         return Err(DnsMessageParserError::SimpleError {
-            cause: format!(
-                "The exponent shouldn't be greater than 9. Exponent: {}",
-                exponent
-            ),
+            cause: format!("The exponent shouldn't be greater than 9. Exponent: {exponent}"),
         });
     }
 
@@ -1280,7 +1282,7 @@ fn parse_unknown_record_type(rtype: u16) -> Option<String> {
 fn format_bytes_as_hex_string(bytes: &[u8]) -> String {
     bytes
         .iter()
-        .map(|e| format!("{:02X}", e))
+        .map(|e| format!("{e:02X}"))
         .collect::<Vec<String>>()
         .join(".")
 }
@@ -1295,29 +1297,23 @@ mod tests {
     #[allow(deprecated)]
     use hickory_proto::dnssec::rdata::key::UpdateScope;
     use hickory_proto::{
-        dnssec::PublicKeyBuf,
+        dnssec::{
+            Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm, PublicKeyBuf,
+            rdata::{
+                KEY, NSEC, NSEC3, NSEC3PARAM, RRSIG, SIG,
+                key::{KeyTrust, KeyUsage, Protocol},
+            },
+        },
         rr::{
             domain::Name,
             rdata::{
+                CAA, CERT, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
                 caa::KeyValue,
+                cert::{Algorithm as CertAlgorithm, CertType},
                 sshfp::{Algorithm, FingerprintType},
                 svcb,
                 tlsa::{CertUsage, Matching, Selector},
-                CAA, CSYNC, HINFO, HTTPS, NAPTR, OPT, SSHFP, TLSA, TXT,
             },
-        },
-    };
-    use hickory_proto::{
-        dnssec::{
-            rdata::{
-                key::{KeyTrust, KeyUsage, Protocol},
-                KEY, NSEC, NSEC3, NSEC3PARAM, RRSIG, SIG,
-            },
-            Algorithm as DNSSEC_Algorithm, DigestType, Nsec3HashAlgorithm,
-        },
-        rr::rdata::{
-            cert::{Algorithm as CertAlgorithm, CertType},
-            CERT,
         },
         serialize::binary::Restrict,
     };
@@ -1387,8 +1383,7 @@ mod tests {
 
     #[test]
     fn test_parse_as_query_message_with_ede_with_extra_text() {
-        let raw_dns_message =
-            "szgAAAABAAAAAAABAmg1B2V4YW1wbGUDY29tAAAGAAEAACkE0AEBQAAAOQAPADUACW5vIFNFUCBtYXRjaGluZyB0aGUgRFMgZm91bmQgZm9yIGRuc3NlYy1mYWlsZWQub3JnLg==";
+        let raw_dns_message = "szgAAAABAAAAAAABAmg1B2V4YW1wbGUDY29tAAAGAAEAACkE0AEBQAAAOQAPADUACW5vIFNFUCBtYXRjaGluZyB0aGUgRFMgZm91bmQgZm9yIGRuc3NlYy1mYWlsZWQub3JnLg==";
         let raw_query_message = BASE64
             .decode(raw_dns_message.as_bytes())
             .expect("Invalid base64 encoded data.");
@@ -1440,7 +1435,7 @@ mod tests {
             DnsMessageParserError::SimpleError { cause: e } => {
                 panic!("Expected TrustDnsError, got {}.", &e)
             }
-            _ => panic!("{}.", err),
+            _ => panic!("{err}."),
         }
     }
 
@@ -1529,9 +1524,25 @@ mod tests {
         let raw_update_message = BASE64
             .decode(raw_dns_message.as_bytes())
             .expect("Invalid base64 encoded data.");
-        assert!(DnsMessageParser::new(raw_update_message)
-            .parse_as_update_message()
-            .is_err());
+        assert!(
+            DnsMessageParser::new(raw_update_message)
+                .parse_as_update_message()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_parse_bad_prefix_value() {
+        // this testcase have prefix value of 160,
+        let raw_dns_message = "oAAAMgABAAAAAAABAAABAAAAACYAAC8BAAAAAaAAAAAAAA==";
+        let raw_query_message = BASE64
+            .decode(raw_dns_message.as_bytes())
+            .expect("Invalid base64 encoded data.");
+        assert!(
+            DnsMessageParser::new(raw_query_message)
+                .parse_as_query_message()
+                .is_err()
+        );
     }
 
     #[test]
@@ -2072,7 +2083,7 @@ mod tests {
             "5ZWBgAABAAEAAAABBm1pbmZvbwhleGFtcGxlMQNjb20AAA4AAcAMAA4AAQAADGsADQRmcmVkwBMDam9lwBMAACkQAAAAAAAAHAAKABgZ5zwJEK3VJQEAAABfSBqpS2bKf9CNBXg=",
             "BGZyZWTAEwNqb2XAEw==",
             14,
-            "fred.example1.com. joe.example1.com."
+            "fred.example1.com. joe.example1.com.",
         );
     }
 

@@ -3,12 +3,11 @@ use std::{fs::File, io::Read};
 use aws_smithy_types::body::SdkBody;
 use bytes::Bytes;
 use chrono::Utc;
-use futures::StreamExt;
-use futures::{future::ready, stream};
+use futures::{StreamExt, future::ready, stream};
 use http::{Request, StatusCode};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use vector_lib::{
-    config::{init_telemetry, log_schema, Tags, Telemetry},
+    config::{Tags, Telemetry, init_telemetry, log_schema},
     event::{BatchNotifier, BatchStatus, Event, LogEvent},
 };
 
@@ -16,15 +15,16 @@ use super::{config::DATA_STREAM_TIMESTAMP_KEY, *};
 use crate::{
     aws::{ImdsAuthentication, RegionOrEndpoint},
     config::{ProxyConfig, SinkConfig, SinkContext},
-    http::{HttpClient, QueryParameterValue},
+    http::{HttpClient, ParameterValue, QueryParameterValue},
     sinks::{
-        util::{auth::Auth, BatchConfig, Compression, SinkBatchSettings},
         HealthcheckError,
+        util::{BatchConfig, Compression, SinkBatchSettings, auth::Auth},
     },
     test_util::{
         components::{
+            COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
             run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
-            run_and_assert_sink_error, COMPONENT_ERROR_TAGS, DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
+            run_and_assert_sink_error,
         },
         random_events_with_stream, random_string, trace_init,
     },
@@ -91,7 +91,7 @@ impl ElasticsearchCommon {
 }
 
 async fn flush(common: ElasticsearchCommon) -> crate::Result<()> {
-    use tokio::time::{sleep, Duration};
+    use tokio::time::{Duration, sleep};
     sleep(Duration::from_secs(2)).await;
     common.flush_request().await?;
     sleep(Duration::from_secs(2)).await;
@@ -135,7 +135,7 @@ async fn ensure_pipeline_in_params() {
 
     assert_eq!(
         common.query_params["pipeline"],
-        QueryParameterValue::SingleParam(pipeline)
+        QueryParameterValue::SingleParam(ParameterValue::String(pipeline))
     );
 }
 
@@ -210,7 +210,7 @@ async fn structures_events_correctly() {
     flush(common).await.unwrap();
 
     let response = reqwest::Client::new()
-        .get(format!("{}/{}/_search", base_url, index))
+        .get(format!("{base_url}/{index}/_search"))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))
@@ -680,7 +680,7 @@ async fn run_insert_tests_with_config(
 
     let client = create_http_client();
     let mut response = client
-        .get(format!("{}/{}/_search", base_url, index))
+        .get(format!("{base_url}/{index}/_search"))
         .basic_auth("elastic", Some("vector"))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
@@ -769,7 +769,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
     let mut total = 0;
     for base_url in base_urls {
         if let Ok(response) = client
-            .get(format!("{}/{}/_search", base_url, index))
+            .get(format!("{base_url}/{index}/_search"))
             .basic_auth("elastic", Some("vector"))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }

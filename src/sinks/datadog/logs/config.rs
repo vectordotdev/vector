@@ -2,25 +2,23 @@ use std::{convert::TryFrom, sync::Arc};
 
 use indoc::indoc;
 use tower::ServiceBuilder;
-
 use vector_lib::{
     config::proxy::ProxyConfig, configurable::configurable_component, schema::meaning,
 };
 use vrl::value::Kind;
 
+use super::{service::LogApiRetry, sink::LogSinkBuilder};
 use crate::{
     common::datadog,
     http::HttpClient,
     schema,
     sinks::{
-        datadog::{logs::service::LogApiService, DatadogCommonConfig, LocalDatadogCommonConfig},
+        datadog::{DatadogCommonConfig, LocalDatadogCommonConfig, logs::service::LogApiService},
         prelude::*,
         util::http::RequestConfig,
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
-
-use super::{service::LogApiRetry, sink::LogSinkBuilder};
 
 // The Datadog API has a hard limit of 5MB for uncompressed payloads. Above this
 // threshold the API will toss results. We previously serialized Events as they
@@ -93,7 +91,7 @@ impl DatadogLogsConfig {
             .clone()
             .unwrap_or_else(|| format!("https://http-intake.logs.{}", dd_common.site));
 
-        http::Uri::try_from(format!("{}/api/v2/logs", base_url)).expect("URI not valid")
+        http::Uri::try_from(format!("{base_url}/api/v2/logs")).expect("URI not valid")
     }
 
     pub fn get_protocol(&self, dd_common: &DatadogCommonConfig) -> String {
@@ -215,13 +213,13 @@ impl SinkConfig for DatadogLogsConfig {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::codecs::EncodingConfigWithFraming;
-    use crate::components::validation::prelude::*;
     use vector_lib::{
-        codecs::{encoding::format::JsonSerializerOptions, JsonSerializerConfig, MetricTagValues},
+        codecs::{JsonSerializerConfig, MetricTagValues, encoding::format::JsonSerializerOptions},
         config::LogNamespace,
     };
+
+    use super::*;
+    use crate::{codecs::EncodingConfigWithFraming, components::validation::prelude::*};
 
     #[test]
     fn generate_config() {

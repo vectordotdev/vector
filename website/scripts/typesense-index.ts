@@ -222,8 +222,8 @@ async function buildIndex() {
   const sections: Section[] = [
     {
       name: "Docs",
-      path: `${publicPath}/docs/about/**/**.html`,
-      displayPath: "docs/about",
+      path: `${publicPath}/docs/introduction/**/**.html`,
+      displayPath: "docs/introduction",
       ranking: 50,
     },
     {
@@ -261,12 +261,30 @@ async function buildIndex() {
       path: `${publicPath}/guides/developer/**/**.html`,
       displayPath: "guides/developer",
       ranking: 40,
-    }
+    },
+    {
+      name: "Vector highlights",
+      path: `${publicPath}/highlights/**/**.html`,
+      displayPath: "highlights/",
+      ranking: 40,
+    },
+    {
+      name: "Upgrade guides",
+      path: `${publicPath}/highlights/*-upgrade-guide/**.html`,
+      displayPath: "highlights/",
+      ranking: 10,
+    },
   ];
 
   // Recurse through each section and push the resulting records to `allRecords`
   for (const section of sections) {
     let files = await glob(section.path);
+
+    // We shouldn't index upgrade guides
+    if (section.name === "Vector highlights") {
+      files = files.filter((path) => !path.includes("-upgrade-guide"))
+    }
+
     console.log(chalk.blue(`Indexing ${section.displayPath}...`));
     await indexHTMLFiles(allRecords, section.name, files, section.ranking);
   }

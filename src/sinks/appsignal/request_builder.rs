@@ -1,17 +1,15 @@
 use bytes::Bytes;
-
-use vector_lib::event::Event;
 use vector_lib::{
     byte_size_of::ByteSizeOf,
+    event::Event,
     finalization::{EventFinalizers, Finalizable},
     request_metadata::{MetaDescriptive, RequestMetadata},
 };
 
-use crate::sinks::util::{
-    metadata::RequestMetadataBuilder, request_builder::EncodeResult, Compression, RequestBuilder,
-};
-
 use super::encoder::AppsignalEncoder;
+use crate::sinks::util::{
+    Compression, RequestBuilder, metadata::RequestMetadataBuilder, request_builder::EncodeResult,
+};
 
 #[derive(Clone)]
 pub(super) struct AppsignalRequest {

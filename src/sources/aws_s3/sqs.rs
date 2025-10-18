@@ -1,17 +1,23 @@
-use std::collections::HashMap;
-use std::{future::ready, num::NonZeroUsize, panic, sync::Arc, sync::LazyLock};
-
-use aws_sdk_s3::operation::get_object::GetObjectError;
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_sqs::operation::delete_message_batch::{
-    DeleteMessageBatchError, DeleteMessageBatchOutput,
+use std::{
+    collections::HashMap,
+    future::ready,
+    num::NonZeroUsize,
+    panic,
+    sync::{Arc, LazyLock},
+    time::Duration,
 };
-use aws_sdk_sqs::operation::receive_message::ReceiveMessageError;
-use aws_sdk_sqs::operation::send_message_batch::{SendMessageBatchError, SendMessageBatchOutput};
-use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message, SendMessageBatchRequestEntry};
-use aws_sdk_sqs::Client as SqsClient;
-use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
-use aws_smithy_runtime_api::client::result::SdkError;
+
+use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
+use aws_sdk_sqs::{
+    Client as SqsClient,
+    operation::{
+        delete_message_batch::{DeleteMessageBatchError, DeleteMessageBatchOutput},
+        receive_message::ReceiveMessageError,
+        send_message_batch::{SendMessageBatchError, SendMessageBatchOutput},
+    },
+    types::{DeleteMessageBatchRequestEntry, Message, SendMessageBatchRequestEntry},
+};
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
@@ -23,36 +29,36 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
-use vector_lib::codecs::decoding::FramingError;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+use vector_lib::{
+    codecs::decoding::FramingError,
+    config::{LegacyKey, LogNamespace, log_schema},
+    configurable::configurable_component,
+    event::MaybeAsLogMut,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    },
+    lookup::{PathPrefix, metadata_path, path},
 };
 
-use crate::codecs::Decoder;
-use crate::event::{Event, LogEvent};
-use crate::internal_events::{
-    SqsMessageSendBatchError, SqsMessageSentPartialError, SqsMessageSentSucceeded,
-};
 use crate::{
+    SourceSender,
     aws::AwsTimeout,
+    codecs::Decoder,
+    common::backoff::ExponentialBackoff,
     config::{SourceAcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
+    event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
-        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored,
+        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsMessageSendBatchError,
+        SqsMessageSentPartialError, SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored,
         StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     sources::aws_s3::AwsS3Config,
     tls::TlsConfig,
-    SourceSender,
 };
-use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
-use vector_lib::event::MaybeAsLogMut;
-use vector_lib::lookup::{metadata_path, path, PathPrefix};
 
 static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
     LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
@@ -358,10 +364,10 @@ impl Ingestor {
         // Wait for all of the processes to finish.  If any one of them panics, we resume
         // that panic here to properly shutdown Vector.
         for handle in handles.drain(..) {
-            if let Err(e) = handle.await {
-                if e.is_panic() {
-                    panic::resume_unwind(e.into_panic());
-                }
+            if let Err(e) = handle.await
+                && e.is_panic()
+            {
+                panic::resume_unwind(e.into_panic());
             }
         }
 
@@ -377,6 +383,7 @@ pub struct IngestorProcess {
     log_namespace: LogNamespace,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    backoff: ExponentialBackoff,
 }
 
 impl IngestorProcess {
@@ -395,6 +402,9 @@ impl IngestorProcess {
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
             events_received: register!(EventsReceived),
+            backoff: ExponentialBackoff::from_millis(2)
+                .factor(250)
+                .max_delay(Duration::from_secs(30)),
         }
     }
 
@@ -405,23 +415,39 @@ impl IngestorProcess {
         loop {
             select! {
                 _ = &mut shutdown => break,
-                _ = self.run_once() => {},
+                result = self.run_once() => {
+                    match result {
+                        Ok(()) => {
+                            // Reset backoff on successful receive
+                            self.backoff.reset();
+                        }
+                        Err(_) => {
+                            let delay = self.backoff.next().expect("backoff never ends");
+                            trace!(
+                                delay_ms = delay.as_millis(),
+                                "`run_once` failed, will retry after delay.",
+                            );
+                            tokio::time::sleep(delay).await;
+                        }
+                    }
+                },
             }
         }
     }
 
-    async fn run_once(&mut self) {
-        let messages = self.receive_messages().await;
-        let messages = messages
-            .inspect(|messages| {
+    async fn run_once(&mut self) -> Result<(), ()> {
+        let messages = match self.receive_messages().await {
+            Ok(messages) => {
                 emit!(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
-            })
-            .inspect_err(|err| {
-                emit!(SqsMessageReceiveError { error: err });
-            })
-            .unwrap_or_default();
+                messages
+            }
+            Err(err) => {
+                emit!(SqsMessageReceiveError { error: &err });
+                return Err(());
+            }
+        };
 
         let mut delete_entries = Vec::new();
         let mut deferred_entries = Vec::new();
@@ -517,7 +543,7 @@ impl IngestorProcess {
                     message = "Deferred queue not configured, but received deferred entries.",
                     internal_log_rate_limit = true
                 );
-                return;
+                return Ok(());
             };
             let cloned_entries = deferred_entries.clone();
             match self
@@ -572,6 +598,7 @@ impl IngestorProcess {
                 }
             }
         }
+        Ok(())
     }
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
@@ -1113,7 +1140,7 @@ mod urlencoded_string {
         use serde::de::Error;
 
         serde::de::Deserialize::deserialize(deserializer).and_then(|s: &[u8]| {
-            let decoded = if s.iter().any(|c| *c == b'+') {
+            let decoded = if s.contains(&b'+') {
                 // AWS encodes spaces as `+` rather than `%20`, so we first need to handle this.
                 let s = s
                     .iter()
@@ -1124,9 +1151,8 @@ mod urlencoded_string {
                 percent_decode(s).decode_utf8().map(Into::into)
             };
 
-            decoded.map_err(|err| {
-                D::Error::custom(format!("error url decoding S3 object key: {}", err))
-            })
+            decoded
+                .map_err(|err| D::Error::custom(format!("error url decoding S3 object key: {err}")))
         })
     }
 

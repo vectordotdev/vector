@@ -4,14 +4,14 @@ description: Parse structured application logs in CSV format using Lua transform
 authors: ["binarylogic"]
 domain: transforms
 transforms: ["lua"]
-weight: 4
+weight: 3
 tags: ["lua", "csv", "logs", "transform", "advanced", "guides", "guide"]
 ---
 
 {{< requirement title="Pre-requisites" >}}
 
 * You understand the <a href="/docs/reference/configuration/transforms/lua">basic Lua concepts</a>.
-* You understand the <a href="/docs/about/concepts">basic Vector concepts</a> and understand <a href="/docs/setup/quickstart/">how to set up a pipeline</a>
+* You understand the <a href="/docs/introduction/concepts">basic Vector concepts</a> and understand <a href="/docs/setup/quickstart/">how to set up a pipeline</a>
 
 {{< /requirement >}}
 

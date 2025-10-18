@@ -126,7 +126,7 @@ fn counter(
     tags: MetricTags,
 ) -> Metric {
     Metric::new(
-        format!("{}_{}", prefix, name),
+        format!("{prefix}_{name}"),
         MetricKind::Absolute,
         MetricValue::Counter { value },
     )
@@ -144,7 +144,7 @@ fn gauge(
     tags: MetricTags,
 ) -> Metric {
     Metric::new(
-        format!("{}_{}", prefix, name),
+        format!("{prefix}_{name}"),
         MetricKind::Absolute,
         MetricValue::Gauge { value },
     )
@@ -340,25 +340,24 @@ fn cpu_metrics(
         );
     }
 
-    if let Some(cpu_usage) = &cpu.cpu_usage {
-        if let (Some(percpu_usage), Some(online_cpus)) = (&cpu_usage.percpu_usage, cpu.online_cpus)
-        {
-            metrics.extend((0..online_cpus).filter_map(|index| {
-                percpu_usage.get(index).map(|value| {
-                    let mut tags = tags.clone();
-                    tags.replace("cpu".into(), index.to_string());
+    if let Some(cpu_usage) = &cpu.cpu_usage
+        && let (Some(percpu_usage), Some(online_cpus)) = (&cpu_usage.percpu_usage, cpu.online_cpus)
+    {
+        metrics.extend((0..online_cpus).filter_map(|index| {
+            percpu_usage.get(index).map(|value| {
+                let mut tags = tags.clone();
+                tags.replace("cpu".into(), index.to_string());
 
-                    counter(
-                        usage,
-                        "usage_percpu_jiffies_total",
-                        namespace.clone(),
-                        timestamp,
-                        *value,
-                        tags,
-                    )
-                })
-            }));
-        }
+                counter(
+                    usage,
+                    "usage_percpu_jiffies_total",
+                    namespace.clone(),
+                    timestamp,
+                    *value,
+                    tags,
+                )
+            })
+        }));
     }
 
     metrics
@@ -507,14 +506,28 @@ fn network_metrics(
     .collect()
 }
 
+#[allow(clippy::large_enum_variant)]
+#[derive(Deserialize)]
+#[serde(untagged, deny_unknown_fields)]
+enum StatsPayload {
+    Container(ContainerStats),
+    Empty {},
+    Null,
+}
+
 pub(super) fn parse(
     bytes: &[u8],
     namespace: Option<String>,
 ) -> Result<Vec<Metric>, serde_json::Error> {
     let mut metrics = Vec::new();
-    let parsed = serde_json::from_slice::<BTreeMap<String, ContainerStats>>(bytes)?;
+    let parsed = serde_json::from_slice::<BTreeMap<String, StatsPayload>>(bytes)?;
 
-    for (id, container) in parsed {
+    for (id, payload) in parsed {
+        let container = match payload {
+            StatsPayload::Container(container) => container,
+            _ => continue,
+        };
+
         let mut tags = MetricTags::default();
         tags.replace("container_id".into(), id);
         if let Some(name) = container.name {
@@ -559,9 +572,8 @@ pub(super) fn parse(
 
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::metric_tags;
+    use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
+    use vector_lib::{assert_event_data_eq, metric_tags};
 
     use super::parse;
     use crate::event::metric::{Metric, MetricKind, MetricValue};
@@ -608,7 +620,9 @@ mod test {
                     "io_time_recursive": [],
                     "sectors_recursive": []
                 }
-            }
+            },
+            "123456789": {},
+            "123456789": null
         }"#;
 
         assert_event_data_eq!(
@@ -672,7 +686,9 @@ mod test {
                         "throttled_time": 0
                     }
                 }
-            }
+            },
+            "2344": {},
+            "test": null
         }"#;
 
         assert_event_data_eq!(

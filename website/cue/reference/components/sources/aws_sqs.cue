@@ -40,7 +40,6 @@ components: sources: aws_sqs: components._aws & {
 			"aarch64-unknown-linux-musl":     true
 			"armv7-unknown-linux-gnueabihf":  true
 			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
 			"x86_64-pc-windows-msv":          true
 			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      true
@@ -54,31 +53,39 @@ components: sources: aws_sqs: components._aws & {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.aws_sqs.configuration & {
+	configuration: generated.components.sources.aws_sqs.configuration & {
 		_aws_include: false
 	}
 
-	output: logs: record: {
-		description: "An individual SQS record"
-		fields: {
-			message: {
-				description: "The raw message from the SQS record."
-				required:    true
-				type: string: {
-					examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
-					syntax: "literal"
+	output: {
+		logs: record: {
+			description: "An individual SQS record"
+			fields: {
+				message: {
+					description: "The raw message from the SQS record."
+					required:    true
+					type: string: {
+						examples: ["53.126.150.246 - - [01/Oct/2020:11:25:58 -0400] \"GET /disintermediate HTTP/2.0\" 401 20308"]
+						syntax: "literal"
+					}
+				}
+				source_type: {
+					description: "The name of the source type."
+					required:    true
+					type: string: {
+						examples: ["aws_sqs"]
+					}
+				}
+				timestamp: fields._current_timestamp & {
+					description: "The time this message was sent to SQS."
 				}
 			}
-			source_type: {
-				description: "The name of the source type."
-				required:    true
-				type: string: {
-					examples: ["aws_sqs"]
-				}
-			}
-			timestamp: fields._current_timestamp & {
-				description: "The time this message was sent to SQS."
-			}
+		}
+		metrics: "": {
+			description: "Metric events that may be emitted by this source."
+		}
+		traces: "": {
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 

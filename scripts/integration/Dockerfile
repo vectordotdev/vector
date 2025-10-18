@@ -1,5 +1,5 @@
-ARG RUST_VERSION
-FROM docker.io/rust:${RUST_VERSION}-slim-bookworm
+ARG RUST_VERSION=1.85
+FROM docker.io/rust:${RUST_VERSION}-slim-trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
@@ -18,10 +18,15 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     unixodbc-dev \
     odbcinst \
     odbc-mariadb \
-    odbc-postgresql
+    odbc-postgresql \
+  && rm -rf /var/lib/apt/lists/*
 
-RUN rustup run "${RUST_VERSION}" cargo install cargo-nextest --version 0.9.72 --locked
+COPY tests/data/ca/certs /certs
 
 COPY scripts/environment/install-protoc.sh /
-COPY tests/data/ca/certs /certs
+COPY scripts/environment/prepare.sh /
+COPY scripts/environment/binstall.sh /
+COPY scripts/environment/release-flags.sh /
+
+RUN bash /prepare.sh --modules=cargo-nextest
 RUN bash /install-protoc.sh

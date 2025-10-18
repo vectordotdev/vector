@@ -55,7 +55,6 @@ components: sinks: websocket_server: {
 			"aarch64-unknown-linux-musl":     true
 			"armv7-unknown-linux-gnueabihf":  true
 			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
 			"x86_64-pc-windows-msv":          true
 			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      true
@@ -66,6 +65,10 @@ components: sinks: websocket_server: {
 	}
 
 	input: {
+		description: """
+			The supported input types depend on the encoding configuration.
+			This sink accepts any input type supported by the specified encoder.
+			"""
 		logs: true
 		metrics: {
 			counter:      true
@@ -97,7 +100,7 @@ components: sinks: websocket_server: {
 		}
 	}
 
-	configuration: base.components.sinks.websocket_server.configuration
+	configuration: generated.components.sinks.websocket_server.configuration
 
 	how_it_works: {
 		simple_configuration: {
@@ -116,7 +119,7 @@ components: sinks: websocket_server: {
 				sinks:
 					websocket_sink:
 						inputs: ["demo_logs_test"]
-						type: "websocket_listener"
+						type: "websocket_server"
 						address: "0.0.0.0:1234"
 						auth:
 							username: "test"

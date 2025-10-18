@@ -1,21 +1,21 @@
-use std::collections::BTreeMap;
-use std::path::{Path, PathBuf};
-use std::{env, fs};
+use std::{
+    collections::BTreeMap,
+    env, fs,
+    path::{Path, PathBuf},
+};
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use indexmap::IndexMap;
 use itertools::{self, Itertools};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-use crate::{app, util};
+use crate::{app, environment::Environment, util};
 
 const FILE_NAME: &str = "test.yaml";
 
 pub const INTEGRATION_TESTS_DIR: &str = "integration";
 pub const E2E_TESTS_DIR: &str = "e2e";
-
-pub type Environment = BTreeMap<String, Option<String>>;
 
 #[derive(Deserialize, Debug)]
 pub struct RustToolchainRootConfig {
@@ -28,32 +28,67 @@ pub struct RustToolchainConfig {
 }
 
 impl RustToolchainConfig {
-    pub fn parse() -> Result<Self> {
+    fn parse() -> Result<Self> {
         let repo_path = app::path();
         let config_file: PathBuf = [repo_path, "rust-toolchain.toml"].iter().collect();
         let contents = fs::read_to_string(&config_file)
-            .with_context(|| format!("failed to read {config_file:?}"))?;
+            .with_context(|| format!("failed to read {}", config_file.display()))?;
         let config: RustToolchainRootConfig = toml::from_str(&contents)
-            .with_context(|| format!("failed to parse {config_file:?}"))?;
+            .with_context(|| format!("failed to parse {}", config_file.display()))?;
 
         Ok(config.toolchain)
     }
+
+    pub fn rust_version() -> String {
+        match RustToolchainConfig::parse() {
+            Ok(config) => config.channel,
+            Err(error) => fatal!("Could not read `rust-toolchain.toml` file: {error}"),
+        }
+    }
 }
 
-pub fn get_rust_version() -> String {
-    match RustToolchainConfig::parse() {
-        Ok(config) => config.channel,
-        Err(error) => fatal!("Could not read `rust-toolchain.toml` file: {error}"),
-    }
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum VolumeMount {
+    Short(String),
+    Long {
+        #[serde(default)]
+        r#type: Option<String>,
+        source: String,
+        target: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        read_only: Option<bool>,
+    },
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum VolumeDefinition {
+    Empty,
+    WithOptions(BTreeMap<String, Value>),
 }
 
 #[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeConfig {
     pub services: BTreeMap<String, ComposeService>,
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
-    pub volumes: BTreeMap<String, Value>,
+    pub volumes: BTreeMap<String, VolumeDefinition>,
     #[serde(default)]
-    pub networks: BTreeMap<String, BTreeMap<String, String>>,
+    pub networks: BTreeMap<String, BTreeMap<String, Value>>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum DependsOn {
+    Simple(Vec<String>),
+    Conditional(BTreeMap<String, DependencyCondition>),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DependencyCondition {
+    pub condition: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
 }
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -73,11 +108,11 @@ pub struct ComposeService {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub env_file: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub volumes: Option<Vec<String>>,
+    pub volumes: Option<Vec<VolumeMount>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub environment: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<DependsOn>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub healthcheck: Option<Value>,
 }
@@ -91,9 +126,10 @@ pub enum Command {
 
 impl ComposeConfig {
     pub fn parse(path: &Path) -> Result<Self> {
-        let contents =
-            fs::read_to_string(path).with_context(|| format!("failed to read {path:?}"))?;
-        serde_yaml::from_str(&contents).with_context(|| format!("failed to parse {path:?}"))
+        let contents = fs::read_to_string(path)
+            .with_context(|| format!("failed to read {}", path.display()))?;
+        serde_yaml::from_str(&contents)
+            .with_context(|| format!("failed to parse {}", path.display()))
     }
 }
 

@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use std::{collections::HashMap, fmt, num::NonZeroUsize};
+use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc};
 
 use bitmask_enum::bitmask;
 use bytes::Bytes;
@@ -12,18 +11,17 @@ pub mod output_id;
 pub mod proxy;
 mod telemetry;
 
-use crate::event::LogEvent;
-pub use global_options::GlobalOptions;
-pub use log_schema::{init_log_schema, log_schema, LogSchema};
-use lookup::{lookup_v2::ValuePath, path, PathPrefix};
+pub use global_options::{GlobalOptions, WildcardMatching};
+pub use log_schema::{LogSchema, init_log_schema, log_schema};
+use lookup::{PathPrefix, lookup_v2::ValuePath, path};
 pub use output_id::OutputId;
 use serde::{Deserialize, Serialize};
-pub use telemetry::{init_telemetry, telemetry, Tags, Telemetry};
+pub use telemetry::{Tags, Telemetry, init_telemetry, telemetry};
 pub use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
 use vrl::value::Value;
 
-use crate::schema;
+use crate::{event::LogEvent, schema};
 
 pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: NonZeroUsize =
     vector_buffers::config::memory_buffer_default_max_events();
@@ -304,7 +302,7 @@ Enabling or disabling acknowledgements at the source level has **no effect** on 
 See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
 [global_acks]: https://vector.dev/docs/reference/configuration/global-options/#acknowledgements
-[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/"
+[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/"
 )]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct SourceAcknowledgementsConfig {
@@ -352,11 +350,11 @@ impl From<SourceAcknowledgementsConfig> for AcknowledgementsConfig {
 #[configurable(
     description = "See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
-[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/"
+[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/"
 )]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AcknowledgementsConfig {
-    /// Whether or not end-to-end acknowledgements are enabled.
+    /// Controls whether or not end-to-end acknowledgements are enabled.
     ///
     /// When enabled for a sink, any source that supports end-to-end
     /// acknowledgements that is connected to that sink waits for events
@@ -570,12 +568,13 @@ impl LogNamespace {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::event::LogEvent;
     use chrono::Utc;
-    use lookup::{event_path, owned_value_path, OwnedTargetPath};
+    use lookup::{OwnedTargetPath, event_path, owned_value_path};
     use vector_common::btreemap;
     use vrl::value::Kind;
+
+    use super::*;
+    use crate::event::LogEvent;
 
     #[test]
     fn test_insert_standard_vector_source_metadata() {

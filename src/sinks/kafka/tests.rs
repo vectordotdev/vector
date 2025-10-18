@@ -8,15 +8,15 @@ mod integration_test {
     use bytes::Bytes;
     use futures::StreamExt;
     use rdkafka::{
+        Message, Offset, TopicPartitionList,
         consumer::{BaseConsumer, Consumer},
         message::Headers,
-        Message, Offset, TopicPartitionList,
     };
-    use vector_lib::codecs::TextSerializerConfig;
-    use vector_lib::lookup::lookup_v2::ConfigTargetPath;
     use vector_lib::{
-        config::{init_telemetry, Tags, Telemetry},
+        codecs::TextSerializerConfig,
+        config::{Tags, Telemetry, init_telemetry},
         event::{BatchNotifier, BatchStatus},
+        lookup::lookup_v2::ConfigTargetPath,
     };
 
     use super::super::{config::KafkaSinkConfig, sink::KafkaSink, *};
@@ -26,12 +26,12 @@ mod integration_test {
         sinks::prelude::*,
         test_util::{
             components::{
-                assert_data_volume_sink_compliance, assert_sink_compliance, DATA_VOLUME_SINK_TAGS,
-                SINK_TAGS,
+                DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
+                assert_sink_compliance,
             },
             random_lines_with_stream, random_string, wait_for,
         },
-        tls::{TlsConfig, TlsEnableableConfig, TEST_PEM_INTERMEDIATE_CA_PATH},
+        tls::{TEST_PEM_INTERMEDIATE_CA_PATH, TlsConfig, TlsEnableableConfig},
     };
 
     fn kafka_host() -> String {
@@ -59,6 +59,8 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
@@ -85,6 +87,8 @@ mod integration_test {
             auth: KafkaAuthConfig::default(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: None,
             acknowledgements: Default::default(),
@@ -174,7 +178,7 @@ mod integration_test {
         let topic = format!("test-{}", random_string(10));
         let config = KafkaSinkConfig {
             bootstrap_servers: kafka_address(9091),
-            topic: Template::try_from(format!("{}-%Y%m%d", topic)).unwrap(),
+            topic: Template::try_from(format!("{topic}-%Y%m%d")).unwrap(),
             compression: KafkaCompression::None,
             healthcheck_topic: None,
             encoding: TextSerializerConfig::default().into(),
@@ -185,6 +189,8 @@ mod integration_test {
             },
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             batch,
             librdkafka_options,
             headers_key: None,
@@ -201,16 +207,18 @@ mod integration_test {
         let mut batch = BatchConfig::default();
         batch.max_bytes = Some(1000);
 
-        assert!(kafka_batch_options_overrides(
-            batch,
-            indexmap::indexmap! {
-                "batch.size".to_string() => 1.to_string(),
-            }
-            .into_iter()
-            .collect()
+        assert!(
+            kafka_batch_options_overrides(
+                batch,
+                indexmap::indexmap! {
+                    "batch.size".to_string() => 1.to_string(),
+                }
+                .into_iter()
+                .collect()
+            )
+            .await
+            .is_err()
         )
-        .await
-        .is_err())
     }
 
     #[tokio::test]
@@ -231,16 +239,18 @@ mod integration_test {
         let mut batch = BatchConfig::default();
         batch.max_events = Some(10);
 
-        assert!(kafka_batch_options_overrides(
-            batch,
-            indexmap::indexmap! {
-                "batch.num.messages".to_string() => 1.to_string(),
-            }
-            .into_iter()
-            .collect()
+        assert!(
+            kafka_batch_options_overrides(
+                batch,
+                indexmap::indexmap! {
+                    "batch.num.messages".to_string() => 1.to_string(),
+                }
+                .into_iter()
+                .collect()
+            )
+            .await
+            .is_err()
         )
-        .await
-        .is_err())
     }
 
     #[tokio::test]
@@ -249,16 +259,18 @@ mod integration_test {
         let mut batch = BatchConfig::default();
         batch.timeout_secs = Some(10.0);
 
-        assert!(kafka_batch_options_overrides(
-            batch,
-            indexmap::indexmap! {
-                "queue.buffering.max.ms".to_string() => 1.to_string(),
-            }
-            .into_iter()
-            .collect()
+        assert!(
+            kafka_batch_options_overrides(
+                batch,
+                indexmap::indexmap! {
+                    "queue.buffering.max.ms".to_string() => 1.to_string(),
+                }
+                .into_iter()
+                .collect()
+            )
+            .await
+            .is_err()
         )
-        .await
-        .is_err())
     }
 
     #[tokio::test]
@@ -325,7 +337,7 @@ mod integration_test {
         let kafka_auth = KafkaAuthConfig { sasl, tls };
         let config = KafkaSinkConfig {
             bootstrap_servers: server.clone(),
-            topic: Template::try_from(format!("{}-%Y%m%d", topic)).unwrap(),
+            topic: Template::try_from(format!("{topic}-%Y%m%d")).unwrap(),
             healthcheck_topic: None,
             key_field: None,
             encoding: TextSerializerConfig::default().into(),
@@ -334,12 +346,14 @@ mod integration_test {
             auth: kafka_auth.clone(),
             socket_timeout_ms: Duration::from_millis(60000),
             message_timeout_ms: Duration::from_millis(300000),
+            rate_limit_duration_secs: 1,
+            rate_limit_num: i64::MAX as u64,
             librdkafka_options: HashMap::new(),
             headers_key: Some(headers_key.clone()),
             acknowledgements: Default::default(),
         };
         let topic = format!("{}-{}", topic, chrono::Utc::now().format("%Y%m%d"));
-        println!("Topic name generated in test: {:?}", topic);
+        println!("Topic name generated in test: {topic:?}");
 
         let num_events = 1000;
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();
@@ -399,7 +413,7 @@ mod integration_test {
             || match consumer.fetch_watermarks(&topic, 0, Duration::from_secs(3)) {
                 Ok((_low, high)) => ready(high > 0),
                 Err(err) => {
-                    println!("retrying due to error fetching watermarks: {}", err);
+                    println!("retrying due to error fetching watermarks: {err}");
                     ready(false)
                 }
             },

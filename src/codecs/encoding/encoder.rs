@@ -1,8 +1,8 @@
 use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
 use vector_lib::codecs::{
-    encoding::{Error, Framer, Serializer},
     CharacterDelimitedEncoder, NewlineDelimitedEncoder, TextSerializerConfig,
+    encoding::{Error, Framer, Serializer},
 };
 
 use crate::{
@@ -93,12 +93,14 @@ impl Encoder<Framer> {
     }
 
     /// Get the suffix that encloses a batch of events.
-    pub const fn batch_suffix(&self) -> &[u8] {
-        match (&self.framer, &self.serializer) {
+    pub const fn batch_suffix(&self, empty: bool) -> &[u8] {
+        match (&self.framer, &self.serializer, empty) {
             (
                 Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
                 Serializer::Json(_) | Serializer::NativeJson(_),
+                _,
             ) => b"]",
+            (Framer::NewlineDelimited(_), _, false) => b"\n",
             _ => &[],
         }
     }
@@ -126,6 +128,8 @@ impl Encoder<Framer> {
                 | Serializer::Text(_),
                 _,
             ) => "text/plain",
+            #[cfg(feature = "codecs-opentelemetry")]
+            (Serializer::Otlp(_), _) => "application/x-protobuf",
         }
     }
 }
@@ -187,8 +191,7 @@ mod tests {
     use bytes::BufMut;
     use futures_util::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
-    use vector_lib::codecs::encoding::BoxedFramingError;
-    use vector_lib::event::LogEvent;
+    use vector_lib::{codecs::encoding::BoxedFramingError, event::LogEvent};
 
     use super::*;
 
@@ -237,7 +240,7 @@ mod tests {
         fn encode(&mut self, _: (), dst: &mut BytesMut) -> Result<(), Self::Error> {
             self.0.encode((), dst)?;
             let result = if self.1 == self.2 {
-                Err(Box::new(std::io::Error::new(std::io::ErrorKind::Other, "error")) as _)
+                Err(Box::new(std::io::Error::other("error")) as _)
             } else {
                 Ok(())
             };
@@ -322,5 +325,24 @@ mod tests {
         framed.flush().await.unwrap();
         let sink = framed.into_inner();
         assert_eq!(sink, b"(foo)(bar)");
+    }
+
+    #[tokio::test]
+    async fn test_encode_batch_newline() {
+        let encoder = Encoder::<Framer>::new(
+            Framer::NewlineDelimited(NewlineDelimitedEncoder::default()),
+            TextSerializerConfig::default().build().into(),
+        );
+        let source = futures::stream::iter(vec![
+            Event::Log(LogEvent::from("bar")),
+            Event::Log(LogEvent::from("baz")),
+            Event::Log(LogEvent::from("bat")),
+        ])
+        .map(Ok);
+        let sink: Vec<u8> = Vec::new();
+        let mut framed = FramedWrite::new(sink, encoder);
+        source.forward(&mut framed).await.unwrap();
+        let sink = framed.into_inner();
+        assert_eq!(sink, b"bar\nbaz\nbat\n");
     }
 }

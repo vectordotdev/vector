@@ -11,30 +11,30 @@ static IS_VALID_PATH_SEGMENT: LazyLock<Regex> =
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order
 /// and their corresponding values.
-pub fn all_fields(fields: &ObjectMap) -> FieldsIter {
+pub fn all_fields(fields: &ObjectMap) -> FieldsIter<'_> {
     FieldsIter::new(None, fields, true)
 }
 
 /// Iterates over all paths in form `a.b[0].c[1]` in alphabetical order and their corresponding
 /// values. Field names containing meta-characters are not quoted.
-pub fn all_fields_unquoted(fields: &ObjectMap) -> FieldsIter {
+pub fn all_fields_unquoted(fields: &ObjectMap) -> FieldsIter<'_> {
     FieldsIter::new(None, fields, false)
 }
 
 /// Same functionality as `all_fields` but it prepends a character that denotes the
 /// path type.
-pub fn all_metadata_fields(fields: &ObjectMap) -> FieldsIter {
+pub fn all_metadata_fields(fields: &ObjectMap) -> FieldsIter<'_> {
     FieldsIter::new(Some(PathPrefix::Metadata), fields, true)
 }
 
 /// An iterator with a single "message" element
-pub fn all_fields_non_object_root(value: &Value) -> FieldsIter {
+pub fn all_fields_non_object_root(value: &Value) -> FieldsIter<'_> {
     FieldsIter::non_object(value)
 }
 
 /// An iterator similar to `all_fields`, but instead of visiting each array element individually,
 /// it treats the entire array as a single value.
-pub fn all_fields_skip_array_elements(fields: &ObjectMap) -> FieldsIter {
+pub fn all_fields_skip_array_elements(fields: &ObjectMap) -> FieldsIter<'_> {
     FieldsIter::new_with_skip_array_elements(fields)
 }
 
@@ -144,7 +144,7 @@ impl<'a> FieldsIter<'a> {
                 None => break res.into(),
                 Some(PathComponent::Key(key)) => {
                     if self.quote_invalid_fields && !IS_VALID_PATH_SEGMENT.is_match(key) {
-                        res.push_str(&format!("\"{key}\""));
+                        write!(res, "\"{key}\"").expect("write to String never fails");
                     } else {
                         res.push_str(key);
                     }
@@ -191,7 +191,7 @@ impl<'a> Iterator for FieldsIter<'a> {
                     *visited = true;
                     break result;
                 }
-            };
+            }
         }
     }
 }

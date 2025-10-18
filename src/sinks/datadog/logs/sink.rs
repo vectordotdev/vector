@@ -3,22 +3,18 @@ use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 use itertools::Itertools;
 use snafu::Snafu;
 use vector_lib::{
-    event::ObjectMap,
-    event::Value,
+    event::{ObjectMap, Value},
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
-use vrl::{
-    path::{OwnedSegment, OwnedTargetPath, PathPrefix},
-    value::KeyString,
-};
+use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
-    common::datadog::{is_reserved_attribute, DDTAGS, DD_RESERVED_SEMANTIC_ATTRS, MESSAGE},
+    common::datadog::{DD_RESERVED_SEMANTIC_ATTRS, DDTAGS, MESSAGE, is_reserved_attribute},
     sinks::{
         prelude::*,
-        util::{http::HttpJsonBatchSizer, Compressor},
+        util::{Compressor, http::HttpJsonBatchSizer},
     },
 };
 #[derive(Default)]
@@ -129,19 +125,19 @@ pub fn normalize_event(event: &mut Event) {
     // NOTE: we don't access by semantic meaning here because in the prior step
     // we ensured reserved attributes are in expected locations.
     let ddtags_path = event_path!(DDTAGS);
-    if let Some(Value::Array(tags_arr)) = log.get(ddtags_path) {
-        if !tags_arr.is_empty() {
-            let all_tags: String = tags_arr
-                .iter()
-                .filter_map(|tag_kv| {
-                    tag_kv
-                        .as_bytes()
-                        .map(|bytes| String::from_utf8_lossy(bytes))
-                })
-                .join(",");
+    if let Some(Value::Array(tags_arr)) = log.get(ddtags_path)
+        && !tags_arr.is_empty()
+    {
+        let all_tags: String = tags_arr
+            .iter()
+            .filter_map(|tag_kv| {
+                tag_kv
+                    .as_bytes()
+                    .map(|bytes| String::from_utf8_lossy(bytes))
+            })
+            .join(",");
 
-            log.insert(ddtags_path, all_tags);
-        }
+        log.insert(ddtags_path, all_tags);
     }
 
     // ensure the timestamp is in expected format
@@ -165,29 +161,8 @@ pub fn normalize_as_agent_event(event: &mut Event) {
     let Some(object_map) = log.as_map_mut() else {
         return;
     };
-
-    // Extract the `message` object from the log if it already exists. Then JSON deserialize its
-    // value field. All non reserved fields placed at the root will be moved there.
-    let mut message = if let Some(outer_msg) = object_map.remove(MESSAGE) {
-        if let Value::Object(current_message) = outer_msg {
-            current_message // already JSON
-        } else {
-            // possible payload is stringified JSON
-            outer_msg
-                .as_bytes()
-                .and_then(|b| serde_json::from_slice::<ObjectMap>(b).ok())
-                .unwrap_or_else(|| {
-                    [(KeyString::from(MESSAGE), outer_msg)]
-                        .into_iter()
-                        .collect()
-                })
-        }
-    } else {
-        ObjectMap::default()
-    };
-
     // Move all non reserved fields into a new object
-    let mut collisions = ObjectMap::default();
+    let mut local_root = ObjectMap::default();
     let keys_to_move = object_map
         .keys()
         .filter(|ks| !is_reserved_attribute(ks.as_str()))
@@ -195,29 +170,11 @@ pub fn normalize_as_agent_event(event: &mut Event) {
         .collect::<Vec<_>>();
     for key in keys_to_move {
         if let Some((entry_k, entry_v)) = object_map.remove_entry(key.as_str()) {
-            if let Some(returned_entry_v) = message.insert(entry_k, entry_v) {
-                collisions.insert(key, returned_entry_v);
-            }
+            local_root.insert(entry_k, entry_v);
         }
     }
-    if !collisions.is_empty() {
-        if message
-            .insert(KeyString::from("_collisions"), Value::Object(collisions))
-            .is_none()
-        {
-            warn!(
-                message = "Some duplicate field names collided with ones already existing within the 'message' field. They have been stored under a new object at 'message._collisions'.",
-                internal_log_rate_limit = true,
-            );
-        } else {
-            error!(
-                message = "A field with the name 'message._collisions' already exists, replacing its value with an object containing key collisions.",
-                internal_log_rate_limit = true,
-            );
-        }
-    }
-    // .. finally nest this object at the root under the reserved key named 'message'
-    log.insert(MESSAGE, message);
+    // .. nest this object at the root under the reserved key named 'message'
+    log.insert(MESSAGE, local_root);
 }
 
 // If an expected reserved attribute is not located in the event root, rename it and handle
@@ -236,7 +193,7 @@ pub fn position_reserved_attr_event_root(
         // if an existing attribute exists here already, move it so to not overwrite it.
         // yes, technically the rename path could exist, but technically that could always be the case.
         if log.contains(desired_path) {
-            let rename_attr = format!("_RESERVED_{}", meaning);
+            let rename_attr = format!("_RESERVED_{meaning}");
             let rename_path = event_path!(rename_attr.as_str());
             warn!(
                 message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
@@ -483,22 +440,23 @@ mod tests {
     use vector_lib::{
         config::{LegacyKey, LogNamespace},
         event::{Event, EventMetadata, LogEvent},
-        schema::{meaning, Definition},
+        schema::{Definition, meaning},
     };
     use vrl::{
         core::Value,
         event_path, metadata_path, owned_value_path, value,
-        value::{kind::Collection, Kind},
+        value::{Kind, kind::Collection},
     };
 
     use super::{normalize_as_agent_event, normalize_event};
     use crate::common::datadog::DD_RESERVED_SEMANTIC_ATTRS;
 
     fn assert_normalized_log_has_expected_attrs(log: &LogEvent) {
-        assert!(log
-            .get(event_path!("timestamp"))
-            .expect("should have timestamp")
-            .is_integer());
+        assert!(
+            log.get(event_path!("timestamp"))
+                .expect("should have timestamp")
+                .is_integer()
+        );
 
         for attr in [
             "message",
@@ -508,7 +466,7 @@ mod tests {
             "service",
             "status",
         ] {
-            assert!(log.contains(event_path!(attr)), "missing {}", attr);
+            assert!(log.contains(event_path!(attr)), "missing {attr}");
         }
 
         assert_eq!(
@@ -693,6 +651,7 @@ mod tests {
         log.insert(event_path!("severity"), "the_severity");
 
         let sample_message = value!({
+            "message": "hello world",
             "field_a": "field_a_value",
             "field_b": "field_b_value",
             "field_c": { "field_c_nested" : "field_c_value" },
@@ -731,12 +690,13 @@ mod tests {
             Some(&value!({
                 "source_type": "datadog_agent",
                 "field_a": "replaced_field_a_value",
-                "field_b": "field_b_value",
                 "field_c": "replaced_field_c_value",
-                "_collisions": {
+                "message": (value!({
+                    "message": "hello world",
                     "field_a": "field_a_value",
+                    "field_b": "field_b_value",
                     "field_c": { "field_c_nested" : "field_c_value" },
-                }
+                }).to_string()),
             }))
         );
     }
@@ -765,9 +725,12 @@ mod tests {
             log.get(event_path!("message")),
             Some(&value!({
                 "source_type": "datadog_agent",
-                "field_a": "field_a_value",
-                "field_b": "field_b_value",
-                "field_c": { "field_c_nested" : "field_c_value" },
+                "message": (value!({
+                    "message": "hello world",
+                    "field_a": "field_a_value",
+                    "field_b": "field_b_value",
+                    "field_c": { "field_c_nested" : "field_c_value" },
+                }).to_string()),
                 "field_1": "value_1",
                 "field_2": "value_2",
                 "field_3": {
@@ -775,88 +738,5 @@ mod tests {
                 }
             }))
         );
-    }
-
-    #[test]
-    fn normalize_conforming_agent_test_msg_field() {
-        // Ensure that if the message field is of any type, normalization will work
-        let mut log = prepare_agent_event();
-        log.insert(event_path!("root_item"), "root_item_value");
-
-        // Macro adds the 'message' field with given value to a copy of the log, then normalizes
-        // and performs standard assertions, returning the resultant log if no assertions have triggered.
-        macro_rules! normalize_case {
-            ($log:expr, $val:expr) => {{
-                let mut log_copy = $log.clone();
-                log_copy.insert(event_path!("message"), $val);
-                let mut event = Event::Log(log_copy);
-                normalize_event(&mut event);
-                normalize_as_agent_event(&mut event);
-                let log = event.into_log();
-                assert_normalized_log_has_expected_attrs(&log);
-                assert_only_reserved_fields_at_root(&log);
-                log
-            }};
-        }
-        // Message as String
-        {
-            let log = normalize_case!(&log, "message_value");
-            assert_eq!(
-                log.get(event_path!("message")),
-                Some(&value!({
-                    "source_type": "datadog_agent",
-                    "message": "message_value",
-                    "root_item": "root_item_value",
-                }))
-            );
-        }
-        // Message as stringified JSON
-        {
-            let log = normalize_case!(&log, r#"{ "field_d": "field_d_value" }"#);
-            assert_eq!(
-                log.get(event_path!("message")),
-                Some(&value!({
-                    "source_type": "datadog_agent",
-                    "field_d": "field_d_value",
-                    "root_item": "root_item_value",
-                }))
-            );
-        }
-        // Message as JSON
-        {
-            let log = normalize_case!(&log, value!({ "field_d": "field_d_value" }));
-            assert_eq!(
-                log.get(event_path!("message")),
-                Some(&value!({
-                    "source_type": "datadog_agent",
-                    "field_d": "field_d_value",
-                    "root_item": "root_item_value",
-                }))
-            );
-        }
-        // Message as number
-        {
-            let log = normalize_case!(&log, 5);
-            assert_eq!(
-                log.get(event_path!("message")),
-                Some(&value!({
-                    "source_type": "datadog_agent",
-                    "message": 5,
-                    "root_item": "root_item_value",
-                }))
-            );
-        }
-        // Message as stringified array
-        {
-            let log = normalize_case!(&log, "[1,2,3,4,5]");
-            assert_eq!(
-                log.get(event_path!("message")),
-                Some(&value!({
-                    "source_type": "datadog_agent",
-                    "message": "[1,2,3,4,5]",
-                    "root_item": "root_item_value",
-                }))
-            );
-        }
     }
 }

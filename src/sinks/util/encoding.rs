@@ -3,9 +3,10 @@ use std::io;
 use bytes::BytesMut;
 use itertools::{Itertools, Position};
 use tokio_util::codec::Encoder as _;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::{config::telemetry, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, codecs::encoding::Framer, config::telemetry,
+    request_metadata::GroupedCountByteSize,
+};
 
 use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
 
@@ -31,6 +32,7 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
         let mut encoder = self.1.clone();
         let mut bytes_written = 0;
         let mut n_events_pending = events.len();
+        let is_empty = events.is_empty();
         let batch_prefix = encoder.batch_prefix();
         write_all(writer, n_events_pending, batch_prefix)?;
         bytes_written += batch_prefix.len();
@@ -65,7 +67,7 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
             n_events_pending -= 1;
         }
 
-        let batch_suffix = encoder.batch_suffix();
+        let batch_suffix = encoder.batch_suffix(is_empty);
         assert!(n_events_pending == 0);
         write_all(writer, 0, batch_suffix)?;
         bytes_written += batch_suffix.len();
@@ -146,18 +148,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-    use std::env;
-    use std::path::PathBuf;
+    use std::{collections::BTreeMap, env, path::PathBuf};
 
     use bytes::{BufMut, Bytes};
-    use vector_lib::codecs::encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions};
-    use vector_lib::codecs::{
-        CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
-        NewlineDelimitedEncoder, TextSerializerConfig,
+    use vector_lib::{
+        codecs::{
+            CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
+            NewlineDelimitedEncoder, TextSerializerConfig,
+            encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions},
+        },
+        event::LogEvent,
+        internal_event::CountByteSize,
+        json_size::JsonSize,
     };
-    use vector_lib::event::LogEvent;
-    use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
     use vrl::value::{KeyString, Value};
 
     use super::*;
@@ -295,9 +298,9 @@ mod tests {
             .sum::<JsonSize>();
 
         let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
-        assert_eq!(written, 15);
+        assert_eq!(written, 16);
 
-        assert_eq!(String::from_utf8(writer).unwrap(), r#"{"key":"value"}"#);
+        assert_eq!(String::from_utf8(writer).unwrap(), "{\"key\":\"value\"}\n");
         assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
     }
 
@@ -332,11 +335,11 @@ mod tests {
             .sum::<JsonSize>();
 
         let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
-        assert_eq!(written, 50);
+        assert_eq!(written, 51);
 
         assert_eq!(
             String::from_utf8(writer).unwrap(),
-            "{\"key\":\"value1\"}\n{\"key\":\"value2\"}\n{\"key\":\"value3\"}"
+            "{\"key\":\"value1\"}\n{\"key\":\"value2\"}\n{\"key\":\"value3\"}\n"
         );
         assert_eq!(CountByteSize(3, input_json_size), json_size.size().unwrap());
     }
@@ -403,6 +406,7 @@ mod tests {
             protobuf: ProtobufSerializerOptions {
                 desc_file: test_data_dir().join("test_proto.desc"),
                 message_type: "test_proto.User".to_string(),
+                use_json_names: false,
             },
         };
 
@@ -457,6 +461,7 @@ mod tests {
             protobuf: ProtobufSerializerOptions {
                 desc_file: test_data_dir().join("test_proto.desc"),
                 message_type: "test_proto.User".to_string(),
+                use_json_names: false,
             },
         };
 

@@ -4,7 +4,6 @@
 use crate::git;
 use crate::util::run_command;
 use anyhow::{anyhow, Result};
-use indoc::indoc;
 use reqwest::blocking::Client;
 use semver::Version;
 use std::fs::File;
@@ -115,12 +114,12 @@ impl Prepare {
         git::run_and_check_output(&["fetch"])?;
         git::checkout_main_branch()?;
 
-        git::create_branch(self.release_branch.as_str())?;
+        git::checkout_or_create_branch(self.release_branch.as_str())?;
         git::push_and_set_upstream(self.release_branch.as_str())?;
 
         // Step 2: Create a new release preparation branch
         //         The branch website contains 'website' to generate vector.dev preview.
-        git::create_branch(self.release_preparation_branch.as_str())?;
+        git::checkout_or_create_branch(self.release_preparation_branch.as_str())?;
         git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
         Ok(())
     }
@@ -364,65 +363,25 @@ impl Prepare {
 
     fn append_vrl_changelog_to_release_cue(&self) -> Result<()> {
         debug!("append_vrl_changelog_to_release_cue");
-        let releases_path = &self.repo_root.join("website").join("cue").join("reference").join("releases");
-        let vector_version = &self.new_vector_version;
-        let release_cue_path = releases_path.join(format!("{vector_version}.cue"));
-        if !release_cue_path.is_file() {
-            return Err(anyhow!("{release_cue_path:?} not found"));
+
+        let releases_path = self.repo_root.join("website/cue/reference/releases");
+        let version = &self.new_vector_version;
+        let cue_path = releases_path.join(format!("{version}.cue"));
+        if !cue_path.is_file() {
+            return Err(anyhow!("{cue_path:?} not found"));
         }
 
         let vrl_changelog = get_latest_vrl_tag_and_changelog()?;
+        let vrl_changelog_block = format_vrl_changelog_block(&vrl_changelog);
 
-        let temp_file_path = releases_path.join(format!("{vector_version}.cue.tmp"));
-        let input_file = File::open(&release_cue_path)?;
-        let reader = BufReader::new(input_file);
-        let mut output_file = File::create(&temp_file_path)?;
+        let original = fs::read_to_string(&cue_path)?;
+        let updated = insert_block_after_changelog(&original, &vrl_changelog_block);
 
-        let indent = "\t".repeat(5);
-        let processed_changelog: String = vrl_changelog
-            .lines()
-            .map(|line| {
-                let line = line.trim();
-                if line.starts_with('#') {
-                    format!("{indent}#{line}")
-                } else {
-                    format!("{indent}{line}")
-                }
-            })
-            .collect::<Vec<String>>()
-            .join("\n");
+        let tmp_path = cue_path.with_extension("cue.tmp");
+        fs::write(&tmp_path, &updated)?;
+        fs::rename(&tmp_path, &cue_path)?;
 
-        // Format the new changelog entry
-        let vrl_cue_block = format!(
-            indoc! {r#"
-            {{
-                type: "feat"
-                description: """
-            {}
-                    """
-            }},
-        "#},
-            processed_changelog
-        );
-
-        let mut found_changelog = false;
-        let changelog_marker = "changelog: [";
-
-        // Read and write line by line
-        for line in reader.lines() {
-            let line = line?;
-            writeln!(output_file, "{line}")?;
-
-            // Check if this is the changelog line
-            if !found_changelog && line.trim().starts_with(changelog_marker) {
-                // Insert the new entry after the changelog opening
-                writeln!(output_file, "{vrl_cue_block}")?;
-                found_changelog = true;
-            }
-        }
-
-        fs::rename(&temp_file_path, &release_cue_path)?;
-        run_command(&format!("cue fmt {release_cue_path:?}"));
+        run_command(&format!("cue fmt {}", cue_path.display()));
         debug!("Successfully added VRL changelog to the release cue file.");
         Ok(())
     }
@@ -437,12 +396,52 @@ fn get_repo_root() -> PathBuf {
 fn get_latest_version_from_vector_tags() -> Result<Version> {
     let tags = run_command("git tag --list --sort=-v:refname");
     let latest_tag = tags
-        .lines().next()
-        .ok_or_else(|| anyhow::anyhow!("No tags found starting with 'v'"))?;
+        .lines()
+        .find(|tag| tag.starts_with('v') && !tag.starts_with("vdev-v"))
+        .ok_or_else(|| anyhow::anyhow!("Could not find latest Vector release tag"))?;
 
     let version_str = latest_tag.trim_start_matches('v');
     Version::parse(version_str)
         .map_err(|e| anyhow::anyhow!("Failed to parse version from tag '{latest_tag}': {e}"))
+}
+
+fn format_vrl_changelog_block(changelog: &str) -> String {
+    let double_tab = "\t\t";
+    let body = changelog
+        .lines()
+        .map(|line| {
+            let line = line.trim();
+            if line.starts_with('#') {
+                format!("{double_tab}#{line}")
+            } else {
+                format!("{double_tab}{line}")
+            }
+        })
+        .collect::<Vec<_>>()
+        .join("\n");
+
+    let opening = "\tvrl_changelog: \"\"\"";
+    let closing = format!("{double_tab}\"\"\"");
+
+    format!("{opening}\n{body}\n{closing}")
+}
+
+fn insert_block_after_changelog(original: &str, block: &str) -> String {
+    let mut result = Vec::new();
+    let mut inserted = false;
+
+    for line in original.lines() {
+        result.push(line.to_string());
+
+        // Insert *after* the line containing only the closing `]` (end of changelog array)
+        if !inserted && line.trim() == "]" {
+            result.push(String::new()); // empty line before
+            result.push(block.to_string());
+            inserted = true;
+        }
+    }
+
+    result.join("\n")
 }
 
 fn get_latest_vrl_tag_and_changelog() -> Result<String> {
@@ -496,4 +495,43 @@ fn get_latest_vrl_tag_and_changelog() -> Result<String> {
     }
 
     Ok(section.join("\n"))
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::commands::release::prepare::{format_vrl_changelog_block, insert_block_after_changelog};
+    use indoc::indoc;
+
+    #[test]
+    fn test_insert_block_after_changelog() {
+        let vrl_changelog = "### [0.2.0]\n- Feature\n- Fix";
+        let vrl_changelog_block = format_vrl_changelog_block(vrl_changelog);
+
+        let expected = concat!(
+        "\tvrl_changelog: \"\"\"\n",
+        "\t\t#### [0.2.0]\n",
+        "\t\t- Feature\n",
+        "\t\t- Fix\n",
+        "\t\t\"\"\""
+        );
+
+        assert_eq!(vrl_changelog_block, expected);
+
+        let original = indoc! {r#"
+            version: "1.2.3"
+            changelog: [
+                {
+                    type: "fix"
+                    description: "Some fix"
+                },
+            ]
+        "#};
+        let updated = insert_block_after_changelog(original, &vrl_changelog_block);
+
+        // Assert the last 5 lines match the VRL changelog block
+        let expected_lines_len = 5;
+        let updated_tail: Vec<&str> = updated.lines().rev().take(expected_lines_len).collect::<Vec<_>>().into_iter().rev().collect();
+        let expected_lines: Vec<&str> = vrl_changelog_block.lines().collect();
+        assert_eq!(updated_tail, expected_lines);
+    }
 }

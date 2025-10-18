@@ -1,31 +1,33 @@
-use std::collections::HashMap;
-use std::io::{self, Read};
-use std::net::SocketAddr;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    io::{self, Read},
+    net::SocketAddr,
+    time::Duration,
+};
 
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Buf, Bytes, BytesMut};
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
-use rmp_serde::{decode, Deserializer, Serializer};
+use rmp_serde::{Deserializer, Serializer, decode};
 use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use tokio_util::codec::Decoder;
-use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::ipallowlist::IpAllowlistConfig;
-use vector_lib::lookup::lookup_v2::parse_value_path;
-use vector_lib::lookup::{metadata_path, owned_value_path, path, OwnedValuePath};
-use vector_lib::schema::Definition;
-use vrl::value::kind::Collection;
-use vrl::value::{Kind, Value};
+use vector_lib::{
+    codecs::{BytesDeserializerConfig, StreamDecodingError},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    ipallowlist::IpAllowlistConfig,
+    lookup::{OwnedValuePath, lookup_v2::parse_value_path, metadata_path, owned_value_path, path},
+    schema::Definition,
+};
+use vrl::value::{Kind, Value, kind::Collection};
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput,
+        DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput, log_schema,
     },
     event::{Event, LogEvent},
     internal_events::{FluentMessageDecodeError, FluentMessageReceived},
@@ -460,13 +462,13 @@ pub enum DecodeError {
 impl std::fmt::Display for DecodeError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            DecodeError::IO(err) => write!(f, "{}", err),
-            DecodeError::Decode(err) => write!(f, "{}", err),
+            DecodeError::IO(err) => write!(f, "{err}"),
+            DecodeError::Decode(err) => write!(f, "{err}"),
             DecodeError::UnknownCompression(compression) => {
-                write!(f, "unknown compression: {}", compression)
+                write!(f, "unknown compression: {compression}")
             }
             DecodeError::UnexpectedValue(value) => {
-                write!(f, "unexpected msgpack value, ignoring: {}", value)
+                write!(f, "unexpected msgpack value, ignoring: {value}")
             }
         }
     }
@@ -653,10 +655,9 @@ impl Decoder for FluentDecoder {
                     decode::Error::InvalidDataRead(ref custom)
                     | decode::Error::InvalidMarkerRead(ref custom),
                 )) = res
+                    && custom.kind() == io::ErrorKind::UnexpectedEof
                 {
-                    if custom.kind() == io::ErrorKind::UnexpectedEof {
-                        return Ok(None);
-                    }
+                    return Ok(None);
                 }
 
                 (des.position() as usize, res)
@@ -696,10 +697,10 @@ impl Decoder for FluentEntryStreamDecoder {
             // attempt to parse, if we get unexpected EOF, we need more data
             let res = Deserialize::deserialize(&mut des).map_err(DecodeError::Decode);
 
-            if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = res {
-                if custom.kind() == io::ErrorKind::UnexpectedEof {
-                    return Ok(None);
-                }
+            if let Err(DecodeError::Decode(decode::Error::InvalidDataRead(ref custom))) = res
+                && custom.kind() == io::ErrorKind::UnexpectedEof
+            {
+                return Ok(None);
             }
 
             let byte_size = des.position();
@@ -832,20 +833,18 @@ mod tests {
     use serde::Serialize;
     use tokio::{
         io::{AsyncReadExt, AsyncWriteExt},
-        time::{error::Elapsed, timeout, Duration},
+        time::{Duration, error::Elapsed, timeout},
     };
     use tokio_util::codec::Decoder;
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::lookup::OwnedTargetPath;
-    use vector_lib::schema::Definition;
-    use vrl::value::{kind::Collection, ObjectMap, Value};
+    use vector_lib::{assert_event_data_eq, lookup::OwnedTargetPath, schema::Definition};
+    use vrl::value::{ObjectMap, Value, kind::Collection};
 
     use super::{message::FluentMessageOptions, *};
     use crate::{
+        SourceSender,
         config::{SourceConfig, SourceContext},
         event::EventStatus,
         test_util::{self, next_addr, trace_init, wait_for_tcp},
-        SourceSender,
     };
 
     #[test]
@@ -1259,17 +1258,16 @@ mod integration_tests {
     use tokio::time::sleep;
     use vector_lib::event::{Event, EventStatus};
 
-    use crate::sources::fluent::{FluentMode, FluentTcpConfig};
     use crate::{
+        SourceSender,
         config::{SourceConfig, SourceContext},
         docker::Container,
-        sources::fluent::FluentConfig,
+        sources::fluent::{FluentConfig, FluentMode, FluentTcpConfig},
         test_util::{
             collect_ready,
-            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            components::{SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance},
             next_addr, next_addr_for_ip, random_string, wait_for_tcp,
         },
-        SourceSender,
     };
 
     const FLUENT_BIT_IMAGE: &str = "fluent/fluent-bit";
@@ -1280,7 +1278,7 @@ mod integration_tests {
     fn make_file(name: &str, content: &str) -> tempfile::TempDir {
         let dir = tempfile::tempdir().unwrap();
         let mut file = File::create(dir.path().join(name)).unwrap();
-        write!(&mut file, "{}", content).unwrap();
+        write!(&mut file, "{content}").unwrap();
         dir
     }
 
@@ -1334,7 +1332,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(format!("http://{}/", test_address))
+                        .post(format!("http://{test_address}/"))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()
@@ -1415,7 +1413,7 @@ mod integration_tests {
                 .run(async move {
                     wait_for_tcp(test_address).await;
                     reqwest::Client::new()
-                        .post(format!("http://{}/", test_address))
+                        .post(format!("http://{test_address}/"))
                         .header("content-type", "application/json")
                         .body(body.to_string())
                         .send()

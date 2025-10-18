@@ -2,25 +2,23 @@
 //! stream based sinks are likely to use.
 
 pub use async_trait::async_trait;
-pub use futures::{future, future::BoxFuture, stream::BoxStream, FutureExt, StreamExt};
+pub use futures::{FutureExt, StreamExt, future, future::BoxFuture, stream::BoxStream};
 pub use tower::{Service, ServiceBuilder};
-pub use vector_lib::buffers::EventCount;
-pub use vector_lib::configurable::configurable_component;
-pub use vector_lib::stream::{BatcherSettings, DriverResponse};
 pub use vector_lib::{
-    config::{telemetry, AcknowledgementsConfig, Input},
-    event::Value,
-    partition::Partitioner,
-    schema::Requirement,
-    sink::{StreamSink, VectorSink},
-    tls::TlsSettings,
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
-};
-pub use vector_lib::{
+    buffers::EventCount,
+    config::{AcknowledgementsConfig, Input, telemetry},
+    configurable::configurable_component,
+    event::Value,
     finalization::{EventFinalizers, EventStatus, Finalizable},
     internal_event::{CountByteSize, TaggedEventsSent},
     json_size::JsonSize,
+    partition::Partitioner,
     request_metadata::{GetEventCountTags, GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    schema::Requirement,
+    sink::{StreamSink, VectorSink},
+    stream::{BatcherSettings, DriverResponse},
+    tls::TlsSettings,
 };
 
 pub use crate::{
@@ -29,18 +27,18 @@ pub use crate::{
     event::{Event, LogEvent},
     internal_events::{SinkRequestBuildError, TemplateRenderingError},
     sinks::{
+        Healthcheck, HealthcheckError,
         util::{
+            BatchConfig, Compression, Concurrency, NoDefaultsBatchSettings, RequestBuilder,
+            SinkBatchSettings, TowerRequestConfig,
             builder::SinkBuilderExt,
             encoding::{self, write_all},
             metadata::RequestMetadataBuilder,
-            request_builder::{default_request_builder_concurrency_limit, EncodeResult},
+            request_builder::{EncodeResult, default_request_builder_concurrency_limit},
             retries::{RetryAction, RetryLogic},
             service::{ServiceBuilderExt, Svc},
-            BatchConfig, Compression, Concurrency, NoDefaultsBatchSettings, RequestBuilder,
-            SinkBatchSettings, TowerRequestConfig,
         },
-        Healthcheck, HealthcheckError,
     },
-    template::{Template, TemplateParseError},
+    template::{Template, TemplateParseError, UnsignedIntTemplate},
     tls::TlsConfig,
 };

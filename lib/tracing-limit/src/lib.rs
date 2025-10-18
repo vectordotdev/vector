@@ -4,11 +4,11 @@ use std::fmt;
 
 use dashmap::DashMap;
 use tracing_core::{
+    Event, Metadata, Subscriber,
     callsite::Identifier,
-    field::{display, Field, Value, Visit},
+    field::{Field, Value, Visit, display},
     span,
     subscriber::Interest,
-    Event, Metadata, Subscriber,
 };
 use tracing_subscriber::layer::{Context, Layer};
 
@@ -389,7 +389,7 @@ impl Visit for RateLimitedSpanKeys {
     }
 
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
-        self.record(field, format!("{:?}", value).into());
+        self.record(field, format!("{value:?}").into());
     }
 }
 
@@ -437,7 +437,7 @@ impl Visit for MessageVisitor {
 
     fn record_debug(&mut self, field: &Field, value: &dyn fmt::Debug) {
         if self.message.is_none() && field.name() == MESSAGE_FIELD {
-            self.message = Some(format!("{:?}", value));
+            self.message = Some(format!("{value:?}"));
         }
     }
 }
@@ -445,12 +445,14 @@ impl Visit for MessageVisitor {
 #[cfg(test)]
 mod test {
     use std::{
-        sync::{Arc, Mutex},
+        sync::{Arc, LazyLock, Mutex},
         time::Duration,
     };
 
     use mock_instant::global::MockClock;
     use tracing_subscriber::layer::SubscriberExt;
+
+    static TRACING_DEFAULT_LOCK: LazyLock<Mutex<()>> = LazyLock::new(|| Mutex::new(()));
 
     use super::*;
 
@@ -494,6 +496,8 @@ mod test {
 
     #[test]
     fn rate_limits() {
+        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
+
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -527,6 +531,8 @@ mod test {
 
     #[test]
     fn override_rate_limit_at_callsite() {
+        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
+
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -564,6 +570,8 @@ mod test {
 
     #[test]
     fn rate_limit_by_span_key() {
+        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
+
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -577,8 +585,7 @@ mod test {
                             info_span!("span", component_id = &key, vrl_position = &line_number);
                         let _enter = span.enter();
                         info!(
-                            message =
-                                format!("Hello {} on line_number {}!", key, line_number).as_str(),
+                            message = format!("Hello {key} on line_number {line_number}!").as_str(),
                             internal_log_rate_limit = true
                         );
                     }
@@ -629,6 +636,8 @@ mod test {
 
     #[test]
     fn rate_limit_by_event_key() {
+        let _guard = TRACING_DEFAULT_LOCK.lock().unwrap();
+
         let events: Arc<Mutex<Vec<String>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
@@ -639,8 +648,7 @@ mod test {
                 for key in &["foo", "bar"] {
                     for line_number in &[1, 2] {
                         info!(
-                            message =
-                                format!("Hello {} on line_number {}!", key, line_number).as_str(),
+                            message = format!("Hello {key} on line_number {line_number}!").as_str(),
                             internal_log_rate_limit = true,
                             component_id = &key,
                             vrl_position = &line_number
