@@ -468,3 +468,123 @@ struct Stats {
     elapsed: f64,
     rows_read: usize,
 }
+
+#[tokio::test]
+async fn insert_events_arrow_format() {
+    trace_init();
+
+    let table = random_table_name();
+    let host = clickhouse_address();
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(5);
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        table: table.clone().try_into().unwrap(),
+        compression: Compression::None,
+        format: crate::sinks::clickhouse::config::Format::ArrowStream,
+        batch,
+        request: TowerRequestConfig {
+            retry_attempts: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let client = ClickhouseClient::new(host.clone());
+
+    client
+        .create_table(
+            &table,
+            "host String, timestamp DateTime64(3), message String, count Int64",
+        )
+        .await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    let mut events: Vec<Event> = Vec::new();
+    for i in 0..5 {
+        let mut event = LogEvent::from(format!("log message {}", i));
+        event.insert("host", format!("host{}.example.com", i));
+        event.insert("count", i as i64);
+        events.push(event.into());
+    }
+
+    run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
+
+    let output = client.select_all(&table).await;
+    assert_eq!(5, output.rows);
+
+    // Verify fields exist and are correctly typed
+    for row in output.data.iter() {
+        assert!(row.get("host").and_then(|v| v.as_str()).is_some());
+        assert!(row.get("message").and_then(|v| v.as_str()).is_some());
+        assert!(
+            row.get("count")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<i64>().ok())
+                .is_some()
+        );
+    }
+}
+
+#[tokio::test]
+async fn insert_events_arrow_format_with_compression() {
+    trace_init();
+
+    let table = random_table_name();
+    let host = clickhouse_address();
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(5);
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        table: table.clone().try_into().unwrap(),
+        compression: Compression::gzip_default(),
+        format: crate::sinks::clickhouse::config::Format::ArrowStream,
+        batch,
+        request: TowerRequestConfig {
+            retry_attempts: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let client = ClickhouseClient::new(host);
+
+    client
+        .create_table(
+            &table,
+            "host String, timestamp DateTime64(3), message String, count Int64",
+        )
+        .await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    let mut events: Vec<Event> = Vec::new();
+    for i in 0..5 {
+        let mut event = LogEvent::from(format!("log message {}", i));
+        event.insert("host", format!("host{}.example.com", i));
+        event.insert("count", i as i64);
+        events.push(event.into());
+    }
+
+    run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
+
+    let output = client.select_all(&table).await;
+    assert_eq!(5, output.rows);
+
+    // Verify fields exist and are correctly typed
+    for row in output.data.iter() {
+        assert!(row.get("host").and_then(|v| v.as_str()).is_some());
+        assert!(row.get("message").and_then(|v| v.as_str()).is_some());
+        assert!(
+            row.get("count")
+                .and_then(|v| v.as_str())
+                .and_then(|s| s.parse::<i64>().ok())
+                .is_some()
+        );
+    }
+}

@@ -39,6 +39,9 @@ pub enum Format {
 
     /// JSONAsString.
     JsonAsString,
+
+    /// Arrow.
+    ArrowStream,
 }
 
 impl fmt::Display for Format {
@@ -47,6 +50,7 @@ impl fmt::Display for Format {
             Format::JsonEachRow => write!(f, "JSONEachRow"),
             Format::JsonAsObject => write!(f, "JSONAsObject"),
             Format::JsonAsString => write!(f, "JSONAsString"),
+            Format::ArrowStream => write!(f, "ArrowStream"),
         }
     }
 }
@@ -224,6 +228,7 @@ impl SinkConfig for ClickhouseConfig {
                     JsonSerializerConfig::default().build().into(),
                 ),
             ),
+            format: self.format,
         };
 
         let sink = ClickhouseSink::new(

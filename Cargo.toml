@@ -137,6 +137,8 @@ members = [
 
 [workspace.dependencies]
 anyhow = { version = "1.0.99", default-features = false, features = ["std"] }
+arrow = { version = "54.0.0", default-features = false, features = ["ipc"] }
+arrow-schema = { version = "54.0.0", default-features = false }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
@@ -228,6 +230,8 @@ vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
+arrow = { workspace = true, optional = true }
+arrow-schema = { workspace = true, optional = true }
 async-stream.workspace = true
 async-trait.workspace = true
 futures.workspace = true
@@ -841,7 +845,7 @@ sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage",
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
-sinks-clickhouse = []
+sinks-clickhouse = ["dep:arrow", "dep:arrow-schema"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
 sinks-datadog_events = []
