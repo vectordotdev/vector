@@ -10,3 +10,8 @@ services:
       - MYSQL_PASSWORD=vector
       - MYSQL_ROOT_PASSWORD=vector
       - MYSQL_DATABASE=vector_db
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

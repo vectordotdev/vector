@@ -9,3 +9,8 @@ services:
       - POSTGRES_USER=vector
       - POSTGRES_PASSWORD=vector
       - POSTGRES_DB=vector_db
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
