@@ -253,7 +253,15 @@ fn build_binary_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
 mod tests {
     use super::*;
     use crate::event::LogEvent;
-    use arrow::datatypes::Field;
+    use arrow::{
+        array::{
+            Array, BinaryArray, BooleanArray, Float64Array, Int64Array, StringArray,
+            TimestampMillisecondArray,
+        },
+        datatypes::Field,
+        ipc::reader::StreamReader,
+    };
+    use std::io::Cursor;
 
     #[test]
     fn test_encode_simple_events() {
@@ -272,11 +280,281 @@ mod tests {
             Field::new("count", DataType::Int64, true),
         ]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(schema));
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
         assert!(!bytes.is_empty());
+
+        // Validate the Arrow stream
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 2);
+        assert_eq!(batch.num_columns(), 2);
+        assert_eq!(batch.schema().as_ref(), schema.as_ref());
+
+        let message_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        assert_eq!(message_array.value(0), "hello");
+        assert_eq!(message_array.value(1), "world");
+
+        let count_array = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(count_array.value(0), 42);
+        assert_eq!(count_array.value(1), 100);
+    }
+
+    #[test]
+    fn test_encode_all_types() {
+        use chrono::Utc;
+
+        let mut log = LogEvent::default();
+        log.insert("string_field", "test");
+        log.insert("int_field", 42);
+        log.insert("float_field", 3.14);
+        log.insert("bool_field", true);
+        log.insert("bytes_field", bytes::Bytes::from("binary"));
+        log.insert("timestamp_field", Utc::now());
+
+        let events = vec![Event::Log(log)];
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("string_field", DataType::Utf8, true),
+            Field::new("int_field", DataType::Int64, true),
+            Field::new("float_field", DataType::Float64, true),
+            Field::new("bool_field", DataType::Boolean, true),
+            Field::new("bytes_field", DataType::Binary, true),
+            Field::new(
+                "timestamp_field",
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+                true,
+            ),
+        ]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 1);
+        assert_eq!(batch.num_columns(), 6);
+
+        // Verify each column has data
+        assert_eq!(
+            batch
+                .column(0)
+                .as_any()
+                .downcast_ref::<StringArray>()
+                .unwrap()
+                .value(0),
+            "test"
+        );
+        assert_eq!(
+            batch
+                .column(1)
+                .as_any()
+                .downcast_ref::<Int64Array>()
+                .unwrap()
+                .value(0),
+            42
+        );
+        assert!(
+            (batch
+                .column(2)
+                .as_any()
+                .downcast_ref::<Float64Array>()
+                .unwrap()
+                .value(0)
+                - 3.14)
+                .abs()
+                < 0.001
+        );
+        assert!(
+            batch
+                .column(3)
+                .as_any()
+                .downcast_ref::<BooleanArray>()
+                .unwrap()
+                .value(0),
+            "{}",
+            true
+        );
+        assert_eq!(
+            batch
+                .column(4)
+                .as_any()
+                .downcast_ref::<BinaryArray>()
+                .unwrap()
+                .value(0),
+            b"binary"
+        );
+        assert!(
+            !batch
+                .column(5)
+                .as_any()
+                .downcast_ref::<TimestampMillisecondArray>()
+                .unwrap()
+                .is_null(0)
+        );
+    }
+
+    #[test]
+    fn test_encode_null_values() {
+        let mut log1 = LogEvent::default();
+        log1.insert("field_a", 1);
+        // field_b is missing
+
+        let mut log2 = LogEvent::default();
+        log2.insert("field_b", 2);
+        // field_a is missing
+
+        let events = vec![Event::Log(log1), Event::Log(log2)];
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("field_a", DataType::Int64, true),
+            Field::new("field_b", DataType::Int64, true),
+        ]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 2);
+
+        let field_a = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(field_a.value(0), 1);
+        assert!(field_a.is_null(1));
+
+        let field_b = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert!(field_b.is_null(0));
+        assert_eq!(field_b.value(1), 2);
+    }
+
+    #[test]
+    fn test_encode_type_mismatches() {
+        let mut log1 = LogEvent::default();
+        log1.insert("field", 42); // Integer
+
+        let mut log2 = LogEvent::default();
+        log2.insert("field", 3.14); // Float - type mismatch!
+
+        let events = vec![Event::Log(log1), Event::Log(log2)];
+
+        // Schema expects Int64
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field",
+            DataType::Int64,
+            true,
+        )]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 2);
+
+        let field_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+        assert_eq!(field_array.value(0), 42);
+        assert!(field_array.is_null(1)); // Type mismatch becomes null
+    }
+
+    #[test]
+    fn test_encode_complex_json_values() {
+        use serde_json::json;
+
+        let mut log = LogEvent::default();
+        log.insert(
+            "object_field",
+            json!({"key": "value", "nested": {"count": 42}}),
+        );
+        log.insert("array_field", json!([1, 2, 3]));
+
+        let events = vec![Event::Log(log)];
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("object_field", DataType::Utf8, true),
+            Field::new("array_field", DataType::Utf8, true),
+        ]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 1);
+
+        let object_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let object_str = object_array.value(0);
+        assert!(object_str.contains("key"));
+        assert!(object_str.contains("value"));
+
+        let array_array = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<StringArray>()
+            .unwrap();
+        let array_str = array_array.value(0);
+        assert_eq!(array_str, "[1,2,3]");
+    }
+
+    #[test]
+    fn test_encode_unsupported_type() {
+        let mut log = LogEvent::default();
+        log.insert("field", "value");
+
+        let events = vec![Event::Log(log)];
+
+        // Use an unsupported type
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "field",
+            DataType::Duration(TimeUnit::Millisecond),
+            true,
+        )]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(schema));
+        assert!(result.is_err());
+        assert!(matches!(
+            result.unwrap_err(),
+            ArrowEncodingError::UnsupportedType { .. }
+        ));
     }
 
     #[test]
@@ -299,5 +577,6 @@ mod tests {
         let events: Vec<Event> = vec![];
         let result = encode_events_to_arrow_stream(&events, None);
         assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), ArrowEncodingError::NoEvents));
     }
 }
