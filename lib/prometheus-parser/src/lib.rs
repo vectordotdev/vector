@@ -335,10 +335,19 @@ impl MetricGroupSet {
         self.0.get_full_mut(name).unwrap()
     }
 
-    fn insert_metadata(&mut self, name: String, kind: MetricKind) -> Result<(), ParserError> {
+    fn insert_metadata(
+        &mut self,
+        name: String,
+        kind: MetricKind,
+        reject_on_conflict: bool,
+    ) -> Result<(), ParserError> {
         match self.0.get(&name) {
             Some(group) if !group.matches_kind(kind) => {
-                Err(ParserError::MultipleMetricKinds { name })
+                if reject_on_conflict {
+                    Err(ParserError::MultipleMetricKinds { name })
+                } else {
+                    Ok(())
+                }
             }
             Some(_) => Ok(()), // metadata already exists and is the right type
             None => {
@@ -384,7 +393,10 @@ impl MetricGroupSet {
 
 /// Parse the given remote_write request, grouping the metrics into
 /// higher-level metric types based on the metadata.
-pub fn parse_request(request: proto::WriteRequest) -> Result<Vec<MetricGroup>, ParserError> {
+pub fn parse_request(
+    request: proto::WriteRequest,
+    reject_on_conflict: bool,
+) -> Result<Vec<MetricGroup>, ParserError> {
     let mut groups = MetricGroupSet::default();
 
     for metadata in request.metadata {
@@ -392,7 +404,7 @@ pub fn parse_request(request: proto::WriteRequest) -> Result<Vec<MetricGroup>, P
         let kind = proto::MetricType::try_from(metadata.r#type)
             .unwrap_or(proto::MetricType::Unknown)
             .into();
-        groups.insert_metadata(name, kind)?;
+        groups.insert_metadata(name, kind, reject_on_conflict)?;
     }
 
     for timeseries in request.timeseries {
@@ -741,13 +753,14 @@ mod test {
 
     #[test]
     fn parse_request_empty() {
-        let parsed = parse_request(write_request!([], [])).unwrap();
+        let parsed = parse_request(write_request!([], []), false).unwrap();
         assert!(parsed.is_empty());
     }
 
     #[test]
     fn parse_request_only_metadata() {
-        let parsed = parse_request(write_request!(["one" = Counter, "two" = Gauge], [])).unwrap();
+        let parsed =
+            parse_request(write_request!(["one" = Counter, "two" = Gauge], []), false).unwrap();
         assert_eq!(parsed.len(), 2);
         match_group!(parsed[0], "one", Counter => |metrics: &MetricMap<SimpleMetric>| {
             assert!(metrics.is_empty());
@@ -759,10 +772,10 @@ mod test {
 
     #[test]
     fn parse_request_untyped() {
-        let parsed = parse_request(write_request!(
-            [],
-            [ [__name__ => "one", big => "small"] => [123 @ 1395066367500] ]
-        ))
+        let parsed = parse_request(
+            write_request!([], [ [__name__ => "one", big => "small"] => [123 @ 1395066367500] ]),
+            false,
+        )
         .unwrap();
 
         assert_eq!(parsed.len(), 1);
@@ -777,13 +790,16 @@ mod test {
 
     #[test]
     fn parse_request_gauge() {
-        let parsed = parse_request(write_request!(
-            ["one" = Gauge],
-            [
-                [__name__ => "one"] => [ 12 @ 1395066367600, 14 @ 1395066367800 ],
-                [__name__ => "two"] => [ 13 @ 1395066367700 ]
-            ]
-        ))
+        let parsed = parse_request(
+            write_request!(
+                ["one" = Gauge],
+                [
+                    [__name__ => "one"] => [ 12 @ 1395066367600, 14 @ 1395066367800 ],
+                    [__name__ => "two"] => [ 13 @ 1395066367700 ]
+                ]
+            ),
+            false,
+        )
         .unwrap();
 
         assert_eq!(parsed.len(), 2);
@@ -809,16 +825,19 @@ mod test {
 
     #[test]
     fn parse_request_histogram() {
-        let parsed = parse_request(write_request!(
-            ["one" = Histogram],
-            [
-                [__name__ => "one_bucket", le => "1"] => [ 15 @ 1395066367700 ],
-                [__name__ => "one_bucket", le => "+Inf"] => [ 19 @ 1395066367700 ],
-                [__name__ => "one_count"] => [ 19 @ 1395066367700 ],
-                [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
-                [__name__ => "one_total"] => [24 @ 1395066367700]
-            ]
-        ))
+        let parsed = parse_request(
+            write_request!(
+                ["one" = Histogram],
+                [
+                    [__name__ => "one_bucket", le => "1"] => [ 15 @ 1395066367700 ],
+                    [__name__ => "one_bucket", le => "+Inf"] => [ 19 @ 1395066367700 ],
+                    [__name__ => "one_count"] => [ 19 @ 1395066367700 ],
+                    [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
+                    [__name__ => "one_total"] => [24 @ 1395066367700]
+                ]
+            ),
+            false,
+        )
         .unwrap();
 
         assert_eq!(parsed.len(), 2);
@@ -848,16 +867,19 @@ mod test {
 
     #[test]
     fn parse_request_summary() {
-        let parsed = parse_request(write_request!(
-            ["one" = Summary],
-            [
-                [__name__ => "one", quantile => "0.5"] => [ 15 @ 1395066367700 ],
-                [__name__ => "one", quantile => "0.9"] => [ 19 @ 1395066367700 ],
-                [__name__ => "one_count"] => [ 21 @ 1395066367700 ],
-                [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
-                [__name__ => "one_total"] => [24 @ 1395066367700]
-            ]
-        ))
+        let parsed = parse_request(
+            write_request!(
+                ["one" = Summary],
+                [
+                    [__name__ => "one", quantile => "0.5"] => [ 15 @ 1395066367700 ],
+                    [__name__ => "one", quantile => "0.9"] => [ 19 @ 1395066367700 ],
+                    [__name__ => "one_count"] => [ 21 @ 1395066367700 ],
+                    [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
+                    [__name__ => "one_total"] => [24 @ 1395066367700]
+                ]
+            ),
+            false,
+        )
         .unwrap();
 
         assert_eq!(parsed.len(), 2);
@@ -883,5 +905,53 @@ mod test {
             assert_eq!(metrics.len(), 1);
             assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1395066367700), labels!(), 24.0));
         });
+    }
+
+    #[test]
+    fn parse_request_conflicting_metadata() {
+        let request = proto::WriteRequest {
+            metadata: vec![
+                proto::MetricMetadata {
+                    r#type: proto::MetricType::Gauge as i32,
+                    metric_family_name: "go_memstats_alloc_bytes".into(),
+                    help: "Number of bytes allocated and still in use.".into(),
+                    unit: String::default(),
+                },
+                proto::MetricMetadata {
+                    r#type: proto::MetricType::Counter as i32,
+                    metric_family_name: "go_memstats_alloc_bytes".into(),
+                    help: "Total number of bytes allocated, even if freed.".into(),
+                    unit: String::default(),
+                },
+            ],
+            timeseries: vec![proto::TimeSeries {
+                labels: vec![proto::Label {
+                    name: "__name__".into(),
+                    value: "go_memstats_alloc_bytes".into(),
+                }],
+                samples: vec![proto::Sample {
+                    value: 12345.0,
+                    timestamp: 1395066367500,
+                }],
+            }],
+        };
+
+        // Should succeed and use the first metadata entry (Gauge)
+        let parsed = parse_request(request.clone(), false).unwrap();
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "go_memstats_alloc_bytes", Gauge => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1395066367500), labels!(), 12345.0)
+            );
+        });
+
+        // Should fail when reject_on_conflict is true
+        let err = parse_request(request, true).unwrap_err();
+        assert!(matches!(
+            err,
+            ParserError::MultipleMetricKinds { name } if name == "go_memstats_alloc_bytes"
+        ));
     }
 }
