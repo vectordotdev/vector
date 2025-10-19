@@ -11,7 +11,7 @@ use crate::sources::netflow::templates::{
 };
 use crate::sources::netflow::templates::parse_ipfix_template_fields;
 use std::net::SocketAddr;
-use vector_lib::event::{Event, LogEvent};
+use vector_lib::event::{Event, LogEvent, Value};
 use base64::Engine;
 
 
@@ -501,11 +501,12 @@ impl IpfixParser {
             // Only emit event if we parsed some fields
             if fields_parsed > 0 {
                 // Debug: Log the parsed fields to understand what we're getting
+                let field_names: Vec<String> = log_event.iter().map(|(k, _)| k.to_string()).collect();
                 debug!(
                     "Parsed flow record {}: fields={}, data={:?}",
                     record_count,
                     fields_parsed,
-                    log_event.get_all().keys().collect::<Vec<_>>()
+                    field_names
                 );
                 
                 // Log specific problematic fields for debugging
