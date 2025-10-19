@@ -310,9 +310,9 @@ impl IpfixParser {
             // Parse template fields
             let template_data = &data[offset..template_end];
             
-            // Debug: Log raw template data for template ID 1024
+            // Debug: Log raw template data for template ID 1024 (only once)
             if template_id == 1024 {
-                error!(
+                debug!(
                     message = "Template ID 1024 received - raw template data dump",
                     template_id = template_id,
                     field_count = field_count,
