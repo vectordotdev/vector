@@ -501,12 +501,10 @@ impl IpfixParser {
             // Only emit event if we parsed some fields
             if fields_parsed > 0 {
                 // Debug: Log the parsed fields to understand what we're getting
-                let field_names: Vec<String> = log_event.iter().map(|(k, _)| k.to_string()).collect();
                 debug!(
-                    "Parsed flow record {}: fields={}, data={:?}",
+                    "Parsed flow record {}: fields={}",
                     record_count,
-                    fields_parsed,
-                    field_names
+                    fields_parsed
                 );
                 
                 // Log specific problematic fields for debugging
@@ -517,7 +515,7 @@ impl IpfixParser {
                 }
                 
                 if let Some(Value::Bytes(protocol)) = log_event.get("protocolName") {
-                    if protocol == b"XNET" {
+                    if protocol.as_ref() == b"XNET" {
                         debug!("XNET protocol detected - possible parsing issue");
                     }
                 }
