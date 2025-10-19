@@ -12,6 +12,7 @@ use crate::sources::netflow::templates::{
 use crate::sources::netflow::templates::parse_ipfix_template_fields;
 use std::net::SocketAddr;
 use vector_lib::event::{Event, LogEvent};
+use base64::Engine;
 
 
 /// IPFIX protocol constants
