@@ -41,6 +41,7 @@ use vrl::{
 use super::util::MultilineConfig;
 use crate::{
     SourceSender,
+    common::backoff::ExponentialBackoff,
     config::{DataType, SourceConfig, SourceContext, SourceOutput, log_schema},
     docker::{DockerTlsConfig, docker},
     event::{self, EstimatedJsonEncodedSizeOf, LogEvent, Value, merge_state::LogEventMergeState},
@@ -468,6 +469,8 @@ struct DockerLogsSource {
     /// It may contain shortened container id.
     hostname: Option<String>,
     backoff_duration: Duration,
+    /// Backoff strategy for events stream retries
+    events_backoff: ExponentialBackoff,
 }
 
 impl DockerLogsSource {
@@ -521,6 +524,8 @@ impl DockerLogsSource {
             main_recv,
             hostname,
             backoff_duration: backoff_secs,
+            events_backoff: ExponentialBackoff::from_millis(backoff_secs.as_millis() as u64)
+                .max_delay(Duration::from_secs(300)),
         })
     }
 
@@ -620,6 +625,9 @@ impl DockerLogsSource {
                 value = self.events.next() => {
                     match value {
                         Some(Ok(mut event)) => {
+                            // Reset backoff on successful event
+                            self.events_backoff.reset();
+
                             let action = event.action.unwrap();
                             let actor = event.actor.take().unwrap();
                             let id = actor.id.unwrap();
@@ -662,13 +670,27 @@ impl DockerLogsSource {
                                 error,
                                 container_id: None,
                             });
-                            return;
+                            // Rebuild events stream with backoff
+                            if let Some(delay) = self.events_backoff.next() {
+                                warn!(
+                                    message = "Docker events stream failed, retrying with backoff",
+                                    delay_ms = delay.as_millis()
+                                );
+                                tokio::time::sleep(delay).await;
+                                self.events = Box::pin(self.esb.core.docker_logs_event_stream());
+                            }
                         },
                         None => {
-                            // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
-                            error!(message = "Docker log event stream has ended unexpectedly.", internal_log_rate_limit = false);
-                            info!(message = "Shutting down docker_logs source.");
-                            return;
+                            warn!(message = "Docker events stream has ended, will retry with backoff.");
+                            // Rebuild events stream with backoff
+                            if let Some(delay) = self.events_backoff.next() {
+                                warn!(
+                                    message = "Docker events stream ended, retrying with backoff",
+                                    delay_ms = delay.as_millis()
+                                );
+                                tokio::time::sleep(delay).await;
+                                self.events = Box::pin(self.esb.core.docker_logs_event_stream());
+                            }
                         }
                     };
                 }
