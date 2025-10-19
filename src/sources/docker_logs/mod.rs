@@ -670,31 +670,40 @@ impl DockerLogsSource {
                                 error,
                                 container_id: None,
                             });
-                            // Rebuild events stream with backoff
-                            if let Some(delay) = self.events_backoff.next() {
-                                warn!(
-                                    message = "Docker events stream failed, retrying with backoff",
-                                    delay_ms = delay.as_millis()
-                                );
-                                tokio::time::sleep(delay).await;
-                                self.events = Box::pin(self.esb.core.docker_logs_event_stream());
+                            // Retry events stream with exponential backoff
+                            if !self.retry_events_stream_with_backoff("Docker events stream failed").await {
+                                error!("Docker events stream failed and retry exhausted, shutting down");
+                                return;
                             }
                         },
                         None => {
-                            warn!(message = "Docker events stream has ended, will retry with backoff.");
-                            // Rebuild events stream with backoff
-                            if let Some(delay) = self.events_backoff.next() {
-                                warn!(
-                                    message = "Docker events stream ended, retrying with backoff",
-                                    delay_ms = delay.as_millis()
-                                );
-                                tokio::time::sleep(delay).await;
-                                self.events = Box::pin(self.esb.core.docker_logs_event_stream());
+                            // Retry events stream with exponential backoff
+                            if !self.retry_events_stream_with_backoff("Docker events stream ended").await {
+                                error!("Docker events stream ended and retry exhausted, shutting down");
+                                return;
                             }
                         }
                     };
                 }
             };
+        }
+    }
+
+    /// Retry events stream with exponential backoff
+    /// Returns true if retry was attempted, false if exhausted
+    async fn retry_events_stream_with_backoff(&mut self, reason: &str) -> bool {
+        if let Some(delay) = self.events_backoff.next() {
+            warn!(
+                message = reason,
+                action = "retrying with backoff",
+                delay_ms = delay.as_millis()
+            );
+            tokio::time::sleep(delay).await;
+            self.events = Box::pin(self.esb.core.docker_logs_event_stream());
+            true
+        } else {
+            error!(message = "Events stream retry exhausted", reason = reason);
+            false
         }
     }
 
