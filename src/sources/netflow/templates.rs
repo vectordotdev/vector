@@ -18,7 +18,6 @@ use std::collections::HashMap;
 
 use crate::sources::netflow::events::*;
 use tracing::debug;
-use base64::Engine;
 
 
 /// Unique identifier for a template.
