@@ -563,6 +563,17 @@ pub fn parse_ipfix_template_fields(data: &[u8]) -> Result<Vec<TemplateField>, St
         let field_length = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
         offset += 4;
 
+        // Validate field length - if it's unreasonably large, treat as variable length
+        let actual_field_length = if field_length > 1000 {
+            warn!(
+                "Template field has unreasonably large length {} for field type {}, treating as variable length",
+                field_length, raw_field_type
+            );
+            65535 // Treat as variable length
+        } else {
+            field_length
+        };
+
         let (field_type, enterprise_number) = if raw_field_type & 0x8000 != 0 {
             // Enterprise field - next 4 bytes contain enterprise number
             if offset + 4 > data.len() {
@@ -579,6 +590,17 @@ pub fn parse_ipfix_template_fields(data: &[u8]) -> Result<Vec<TemplateField>, St
                             raw_data_hex = format!("{:02x?}", data),
                             raw_data_base64 = base64::engine::general_purpose::STANDARD.encode(data),
                         );
+                    }
+                }
+                // For template ID 1024, try to continue without enterprise number
+                if data.len() >= 2 {
+                    let template_id = u16::from_be_bytes([data[0], data[1]]);
+                    if template_id == 1024 {
+                        warn!(
+                            "Template ID 1024 has malformed enterprise field, treating as standard field: field_type={}, field_length={}",
+                            raw_field_type, actual_field_length
+                        );
+                        return Ok(fields); // Return what we have so far
                     }
                 }
                 return Err("Insufficient data for enterprise field".to_string());
@@ -599,7 +621,7 @@ pub fn parse_ipfix_template_fields(data: &[u8]) -> Result<Vec<TemplateField>, St
 
         fields.push(TemplateField {
             field_type,
-            field_length,
+            field_length: actual_field_length,
             enterprise_number,
         });
     }
