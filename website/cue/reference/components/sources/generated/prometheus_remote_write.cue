@@ -112,6 +112,16 @@ generated: components: sources: prometheus_remote_write: configuration: {
 			}
 		}
 	}
+	skip_nan_values: {
+		description: """
+			Whether to skip/discard received samples with NaN values.
+
+			When enabled, any metric sample with a NaN value will be filtered out
+			during parsing, preventing downstream processing of invalid metrics.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
@@ -149,7 +159,7 @@ generated: components: sources: prometheus_remote_write: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming or outgoing connections.
+					Whether to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.

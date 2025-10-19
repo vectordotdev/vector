@@ -20,12 +20,11 @@ generated: components: sinks: configuration: {
 			}
 			max_size: {
 				description: """
-					The maximum size of the buffer on disk.
+					The maximum allowed amount of allocated memory the buffer can hold.
 
-					Must be at least ~256 megabytes (268435488 bytes).
+					If `type = "disk"` then must be at least ~256 megabytes (268435488 bytes).
 					"""
-				relevant_when: "type = \"disk\""
-				required:      true
+				required: true
 				type: uint: unit: "bytes"
 			}
 			type: {

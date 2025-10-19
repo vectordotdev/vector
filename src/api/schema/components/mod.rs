@@ -10,7 +10,7 @@ use std::{
 };
 
 use async_graphql::{Enum, InputObject, Interface, Object, Subscription};
-use tokio_stream::{wrappers::BroadcastStream, Stream, StreamExt};
+use tokio_stream::{Stream, StreamExt, wrappers::BroadcastStream};
 use vector_lib::internal_event::DEFAULT_OUTPUT;
 
 use crate::{
@@ -19,7 +19,7 @@ use crate::{
         filter::{self, filter_items},
         relay, sort,
     },
-    config::{get_transform_output_ids, ComponentKey, Config},
+    config::{ComponentKey, Config, get_transform_output_ids},
     filter_check,
 };
 
@@ -235,7 +235,7 @@ pub struct ComponentsSubscription;
 #[Subscription]
 impl ComponentsSubscription {
     /// Subscribes to all newly added components
-    async fn component_added(&self) -> impl Stream<Item = Component> {
+    async fn component_added(&self) -> impl Stream<Item = Component> + use<> {
         BroadcastStream::new(COMPONENT_CHANGED.subscribe()).filter_map(|c| match c {
             Ok(ComponentChanged::Added(c)) => Some(c),
             _ => None,
@@ -243,7 +243,7 @@ impl ComponentsSubscription {
     }
 
     /// Subscribes to all removed components
-    async fn component_removed(&self) -> impl Stream<Item = Component> {
+    async fn component_removed(&self) -> impl Stream<Item = Component> + use<> {
         BroadcastStream::new(COMPONENT_CHANGED.subscribe()).filter_map(|c| match c {
             Ok(ComponentChanged::Removed(c)) => Some(c),
             _ => None,

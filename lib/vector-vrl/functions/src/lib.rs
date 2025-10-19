@@ -1,7 +1,6 @@
 #![deny(warnings)]
 
-use vrl::compiler::Function;
-use vrl::path::OwnedTargetPath;
+use vrl::{compiler::Function, path::OwnedTargetPath};
 
 pub mod get_secret;
 pub mod remove_secret;

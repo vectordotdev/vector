@@ -1,10 +1,9 @@
-use crate::encoding::BuildError;
+use std::{collections::HashMap, fmt::Write, num::ParseIntError};
+
 use bytes::BytesMut;
 use chrono::SecondsFormat;
 use lookup::lookup_v2::ConfigTargetPath;
 use snafu::Snafu;
-use std::num::ParseIntError;
-use std::{collections::HashMap, fmt::Write};
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{
@@ -12,6 +11,8 @@ use vector_core::{
     event::{Event, LogEvent, Value},
     schema,
 };
+
+use crate::encoding::BuildError;
 
 const DEFAULT_DEVICE_VENDOR: &str = "Datadog";
 const DEFAULT_DEVICE_PRODUCT: &str = "Vector";
@@ -208,7 +209,7 @@ pub struct CefSerializerOptions {
     /// The value length must be less than or equal to 63.
     pub device_product: String,
 
-    /// Identifies the version of the problem. The combination of the device product, vendor and this value make up the unique id of the device that sends messages.
+    /// Identifies the version of the problem. The combination of the device product, vendor, and this value make up the unique id of the device that sends messages.
     /// The value length must be less than or equal to 31.
     pub device_version: String,
 
@@ -217,7 +218,6 @@ pub struct CefSerializerOptions {
     pub device_event_class_id: String,
 
     /// This is a path that points to the field of a log event that reflects importance of the event.
-    /// Reflects importance of the event.
     ///
     /// It must point to a number from 0 to 10.
     /// 0 = lowest_importance, 10 = highest_importance.
@@ -321,7 +321,7 @@ impl Encoder<Event> for CefSerializer {
                 continue;
             }
             let value = escape_extension(&value);
-            formatted_extensions.push(format!("{}={}", extension, value));
+            formatted_extensions.push(format!("{extension}={value}"));
         }
 
         buffer.write_fmt(format_args!(
@@ -368,7 +368,7 @@ fn escape_extension(s: &str) -> String {
 
 fn escape_special_chars(s: &str, extra_char: char) -> String {
     s.replace('\\', r#"\\"#)
-        .replace(extra_char, &format!(r#"\{}"#, extra_char))
+        .replace(extra_char, &format!(r#"\{extra_char}"#))
 }
 
 fn validate_length(field: &str, field_name: &str, max_length: usize) -> Result<String, BuildError> {

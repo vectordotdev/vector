@@ -6,7 +6,7 @@ use crate::{
     config::SinkConfig,
     sinks::util::test::load_sink,
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         generate_lines_with_stream,
     },
 };
@@ -25,7 +25,7 @@ async fn to_real_v2_endpoint() {
 
     let (sink, _) = config.build(cx).await.unwrap();
     let (batch, receiver) = BatchNotifier::new_with_receiver();
-    let generator = |index| format!("this is a log with index {}", index);
+    let generator = |index| format!("this is a log with index {index}");
     let (_, events) = generate_lines_with_stream(generator, 10, Some(batch));
 
     run_and_assert_sink_compliance(sink, events, &SINK_TAGS).await;

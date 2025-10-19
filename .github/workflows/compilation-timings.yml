@@ -15,10 +15,10 @@ jobs:
     name: "Release Build (optimized)"
     runs-on: ubuntu-24.04-8core
     steps:
-      - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v4
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build --release
 
@@ -31,10 +31,10 @@ jobs:
       # with full LTO / single codegen unit.
       PROFILE: debug
     steps:
-      - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v4
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build --release
 
@@ -42,10 +42,10 @@ jobs:
     name: "Debug Build"
     runs-on: ubuntu-24.04-8core
     steps:
-      - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v4
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build
 
@@ -53,10 +53,10 @@ jobs:
     name: "Debug Rebuild"
     runs-on: ubuntu-24.04-8core
     steps:
-      - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v4
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo build
       - run: touch src/app.rs
@@ -66,9 +66,9 @@ jobs:
     name: "Cargo Check"
     runs-on: ubuntu-24.04-8core
     steps:
-      - uses: colpal/actions-clean@v1
-      - uses: actions/checkout@v4
+      - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
       - run: cargo clean
       - run: cargo check

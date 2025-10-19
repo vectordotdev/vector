@@ -1,16 +1,17 @@
-use bytes::{Bytes, BytesMut};
-use codecs::{
-    decoding::format::AvroDeserializerConfig, decoding::format::Deserializer,
-    encoding::format::AvroSerializerConfig,
-};
-use rstest::*;
-use similar_asserts::assert_eq;
 use std::{
     fs::File,
     io::Read,
     path::{Path, PathBuf},
     str::from_utf8,
 };
+
+use bytes::{Bytes, BytesMut};
+use codecs::{
+    decoding::format::{AvroDeserializerConfig, Deserializer},
+    encoding::format::AvroSerializerConfig,
+};
+use rstest::*;
+use similar_asserts::assert_eq;
 use tokio_util::codec::Encoder;
 use vector_core::{config::LogNamespace, event::Event};
 

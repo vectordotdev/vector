@@ -14,17 +14,21 @@ fi
 export DEBIAN_FRONTEND=noninteractive
 export ACCEPT_EULA=Y
 
-echo 'Acquire::Retries "5";' > /etc/apt/apt.conf.d/80-retries
+# Configure apt for speed and efficiency
+cat > /etc/apt/apt.conf.d/90-vector-optimizations <<EOF
+Acquire::Retries "5";
+Acquire::Queue-Mode "host";
+Acquire::Languages "none";
+APT::Install-Recommends "false";
+EOF
 
 apt-get update --yes
 
+# Install all base dependencies in one go
 apt-get install --yes \
-  software-properties-common \
-  apt-utils \
-  apt-transport-https
-
-# Deps
-apt-get install --yes --no-install-recommends \
+    software-properties-common \
+    apt-utils \
+    apt-transport-https \
     build-essential \
     ca-certificates \
     cmake \
@@ -60,21 +64,8 @@ tar \
 cp "${TEMP}/cue" /usr/bin/cue
 rm -rf "$TEMP"
 
-# Grease
-# Grease is used for the `make release-github` task.
-TEMP=$(mktemp -d)
-curl \
-    -L https://github.com/vectordotdev/grease/releases/download/v1.0.1/grease-1.0.1-linux-amd64.tar.gz \
-    -o "${TEMP}/grease-1.0.1-linux-amd64.tar.gz"
-tar \
-    -xvf "${TEMP}/grease-1.0.1-linux-amd64.tar.gz" \
-    -C "${TEMP}"
-cp "${TEMP}/grease/bin/grease" /usr/bin/grease
-rm -rf "$TEMP"
-
 # Locales
 locale-gen en_US.UTF-8
-dpkg-reconfigure locales
 
 if ! command -v rustup ; then
   # https://github.com/actions/runner-images/blob/main/images/ubuntu/Ubuntu2404-Readme.md#rust-tools
@@ -91,35 +82,44 @@ else
     echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> "${HOME}/.bash_profile"
 fi
 
-# Docker.
+# Add repositories for Docker and Node.js first, then do a single update
+NEED_UPDATE=0
+
 if ! [ -x "$(command -v docker)" ]; then
     curl -fsSL https://download.docker.com/linux/ubuntu/gpg | apt-key add -
     add-apt-repository \
         "deb [arch=$(dpkg --print-architecture)] https://download.docker.com/linux/ubuntu \
         xenial \
         stable"
-    # Install those new things
-    apt-get update --yes
-    apt-get install --yes docker-ce docker-ce-cli containerd.io
-
-    # ubuntu user doesn't exist in scripts/environment/Dockerfile which runs this
-    usermod --append --groups docker ubuntu || true
+    NEED_UPDATE=1
 fi
 
-bash scripts/environment/install-protoc.sh
-
-# Node.js, npm and yarn.
-# Note: the current LTS for the Node.js toolchain is 18.x
 if ! [ -x "$(command -v node)" ]; then
     curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key | apt-key add -
     add-apt-repository \
         "deb [arch=$(dpkg --print-architecture)] https://deb.nodesource.com/node_18.x \
         nodistro \
         main"
-    # Install those new things
-    apt-get update --yes
-    apt-get install --yes nodejs
+    NEED_UPDATE=1
+fi
 
+# Only update if we added new repositories
+if [ $NEED_UPDATE -eq 1 ]; then
+    apt-get update --yes
+fi
+
+# Install Docker if needed
+if ! [ -x "$(command -v docker)" ]; then
+    apt-get install --yes docker-ce docker-ce-cli containerd.io
+    # ubuntu user doesn't exist in scripts/environment/Dockerfile which runs this
+    usermod --append --groups docker ubuntu || true
+fi
+
+bash scripts/environment/install-protoc.sh
+
+# Install Node.js if needed
+if ! [ -x "$(command -v node)" ]; then
+    apt-get install --yes nodejs
     # enable corepack (enables the yarn and pnpm package managers)
     # ref: https://nodejs.org/docs/latest-v18.x/api/corepack.html
     corepack enable

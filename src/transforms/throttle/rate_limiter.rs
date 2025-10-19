@@ -1,10 +1,8 @@
-use governor::clock;
-use governor::middleware::NoOpMiddleware;
-use governor::state::keyed::DashMapStateStore;
-use governor::{Quota, RateLimiter};
-use std::hash::Hash;
-use std::sync::Arc;
-use std::time::Duration;
+use std::{hash::Hash, sync::Arc, time::Duration};
+
+use governor::{
+    Quota, RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::DashMapStateStore,
+};
 use tokio;
 
 /// Re-usable wrapper around the structs/type from the governor crate.

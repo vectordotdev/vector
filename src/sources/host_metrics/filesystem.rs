@@ -2,12 +2,10 @@ use futures::StreamExt;
 use heim::units::information::byte;
 #[cfg(not(windows))]
 use heim::units::ratio::ratio;
-use vector_lib::configurable::configurable_component;
-use vector_lib::metric_tags;
+use vector_lib::{configurable::configurable_component, metric_tags};
 
+use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeFilesystemError};
-
-use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
 
 /// Options for the filesystem metrics collector.
 #[configurable_component]
@@ -148,8 +146,8 @@ impl HostMetrics {
 mod tests {
     use super::{
         super::{
-            tests::{all_gauges, assert_filtered_metrics, count_name, count_tag},
             HostMetrics, HostMetricsConfig, MetricsBuffer,
+            tests::{all_gauges, assert_filtered_metrics, count_name, count_tag},
         },
         FilesystemConfig,
     };
@@ -163,7 +161,7 @@ mod tests {
             .await;
         let metrics = buffer.metrics;
         assert!(!metrics.is_empty());
-        assert!(metrics.len() % 4 == 0);
+        assert!(metrics.len().is_multiple_of(4));
         assert!(all_gauges(&metrics));
 
         // There are exactly three filesystem_* names
@@ -173,12 +171,7 @@ mod tests {
             "filesystem_used_bytes",
             "filesystem_used_ratio",
         ] {
-            assert_eq!(
-                count_name(&metrics, name),
-                metrics.len() / 4,
-                "name={}",
-                name
-            );
+            assert_eq!(count_name(&metrics, name), metrics.len() / 4, "name={name}");
         }
 
         // They should all have "filesystem" and "mountpoint" tags

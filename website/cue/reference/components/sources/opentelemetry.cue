@@ -72,7 +72,7 @@ components: sources: opentelemetry: {
 
 	output: {
 		logs: event: {
-			description: "An individual log event from a batch of events received through an OTLP request"
+			description: "An individual log event from a batch of events received through an OTLP request. The following applies only when the `use_otlp_decoding` option is `false`."
 			fields: {
 				attributes: {
 					description: "Attributes that describe the specific event occurrence."
@@ -241,14 +241,39 @@ components: sources: opentelemetry: {
 			}
 		}
 		metrics: "": {
-			description: "The input `metric` event."
+			description: "Metric events that may be emitted by this source."
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 
 	how_it_works: {
+		otlp_decoding: {
+			title: "OTLP Decoding Usage"
+			body: """
+				This section is a usage example for the `use_otlp_decoding` option.
+				This setup allows shipping OTLP formatted logs to an OTEL collector without the use of a `remap` transform.
+				The same can be done for metrics and traces.
+
+				However, OTLP formatted metrics cannot be converted to Vector's metrics format. As a workaround, the OTLP
+				metrics are converted to Vector log events while preserving the OTLP format. This prohibits the use of metric
+				transforms like `aggregate` but it enables easy shipping to OTEL collectors.
+
+				The recommended `opentelemetry` sink configuration is the following:
+				```yaml
+					otel_sink:
+						inputs:
+							- otel.logs
+						type: opentelemetry
+						protocol:
+							type: http
+							uri: http://localhost:5318/v1/logs
+						encoding:
+							codec: otlp
+				```
+				"""
+		}
 		tls: {
 			title: "Transport Layer Security (TLS)"
 			body:  """

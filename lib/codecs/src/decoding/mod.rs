@@ -5,7 +5,8 @@ mod error;
 pub mod format;
 pub mod framing;
 
-use crate::decoding::format::{VrlDeserializer, VrlDeserializerConfig};
+use std::fmt::Debug;
+
 use bytes::{Bytes, BytesMut};
 pub use error::StreamDecodingError;
 pub use format::{
@@ -16,6 +17,8 @@ pub use format::{
     NativeJsonDeserializerConfig, NativeJsonDeserializerOptions, ProtobufDeserializer,
     ProtobufDeserializerConfig, ProtobufDeserializerOptions,
 };
+#[cfg(feature = "opentelemetry")]
+pub use format::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType};
 #[cfg(feature = "syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
 pub use framing::{
@@ -24,10 +27,9 @@ pub use framing::{
     ChunkedGelfDecoderConfig, ChunkedGelfDecoderOptions, FramingError, LengthDelimitedDecoder,
     LengthDelimitedDecoderConfig, NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig,
     NewlineDelimitedDecoderOptions, OctetCountingDecoder, OctetCountingDecoderConfig,
-    OctetCountingDecoderOptions,
+    OctetCountingDecoderOptions, VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
 };
 use smallvec::SmallVec;
-use std::fmt::Debug;
 use vector_config::configurable_component;
 use vector_core::{
     config::{DataType, LogNamespace},
@@ -36,6 +38,7 @@ use vector_core::{
 };
 
 use self::format::{AvroDeserializer, AvroDeserializerConfig, AvroDeserializerOptions};
+use crate::decoding::format::{VrlDeserializer, VrlDeserializerConfig};
 
 /// An error that occurred while decoding structured events from a byte stream /
 /// byte messages.
@@ -51,8 +54,8 @@ pub enum Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::FramingError(error) => write!(formatter, "FramingError({})", error),
-            Self::ParsingError(error) => write!(formatter, "ParsingError({})", error),
+            Self::FramingError(error) => write!(formatter, "FramingError({error})"),
+            Self::ParsingError(error) => write!(formatter, "ParsingError({error})"),
         }
     }
 }
@@ -105,6 +108,10 @@ pub enum FramingConfig {
     ///
     /// [chunked_gelf]: https://go2docs.graylog.org/current/getting_in_log_data/gelf.html
     ChunkedGelf(ChunkedGelfDecoderConfig),
+
+    /// Byte frames which are prefixed by a varint indicating the length.
+    /// This is compatible with protobuf's length-delimited encoding.
+    VarintLengthDelimited(VarintLengthDelimitedDecoderConfig),
 }
 
 impl From<BytesDecoderConfig> for FramingConfig {
@@ -143,6 +150,12 @@ impl From<ChunkedGelfDecoderConfig> for FramingConfig {
     }
 }
 
+impl From<VarintLengthDelimitedDecoderConfig> for FramingConfig {
+    fn from(config: VarintLengthDelimitedDecoderConfig) -> Self {
+        Self::VarintLengthDelimited(config)
+    }
+}
+
 impl FramingConfig {
     /// Build the `Framer` from this configuration.
     pub fn build(&self) -> Framer {
@@ -153,6 +166,9 @@ impl FramingConfig {
             FramingConfig::NewlineDelimited(config) => Framer::NewlineDelimited(config.build()),
             FramingConfig::OctetCounting(config) => Framer::OctetCounting(config.build()),
             FramingConfig::ChunkedGelf(config) => Framer::ChunkedGelf(config.build()),
+            FramingConfig::VarintLengthDelimited(config) => {
+                Framer::VarintLengthDelimited(config.build())
+            }
         }
     }
 }
@@ -174,6 +190,8 @@ pub enum Framer {
     Boxed(BoxedFramer),
     /// Uses a `ChunkedGelfDecoder` for framing.
     ChunkedGelf(ChunkedGelfDecoder),
+    /// Uses a `VarintLengthDelimitedDecoder` for framing.
+    VarintLengthDelimited(VarintLengthDelimitedDecoder),
 }
 
 impl tokio_util::codec::Decoder for Framer {
@@ -189,6 +207,7 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::OctetCounting(framer) => framer.decode(src),
             Framer::Boxed(framer) => framer.decode(src),
             Framer::ChunkedGelf(framer) => framer.decode(src),
+            Framer::VarintLengthDelimited(framer) => framer.decode(src),
         }
     }
 
@@ -201,6 +220,7 @@ impl tokio_util::codec::Decoder for Framer {
             Framer::OctetCounting(framer) => framer.decode_eof(src),
             Framer::Boxed(framer) => framer.decode_eof(src),
             Framer::ChunkedGelf(framer) => framer.decode_eof(src),
+            Framer::VarintLengthDelimited(framer) => framer.decode_eof(src),
         }
     }
 }
@@ -224,6 +244,15 @@ pub enum DeserializerConfig {
     ///
     /// [protobuf]: https://protobuf.dev/
     Protobuf(ProtobufDeserializerConfig),
+
+    #[cfg(feature = "opentelemetry")]
+    /// Decodes the raw bytes as [OTLP (OpenTelemetry Protocol)][otlp] protobuf format.
+    ///
+    /// This decoder handles the three OTLP signal types: logs, metrics, and traces.
+    /// It automatically detects which type of OTLP message is being decoded.
+    ///
+    /// [otlp]: https://opentelemetry.io/docs/specs/otlp/
+    Otlp(OtlpDeserializerConfig),
 
     #[cfg(feature = "syslog")]
     /// Decodes the raw bytes as a Syslog message.
@@ -260,7 +289,7 @@ pub enum DeserializerConfig {
     /// This codec is experimental for the following reason:
     ///
     /// The GELF specification is more strict than the actual Graylog receiver.
-    /// Vector's decoder currently adheres more strictly to the GELF spec, with
+    /// Vector's decoder adheres more strictly to the GELF spec, with
     /// the exception that some characters such as `@`  are allowed in field names.
     ///
     /// Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
@@ -348,6 +377,8 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => Ok(Deserializer::Bytes(BytesDeserializerConfig.build())),
             DeserializerConfig::Json(config) => Ok(Deserializer::Json(config.build())),
             DeserializerConfig::Protobuf(config) => Ok(Deserializer::Protobuf(config.build()?)),
+            #[cfg(feature = "opentelemetry")]
+            DeserializerConfig::Otlp(config) => Ok(Deserializer::Otlp(config.build())),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => Ok(Deserializer::Syslog(config.build())),
             DeserializerConfig::Native => {
@@ -372,6 +403,8 @@ impl DeserializerConfig {
                 FramingConfig::NewlineDelimited(Default::default())
             }
             DeserializerConfig::Protobuf(_) => FramingConfig::Bytes,
+            #[cfg(feature = "opentelemetry")]
+            DeserializerConfig::Otlp(_) => FramingConfig::Bytes,
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(_) => FramingConfig::NewlineDelimited(Default::default()),
             DeserializerConfig::Vrl(_) => FramingConfig::Bytes,
@@ -399,6 +432,8 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
             DeserializerConfig::Json(config) => config.output_type(),
             DeserializerConfig::Protobuf(config) => config.output_type(),
+            #[cfg(feature = "opentelemetry")]
+            DeserializerConfig::Otlp(config) => config.output_type(),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => config.output_type(),
             DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
@@ -419,6 +454,8 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::Json(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Protobuf(config) => config.schema_definition(log_namespace),
+            #[cfg(feature = "opentelemetry")]
+            DeserializerConfig::Otlp(config) => config.schema_definition(log_namespace),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
@@ -452,6 +489,8 @@ impl DeserializerConfig {
                 "application/octet-stream"
             }
             (DeserializerConfig::Protobuf(_), _) => "application/octet-stream",
+            #[cfg(feature = "opentelemetry")]
+            (DeserializerConfig::Otlp(_), _) => "application/x-protobuf",
             (
                 DeserializerConfig::Json(_)
                 | DeserializerConfig::NativeJson(_)
@@ -468,6 +507,7 @@ impl DeserializerConfig {
 }
 
 /// Parse structured events from bytes.
+#[allow(clippy::large_enum_variant)]
 #[derive(Clone)]
 pub enum Deserializer {
     /// Uses a `AvroDeserializer` for deserialization.
@@ -478,6 +518,9 @@ pub enum Deserializer {
     Json(JsonDeserializer),
     /// Uses a `ProtobufDeserializer` for deserialization.
     Protobuf(ProtobufDeserializer),
+    #[cfg(feature = "opentelemetry")]
+    /// Uses an `OtlpDeserializer` for deserialization.
+    Otlp(OtlpDeserializer),
     #[cfg(feature = "syslog")]
     /// Uses a `SyslogDeserializer` for deserialization.
     Syslog(SyslogDeserializer),
@@ -506,6 +549,8 @@ impl format::Deserializer for Deserializer {
             Deserializer::Bytes(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Json(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Protobuf(deserializer) => deserializer.parse(bytes, log_namespace),
+            #[cfg(feature = "opentelemetry")]
+            Deserializer::Otlp(deserializer) => deserializer.parse(bytes, log_namespace),
             #[cfg(feature = "syslog")]
             Deserializer::Syslog(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Native(deserializer) => deserializer.parse(bytes, log_namespace),

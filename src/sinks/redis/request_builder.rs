@@ -2,13 +2,13 @@ use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
 use vector_lib::config::telemetry;
 
-use crate::sinks::{prelude::*, util::EncodedLength};
-
 use super::{RedisEvent, RedisKvEntry, RedisRequest};
+use crate::sinks::{prelude::*, util::EncodedLength};
 
 pub(super) fn encode_event(
     mut event: Event,
     key: String,
+    score: Option<u64>,
     transformer: &Transformer,
     encoder: &mut Encoder<()>,
     byte_size: &mut GroupedCountByteSize,
@@ -23,7 +23,7 @@ pub(super) fn encode_event(
 
     let value = bytes.freeze();
 
-    let event = RedisKvEntry { key, value };
+    let event = RedisKvEntry { key, value, score };
     Some(event)
 }
 
@@ -36,7 +36,14 @@ fn encode_events(
     let request = events
         .into_iter()
         .filter_map(|event| {
-            encode_event(event.event, event.key, transformer, encoder, &mut byte_size)
+            encode_event(
+                event.event,
+                event.key,
+                event.score,
+                transformer,
+                encoder,
+                &mut byte_size,
+            )
         })
         .collect::<Vec<_>>();
 

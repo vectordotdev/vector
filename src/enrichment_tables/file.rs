@@ -3,9 +3,12 @@ use std::{collections::HashMap, fs, hash::Hasher, path::PathBuf, time::SystemTim
 
 use bytes::Bytes;
 use tracing::trace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
-use vector_lib::{conversion::Conversion, TimeZone};
+use vector_lib::{
+    TimeZone,
+    configurable::configurable_component,
+    conversion::Conversion,
+    enrichment::{Case, Condition, IndexHandle, Table},
+};
 use vrl::value::{ObjectMap, Value};
 
 use crate::config::EnrichmentTableConfig;
@@ -143,10 +146,7 @@ impl FileConfig {
                             .from_utc_datetime(
                                 &chrono::NaiveDate::parse_from_str(value, "%Y-%m-%d")
                                     .map_err(|_| {
-                                        format!(
-                                            "unable to parse date {} found in row {}",
-                                            value, row
-                                        )
+                                        format!("unable to parse date {value} found in row {row}")
                                     })?
                                     .and_hms_opt(0, 0, 0)
                                     .expect("invalid timestamp"),
@@ -159,10 +159,7 @@ impl FileConfig {
                             .from_utc_datetime(
                                 &chrono::NaiveDate::parse_from_str(value, format)
                                     .map_err(|_| {
-                                        format!(
-                                            "unable to parse date {} found in row {}",
-                                            value, row
-                                        )
+                                        format!("unable to parse date {value} found in row {row}")
                                     })?
                                     .and_hms_opt(0, 0, 0)
                                     .expect("invalid timestamp"),
@@ -174,9 +171,7 @@ impl FileConfig {
                             Conversion::parse(format, timezone).map_err(|err| err.to_string())?;
                         conversion
                             .convert(Bytes::copy_from_slice(value.as_bytes()))
-                            .map_err(|_| {
-                                format!("unable to parse {} found in row {}", value, row)
-                            })?
+                            .map_err(|_| format!("unable to parse {value} found in row {row}"))?
                     }
                 }
             }
@@ -416,7 +411,7 @@ impl File {
                 })
                 .collect::<Vec<_>>()
                 .join(", ");
-            Err(format!("field(s) '{}' missing from dataset", missing))
+            Err(format!("field(s) '{missing}' missing from dataset"))
         } else {
             Ok(normalized)
         }

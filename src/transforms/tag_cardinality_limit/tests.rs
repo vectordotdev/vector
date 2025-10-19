@@ -1,25 +1,25 @@
-use std::collections::HashMap;
-use std::sync::Arc;
+use std::{collections::HashMap, sync::Arc};
 
 use config::PerMetricConfig;
-use vector_lib::config::ComponentKey;
-use vector_lib::config::OutputId;
-use vector_lib::event::EventMetadata;
-use vector_lib::metric_tags;
-
-use super::*;
-use crate::config::schema::Definition;
-use crate::config::LogNamespace;
-use crate::event::metric::TagValue;
-use crate::event::{metric, Event, Metric, MetricTags};
-use crate::test_util::components::assert_transform_compliance;
-use crate::transforms::tag_cardinality_limit::config::{
-    default_cache_size, BloomFilterConfig, Mode,
-};
-use crate::transforms::test::create_topology;
 use tokio::sync::mpsc;
 use tokio_stream::wrappers::ReceiverStream;
+use vector_lib::{
+    config::{ComponentKey, OutputId},
+    event::EventMetadata,
+    metric_tags,
+};
 use vrl::compiler::prelude::Kind;
+
+use super::*;
+use crate::{
+    config::{LogNamespace, schema::Definition},
+    event::{Event, Metric, MetricTags, metric, metric::TagValue},
+    test_util::components::assert_transform_compliance,
+    transforms::{
+        tag_cardinality_limit::config::{BloomFilterConfig, Mode, default_cache_size},
+        test::create_topology,
+    },
+};
 
 #[test]
 fn generate_config() {
@@ -529,11 +529,13 @@ async fn separate_value_limit_per_metric_name(config: TagCardinalityLimitConfig)
         assert_eq!(new_event_a1, Some(event_a1));
         // The second event should have been modified to remove "tag1"
         let new_event_a2 = new_event_a2.unwrap();
-        assert!(!new_event_a2
-            .as_metric()
-            .tags()
-            .unwrap()
-            .contains_key("tag1"));
+        assert!(
+            !new_event_a2
+                .as_metric()
+                .tags()
+                .unwrap()
+                .contains_key("tag1")
+        );
         assert_eq!(
             "val1",
             new_event_a2
@@ -546,11 +548,13 @@ async fn separate_value_limit_per_metric_name(config: TagCardinalityLimitConfig)
 
         // The third event should have been modified to remove "tag2"
         let new_event_a3 = new_event_a3.unwrap();
-        assert!(!new_event_a3
-            .as_metric()
-            .tags()
-            .unwrap()
-            .contains_key("tag2"));
+        assert!(
+            !new_event_a3
+                .as_metric()
+                .tags()
+                .unwrap()
+                .contains_key("tag2")
+        );
         assert_eq!(
             "val1",
             new_event_a3
@@ -569,11 +573,13 @@ async fn separate_value_limit_per_metric_name(config: TagCardinalityLimitConfig)
         assert_eq!(new_event_c2, Some(event_c2));
         // The third event should have been modified to remove "tag2"
         let new_event_c3 = new_event_c3.unwrap();
-        assert!(!new_event_c3
-            .as_metric()
-            .tags()
-            .unwrap()
-            .contains_key("tag2"));
+        assert!(
+            !new_event_c3
+                .as_metric()
+                .tags()
+                .unwrap()
+                .contains_key("tag2")
+        );
         assert_eq!(
             "val1",
             new_event_c3

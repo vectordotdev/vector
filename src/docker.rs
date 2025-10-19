@@ -2,6 +2,7 @@
 use std::{collections::HashMap, env, path::PathBuf};
 
 use bollard::{
+    API_DEFAULT_VERSION, Docker,
     errors::Error as DockerError,
     models::HostConfig,
     query_parameters::{
@@ -9,7 +10,6 @@ use bollard::{
         RemoveContainerOptions, StartContainerOptions, StopContainerOptions,
     },
     secret::ContainerCreateBody,
-    Docker, API_DEFAULT_VERSION,
 };
 use futures::StreamExt;
 use http::uri::Uri;
@@ -79,7 +79,7 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
                 Some("unix") | Some("npipe") | None => {
                     Docker::connect_with_defaults().map_err(Into::into)
                 }
-                Some(scheme) => Err(format!("Unknown scheme: {}", scheme).into()),
+                Some(scheme) => Err(format!("Unknown scheme: {scheme}").into()),
             }
         }
     }
@@ -130,7 +130,7 @@ async fn pull_image(docker: &Docker, image: &str, tag: &str) {
             .for_each(|item| async move {
                 let info = item.unwrap();
                 if let Some(error) = info.error {
-                    panic!("{:?}", error);
+                    panic!("{error:?}");
                 }
             })
             .await
@@ -172,7 +172,7 @@ impl Container {
     }
 
     pub fn bind(mut self, src: impl std::fmt::Display, dst: &str) -> Self {
-        let bind = format!("{}:{}", src, dst);
+        let bind = format!("{src}:{dst}");
         self.binds.get_or_insert_with(Vec::new).push(bind);
         self
     }

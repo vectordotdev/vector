@@ -76,7 +76,7 @@ generated: components: sources: opentelemetry: configuration: {
 						}
 						enabled: {
 							description: """
-																Whether or not to require TLS for incoming or outgoing connections.
+																Whether to require TLS for incoming or outgoing connections.
 
 																When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 																more information.
@@ -255,7 +255,7 @@ generated: components: sources: opentelemetry: configuration: {
 						}
 						enabled: {
 							description: """
-																Whether or not to require TLS for incoming or outgoing connections.
+																Whether to require TLS for incoming or outgoing connections.
 
 																When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 																more information.
@@ -324,5 +324,16 @@ generated: components: sources: opentelemetry: configuration: {
 				}
 			}
 		}
+	}
+	use_otlp_decoding: {
+		description: """
+			Setting this field will override the legacy mapping of OTEL protos to Vector events and use the proto directly.
+
+			One major caveat here is that the incoming metrics will be parsed as logs but they will preserve the OTLP format.
+			This means that components that work on metrics, will not be compatible with this output.
+			However, these events can be forwarded directly to a downstream OTEL collector.
+			"""
+		required: false
+		type: bool: default: false
 	}
 }

@@ -2,7 +2,7 @@
 name = "vector-vrl-tests"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
-edition = "2021"
+edition = "2024"
 publish = false
 
 [dependencies]
@@ -16,7 +16,7 @@ clap.workspace = true
 glob.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-tracing-subscriber = { version = "0.3.19", default-features = false, features = ["fmt"] }
+tracing-subscriber = { workspace = true, features = ["fmt"] }
 
 [target.'cfg(not(target_env = "msvc"))'.dependencies]
 tikv-jemallocator = { version = "0.6.0" }
