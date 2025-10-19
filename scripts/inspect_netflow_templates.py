@@ -44,17 +44,23 @@ class NetFlowTemplateInspector:
         if len(data) < 4:
             return
             
-        # Check if it's IPFIX (version 10)
+        # Check version and show first few bytes for debugging
         version = struct.unpack('>H', data[0:2])[0]
+        hex_preview = ' '.join(f'{b:02x}' for b in data[:16])
         
         if version == 10:  # IPFIX
+            print(f"📦 IPFIX packet from {addr}: {hex_preview}...")
             self.process_ipfix_packet(data, addr)
         elif version == 5:  # NetFlow v5
+            if not getattr(self, 'ipfix_only', False):
+                print(f"📦 NetFlow v5 packet from {addr}: {hex_preview}...")
             self.process_netflow_v5_packet(data, addr)
         elif version == 9:  # NetFlow v9
+            if not getattr(self, 'ipfix_only', False):
+                print(f"📦 NetFlow v9 packet from {addr}: {hex_preview}...")
             self.process_netflow_v9_packet(data, addr)
         else:
-            print(f"❓ Unknown version {version} from {addr}")
+            print(f"❓ Unknown version {version} from {addr}: {hex_preview}...")
     
     def process_ipfix_packet(self, data: bytes, addr: tuple):
         """Process IPFIX packet"""
@@ -224,10 +230,12 @@ def main():
     parser.add_argument('--port', type=int, default=9995, help='UDP port to listen on')
     parser.add_argument('--bind', default='0.0.0.0', help='Address to bind to')
     parser.add_argument('--duration', type=int, help='Run for N seconds then exit')
+    parser.add_argument('--ipfix-only', action='store_true', help='Only show IPFIX packets')
     
     args = parser.parse_args()
     
     inspector = NetFlowTemplateInspector(port=args.port, bind_addr=args.bind)
+    inspector.ipfix_only = args.ipfix_only
     
     if args.duration:
         print(f"⏱️  Running for {args.duration} seconds...")
