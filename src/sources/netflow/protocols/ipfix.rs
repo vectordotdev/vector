@@ -485,9 +485,15 @@ impl IpfixParser {
                 fields_parsed += 1;
             }
 
-            // Only emit event if we parsed some fields
+            // Only emit event if we parsed some fields and have valid data
             if fields_parsed > 0 {
-                events.push(Event::Log(log_event));
+                // Validate that we have reasonable data (not garbage)
+                let has_valid_data = self.validate_flow_record(&log_event);
+                if has_valid_data {
+                    events.push(Event::Log(log_event));
+                } else {
+                    debug!("Skipping invalid flow record with garbage data");
+                }
             }
 
             // Advance to next record
@@ -541,6 +547,33 @@ impl IpfixParser {
         } else {
             None
         }
+    }
+
+    /// Validate that a flow record contains reasonable data
+    fn validate_flow_record(&self, log_event: &LogEvent) -> bool {
+        // Check for obviously invalid data
+        if let Some(Value::Integer(bytes)) = log_event.get("octetDeltaCount") {
+            // Reject records with unrealistic byte counts (> 1TB)
+            if *bytes > 1_000_000_000_000i64 {
+                return false;
+            }
+        }
+
+        if let Some(Value::Integer(packets)) = log_event.get("packetDeltaCount") {
+            // Reject records with unrealistic packet counts (> 1 billion)
+            if *packets > 1_000_000_000i64 {
+                return false;
+            }
+        }
+
+        // Check for missing critical fields
+        let has_source_ip = log_event.get("sourceIPv4Address").is_some() || 
+                           log_event.get("sourceIPv6Address").is_some();
+        let has_dest_ip = log_event.get("destinationIPv4Address").is_some() || 
+                         log_event.get("destinationIPv6Address").is_some();
+
+        // Must have at least source or destination IP
+        has_source_ip || has_dest_ip
     }
 }
 
