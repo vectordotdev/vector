@@ -424,9 +424,10 @@ impl IpfixParser {
         };
 
         debug!(
-            "Parsing IPFIX data set: template_id={}, fields={}",
+            "Parsing IPFIX data set: template_id={}, fields={}, template_fields={:?}",
             template_id,
-            template.fields.len()
+            template.fields.len(),
+            template.fields.iter().map(|f| (f.field_type, f.field_length)).collect::<Vec<_>>()
         );
 
         // Calculate record size for fixed-length templates
@@ -479,21 +480,48 @@ impl IpfixParser {
                 }
 
                 let field_data = &data[field_offset..field_offset + field_length];
+                
+                // Debug: Log raw field data for problematic fields
+                if field.field_type == 96 || field.field_type == 236 || field.field_type == 32793 {
+                    debug!(
+                        "Field {} (type={}, length={}): raw_data={:?}",
+                        fields_parsed,
+                        field.field_type,
+                        field_length,
+                        &field_data[..std::cmp::min(field_data.len(), 16)]
+                    );
+                }
+                
                 self.field_parser.parse_field(field, field_data, &mut log_event);
 
                 field_offset += field_length;
                 fields_parsed += 1;
             }
 
-            // Only emit event if we parsed some fields and have valid data
+            // Only emit event if we parsed some fields
             if fields_parsed > 0 {
-                // Validate that we have reasonable data (not garbage)
-                let has_valid_data = self.validate_flow_record(&log_event);
-                if has_valid_data {
-                    events.push(Event::Log(log_event));
-                } else {
-                    debug!("Skipping invalid flow record with garbage data");
+                // Debug: Log the parsed fields to understand what we're getting
+                debug!(
+                    "Parsed flow record {}: fields={}, data={:?}",
+                    record_count,
+                    fields_parsed,
+                    log_event.get_all().keys().collect::<Vec<_>>()
+                );
+                
+                // Log specific problematic fields for debugging
+                if let Some(Value::Integer(bytes)) = log_event.get("octetDeltaCount") {
+                    if *bytes > 1_000_000_000_000i64 {
+                        debug!("Large byte count detected: {} bytes", bytes);
+                    }
                 }
+                
+                if let Some(Value::Bytes(protocol)) = log_event.get("protocolName") {
+                    if protocol == b"XNET" {
+                        debug!("XNET protocol detected - possible parsing issue");
+                    }
+                }
+                
+                events.push(Event::Log(log_event));
             }
 
             // Advance to next record
@@ -549,32 +577,6 @@ impl IpfixParser {
         }
     }
 
-    /// Validate that a flow record contains reasonable data
-    fn validate_flow_record(&self, log_event: &LogEvent) -> bool {
-        // Check for obviously invalid data
-        if let Some(Value::Integer(bytes)) = log_event.get("octetDeltaCount") {
-            // Reject records with unrealistic byte counts (> 1TB)
-            if *bytes > 1_000_000_000_000i64 {
-                return false;
-            }
-        }
-
-        if let Some(Value::Integer(packets)) = log_event.get("packetDeltaCount") {
-            // Reject records with unrealistic packet counts (> 1 billion)
-            if *packets > 1_000_000_000i64 {
-                return false;
-            }
-        }
-
-        // Check for missing critical fields
-        let has_source_ip = log_event.get("sourceIPv4Address").is_some() || 
-                           log_event.get("sourceIPv6Address").is_some();
-        let has_dest_ip = log_event.get("destinationIPv4Address").is_some() || 
-                         log_event.get("destinationIPv6Address").is_some();
-
-        // Must have at least source or destination IP
-        has_source_ip || has_dest_ip
-    }
 }
 
 /// Additional event types for IPFIX-specific events
