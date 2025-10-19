@@ -146,6 +146,8 @@ mod tests {
             parse_options_templates: true,
             parse_variable_length_fields: true,
             enterprise_fields: std::collections::HashMap::new(),
+            buffer_missing_templates: true,
+            max_buffered_records: 100,
         };
 
         let parser = ProtocolParser::new(&config, template_cache.clone());
@@ -282,6 +284,8 @@ mod tests {
             parse_options_templates: true,
             parse_variable_length_fields: true,
             enterprise_fields: std::collections::HashMap::new(),
+            buffer_missing_templates: true,
+            max_buffered_records: 100,
         };
 
         let (tx, rx) = SourceSender::new_test();
