@@ -50,16 +50,30 @@ pub struct NetflowParseError<'a> {
 
 impl<'a> InternalEvent for NetflowParseError<'a> {
     fn emit(self) {
-        error!(
-            message = "Failed to parse NetFlow packet",
-            error = %self.error,
-            protocol = %self.protocol,
-            peer_addr = %self.peer_addr,
-            error_code = "parse_failed",
-            error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
-        );
+        // Only log as error for critical parsing failures, not missing templates
+        if self.error.contains("No template") {
+            debug!(
+                message = "Template not yet available, data may be buffered",
+                error = %self.error,
+                protocol = %self.protocol,
+                peer_addr = %self.peer_addr,
+                error_code = "template_missing",
+                error_type = error_type::PARSER_FAILED,
+                stage = error_stage::PROCESSING,
+                internal_log_rate_limit = true,
+            );
+        } else {
+            error!(
+                message = "Failed to parse NetFlow packet",
+                error = %self.error,
+                protocol = %self.protocol,
+                peer_addr = %self.peer_addr,
+                error_code = "parse_failed",
+                error_type = error_type::PARSER_FAILED,
+                stage = error_stage::PROCESSING,
+                internal_log_rate_limit = true,
+            );
+        }
         
         counter!(
             "component_errors_total",
@@ -149,14 +163,27 @@ pub struct NetflowEventsDropped {
 
 impl InternalEvent for NetflowEventsDropped {
     fn emit(self) {
-        warn!(
-            message = "NetFlow events dropped",
-            count = self.count,
-            reason = %self.reason,
-            error_code = "events_dropped",
-            error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-        );
+        // Reduce noise for template-related drops when buffering is enabled
+        if self.reason.contains("No template") {
+            debug!(
+                message = "NetFlow events dropped - template not available",
+                count = self.count,
+                reason = %self.reason,
+                error_code = "template_missing",
+                error_type = error_type::PARSER_FAILED,
+                stage = error_stage::PROCESSING,
+                internal_log_rate_limit = true,
+            );
+        } else {
+            warn!(
+                message = "NetFlow events dropped",
+                count = self.count,
+                reason = %self.reason,
+                error_code = "events_dropped",
+                error_type = error_type::PARSER_FAILED,
+                stage = error_stage::PROCESSING,
+            );
+        }
         
         counter!(
             "component_errors_total",
@@ -305,6 +332,15 @@ pub struct TemplateReceived {
     pub protocol: &'static str,
 }
 
+/// Buffered records processed when template becomes available
+#[derive(Debug)]
+pub struct BufferedRecordsProcessed {
+    pub template_id: u16,
+    pub record_count: usize,
+    pub peer_addr: SocketAddr,
+    pub observation_domain_id: u32,
+}
+
 impl InternalEvent for TemplateReceived {
     fn emit(self) {
         debug!(
@@ -322,6 +358,25 @@ impl InternalEvent for TemplateReceived {
             "peer_addr" => self.peer_addr.to_string(),
         )
         .increment(1);
+    }
+}
+
+impl InternalEvent for BufferedRecordsProcessed {
+    fn emit(self) {
+        debug!(
+            message = "Buffered records processed with new template",
+            template_id = self.template_id,
+            record_count = self.record_count,
+            peer_addr = %self.peer_addr,
+            observation_domain_id = self.observation_domain_id,
+        );
+        
+        counter!(
+            "netflow_buffered_records_processed_total",
+            "template_id" => self.template_id.to_string(),
+            "peer_addr" => self.peer_addr.to_string(),
+        )
+        .increment(self.record_count as u64);
     }
 }
 

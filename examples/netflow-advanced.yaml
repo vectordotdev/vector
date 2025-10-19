@@ -1,0 +1,154 @@
+# Advanced NetFlow configuration with all protocols and enterprise fields
+# This configuration shows all available options for production use
+
+sources:
+  netflow:
+    type: netflow
+    address: "0.0.0.0:2055"
+    protocols: ["netflow_v5", "netflow_v9", "ipfix", "sflow"]
+    
+    # Template handling
+    buffer_missing_templates: true
+    max_buffered_records: 500
+    max_templates: 5000
+    template_timeout: 7200  # 2 hours
+    
+    # Packet handling
+    max_length: 65535
+    max_field_length: 4096
+    max_message_size: 1048576  # 1MB
+    
+    # Parsing options
+    parse_enterprise_fields: true
+    parse_options_templates: true
+    parse_variable_length_fields: true
+    
+    # Enterprise field mappings for vendor-specific fields
+    enterprise_fields:
+      "9:1001": "cisco_application_id"
+      "9:1002": "cisco_application_name"
+      "9:1003": "cisco_application_category"
+      "9:1004": "cisco_application_subcategory"
+      "9:1005": "cisco_application_protocol"
+      "9:1006": "cisco_application_risk"
+      "9:1007": "cisco_application_confidence"
+      "9:1008": "cisco_application_priority"
+      "9:1009": "cisco_application_encryption"
+      "9:1010": "cisco_application_tunnel"
+      "9:1011": "cisco_application_ssl"
+      "9:1012": "cisco_application_http"
+      "9:1013": "cisco_application_https"
+      "9:1014": "cisco_application_ftp"
+      "9:1015": "cisco_application_telnet"
+      "9:1016": "cisco_application_ssh"
+      "9:1017": "cisco_application_smtp"
+      "9:1018": "cisco_application_pop3"
+      "9:1019": "cisco_application_imap"
+      "9:1020": "cisco_application_dns"
+      "9:1021": "cisco_application_dhcp"
+      "9:1022": "cisco_application_ntp"
+      "9:1023": "cisco_application_snmp"
+      "9:1024": "cisco_application_ldap"
+      "9:1025": "cisco_application_radius"
+      "9:1026": "cisco_application_tacacs"
+      "9:1027": "cisco_application_kerberos"
+      "9:1028": "cisco_application_nfs"
+      "9:1029": "cisco_application_cifs"
+      "9:1030": "cisco_application_smb"
+      "9:1031": "cisco_application_netbios"
+      "9:1032": "cisco_application_rdp"
+      "9:1033": "cisco_application_vnc"
+      "9:1034": "cisco_application_teamviewer"
+      "9:1035": "cisco_application_skype"
+      "9:1036": "cisco_application_whatsapp"
+      "9:1037": "cisco_application_telegram"
+      "9:1038": "cisco_application_facebook"
+      "9:1039": "cisco_application_twitter"
+      "9:1040": "cisco_application_instagram"
+      "9:1041": "cisco_application_youtube"
+      "9:1042": "cisco_application_netflix"
+      "9:1043": "cisco_application_spotify"
+      "9:1044": "cisco_application_dropbox"
+      "9:1045": "cisco_application_onedrive"
+      "9:1046": "cisco_application_google_drive"
+      "9:1047": "cisco_application_icloud"
+      "9:1048": "cisco_application_amazon_s3"
+      "9:1049": "cisco_application_azure_blob"
+      "9:1050": "cisco_application_aws_s3"
+
+transforms:
+  # Add source metadata
+  add_source_metadata:
+    type: remap
+    inputs: ["netflow"]
+    source: |
+      .source = "netflow"
+      .timestamp = now()
+      
+  # Filter out unparseable records (optional)
+  filter_parseable:
+    type: filter
+    inputs: ["add_source_metadata"]
+    condition: |
+      .flow_type != "ipfix_data_unparseable"
+      
+  # Add network analysis
+  network_analysis:
+    type: remap
+    inputs: ["filter_parseable"]
+    source: |
+      # Add network segment analysis
+      if exists(.src_addr) && exists(.dst_addr) {
+        .network_segment = if .src_addr =~ /^192\.168\./ || .src_addr =~ /^10\./ || .src_addr =~ /^172\.(1[6-9]|2[0-9]|3[0-1])\./ {
+          "private"
+        } else {
+          "public"
+        }
+        
+        # Add traffic direction
+        .traffic_direction = if .src_addr =~ /^192\.168\./ || .src_addr =~ /^10\./ || .src_addr =~ /^172\.(1[6-9]|2[0-9]|3[0-1])\./ {
+          "outbound"
+        } else {
+          "inbound"
+        }
+      }
+      
+      # Add protocol analysis
+      if exists(.protocol) {
+        .protocol_name = match(.protocol) {
+          1 => "ICMP",
+          6 => "TCP", 
+          17 => "UDP",
+          47 => "GRE",
+          50 => "ESP",
+          51 => "AH",
+          89 => "OSPF",
+          132 => "SCTP",
+          _ => "Unknown"
+        }
+      }
+
+sinks:
+  # Console output for debugging
+  console:
+    type: console
+    inputs: ["network_analysis"]
+    encoding:
+      codec: json
+      
+  # File output for persistence
+  file:
+    type: file
+    inputs: ["network_analysis"]
+    path: "/var/log/vector/netflow-%Y-%m-%d.log"
+    encoding:
+      codec: json
+      
+  # Elasticsearch for analysis (optional)
+  # elasticsearch:
+  #   type: elasticsearch
+  #   inputs: ["network_analysis"]
+  #   endpoint: "http://localhost:9200"
+  #   index: "netflow-%Y-%m-%d"
+  #   encoding:
+  #     codec: json

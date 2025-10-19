@@ -33,7 +33,10 @@ async fn netflow_source(
         }.emit();
     })?;
 
-    let template_cache = templates::TemplateCache::new(config.max_templates);
+    let template_cache = templates::TemplateCache::new_with_buffering(
+        config.max_templates, 
+        config.max_buffered_records
+    );
     let protocol_parser = protocols::ProtocolParser::new(&config, template_cache.clone());
     
     let mut buf = vec![0; config.max_length];

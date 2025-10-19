@@ -7,6 +7,7 @@
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
 use std::time::{Duration, Instant};
+use std::collections::VecDeque;
 
 #[cfg(not(test))]
 use lru::LruCache;
@@ -52,6 +53,20 @@ pub struct Template {
     /// Number of times this template has been used
     pub usage_count: u64,
 }
+
+/// Buffered data record waiting for template.
+#[derive(Debug, Clone)]
+pub struct BufferedDataRecord {
+    /// Raw data bytes
+    pub data: Vec<u8>,
+    /// When this record was buffered
+    pub buffered_at: Instant,
+    /// Peer address that sent this data
+    pub peer_addr: SocketAddr,
+    /// Observation domain ID
+    pub observation_domain_id: u32,
+}
+
 
 impl Template {
     /// Create a new template.
@@ -107,6 +122,10 @@ pub struct TemplateCache {
     cache: Arc<RwLock<HashMap<TemplateKey, Template>>>,
     max_size: usize,
     stats: Arc<RwLock<CacheStats>>,
+    /// Buffered data records waiting for templates
+    buffered_records: Arc<RwLock<std::collections::HashMap<TemplateKey, VecDeque<BufferedDataRecord>>>>,
+    /// Maximum number of records to buffer per template
+    max_buffered_records: usize,
 }
 
 /// Cache statistics for monitoring and debugging.
@@ -135,6 +154,11 @@ impl CacheStats {
 impl TemplateCache {
     /// Create a new template cache with the specified maximum size.
     pub fn new(max_size: usize) -> Self {
+        Self::new_with_buffering(max_size, 100)
+    }
+
+    /// Create a new template cache with buffering support.
+    pub fn new_with_buffering(max_size: usize, max_buffered_records: usize) -> Self {
         #[cfg(not(test))]
         let cache = Arc::new(RwLock::new(
             LruCache::new(NonZeroUsize::new(max_size).unwrap_or(NonZeroUsize::new(1000).unwrap()))
@@ -147,6 +171,8 @@ impl TemplateCache {
             cache,
             max_size,
             stats: Arc::new(RwLock::new(CacheStats::default())),
+            buffered_records: Arc::new(RwLock::new(std::collections::HashMap::new())),
+            max_buffered_records,
         }
     }
 
@@ -235,6 +261,14 @@ impl TemplateCache {
             evicted = evicted,
             "Template cached"
         );
+
+        // Process any buffered records for this template
+        self.process_buffered_records(key);
+    }
+
+    /// Process buffered records for a newly available template.
+    pub fn process_buffered_records(&self, key: TemplateKey) -> Vec<BufferedDataRecord> {
+        self.get_buffered_records(&key)
     }
 
     /// Remove expired templates from the cache.
@@ -288,15 +322,19 @@ impl TemplateCache {
             }
         }
 
-        if removed_count > 0 {
+        // Also clean up expired buffered records
+        let buffered_removed = self.cleanup_expired_buffered_records(timeout);
+
+        if removed_count > 0 || buffered_removed > 0 {
             debug!(
                 removed_count = removed_count,
+                buffered_removed = buffered_removed,
                 timeout_seconds = timeout_seconds,
-                "Cleaned up expired templates"
+                "Cleaned up expired templates and buffered records"
             );
 
             emit!(TemplateCleanupCompleted {
-                removed_count: removed_count as usize,
+                removed_count: (removed_count as usize + buffered_removed),
                 timeout_seconds,
             });
         }
@@ -378,6 +416,87 @@ impl TemplateCache {
             } else {
                 Vec::new()
             }
+        }
+    }
+
+    /// Buffer a data record while waiting for its template.
+    pub fn buffer_data_record(
+        &self,
+        key: TemplateKey,
+        data: Vec<u8>,
+        peer_addr: SocketAddr,
+        observation_domain_id: u32,
+    ) -> bool {
+        if let Ok(mut buffered) = self.buffered_records.write() {
+            let queue = buffered.entry(key).or_insert_with(VecDeque::new);
+            
+            // Check if we've hit the limit
+            if queue.len() >= self.max_buffered_records {
+                // Remove oldest record
+                queue.pop_front();
+            }
+            
+            queue.push_back(BufferedDataRecord {
+                data,
+                buffered_at: Instant::now(),
+                peer_addr,
+                observation_domain_id,
+            });
+            
+            true
+        } else {
+            false
+        }
+    }
+
+    /// Get and clear buffered records for a template.
+    pub fn get_buffered_records(&self, key: &TemplateKey) -> Vec<BufferedDataRecord> {
+        if let Ok(mut buffered) = self.buffered_records.write() {
+            buffered.remove(key).unwrap_or_default().into()
+        } else {
+            Vec::new()
+        }
+    }
+
+    /// Clean up expired buffered records.
+    pub fn cleanup_expired_buffered_records(&self, timeout: Duration) -> usize {
+        let mut removed = 0;
+        
+        if let Ok(mut buffered) = self.buffered_records.write() {
+            let now = Instant::now();
+            let mut keys_to_remove = Vec::new();
+            
+            for (key, queue) in buffered.iter_mut() {
+                while let Some(record) = queue.front() {
+                    if now.duration_since(record.buffered_at) > timeout {
+                        queue.pop_front();
+                        removed += 1;
+                    } else {
+                        break;
+                    }
+                }
+                
+                if queue.is_empty() {
+                    keys_to_remove.push(*key);
+                }
+            }
+            
+            for key in keys_to_remove {
+                buffered.remove(&key);
+            }
+        }
+        
+        removed
+    }
+
+    /// Get statistics about buffered records.
+    pub fn buffered_stats(&self) -> (usize, usize) {
+        if let Ok(buffered) = self.buffered_records.read() {
+            let total_records: usize = buffered.values().map(|q| q.len()).sum();
+            let unique_templates = buffered.len();
+            (total_records, unique_templates)
+        } else {
+            (0, 0)
         }
     }
 }

@@ -71,6 +71,17 @@ pub struct NetflowConfig {
     /// Custom enterprise fields.
     #[serde(default)]
     pub enterprise_fields: std::collections::HashMap<String, String>, // Simplified for now
+
+    /// Whether to buffer data records while waiting for templates.
+    /// When enabled, data records without templates are buffered for up to `template_timeout` seconds.
+    #[configurable(metadata(docs::examples = true))]
+    #[configurable(metadata(docs::examples = false))]
+    pub buffer_missing_templates: bool,
+
+    /// Maximum number of data records to buffer per template while waiting for template definition.
+    #[configurable(metadata(docs::examples = 100))]
+    #[configurable(metadata(docs::examples = 1000))]
+    pub max_buffered_records: usize,
 }
 
 /// Supported flow protocols.
@@ -163,6 +174,8 @@ impl Default for NetflowConfig {
             parse_options_templates: default_true(),
             parse_variable_length_fields: default_true(),
             enterprise_fields: std::collections::HashMap::new(),
+            buffer_missing_templates: true,
+            max_buffered_records: 100,
         }
     }
 }
@@ -193,6 +206,13 @@ impl NetflowConfig {
 
         if self.template_timeout == 0 {
             errors.push("template_timeout must be greater than 0".to_string());
+        }
+
+        if self.max_buffered_records == 0 {
+            errors.push("max_buffered_records must be greater than 0".to_string());
+        }
+        if self.max_buffered_records > 10000 {
+            errors.push("max_buffered_records cannot exceed 10,000 (memory usage)".to_string());
         }
 
         // Validate protocols list

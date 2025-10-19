@@ -144,6 +144,7 @@ impl ProtocolParser {
                     template_cache,
                     false, // include_raw_data
                     true,  // drop_unparseable_records
+                    true,  // buffer_missing_templates
                 )
             }
             DetectedProtocol::Sflow => {

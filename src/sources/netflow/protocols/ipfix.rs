@@ -160,6 +160,7 @@ impl IpfixParser {
         template_cache: &TemplateCache,
         include_raw_data: bool,
         drop_unparseable_records: bool,
+        buffer_missing_templates: bool,
     ) -> Result<Vec<Event>, String> {
         let mut events = Vec::new();
 
@@ -231,6 +232,7 @@ impl IpfixParser {
                         peer_addr,
                         template_cache,
                         drop_unparseable_records,
+                        buffer_missing_templates,
                     );
                     data_set_count += 1;
                     data_events.append(&mut set_events);
@@ -357,6 +359,7 @@ impl IpfixParser {
         peer_addr: SocketAddr,
         template_cache: &TemplateCache,
         drop_unparseable_records: bool,
+        buffer_missing_templates: bool,
     ) -> Vec<Event> {
         let mut events = Vec::new();
         let key = (peer_addr, observation_domain_id, template_id);
@@ -368,6 +371,22 @@ impl IpfixParser {
                     "No template found for data set: template_id={}, domain={}",
                     template_id, observation_domain_id
                 );
+
+                // Try to buffer the data if buffering is enabled
+                if buffer_missing_templates {
+                    if template_cache.buffer_data_record(
+                        key,
+                        data.to_vec(),
+                        peer_addr,
+                        observation_domain_id,
+                    ) {
+                        debug!(
+                            "Buffered data record for template_id={}, waiting for template",
+                            template_id
+                        );
+                        return events; // Return empty, data is buffered
+                    }
+                }
 
                 if drop_unparseable_records {
                     emit!(NetflowEventsDropped {
