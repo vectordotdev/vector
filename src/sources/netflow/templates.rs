@@ -565,6 +565,21 @@ pub fn parse_ipfix_template_fields(data: &[u8]) -> Result<Vec<TemplateField>, St
         let (field_type, enterprise_number) = if raw_field_type & 0x8000 != 0 {
             // Enterprise field - next 4 bytes contain enterprise number
             if offset + 4 > data.len() {
+                // Debug: Log raw template data for template ID 1024
+                if data.len() >= 2 {
+                    let template_id = u16::from_be_bytes([data[0], data[1]]);
+                    if template_id == 1024 {
+                        error!(
+                            message = "Template ID 1024 enterprise field parsing failed - raw data dump",
+                            template_id = template_id,
+                            data_length = data.len(),
+                            offset = offset,
+                            remaining_bytes = data.len() - offset,
+                            raw_data_hex = format!("{:02x?}", data),
+                            raw_data_base64 = base64::engine::general_purpose::STANDARD.encode(data),
+                        );
+                    }
+                }
                 return Err("Insufficient data for enterprise field".to_string());
             }
 

@@ -308,6 +308,21 @@ impl IpfixParser {
 
             // Parse template fields
             let template_data = &data[offset..template_end];
+            
+            // Debug: Log raw template data for template ID 1024
+            if template_id == 1024 {
+                error!(
+                    message = "Template ID 1024 received - raw template data dump",
+                    template_id = template_id,
+                    field_count = field_count,
+                    template_data_length = template_data.len(),
+                    raw_template_hex = format!("{:02x?}", template_data),
+                    raw_template_base64 = base64::engine::general_purpose::STANDARD.encode(template_data),
+                    peer_addr = %peer_addr,
+                    observation_domain_id = observation_domain_id,
+                );
+            }
+            
             match parse_ipfix_template_fields(template_data) {
                 Ok(fields) => {
                     let template = Template::new(template_id, fields);
