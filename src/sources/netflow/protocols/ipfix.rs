@@ -823,7 +823,7 @@ mod tests {
     fn test_template_parsing() {
         let config = NetflowConfig::default();
         let field_parser = FieldParser::new(&config);
-        let parser = IpfixParser::new(field_parser);
+        let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
         let template_cache = TemplateCache::new(100);
 
         // Create IPFIX packet with template
@@ -854,7 +854,7 @@ mod tests {
     fn test_data_parsing_without_template() {
         let config = NetflowConfig::default();
         let field_parser = FieldParser::new(&config);
-        let parser = IpfixParser::new(field_parser);
+        let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
         let template_cache = TemplateCache::new(100);
 
         // Create IPFIX packet with data set (no template)
@@ -884,7 +884,7 @@ mod tests {
     fn test_data_parsing_with_template() {
         let config = NetflowConfig::default();
         let field_parser = FieldParser::new(&config);
-        let parser = IpfixParser::new(field_parser);
+        let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
         let template_cache = TemplateCache::new(100);
 
         // First, add a template to cache
@@ -924,7 +924,7 @@ mod tests {
     fn test_variable_length_parsing() {
         let config = NetflowConfig::default();
         let field_parser = FieldParser::new(&config);
-        let parser = IpfixParser::new(field_parser);
+        let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
 
         // Test single-byte length
         let data = vec![10, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
@@ -946,7 +946,7 @@ mod tests {
     fn test_enterprise_field_template() {
         let config = NetflowConfig::default();
         let field_parser = FieldParser::new(&config);
-        let parser = IpfixParser::new(field_parser);
+        let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
         let template_cache = TemplateCache::new(100);
 
         // Create IPFIX packet with enterprise field template
@@ -978,7 +978,7 @@ mod tests {
     fn test_malformed_packet_handling() {
         let config = NetflowConfig::default();
         let field_parser = FieldParser::new(&config);
-        let parser = IpfixParser::new(field_parser);
+        let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
         let template_cache = TemplateCache::new(100);
 
         // Test with corrupted set length
