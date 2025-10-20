@@ -1,16 +1,19 @@
 //! `RequestBuilder` implementation for the `Clickhouse` sink.
 
+use std::io::Write;
 use std::sync::Arc;
 
 use bytes::Bytes;
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use vector_lib::codecs::encoding::Framer;
+use vector_lib::request_metadata::GroupedCountByteSize;
 
 #[cfg(feature = "sinks-clickhouse")]
 use super::encoder;
 use super::{config::Format, sink::PartitionKey};
 use crate::codecs::Encoder;
 use crate::sinks::util::Compressor;
+use crate::sinks::util::encoding::Encoder as EncoderTrait;
 use crate::sinks::{prelude::*, util::http::HttpRequest};
 
 #[derive(Debug, Snafu)]
@@ -82,7 +85,6 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
         let mut compressor = Compressor::from(self.compression());
         let is_compressed = compressor.is_compressed();
         let (_, json_size) = {
-            use crate::sinks::util::encoding::Encoder as EncoderTrait;
             self.encoder()
                 .encode_input(events, &mut compressor)
                 .map_err(|source| RequestBuilderError::Encoding { source })?
@@ -125,8 +127,6 @@ impl ClickhouseRequestBuilder {
         &self,
         events: Vec<Event>,
     ) -> Result<EncodeResult<Bytes>, RequestBuilderError> {
-        use snafu::ResultExt;
-
         // Encode events to Arrow IPC format using provided schema
         let arrow_bytes =
             encoder::encode_events_to_arrow_stream(&events, self.arrow_schema.clone())
@@ -138,7 +138,6 @@ impl ClickhouseRequestBuilder {
         let mut compressor = Compressor::from(self.compression());
         let is_compressed = compressor.is_compressed();
 
-        use std::io::Write;
         compressor
             .write_all(&arrow_bytes)
             .context(CompressionSnafu)?;
@@ -147,7 +146,6 @@ impl ClickhouseRequestBuilder {
 
         // Calculate size for metrics
         // We need to create a temporary EncodeResult to extract the GroupedCountByteSize
-        use vector_lib::request_metadata::GroupedCountByteSize;
         let temp_result =
             EncodeResult::uncompressed(Bytes::new(), GroupedCountByteSize::new_untagged());
         let json_size = RequestMetadataBuilder::from_events(&events)
