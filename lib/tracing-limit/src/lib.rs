@@ -842,7 +842,10 @@ mod test {
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
                 for key in &["foo", "bar"] {
-                    info!(message = format!("Hello {key}!").as_str(), component_id = &key);
+                    info!(
+                        message = format!("Hello {key}!").as_str(),
+                        component_id = &key
+                    );
                 }
                 MockClock::advance(Duration::from_millis(100));
             }
