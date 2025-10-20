@@ -150,72 +150,13 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - run: |
-          export DEBIAN_FRONTEND=noninteractive
-          export ACCEPT_EULA=Y
-
-          echo 'Acquire::Retries "5";' | sudo tee /etc/apt/apt.conf.d/80-retries
-
-          sudo apt-get update --yes
-
-          sudo apt-get install --yes \
-            software-properties-common \
-            apt-utils \
-            apt-transport-https
-
-          # Deps
-          sudo apt-get install --yes --no-install-recommends \
-              build-essential \
-              ca-certificates \
-              cmake \
-              cmark-gfm \
-              curl \
-              gawk \
-              gnupg2 \
-              gnupg-agent \
-              gnuplot \
-              jq \
-              libclang-dev \
-              libsasl2-dev \
-              libssl-dev \
-              llvm \
-              locales \
-              pkg-config \
-              rename \
-              rpm \
-              ruby-bundler \
-              shellcheck \
-              sudo \
-              unzip \
-              wget
-
-          # Locales
-          sudo locale-gen en_US.UTF-8
-          sudo dpkg-reconfigure locales
-
-          # Rust/Cargo should already be installed on both GH Actions-provided Ubuntu 24.04 images _and_
-          # by our own Ubuntu 24.04 images, so this is really just make sure the path is configured.
-          if [ -n "${CI-}" ] ; then
-              echo "${HOME}/.cargo/bin" >> "${GITHUB_PATH}"
-              # we often run into OOM issues in CI due to the low memory vs. CPU ratio on c5 instances
-              echo "CARGO_BUILD_JOBS=$(($(nproc) /2))" >> "${GITHUB_ENV}"
-          else
-              echo "export PATH=\"$HOME/.cargo/bin:\$PATH\"" >> "${HOME}/.bash_profile"
-          fi
-
-          sudo mkdir -p /var/lib/vector
-          sudo chmod 777 /var/lib/vector
-
-
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - uses: ./.github/actions/setup
         with:
           rust: true
           protoc: true
-      - run: |
-
-          cargo build --quiet
-          target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
-          ./scripts/generate-component-docs.rb "/tmp/vector-config-schema.json"
+          cue: true
+      - run: make check-component-docs
 
   check-rust-docs:
     name: Check Rust Docs
