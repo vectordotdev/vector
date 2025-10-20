@@ -53,7 +53,7 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
         events: Self::Events,
     ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
         if self.format == Format::ArrowStream {
-            return self.encode_events_arrow_stream(events);
+            return self.build_arrow_request_payload(events);
         }
 
         // Standard JSON encoding path for other formats
@@ -97,7 +97,7 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
 
 #[cfg(feature = "sinks-clickhouse")]
 impl ClickhouseRequestBuilder {
-    fn encode_events_arrow_stream(
+    fn build_arrow_request_payload(
         &self,
         events: Vec<Event>,
     ) -> Result<EncodeResult<Bytes>, std::io::Error> {
