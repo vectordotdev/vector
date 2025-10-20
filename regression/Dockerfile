@@ -1,10 +1,9 @@
 #
 # VECTOR BUILDER
 #
-FROM ghcr.io/vectordotdev/vector/soak-builder@sha256:c51a7091de2caebaa690e17f37dbfed4d4059dcdf5114a5596e8ca9b5ef494f3 AS builder
+FROM docker.io/timberio/vector-dev:latest AS builder
 WORKDIR /vector
 COPY . .
-RUN bash scripts/environment/install-protoc.sh
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/vector/target \
