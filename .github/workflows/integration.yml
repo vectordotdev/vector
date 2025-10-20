@@ -44,26 +44,10 @@ jobs:
     secrets: inherit
 
   build-test-runner:
-    runs-on: ubuntu-24.04
     if: ${{ github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' }}
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          submodules: "recursive"
-
-      - name: Log in to GHCR
-        run: echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-      - name: Build and push test runner image
-        run: |
-          cargo vdev int build
-          # Get rust version from rust-toolchain.toml (same as vdev does)
-          RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
-          LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
-          REMOTE_IMAGE="ghcr.io/${{ github.repository_owner }}/vector-test-runner:${{ github.sha }}"
-
-          docker tag "${LOCAL_IMAGE}" "${REMOTE_IMAGE}"
-          docker push "${REMOTE_IMAGE}"
+    uses: ./.github/workflows/build-test-runner.yml
+    with:
+      commit_sha: ${{ github.sha }}
 
   integration-tests:
     runs-on: ubuntu-24.04-8core

@@ -80,8 +80,17 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-  integration-tests:
+  build-test-runner:
     needs: prep-pr
+    uses: ./.github/workflows/build-test-runner.yml
+    with:
+      commit_sha: ${{ github.event.review.commit_id }}
+      checkout_ref: ${{ github.event.review.commit_id }}
+
+  integration-tests:
+    needs:
+      - prep-pr
+      - build-test-runner
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
@@ -99,6 +108,17 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
+      - name: Log in to GHCR and pull test runner image
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
+          REMOTE_IMAGE="ghcr.io/${{ github.repository_owner }}/vector-test-runner:${{ github.event.review.commit_id }}"
+          LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
+
+          docker pull "${REMOTE_IMAGE}"
+          docker tag "${REMOTE_IMAGE}" "${LOCAL_IMAGE}"
+
       - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
       - run: docker image prune -af ; docker container prune -f
@@ -114,7 +134,9 @@ jobs:
           command: bash scripts/run-integration-test.sh int ${{ matrix.service }}
 
   e2e-tests:
-    needs: prep-pr
+    needs:
+      - prep-pr
+      - build-test-runner
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
     steps:
@@ -122,6 +144,17 @@ jobs:
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
+
+      - name: Log in to GHCR and pull test runner image
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
+
+          RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
+          REMOTE_IMAGE="ghcr.io/${{ github.repository_owner }}/vector-test-runner:${{ github.event.review.commit_id }}"
+          LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
+
+          docker pull "${REMOTE_IMAGE}"
+          docker tag "${REMOTE_IMAGE}" "${LOCAL_IMAGE}"
 
       - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
