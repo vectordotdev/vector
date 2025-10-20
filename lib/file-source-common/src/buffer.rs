@@ -343,13 +343,6 @@ mod test {
         // We'll position delimiters to split at this boundary
         let buffer_capacity = 10;
 
-        println!(
-            "\n=== Testing delimiter: {:?} (length: {}) ===",
-            String::from_utf8_lossy(delimiter),
-            delimiter_len
-        );
-        println!("Buffer capacity: {} bytes", buffer_capacity);
-
         // Build test data where each delimiter is positioned to split across buffer boundary
         // Strategy: For each line, calculate position so delimiter starts at boundary - (delimiter_len - 1)
         let mut data = Vec::new();
@@ -379,20 +372,10 @@ mod test {
                 content
             };
 
-            println!(
-                "Line {}: '{}' (len: {}, data pos: {})",
-                i,
-                String::from_utf8_lossy(&line_content),
-                line_content.len(),
-                current_pos
-            );
-
             expected_lines.push(line_content.clone());
             data.extend_from_slice(&line_content);
             data.extend_from_slice(delimiter);
         }
-
-        println!("Total test data size: {} bytes\n", data.len());
 
         // Now test reading this data
         let cursor = Cursor::new(data);
