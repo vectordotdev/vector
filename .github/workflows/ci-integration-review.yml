@@ -113,7 +113,7 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
           RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
-          REMOTE_IMAGE="ghcr.io/${{ github.repository_owner }}/vector-test-runner:${{ github.event.review.commit_id }}"
+          REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ github.event.review.commit_id }}"
           LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
 
           docker pull "${REMOTE_IMAGE}"
@@ -150,7 +150,7 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
           RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
-          REMOTE_IMAGE="ghcr.io/${{ github.repository_owner }}/vector-test-runner:${{ github.event.review.commit_id }}"
+          REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ github.event.review.commit_id }}"
           LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
 
           docker pull "${REMOTE_IMAGE}"

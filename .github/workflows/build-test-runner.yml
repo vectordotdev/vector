@@ -34,7 +34,7 @@ jobs:
           # Get rust version from rust-toolchain.toml (same as vdev does)
           RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
           LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
-          REMOTE_IMAGE="ghcr.io/${{ github.repository_owner }}/vector-test-runner:${{ inputs.commit_sha }}"
+          REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ inputs.commit_sha }}"
 
           docker tag "${LOCAL_IMAGE}" "${REMOTE_IMAGE}"
           docker push "${REMOTE_IMAGE}"
