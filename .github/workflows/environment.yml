@@ -84,7 +84,7 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/src" \
             -w /src \
             "${IMAGE_TAG}" \
-            /usr/bin/mold -run cargo build --bin vector
+            bash -c '/usr/bin/mold -run cargo build --bin vector && ./target/debug/vector --version'
 
       - name: Push image
         if: env.SHOULD_PUBLISH == 'true'
