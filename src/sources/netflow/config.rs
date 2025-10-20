@@ -43,7 +43,7 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::examples = "netflow_v9"))]
     #[configurable(metadata(docs::examples = "ipfix"))]
     #[configurable(metadata(docs::examples = "sflow"))]
-    #[serde(default)]
+    #[serde(default = "default_protocols")]
     pub protocols: Vec<String>,
 
     /// Whether to parse enterprise fields.
@@ -86,7 +86,7 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::examples = "emit_metadata"))]
     #[configurable(metadata(docs::examples = "discard"))]
     #[configurable(metadata(docs::examples = "enrich"))]
-    #[serde(default)]
+    #[serde(default = "default_options_template_mode")]
     pub options_template_mode: String,
 }
 
@@ -158,16 +158,16 @@ const fn default_template_timeout() -> u64 {
     1800 // 30 minutes - matches typical resend intervals
 }
 
-const fn default_protocols() -> &'static [&'static str] {
-    &["netflow_v5", "netflow_v9", "ipfix", "sflow"]
+fn default_protocols() -> Vec<String> {
+    vec!["netflow_v5".to_string(), "netflow_v9".to_string(), "ipfix".to_string(), "sflow".to_string()]
 }
 
 const fn default_max_buffered_records() -> usize {
     1000
 }
 
-const fn default_options_template_mode() -> &'static str {
-    "emit_metadata"
+fn default_options_template_mode() -> String {
+    "emit_metadata".to_string()
 }
 
 
@@ -180,58 +180,18 @@ impl Default for NetflowConfig {
             max_packet_size: default_max_packet_size(),
             max_templates: default_max_templates(),
             template_timeout: default_template_timeout(),
-            protocols: default_protocols().iter().map(|s| s.to_string()).collect(),
+            protocols: default_protocols(),
             parse_enterprise_fields: default_true(),
             parse_options_templates: default_true(),
             parse_variable_length_fields: default_true(),
             enterprise_fields: std::collections::HashMap::new(),
             buffer_missing_templates: true,
             max_buffered_records: default_max_buffered_records(),
-            options_template_mode: default_options_template_mode().to_string(),
+            options_template_mode: default_options_template_mode(),
         }
     }
 }
 
-// Custom deserialization to handle defaults for Vec<String> and String
-impl<'de> serde::Deserialize<'de> for NetflowConfig {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(serde::Deserialize)]
-        struct NetflowConfigHelper {
-            address: Option<SocketAddr>,
-            max_packet_size: Option<usize>,
-            max_templates: Option<usize>,
-            template_timeout: Option<u64>,
-            protocols: Option<Vec<String>>,
-            parse_enterprise_fields: Option<bool>,
-            parse_options_templates: Option<bool>,
-            parse_variable_length_fields: Option<bool>,
-            enterprise_fields: Option<std::collections::HashMap<String, String>>,
-            buffer_missing_templates: Option<bool>,
-            max_buffered_records: Option<usize>,
-            options_template_mode: Option<String>,
-        }
-
-        let helper = NetflowConfigHelper::deserialize(deserializer)?;
-        
-        Ok(NetflowConfig {
-            address: helper.address.unwrap_or_else(|| "0.0.0.0:2055".parse().unwrap()),
-            max_packet_size: helper.max_packet_size.unwrap_or_else(default_max_packet_size),
-            max_templates: helper.max_templates.unwrap_or_else(default_max_templates),
-            template_timeout: helper.template_timeout.unwrap_or_else(default_template_timeout),
-            protocols: helper.protocols.unwrap_or_else(|| default_protocols().iter().map(|s| s.to_string()).collect()),
-            parse_enterprise_fields: helper.parse_enterprise_fields.unwrap_or_else(default_true),
-            parse_options_templates: helper.parse_options_templates.unwrap_or_else(default_true),
-            parse_variable_length_fields: helper.parse_variable_length_fields.unwrap_or_else(default_true),
-            enterprise_fields: helper.enterprise_fields.unwrap_or_default(),
-            buffer_missing_templates: helper.buffer_missing_templates.unwrap_or(true),
-            max_buffered_records: helper.max_buffered_records.unwrap_or_else(default_max_buffered_records),
-            options_template_mode: helper.options_template_mode.unwrap_or_else(|| default_options_template_mode().to_string()),
-        })
-    }
-}
 
 
 impl NetflowConfig {
