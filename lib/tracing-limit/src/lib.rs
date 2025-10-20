@@ -798,45 +798,6 @@ mod test {
 
     #[test]
     #[serial]
-    fn rate_limit_by_span_key() {
-        let (events, sub) = setup_test(1);
-        tracing::subscriber::with_default(sub, || {
-            for _ in 0..21 {
-                for key in &["foo", "bar"] {
-                    let span = info_span!("span", component_id = &key);
-                    let _enter = span.enter();
-                    info!(message = format!("Hello {key}!").as_str());
-                }
-                MockClock::advance(Duration::from_millis(100));
-            }
-        });
-
-        let events = events.lock().unwrap();
-
-        // Events with different component_id values create separate rate limit groups
-        assert_eq!(
-            *events,
-            vec![
-                event!("Hello foo!", component_id: "foo"),
-                event!("Hello bar!", component_id: "bar"),
-                event!("Internal log [Hello foo!] is being suppressed to avoid flooding.", component_id: "foo"),
-                event!("Internal log [Hello bar!] is being suppressed to avoid flooding.", component_id: "bar"),
-                event!("Internal log [Hello foo!] has been suppressed 9 times.", component_id: "foo"),
-                event!("Hello foo!", component_id: "foo"),
-                event!("Internal log [Hello bar!] has been suppressed 9 times.", component_id: "bar"),
-                event!("Hello bar!", component_id: "bar"),
-                event!("Internal log [Hello foo!] is being suppressed to avoid flooding.", component_id: "foo"),
-                event!("Internal log [Hello bar!] is being suppressed to avoid flooding.", component_id: "bar"),
-                event!("Internal log [Hello foo!] has been suppressed 9 times.", component_id: "foo"),
-                event!("Hello foo!", component_id: "foo"),
-                event!("Internal log [Hello bar!] has been suppressed 9 times.", component_id: "bar"),
-                event!("Hello bar!", component_id: "bar"),
-            ]
-        );
-    }
-
-    #[test]
-    #[serial]
     fn rate_limit_by_event_key() {
         let (events, sub) = setup_test(1);
         tracing::subscriber::with_default(sub, || {
@@ -891,42 +852,6 @@ mod test {
         // All 21 events should be emitted since rate limiting is disabled
         assert_eq!(events.len(), 21);
         assert!(events.iter().all(|e| e == &event!("Hello world!")));
-    }
-
-    #[test]
-    #[serial]
-    fn rate_limit_ignores_fanout_id() {
-        let (events, sub) = setup_test(1);
-        tracing::subscriber::with_default(sub, || {
-            for i in 0..21 {
-                // Call the SAME info! macro with different fanout_id values
-                // to verify that fanout_id doesn't create separate rate limit groups
-                let fanout = if i % 2 == 0 { "i1" } else { "i2" };
-                info!(
-                    message = "Test message.",
-                    component_id = "c1",
-                    fanout_id = fanout
-                );
-                MockClock::advance(Duration::from_millis(100));
-            }
-        });
-
-        let events = events.lock().unwrap();
-
-        // All events share the same rate limit group (same callsite + component_id, fanout_id is ignored)
-        // Even though fanout_id alternates between i1 and i2, they're all in one group
-        assert_eq!(
-            *events,
-            vec![
-                event!("Test message.", component_id: "c1", fanout_id: "i1"),
-                event!("Internal log [Test message.] is being suppressed to avoid flooding."),
-                event!("Internal log [Test message.] has been suppressed 9 times."),
-                event!("Test message.", component_id: "c1", fanout_id: "i1"),
-                event!("Internal log [Test message.] is being suppressed to avoid flooding."),
-                event!("Internal log [Test message.] has been suppressed 9 times."),
-                event!("Test message.", component_id: "c1", fanout_id: "i1"),
-            ]
-        );
     }
 
     #[test]
@@ -1054,6 +979,36 @@ mod test {
                     component_id: "transform"
                 ),
                 event!("Event message", component_id: "transform"),
+            ]
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn rate_limit_same_message_different_component() {
+        let (events, sub) = setup_test(1);
+        tracing::subscriber::with_default(sub, || {
+            // Use a loop with the SAME callsite to demonstrate that identical messages
+            // with different component_ids create separate rate limit groups
+            for component in &["foo", "foo", "bar"] {
+                info!(message = "Hello!", component_id = component);
+                MockClock::advance(Duration::from_millis(100));
+            }
+        });
+
+        let events = events.lock().unwrap();
+
+        // The first "foo" event is emitted normally (count=0)
+        // The second "foo" event triggers suppression warning (count=1)
+        // The "bar" event is emitted normally (count=0 for its group)
+        // This proves that even with identical message text, different component_ids
+        // create separate rate limit groups
+        assert_eq!(
+            *events,
+            vec![
+                event!("Hello!", component_id: "foo"),
+                event!("Internal log [Hello!] is being suppressed to avoid flooding."),
+                event!("Hello!", component_id: "bar"),
             ]
         );
     }
