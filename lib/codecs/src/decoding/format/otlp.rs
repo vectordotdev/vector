@@ -5,7 +5,7 @@ use opentelemetry_proto::proto::{
     TRACES_REQUEST_MESSAGE_TYPE,
 };
 use smallvec::{SmallVec, smallvec};
-use vector_config::configurable_component;
+use vector_config::{configurable_component, indexmap::IndexSet};
 use vector_core::{
     config::{DataType, LogNamespace},
     event::Event,
@@ -15,15 +15,55 @@ use vrl::{protobuf::parse::Options, value::Kind};
 
 use super::{Deserializer, ProtobufDeserializer};
 
+/// OTLP signal type for prioritized parsing.
+#[configurable_component]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
+pub enum OtlpSignalType {
+    /// OTLP logs signal (ExportLogsServiceRequest)
+    Logs,
+    /// OTLP metrics signal (ExportMetricsServiceRequest)
+    Metrics,
+    /// OTLP traces signal (ExportTraceServiceRequest)
+    Traces,
+}
+
 /// Config used to build an `OtlpDeserializer`.
 #[configurable_component]
-#[derive(Debug, Clone, Default)]
-pub struct OtlpDeserializerConfig {}
+#[derive(Debug, Clone)]
+pub struct OtlpDeserializerConfig {
+    /// Signal types to attempt parsing, in priority order.
+    ///
+    /// The deserializer will try parsing in the order specified. This allows you to optimize
+    /// performance when you know the expected signal types. For example, if you only receive
+    /// traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
+    ///
+    /// If not specified, defaults to trying all types in order: logs, metrics, traces.
+    /// Duplicate signal types are automatically removed while preserving order.
+    #[serde(default = "default_signal_types")]
+    pub signal_types: IndexSet<OtlpSignalType>,
+}
+
+fn default_signal_types() -> IndexSet<OtlpSignalType> {
+    IndexSet::from([
+        OtlpSignalType::Logs,
+        OtlpSignalType::Metrics,
+        OtlpSignalType::Traces,
+    ])
+}
+
+impl Default for OtlpDeserializerConfig {
+    fn default() -> Self {
+        Self {
+            signal_types: default_signal_types(),
+        }
+    }
+}
 
 impl OtlpDeserializerConfig {
     /// Build the `OtlpDeserializer` from this configuration.
-    pub fn build(&self) -> vector_common::Result<OtlpDeserializer> {
-        OtlpDeserializer::new()
+    pub fn build(&self) -> OtlpDeserializer {
+        OtlpDeserializer::new_with_signals(self.signal_types.clone())
     }
 
     /// Return the type of event build by this deserializer.
@@ -65,11 +105,20 @@ pub struct OtlpDeserializer {
     logs_deserializer: ProtobufDeserializer,
     metrics_deserializer: ProtobufDeserializer,
     traces_deserializer: ProtobufDeserializer,
+    /// Signal types to parse, in priority order
+    signals: IndexSet<OtlpSignalType>,
+}
+
+impl Default for OtlpDeserializer {
+    fn default() -> Self {
+        Self::new_with_signals(default_signal_types())
+    }
 }
 
 impl OtlpDeserializer {
-    /// Creates a new OTLP deserializer with the appropriate protobuf deserializers.
-    pub fn new() -> vector_common::Result<Self> {
+    /// Creates a new OTLP deserializer with custom signal support.
+    /// During parsing, each signal type is tried in order until one succeeds.
+    pub fn new_with_signals(signals: IndexSet<OtlpSignalType>) -> Self {
         let options = Options {
             use_json_names: true,
         };
@@ -78,25 +127,29 @@ impl OtlpDeserializer {
             DESCRIPTOR_BYTES,
             LOGS_REQUEST_MESSAGE_TYPE,
             options.clone(),
-        )?;
+        )
+        .expect("Failed to create logs deserializer");
 
         let metrics_deserializer = ProtobufDeserializer::new_from_bytes(
             DESCRIPTOR_BYTES,
             METRICS_REQUEST_MESSAGE_TYPE,
             options.clone(),
-        )?;
+        )
+        .expect("Failed to create metrics deserializer");
 
         let traces_deserializer = ProtobufDeserializer::new_from_bytes(
             DESCRIPTOR_BYTES,
             TRACES_REQUEST_MESSAGE_TYPE,
             options,
-        )?;
+        )
+        .expect("Failed to create traces deserializer");
 
-        Ok(Self {
+        Self {
             logs_deserializer,
             metrics_deserializer,
             traces_deserializer,
-        })
+            signals,
+        }
     }
 }
 
@@ -106,40 +159,44 @@ impl Deserializer for OtlpDeserializer {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        // Try parsing as logs and check for resourceLogs field
-        if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace)
-            && let Some(Event::Log(log)) = events.first()
-            && log.get(RESOURCE_LOGS_JSON_FIELD).is_some()
-        {
-            return Ok(events);
-        }
-
-        // Try parsing as metrics and check for resourceMetrics field
-        if let Ok(events) = self
-            .metrics_deserializer
-            .parse(bytes.clone(), log_namespace)
-            && let Some(Event::Log(log)) = events.first()
-            && log.get(RESOURCE_METRICS_JSON_FIELD).is_some()
-        {
-            return Ok(events);
-        }
-
-        // Try parsing as traces and check for resourceSpans field
-        if let Ok(mut events) = self.traces_deserializer.parse(bytes, log_namespace)
-            && let Some(Event::Log(log)) = events.first()
-            && log.get(RESOURCE_SPANS_JSON_FIELD).is_some()
-        {
-            // Convert the log event to a trace event by taking ownership
-            if let Some(Event::Log(log)) = events.pop() {
-                let trace_event = Event::Trace(log.into());
-                return Ok(smallvec![trace_event]);
+        // Try parsing in the priority order specified
+        for signal_type in &self.signals {
+            match signal_type {
+                OtlpSignalType::Logs => {
+                    if let Ok(events) = self.logs_deserializer.parse(bytes.clone(), log_namespace)
+                        && let Some(Event::Log(log)) = events.first()
+                        && log.get(RESOURCE_LOGS_JSON_FIELD).is_some()
+                    {
+                        return Ok(events);
+                    }
+                }
+                OtlpSignalType::Metrics => {
+                    if let Ok(events) = self
+                        .metrics_deserializer
+                        .parse(bytes.clone(), log_namespace)
+                        && let Some(Event::Log(log)) = events.first()
+                        && log.get(RESOURCE_METRICS_JSON_FIELD).is_some()
+                    {
+                        return Ok(events);
+                    }
+                }
+                OtlpSignalType::Traces => {
+                    if let Ok(mut events) =
+                        self.traces_deserializer.parse(bytes.clone(), log_namespace)
+                        && let Some(Event::Log(log)) = events.first()
+                        && log.get(RESOURCE_SPANS_JSON_FIELD).is_some()
+                    {
+                        // Convert the log event to a trace event by taking ownership
+                        if let Some(Event::Log(log)) = events.pop() {
+                            let trace_event = Event::Trace(log.into());
+                            return Ok(smallvec![trace_event]);
+                        }
+                    }
+                }
             }
         }
 
-        Err(format!(
-            "Invalid OTLP data: expected '{RESOURCE_LOGS_JSON_FIELD}', '{RESOURCE_METRICS_JSON_FIELD}', or '{RESOURCE_SPANS_JSON_FIELD}'",
-        )
-            .into())
+        Err(format!("Invalid OTLP data: expected one of {:?}", self.signals).into())
     }
 }
 
@@ -309,7 +366,7 @@ mod tests {
     }
 
     fn assert_otlp_event(bytes: Bytes, field: &str, is_trace: bool) {
-        let deserializer = OtlpDeserializer::new().unwrap();
+        let deserializer = OtlpDeserializer::default();
         let events = deserializer.parse(bytes, LogNamespace::Legacy).unwrap();
 
         assert_eq!(events.len(), 1);
@@ -348,7 +405,7 @@ mod tests {
 
     #[test]
     fn deserialize_invalid_otlp() {
-        let deserializer = OtlpDeserializer::new().unwrap();
+        let deserializer = OtlpDeserializer::default();
         let bytes = Bytes::from("invalid protobuf data");
         let result = deserializer.parse(bytes, LogNamespace::Legacy);
 
@@ -359,5 +416,23 @@ mod tests {
                 .to_string()
                 .contains("Invalid OTLP data")
         );
+    }
+
+    #[test]
+    fn deserialize_with_custom_priority_traces_only() {
+        // Configure to only try traces - should succeed for traces, fail for others
+        let deserializer =
+            OtlpDeserializer::new_with_signals(IndexSet::from([OtlpSignalType::Traces]));
+
+        // Traces should work
+        let trace_bytes = create_traces_request_bytes();
+        let result = deserializer.parse(trace_bytes, LogNamespace::Legacy);
+        assert!(result.is_ok());
+        assert!(matches!(result.unwrap()[0], Event::Trace(_)));
+
+        // Logs should fail since we're not trying to parse logs
+        let log_bytes = create_logs_request_bytes();
+        let result = deserializer.parse(log_bytes, LogNamespace::Legacy);
+        assert!(result.is_err());
     }
 }
