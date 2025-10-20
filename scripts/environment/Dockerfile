@@ -10,12 +10,18 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Container junk
 RUN echo $TZ > /etc/timezone
 
+# Failing builds with MacOS host due to bad address
+ENV OPENSSL_NO_VENDOR=1
+
+RUN apt-get update && apt-get install -y git
+
+WORKDIR /git/vectordotdev/vector
+
 # Setup the env
-COPY scripts/environment/*.sh /git/vectordotdev/vector/scripts/environment/
-RUN cd git/vectordotdev/vector && ./scripts/environment/bootstrap-ubuntu-24.04.sh
+COPY scripts/environment/*.sh scripts/environment/
+RUN ./scripts/environment/bootstrap-ubuntu-24.04.sh
 
 # Setup the toolchain
-WORKDIR /git/vectordotdev/vector
 COPY scripts/Gemfile scripts/Gemfile.lock \
     /git/vectordotdev/vector/scripts/
 COPY rust-toolchain.toml \
