@@ -999,27 +999,20 @@ fn init_hpe_aruba_fields() -> HashMap<u16, FieldInfo> {
     map.insert(26, FieldInfo { name: "direction", data_type: DataType::String, description: "Flow direction" });
     map.insert(27, FieldInfo { name: "applicationCategory", data_type: DataType::String, description: "Application category" });
     
-    // Additional HPE Aruba fields found in production packets (undocumented)
-    // These fields are not in the official HPE Aruba documentation but appear in production
-    map.insert(96, FieldInfo { name: "undocumentedField96", data_type: DataType::String, description: "Undocumented HPE Aruba field 96 (not in official docs)" });
-    map.insert(350, FieldInfo { name: "undocumentedField350", data_type: DataType::String, description: "Undocumented HPE Aruba field 350 (not in official docs)" });
-    
     // Options Template fields (for Silver Peak Template 1024)
     // Note: Some of these conflict with standard IPFIX field definitions
     // but are used differently in Silver Peak Options Templates
-    map.insert(303, FieldInfo { name: "unknownField303", data_type: DataType::UInt16, description: "Unknown Options Template field 303" });
-    map.insert(339, FieldInfo { name: "unknownField339", data_type: DataType::UInt8, description: "Unknown Options Template field 339" });
     map.insert(341, FieldInfo { name: "lowerCILimit", data_type: DataType::Float64, description: "Statistical confidence interval lower limit" });
     map.insert(344, FieldInfo { name: "dataLinkFrameSize", data_type: DataType::UInt16, description: "Frame size at data link layer" });
     map.insert(345, FieldInfo { name: "dataLinkFrameType", data_type: DataType::UInt16, description: "Type of data link frame" });
     
-    // Official HPE Aruba Enterprise Fields (PEN 23867) - from official documentation
-    map.insert(10001, FieldInfo { name: "overlayTunnelID", data_type: DataType::UInt32, description: "Identifies the overlay tunnel in SD-WAN" });
-    map.insert(10002, FieldInfo { name: "policyMatchID", data_type: DataType::UInt32, description: "Unique ID for the policy applied to the flow" });
-    map.insert(10003, FieldInfo { name: "applianceName", data_type: DataType::String, description: "Name of the EdgeConnect appliance" });
-    map.insert(10004, FieldInfo { name: "WANInterfaceID", data_type: DataType::UInt16, description: "Interface ID of the WAN link used" });
-    map.insert(10005, FieldInfo { name: "QOSQueueID", data_type: DataType::UInt8, description: "QoS queue assigned to the flow" });
-    map.insert(10006, FieldInfo { name: "linkQualityMetrics", data_type: DataType::String, description: "Jitter, loss, and latency of the flow's path" });
+    // Legacy fields
+    map.insert(10001, FieldInfo { name: "overlayTunnelID", data_type: DataType::UInt32, description: "Overlay tunnel ID" });
+    map.insert(10002, FieldInfo { name: "policyMatchID", data_type: DataType::UInt32, description: "Policy match ID" });
+    map.insert(10003, FieldInfo { name: "applianceName", data_type: DataType::String, description: "Appliance name" });
+    map.insert(10004, FieldInfo { name: "WANInterfaceID", data_type: DataType::UInt16, description: "WAN interface ID" });
+    map.insert(10005, FieldInfo { name: "QOSQueueID", data_type: DataType::UInt8, description: "QoS queue ID" });
+    map.insert(10006, FieldInfo { name: "linkQualityMetrics", data_type: DataType::String, description: "Link quality metrics" });
     
     map
 }
