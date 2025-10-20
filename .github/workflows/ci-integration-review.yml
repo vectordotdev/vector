@@ -109,16 +109,11 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
-      - name: Log in to GHCR and pull test runner image
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-          RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
-          REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ github.event.review.commit_id }}"
-          LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
-
-          docker pull "${REMOTE_IMAGE}"
-          docker tag "${REMOTE_IMAGE}" "${LOCAL_IMAGE}"
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.event.review.commit_id }}
 
       - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
@@ -144,20 +139,14 @@ jobs:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
-      - name: Log in to GHCR and pull test runner image
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-          RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
-          REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ github.event.review.commit_id }}"
-          LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
-
-          docker pull "${REMOTE_IMAGE}"
-          docker tag "${REMOTE_IMAGE}" "${LOCAL_IMAGE}"
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.event.review.commit_id }}
 
       - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
-      - run: docker image prune -af ; docker container prune -f
       - name: e2e-datadog-logs
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-logs')
           || startsWith(github.event.review.body, '/ci-run-e2e-all')

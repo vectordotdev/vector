@@ -83,16 +83,11 @@ jobs:
         with:
           name: int_tests_changes
 
-      - name: Log in to GHCR and pull test runner image
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-          RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
-          REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ github.sha }}"
-          LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
-
-          docker pull "${REMOTE_IMAGE}"
-          docker tag "${REMOTE_IMAGE}" "${LOCAL_IMAGE}"
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.sha }}
 
       - name: Run Integration Tests for ${{ matrix.service }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
@@ -149,16 +144,11 @@ jobs:
         with:
           name: e2e_tests_changes
 
-      - name: Log in to GHCR and pull test runner image
-        run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
-
-          RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
-          REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ github.sha }}"
-          LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
-
-          docker pull "${REMOTE_IMAGE}"
-          docker tag "${REMOTE_IMAGE}" "${LOCAL_IMAGE}"
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.sha }}
 
       - name: Run E2E Tests for ${{ matrix.service }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
