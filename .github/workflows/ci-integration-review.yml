@@ -122,8 +122,6 @@ jobs:
 
       - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
-      - run: docker image prune -af ; docker container prune -f
-
       - name: Integration Tests - ${{ matrix.service }}
         if: ${{ startsWith(github.event.review.body, '/ci-run-integration-all')
           || startsWith(github.event.review.body, '/ci-run-all')
