@@ -1,55 +1,73 @@
-name: "Setup"
-description: "Setup everything"
+name: "CI Toolchain Setup"
+description: "Prepare a fast and minimal CI environment. Set any input to true to install or configure any tool"
+
+branding:
+  icon: package
+  color: purple
 
 inputs:
   cargo-cache:
     required: false
     default: true
+    description: "Cache Cargo registry, index, git DB, and ~/.cargo/bin. Enabled automatically if any Rust tools are requested."
 
   mold:
     required: false
     default: true
+    description: "Install mold linker and configure a rustc wrapper to speed up linking. Avoid enabling with cross."
 
   protoc:
     required: false
     default: false
+    description: "Install protoc (uses scripts/environment/install-protoc.sh)."
   cue:
     required: false
     default: false
+    description: "Install cue."
 
   # prepare.sh - rust
   rust: # rustup module
     required: false
     default: false
+    description: "Install/ensure Rust toolchain via rustup (prepare.sh rustup module)."
   cargo-deb:
     required: false
     default: false
+    description: "Install cargo-deb."
   cross:
     required: false
     default: false
+    description: "Install cross for cross-compiling Rust."
   cargo-nextest:
     required: false
     default: false
+    description: "Install cargo-nextest test runner."
   cargo-deny:
     required: false
     default: false
+    description: "Install cargo-deny for advisory and license checks."
   cargo-msrv:
     required: false
     default: false
+    description: "Install cargo-msrv for minimum supported Rust version checks."
   dd-rust-license-tool:
     required: false
     default: false
+    description: "Install Datadog rust-license-tool."
   wasm-pack:
     required: false
     default: false
+    description: "Install wasm-pack for Rust to WASM bridge."
 
   # prepare.sh - npm
   markdownlint:
     required: false
     default: false
+    description: "Install markdownlint (npm)."
   datadog-ci:
     required: false
     default: false
+    description: "Install @datadog/datadog-ci (npm)."
 
 runs:
   using: "composite"
