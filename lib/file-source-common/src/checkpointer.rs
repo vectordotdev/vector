@@ -19,6 +19,7 @@ use super::{FilePosition, fingerprinter::FileFingerprint};
 
 const TMP_FILE_NAME: &str = "checkpoints.new.json";
 pub const CHECKPOINT_FILE_NAME: &str = "checkpoints.json";
+const EXPIRATION_GRACE_DURATION: chrono::Duration = chrono::Duration::seconds(60);
 
 /// This enum represents the file format of checkpoints persisted to disk. Right
 /// now there is only one variant, but any incompatible changes will require and
@@ -98,7 +99,7 @@ impl CheckpointsView {
             .filter(|entry| {
                 let ts = entry.value();
                 let duration = now - *ts;
-                duration >= chrono::Duration::seconds(60)
+                duration >= EXPIRATION_GRACE_DURATION
             })
             .map(|entry| *entry.key())
             .collect::<Vec<FileFingerprint>>();
@@ -286,10 +287,14 @@ impl Checkpointer {
 
 #[cfg(test)]
 mod test {
+    use std::io::Write;
+
     use chrono::{Duration, Utc};
     use similar_asserts::assert_eq;
     use tempfile::tempdir;
     use tokio::fs;
+
+    use crate::fingerprinter::FINGERPRINT_CRC;
 
     use super::{
         CHECKPOINT_FILE_NAME, Checkpoint, Checkpointer, FileFingerprint, FilePosition,
@@ -576,5 +581,195 @@ mod test {
         for fingerprint in fingerprints {
             assert_eq!(chkptr.get_checkpoint(fingerprint), Some(1234))
         }
+    }
+
+    #[tokio::test]
+    async fn test_checkpointer_expiration_inode() {
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+        let position: FilePosition = 1234;
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(data_dir.path());
+
+        chkptr.update_checkpoint(fingerprint, position);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+
+        chkptr.checkpoints.set_dead(fingerprint);
+        chkptr.checkpoints.remove_expired();
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+
+        // Hack the timestamp to be in the past
+        let now = Utc::now();
+        let past = now - Duration::seconds(61);
+        chkptr.checkpoints.removed_times.insert(fingerprint, past);
+
+        chkptr.checkpoints.remove_expired();
+        assert_eq!(chkptr.get_checkpoint(fingerprint), None);
+    }
+
+    #[tokio::test]
+    async fn test_checkpointer_serialization_inode() {
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+        let position: FilePosition = 1234;
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(data_dir.path());
+
+        chkptr.update_checkpoint(fingerprint, position);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+
+        chkptr.write_checkpoints().await.unwrap();
+        assert!(data_dir.path().join(CHECKPOINT_FILE_NAME).exists());
+        assert!(!data_dir.path().join(TMP_FILE_NAME).exists());
+    }
+
+    #[tokio::test]
+    async fn test_checkpointer_deserialization_inode() {
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+        let position: u64 = 1234;
+        let data_dir = tempdir().unwrap();
+
+        // load and persist the checkpoints
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.update_checkpoint(fingerprint, position);
+            chkptr.write_checkpoints().await.unwrap();
+        }
+
+        // read them back
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.read_checkpoints(None).await;
+            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+        }
+    }
+
+    #[tokio::test]
+    async fn test_checkpointer_restart_inode() {
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+        let position: u64 = 1234;
+        let data_dir = tempdir().unwrap();
+
+        // load and persist the checkpoints
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.update_checkpoint(fingerprint, position);
+            chkptr.write_checkpoints().await.unwrap();
+        }
+
+        // simulate a crash by writing to the tmp file
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.update_checkpoint(fingerprint, position + 1);
+            let current = chkptr.checkpoints.get_state();
+            let f = std::io::BufWriter::new(std::fs::File::create(&chkptr.tmp_file_path).unwrap());
+            serde_json::to_writer(f, &current).unwrap();
+        }
+
+        // read them back and assert we get the tmp file
+        {
+            let mut chkptr = Checkpointer::new(data_dir.path());
+            chkptr.read_checkpoints(None).await;
+            assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position + 1));
+        }
+    }
+
+    #[test]
+    fn test_checkpointer_file_upgrades_inode() {
+        let fingerprint = FileFingerprint::DevInode(1, 2);
+        let position: u64 = 1234;
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(data_dir.path());
+
+        chkptr.update_checkpoint(fingerprint, position);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+
+        let fingerprint2 = FileFingerprint::DevInode(3, 4);
+        chkptr.checkpoints.update_key(fingerprint, fingerprint2);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), None);
+        assert_eq!(chkptr.get_checkpoint(fingerprint2), Some(position));
+    }
+
+    #[tokio::test]
+    async fn test_checkpointer_fingerprint_upgrades_unknown_inode() {
+        let fingerprint = FileFingerprint::Unknown(1337);
+        let position: u64 = 1234;
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(data_dir.path());
+
+        chkptr.update_checkpoint(fingerprint, position);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+
+        // Create a DevInode fingerprint that has the same legacy value as the Unknown fingerprint
+        // This is what we're testing - that an Unknown fingerprint can be upgraded to a DevInode
+        // fingerprint if they have the same legacy value
+        let dev: u64 = 1;
+        let ino: u64 = 2;
+        let mut buf = Vec::with_capacity(std::mem::size_of_val(&dev) * 2);
+        buf.write_all(&dev.to_be_bytes()).expect("writing to array");
+        buf.write_all(&ino.to_be_bytes()).expect("writing to array");
+        let legacy_value = FINGERPRINT_CRC.checksum(&buf[..]);
+
+        // Create a new Unknown fingerprint with the same legacy value
+        let fingerprint = FileFingerprint::Unknown(legacy_value);
+        chkptr.update_checkpoint(fingerprint, position);
+
+        // Now create the DevInode fingerprint with the same values
+        let fingerprint2 = FileFingerprint::DevInode(dev, ino);
+        let mut buffer = Vec::new();
+        let fingerprinter = Fingerprinter::new(FingerprintStrategy::DevInode);
+        let path = data_dir.path().join("test");
+        std::fs::write(&path, "test").unwrap();
+
+        // This should upgrade the Unknown fingerprint to the DevInode fingerprint
+        chkptr
+            .maybe_upgrade(&path, fingerprint2, &fingerprinter, &mut buffer)
+            .await;
+
+        // The Unknown fingerprint should be gone, and the DevInode fingerprint should have the position
+        assert_eq!(chkptr.get_checkpoint(fingerprint), None);
+        assert_eq!(chkptr.get_checkpoint(fingerprint2), Some(position));
+    }
+
+    #[tokio::test]
+    async fn test_checkpointer_fingerprint_upgrades_legacy_checksum_inode() {
+        let fingerprint = FileFingerprint::BytesChecksum(1337);
+        let position: u64 = 1234;
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(data_dir.path());
+
+        chkptr.update_checkpoint(fingerprint, position);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+
+        let fingerprint2 = FileFingerprint::DevInode(1, 2);
+        let mut buffer = Vec::new();
+        let fingerprinter = Fingerprinter::new(FingerprintStrategy::DevInode);
+        let path = data_dir.path().join("test");
+        std::fs::write(&path, "test").unwrap();
+        chkptr
+            .maybe_upgrade(&path, fingerprint2, &fingerprinter, &mut buffer)
+            .await;
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+        assert_eq!(chkptr.get_checkpoint(fingerprint2), None);
+    }
+
+    #[tokio::test]
+    async fn test_checkpointer_fingerprint_upgrades_legacy_first_lines_checksum_inode() {
+        let fingerprint = FileFingerprint::FirstLinesChecksum(1337);
+        let position: u64 = 1234;
+        let data_dir = tempdir().unwrap();
+        let mut chkptr = Checkpointer::new(data_dir.path());
+
+        chkptr.update_checkpoint(fingerprint, position);
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+
+        let fingerprint2 = FileFingerprint::DevInode(1, 2);
+        let mut buffer = Vec::new();
+        let fingerprinter = Fingerprinter::new(FingerprintStrategy::DevInode);
+        let path = data_dir.path().join("test");
+        std::fs::write(&path, "test").unwrap();
+        chkptr
+            .maybe_upgrade(&path, fingerprint2, &fingerprinter, &mut buffer)
+            .await;
+        assert_eq!(chkptr.get_checkpoint(fingerprint), Some(position));
+        assert_eq!(chkptr.get_checkpoint(fingerprint2), None);
     }
 }

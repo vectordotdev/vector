@@ -2674,6 +2674,29 @@ dependencies = [
 
 [[package]]
 name = "criterion"
+version = "0.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bf7af66b0989381bd0be551bd7cc91912a655a58c6918420c9527b1fd8b4679"
+dependencies = [
+ "anes",
+ "cast",
+ "ciborium",
+ "clap",
+ "criterion-plot 0.5.0",
+ "itertools 0.13.0",
+ "num-traits",
+ "oorandom",
+ "plotters",
+ "rayon",
+ "regex",
+ "serde",
+ "serde_json",
+ "tinytemplate",
+ "walkdir",
+]
+
+[[package]]
+name = "criterion"
 version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e1c047a62b0cc3e145fa84415a3191f628e980b194c2755aa12300a4e6cbd928"
@@ -2682,7 +2705,7 @@ dependencies = [
  "cast",
  "ciborium",
  "clap",
- "criterion-plot",
+ "criterion-plot 0.6.0",
  "itertools 0.13.0",
  "num-traits",
  "oorandom",
@@ -2694,6 +2717,16 @@ dependencies = [
  "tinytemplate",
  "tokio",
  "walkdir",
+]
+
+[[package]]
+name = "criterion-plot"
+version = "0.5.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6b50826342786a51a89e2da3a28f1c32b06e387201bc2d19791f622c673706b1"
+dependencies = [
+ "cast",
+ "itertools 0.10.5",
 ]
 
 [[package]]
@@ -3248,7 +3281,7 @@ dependencies = [
 name = "dnsmsg-parser"
 version = "0.1.0"
 dependencies = [
- "criterion",
+ "criterion 0.7.0",
  "data-encoding",
  "hickory-proto",
  "snafu 0.8.9",
@@ -4875,7 +4908,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.4.10",
+ "socket2 0.5.10",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
@@ -5274,6 +5307,36 @@ checksum = "daca1df1c957320b2cf139ac61e7bd64fed304c5040df000a745aa1de3b4ef71"
 dependencies = [
  "icu_normalizer",
  "icu_properties",
+]
+
+[[package]]
+name = "ifile-source"
+version = "0.1.0"
+dependencies = [
+ "async-compression",
+ "bstr 1.12.0",
+ "bytes 1.10.1",
+ "chrono",
+ "crc",
+ "criterion 0.6.0",
+ "dashmap",
+ "file-source-common",
+ "futures 0.3.31",
+ "glob",
+ "indexmap 2.11.0",
+ "libc",
+ "notify",
+ "quickcheck",
+ "scan_fmt",
+ "serde",
+ "serde_json",
+ "similar-asserts",
+ "tempfile",
+ "tokio",
+ "tracing 0.1.41",
+ "vector-common",
+ "vector-config",
+ "winapi",
 ]
 
 [[package]]
@@ -8061,7 +8124,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.11.0",
+ "itertools 0.14.0",
  "log",
  "multimap",
  "once_cell",
@@ -8107,7 +8170,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.11.0",
+ "itertools 0.14.0",
  "proc-macro2 1.0.101",
  "quote 1.0.40",
  "syn 2.0.106",
@@ -9437,6 +9500,15 @@ dependencies = [
  "krb5-src",
  "libc",
  "pkg-config",
+]
+
+[[package]]
+name = "scan_fmt"
+version = "0.2.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0b53b0a5db882a8e2fdaae0a43f7b39e7e9082389e978398bdf223a55b581248"
+dependencies = [
+ "regex",
 ]
 
 [[package]]
@@ -11442,7 +11514,7 @@ dependencies = [
 name = "tracing-limit"
 version = "0.1.0"
 dependencies = [
- "criterion",
+ "criterion 0.7.0",
  "dashmap",
  "mock_instant",
  "tracing 0.1.41",
@@ -12059,7 +12131,7 @@ dependencies = [
  "clap",
  "colored",
  "console-subscriber",
- "criterion",
+ "criterion 0.7.0",
  "csv",
  "databend-client",
  "deadpool",
@@ -12241,7 +12313,7 @@ dependencies = [
  "bytes 1.10.1",
  "clap",
  "crc32fast",
- "criterion",
+ "criterion 0.7.0",
  "crossbeam-queue",
  "crossbeam-utils",
  "dashmap",
@@ -12362,7 +12434,7 @@ dependencies = [
  "cfg-if",
  "chrono",
  "chrono-tz",
- "criterion",
+ "criterion 0.7.0",
  "crossbeam-utils",
  "derivative",
  "dyn-clone",
@@ -12438,6 +12510,7 @@ dependencies = [
  "enrichment",
  "file-source",
  "file-source-common",
+ "ifile-source",
  "opentelemetry-proto",
  "prometheus-parser",
  "vector-api-client",
