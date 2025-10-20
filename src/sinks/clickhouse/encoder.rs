@@ -5,13 +5,15 @@ use std::sync::Arc;
 use arrow::{
     array::{
         ArrayRef, BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder,
-        TimestampMillisecondBuilder,
+        TimestampMicrosecondBuilder, TimestampMillisecondBuilder, TimestampNanosecondBuilder,
+        TimestampSecondBuilder,
     },
     datatypes::{DataType, Schema, TimeUnit},
     ipc::writer::StreamWriter,
     record_batch::RecordBatch,
 };
 use bytes::{BufMut, Bytes, BytesMut};
+use chrono::{DateTime, Utc};
 use snafu::Snafu;
 
 use crate::event::{Event, Value};
@@ -116,8 +118,8 @@ fn build_record_batch(
     for field in schema.fields() {
         let field_name = field.name();
         let array: ArrayRef = match field.data_type() {
-            DataType::Timestamp(TimeUnit::Millisecond, _) => {
-                build_timestamp_array(events, field_name)?
+            DataType::Timestamp(time_unit, _) => {
+                build_timestamp_array(events, field_name, *time_unit)?
             }
             DataType::Utf8 => build_string_array(events, field_name)?,
             DataType::Int64 => build_int64_array(events, field_name)?,
@@ -142,19 +144,57 @@ fn build_record_batch(
 fn build_timestamp_array(
     events: &[Event],
     field_name: &str,
+    time_unit: TimeUnit,
 ) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = TimestampMillisecondBuilder::new();
-
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Timestamp(ts)) => builder.append_value(ts.timestamp_millis()),
-                _ => builder.append_null(),
+    macro_rules! build_array {
+        ($builder:ty, $converter:expr) => {{
+            let mut builder = <$builder>::new();
+            for event in events {
+                if let Event::Log(log) = event {
+                    match log.get(field_name) {
+                        Some(Value::Timestamp(ts)) => builder.append_value($converter(ts)),
+                        Some(Value::Integer(i)) => builder.append_value(*i),
+                        _ => builder.append_null(),
+                    }
+                }
             }
-        }
+            Ok(Arc::new(builder.finish()))
+        }};
     }
 
-    Ok(Arc::new(builder.finish()))
+    match time_unit {
+        TimeUnit::Second => {
+            build_array!(TimestampSecondBuilder, |ts: &DateTime<Utc>| ts.timestamp())
+        }
+        TimeUnit::Millisecond => {
+            build_array!(TimestampMillisecondBuilder, |ts: &DateTime<Utc>| ts
+                .timestamp_millis())
+        }
+        TimeUnit::Microsecond => {
+            build_array!(TimestampMicrosecondBuilder, |ts: &DateTime<Utc>| ts
+                .timestamp_micros())
+        }
+        TimeUnit::Nanosecond => {
+            let mut builder = TimestampNanosecondBuilder::new();
+            for event in events {
+                if let Event::Log(log) = event {
+                    match log.get(field_name) {
+                        Some(Value::Timestamp(ts)) => {
+                            if let Some(nanos) = ts.timestamp_nanos_opt() {
+                                builder.append_value(nanos);
+                            } else {
+                                builder.append_null();
+                            }
+                        }
+
+                        Some(Value::Integer(i)) => builder.append_value(*i),
+                        _ => builder.append_null(),
+                    }
+                }
+            }
+            Ok(Arc::new(builder.finish()))
+        }
+    }
 }
 
 fn build_string_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
@@ -256,11 +296,13 @@ mod tests {
     use arrow::{
         array::{
             Array, BinaryArray, BooleanArray, Float64Array, Int64Array, StringArray,
-            TimestampMillisecondArray,
+            TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
+            TimestampSecondArray,
         },
         datatypes::Field,
         ipc::reader::StreamReader,
     };
+    use chrono::Utc;
     use std::io::Cursor;
 
     #[test]
@@ -314,8 +356,6 @@ mod tests {
 
     #[test]
     fn test_encode_all_types() {
-        use chrono::Utc;
-
         let mut log = LogEvent::default();
         log.insert("string_field", "test");
         log.insert("int_field", 42);
@@ -578,5 +618,162 @@ mod tests {
         let result = encode_events_to_arrow_stream(&events, None);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ArrowEncodingError::NoEvents));
+    }
+
+    #[test]
+    fn test_encode_timestamp_precisions() {
+        let now = Utc::now();
+        let mut log = LogEvent::default();
+        log.insert("ts_second", now);
+        log.insert("ts_milli", now);
+        log.insert("ts_micro", now);
+        log.insert("ts_nano", now);
+
+        let events = vec![Event::Log(log)];
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new(
+                "ts_second",
+                DataType::Timestamp(TimeUnit::Second, None),
+                true,
+            ),
+            Field::new(
+                "ts_milli",
+                DataType::Timestamp(TimeUnit::Millisecond, None),
+                true,
+            ),
+            Field::new(
+                "ts_micro",
+                DataType::Timestamp(TimeUnit::Microsecond, None),
+                true,
+            ),
+            Field::new(
+                "ts_nano",
+                DataType::Timestamp(TimeUnit::Nanosecond, None),
+                true,
+            ),
+        ]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 1);
+        assert_eq!(batch.num_columns(), 4);
+
+        let ts_second = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<TimestampSecondArray>()
+            .unwrap();
+        assert!(!ts_second.is_null(0));
+        assert_eq!(ts_second.value(0), now.timestamp());
+
+        let ts_milli = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<TimestampMillisecondArray>()
+            .unwrap();
+        assert!(!ts_milli.is_null(0));
+        assert_eq!(ts_milli.value(0), now.timestamp_millis());
+
+        let ts_micro = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<TimestampMicrosecondArray>()
+            .unwrap();
+        assert!(!ts_micro.is_null(0));
+        assert_eq!(ts_micro.value(0), now.timestamp_micros());
+
+        let ts_nano = batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .unwrap();
+        assert!(!ts_nano.is_null(0));
+        assert_eq!(ts_nano.value(0), now.timestamp_nanos_opt().unwrap());
+    }
+
+    #[test]
+    fn test_encode_integer_as_timestamp() {
+        // Test that integer timestamps are automatically converted
+        let mut log = LogEvent::default();
+
+        log.insert("ts_nano", 1760971112896200940_i64);
+
+        let events = vec![Event::Log(log)];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "ts_nano",
+            DataType::Timestamp(TimeUnit::Nanosecond, None),
+            true,
+        )]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 1);
+        assert_eq!(batch.num_columns(), 1);
+
+        let ts_nano = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .unwrap();
+
+        // Integer should be used directly for nanoseconds
+        assert!(!ts_nano.is_null(0));
+        assert_eq!(ts_nano.value(0), 1760971112896200940_i64);
+    }
+
+    #[test]
+    fn test_encode_mixed_timestamp_types() {
+        // Test mixing Timestamp and Integer values in the same field
+        let mut log1 = LogEvent::default();
+        log1.insert("ts", Utc::now());
+
+        let mut log2 = LogEvent::default();
+        log2.insert("ts", 1760971112896200940_i64);
+
+        let events = vec![Event::Log(log1), Event::Log(log2)];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "ts",
+            DataType::Timestamp(TimeUnit::Nanosecond, None),
+            true,
+        )]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 2);
+        assert_eq!(batch.num_columns(), 1);
+
+        let ts_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .unwrap();
+
+        // Both rows should have non-null values
+        assert!(!ts_array.is_null(0));
+        assert!(!ts_array.is_null(1));
+
+        // Second row should have the integer value
+        assert_eq!(ts_array.value(1), 1760971112896200940_i64);
     }
 }

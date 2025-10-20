@@ -101,10 +101,8 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
         "Bool" => DataType::Boolean,
         "Date" => DataType::Date32,
         "Date32" => DataType::Date32,
-        "DateTime" | "DateTime64" => DataType::Timestamp(TimeUnit::Millisecond, None),
-        _ if base_type.starts_with("DateTime64") => {
-            DataType::Timestamp(TimeUnit::Millisecond, None)
-        }
+        "DateTime" => DataType::Timestamp(TimeUnit::Second, None),
+        _ if base_type.starts_with("DateTime64") => parse_datetime64_precision(base_type),
         _ if base_type.starts_with("FixedString") => DataType::Utf8,
         _ if base_type.starts_with("Decimal") => DataType::Float64,
         _ if base_type.starts_with("Array") => DataType::Utf8, // Serialize as JSON
@@ -114,6 +112,41 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
             tracing::warn!("Unknown ClickHouse type '{}', defaulting to Utf8", ch_type);
             DataType::Utf8
         }
+    }
+}
+
+/// Parses DateTime64 precision and returns the appropriate Arrow timestamp type.
+/// DateTime64(0) -> Second
+/// DateTime64(3) -> Millisecond
+/// DateTime64(6) -> Microsecond
+/// DateTime64(9) -> Nanosecond
+fn parse_datetime64_precision(ch_type: &str) -> DataType {
+    // Extract precision from DateTime64(N)
+    if let Some(precision_str) = ch_type
+        .strip_prefix("DateTime64(")
+        .and_then(|s| s.split(')').next())
+        .and_then(|s| s.split(',').next())
+    {
+        match precision_str.trim().parse::<u8>() {
+            Ok(0) => DataType::Timestamp(TimeUnit::Second, None),
+            Ok(1..=3) => DataType::Timestamp(TimeUnit::Millisecond, None),
+            Ok(4..=6) => DataType::Timestamp(TimeUnit::Microsecond, None),
+            Ok(7..=9) => DataType::Timestamp(TimeUnit::Nanosecond, None),
+            _ => {
+                tracing::warn!(
+                    "Unsupported DateTime64 precision in '{}', defaulting to Millisecond",
+                    ch_type
+                );
+                DataType::Timestamp(TimeUnit::Millisecond, None)
+            }
+        }
+    } else {
+        // Default to millisecond if we can't parse
+        tracing::warn!(
+            "Could not parse DateTime64 precision from '{}', defaulting to Millisecond",
+            ch_type
+        );
+        DataType::Timestamp(TimeUnit::Millisecond, None)
     }
 }
 
@@ -129,7 +162,45 @@ mod tests {
         assert_eq!(clickhouse_type_to_arrow("Bool"), DataType::Boolean);
         assert_eq!(
             clickhouse_type_to_arrow("DateTime"),
+            DataType::Timestamp(TimeUnit::Second, None)
+        );
+    }
+
+    #[test]
+    fn test_datetime64_precision_mapping() {
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(0)"),
+            DataType::Timestamp(TimeUnit::Second, None)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(3)"),
             DataType::Timestamp(TimeUnit::Millisecond, None)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(6)"),
+            DataType::Timestamp(TimeUnit::Microsecond, None)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(9)"),
+            DataType::Timestamp(TimeUnit::Nanosecond, None)
+        );
+        // Test with timezone
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(9, 'UTC')"),
+            DataType::Timestamp(TimeUnit::Nanosecond, None)
+        );
+        // Test edge cases for precision ranges
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(1)"),
+            DataType::Timestamp(TimeUnit::Millisecond, None)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(4)"),
+            DataType::Timestamp(TimeUnit::Microsecond, None)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(7)"),
+            DataType::Timestamp(TimeUnit::Nanosecond, None)
         );
     }
 
@@ -155,7 +226,7 @@ mod tests {
         assert_eq!(schema.field(2).name(), "timestamp");
         assert_eq!(
             schema.field(2).data_type(),
-            &DataType::Timestamp(TimeUnit::Millisecond, None)
+            &DataType::Timestamp(TimeUnit::Second, None)
         );
     }
 }
