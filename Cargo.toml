@@ -137,8 +137,6 @@ members = [
 
 [workspace.dependencies]
 anyhow = { version = "1.0.99", default-features = false, features = ["std"] }
-arrow = { version = "54.0.0", default-features = false, features = ["ipc"] }
-arrow-schema = { version = "54.0.0", default-features = false }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
@@ -230,8 +228,6 @@ vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
-arrow = { workspace = true, optional = true }
-arrow-schema = { workspace = true, optional = true }
 async-stream.workspace = true
 async-trait.workspace = true
 futures.workspace = true
@@ -341,6 +337,8 @@ greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingest
 arc-swap = { version = "1.7", default-features = false, optional = true }
 async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
+arrow = { version = "54.0.0", default-features = false, features = ["ipc"], optional = true }
+arrow-schema = { version = "54.0.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { workspace = true, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
