@@ -25,7 +25,7 @@
 //! - `component_id` - Different components are rate limited independently
 //!
 //! **All other fields are ignored for grouping**, including:
-//! - `fanout_id`, `input_id`, `output_id` - Not used for grouping to avoid high cardinality issues
+//! - `fanout_id`, `input_id`, `output_id` - Not used for grouping to avoid resource/cost implications from high-cardinality tags
 //! - `message` - The log message itself doesn't differentiate groups
 //! - `internal_log_rate_limit` - Control field for enabling/disabling rate limiting
 //! - `internal_log_rate_secs` - Control field for customizing the rate limit window
@@ -45,7 +45,7 @@
 //! info!(component_id = "router", fanout_id = "output_1", "Routing event");  // Group C (same group!)
 //! info!(component_id = "router", fanout_id = "output_1", input_id = "kafka", "Routing event");  // Group C (same!)
 //! // All of these share the same group because they have the same component_id
-//! // The fanout_id and input_id fields are ignored to prevent memory issues
+//! // The fanout_id and input_id fields are ignored to avoid resource/cost implications
 //!
 //! // Example 3: Span fields contribute to grouping
 //! let span = info_span!("process", component_id = "transform_1");
@@ -93,7 +93,7 @@
 //! ```
 //!
 //! This ensures logs from different components are rate limited independently,
-//! while preventing memory issues from high-cardinality fields.
+//! while avoiding resource/cost implications from high-cardinality tags.
 
 use std::fmt;
 
@@ -479,8 +479,7 @@ impl From<String> for TraceValue {
 /// **Tracked fields** (only these create distinct rate limit groups):
 /// - `component_id` - Different components are rate limited independently
 ///
-/// **Ignored fields**: All other fields are ignored for grouping purposes. This prevents high-cardinality fields from
-/// causing memory issues.
+/// **Ignored fields**: All other fields are ignored for grouping purposes. This avoids resource/cost implications from high-cardinality tags.
 /// ```
 #[derive(Default, Eq, PartialEq, Hash, Clone)]
 struct RateLimitedSpanKeys {
