@@ -553,6 +553,7 @@ pub fn parse_netflow_v9_template_fields(data: &[u8]) -> Result<Vec<TemplateField
             field_type,
             field_length,
             enterprise_number: None, // NetFlow v9 doesn't use enterprise numbers
+            is_scope: false,
         });
 
         offset += 4;
@@ -654,7 +655,7 @@ pub fn parse_ipfix_options_template_fields(data: &[u8]) -> Result<(Vec<TemplateF
     let mut offset = 6; // Skip template_id, field_count, and scope_field_count
 
     // Parse scope fields first
-    for i in 0..scope_field_count {
+    for _i in 0..scope_field_count {
         if offset + 4 > data.len() {
             return Err("Insufficient data for scope field".to_string());
         }
@@ -761,11 +762,13 @@ mod tests {
                     field_type: 1,
                     field_length: 4,
                     enterprise_number: None,
+                    is_scope: false,
                 },
                 TemplateField {
                     field_type: 7,
                     field_length: 2,
                     enterprise_number: None,
+                    is_scope: false,
                 },
             ],
         )
@@ -792,11 +795,13 @@ mod tests {
                     field_type: 1,
                     field_length: 4,
                     enterprise_number: None,
+                    is_scope: false,
                 },
                 TemplateField {
                     field_type: 2,
                     field_length: 65535, // Variable length
                     enterprise_number: None,
+                    is_scope: false,
                 },
             ],
         );

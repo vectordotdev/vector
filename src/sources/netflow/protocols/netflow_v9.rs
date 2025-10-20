@@ -414,6 +414,7 @@ impl NetflowV9Parser {
                     field_type,
                     field_length,
                     enterprise_number: None, // NetFlow v9 doesn't use enterprise numbers
+                    is_scope: false,
                 });
 
                 field_offset += 4;
@@ -727,6 +728,7 @@ mod tests {
                 field_type: 8, // sourceIPv4Address
                 field_length: 4,
                 enterprise_number: None,
+                is_scope: false,
             }],
         );
         let key = (test_peer_addr(), 1, 256);
@@ -832,6 +834,7 @@ mod tests {
                field_type: 8, // sourceIPv4Address
                field_length: 4,
                enterprise_number: None,
+               is_scope: false,
            }],
        );
        let key = (test_peer_addr(), 1, 256);
@@ -981,6 +984,7 @@ mod tests {
                field_type: 8,
                field_length: 65535, // Variable length
                enterprise_number: None,
+               is_scope: false,
            }],
        );
        let key = (test_peer_addr(), 1, 256);
@@ -1099,6 +1103,7 @@ mod tests {
                field_type: 4, // protocolIdentifier
                field_length: 1,
                enterprise_number: None,
+               is_scope: false,
            }],
        );
        let key = (test_peer_addr(), 1, 256);
@@ -1159,11 +1164,13 @@ mod tests {
                    field_type: 8, // sourceIPv4Address
                    field_length: 4,
                    enterprise_number: None,
+                   is_scope: false,
                },
                TemplateField {
                    field_type: 12, // destinationIPv4Address
                    field_length: 4,
                    enterprise_number: None,
+                   is_scope: false,
                },
            ],
        );

@@ -857,6 +857,7 @@ mod tests {
                 field_type: 8, // sourceIPv4Address
                 field_length: 4,
                 enterprise_number: None,
+                is_scope: false,
             }],
         );
         let key = (test_peer_addr(), 1, 256);
@@ -1009,6 +1010,7 @@ mod tests {
                field_type: 8, // sourceIPv4Address
                field_length: 4,
                enterprise_number: None,
+               is_scope: false,
            }],
        );
        let key = (test_peer_addr(), 1, 256);
@@ -1151,6 +1153,7 @@ mod tests {
                field_type: 4, // protocolIdentifier
                field_length: 1,
                enterprise_number: None,
+               is_scope: false,
            }],
        );
        let key = (test_peer_addr(), 1, 256);

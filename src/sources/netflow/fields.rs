@@ -1286,6 +1286,7 @@ fn init_cisco_fields() -> HashMap<u16, FieldInfo> {
             field_type: 8, // sourceIPv4Address
             field_length: 4,
             enterprise_number: None,
+            is_scope: false,
         };
         
         let field_info = parser.get_field_info(&field);
@@ -1302,6 +1303,7 @@ fn init_cisco_fields() -> HashMap<u16, FieldInfo> {
             field_type: 1, // clientIPv4Address
             field_length: 4,
             enterprise_number: Some(23867),
+            is_scope: false,
         };
         
         let field_info = parser.get_field_info(&field);
@@ -1323,6 +1325,7 @@ fn init_cisco_fields() -> HashMap<u16, FieldInfo> {
             field_type: 1001,
             field_length: 4,
             enterprise_number: Some(9),
+            is_scope: false,
         };
         
         let field_info = parser.get_field_info(&field);
@@ -1340,6 +1343,7 @@ fn init_cisco_fields() -> HashMap<u16, FieldInfo> {
             field_type: 9999,
             field_length: 4,
             enterprise_number: None,
+            is_scope: false,
         };
         
         let field_info = parser.get_field_info(&field);
@@ -1351,6 +1355,7 @@ fn init_cisco_fields() -> HashMap<u16, FieldInfo> {
             field_type: 1001,
             field_length: 4,
             enterprise_number: Some(99999),
+            is_scope: false,
         };
         
         let field_info = parser.get_field_info(&field);
@@ -1367,6 +1372,7 @@ fn init_cisco_fields() -> HashMap<u16, FieldInfo> {
             field_type: 4, // protocolIdentifier
             field_length: 1,
             enterprise_number: None,
+            is_scope: false,
         };
         
         let mut log_event = LogEvent::default();
@@ -1390,6 +1396,7 @@ fn init_cisco_fields() -> HashMap<u16, FieldInfo> {
             field_type: 999, // Unknown field, will be parsed as binary
             field_length: 20,
             enterprise_number: None,
+            is_scope: false,
         };
         
         let mut log_event = LogEvent::default();
