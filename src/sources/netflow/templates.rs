@@ -37,6 +37,8 @@ pub struct TemplateField {
     pub field_length: u16,
     /// Enterprise number for vendor-specific fields (IPFIX only)
     pub enterprise_number: Option<u32>,
+    /// Whether this field is a scope field (Options Templates only)
+    pub is_scope: bool,
 }
 
 /// Template definition containing field layout.
@@ -46,6 +48,8 @@ pub struct Template {
     pub template_id: u16,
     /// List of fields in this template
     pub fields: Vec<TemplateField>,
+    /// Number of scope fields (Options Templates only, 0 for regular templates)
+    pub scope_field_count: u16,
     /// When this template was created/last used
     pub created: Instant,
     /// Last time this template was accessed
@@ -75,6 +79,20 @@ impl Template {
         Self {
             template_id,
             fields,
+            scope_field_count: 0, // Regular templates have no scope fields
+            created: now,
+            last_used: now,
+            usage_count: 0,
+        }
+    }
+
+    /// Create a new options template with scope fields.
+    pub fn new_options(template_id: u16, fields: Vec<TemplateField>, scope_field_count: u16) -> Self {
+        let now = Instant::now();
+        Self {
+            template_id,
+            fields,
+            scope_field_count,
             created: now,
             last_used: now,
             usage_count: 0,
@@ -610,10 +628,120 @@ pub fn parse_ipfix_template_fields(data: &[u8]) -> Result<Vec<TemplateField>, St
             field_type,
             field_length: actual_field_length,
             enterprise_number,
+            is_scope: false, // Will be set correctly by the caller
         });
     }
 
     Ok(fields)
+}
+
+/// Parse options template fields from IPFIX options template data.
+/// This handles the additional scope field count that Options Templates have.
+pub fn parse_ipfix_options_template_fields(data: &[u8]) -> Result<(Vec<TemplateField>, u16), String> {
+    if data.len() < 6 {
+        return Err("Options template data too short".to_string());
+    }
+
+    let field_count = u16::from_be_bytes([data[2], data[3]]);
+    let scope_field_count = u16::from_be_bytes([data[4], data[5]]);
+    
+    if scope_field_count > field_count {
+        return Err("Scope field count cannot exceed total field count".to_string());
+    }
+
+    let option_field_count = field_count - scope_field_count;
+    let mut fields = Vec::with_capacity(field_count as usize);
+    let mut offset = 6; // Skip template_id, field_count, and scope_field_count
+
+    // Parse scope fields first
+    for i in 0..scope_field_count {
+        if offset + 4 > data.len() {
+            return Err("Insufficient data for scope field".to_string());
+        }
+
+        let raw_field_type = u16::from_be_bytes([data[offset], data[offset + 1]]);
+        let field_length = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
+        offset += 4;
+
+        // Handle variable-length fields
+        let actual_field_length = if field_length == 65535 {
+            field_length
+        } else if field_length > 1000 {
+            warn!(
+                "Options template scope field has unusual length {} for field type {}, treating as variable length",
+                field_length, raw_field_type
+            );
+            65535
+        } else {
+            field_length
+        };
+
+        let (field_type, enterprise_number) = if raw_field_type & 0x8000 != 0 {
+            if offset + 4 > data.len() {
+                return Err("Insufficient data for enterprise field".to_string());
+            }
+            let enterprise_id = u32::from_be_bytes([
+                data[offset], data[offset + 1], data[offset + 2], data[offset + 3]
+            ]);
+            offset += 4;
+            (raw_field_type & 0x7FFF, Some(enterprise_id))
+        } else {
+            (raw_field_type, None)
+        };
+
+        fields.push(TemplateField {
+            field_type,
+            field_length: actual_field_length,
+            enterprise_number,
+            is_scope: true,
+        });
+    }
+
+    // Parse option fields
+    for _ in 0..option_field_count {
+        if offset + 4 > data.len() {
+            return Err("Insufficient data for option field".to_string());
+        }
+
+        let raw_field_type = u16::from_be_bytes([data[offset], data[offset + 1]]);
+        let field_length = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
+        offset += 4;
+
+        // Handle variable-length fields
+        let actual_field_length = if field_length == 65535 {
+            field_length
+        } else if field_length > 1000 {
+            warn!(
+                "Options template option field has unusual length {} for field type {}, treating as variable length",
+                field_length, raw_field_type
+            );
+            65535
+        } else {
+            field_length
+        };
+
+        let (field_type, enterprise_number) = if raw_field_type & 0x8000 != 0 {
+            if offset + 4 > data.len() {
+                return Err("Insufficient data for enterprise field".to_string());
+            }
+            let enterprise_id = u32::from_be_bytes([
+                data[offset], data[offset + 1], data[offset + 2], data[offset + 3]
+            ]);
+            offset += 4;
+            (raw_field_type & 0x7FFF, Some(enterprise_id))
+        } else {
+            (raw_field_type, None)
+        };
+
+        fields.push(TemplateField {
+            field_type,
+            field_length: actual_field_length,
+            enterprise_number,
+            is_scope: false,
+        });
+    }
+
+    Ok((fields, scope_field_count))
 }
 
 #[cfg(test)]
@@ -795,5 +923,88 @@ mod tests {
         assert_eq!(debug_templates.len(), 1);
         assert_eq!(debug_templates[0].0, key);
         assert_eq!(debug_templates[0].1.template_id, 256);
+    }
+
+    #[test]
+    fn test_options_template_1024_parsing() {
+        // Test data for Silver Peak Options Template 1024
+        // Set ID: 00 03 (3 = Options Template)
+        // Set Length: 00 22 (34 bytes)
+        // Template ID: 04 00 (1024)
+        // Field Count: 00 06 (6 fields)
+        // Scope Count: 00 01 (1 scope field)
+        // Scope Field: 01 5a 00 04 (Field 346, Length 4)
+        // Option Fields: 01 2f 00 02, 01 53 00 01, 01 58 00 01, 01 55 ff ff, 01 59 00 02
+        let data = vec![
+            0x04, 0x00, // Template ID = 1024
+            0x00, 0x06, // Field Count = 6
+            0x00, 0x01, // Scope Field Count = 1
+            // Scope field
+            0x01, 0x5a, 0x00, 0x04, // Field 346, Length 4
+            // Option fields
+            0x01, 0x2f, 0x00, 0x02, // Field 303, Length 2
+            0x01, 0x53, 0x00, 0x01, // Field 339, Length 1
+            0x01, 0x58, 0x00, 0x01, // Field 344, Length 1
+            0x01, 0x55, 0xff, 0xff, // Field 341, Length VAR
+            0x01, 0x59, 0x00, 0x02, // Field 345, Length 2
+        ];
+        
+        let result = parse_ipfix_options_template_fields(&data);
+        assert!(result.is_ok());
+        
+        let (fields, scope_field_count) = result.unwrap();
+        assert_eq!(scope_field_count, 1);
+        assert_eq!(fields.len(), 6);
+        
+        // Check scope field (first field)
+        assert_eq!(fields[0].field_type, 346);
+        assert_eq!(fields[0].field_length, 4);
+        assert_eq!(fields[0].is_scope, true);
+        
+        // Check option fields
+        assert_eq!(fields[1].field_type, 303);
+        assert_eq!(fields[1].field_length, 2);
+        assert_eq!(fields[1].is_scope, false);
+        
+        assert_eq!(fields[2].field_type, 339);
+        assert_eq!(fields[2].field_length, 1);
+        assert_eq!(fields[2].is_scope, false);
+        
+        assert_eq!(fields[3].field_type, 344);
+        assert_eq!(fields[3].field_length, 1);
+        assert_eq!(fields[3].is_scope, false);
+        
+        assert_eq!(fields[4].field_type, 341);
+        assert_eq!(fields[4].field_length, 65535); // Variable length
+        assert_eq!(fields[4].is_scope, false);
+        
+        assert_eq!(fields[5].field_type, 345);
+        assert_eq!(fields[5].field_length, 2);
+        assert_eq!(fields[5].is_scope, false);
+    }
+
+    #[test]
+    fn test_options_template_creation() {
+        let fields = vec![
+            TemplateField {
+                field_type: 346,
+                field_length: 4,
+                enterprise_number: None,
+                is_scope: true,
+            },
+            TemplateField {
+                field_type: 303,
+                field_length: 2,
+                enterprise_number: None,
+                is_scope: false,
+            },
+        ];
+        
+        let template = Template::new_options(1024, fields, 1);
+        assert_eq!(template.template_id, 1024);
+        assert_eq!(template.scope_field_count, 1);
+        assert_eq!(template.fields.len(), 2);
+        assert_eq!(template.fields[0].is_scope, true);
+        assert_eq!(template.fields[1].is_scope, false);
     }
 }

@@ -779,7 +779,7 @@ fn init_standard_fields() -> HashMap<u16, FieldInfo> {
     map.insert(343, FieldInfo { name: "informationElementRangeEnd", data_type: DataType::UInt64, description: "Contains the inclusive high end of" });
     map.insert(344, FieldInfo { name: "informationElementSemantics", data_type: DataType::UInt8, description: "A description of the semantics of" });
     map.insert(345, FieldInfo { name: "informationElementUnits", data_type: DataType::UInt16, description: "A description of the units of" });
-    map.insert(346, FieldInfo { name: "privateEnterpriseNumber", data_type: DataType::UInt32, description: "A private enterprise number, as assigned" });
+    map.insert(346, FieldInfo { name: "observationPointId", data_type: DataType::UInt32, description: "Identifier of the observation point" });
     map.insert(347, FieldInfo { name: "virtualStationInterfaceId", data_type: DataType::Binary, description: "Instance Identifier of the interface to" });
     map.insert(348, FieldInfo { name: "virtualStationInterfaceName", data_type: DataType::String, description: "Name of the interface to a" });
     map.insert(349, FieldInfo { name: "virtualStationUUID", data_type: DataType::Binary, description: "Unique Identifier of a Virtual Station." });
@@ -998,6 +998,13 @@ fn init_hpe_aruba_fields() -> HashMap<u16, FieldInfo> {
     map.insert(25, FieldInfo { name: "overlay", data_type: DataType::String, description: "Overlay identifier" });
     map.insert(26, FieldInfo { name: "direction", data_type: DataType::String, description: "Flow direction" });
     map.insert(27, FieldInfo { name: "applicationCategory", data_type: DataType::String, description: "Application category" });
+    
+    // Options Template fields (for Silver Peak Template 1024)
+    // Note: Some of these conflict with standard IPFIX field definitions
+    // but are used differently in Silver Peak Options Templates
+    map.insert(341, FieldInfo { name: "lowerCILimit", data_type: DataType::Float64, description: "Statistical confidence interval lower limit" });
+    map.insert(344, FieldInfo { name: "dataLinkFrameSize", data_type: DataType::UInt16, description: "Frame size at data link layer" });
+    map.insert(345, FieldInfo { name: "dataLinkFrameType", data_type: DataType::UInt16, description: "Type of data link frame" });
     
     // Legacy fields
     map.insert(10001, FieldInfo { name: "overlayTunnelID", data_type: DataType::UInt32, description: "Overlay tunnel ID" });

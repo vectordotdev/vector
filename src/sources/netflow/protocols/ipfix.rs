@@ -9,7 +9,7 @@ use crate::sources::netflow::fields::FieldParser;
 use crate::sources::netflow::templates::{
     TemplateCache, Template,
 };
-use crate::sources::netflow::templates::parse_ipfix_template_fields;
+use crate::sources::netflow::templates::{parse_ipfix_template_fields, parse_ipfix_options_template_fields};
 use std::net::SocketAddr;
 use vector_lib::event::{Event, LogEvent, Value};
 use base64::Engine;
@@ -353,7 +353,7 @@ impl IpfixParser {
         template_count
     }
 
-    /// Parse options template set (similar to regular templates for now)
+    /// Parse options template set with proper scope field handling
     fn parse_options_template_set(
         &self,
         data: &[u8],
@@ -361,9 +361,85 @@ impl IpfixParser {
         peer_addr: SocketAddr,
         template_cache: &TemplateCache,
     ) -> usize {
-        // For simplicity, treat options templates like regular templates
-        // In a full implementation, this would handle scope fields differently
-        self.parse_template_set(data, observation_domain_id, peer_addr, template_cache)
+        let mut template_count = 0;
+        let mut offset = 4; // Skip set header
+
+        while offset + 6 <= data.len() { // Need at least 6 bytes for options template header
+            let template_id = u16::from_be_bytes([data[offset], data[offset + 1]]);
+            let field_count = u16::from_be_bytes([data[offset + 2], data[offset + 3]]);
+            let scope_field_count = u16::from_be_bytes([data[offset + 4], data[offset + 5]]);
+
+            debug!(
+                "Parsing IPFIX options template: id={}, fields={}, scope_fields={}",
+                template_id, field_count, scope_field_count
+            );
+
+            // Find end of this template
+            let mut template_end = offset + 6; // Skip template_id, field_count, scope_field_count
+            let mut remaining_fields = field_count;
+
+            while remaining_fields > 0 && template_end + 4 <= data.len() {
+                let field_type = u16::from_be_bytes([data[template_end], data[template_end + 1]]);
+                template_end += 4; // field_type + field_length
+
+                // Check for enterprise field
+                if field_type & 0x8000 != 0 && template_end + 4 <= data.len() {
+                    template_end += 4; // enterprise_number
+                }
+
+                remaining_fields -= 1;
+            }
+
+            if remaining_fields > 0 {
+                warn!("Incomplete options template data for template {}", template_id);
+                break;
+            }
+
+            // Parse options template fields
+            let template_data = &data[offset..template_end];
+            
+            // Debug: Log raw template data for template ID 1024 (only once)
+            if template_id == 1024 {
+                debug!(
+                    message = "Options Template ID 1024 received - raw template data dump",
+                    template_id = template_id,
+                    field_count = field_count,
+                    scope_field_count = scope_field_count,
+                    template_data_length = template_data.len(),
+                    raw_template_hex = format!("{:02x?}", template_data),
+                    raw_template_base64 = base64::engine::general_purpose::STANDARD.encode(template_data),
+                    peer_addr = %peer_addr,
+                    observation_domain_id = observation_domain_id,
+                );
+            }
+            
+            match parse_ipfix_options_template_fields(template_data) {
+                Ok((fields, scope_count)) => {
+                    let template = Template::new_options(template_id, fields, scope_count);
+                    let key = (peer_addr, observation_domain_id, template_id);
+                    template_cache.insert(key, template);
+                    template_count += 1;
+
+                    emit!(IpfixTemplateReceived {
+                        template_id,
+                        field_count,
+                        peer_addr,
+                        observation_domain_id,
+                    });
+                }
+                Err(e) => {
+                    emit!(NetflowTemplateError {
+                        error: e.as_str(),
+                        template_id,
+                        peer_addr,
+                    });
+                }
+            }
+
+            offset = template_end;
+        }
+
+        template_count
     }
 
     /// Parse data set using cached template
