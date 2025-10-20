@@ -24,3 +24,8 @@ services:
             echo "sentinel failover-timeout vector 5000" >> /etc/sentinel.conf &&
             echo "sentinel parallel-syncs vector 1" >> /etc/sentinel.conf &&
             redis-sentinel /etc/sentinel.conf'
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
