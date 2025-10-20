@@ -999,9 +999,15 @@ fn init_hpe_aruba_fields() -> HashMap<u16, FieldInfo> {
     map.insert(26, FieldInfo { name: "direction", data_type: DataType::String, description: "Flow direction" });
     map.insert(27, FieldInfo { name: "applicationCategory", data_type: DataType::String, description: "Application category" });
     
+    // Additional HPE Aruba fields found in production packets
+    map.insert(96, FieldInfo { name: "unknownField96", data_type: DataType::String, description: "Unknown HPE Aruba field 96" });
+    map.insert(350, FieldInfo { name: "unknownField350", data_type: DataType::String, description: "Unknown HPE Aruba field 350" });
+    
     // Options Template fields (for Silver Peak Template 1024)
     // Note: Some of these conflict with standard IPFIX field definitions
     // but are used differently in Silver Peak Options Templates
+    map.insert(303, FieldInfo { name: "unknownField303", data_type: DataType::UInt16, description: "Unknown Options Template field 303" });
+    map.insert(339, FieldInfo { name: "unknownField339", data_type: DataType::UInt8, description: "Unknown Options Template field 339" });
     map.insert(341, FieldInfo { name: "lowerCILimit", data_type: DataType::Float64, description: "Statistical confidence interval lower limit" });
     map.insert(344, FieldInfo { name: "dataLinkFrameSize", data_type: DataType::UInt16, description: "Frame size at data link layer" });
     map.insert(345, FieldInfo { name: "dataLinkFrameType", data_type: DataType::UInt16, description: "Type of data link frame" });
