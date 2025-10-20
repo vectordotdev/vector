@@ -23,17 +23,13 @@
 //!
 //! **Only these fields create distinct rate limit groups:**
 //! - `component_id` - Different components are rate limited independently
-//! - `vrl_position` - Different VRL script positions are rate limited independently
 //!
 //! **All other fields are ignored for grouping**, including:
-//! - `fanout_id`, `input_id`, `output_id` - Not used for grouping to avoid cardinality issues
+//! - `fanout_id`, `input_id`, `output_id` - Not used for grouping to avoid high cardinality issues
 //! - `message` - The log message itself doesn't differentiate groups
 //! - `internal_log_rate_limit` - Control field for enabling/disabling rate limiting
 //! - `internal_log_rate_secs` - Control field for customizing the rate limit window
 //! - Any custom fields you add
-//!
-//! This restrictive approach prevents high-cardinality fields (like request IDs or UUIDs) from
-//! causing unbounded memory growth.
 //!
 //! ## Examples
 //!
@@ -43,7 +39,7 @@
 //! info!(component_id = "transform_2", "Processing event");  // Group B
 //! // Even though the message is identical, these are rate limited independently
 //!
-//! // Example 2: Only component_id and vrl_position matter for grouping
+//! // Example 2: Only component_id matters for grouping
 //! info!(component_id = "router", fanout_id = "output_1", "Routing event");  // Group C
 //! info!(component_id = "router", fanout_id = "output_2", "Routing event");  // Group C (same group!)
 //! info!(component_id = "router", fanout_id = "output_1", "Routing event");  // Group C (same group!)
@@ -70,20 +66,15 @@
 //!
 //! // Example 5: Same callsite with no fields = single rate limit group
 //! info!("Simple message");  // Group G
-//! info!("Simple message");  // Group G (same group, will be rate limited together)
+//! info!("Simple message");  // Group G
 //! info!("Simple message");  // Group G
 //!
-//! // Example 6: VRL position tracking for script errors
-//! info!(vrl_position = "line 10", "VRL compilation error");  // Group H
-//! info!(vrl_position = "line 25", "VRL compilation error");  // Group I
-//! // Each line in a VRL script gets its own rate limit group
-//!
-//! // Example 7: Custom fields are ignored for grouping
-//! info!(component_id = "source", input_id = "in_1", "Received data");  // Group J
-//! info!(component_id = "source", input_id = "in_2", "Received data");  // Group J (same group!)
+//! // Example 6: Custom fields are ignored for grouping
+//! info!(component_id = "source", input_id = "in_1", "Received data");  // Group H
+//! info!(component_id = "source", input_id = "in_2", "Received data");  // Group H (same group!)
 //! // The input_id field is ignored - only component_id matters
 //!
-//! // Example 8: Disabling rate limiting for specific logs
+//! // Example 7: Disabling rate limiting for specific logs
 //! // Rate limiting is ON by default - explicitly disable for important logs
 //! warn!(
 //!     component_id = "critical_component",
@@ -92,7 +83,7 @@
 //! );
 //! // This event will NEVER be rate limited, regardless of how often it fires
 //!
-//! // Example 9: Custom rate limit window for specific events
+//! // Example 8: Custom rate limit window for specific events
 //! info!(
 //!     component_id = "noisy_component",
 //!     message = "Frequent status update",
@@ -101,7 +92,7 @@
 //! // Override the default window for this specific log
 //! ```
 //!
-//! This ensures logs from different components and VRL positions are rate limited independently,
+//! This ensures logs from different components are rate limited independently,
 //! while preventing memory issues from high-cardinality fields.
 
 use std::fmt;
@@ -133,7 +124,6 @@ const MESSAGE_FIELD: &str = "message";
 // These fields will cause events to be independently rate limited by the values
 // for these keys
 const COMPONENT_ID_FIELD: &str = "component_id";
-const VRL_POSITION: &str = "vrl_position";
 
 #[derive(Eq, PartialEq, Hash, Clone)]
 struct RateKeyIdentifier {
@@ -488,43 +478,25 @@ impl From<String> for TraceValue {
 ///
 /// **Tracked fields** (only these create distinct rate limit groups):
 /// - `component_id` - Different components are rate limited independently
-/// - `vrl_position` - Different VRL script positions are rate limited independently
 ///
-/// **Ignored fields**: All other fields (including `fanout_id`, `input_id`, etc.) are ignored
-/// for grouping purposes. This prevents high-cardinality fields from causing memory issues.
-///
-/// ## Example:
-///
-/// ```rust,ignore
-/// // These create separate groups (different component_id):
-/// info!(component_id = "source_1", "Event received");  // Group A
-/// info!(component_id = "source_2", "Event received");  // Group B
-///
-/// // These share the same group (same component_id, fanout_id is ignored):
-/// info!(component_id = "router", fanout_id = "output_1", "Routing");  // Group C
-/// info!(component_id = "router", fanout_id = "output_2", "Routing");  // Group C (same!)
+/// **Ignored fields**: All other fields are ignored for grouping purposes. This prevents high-cardinality fields from
+/// causing memory issues.
 /// ```
 #[derive(Default, Eq, PartialEq, Hash, Clone)]
 struct RateLimitedSpanKeys {
     component_id: Option<TraceValue>,
-    vrl_position: Option<TraceValue>,
 }
 
 impl RateLimitedSpanKeys {
     fn record(&mut self, field: &Field, value: TraceValue) {
-        match field.name() {
-            COMPONENT_ID_FIELD => self.component_id = Some(value),
-            VRL_POSITION => self.vrl_position = Some(value),
-            _ => {}
+        if field.name() == COMPONENT_ID_FIELD {
+            self.component_id = Some(value);
         }
     }
 
     fn merge(&mut self, other: &Self) {
         if let Some(component_id) = &other.component_id {
             self.component_id = Some(component_id.clone());
-        }
-        if let Some(vrl_position) = &other.vrl_position {
-            self.vrl_position = Some(vrl_position.clone());
         }
     }
 }
@@ -745,12 +717,6 @@ mod test {
                         if let Some(TraceValue::String(ref s)) = span_keys.component_id {
                             visitor.fields.insert("component_id".to_string(), s.clone());
                         }
-                        // Add vrl_position
-                        if let Some(val) = &span_keys.vrl_position {
-                            visitor
-                                .fields
-                                .insert("vrl_position".to_string(), val.to_string());
-                        }
                     }
                 }
             }
@@ -833,14 +799,9 @@ mod test {
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
                 for key in &["foo", "bar"] {
-                    for line_number in &[1, 2] {
-                        let span =
-                            info_span!("span", component_id = &key, vrl_position = &line_number);
-                        let _enter = span.enter();
-                        info!(
-                            message = format!("Hello {key} on line_number {line_number}!").as_str()
-                        );
-                    }
+                    let span = info_span!("span", component_id = &key);
+                    let _enter = span.enter();
+                    info!(message = format!("Hello {key}!").as_str());
                 }
                 MockClock::advance(Duration::from_millis(100));
             }
@@ -848,37 +809,24 @@ mod test {
 
         let events = events.lock().unwrap();
 
+        // Events with different component_id values create separate rate limit groups
         assert_eq!(
             *events,
             vec![
-                event!("Hello foo on line_number 1!", component_id: "foo", vrl_position: "1"),
-                event!("Hello foo on line_number 2!", component_id: "foo", vrl_position: "2"),
-                event!("Hello bar on line_number 1!", component_id: "bar", vrl_position: "1"),
-                event!("Hello bar on line_number 2!", component_id: "bar", vrl_position: "2"),
-                event!("Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding.", component_id: "foo", vrl_position: "1"),
-                event!("Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding.", component_id: "foo", vrl_position: "2"),
-                event!("Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding.", component_id: "bar", vrl_position: "1"),
-                event!("Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding.", component_id: "bar", vrl_position: "2"),
-                event!("Internal log [Hello foo on line_number 1!] has been suppressed 9 times.", component_id: "foo", vrl_position: "1"),
-                event!("Hello foo on line_number 1!", component_id: "foo", vrl_position: "1"),
-                event!("Internal log [Hello foo on line_number 2!] has been suppressed 9 times.", component_id: "foo", vrl_position: "2"),
-                event!("Hello foo on line_number 2!", component_id: "foo", vrl_position: "2"),
-                event!("Internal log [Hello bar on line_number 1!] has been suppressed 9 times.", component_id: "bar", vrl_position: "1"),
-                event!("Hello bar on line_number 1!", component_id: "bar", vrl_position: "1"),
-                event!("Internal log [Hello bar on line_number 2!] has been suppressed 9 times.", component_id: "bar", vrl_position: "2"),
-                event!("Hello bar on line_number 2!", component_id: "bar", vrl_position: "2"),
-                event!("Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding.", component_id: "foo", vrl_position: "1"),
-                event!("Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding.", component_id: "foo", vrl_position: "2"),
-                event!("Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding.", component_id: "bar", vrl_position: "1"),
-                event!("Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding.", component_id: "bar", vrl_position: "2"),
-                event!("Internal log [Hello foo on line_number 1!] has been suppressed 9 times.", component_id: "foo", vrl_position: "1"),
-                event!("Hello foo on line_number 1!", component_id: "foo", vrl_position: "1"),
-                event!("Internal log [Hello foo on line_number 2!] has been suppressed 9 times.", component_id: "foo", vrl_position: "2"),
-                event!("Hello foo on line_number 2!", component_id: "foo", vrl_position: "2"),
-                event!("Internal log [Hello bar on line_number 1!] has been suppressed 9 times.", component_id: "bar", vrl_position: "1"),
-                event!("Hello bar on line_number 1!", component_id: "bar", vrl_position: "1"),
-                event!("Internal log [Hello bar on line_number 2!] has been suppressed 9 times.", component_id: "bar", vrl_position: "2"),
-                event!("Hello bar on line_number 2!", component_id: "bar", vrl_position: "2"),
+                event!("Hello foo!", component_id: "foo"),
+                event!("Hello bar!", component_id: "bar"),
+                event!("Internal log [Hello foo!] is being suppressed to avoid flooding.", component_id: "foo"),
+                event!("Internal log [Hello bar!] is being suppressed to avoid flooding.", component_id: "bar"),
+                event!("Internal log [Hello foo!] has been suppressed 9 times.", component_id: "foo"),
+                event!("Hello foo!", component_id: "foo"),
+                event!("Internal log [Hello bar!] has been suppressed 9 times.", component_id: "bar"),
+                event!("Hello bar!", component_id: "bar"),
+                event!("Internal log [Hello foo!] is being suppressed to avoid flooding.", component_id: "foo"),
+                event!("Internal log [Hello bar!] is being suppressed to avoid flooding.", component_id: "bar"),
+                event!("Internal log [Hello foo!] has been suppressed 9 times.", component_id: "foo"),
+                event!("Hello foo!", component_id: "foo"),
+                event!("Internal log [Hello bar!] has been suppressed 9 times.", component_id: "bar"),
+                event!("Hello bar!", component_id: "bar"),
             ]
         );
     }
@@ -894,13 +842,7 @@ mod test {
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
                 for key in &["foo", "bar"] {
-                    for line_number in &[1, 2] {
-                        info!(
-                            message = format!("Hello {key} on line_number {line_number}!").as_str(),
-                            component_id = &key,
-                            vrl_position = &line_number
-                        );
-                    }
+                    info!(message = format!("Hello {key}!").as_str(), component_id = &key);
                 }
                 MockClock::advance(Duration::from_millis(100));
             }
@@ -908,53 +850,24 @@ mod test {
 
         let events = events.lock().unwrap();
 
+        // Events with different component_id values create separate rate limit groups
         assert_eq!(
             *events,
             vec![
-                event!("Hello foo on line_number 1!", component_id: "foo", vrl_position: "1"),
-                event!("Hello foo on line_number 2!", component_id: "foo", vrl_position: "2"),
-                event!("Hello bar on line_number 1!", component_id: "bar", vrl_position: "1"),
-                event!("Hello bar on line_number 2!", component_id: "bar", vrl_position: "2"),
-                event!(
-                    "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding."
-                ),
-                event!(
-                    "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding."
-                ),
-                event!(
-                    "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding."
-                ),
-                event!(
-                    "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding."
-                ),
-                event!("Internal log [Hello foo on line_number 1!] has been suppressed 9 times."),
-                event!("Hello foo on line_number 1!", component_id: "foo", vrl_position: "1"),
-                event!("Internal log [Hello foo on line_number 2!] has been suppressed 9 times."),
-                event!("Hello foo on line_number 2!", component_id: "foo", vrl_position: "2"),
-                event!("Internal log [Hello bar on line_number 1!] has been suppressed 9 times."),
-                event!("Hello bar on line_number 1!", component_id: "bar", vrl_position: "1"),
-                event!("Internal log [Hello bar on line_number 2!] has been suppressed 9 times."),
-                event!("Hello bar on line_number 2!", component_id: "bar", vrl_position: "2"),
-                event!(
-                    "Internal log [Hello foo on line_number 1!] is being suppressed to avoid flooding."
-                ),
-                event!(
-                    "Internal log [Hello foo on line_number 2!] is being suppressed to avoid flooding."
-                ),
-                event!(
-                    "Internal log [Hello bar on line_number 1!] is being suppressed to avoid flooding."
-                ),
-                event!(
-                    "Internal log [Hello bar on line_number 2!] is being suppressed to avoid flooding."
-                ),
-                event!("Internal log [Hello foo on line_number 1!] has been suppressed 9 times."),
-                event!("Hello foo on line_number 1!", component_id: "foo", vrl_position: "1"),
-                event!("Internal log [Hello foo on line_number 2!] has been suppressed 9 times."),
-                event!("Hello foo on line_number 2!", component_id: "foo", vrl_position: "2"),
-                event!("Internal log [Hello bar on line_number 1!] has been suppressed 9 times."),
-                event!("Hello bar on line_number 1!", component_id: "bar", vrl_position: "1"),
-                event!("Internal log [Hello bar on line_number 2!] has been suppressed 9 times."),
-                event!("Hello bar on line_number 2!", component_id: "bar", vrl_position: "2"),
+                event!("Hello foo!", component_id: "foo"),
+                event!("Hello bar!", component_id: "bar"),
+                event!("Internal log [Hello foo!] is being suppressed to avoid flooding."),
+                event!("Internal log [Hello bar!] is being suppressed to avoid flooding."),
+                event!("Internal log [Hello foo!] has been suppressed 9 times."),
+                event!("Hello foo!", component_id: "foo"),
+                event!("Internal log [Hello bar!] has been suppressed 9 times."),
+                event!("Hello bar!", component_id: "bar"),
+                event!("Internal log [Hello foo!] is being suppressed to avoid flooding."),
+                event!("Internal log [Hello bar!] is being suppressed to avoid flooding."),
+                event!("Internal log [Hello foo!] has been suppressed 9 times."),
+                event!("Hello foo!", component_id: "foo"),
+                event!("Internal log [Hello bar!] has been suppressed 9 times."),
+                event!("Hello bar!", component_id: "bar"),
             ]
         );
     }
@@ -1111,21 +1024,21 @@ mod test {
 
     #[test]
     #[serial]
-    fn nested_spans_merges_different_fields() {
+    fn nested_spans_ignores_untracked_fields() {
         let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
 
         let recorder = RecordingLayer::new(Arc::clone(&events));
         let sub = tracing_subscriber::registry::Registry::default()
             .with(RateLimitedLayer::new(recorder).with_default_limit(1));
         tracing::subscriber::with_default(sub, || {
-            // Parent has component_id, child has vrl_position - both should be included
+            // Parent has component_id, child has some_field - only component_id is tracked
             let outer = info_span!("outer", component_id = "transform");
             let _outer_guard = outer.enter();
 
             for _ in 0..21 {
-                let inner = info_span!("inner", vrl_position = "line 42");
+                let inner = info_span!("inner", some_field = "value");
                 let _inner_guard = inner.enter();
-                info!(message = "VRL event");
+                info!(message = "Event message");
                 drop(_inner_guard);
 
                 MockClock::advance(Duration::from_millis(100));
@@ -1134,33 +1047,30 @@ mod test {
 
         let events = events.lock().unwrap();
 
-        // Events should have BOTH component_id from parent AND vrl_position from child
+        // Events should have component_id from parent, some_field from child is ignored for grouping
+        // All events are in the same rate limit group
         assert_eq!(
             *events,
             vec![
-                event!("VRL event", component_id: "transform", vrl_position: "line 42"),
+                event!("Event message", component_id: "transform"),
                 event!(
-                    "Internal log [VRL event] is being suppressed to avoid flooding.",
-                    component_id: "transform",
-                    vrl_position: "line 42"
+                    "Internal log [Event message] is being suppressed to avoid flooding.",
+                    component_id: "transform"
                 ),
                 event!(
-                    "Internal log [VRL event] has been suppressed 9 times.",
-                    component_id: "transform",
-                    vrl_position: "line 42"
+                    "Internal log [Event message] has been suppressed 9 times.",
+                    component_id: "transform"
                 ),
-                event!("VRL event", component_id: "transform", vrl_position: "line 42"),
+                event!("Event message", component_id: "transform"),
                 event!(
-                    "Internal log [VRL event] is being suppressed to avoid flooding.",
-                    component_id: "transform",
-                    vrl_position: "line 42"
+                    "Internal log [Event message] is being suppressed to avoid flooding.",
+                    component_id: "transform"
                 ),
                 event!(
-                    "Internal log [VRL event] has been suppressed 9 times.",
-                    component_id: "transform",
-                    vrl_position: "line 42"
+                    "Internal log [Event message] has been suppressed 9 times.",
+                    component_id: "transform"
                 ),
-                event!("VRL event", component_id: "transform", vrl_position: "line 42"),
+                event!("Event message", component_id: "transform"),
             ]
         );
     }
