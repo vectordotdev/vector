@@ -11,8 +11,7 @@ pub struct Cli {
     test: String,
 
     /// Use only the features defined in test.yaml (e.g., scripts/e2e/<test-name>/test.yaml)
-    /// instead of the shared 'all-e2e-tests' feature. Defaults to false for better image
-    /// reuse across tests.
+    /// instead of the shared 'all-e2e-tests' feature. Defaults to false for better image reuse across tests.
     #[arg(long)]
     test_yaml_features: bool,
 

@@ -11,8 +11,7 @@ pub struct Cli {
     integration: String,
 
     /// Use only the features defined in test.yaml (e.g., scripts/integration/<test-name>/test.yaml)
-    /// instead of the shared 'all-integration-tests' feature. Defaults to false for better image
-    /// reuse across tests.
+    /// instead of the shared 'all-integration-tests' feature. Defaults to false for better image reuse across tests.
     #[arg(long)]
     test_yaml_features: bool,
 }
