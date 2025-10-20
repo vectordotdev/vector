@@ -148,13 +148,23 @@ pub trait ContainerTestRunner: TestRunner {
         directory: &str,
         config_env_vars: &Environment,
     ) -> Result<()> {
+        // Check if the image already exists
+        let image_name = self.image_name();
+        let mut check_command = docker_command(["image", "inspect", &image_name]);
+
+        if check_command.output().is_ok() {
+            // Image already exists, skip build
+            info!("Image {} already exists, skipping build", image_name);
+            return Ok(());
+        }
+
         let dockerfile: PathBuf = [app::path(), "scripts", directory, "Dockerfile"]
             .iter()
             .collect();
 
         let mut command =
-            prepare_build_command(&self.image_name(), &dockerfile, features, config_env_vars);
-        waiting!("Building image {}", self.image_name());
+            prepare_build_command(&image_name, &dockerfile, features, config_env_vars);
+        waiting!("Building image {}", image_name);
         command.check_run()
     }
 

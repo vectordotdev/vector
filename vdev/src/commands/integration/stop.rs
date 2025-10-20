@@ -10,9 +10,11 @@ pub struct Cli {
     /// The integration name to stop
     integration: String,
 
-    /// If true, remove the runner container compiled with all integration test features
-    #[arg(short = 'a', long)]
-    all_features: bool,
+    /// Use only the features defined in test.yaml (e.g., scripts/integration/<test-name>/test.yaml)
+    /// instead of the shared 'all-integration-tests' feature. Defaults to false for better image
+    /// reuse across tests.
+    #[arg(long)]
+    test_yaml_features: bool,
 }
 
 impl Cli {
@@ -20,7 +22,7 @@ impl Cli {
         crate::commands::compose_tests::stop::exec(
             ComposeTestLocalConfig::integration(),
             &self.integration,
-            self.all_features,
+            !self.test_yaml_features,
         )
     }
 }

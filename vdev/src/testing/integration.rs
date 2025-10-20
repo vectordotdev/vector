@@ -67,7 +67,8 @@ pub(crate) struct ComposeTest {
     runner: IntegrationTestRunner,
     compose: Option<Compose>,
     env_config: Environment,
-    build_all: bool,
+    /// When true, uses 'all-integration-tests' or 'all-e2e-tests' feature. When false, uses features from test.yaml.
+    all_features: bool,
     retries: u8,
 }
 
@@ -76,7 +77,7 @@ impl ComposeTest {
         local_config: ComposeTestLocalConfig,
         test_name: impl Into<String>,
         environment: impl Into<String>,
-        build_all: bool,
+        all_features: bool,
         retries: u8,
     ) -> Result<ComposeTest> {
         let test_name: String = test_name.into();
@@ -89,8 +90,9 @@ impl ComposeTest {
         let network_name = format!("vector-integration-tests-{test_name}");
         let compose = Compose::new(test_dir, env_config.clone(), network_name.clone())?;
 
-        // None if compiling with all integration test feature flag.
-        let runner_name = (!build_all).then(|| test_name.clone());
+        // When using 'all-*-tests' feature, creates shared image (vector-test-runner-1.90:latest).
+        // When using test.yaml features, creates per-test image (vector-test-runner-clickhouse-1.90:latest).
+        let runner_name = (!all_features).then(|| test_name.clone());
 
         let runner = IntegrationTestRunner::new(
             runner_name,
@@ -108,7 +110,7 @@ impl ComposeTest {
             runner,
             compose,
             env_config: rename_environment_keys(&env_config),
-            build_all,
+            all_features,
             retries,
         };
         trace!("Generated {compose_test:#?}");
@@ -174,7 +176,9 @@ impl ComposeTest {
 
         args.push("--features".to_string());
 
-        args.push(if self.build_all {
+        // When all_features=true: use 'all-integration-tests' or 'all-e2e-tests'
+        // When all_features=false: use test-specific features from test.yaml
+        args.push(if self.all_features {
             self.local_config.feature_flag.to_string()
         } else {
             self.config.features.join(",")

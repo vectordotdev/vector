@@ -20,9 +20,11 @@ pub struct Cli {
     /// The desired environment (optional)
     environment: Option<String>,
 
-    /// Whether to compile the test runner with all integration test features
-    #[arg(short = 'a', long)]
-    build_all: bool,
+    /// Use only the features defined in test.yaml (e.g., scripts/integration/<test-name>/test.yaml)
+    /// instead of the shared 'all-integration-tests' feature. Defaults to false for better image
+    /// reuse across tests.
+    #[arg(long)]
+    test_yaml_features: bool,
 
     /// Number of retries to allow on each integration test case.
     #[arg(short = 'r', long)]
@@ -38,7 +40,7 @@ impl Cli {
             ComposeTestLocalConfig::integration(),
             &self.integration,
             self.environment.as_ref(),
-            self.build_all,
+            !self.test_yaml_features,
             self.retries.unwrap_or_default(),
             &self.args,
         )
