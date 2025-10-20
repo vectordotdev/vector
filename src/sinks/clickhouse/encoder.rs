@@ -114,24 +114,26 @@ fn build_record_batch(
     schema: Arc<Schema>,
     events: &[Event],
 ) -> Result<RecordBatch, ArrowEncodingError> {
-    let mut columns: Vec<ArrayRef> = Vec::new();
+    let num_events = events.len();
+    let num_fields = schema.fields().len();
+    let mut columns: Vec<ArrayRef> = Vec::with_capacity(num_fields);
 
     for field in schema.fields() {
         let field_name = field.name();
         let array: ArrayRef = match field.data_type() {
             DataType::Timestamp(time_unit, _) => {
-                build_timestamp_array(events, field_name, *time_unit)?
+                build_timestamp_array(events, field_name, *time_unit, num_events)?
             }
-            DataType::Utf8 => build_string_array(events, field_name)?,
-            DataType::Int64 => build_int64_array(events, field_name)?,
-            DataType::Float64 => build_float64_array(events, field_name)?,
-            DataType::Boolean => build_boolean_array(events, field_name)?,
-            DataType::Binary => build_binary_array(events, field_name)?,
+            DataType::Utf8 => build_string_array(events, field_name, num_events)?,
+            DataType::Int64 => build_int64_array(events, field_name, num_events)?,
+            DataType::Float64 => build_float64_array(events, field_name, num_events)?,
+            DataType::Boolean => build_boolean_array(events, field_name, num_events)?,
+            DataType::Binary => build_binary_array(events, field_name, num_events)?,
             DataType::Decimal128(precision, scale) => {
-                build_decimal128_array(events, field_name, *precision, *scale)?
+                build_decimal128_array(events, field_name, *precision, *scale, num_events)?
             }
             DataType::Decimal256(precision, scale) => {
-                build_decimal256_array(events, field_name, *precision, *scale)?
+                build_decimal256_array(events, field_name, *precision, *scale, num_events)?
             }
             other_type => {
                 return Err(ArrowEncodingError::UnsupportedType {
@@ -152,10 +154,11 @@ fn build_timestamp_array(
     events: &[Event],
     field_name: &str,
     time_unit: TimeUnit,
+    capacity: usize,
 ) -> Result<ArrayRef, ArrowEncodingError> {
     macro_rules! build_array {
         ($builder:ty, $converter:expr) => {{
-            let mut builder = <$builder>::new();
+            let mut builder = <$builder>::with_capacity(capacity);
             for event in events {
                 if let Event::Log(log) = event {
                     match log.get(field_name) {
@@ -182,7 +185,7 @@ fn build_timestamp_array(
                 .timestamp_micros())
         }
         TimeUnit::Nanosecond => {
-            let mut builder = TimestampNanosecondBuilder::new();
+            let mut builder = TimestampNanosecondBuilder::with_capacity(capacity);
             for event in events {
                 if let Event::Log(log) = event {
                     match log.get(field_name) {
@@ -204,15 +207,23 @@ fn build_timestamp_array(
     }
 }
 
-fn build_string_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = StringBuilder::new();
+fn build_string_array(
+    events: &[Event],
+    field_name: &str,
+    capacity: usize,
+) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = StringBuilder::with_capacity(capacity, capacity * 32);
 
     for event in events {
         if let Event::Log(log) = event {
             if let Some(value) = log.get(field_name) {
                 match value {
                     Value::Bytes(bytes) => {
-                        builder.append_value(&String::from_utf8_lossy(bytes));
+                        // Attempt direct UTF-8 conversion first, fallback to lossy
+                        match std::str::from_utf8(bytes) {
+                            Ok(s) => builder.append_value(s),
+                            Err(_) => builder.append_value(&String::from_utf8_lossy(bytes)),
+                        }
                     }
                     Value::Object(obj) => match serde_json::to_string(&obj) {
                         Ok(s) => builder.append_value(s),
@@ -235,8 +246,12 @@ fn build_string_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_int64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Int64Builder::new();
+fn build_int64_array(
+    events: &[Event],
+    field_name: &str,
+    capacity: usize,
+) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = Int64Builder::with_capacity(capacity);
 
     for event in events {
         if let Event::Log(log) = event {
@@ -250,8 +265,12 @@ fn build_int64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_float64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Float64Builder::new();
+fn build_float64_array(
+    events: &[Event],
+    field_name: &str,
+    capacity: usize,
+) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = Float64Builder::with_capacity(capacity);
 
     for event in events {
         if let Event::Log(log) = event {
@@ -266,8 +285,12 @@ fn build_float64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_boolean_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = BooleanBuilder::new();
+fn build_boolean_array(
+    events: &[Event],
+    field_name: &str,
+    capacity: usize,
+) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = BooleanBuilder::with_capacity(capacity);
 
     for event in events {
         if let Event::Log(log) = event {
@@ -281,8 +304,12 @@ fn build_boolean_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_binary_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = BinaryBuilder::new();
+fn build_binary_array(
+    events: &[Event],
+    field_name: &str,
+    capacity: usize,
+) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = BinaryBuilder::with_capacity(capacity, capacity * 16);
 
     for event in events {
         if let Event::Log(log) = event {
@@ -301,8 +328,9 @@ fn build_decimal128_array(
     field_name: &str,
     precision: u8,
     scale: i8,
+    capacity: usize,
 ) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Decimal128Builder::new()
+    let mut builder = Decimal128Builder::with_capacity(capacity)
         .with_precision_and_scale(precision, scale)
         .map_err(|_| ArrowEncodingError::UnsupportedType {
             field_name: field_name.to_string(),
@@ -343,10 +371,11 @@ fn build_decimal256_array(
     field_name: &str,
     precision: u8,
     scale: i8,
+    capacity: usize,
 ) -> Result<ArrayRef, ArrowEncodingError> {
     use arrow::datatypes::i256;
 
-    let mut builder = Decimal256Builder::new()
+    let mut builder = Decimal256Builder::with_capacity(capacity)
         .with_precision_and_scale(precision, scale)
         .map_err(|_| ArrowEncodingError::UnsupportedType {
             field_name: field_name.to_string(),
