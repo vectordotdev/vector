@@ -7,6 +7,7 @@ permissions:
 on:
   workflow_dispatch:
   schedule:
+    # Same schedule as deny.yml
     - cron: "0 5 * * 2-6"  # Runs at 5:00 AM UTC, Tuesday through Saturday
 
 jobs:
