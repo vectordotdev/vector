@@ -20,17 +20,20 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[configurable(metadata(docs::examples = 1500))]
     #[configurable(metadata(docs::examples = 65535))]
+    #[serde(default = "default_max_packet_size")]
     pub max_packet_size: usize,
 
     /// The maximum number of templates to cache per peer.
     #[configurable(metadata(docs::examples = 1000))]
     #[configurable(metadata(docs::examples = 5000))]
+    #[serde(default = "default_max_templates")]
     pub max_templates: usize,
 
     /// The timeout for template cache entries in seconds.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 3600))]
     #[configurable(metadata(docs::examples = 7200))]
+    #[serde(default = "default_template_timeout")]
     pub template_timeout: u64,
 
 
@@ -40,21 +43,25 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::examples = "netflow_v9"))]
     #[configurable(metadata(docs::examples = "ipfix"))]
     #[configurable(metadata(docs::examples = "sflow"))]
+    #[serde(default = "default_protocols")]
     pub protocols: Vec<String>,
 
     /// Whether to parse enterprise fields.
     #[configurable(metadata(docs::examples = false))]
     #[configurable(metadata(docs::examples = true))]
+    #[serde(default = "default_true")]
     pub parse_enterprise_fields: bool,
 
     /// Whether to parse options templates.
     #[configurable(metadata(docs::examples = false))]
     #[configurable(metadata(docs::examples = true))]
+    #[serde(default = "default_true")]
     pub parse_options_templates: bool,
 
     /// Whether to parse variable length fields.
     #[configurable(metadata(docs::examples = true))]
     #[configurable(metadata(docs::examples = false))]
+    #[serde(default = "default_true")]
     pub parse_variable_length_fields: bool,
 
     /// Custom enterprise fields.
@@ -65,11 +72,13 @@ pub struct NetflowConfig {
     /// When enabled, data records without templates are buffered for up to `template_timeout` seconds.
     #[configurable(metadata(docs::examples = true))]
     #[configurable(metadata(docs::examples = false))]
+    #[serde(default = "default_true")]
     pub buffer_missing_templates: bool,
 
     /// Maximum number of data records to buffer per template while waiting for template definition.
     #[configurable(metadata(docs::examples = 100))]
     #[configurable(metadata(docs::examples = 1000))]
+    #[serde(default = "default_max_buffered_records")]
     pub max_buffered_records: usize,
 
     /// How to handle Options Template data records (exporter metadata).
@@ -77,6 +86,7 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::examples = "emit_metadata"))]
     #[configurable(metadata(docs::examples = "discard"))]
     #[configurable(metadata(docs::examples = "enrich"))]
+    #[serde(default = "default_options_template_mode")]
     pub options_template_mode: String,
 }
 
@@ -146,6 +156,18 @@ const fn default_max_templates() -> usize {
 
 const fn default_template_timeout() -> u64 {
     1800 // 30 minutes - matches typical resend intervals
+}
+
+const fn default_protocols() -> Vec<String> {
+    vec!["netflow_v5".to_string(), "netflow_v9".to_string(), "ipfix".to_string(), "sflow".to_string()]
+}
+
+const fn default_max_buffered_records() -> usize {
+    1000
+}
+
+const fn default_options_template_mode() -> String {
+    "emit_metadata".to_string()
 }
 
 
