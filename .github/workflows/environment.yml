@@ -78,7 +78,7 @@ jobs:
 
       - name: Test built image
         run: |
-          IMAGE_TAG="${{ steps.meta.outputs.tags }}"
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
           echo "Running build test inside container: ${IMAGE_TAG}"
           docker run --rm \
             -v "${GITHUB_WORKSPACE}:/src" \
