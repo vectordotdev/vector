@@ -103,7 +103,7 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
         "Date32" => DataType::Date32,
         "DateTime" => DataType::Timestamp(TimeUnit::Second, None),
         _ if base_type.starts_with("DateTime64") => parse_datetime64_precision(base_type),
-        _ if base_type.starts_with("Decimal") => DataType::Float64,
+        _ if base_type.starts_with("Decimal") => parse_decimal_type(base_type),
         _ if base_type.starts_with("Array") => DataType::Utf8, // Serialize as JSON
         _ if base_type.starts_with("Map") => DataType::Utf8,   // Serialize as JSON
         _ if base_type.starts_with("Tuple") => DataType::Utf8, // Serialize as JSON
@@ -112,6 +112,64 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
             DataType::Utf8
         }
     }
+}
+
+/// Parses ClickHouse Decimal types and returns the appropriate Arrow decimal type.
+/// ClickHouse formats:
+/// - Decimal(P, S) -> generic decimal with precision P and scale S
+/// - Decimal32(S) -> precision up to 9, scale S
+/// - Decimal64(S) -> precision up to 18, scale S
+/// - Decimal128(S) -> precision up to 38, scale S
+/// - Decimal256(S) -> precision up to 76, scale S
+fn parse_decimal_type(ch_type: &str) -> DataType {
+    // Try to parse Decimal(P, S) format
+    if let Some(params) = ch_type.strip_prefix("Decimal(")
+        && let Some(params) = params.strip_suffix(')')
+    {
+        let parts: Vec<&str> = params.split(',').map(|s| s.trim()).collect();
+        if parts.len() == 2
+            && let (Ok(precision), Ok(scale)) = (parts[0].parse::<u8>(), parts[1].parse::<i8>())
+        {
+            return if precision <= 38 {
+                DataType::Decimal128(precision, scale)
+            } else {
+                DataType::Decimal256(precision, scale)
+            };
+        }
+    }
+
+    // Try to parse Decimal32(S), Decimal64(S), Decimal128(S), Decimal256(S)
+    let (prefix, max_precision) = if ch_type.starts_with("Decimal256(") {
+        ("Decimal256(", 76)
+    } else if ch_type.starts_with("Decimal128(") {
+        ("Decimal128(", 38)
+    } else if ch_type.starts_with("Decimal64(") {
+        ("Decimal64(", 18)
+    } else if ch_type.starts_with("Decimal32(") {
+        ("Decimal32(", 9)
+    } else {
+        tracing::warn!(
+            "Could not parse Decimal type '{}', defaulting to Float64",
+            ch_type
+        );
+        return DataType::Float64;
+    };
+
+    if let Some(scale_str) = ch_type.strip_prefix(prefix).and_then(|s| s.strip_suffix(')'))
+        && let Ok(scale) = scale_str.trim().parse::<i8>()
+    {
+        return if max_precision <= 38 {
+            DataType::Decimal128(max_precision, scale)
+        } else {
+            DataType::Decimal256(max_precision, scale)
+        };
+    }
+
+    tracing::warn!(
+        "Could not parse Decimal type '{}', defaulting to Float64",
+        ch_type
+    );
+    DataType::Float64
 }
 
 /// Parses DateTime64 precision and returns the appropriate Arrow timestamp type.
@@ -223,6 +281,53 @@ mod tests {
         assert_eq!(
             clickhouse_type_to_arrow("Nullable(LowCardinality(String))"),
             DataType::Utf8
+        );
+    }
+
+    #[test]
+    fn test_decimal_type_mapping() {
+        // Generic Decimal(P, S)
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal(10, 2)"),
+            DataType::Decimal128(10, 2)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal(38, 6)"),
+            DataType::Decimal128(38, 6)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal(50, 10)"),
+            DataType::Decimal256(50, 10)
+        );
+
+        // Decimal32(S) - precision up to 9
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal32(2)"),
+            DataType::Decimal128(9, 2)
+        );
+
+        // Decimal64(S) - precision up to 18
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal64(4)"),
+            DataType::Decimal128(18, 4)
+        );
+
+        // Decimal128(S) - precision up to 38
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal128(10)"),
+            DataType::Decimal128(38, 10)
+        );
+
+        // Decimal256(S) - precision up to 76
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal256(20)"),
+            DataType::Decimal256(76, 20)
+        );
+
+        // With Nullable wrapper
+        assert_eq!(
+            clickhouse_type_to_arrow("Nullable(Decimal(18, 6))"),
+            DataType::Decimal128(18, 6)
         );
     }
 

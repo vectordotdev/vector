@@ -4,9 +4,9 @@ use std::sync::Arc;
 
 use arrow::{
     array::{
-        ArrayRef, BinaryBuilder, BooleanBuilder, Float64Builder, Int64Builder, StringBuilder,
-        TimestampMicrosecondBuilder, TimestampMillisecondBuilder, TimestampNanosecondBuilder,
-        TimestampSecondBuilder,
+        ArrayRef, BinaryBuilder, BooleanBuilder, Decimal128Builder, Decimal256Builder,
+        Float64Builder, Int64Builder, StringBuilder, TimestampMicrosecondBuilder,
+        TimestampMillisecondBuilder, TimestampNanosecondBuilder, TimestampSecondBuilder,
     },
     datatypes::{DataType, Schema, TimeUnit},
     ipc::writer::StreamWriter,
@@ -14,6 +14,7 @@ use arrow::{
 };
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
+use rust_decimal::Decimal;
 use snafu::Snafu;
 
 use crate::event::{Event, Value};
@@ -126,6 +127,12 @@ fn build_record_batch(
             DataType::Float64 => build_float64_array(events, field_name)?,
             DataType::Boolean => build_boolean_array(events, field_name)?,
             DataType::Binary => build_binary_array(events, field_name)?,
+            DataType::Decimal128(precision, scale) => {
+                build_decimal128_array(events, field_name, *precision, *scale)?
+            }
+            DataType::Decimal256(precision, scale) => {
+                build_decimal256_array(events, field_name, *precision, *scale)?
+            }
             other_type => {
                 return Err(ArrowEncodingError::UnsupportedType {
                     field_name: field_name.to_string(),
@@ -281,6 +288,91 @@ fn build_binary_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
         if let Event::Log(log) = event {
             match log.get(field_name) {
                 Some(Value::Bytes(bytes)) => builder.append_value(bytes),
+                _ => builder.append_null(),
+            }
+        }
+    }
+
+    Ok(Arc::new(builder.finish()))
+}
+
+fn build_decimal128_array(
+    events: &[Event],
+    field_name: &str,
+    precision: u8,
+    scale: i8,
+) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = Decimal128Builder::new()
+        .with_precision_and_scale(precision, scale)
+        .map_err(|_| ArrowEncodingError::UnsupportedType {
+            field_name: field_name.to_string(),
+            data_type: DataType::Decimal128(precision, scale),
+        })?;
+
+    for event in events {
+        if let Event::Log(log) = event {
+            match log.get(field_name) {
+                Some(Value::Float(f)) => {
+                    // Use rust_decimal for accurate conversion
+                    if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
+                        // Rescale to match the target scale
+                        decimal.rescale(scale.unsigned_abs().into());
+                        // Convert to i128 representation (mantissa)
+                        let mantissa = decimal.mantissa();
+                        builder.append_value(mantissa);
+                    } else {
+                        builder.append_null();
+                    }
+                }
+                Some(Value::Integer(i)) => {
+                    let mut decimal = Decimal::from(*i);
+                    decimal.rescale(scale.unsigned_abs().into());
+                    let mantissa = decimal.mantissa();
+                    builder.append_value(mantissa);
+                }
+                _ => builder.append_null(),
+            }
+        }
+    }
+
+    Ok(Arc::new(builder.finish()))
+}
+
+fn build_decimal256_array(
+    events: &[Event],
+    field_name: &str,
+    precision: u8,
+    scale: i8,
+) -> Result<ArrayRef, ArrowEncodingError> {
+    use arrow::datatypes::i256;
+
+    let mut builder = Decimal256Builder::new()
+        .with_precision_and_scale(precision, scale)
+        .map_err(|_| ArrowEncodingError::UnsupportedType {
+            field_name: field_name.to_string(),
+            data_type: DataType::Decimal256(precision, scale),
+        })?;
+
+    for event in events {
+        if let Event::Log(log) = event {
+            match log.get(field_name) {
+                Some(Value::Float(f)) => {
+                    if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
+                        // Rescale to match the target scale
+                        decimal.rescale(scale.unsigned_abs().into());
+                        // Convert to i128 representation (mantissa)
+                        let mantissa = decimal.mantissa();
+                        builder.append_value(i256::from_i128(mantissa));
+                    } else {
+                        builder.append_null();
+                    }
+                }
+                Some(Value::Integer(i)) => {
+                    let mut decimal = Decimal::from(*i);
+                    decimal.rescale(scale.unsigned_abs().into());
+                    let mantissa = decimal.mantissa();
+                    builder.append_value(i256::from_i128(mantissa));
+                }
                 _ => builder.append_null(),
             }
         }
@@ -775,5 +867,211 @@ mod tests {
 
         // Second row should have the integer value
         assert_eq!(ts_array.value(1), 1760971112896200940_i64);
+    }
+
+    #[test]
+    fn test_encode_decimal128_from_float() {
+        use arrow::array::Decimal128Array;
+
+        let mut log = LogEvent::default();
+        // Store price as float: 123.45
+        log.insert("price", 123.45_f64);
+
+        let events = vec![Event::Log(log)];
+
+        // Decimal(10, 2) - 10 total digits, 2 after decimal
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "price",
+            DataType::Decimal128(10, 2),
+            true,
+        )]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 1);
+        assert_eq!(batch.num_columns(), 1);
+
+        let decimal_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Decimal128Array>()
+            .unwrap();
+
+        assert!(!decimal_array.is_null(0));
+        // 123.45 with scale 2 = 12345
+        assert_eq!(decimal_array.value(0), 12345_i128);
+    }
+
+    #[test]
+    fn test_encode_decimal128_from_integer() {
+        use arrow::array::Decimal128Array;
+
+        let mut log = LogEvent::default();
+        // Store quantity as integer: 1000
+        log.insert("quantity", 1000_i64);
+
+        let events = vec![Event::Log(log)];
+
+        // Decimal(10, 3) - will represent 1000 as 1000.000
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "quantity",
+            DataType::Decimal128(10, 3),
+            true,
+        )]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 1);
+
+        let decimal_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Decimal128Array>()
+            .unwrap();
+
+        assert!(!decimal_array.is_null(0));
+        // 1000 with scale 3 = 1000 * 10^3 = 1000000
+        assert_eq!(decimal_array.value(0), 1000000_i128);
+    }
+
+    #[test]
+    fn test_encode_decimal256() {
+        use arrow::array::Decimal256Array;
+
+        let mut log = LogEvent::default();
+        // Very large precision number
+        log.insert("big_value", 123456789.123456_f64);
+
+        let events = vec![Event::Log(log)];
+
+        // Decimal256(50, 6) - high precision decimal
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "big_value",
+            DataType::Decimal256(50, 6),
+            true,
+        )]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 1);
+
+        let decimal_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Decimal256Array>()
+            .unwrap();
+
+        assert!(!decimal_array.is_null(0));
+        // Value should be non-null and encoded
+        let value = decimal_array.value(0);
+        assert!(value.to_i128().is_some());
+    }
+
+    #[test]
+    fn test_encode_decimal_null_values() {
+        use arrow::array::Decimal128Array;
+
+        let mut log1 = LogEvent::default();
+        log1.insert("price", 99.99_f64);
+
+        let log2 = LogEvent::default();
+        // No price field - should be null
+
+        let mut log3 = LogEvent::default();
+        log3.insert("price", 50.00_f64);
+
+        let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "price",
+            DataType::Decimal128(10, 2),
+            true,
+        )]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 3);
+
+        let decimal_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Decimal128Array>()
+            .unwrap();
+
+        // First row: 99.99
+        assert!(!decimal_array.is_null(0));
+        assert_eq!(decimal_array.value(0), 9999_i128);
+
+        // Second row: null
+        assert!(decimal_array.is_null(1));
+
+        // Third row: 50.00
+        assert!(!decimal_array.is_null(2));
+        assert_eq!(decimal_array.value(2), 5000_i128);
+    }
+
+    #[test]
+    fn test_encode_mixed_types_with_decimal() {
+        use arrow::array::Decimal128Array;
+
+        let mut log = LogEvent::default();
+        log.insert("id", 123_i64);
+        log.insert("name", "Product A");
+        log.insert("price", 19.99_f64);
+        log.insert("in_stock", true);
+
+        let events = vec![Event::Log(log)];
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("id", DataType::Int64, true),
+            Field::new("name", DataType::Utf8, true),
+            Field::new("price", DataType::Decimal128(10, 2), true),
+            Field::new("in_stock", DataType::Boolean, true),
+        ]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 1);
+        assert_eq!(batch.num_columns(), 4);
+
+        // Verify decimal column
+        let decimal_array = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<Decimal128Array>()
+            .unwrap();
+
+        assert!(!decimal_array.is_null(0));
+        assert_eq!(decimal_array.value(0), 1999_i128);
     }
 }
