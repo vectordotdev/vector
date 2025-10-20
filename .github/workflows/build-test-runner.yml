@@ -17,6 +17,9 @@ on:
         required: false
         type: string
 
+permissions:
+  packages: write
+
 jobs:
   build:
     runs-on: ubuntu-24.04

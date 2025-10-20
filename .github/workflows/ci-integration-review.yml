@@ -34,6 +34,7 @@ on:
 
 permissions:
   statuses: write
+  packages: write
 
 env:
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}

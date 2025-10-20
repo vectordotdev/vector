@@ -17,6 +17,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
+permissions:
+  packages: write
+  contents: read
+
 env:
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
