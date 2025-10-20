@@ -135,12 +135,16 @@ impl SetHeader {
 /// IPFIX protocol parser
 pub struct IpfixParser {
     field_parser: FieldParser,
+    options_template_handling: String,
 }
 
 impl IpfixParser {
     /// Create a new IPFIX parser
-    pub fn new(field_parser: FieldParser) -> Self {
-        Self { field_parser }
+    pub fn new(field_parser: FieldParser, options_template_handling: String) -> Self {
+        Self { 
+            field_parser,
+            options_template_handling,
+        }
     }
 
     /// Check if packet data looks like IPFIX
@@ -514,7 +518,16 @@ impl IpfixParser {
 
         while offset < data.len() && record_count < MAX_RECORDS {
             let mut log_event = LogEvent::default();
-            log_event.insert("flow_type", "ipfix_data");
+            
+            // Check if this is an Options Template (metadata about exporter)
+            if template.scope_field_count > 0 {
+                log_event.insert("flow_type", "ipfix_options_data");
+                log_event.insert("data_type", "exporter_metadata");
+            } else {
+                log_event.insert("flow_type", "ipfix_data");
+                log_event.insert("data_type", "flow_data");
+            }
+            
             log_event.insert("template_id", template_id);
             log_event.insert("observation_domain_id", observation_domain_id);
             log_event.insert("record_number", record_count);
@@ -576,27 +589,51 @@ impl IpfixParser {
 
             // Only emit event if we parsed some fields
             if fields_parsed > 0 {
-                // Debug: Log the parsed fields to understand what we're getting
-                debug!(
-                    "Parsed flow record {}: fields={}",
-                    record_count,
-                    fields_parsed
-                );
-                
-                // Log specific problematic fields for debugging
-                if let Some(Value::Integer(bytes)) = log_event.get("octetDeltaCount") {
-                    if *bytes > 1_000_000_000_000i64 {
-                        debug!("Large byte count detected: {} bytes", bytes);
+                // Check if this is Options Template data and handle accordingly
+                if template.scope_field_count > 0 {
+                    match self.options_template_handling.as_str() {
+                        "discard" => {
+                            debug!("Discarding Options Template data record (template_id={})", template_id);
+                            // Don't add to events - effectively discard
+                        },
+                        "emit" => {
+                            debug!("Emitting Options Template data record (template_id={})", template_id);
+                            events.push(Event::Log(log_event));
+                        },
+                        "enrich" => {
+                            debug!("Using Options Template data for enrichment (template_id={})", template_id);
+                            // Add enrichment metadata but mark as non-flow data
+                            log_event.insert("enrichment_only", true);
+                            events.push(Event::Log(log_event));
+                        },
+                        _ => {
+                            warn!("Unknown options_template_handling value: {}, defaulting to discard", self.options_template_handling);
+                            // Default to discard for unknown values
+                        }
                     }
-                }
-                
-                if let Some(Value::Bytes(protocol)) = log_event.get("protocolName") {
-                    if protocol.as_ref() == b"XNET" {
-                        debug!("XNET protocol detected - possible parsing issue");
+                } else {
+                    // Regular flow data - always emit
+                    debug!(
+                        "Parsed flow record {}: fields={}",
+                        record_count,
+                        fields_parsed
+                    );
+                    
+                    // Log specific problematic fields for debugging
+                    if let Some(Value::Integer(bytes)) = log_event.get("octetDeltaCount") {
+                        if *bytes > 1_000_000_000_000i64 {
+                            debug!("Large byte count detected: {} bytes", bytes);
+                        }
                     }
+                    
+                    if let Some(Value::Bytes(protocol)) = log_event.get("protocolName") {
+                        if protocol.as_ref() == b"XNET" {
+                            debug!("XNET protocol detected - possible parsing issue");
+                        }
+                    }
+                    
+                    events.push(Event::Log(log_event));
                 }
-                
-                events.push(Event::Log(log_event));
             }
 
             // Advance to next record

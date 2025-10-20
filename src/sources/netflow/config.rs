@@ -82,6 +82,13 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::examples = 100))]
     #[configurable(metadata(docs::examples = 1000))]
     pub max_buffered_records: usize,
+
+    /// How to handle Options Template data records (exporter metadata).
+    /// Options: "emit" (emit as separate events), "discard" (ignore), "enrich" (use for enrichment only)
+    #[configurable(metadata(docs::examples = "emit"))]
+    #[configurable(metadata(docs::examples = "discard"))]
+    #[configurable(metadata(docs::examples = "enrich"))]
+    pub options_template_handling: String,
 }
 
 /// Supported flow protocols.
@@ -176,6 +183,7 @@ impl Default for NetflowConfig {
             enterprise_fields: std::collections::HashMap::new(),
             buffer_missing_templates: true,
             max_buffered_records: 100,
+            options_template_handling: "discard".to_string(),
         }
     }
 }
