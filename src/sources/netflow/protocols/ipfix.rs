@@ -1124,16 +1124,19 @@ mod tests {
 
        // Create IPFIX packet with options template
        let mut data = create_ipfix_header();
-       data[2..4].copy_from_slice(&28u16.to_be_bytes()); // Update length
+       data[2..4].copy_from_slice(&30u16.to_be_bytes()); // Update length
 
        // Options template set header
        data.extend_from_slice(&3u16.to_be_bytes()); // set_id (options template)
-       data.extend_from_slice(&12u16.to_be_bytes()); // set_length
+       data.extend_from_slice(&14u16.to_be_bytes()); // set_length
 
-       // Options template definition (simplified as regular template)
+       // Options template definition (proper format with scope field count)
        data.extend_from_slice(&257u16.to_be_bytes()); // template_id
-       data.extend_from_slice(&1u16.to_be_bytes()); // field_count
-       data.extend_from_slice(&149u16.to_be_bytes()); // observationDomainId
+       data.extend_from_slice(&2u16.to_be_bytes()); // field_count
+       data.extend_from_slice(&1u16.to_be_bytes()); // scope_field_count
+       data.extend_from_slice(&149u16.to_be_bytes()); // observationDomainId (scope field)
+       data.extend_from_slice(&4u16.to_be_bytes()); // field_length
+       data.extend_from_slice(&8u16.to_be_bytes()); // sourceIPv4Address (option field)
        data.extend_from_slice(&4u16.to_be_bytes()); // field_length
 
        let events = parser.parse(&data, test_peer_addr(), &template_cache, false, false, true).unwrap();
