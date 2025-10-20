@@ -1164,7 +1164,9 @@ mod tests {
        assert!(!events.is_empty());
        
        // Template should be cached
-       let key = (test_peer_addr(), 1, 257);
+       // Note: The template is cached with port 2055, not the test_peer_addr() port 4739
+       use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+       let key = (SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 100)), 2055), 1, 257);
        assert!(template_cache.get(&key).is_some());
    }
 
