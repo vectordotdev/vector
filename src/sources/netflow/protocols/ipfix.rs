@@ -1124,7 +1124,7 @@ mod tests {
 
        // Create IPFIX packet with options template
        let mut data = create_ipfix_header();
-       data[2..4].copy_from_slice(&30u16.to_be_bytes()); // Update length
+       data[2..4].copy_from_slice(&34u16.to_be_bytes()); // Update length (16 + 4 + 14 = 34)
 
        // Options template set header
        data.extend_from_slice(&3u16.to_be_bytes()); // set_id (options template)
