@@ -1117,6 +1117,25 @@ mod tests {
 
    #[test]
    fn test_options_template_parsing() {
+       // Test the parse_ipfix_options_template_fields function directly first
+       let template_data = vec![
+           0x01, 0x01, // template_id = 257
+           0x00, 0x02, // field_count = 2
+           0x00, 0x01, // scope_field_count = 1
+           0x00, 0x95, 0x00, 0x04, // observationDomainId (149), length 4
+           0x00, 0x08, 0x00, 0x04, // sourceIPv4Address (8), length 4
+       ];
+       
+       let result = crate::sources::netflow::templates::parse_ipfix_options_template_fields(&template_data);
+       assert!(result.is_ok());
+       
+       let (fields, scope_field_count) = result.unwrap();
+       assert_eq!(scope_field_count, 1);
+       assert_eq!(fields.len(), 2);
+       assert_eq!(fields[0].is_scope, true);
+       assert_eq!(fields[1].is_scope, false);
+       
+       // Now test the full IPFIX parsing
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
        let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
