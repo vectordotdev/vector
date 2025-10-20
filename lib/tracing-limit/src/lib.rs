@@ -725,14 +725,25 @@ mod test {
         }
     }
 
+    /// Helper function to set up a test with a rate-limited subscriber.
+    /// Returns the events Arc for asserting on collected events.
+    fn setup_test(
+        default_limit: u64,
+    ) -> (
+        Arc<Mutex<Vec<RecordedEvent>>>,
+        impl Subscriber + for<'a> tracing_subscriber::registry::LookupSpan<'a>,
+    ) {
+        let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
+        let recorder = RecordingLayer::new(Arc::clone(&events));
+        let sub = tracing_subscriber::registry::Registry::default()
+            .with(RateLimitedLayer::new(recorder).with_default_limit(default_limit));
+        (events, sub)
+    }
+
     #[test]
     #[serial]
     fn rate_limits() {
-        let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
-
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub = tracing_subscriber::registry::Registry::default()
-            .with(RateLimitedLayer::new(recorder).with_default_limit(1));
+        let (events, sub) = setup_test(1);
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
                 info!(message = "Hello world!");
@@ -759,30 +770,28 @@ mod test {
     #[test]
     #[serial]
     fn override_rate_limit_at_callsite() {
-        let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
-
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub = tracing_subscriber::registry::Registry::default()
-            .with(RateLimitedLayer::new(recorder).with_default_limit(100));
+        let (events, sub) = setup_test(100);
         tracing::subscriber::with_default(sub, || {
-            for _ in 0..21 {
-                info!(message = "Hello world!", internal_log_rate_secs = 1);
+            for _ in 0..31 {
+                info!(message = "Hello world!", internal_log_rate_secs = 2);
                 MockClock::advance(Duration::from_millis(100));
             }
         });
 
         let events = events.lock().unwrap();
 
+        // With a 2-second window and 100ms advances, we get:
+        // - Event every 20 iterations (2000ms / 100ms = 20)
+        // - First window: iteration 0-19 (suppressed 19 times after first 2)
+        // - Second window: iteration 20-39 (but we only go to 30)
         assert_eq!(
             *events,
             vec![
                 event!("Hello world!"),
                 event!("Internal log [Hello world!] is being suppressed to avoid flooding."),
-                event!("Internal log [Hello world!] has been suppressed 9 times."),
+                event!("Internal log [Hello world!] has been suppressed 19 times."),
                 event!("Hello world!"),
                 event!("Internal log [Hello world!] is being suppressed to avoid flooding."),
-                event!("Internal log [Hello world!] has been suppressed 9 times."),
-                event!("Hello world!"),
             ]
         );
     }
@@ -790,11 +799,7 @@ mod test {
     #[test]
     #[serial]
     fn rate_limit_by_span_key() {
-        let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
-
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub = tracing_subscriber::registry::Registry::default()
-            .with(RateLimitedLayer::new(recorder).with_default_limit(1));
+        let (events, sub) = setup_test(1);
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
                 for key in &["foo", "bar"] {
@@ -833,11 +838,7 @@ mod test {
     #[test]
     #[serial]
     fn rate_limit_by_event_key() {
-        let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
-
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub = tracing_subscriber::registry::Registry::default()
-            .with(RateLimitedLayer::new(recorder).with_default_limit(1));
+        let (events, sub) = setup_test(1);
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
                 for key in &["foo", "bar"] {
@@ -877,11 +878,7 @@ mod test {
     #[test]
     #[serial]
     fn disabled_rate_limit() {
-        let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
-
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub = tracing_subscriber::registry::Registry::default()
-            .with(RateLimitedLayer::new(recorder).with_default_limit(1));
+        let (events, sub) = setup_test(1);
         tracing::subscriber::with_default(sub, || {
             for _ in 0..21 {
                 info!(message = "Hello world!", internal_log_rate_limit = false);
@@ -899,11 +896,7 @@ mod test {
     #[test]
     #[serial]
     fn rate_limit_ignores_fanout_id() {
-        let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
-
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub = tracing_subscriber::registry::Registry::default()
-            .with(RateLimitedLayer::new(recorder).with_default_limit(1));
+        let (events, sub) = setup_test(1);
         tracing::subscriber::with_default(sub, || {
             for i in 0..21 {
                 // Call the SAME info! macro with different fanout_id values
@@ -939,11 +932,7 @@ mod test {
     #[test]
     #[serial]
     fn rate_limit_ignores_non_special_fields() {
-        let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
-
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub = tracing_subscriber::registry::Registry::default()
-            .with(RateLimitedLayer::new(recorder).with_default_limit(1));
+        let (events, sub) = setup_test(1);
         tracing::subscriber::with_default(sub, || {
             for i in 0..21 {
                 // Call the SAME info! macro multiple times per iteration with varying fanout_id
@@ -985,11 +974,7 @@ mod test {
     #[test]
     #[serial]
     fn nested_spans_child_takes_precedence() {
-        let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
-
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub = tracing_subscriber::registry::Registry::default()
-            .with(RateLimitedLayer::new(recorder).with_default_limit(1));
+        let (events, sub) = setup_test(1);
         tracing::subscriber::with_default(sub, || {
             // Create nested spans where child overrides parent's component_id
             let outer = info_span!("outer", component_id = "parent");
@@ -1027,11 +1012,7 @@ mod test {
     #[test]
     #[serial]
     fn nested_spans_ignores_untracked_fields() {
-        let events: Arc<Mutex<Vec<RecordedEvent>>> = Default::default();
-
-        let recorder = RecordingLayer::new(Arc::clone(&events));
-        let sub = tracing_subscriber::registry::Registry::default()
-            .with(RateLimitedLayer::new(recorder).with_default_limit(1));
+        let (events, sub) = setup_test(1);
         tracing::subscriber::with_default(sub, || {
             // Parent has component_id, child has some_field - only component_id is tracked
             let outer = info_span!("outer", component_id = "transform");
