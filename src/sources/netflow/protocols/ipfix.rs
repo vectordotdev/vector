@@ -423,6 +423,9 @@ impl IpfixParser {
                     let key = (peer_addr, observation_domain_id, template_id);
                     template_cache.insert(key, template);
                     template_count += 1;
+                    
+                    debug!("Cached Options Template: template_id={}, scope_field_count={}", 
+                           template_id, scope_count);
 
                     emit!(IpfixTemplateReceived {
                         template_id,
@@ -461,7 +464,11 @@ impl IpfixParser {
         let key = (peer_addr, observation_domain_id, template_id);
 
         let template = match template_cache.get(&key) {
-            Some(template) => template,
+            Some(template) => {
+                debug!("Retrieved template for data set: template_id={}, scope_field_count={}", 
+                       template_id, template.scope_field_count);
+                template
+            },
             None => {
                 debug!(
                     "No template found for data set: template_id={}, domain={}",
@@ -589,13 +596,15 @@ impl IpfixParser {
 
             // Only emit event if we parsed some fields
             if fields_parsed > 0 {
-                // Check if this is Options Template data and handle accordingly
-                if template.scope_field_count > 0 {
-                    match self.options_template_mode.as_str() {
-                        "discard" => {
-                            debug!("Discarding Options Template data record (template_id={})", template_id);
-                            // Don't add to events - effectively discard
-                        },
+            // Check if this is Options Template data and handle accordingly
+            if template.scope_field_count > 0 {
+                debug!("Options Template data detected: template_id={}, scope_field_count={}, mode={}", 
+                       template_id, template.scope_field_count, self.options_template_mode);
+                match self.options_template_mode.as_str() {
+                    "discard" => {
+                        debug!("Discarding Options Template data record (template_id={})", template_id);
+                        // Don't add to events - effectively discard
+                    },
                         "emit_metadata" => {
                             debug!("Emitting Options Template data record (template_id={})", template_id);
                             events.push(Event::Log(log_event));
