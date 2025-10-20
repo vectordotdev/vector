@@ -135,15 +135,15 @@ impl SetHeader {
 /// IPFIX protocol parser
 pub struct IpfixParser {
     field_parser: FieldParser,
-    options_template_handling: String,
+    options_template_mode: String,
 }
 
 impl IpfixParser {
     /// Create a new IPFIX parser
-    pub fn new(field_parser: FieldParser, options_template_handling: String) -> Self {
+    pub fn new(field_parser: FieldParser, options_template_mode: String) -> Self {
         Self { 
             field_parser,
-            options_template_handling,
+            options_template_mode,
         }
     }
 
@@ -591,12 +591,12 @@ impl IpfixParser {
             if fields_parsed > 0 {
                 // Check if this is Options Template data and handle accordingly
                 if template.scope_field_count > 0 {
-                    match self.options_template_handling.as_str() {
+                    match self.options_template_mode.as_str() {
                         "discard" => {
                             debug!("Discarding Options Template data record (template_id={})", template_id);
                             // Don't add to events - effectively discard
                         },
-                        "emit" => {
+                        "emit_metadata" => {
                             debug!("Emitting Options Template data record (template_id={})", template_id);
                             events.push(Event::Log(log_event));
                         },
@@ -607,7 +607,7 @@ impl IpfixParser {
                             events.push(Event::Log(log_event));
                         },
                         _ => {
-                            warn!("Unknown options_template_handling value: {}, defaulting to discard", self.options_template_handling);
+                            warn!("Unknown options_template_mode value: {}, defaulting to discard", self.options_template_mode);
                             // Default to discard for unknown values
                         }
                     }

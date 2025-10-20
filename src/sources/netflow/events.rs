@@ -919,7 +919,7 @@ mod tests {
     fn test_configuration_events() {
         ConfigValidationError {
             errors: vec![
-                "max_length must be > 0".to_string(),
+                "max_packet_size must be > 0".to_string(),
                 "invalid protocol specified".to_string(),
             ],
         }.emit();

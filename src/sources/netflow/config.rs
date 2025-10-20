@@ -16,17 +16,11 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:4739"))]
     pub address: SocketAddr,
 
-    /// The maximum size of incoming NetFlow packets.
+    /// The maximum size of incoming NetFlow packets and field values.
     #[configurable(metadata(docs::type_unit = "bytes"))]
     #[configurable(metadata(docs::examples = 1500))]
-    #[configurable(metadata(docs::examples = 9000))]
-    pub max_length: usize,
-
-    /// The maximum length of field values before truncation.
-    #[configurable(metadata(docs::type_unit = "bytes"))]
-    #[configurable(metadata(docs::examples = 1024))]
-    #[configurable(metadata(docs::examples = 4096))]
-    pub max_field_length: usize,
+    #[configurable(metadata(docs::examples = 65535))]
+    pub max_packet_size: usize,
 
     /// The maximum number of templates to cache per peer.
     #[configurable(metadata(docs::examples = 1000))]
@@ -39,11 +33,6 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::examples = 7200))]
     pub template_timeout: u64,
 
-    /// The maximum size of a single NetFlow message in bytes.
-    #[configurable(metadata(docs::type_unit = "bytes"))]
-    #[configurable(metadata(docs::examples = 65536))]
-    #[configurable(metadata(docs::examples = 1048576))]
-    pub max_message_size: usize,
 
     /// Protocols to accept (netflow_v5, netflow_v9, ipfix, sflow).
     #[configurable(metadata(docs::examples = "protocols"))]
@@ -84,11 +73,11 @@ pub struct NetflowConfig {
     pub max_buffered_records: usize,
 
     /// How to handle Options Template data records (exporter metadata).
-    /// Options: "emit" (emit as separate events), "discard" (ignore), "enrich" (use for enrichment only)
-    #[configurable(metadata(docs::examples = "emit"))]
+    /// Options: "emit_metadata" (emit as separate events), "discard" (ignore), "enrich" (use for enrichment only)
+    #[configurable(metadata(docs::examples = "emit_metadata"))]
     #[configurable(metadata(docs::examples = "discard"))]
     #[configurable(metadata(docs::examples = "enrich"))]
-    pub options_template_handling: String,
+    pub options_template_mode: String,
 }
 
 /// Supported flow protocols.
@@ -147,12 +136,8 @@ pub enum FieldType {
 }
 
 // Default value functions
-const fn default_max_length() -> usize {
-    1500
-}
-
-const fn default_max_field_length() -> usize {
-    1024
+const fn default_max_packet_size() -> usize {
+    65535 // UDP max
 }
 
 const fn default_max_templates() -> usize {
@@ -160,30 +145,25 @@ const fn default_max_templates() -> usize {
 }
 
 const fn default_template_timeout() -> u64 {
-    3600 // 1 hour
+    1800 // 30 minutes - matches typical resend intervals
 }
 
-const fn default_max_message_size() -> usize {
-    65536
-}
 
 impl Default for NetflowConfig {
     fn default() -> Self {
         Self {
             address: "0.0.0.0:2055".parse().unwrap(),
-            max_length: default_max_length(),
-            max_field_length: default_max_field_length(),
+            max_packet_size: default_max_packet_size(),
             max_templates: default_max_templates(),
             template_timeout: default_template_timeout(),
-            max_message_size: default_max_message_size(),
             protocols: vec!["netflow_v5".to_string(), "netflow_v9".to_string(), "ipfix".to_string(), "sflow".to_string()],
             parse_enterprise_fields: default_true(),
             parse_options_templates: default_true(),
             parse_variable_length_fields: default_true(),
             enterprise_fields: std::collections::HashMap::new(),
             buffer_missing_templates: true,
-            max_buffered_records: 100,
-            options_template_handling: "discard".to_string(),
+            max_buffered_records: 1000,
+            options_template_mode: "emit_metadata".to_string(),
         }
     }
 }
@@ -194,15 +174,11 @@ impl NetflowConfig {
         let mut errors = Vec::new();
 
         // Validate numeric ranges
-        if self.max_length == 0 {
-            errors.push("max_length must be greater than 0".to_string());
+        if self.max_packet_size == 0 {
+            errors.push("max_packet_size must be greater than 0".to_string());
         }
-        if self.max_length > 65535 {
-            errors.push("max_length cannot exceed 65535 bytes".to_string());
-        }
-
-        if self.max_field_length == 0 {
-            errors.push("max_field_length must be greater than 0".to_string());
+        if self.max_packet_size > 65535 {
+            errors.push("max_packet_size cannot exceed 65535 bytes (UDP max)".to_string());
         }
 
         if self.max_templates == 0 {
@@ -315,12 +291,12 @@ mod tests {
     }
 
     #[test]
-    fn test_invalid_max_length() {
+    fn test_invalid_max_packet_size() {
         let mut config = NetflowConfig::default();
-        config.max_length = 0;
+        config.max_packet_size = 0;
         
         let errors = config.validate().unwrap_err();
-        assert!(errors.iter().any(|e| e.contains("max_length must be greater than 0")));
+        assert!(errors.iter().any(|e| e.contains("max_packet_size must be greater than 0")));
     }
 
     #[test]

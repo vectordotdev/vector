@@ -76,7 +76,7 @@ impl ProtocolParser {
         Self {
             netflow_v5: NetflowV5Parser::new(field_parser.clone()),
             netflow_v9: NetflowV9Parser::new(field_parser.clone()),
-            ipfix: IpfixParser::new(field_parser.clone(), config.options_template_handling.clone()),
+            ipfix: IpfixParser::new(field_parser.clone(), config.options_template_mode.clone()),
             sflow: SflowParser::new(),
             enabled_protocols: config.protocols.iter().map(|s| s.to_string()).collect(),
         }

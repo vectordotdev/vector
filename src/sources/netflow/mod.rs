@@ -39,7 +39,7 @@ async fn netflow_source(
     );
     let protocol_parser = protocols::ProtocolParser::new(&config, template_cache.clone());
     
-    let mut buf = vec![0; config.max_length];
+    let mut buf = vec![0; config.max_packet_size];
     let mut last_cleanup = std::time::Instant::now();
 
     loop {
@@ -47,7 +47,7 @@ async fn netflow_source(
             recv_result = socket.recv_from(&mut buf) => {
                 match recv_result {
                     Ok((len, peer_addr)) => {
-                        if len > config.max_length {
+                        if len > config.max_packet_size {
                             NetflowParseError {
                                 error: "Packet too large",
                                 protocol: "unknown",
@@ -136,8 +136,7 @@ mod tests {
         let template_cache = TemplateCache::new(1000);
         let config = NetflowConfig {
             address: "127.0.0.1:2055".parse().unwrap(),
-            max_length: 1500,
-            max_field_length: 1024,
+            max_packet_size: 1500,
             max_templates: 1000,
             template_timeout: 3600,
             max_message_size: 65536,
@@ -274,8 +273,7 @@ mod tests {
         let addr = next_addr();
         let config = NetflowConfig {
             address: addr,
-            max_length: 1500,
-            max_field_length: 1024,
+            max_packet_size: 1500,
             max_templates: 1000,
             template_timeout: 3600,
             max_message_size: 65536,

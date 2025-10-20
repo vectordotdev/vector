@@ -324,7 +324,7 @@ impl FieldParser {
         }
 
         Self {
-            max_field_length: config.max_field_length,
+            max_field_length: config.max_packet_size,
             resolve_protocols: true, // Always resolve protocols for better readability
             custom_enterprise_fields,
         }
@@ -1273,7 +1273,7 @@ fn init_cisco_fields() -> HashMap<u16, FieldInfo> {
     fn test_field_parser_creation() {
         let config = NetflowConfig::default();
         let parser = FieldParser::new(&config);
-        assert_eq!(parser.max_field_length, 1024);
+        assert_eq!(parser.max_field_length, 65535);
         assert!(parser.resolve_protocols);
     }
  
@@ -1387,7 +1387,7 @@ fn init_cisco_fields() -> HashMap<u16, FieldInfo> {
     #[test]
     fn test_field_truncation() {
         let config = NetflowConfig {
-            max_field_length: 10,
+            max_packet_size: 10,
             ..Default::default()
         };
         let parser = FieldParser::new(&config);
