@@ -1012,7 +1012,7 @@ mod tests {
    fn test_drop_unparseable_records() {
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
-       let parser = IpfixParser::new(field_parser);
+       let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
        let template_cache = TemplateCache::new(100);
 
        // Create IPFIX packet with data set (no template)
@@ -1037,7 +1037,7 @@ mod tests {
    fn test_multiple_records_in_data_set() {
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
-       let parser = IpfixParser::new(field_parser);
+       let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
        let template_cache = TemplateCache::new(100);
 
        // Add template with fixed-length field
@@ -1085,7 +1085,7 @@ mod tests {
    fn test_mixed_template_and_data_packet() {
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
-       let parser = IpfixParser::new(field_parser);
+       let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
        let template_cache = TemplateCache::new(100);
 
        // Create IPFIX packet with both template and data
@@ -1119,7 +1119,7 @@ mod tests {
    fn test_options_template_parsing() {
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
-       let parser = IpfixParser::new(field_parser);
+       let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
        let template_cache = TemplateCache::new(100);
 
        // Create IPFIX packet with options template
@@ -1150,7 +1150,7 @@ mod tests {
    fn test_raw_data_inclusion() {
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
-       let parser = IpfixParser::new(field_parser);
+       let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
        let template_cache = TemplateCache::new(100);
 
        let data = create_ipfix_header();
@@ -1180,7 +1180,7 @@ mod tests {
    fn test_record_safety_limits() {
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
-       let parser = IpfixParser::new(field_parser);
+       let parser = IpfixParser::new(field_parser, "emit_metadata".to_string());
        let template_cache = TemplateCache::new(100);
 
        // Add template with very small field to potentially create many records

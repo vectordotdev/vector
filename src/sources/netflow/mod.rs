@@ -146,6 +146,7 @@ mod tests {
             enterprise_fields: std::collections::HashMap::new(),
             buffer_missing_templates: true,
             max_buffered_records: 100,
+            options_template_mode: "emit_metadata".to_string(),
         };
 
         let parser = ProtocolParser::new(&config, template_cache.clone());
@@ -282,6 +283,7 @@ mod tests {
             enterprise_fields: std::collections::HashMap::new(),
             buffer_missing_templates: true,
             max_buffered_records: 100,
+            options_template_mode: "emit_metadata".to_string(),
         };
 
         let (tx, rx) = SourceSender::new_test();
