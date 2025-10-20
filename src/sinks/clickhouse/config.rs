@@ -224,10 +224,10 @@ impl SinkConfig for ClickhouseConfig {
 
         #[cfg(feature = "sinks-clickhouse")]
         let arrow_schema = if self.format == Format::ArrowStream {
-            let table_str = self.table.get_ref();
-            let database_str = database.get_ref();
+            if !self.table.is_dynamic() && !database.is_dynamic() {
+                let table_str = self.table.get_ref();
+                let database_str = database.get_ref();
 
-            if !table_str.contains("{{") && !database_str.contains("{{") {
                 tracing::info!(
                     "Fetching schema for table {}.{} at startup",
                     database_str,
