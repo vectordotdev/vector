@@ -77,14 +77,14 @@ fn parse_schema_from_response(response: &str) -> crate::Result<Arc<Schema>> {
     Ok(Arc::new(Schema::new(fields)))
 }
 
-/// Maps ClickHouse types to Arrow types.
 fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
-    // Remove Nullable() wrapper if present
-    let base_type = if let Some(inner) = ch_type.strip_prefix("Nullable(") {
-        inner.strip_suffix(')').unwrap_or(inner)
-    } else {
-        ch_type
-    };
+    let mut base_type = ch_type;
+    if let Some(inner) = base_type.strip_prefix("Nullable(") {
+        base_type = inner.strip_suffix(')').unwrap_or(inner);
+    }
+    if let Some(inner) = base_type.strip_prefix("LowCardinality(") {
+        base_type = inner.strip_suffix(')').unwrap_or(inner);
+    }
 
     match base_type {
         "String" | "FixedString" => DataType::Utf8,
@@ -103,7 +103,6 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
         "Date32" => DataType::Date32,
         "DateTime" => DataType::Timestamp(TimeUnit::Second, None),
         _ if base_type.starts_with("DateTime64") => parse_datetime64_precision(base_type),
-        _ if base_type.starts_with("FixedString") => DataType::Utf8,
         _ if base_type.starts_with("Decimal") => DataType::Float64,
         _ if base_type.starts_with("Array") => DataType::Utf8, // Serialize as JSON
         _ if base_type.starts_with("Map") => DataType::Utf8,   // Serialize as JSON
@@ -208,6 +207,23 @@ mod tests {
     fn test_nullable_type_mapping() {
         assert_eq!(clickhouse_type_to_arrow("Nullable(String)"), DataType::Utf8);
         assert_eq!(clickhouse_type_to_arrow("Nullable(Int64)"), DataType::Int64);
+    }
+
+    #[test]
+    fn test_lowcardinality_type_mapping() {
+        assert_eq!(
+            clickhouse_type_to_arrow("LowCardinality(String)"),
+            DataType::Utf8
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("LowCardinality(FixedString(10))"),
+            DataType::Utf8
+        );
+        // Nullable + LowCardinality
+        assert_eq!(
+            clickhouse_type_to_arrow("Nullable(LowCardinality(String))"),
+            DataType::Utf8
+        );
     }
 
     #[test]
