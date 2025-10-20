@@ -3,6 +3,7 @@
 use std::sync::Arc;
 
 use bytes::Bytes;
+use snafu::Snafu;
 use vector_lib::codecs::encoding::Framer;
 
 #[cfg(feature = "sinks-clickhouse")]
@@ -11,6 +12,27 @@ use super::{config::Format, sink::PartitionKey};
 use crate::codecs::Encoder;
 use crate::sinks::util::Compressor;
 use crate::sinks::{prelude::*, util::http::HttpRequest};
+
+#[derive(Debug, Snafu)]
+pub enum RequestBuilderError {
+    #[snafu(display("Failed to encode events to Arrow: {}", source))]
+    ArrowEncoding { source: encoder::ArrowEncodingError },
+
+    #[snafu(display("Failed to compress payload: {}", source))]
+    Compression { source: std::io::Error },
+
+    #[snafu(display("Failed to encode events: {}", source))]
+    Encoding { source: std::io::Error },
+
+    #[snafu(display("IO error: {}", source))]
+    Io { source: std::io::Error },
+}
+
+impl From<std::io::Error> for RequestBuilderError {
+    fn from(source: std::io::Error) -> Self {
+        RequestBuilderError::Io { source }
+    }
+}
 
 pub(super) struct ClickhouseRequestBuilder {
     pub(super) compression: Compression,
@@ -26,7 +48,7 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
     type Encoder = (Transformer, Encoder<Framer>);
     type Payload = Bytes;
     type Request = HttpRequest<PartitionKey>;
-    type Error = std::io::Error;
+    type Error = RequestBuilderError;
 
     fn compression(&self) -> Compression {
         self.compression
@@ -61,7 +83,9 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
         let is_compressed = compressor.is_compressed();
         let (_, json_size) = {
             use crate::sinks::util::encoding::Encoder as EncoderTrait;
-            self.encoder().encode_input(events, &mut compressor)?
+            self.encoder()
+                .encode_input(events, &mut compressor)
+                .map_err(|source| RequestBuilderError::Encoding { source })?
         };
 
         let payload = compressor.into_inner().freeze();
@@ -100,17 +124,13 @@ impl ClickhouseRequestBuilder {
     fn build_arrow_request_payload(
         &self,
         events: Vec<Event>,
-    ) -> Result<EncodeResult<Bytes>, std::io::Error> {
+    ) -> Result<EncodeResult<Bytes>, RequestBuilderError> {
+        use snafu::ResultExt;
+
         // Encode events to Arrow IPC format using provided schema
         let arrow_bytes =
-            encoder::encode_events_to_arrow_stream(&events, self.arrow_schema.clone()).map_err(
-                |e| {
-                    std::io::Error::new(
-                        std::io::ErrorKind::InvalidData,
-                        format!("Failed to encode events to Arrow: {}", e),
-                    )
-                },
-            )?;
+            encoder::encode_events_to_arrow_stream(&events, self.arrow_schema.clone())
+                .context(ArrowEncodingSnafu)?;
 
         let uncompressed_byte_size = arrow_bytes.len();
 
@@ -121,7 +141,7 @@ impl ClickhouseRequestBuilder {
         use std::io::Write;
         compressor
             .write_all(&arrow_bytes)
-            .map_err(std::io::Error::other)?;
+            .context(CompressionSnafu)?;
 
         let payload = compressor.into_inner().freeze();
 
