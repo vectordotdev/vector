@@ -72,7 +72,17 @@ impl DataType {
             DataType::UInt32 => {
                 if data.len() >= 4 {
                     let value = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
-                    Ok(Value::Integer(value as i64))
+                    // Handle large unsigned values that would overflow i32
+                    if value > i32::MAX as u32 {
+                        // For values > i32::MAX, store as string to avoid PostgreSQL integer overflow
+                        debug!(
+                            "UInt32 value {} exceeds i32::MAX, storing as string to avoid PostgreSQL overflow",
+                            value
+                        );
+                        Ok(Value::Bytes(value.to_string().into()))
+                    } else {
+                        Ok(Value::Integer(value as i64))
+                    }
                 } else {
                     Err("Insufficient data for UInt32".to_string())
                 }
