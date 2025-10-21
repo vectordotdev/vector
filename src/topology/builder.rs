@@ -395,8 +395,8 @@ impl<'a> Builder<'a> {
                 .shutdown_coordinator
                 .register_source(key, INTERNAL_SOURCES.contains(&typetag));
 
-            // Create topology metadata for internal_metrics source
-            let topology_metadata = if key.id() == "internal_metrics" {
+            // Create topology metadata for any internal_metrics source
+            let topology_metadata = if typetag == "internal_metrics" {
                 self.create_topology_metadata()
             } else {
                 None
