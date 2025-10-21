@@ -578,10 +578,10 @@ impl IpfixParser {
                 let field_data = &data[field_offset..field_offset + field_length];
                 
                 // Debug: Log all field parsing to identify overflow sources
-                debug!(
-                    "Parsing field {} in template {}: type={}, length={}, enterprise={:?}, scope={}, raw_data={:?}",
-                    fields_parsed,
+                info!(
+                    "TEMPLATE {} FIELD {}: type={}, length={}, enterprise={:?}, scope={}, raw_data={:?}",
                     template_id,
+                    fields_parsed,
                     field.field_type,
                     field_length,
                     field.enterprise_number,

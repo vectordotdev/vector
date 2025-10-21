@@ -372,8 +372,8 @@ impl FieldParser {
         let field_info = self.get_field_info(field);
         
         // Debug: Log field parsing details for overflow debugging
-        debug!(
-            "Parsing field: name='{}', type={}, length={}, enterprise={:?}, scope={}",
+        info!(
+            "FIELD PARSE: name='{}', type={}, length={}, enterprise={:?}, scope={}",
             field_info.name,
             field.field_type,
             field.field_length,
