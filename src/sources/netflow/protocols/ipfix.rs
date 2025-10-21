@@ -577,17 +577,6 @@ impl IpfixParser {
 
                 let field_data = &data[field_offset..field_offset + field_length];
                 
-                // Debug: Log all field parsing to identify overflow sources
-                info!(
-                    "TEMPLATE {} FIELD {}: type={}, length={}, enterprise={:?}, scope={}, raw_data={:?}",
-                    template_id,
-                    fields_parsed,
-                    field.field_type,
-                    field_length,
-                    field.enterprise_number,
-                    field.is_scope,
-                    &field_data[..std::cmp::min(field_data.len(), 8)]
-                );
                 
                 self.field_parser.parse_field(field, field_data, &mut log_event);
 
@@ -599,19 +588,16 @@ impl IpfixParser {
             if fields_parsed > 0 {
             // Check if this is Options Template data and handle accordingly
             if template.scope_field_count > 0 {
-                debug!("Options Template data detected: template_id={}, scope_field_count={}, mode={}", 
+                info!("Processing Options Template record: template_id={}, scope_fields={}, mode={}", 
                        template_id, template.scope_field_count, self.options_template_mode);
                 match self.options_template_mode.as_str() {
                     "discard" => {
-                        debug!("Discarding Options Template data record (template_id={})", template_id);
                         // Don't add to events - effectively discard
                     },
                         "emit_metadata" => {
-                            debug!("Emitting Options Template data record (template_id={})", template_id);
                             events.push(Event::Log(log_event));
                         },
                         "enrich" => {
-                            debug!("Using Options Template data for enrichment (template_id={})", template_id);
                             // Add enrichment metadata but mark as non-flow data
                             log_event.insert("enrichment_only", true);
                             events.push(Event::Log(log_event));

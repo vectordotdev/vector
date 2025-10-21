@@ -72,19 +72,7 @@ impl DataType {
             DataType::UInt32 => {
                 if data.len() >= 4 {
                     let value = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
-                    // Debug: Always log UInt32 parsing
-                    info!("UInt32 PARSE: value={}, i32::MAX={}, will_overflow={}", value, i32::MAX, value > i32::MAX as u32);
-                    // Handle large unsigned values that would overflow i32
-                    if value > i32::MAX as u32 {
-                        // For values > i32::MAX, store as string to avoid PostgreSQL integer overflow
-                        warn!(
-                            "UInt32 OVERFLOW: value {} exceeds i32::MAX, storing as string to avoid PostgreSQL overflow",
-                            value
-                        );
-                        Ok(Value::Bytes(value.to_string().into()))
-                    } else {
-                        Ok(Value::Integer(value as i64))
-                    }
+                    Ok(Value::Integer(value as i64))
                 } else {
                     Err("Insufficient data for UInt32".to_string())
                 }
@@ -178,16 +166,7 @@ impl DataType {
             DataType::DateTimeSeconds => {
                 if data.len() >= 4 {
                     let timestamp = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
-                    // Handle large unsigned timestamps that would overflow i32
-                    if timestamp > i32::MAX as u32 {
-                        debug!(
-                            "DateTimeSeconds value {} exceeds i32::MAX, storing as string to avoid PostgreSQL overflow",
-                            timestamp
-                        );
-                        Ok(Value::Bytes(timestamp.to_string().into()))
-                    } else {
-                        Ok(Value::Integer(timestamp as i64))
-                    }
+                    Ok(Value::Integer(timestamp as i64))
                 } else {
                     Err("Insufficient data for DateTime seconds".to_string())
                 }
@@ -198,16 +177,7 @@ impl DataType {
                         data[0], data[1], data[2], data[3],
                         data[4], data[5], data[6], data[7]
                     ]);
-                    // Handle large unsigned timestamps that would overflow i64
-                    if timestamp > i64::MAX as u64 {
-                        debug!(
-                            "DateTimeMilliseconds value {} exceeds i64::MAX, storing as string to avoid PostgreSQL overflow",
-                            timestamp
-                        );
-                        Ok(Value::Bytes(timestamp.to_string().into()))
-                    } else {
-                        Ok(Value::Integer(timestamp as i64))
-                    }
+                    Ok(Value::Integer(timestamp as i64))
                 } else {
                     Err("Insufficient data for DateTime milliseconds".to_string())
                 }
@@ -287,16 +257,7 @@ impl DataType {
                         data[0], data[1], data[2], data[3],
                         data[4], data[5], data[6], data[7]
                     ]);
-                    // Handle large unsigned timestamps that would overflow i64
-                    if timestamp > i64::MAX as u64 {
-                        debug!(
-                            "DateTimeMicroseconds/Nanoseconds value {} exceeds i64::MAX, storing as string to avoid PostgreSQL overflow",
-                            timestamp
-                        );
-                        Ok(Value::Bytes(timestamp.to_string().into()))
-                    } else {
-                        Ok(Value::Integer(timestamp as i64))
-                    }
+                    Ok(Value::Integer(timestamp as i64))
                 } else {
                     Err("Insufficient data for DateTime".to_string())
                 }
@@ -373,24 +334,9 @@ impl FieldParser {
     pub fn parse_field(&self, field: &TemplateField, data: &[u8], log_event: &mut LogEvent) {
         let field_info = self.get_field_info(field);
         
-        // Debug: Log field parsing details for overflow debugging
-        info!(
-            "FIELD PARSE: name='{}', type={}, length={}, enterprise={:?}, scope={}",
-            field_info.name,
-            field.field_type,
-            field.field_length,
-            field.enterprise_number,
-            field.is_scope
-        );
         
         match field_info.data_type.parse(data, self.max_field_length) {
             Ok(value) => {
-                // Debug: Log the actual value being inserted
-                match &value {
-                    Value::Bytes(s) => info!("INSERTING STRING: {} = '{}'", field_info.name, String::from_utf8_lossy(s)),
-                    Value::Integer(i) => info!("INSERTING INTEGER: {} = {}", field_info.name, i),
-                    _ => info!("INSERTING OTHER: {} = {:?}", field_info.name, value),
-                }
                 log_event.insert(field_info.name, value.clone());
                 
                 // Add protocol name resolution for protocol fields
