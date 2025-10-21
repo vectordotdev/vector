@@ -46,6 +46,22 @@ on:
         value: ${{ jobs.source.outputs.website_only }}
       install:
         value: ${{ jobs.source.outputs.install }}
+      test-yml:
+        value: ${{ jobs.source.outputs.test-yml }}
+      integration-yml:
+        value: ${{ jobs.source.outputs.integration-yml }}
+      cli-yml:
+        value: ${{ jobs.source.outputs.cli-yml }}
+      test-make-command-yml:
+        value: ${{ jobs.source.outputs.test-make-command-yml }}
+      msrv-yml:
+        value: ${{ jobs.source.outputs.msrv-yml }}
+      cross-yml:
+        value: ${{ jobs.source.outputs.cross-yml }}
+      unit_mac-yml:
+        value: ${{ jobs.source.outputs.unit_mac-yml }}
+      unit_windows-yml:
+        value: ${{ jobs.source.outputs.unit_windows-yml }}
       k8s:
         value: ${{ jobs.source.outputs.k8s }}
       amqp:
@@ -148,6 +164,14 @@ jobs:
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
+      test-yml: ${{ steps.filter.outputs.test-yml }}
+      integration-yml: ${{ steps.filter.outputs.integration-yml }}
+      cli-yml: ${{ steps.filter.outputs.cli-yml }}
+      test-make-command-yml: ${{ steps.filter.outputs.test-make-command-yml }}
+      msrv-yml: ${{ steps.filter.outputs.msrv-yml }}
+      cross-yml: ${{ steps.filter.outputs.cross-yml }}
+      unit_mac-yml: ${{ steps.filter.outputs.unit_mac-yml }}
+      unit_windows-yml: ${{ steps.filter.outputs.unit_windows-yml }}
     steps:
     - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
@@ -158,7 +182,6 @@ jobs:
         ref:  ${{ env.HEAD_SHA }}
         filters: |
           source:
-            - ".github/workflows/test.yml"
             - ".cargo/**"
             - "benches/**"
             - "lib/**"
@@ -172,6 +195,7 @@ jobs:
             - "Makefile"
             - "rust-toolchain.toml"
             - "vdev/**"
+            - ".github/workflows/changes.yml"
           dependencies:
             - ".cargo/**"
             - 'Cargo.toml'
@@ -180,35 +204,70 @@ jobs:
             - 'Makefile'
             - 'scripts/cross/**'
             - "vdev/**"
+            - ".github/workflows/changes.yml"
           cue:
             - 'website/cue/**'
             - "vdev/**"
+            - ".github/workflows/changes.yml"
           component_docs:
             - 'scripts/generate-component-docs.rb'
             - "vdev/**"
             - 'website/cue/**/base/**.cue'
+            - ".github/workflows/changes.yml"
           markdown:
             - '**/**.md'
             - "vdev/**"
+            - ".github/workflows/changes.yml"
           scripts:
             - '**/**.sh'
+            - ".github/workflows/changes.yml"
           internal_events:
             - 'src/internal_events/**'
             - "vdev/**"
+            - ".github/workflows/changes.yml"
           docker:
             - 'distribution/docker/**'
             - "vdev/**"
+            - ".github/workflows/changes.yml"
           install:
             - ".github/workflows/install-sh.yml"
             - "distribution/install.sh"
+            - ".github/workflows/changes.yml"
           k8s:
             - "src/sources/kubernetes_logs/**"
             - "lib/k8s-e2e-tests/**"
             - "lib/k8s-test-framework/**"
+            - ".github/workflows/k8s_e2e.yml"
+            - ".github/workflows/changes.yml"
           website:
             - "website/**"
           not_website:
             - "!website/**"
+          test-yml:
+            - ".github/workflows/test.yml"
+            - ".github/workflows/changes.yml"
+          integration-yml:
+            - ".github/workflows/integration.yml"
+            - ".github/workflows/changes.yml"
+          cli-yml:
+            - ".github/workflows/cli.yml"
+            - ".github/workflows/changes.yml"
+          test-make-command-yml:
+            - ".github/workflows/test-make-command.yml"
+            - ".github/workflows/changes.yml"
+          msrv-yml:
+            - ".github/workflows/msrv.yml"
+            - ".github/workflows/changes.yml"
+          cross-yml:
+            - ".github/workflows/cross.yml"
+            - ".github/workflows/changes.yml"
+          unit_mac-yml:
+            - ".github/workflows/unit_mac.yml"
+            - ".github/workflows/changes.yml"
+          unit_windows-yml:
+            - ".github/workflows/unit_windows.yml"
+            - ".github/workflows/changes.yml"
+
 
   # Detects changes that are specific to integration tests
   int_tests:
@@ -346,3 +405,25 @@ jobs:
           base: ${{ env.BASE_SHA }}
           ref:  ${{ env.HEAD_SHA }}
           filters: int_test_filters.yaml
+
+      # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
+      # `if` section of a job or step. In return, we can reduce a lot of redundant job configuration in integration.yml.
+      - name: Generate JSON for all outputs
+        id: aggregate
+        run: |
+          json=$(cat <<EOF
+          {
+            "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
+            "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
+            "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }}
+          }
+          EOF
+          )
+
+          echo "$json" > e2e_tests_changes.json
+
+      - name: Upload JSON artifact
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e_tests_changes
+          path: e2e_tests_changes.json
