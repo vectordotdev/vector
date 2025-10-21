@@ -29,9 +29,12 @@ static CLOUD_URL: &str = "https://api.axiom.co";
 pub struct AxiomConfig {
     /// URI of the Axiom endpoint to send data to.
     ///
-    /// Only required if not using Axiom Cloud.
+    /// If a path is provided, the URL is used as-is.
+    /// If no path (or only `/`) is provided, `/v1/datasets/{dataset}/ingest` is appended for backwards compatibility.
+    /// This takes precedence over `region` if both are set.
     #[configurable(validation(format = "uri"))]
-    #[configurable(metadata(docs::examples = "https://axiom.my-domain.com"))]
+    #[configurable(metadata(docs::examples = "https://api.eu.axiom.co"))]
+    #[configurable(metadata(docs::examples = "http://localhost:3400/ingest"))]
     #[configurable(metadata(docs::examples = "${AXIOM_URL}"))]
     url: Option<String>,
 
@@ -51,6 +54,16 @@ pub struct AxiomConfig {
     #[configurable(metadata(docs::examples = "${AXIOM_DATASET}"))]
     #[configurable(metadata(docs::examples = "vector_rocks"))]
     dataset: String,
+
+    /// The Axiom regional edge domain to use for ingestion.
+    ///
+    /// Specify the domain name only (no scheme, no path).
+    /// When set, data will be sent to `https://{region}/v1/ingest/{dataset}`.
+    /// If `url` is also set, `url` takes precedence.
+    #[configurable(metadata(docs::examples = "${AXIOM_REGION}"))]
+    #[configurable(metadata(docs::examples = "mumbai.axiom.co"))]
+    #[configurable(metadata(docs::examples = "eu-central-1.aws.edge.axiom.co"))]
+    region: Option<String>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -150,17 +163,35 @@ impl SinkConfig for AxiomConfig {
 
 impl AxiomConfig {
     fn build_endpoint(&self) -> String {
-        let url = if let Some(url) = self.url.as_ref() {
-            url.clone()
-        } else {
-            CLOUD_URL.to_string()
-        };
+        // Priority: url > region > default cloud endpoint
 
-        // NOTE trim any trailing slashes to avoid redundant rewriting or 301 redirects from intermediate proxies
-        // NOTE Most axiom users will not need to configure a url, this is for the other 1%
-        let url = url.trim_end_matches('/');
+        // If url is set, check if it has a path
+        if let Some(url) = &self.url {
+            let url = url.trim_end_matches('/');
 
-        format!("{}/v1/datasets/{}/ingest", url, self.dataset)
+            // Parse URL to check if path is provided
+            // If path is empty or just "/", append the legacy format for backwards compatibility
+            // Otherwise, use the URL as-is
+            if let Ok(parsed) = url::Url::parse(url) {
+                let path = parsed.path();
+                if path.is_empty() || path == "/" {
+                    // Backwards compatibility: append legacy path format
+                    return format!("{}/v1/datasets/{}/ingest", url, self.dataset);
+                }
+            }
+
+            // URL has a custom path, use as-is
+            return url.to_string();
+        }
+
+        // If region is set, build the regional edge endpoint
+        if let Some(region) = &self.region {
+            let region = region.trim_end_matches('/');
+            return format!("https://{}/v1/ingest/{}", region, self.dataset);
+        }
+
+        // Default: use cloud endpoint with legacy path format
+        format!("{}/v1/datasets/{}/ingest", CLOUD_URL, self.dataset)
     }
 }
 
@@ -169,17 +200,137 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<super::AxiomConfig>();
+    }
 
+    #[test]
+    fn test_region_domain_only() {
+        // region: mumbai.axiomdomain.co → https://mumbai.axiomdomain.co/v1/ingest/test-3
         let config = super::AxiomConfig {
-            url: Some("https://axiom.my-domain.com///".to_string()),
-            org_id: None,
-            dataset: "vector_rocks".to_string(),
+            region: Some("mumbai.axiomdomain.co".to_string()),
+            dataset: "test-3".to_string(),
             ..Default::default()
         };
         let endpoint = config.build_endpoint();
         assert_eq!(
             endpoint,
-            "https://axiom.my-domain.com/v1/datasets/vector_rocks/ingest"
+            "https://mumbai.axiomdomain.co/v1/ingest/test-3"
+        );
+    }
+
+    #[test]
+    fn test_default_no_config() {
+        // No url, no region → https://api.axiom.co/v1/datasets/foo/ingest
+        let config = super::AxiomConfig {
+            dataset: "foo".to_string(),
+            ..Default::default()
+        };
+        let endpoint = config.build_endpoint();
+        assert_eq!(
+            endpoint,
+            "https://api.axiom.co/v1/datasets/foo/ingest"
+        );
+    }
+
+    #[test]
+    fn test_url_with_custom_path() {
+        // url: http://localhost:3400/ingest → http://localhost:3400/ingest (as-is)
+        let config = super::AxiomConfig {
+            url: Some("http://localhost:3400/ingest".to_string()),
+            dataset: "meh".to_string(),
+            ..Default::default()
+        };
+        let endpoint = config.build_endpoint();
+        assert_eq!(
+            endpoint,
+            "http://localhost:3400/ingest"
+        );
+    }
+
+    #[test]
+    fn test_url_without_path_backwards_compat() {
+        // url: https://api.eu.axiom.co/ → https://api.eu.axiom.co/v1/datasets/qoo/ingest
+        let config = super::AxiomConfig {
+            url: Some("https://api.eu.axiom.co".to_string()),
+            dataset: "qoo".to_string(),
+            ..Default::default()
+        };
+        let endpoint = config.build_endpoint();
+        assert_eq!(
+            endpoint,
+            "https://api.eu.axiom.co/v1/datasets/qoo/ingest"
+        );
+
+        // Also test with trailing slash
+        let config = super::AxiomConfig {
+            url: Some("https://api.eu.axiom.co/".to_string()),
+            dataset: "qoo".to_string(),
+            ..Default::default()
+        };
+        let endpoint = config.build_endpoint();
+        assert_eq!(
+            endpoint,
+            "https://api.eu.axiom.co/v1/datasets/qoo/ingest"
+        );
+    }
+
+    #[test]
+    fn test_url_takes_precedence_over_region() {
+        // When both url and region are set, url takes precedence
+        let config = super::AxiomConfig {
+            url: Some("http://localhost:3400/ingest".to_string()),
+            region: Some("mumbai.axiomdomain.co".to_string()),
+            dataset: "test".to_string(),
+            ..Default::default()
+        };
+        let endpoint = config.build_endpoint();
+        assert_eq!(
+            endpoint,
+            "http://localhost:3400/ingest"
+        );
+    }
+
+    #[test]
+    fn test_production_regional_edges() {
+        // Production AWS edge
+        let config = super::AxiomConfig {
+            region: Some("eu-central-1.aws.edge.axiom.co".to_string()),
+            dataset: "my-dataset".to_string(),
+            ..Default::default()
+        };
+        let endpoint = config.build_endpoint();
+        assert_eq!(
+            endpoint,
+            "https://eu-central-1.aws.edge.axiom.co/v1/ingest/my-dataset"
+        );
+    }
+
+    #[test]
+    fn test_staging_environment_edges() {
+        // Staging environment edge
+        let config = super::AxiomConfig {
+            region: Some("us-east-1.edge.staging.axiomdomain.co".to_string()),
+            dataset: "test-dataset".to_string(),
+            ..Default::default()
+        };
+        let endpoint = config.build_endpoint();
+        assert_eq!(
+            endpoint,
+            "https://us-east-1.edge.staging.axiomdomain.co/v1/ingest/test-dataset"
+        );
+    }
+
+    #[test]
+    fn test_dev_environment_edges() {
+        // Dev environment edge
+        let config = super::AxiomConfig {
+            region: Some("eu-west-1.edge.dev.axiomdomain.co".to_string()),
+            dataset: "dev-dataset".to_string(),
+            ..Default::default()
+        };
+        let endpoint = config.build_endpoint();
+        assert_eq!(
+            endpoint,
+            "https://eu-west-1.edge.dev.axiomdomain.co/v1/ingest/dev-dataset"
         );
     }
 }
