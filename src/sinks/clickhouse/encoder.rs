@@ -329,14 +329,14 @@ fn build_decimal128_array(
             data_type: DataType::Decimal128(precision, scale),
         })?;
 
+    let target_scale = scale.unsigned_abs() as u32;
+
     for event in events {
         if let Event::Log(log) = event {
             match log.get(field_name) {
                 Some(Value::Float(f)) => {
-                    // Use rust_decimal for accurate conversion
                     if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
-                        // Rescale to match the target scale
-                        decimal.rescale(scale.unsigned_abs().into());
+                        decimal.rescale(target_scale);
                         // Convert to i128 representation (mantissa)
                         let mantissa = decimal.mantissa();
                         builder.append_value(mantissa);
@@ -346,7 +346,7 @@ fn build_decimal128_array(
                 }
                 Some(Value::Integer(i)) => {
                     let mut decimal = Decimal::from(*i);
-                    decimal.rescale(scale.unsigned_abs().into());
+                    decimal.rescale(target_scale);
                     let mantissa = decimal.mantissa();
                     builder.append_value(mantissa);
                 }
@@ -374,13 +374,14 @@ fn build_decimal256_array(
             data_type: DataType::Decimal256(precision, scale),
         })?;
 
+    let target_scale = scale.unsigned_abs() as u32;
+
     for event in events {
         if let Event::Log(log) = event {
             match log.get(field_name) {
                 Some(Value::Float(f)) => {
                     if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
-                        // Rescale to match the target scale
-                        decimal.rescale(scale.unsigned_abs().into());
+                        decimal.rescale(target_scale);
                         // Convert to i128 representation (mantissa)
                         let mantissa = decimal.mantissa();
                         builder.append_value(i256::from_i128(mantissa));
@@ -390,7 +391,7 @@ fn build_decimal256_array(
                 }
                 Some(Value::Integer(i)) => {
                     let mut decimal = Decimal::from(*i);
-                    decimal.rescale(scale.unsigned_abs().into());
+                    decimal.rescale(target_scale);
                     let mantissa = decimal.mantissa();
                     builder.append_value(i256::from_i128(mantissa));
                 }
