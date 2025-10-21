@@ -1,0 +1,3 @@
+The `vector` sink now supports a `connection_ttl_secs` configuration option to periodically close and re-establish connections. This enables proper load balancing by preventing long-lived HTTP/2 connections from sticking to a single backend instance. When set, the sink will automatically reconnect after the specified duration, allowing load balancers to distribute traffic across multiple backend instances.
+
+authors: Donny Xia
