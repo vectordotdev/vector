@@ -55,18 +55,13 @@ pub fn encode_events_to_arrow_stream(
         return Err(ArrowEncodingError::NoEvents);
     }
 
-    // Use provided schema - schema inference is not supported
     let schema_ref = if let Some(provided_schema) = schema {
-        tracing::debug!(
-            "Using provided schema with {} fields",
-            provided_schema.fields().len()
-        );
         provided_schema
     } else {
         return Err(ArrowEncodingError::NoSchemaProvided);
     };
 
-    tracing::debug!(
+    debug!(
         "Built Arrow schema with {} fields: {:?}",
         schema_ref.fields().len(),
         schema_ref
@@ -76,10 +71,9 @@ pub fn encode_events_to_arrow_stream(
             .collect::<Vec<_>>()
     );
 
-    // Build record batch from events
     let record_batch = build_record_batch(Arc::<Schema>::clone(&schema_ref), events)?;
 
-    tracing::debug!(
+    debug!(
         "Built RecordBatch with {} rows and {} columns",
         record_batch.num_rows(),
         record_batch.num_columns()
@@ -101,7 +95,7 @@ pub fn encode_events_to_arrow_stream(
     }
 
     let encoded_bytes = buffer.into_inner().freeze();
-    tracing::debug!(
+    debug!(
         "Encoded to {} bytes of Arrow IPC stream data",
         encoded_bytes.len()
     );

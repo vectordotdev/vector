@@ -228,10 +228,9 @@ impl SinkConfig for ClickhouseConfig {
                 let table_str = self.table.get_ref();
                 let database_str = database.get_ref();
 
-                tracing::info!(
+                info!(
                     "Fetching schema for table {}.{} at startup",
-                    database_str,
-                    table_str
+                    database_str, table_str
                 );
                 match schema::fetch_table_schema(
                     &client,
@@ -243,7 +242,7 @@ impl SinkConfig for ClickhouseConfig {
                 .await
                 {
                     Ok(schema) => {
-                        tracing::info!(
+                        info!(
                             "Successfully fetched schema with {} fields",
                             schema.fields().len()
                         );

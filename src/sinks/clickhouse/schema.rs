@@ -108,7 +108,7 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
         _ if base_type.starts_with("Map") => DataType::Utf8,   // Serialize as JSON
         _ if base_type.starts_with("Tuple") => DataType::Utf8, // Serialize as JSON
         _ => {
-            tracing::warn!("Unknown ClickHouse type '{}', defaulting to Utf8", ch_type);
+            warn!("Unknown ClickHouse type '{}', defaulting to Utf8", ch_type);
             DataType::Utf8
         }
     }
@@ -148,14 +148,16 @@ fn parse_decimal_type(ch_type: &str) -> DataType {
     } else if ch_type.starts_with("Decimal32(") {
         ("Decimal32(", 9)
     } else {
-        tracing::warn!(
+        warn!(
             "Could not parse Decimal type '{}', defaulting to Float64",
             ch_type
         );
         return DataType::Float64;
     };
 
-    if let Some(scale_str) = ch_type.strip_prefix(prefix).and_then(|s| s.strip_suffix(')'))
+    if let Some(scale_str) = ch_type
+        .strip_prefix(prefix)
+        .and_then(|s| s.strip_suffix(')'))
         && let Ok(scale) = scale_str.trim().parse::<i8>()
     {
         return if max_precision <= 38 {
@@ -165,10 +167,6 @@ fn parse_decimal_type(ch_type: &str) -> DataType {
         };
     }
 
-    tracing::warn!(
-        "Could not parse Decimal type '{}', defaulting to Float64",
-        ch_type
-    );
     DataType::Float64
 }
 
@@ -190,7 +188,7 @@ fn parse_datetime64_precision(ch_type: &str) -> DataType {
             Ok(4..=6) => DataType::Timestamp(TimeUnit::Microsecond, None),
             Ok(7..=9) => DataType::Timestamp(TimeUnit::Nanosecond, None),
             _ => {
-                tracing::warn!(
+                warn!(
                     "Unsupported DateTime64 precision in '{}', defaulting to Millisecond",
                     ch_type
                 );
@@ -199,7 +197,7 @@ fn parse_datetime64_precision(ch_type: &str) -> DataType {
         }
     } else {
         // Default to millisecond if we can't parse
-        tracing::warn!(
+        warn!(
             "Could not parse DateTime64 precision from '{}', defaulting to Millisecond",
             ch_type
         );
