@@ -30,9 +30,7 @@ pub enum ArrowEncodingError {
     #[snafu(display("No events provided for encoding"))]
     NoEvents,
 
-    #[snafu(display(
-        "Schema inference is not supported for ArrowStream format. Table schema must be known before insertion time."
-    ))]
+    #[snafu(display("Schema must be provided before runtime"))]
     NoSchemaProvided,
 
     #[snafu(display(
