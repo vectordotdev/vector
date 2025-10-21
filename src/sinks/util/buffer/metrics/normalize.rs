@@ -15,6 +15,8 @@ use vector_lib::{
     },
 };
 
+use tracing::{debug, error, info, trace};s
+
 #[derive(Debug, Snafu, PartialEq, Eq)]
 pub enum NormalizerError {
     #[snafu(display("`max_bytes` must be greater than zero"))]
@@ -287,16 +289,29 @@ impl CapacityPolicy {
     pub fn free_item(&mut self, series: &MetricSeries, entry: &MetricEntry) {
         if self.max_bytes.is_some() {
             let freed_memory = self.item_size(series, entry);
+            info!(
+                message = "Freeing memory for item",
+                series_name = %series.name,
+                freed_bytes = freed_memory,
+                current_memory = self.current_memory,
+                max_memory = ?self.max_bytes
+            );
             self.remove_memory(freed_memory);
         }
     }
 
     /// Updates memory tracking.
-    const fn replace_memory(&mut self, old_bytes: usize, new_bytes: usize) {
-        self.current_memory = self
-            .current_memory
-            .saturating_sub(old_bytes)
-            .saturating_add(new_bytes);
+    fn replace_memory(&mut self, old_bytes: usize, new_bytes: usize) {
+        let new_total = self.current_memory.saturating_sub(old_bytes).saturating_add(new_bytes);
+        info!(
+            message = "Updating memory tracking",
+            old_bytes = old_bytes,
+            new_bytes = new_bytes, 
+            old_total = self.current_memory,
+            new_total = new_total,
+            max_memory = ?self.max_bytes
+        );
+        self.current_memory = new_total;
     }
 
     /// Checks if the current state exceeds memory limits.
@@ -318,13 +333,40 @@ impl CapacityPolicy {
     }
 
     /// Returns true if any limits are currently exceeded.
-    const fn needs_eviction(&self, entry_count: usize) -> bool {
-        self.exceeds_memory_limit() || self.exceeds_entry_limit(entry_count)
+    fn needs_eviction(&self, entry_count: usize) -> bool {
+        let memory_exceeded = self.exceeds_memory_limit();
+        let entries_exceeded = self.exceeds_entry_limit(entry_count);
+        
+        if memory_exceeded || entries_exceeded {
+            info!(
+                message = "Eviction needed",
+                memory_exceeded = memory_exceeded,
+                entries_exceeded = entries_exceeded,
+                current_memory = self.current_memory,
+                max_memory = ?self.max_bytes,
+                entry_count = entry_count,
+                max_entries = ?self.max_events
+            );
+        }
+        
+        memory_exceeded || entries_exceeded
     }
 
     /// Gets the total memory size of entry/series, excluding LRU cache overhead.
     pub fn item_size(&self, series: &MetricSeries, entry: &MetricEntry) -> usize {
-        entry.allocated_bytes() + series.allocated_bytes()
+        let series_size = series.allocated_bytes();
+        let entry_size = entry.allocated_bytes();
+        let total_size = series_size + entry_size;
+        
+        info!(
+            message = "Calculating item size",
+            series_name = %series.name,
+            series_size = series_size,
+            entry_size = entry_size,
+            total_size = total_size
+        );
+        
+        total_size
     }
 }
 
@@ -462,15 +504,38 @@ impl MetricSet {
         let Some(ref mut capacity_policy) = self.capacity_policy else {
             return; // No capacity limits configured
         };
+        
+        info!(
+            message = "Checking capacity policy",
+            current_memory = capacity_policy.current_memory(),
+            max_memory = ?capacity_policy.max_bytes,
+            current_entries = self.inner.len(),
+            max_entries = ?capacity_policy.max_events
+        );
 
         // Keep evicting until we're within limits
         while capacity_policy.needs_eviction(self.inner.len()) {
             if let Some((series, entry)) = self.inner.pop_lru() {
+                info!(
+                    message = "Evicting item due to capacity limits",
+                    series_name = %series.name,
+                    item_size = capacity_policy.item_size(&series, &entry),
+                    current_memory = capacity_policy.current_memory(),
+                    entry_count = self.inner.len()
+                );
                 capacity_policy.free_item(&series, &entry);
             } else {
                 break; // No more entries to evict
             }
         }
+        
+        info!(
+            message = "After enforcement",
+            current_memory = capacity_policy.current_memory(),
+            max_memory = ?capacity_policy.max_bytes,
+            current_entries = self.inner.len(),
+            max_entries = ?capacity_policy.max_events
+        );
     }
 
     /// Perform TTL cleanup if configured and needed.
@@ -522,6 +587,15 @@ impl MetricSet {
             self.inner.put(series, entry);
             return; // No capacity limits configured, return immediately
         };
+
+        info!(
+            message = "Inserting entry with tracking",
+            series_name = %series.name,
+            current_memory = capacity_policy.current_memory(),
+            max_memory = ?capacity_policy.max_bytes,
+            current_entries = self.inner.len(),
+            max_entries = ?capacity_policy.max_events
+        );
 
         // Handle differently based on whether we need to track memory
         if capacity_policy.max_bytes.is_some() {
