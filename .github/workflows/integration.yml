@@ -48,7 +48,16 @@ jobs:
     secrets: inherit
 
   build-test-runner:
-    if: ${{ github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch' }}
+    needs: changes
+    if: |
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'merge_group' &&
+         (needs.changes.outputs.dependencies == 'true' ||
+          needs.changes.outputs.integration-yml == 'true' ||
+          needs.changes.outputs.int-tests-any == 'true' ||
+          needs.changes.outputs.e2e-tests-any == 'true'))
+      }}
     uses: ./.github/workflows/build-test-runner.yml
     with:
       commit_sha: ${{ github.sha }}
