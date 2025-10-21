@@ -371,6 +371,16 @@ impl FieldParser {
     pub fn parse_field(&self, field: &TemplateField, data: &[u8], log_event: &mut LogEvent) {
         let field_info = self.get_field_info(field);
         
+        // Debug: Log field parsing details for overflow debugging
+        debug!(
+            "Parsing field: name='{}', type={}, length={}, enterprise={:?}, scope={}",
+            field_info.name,
+            field.field_type,
+            field.field_length,
+            field.enterprise_number,
+            field.is_scope
+        );
+        
         match field_info.data_type.parse(data, self.max_field_length) {
             Ok(value) => {
                 log_event.insert(field_info.name, value.clone());

@@ -579,8 +579,9 @@ impl IpfixParser {
                 
                 // Debug: Log all field parsing to identify overflow sources
                 debug!(
-                    "Parsing field {}: type={}, length={}, enterprise={:?}, scope={}, raw_data={:?}",
+                    "Parsing field {} in template {}: type={}, length={}, enterprise={:?}, scope={}, raw_data={:?}",
                     fields_parsed,
+                    template_id,
                     field.field_type,
                     field_length,
                     field.enterprise_number,
