@@ -1,14 +1,10 @@
 //! Top subcommand
 mod cmd;
-mod dashboard;
-mod events;
-mod metrics;
-mod state;
 
 use clap::Parser;
-pub use cmd::{cmd, top};
-pub use dashboard::is_tty;
 use glob::Pattern;
+
+pub use cmd::{cmd, top};
 use url::Url;
 
 use crate::config::api::default_graphql_url;

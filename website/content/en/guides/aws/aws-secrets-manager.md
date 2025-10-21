@@ -203,12 +203,12 @@ Vector retrieves the entire secret and makes individual key-value pairs availabl
 
 - Ensure the backend name in `SECRET[backend_name.key]` exactly matches the section name in your config.
 
-#### "Key does not exist" error
+#### `Key does not exist` error
 
 - Verify the key name exists in your AWS Secrets Manager secret.
 - Check that the secret contains valid JSON.
 
-#### "Secret could not be retrieved" error
+#### `Secret could not be retrieved` error
 
 - Verify AWS credentials have the correct permissions.
 - Check that the secret ID and ARN are correct.
