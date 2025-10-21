@@ -10,10 +10,13 @@ pub struct Cli {
     /// The e2e test name to stop
     test: String,
 
-    /// Use only the features defined in test.yaml (e.g., scripts/e2e/<test-name>/test.yaml)
-    /// instead of the shared 'all-e2e-tests' feature. Defaults to false for better image reuse across tests.
+    /// If true, remove the runner container compiled with all integration test features
+    #[arg(short = 'a', long)]
+    build_all: bool,
+
+    /// Reuse existing test runner image instead of rebuilding (useful in CI)
     #[arg(long)]
-    test_yaml_features: bool,
+    reuse_image: bool,
 }
 
 impl Cli {
@@ -21,7 +24,8 @@ impl Cli {
         crate::commands::compose_tests::stop::exec(
             ComposeTestLocalConfig::e2e(),
             &self.test,
-            !self.test_yaml_features,
+            self.build_all,
+            self.reuse_image,
         )
     }
 }

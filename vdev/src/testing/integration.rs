@@ -69,6 +69,8 @@ pub(crate) struct ComposeTest {
     env_config: Environment,
     /// When true, uses 'all-integration-tests' or 'all-e2e-tests' feature. When false, uses features from test.yaml.
     all_features: bool,
+    /// When true, reuse existing image instead of rebuilding (useful in CI).
+    reuse_image: bool,
     retries: u8,
 }
 
@@ -78,6 +80,7 @@ impl ComposeTest {
         test_name: impl Into<String>,
         environment: impl Into<String>,
         all_features: bool,
+        reuse_image: bool,
         retries: u8,
     ) -> Result<ComposeTest> {
         let test_name: String = test_name.into();
@@ -111,6 +114,7 @@ impl ComposeTest {
             compose,
             env_config: rename_environment_keys(&env_config),
             all_features,
+            reuse_image,
             retries,
         };
         trace!("Generated {compose_test:#?}");
@@ -215,6 +219,7 @@ impl ComposeTest {
             Some(&self.config.features),
             &args,
             self.local_config.directory,
+            self.reuse_image,
         )?;
 
         if self.is_running()? {
@@ -233,6 +238,7 @@ impl ComposeTest {
                 Some(&self.config.features),
                 self.local_config.directory,
                 &self.env_config,
+                self.reuse_image,
             )?;
         }
 

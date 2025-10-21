@@ -20,10 +20,13 @@ pub struct Cli {
     /// The desired environment (optional)
     environment: Option<String>,
 
-    /// Use only the features defined in test.yaml (e.g., scripts/e2e/<test-name>/test.yaml)
-    /// instead of the shared 'all-e2e-tests' feature. Defaults to false for better image reuse across tests.
+    /// Whether to compile the test runner with all integration test features
+    #[arg(short = 'a', long)]
+    build_all: bool,
+
+    /// Reuse existing test runner image instead of rebuilding (useful in CI)
     #[arg(long)]
-    test_yaml_features: bool,
+    reuse_image: bool,
 
     /// Number of retries to allow on each integration test case.
     #[arg(short = 'r', long)]
@@ -39,7 +42,8 @@ impl Cli {
             ComposeTestLocalConfig::e2e(),
             &self.e2e_test,
             self.environment.as_ref(),
-            !self.test_yaml_features,
+            self.build_all,
+            self.reuse_image,
             self.retries.unwrap_or_default(),
             &self.args,
         )

@@ -10,10 +10,13 @@ pub struct Cli {
     /// The integration name
     integration: String,
 
-    /// Use only the features defined in test.yaml (e.g., scripts/integration/<test-name>/test.yaml)
-    /// instead of the shared 'all-integration-tests' feature. Defaults to false for better image reuse across tests.
+    /// Whether to compile the test runner with all integration test features
+    #[arg(short = 'a', long)]
+    build_all: bool,
+
+    /// Reuse existing test runner image instead of rebuilding (useful in CI)
     #[arg(long)]
-    test_yaml_features: bool,
+    reuse_image: bool,
 
     /// The desired environment name to start. If omitted, the first environment name is used.
     environment: Option<String>,
@@ -25,7 +28,8 @@ impl Cli {
             ComposeTestLocalConfig::integration(),
             &self.integration,
             self.environment.as_ref(),
-            !self.test_yaml_features,
+            self.build_all,
+            self.reuse_image,
         )
     }
 }
