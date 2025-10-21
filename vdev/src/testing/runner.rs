@@ -55,6 +55,7 @@ pub trait TestRunner {
         features: Option<&[String]>,
         args: &[String],
         directory: &str,
+        reuse_image: bool,
     ) -> Result<()>;
 }
 
@@ -103,6 +104,7 @@ pub trait ContainerTestRunner: TestRunner {
         features: Option<&[String]>,
         directory: &str,
         config_environment_variables: &Environment,
+        reuse_image: bool,
     ) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
@@ -114,7 +116,12 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, directory, config_environment_variables)?;
+                self.build(
+                    features,
+                    directory,
+                    config_environment_variables,
+                    reuse_image,
+                )?;
                 self.create()?;
                 self.start()?;
             }
@@ -147,14 +154,27 @@ pub trait ContainerTestRunner: TestRunner {
         features: Option<&[String]>,
         directory: &str,
         config_env_vars: &Environment,
+        reuse_image: bool,
     ) -> Result<()> {
+        let image_name = self.image_name();
+
+        // When reuse_image is true, skip build if image already exists (useful in CI).
+        // Otherwise, always rebuild to pick up local code changes.
+        if reuse_image {
+            let mut check_command = docker_command(["image", "inspect", &image_name]);
+            if check_command.output().is_ok() {
+                info!("Image {image_name} already exists, skipping build");
+                return Ok(());
+            }
+        }
+
         let dockerfile: PathBuf = [app::path(), "scripts", directory, "Dockerfile"]
             .iter()
             .collect();
 
         let mut command =
-            prepare_build_command(&self.image_name(), &dockerfile, features, config_env_vars);
-        waiting!("Building image {}", self.image_name());
+            prepare_build_command(&image_name, &dockerfile, features, config_env_vars);
+        waiting!("Building image {}", image_name);
         command.check_run()
     }
 
@@ -234,8 +254,14 @@ where
         features: Option<&[String]>,
         args: &[String],
         directory: &str,
+        reuse_image: bool,
     ) -> Result<()> {
-        self.ensure_running(features, directory, config_environment_variables)?;
+        self.ensure_running(
+            features,
+            directory,
+            config_environment_variables,
+            reuse_image,
+        )?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
@@ -394,6 +420,7 @@ impl TestRunner for LocalTestRunner {
         _features: Option<&[String]>,
         args: &[String],
         _directory: &str,
+        _reuse_image: bool,
     ) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);
