@@ -88,7 +88,7 @@ jobs:
             -v "${GITHUB_WORKSPACE}:/src" \
             -w /src \
             "${IMAGE_TAG}" \
-            cargo run --bin vector -- --version'
+            cargo run --bin vector -- --version
 
       - name: Push image
         if: env.SHOULD_PUBLISH == 'true'
