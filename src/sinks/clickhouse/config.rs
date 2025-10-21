@@ -228,7 +228,7 @@ impl SinkConfig for ClickhouseConfig {
                 let table_str = self.table.get_ref();
                 let database_str = database.get_ref();
 
-                info!(
+                debug!(
                     "Fetching schema for table {}.{} at startup",
                     database_str, table_str
                 );
@@ -242,10 +242,11 @@ impl SinkConfig for ClickhouseConfig {
                 .await
                 {
                     Ok(schema) => {
-                        info!(
+                        debug!(
                             "Successfully fetched schema with {} fields",
                             schema.fields().len()
                         );
+                        debug!("Schema mapping: {:?}", schema);
                         Some(schema)
                     }
                     Err(e) => {
