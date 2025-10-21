@@ -7,10 +7,10 @@ use chrono_tz::Tz;
 use odbc_api::ConnectionOptions;
 use ordered_float::NotNan;
 use std::borrow::Cow;
-use std::collections::BTreeMap;
 use std::fs;
 use std::time::Duration;
 use vector_lib::event::Event;
+use vrl::prelude::*;
 use vrl::value::Value;
 
 enum DbType {
@@ -139,7 +139,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
             Some(3),
         )
         .unwrap();
-    let params = BTreeMap::from([("id".to_string(), "0".to_string())]);
+    let params = ObjectMap::from([("id".into(), 0.into())]);
 
     let _ = fs::remove_file(LAST_RUN_METADATA_PATH);
 
@@ -236,7 +236,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
             Some(3),
         )
         .unwrap();
-    let params = BTreeMap::from([("id".to_string(), "0".to_string())]);
+    let params = ObjectMap::from([("id".into(), 0.into())]);
 
     let _ = fs::write(CONNECTION_STRING_FILE_PATH, conn_str).unwrap();
     let _ = fs::write(

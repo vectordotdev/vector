@@ -5,7 +5,7 @@ use crate::sinks::prelude::*;
 use crate::sources::Source;
 use crate::sources::odbc::{
     ClosedSnafu, Column, Columns, ConfigSnafu, DbSnafu, OdbcError, OdbcSchedule, Rows, load_params,
-    map_value, save_params,
+    map_value, order_params, save_params,
 };
 use chrono::Utc;
 use chrono_tz::Tz;
@@ -14,11 +14,10 @@ use futures_util::StreamExt;
 use itertools::Itertools;
 use odbc_api::buffers::TextRowSet;
 use odbc_api::parameter::VarCharBox;
-use odbc_api::{ConnectionOptions, Cursor, Environment, IntoParameter, ResultSetMetadata};
+use odbc_api::{ConnectionOptions, Cursor, Environment, ResultSetMetadata};
 use serde_with::DurationSeconds;
 use serde_with::serde_as;
 use snafu::{OptionExt, ResultExt};
-use std::collections::BTreeMap;
 use std::fmt::Debug;
 use std::fs;
 use std::sync::Arc;
@@ -94,7 +93,7 @@ pub struct OdbcConfig {
     #[configurable(metadata(
         docs::additional_props_description = "Initial value for the SQL statement parameters. The value is always a string."
     ))]
-    pub statement_init_params: Option<BTreeMap<String, String>>,
+    pub statement_init_params: Option<ObjectMap>,
 
     /// Cron expression for scheduling database queries.
     /// If not set, the statement runs only once by default.
@@ -314,6 +313,8 @@ impl Context {
         #[cfg(test)]
         let mut count = 0;
 
+        let mut prev_result = self.cfg.statement_init_params.clone();
+
         loop {
             select! {
                 _ = shutdown.clone() => {
@@ -326,7 +327,13 @@ impl Context {
                     });
 
                     let instant = Instant::now();
-                    if self.process().await.is_ok() {
+                    if let Ok(result) = self.process(prev_result.clone()).await {
+
+                        // If there is a query result, update the latest result
+                        if let Some(_) = result {
+                            prev_result = result;
+                        }
+
                         emit!(OdbcQueryExecuted {
                           statement: &self.cfg.statement.clone().unwrap_or_default(),
                           elapsed: instant.elapsed().as_millis()
@@ -360,7 +367,8 @@ impl Context {
         Ok(())
     }
 
-    async fn process(&self) -> Result<(), OdbcError> {
+    /// Executes the scheduled ODBC query, sends the result as an event, and updates tracking metadata.
+    async fn process(&self, map: Option<ObjectMap>) -> Result<Option<ObjectMap>, OdbcError> {
         let conn_str = self.cfg.connection_string_or_file();
         let stmt_str = self.cfg.statement_or_file().context(ConfigSnafu {
             cause: "No statement",
@@ -370,21 +378,16 @@ impl Context {
         let env = Arc::clone(&self.env);
 
         // Load the last run metadata from the file.
-        // If the file does not exist or is not set, use the initial parameters.
+        // If the file does not exist or is not set, use the initial parameters or latest query result.
         let stmt_params = self
             .cfg
             .last_run_metadata_path
-            .clone()
-            .and_then(|path| load_params(&path, self.cfg.tracking_columns.as_ref()))
-            .unwrap_or_else(|| {
-                self.cfg
-                    .statement_init_params
-                    .clone()
-                    .unwrap_or_default()
-                    .into_values()
-                    .map(|value| value.to_string().into_parameter())
-                    .collect()
-            });
+            .as_ref()
+            .and_then(|path| load_params(path, self.cfg.tracking_columns.as_ref()))
+            .unwrap_or(
+                order_params(map.unwrap_or_default(), self.cfg.tracking_columns.as_ref())
+                    .unwrap_or_default(),
+            );
         let cfg = self.cfg.clone();
 
         let rows = execute_query(
@@ -398,6 +401,8 @@ impl Context {
             cfg.odbc_max_str_limit,
         )?;
 
+        // event with query results: `{"message":[{ ... }],"timestamp":"2025-10-21T00:00:00.05275Z"}`
+        // event with no query results: `{"message":[],"timestamp":"2025-10-21T00:00:00.05275Z"}`
         let mut event = LogEvent::default();
         event.maybe_insert(Some("timestamp"), Value::Timestamp(Utc::now()));
         event.maybe_insert(
@@ -409,24 +414,29 @@ impl Context {
         out.send_event(event).await.context(ClosedSnafu)?;
 
         if let Some(last) = rows.last() {
-            let Some(path) = cfg.last_run_metadata_path else {
-                return Ok(());
-            };
             let Some(tracking_columns) = cfg.tracking_columns else {
-                return Ok(());
+                return Ok(None);
             };
-            extract_and_save_tracking(&path, last.clone(), tracking_columns).await?;
+            let latest_result = extract_and_save_tracking(
+                cfg.last_run_metadata_path.as_deref(),
+                last.clone(),
+                tracking_columns,
+            )
+            .await?;
+            return Ok(latest_result);
         }
 
-        Ok(())
+        Ok(None)
     }
 }
 
+/// Extracts specified tracking columns from the given object,
+/// saves them to a file if a path is provided.
 async fn extract_and_save_tracking(
-    path: &str,
+    path: Option<&str>,
     obj: Value,
     tracking_columns: Vec<String>,
-) -> Result<(), OdbcError> {
+) -> Result<Option<ObjectMap>, OdbcError> {
     let tracking_columns = tracking_columns
         .iter()
         .map(|col| col.as_str())
@@ -439,12 +449,17 @@ async fn extract_and_save_tracking(
             .map(|(k, v)| (k.clone(), v.clone()))
             .collect();
 
-        save_params(path, &save_obj)?;
+        if let Some(path) = path {
+            save_params(path, &save_obj)?;
+        }
+        return Ok(Some(save_obj));
     }
 
-    Ok(())
+    Ok(None)
 }
 
+/// Executes an ODBC SQL query with optional parameters, fetches rows in batches,
+/// and returns the results as a vector of objects.
 #[allow(clippy::too_many_arguments)]
 pub fn execute_query(
     env: &Environment,

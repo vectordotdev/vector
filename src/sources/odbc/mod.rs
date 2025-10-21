@@ -186,12 +186,15 @@ impl OdbcSchedule {
 /// Loads the last result as SQL parameters.
 /// Parameters are created in the order specified by `columns_order`.
 fn load_params(path: &str, columns_order: Option<&Vec<String>>) -> Option<Vec<VarCharBox>> {
-    let Ok(file) = File::open(path) else {
-        return None;
-    };
-
+    let file = File::open(path).ok()?;
     let reader = BufReader::new(file);
     let map: ObjectMap = serde_json::from_reader(reader).ok()?;
+
+    order_params(map, columns_order)
+}
+
+/// Orders the parameters of a given `ObjectMap` based on an optional column order.
+fn order_params(map: ObjectMap, columns_order: Option<&Vec<String>>) -> Option<Vec<VarCharBox>> {
     if columns_order.is_none() || columns_order.iter().len() == 0 {
         let params = map
             .iter()
@@ -220,9 +223,6 @@ fn load_params(path: &str, columns_order: Option<&Vec<String>>) -> Option<Vec<Va
 }
 
 /// Saves the last result as SQL parameters.
-///
-/// # Arguments
-/// * `path`: The path to the JSON file.
 fn save_params(path: &str, obj: &ObjectMap) -> Result<(), OdbcError> {
     let json = serde_json::to_string(obj).context(JsonSnafu)?;
     fs::write(path, json).context(IoSnafu)
