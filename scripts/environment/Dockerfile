@@ -10,9 +10,6 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Container junk
 RUN echo $TZ > /etc/timezone
 
-# Failing builds due to compiling OpenSSL from source
-ENV OPENSSL_NO_VENDOR=1
-
 RUN apt-get update && apt-get install -y git
 
 WORKDIR /git/vectordotdev/vector
