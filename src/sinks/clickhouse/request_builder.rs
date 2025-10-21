@@ -144,18 +144,20 @@ impl ClickhouseRequestBuilder {
 
         let payload = compressor.into_inner().freeze();
 
-        // Calculate size for metrics
-        // We need to create a temporary EncodeResult to extract the GroupedCountByteSize
-        let temp_result =
-            EncodeResult::uncompressed(Bytes::new(), GroupedCountByteSize::new_untagged());
-        let json_size = RequestMetadataBuilder::from_events(&events)
-            .build(&temp_result)
-            .into_events_estimated_json_encoded_byte_size();
+        // For Arrow format, use the actual Arrow byte size for metrics
+        // Distribute the Arrow payload size across all events proportionally
+        let mut arrow_size = GroupedCountByteSize::new_untagged();
+        if !events.is_empty() {
+            let bytes_per_event = uncompressed_byte_size / events.len();
+            for event in &events {
+                arrow_size.add_event(event, bytes_per_event.into());
+            }
+        }
 
         let result = if is_compressed {
-            EncodeResult::compressed(payload, uncompressed_byte_size, json_size)
+            EncodeResult::compressed(payload, uncompressed_byte_size, arrow_size)
         } else {
-            EncodeResult::uncompressed(payload, json_size)
+            EncodeResult::uncompressed(payload, arrow_size)
         };
 
         Ok(result)
