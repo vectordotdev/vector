@@ -176,7 +176,16 @@ impl DataType {
             DataType::DateTimeSeconds => {
                 if data.len() >= 4 {
                     let timestamp = u32::from_be_bytes([data[0], data[1], data[2], data[3]]);
-                    Ok(Value::Integer(timestamp as i64))
+                    // Handle large unsigned timestamps that would overflow i32
+                    if timestamp > i32::MAX as u32 {
+                        debug!(
+                            "DateTimeSeconds value {} exceeds i32::MAX, storing as string to avoid PostgreSQL overflow",
+                            timestamp
+                        );
+                        Ok(Value::Bytes(timestamp.to_string().into()))
+                    } else {
+                        Ok(Value::Integer(timestamp as i64))
+                    }
                 } else {
                     Err("Insufficient data for DateTime seconds".to_string())
                 }
@@ -187,7 +196,16 @@ impl DataType {
                         data[0], data[1], data[2], data[3],
                         data[4], data[5], data[6], data[7]
                     ]);
-                    Ok(Value::Integer(timestamp as i64))
+                    // Handle large unsigned timestamps that would overflow i64
+                    if timestamp > i64::MAX as u64 {
+                        debug!(
+                            "DateTimeMilliseconds value {} exceeds i64::MAX, storing as string to avoid PostgreSQL overflow",
+                            timestamp
+                        );
+                        Ok(Value::Bytes(timestamp.to_string().into()))
+                    } else {
+                        Ok(Value::Integer(timestamp as i64))
+                    }
                 } else {
                     Err("Insufficient data for DateTime milliseconds".to_string())
                 }
@@ -267,7 +285,16 @@ impl DataType {
                         data[0], data[1], data[2], data[3],
                         data[4], data[5], data[6], data[7]
                     ]);
-                    Ok(Value::Integer(timestamp as i64))
+                    // Handle large unsigned timestamps that would overflow i64
+                    if timestamp > i64::MAX as u64 {
+                        debug!(
+                            "DateTimeMicroseconds/Nanoseconds value {} exceeds i64::MAX, storing as string to avoid PostgreSQL overflow",
+                            timestamp
+                        );
+                        Ok(Value::Bytes(timestamp.to_string().into()))
+                    } else {
+                        Ok(Value::Integer(timestamp as i64))
+                    }
                 } else {
                     Err("Insufficient data for DateTime".to_string())
                 }
