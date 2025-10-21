@@ -246,7 +246,6 @@ impl SinkConfig for ClickhouseConfig {
                             "Successfully fetched schema with {} fields",
                             schema.fields().len()
                         );
-                        debug!("Schema mapping: {:?}", schema);
                         Some(schema)
                     }
                     Err(e) => {
