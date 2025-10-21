@@ -148,13 +148,10 @@ pub trait ContainerTestRunner: TestRunner {
         directory: &str,
         config_env_vars: &Environment,
     ) -> Result<()> {
-        // Check if the image already exists
         let image_name = self.image_name();
         let mut check_command = docker_command(["image", "inspect", &image_name]);
-
         if check_command.output().is_ok() {
-            // Image already exists, skip build
-            info!("Image {} already exists, skipping build", image_name);
+            info!("Image {image_name} already exists, skipping build");
             return Ok(());
         }
 
