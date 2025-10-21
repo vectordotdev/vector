@@ -384,6 +384,7 @@ fn build_decimal256_array(
                         decimal.rescale(target_scale);
                         // Convert to i128 representation (mantissa)
                         let mantissa = decimal.mantissa();
+                        // rust_decimal does not support i256 natively so we upcast here
                         builder.append_value(i256::from_i128(mantissa));
                     } else {
                         builder.append_null();
