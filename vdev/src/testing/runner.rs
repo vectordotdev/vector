@@ -116,7 +116,12 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, directory, config_environment_variables, reuse_image)?;
+                self.build(
+                    features,
+                    directory,
+                    config_environment_variables,
+                    reuse_image,
+                )?;
                 self.create()?;
                 self.start()?;
             }
@@ -251,7 +256,12 @@ where
         directory: &str,
         reuse_image: bool,
     ) -> Result<()> {
-        self.ensure_running(features, directory, config_environment_variables, reuse_image)?;
+        self.ensure_running(
+            features,
+            directory,
+            config_environment_variables,
+            reuse_image,
+        )?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {

@@ -22,5 +22,13 @@ pub(crate) fn exec(
         env.clone()
     };
     debug!("Selected environment: {environment:#?}");
-    ComposeTest::generate(local_config, integration, environment, all_features, reuse_image, 0)?.start()
+    ComposeTest::generate(
+        local_config,
+        integration,
+        environment,
+        all_features,
+        reuse_image,
+        0,
+    )?
+    .start()
 }
