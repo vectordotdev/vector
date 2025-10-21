@@ -27,7 +27,7 @@ use crate::{
 
 /// Defines the behavior for handling conflicting metric metadata.
 #[configurable_component]
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum MetadataConflictStrategy {
     /// Silently ignore metadata conflicts, keeping the first metadata entry. This aligns with Prometheus/Thanos behavior.
@@ -114,7 +114,7 @@ impl GenerateConfig for PrometheusRemoteWriteConfig {
 impl SourceConfig for PrometheusRemoteWriteConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let source = RemoteWriteSource {
-            metadata_conflict_strategy: self.metadata_conflict_strategy.clone(),
+            metadata_conflict_strategy: self.metadata_conflict_strategy,
             skip_nan_values: self.skip_nan_values,
         };
         source.run(
@@ -157,9 +157,12 @@ impl RemoteWriteSource {
                 format!("Could not decode write request: {error}"),
             )
         })?;
-        let reject_on_conflict =
-            self.metadata_conflict_strategy == MetadataConflictStrategy::Reject;
-        parser::parse_request(request, reject_on_conflict, self.skip_nan_values).map_err(|error| {
+        parser::parse_request(
+            request,
+            self.metadata_conflict_strategy,
+            self.skip_nan_values,
+        )
+        .map_err(|error| {
             ErrorMessage::new(
                 StatusCode::BAD_REQUEST,
                 format!("Could not decode write request: {error}"),

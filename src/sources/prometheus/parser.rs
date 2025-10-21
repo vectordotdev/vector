@@ -1,3 +1,5 @@
+#[cfg(feature = "sources-prometheus-remote-write")]
+use super::remote_write::MetadataConflictStrategy;
 use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "sources-prometheus-remote-write")]
 use vector_lib::prometheus::parser::proto;
@@ -42,11 +44,14 @@ fn parse_text_with_nan_filtering(packet: &str) -> Result<Vec<Event>, ParserError
 #[cfg(feature = "sources-prometheus-remote-write")]
 pub(super) fn parse_request(
     request: proto::WriteRequest,
-    reject_on_conflict: bool,
+    metadata_conflict_strategy: MetadataConflictStrategy,
     skip_nan_values: bool,
 ) -> Result<Vec<Event>, ParserError> {
-    vector_lib::prometheus::parser::parse_request(request, reject_on_conflict)
-        .map(|group| reparse_groups(group, vec![], false, skip_nan_values))
+    vector_lib::prometheus::parser::parse_request(
+        request,
+        matches!(metadata_conflict_strategy, MetadataConflictStrategy::Reject),
+    )
+    .map(|group| reparse_groups(group, vec![], false, skip_nan_values))
 }
 
 fn reparse_groups(
