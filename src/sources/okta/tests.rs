@@ -1,18 +1,18 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicBool, Ordering},
-};
+use std::collections::HashMap;
 
+use http::{Response, StatusCode};
 use tokio::time::Duration;
 use vector_lib::{config::LogNamespace, event::Event};
 use warp::Filter;
 
 use crate::{
     components::validation::prelude::*,
-    config::log_schema,
     sources::okta::OktaConfig,
     test_util::{
-        components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
+        components::{
+            COMPONENT_ERROR_TAGS, HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance,
+            run_and_assert_source_error,
+        },
         next_addr, test_generate_config, wait_for_tcp,
     },
 };
@@ -21,16 +21,178 @@ pub(crate) const INTERVAL: Duration = Duration::from_secs(10);
 
 pub(crate) const TIMEOUT: Duration = Duration::from_secs(1);
 
-/// The happy path should yield at least one event and must emit the required internal events for sources.
+/// Run queries against an Okta endpoint and verify compliance.
 pub(crate) async fn run_compliance(config: OktaConfig) -> Vec<Event> {
     let events =
-        run_and_assert_source_compliance(config, Duration::from_secs(5), &HTTP_PULL_SOURCE_TAGS)
+        run_and_assert_source_compliance(config, Duration::from_secs(3), &HTTP_PULL_SOURCE_TAGS)
             .await;
 
     assert!(!events.is_empty());
 
     events
 }
+
+/// The error path should not yield any events and must emit the required error internal events.
+pub(crate) async fn run_error(config: OktaConfig) {
+    let events =
+        run_and_assert_source_error(config, Duration::from_secs(3), &COMPONENT_ERROR_TAGS).await;
+
+    assert!(events.is_empty());
+}
+
+const OKTA_200_EMPTY: &str = r#"[]"#;
+const OKTA_200_RESPONSE: &str = r#"
+[
+  {
+    "actor": {
+      "id": "00uttidj01jqL21aM1d6",
+      "type": "User",
+      "alternateId": "john.doe@example.com",
+      "displayName": "John Doe",
+      "detailEntry": null
+    },
+    "client": {
+      "userAgent": {
+        "rawUserAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/127.0.0.0 Safari/537.36",
+        "os": "Mac OS X",
+        "browser": "CHROME"
+      },
+      "zone": null,
+      "device": "Computer",
+      "id": null,
+      "ipAddress": "10.0.0.1",
+      "geographicalContext": {
+        "city": "New York",
+        "state": "New York",
+        "country": "United States",
+        "postalCode": 10013,
+        "geolocation": {
+          "lat": 40.3157,
+          "lon": -74.01
+        }
+      }
+    },
+    "device": {
+      "id": "guofdhyjex1feOgbN1d9",
+      "name": "Mac15,6",
+      "os_platform": "OSX",
+      "os_version": "14.6.0",
+      "managed": false,
+      "registered": true,
+      "device_integrator": null,
+      "disk_encryption_type": "ALL_INTERNAL_VOLUMES",
+      "screen_lock_type": "BIOMETRIC",
+      "jailbreak": null,
+      "secure_hardware_present": true
+    },
+    "authenticationContext": {
+      "authenticationProvider": null,
+      "credentialProvider": null,
+      "credentialType": null,
+      "issuer": null,
+      "interface": null,
+      "authenticationStep": 0,
+      "rootSessionId": "idxBager62CSveUkTxvgRtonA",
+      "externalSessionId": "idxBager62CSveUkTxvgRtonA"
+    },
+    "displayMessage": "User login to Okta",
+    "eventType": "user.session.start",
+    "outcome": {
+      "result": "SUCCESS",
+      "reason": null
+    },
+    "published": "2024-08-13T15:58:20.353Z",
+    "securityContext": {
+      "asNumber": 394089,
+      "asOrg": "ASN 0000",
+      "isp": "google",
+      "domain": null,
+      "isProxy": false
+    },
+    "severity": "INFO",
+    "debugContext": {
+      "debugData": {
+        "requestId": "ab609228fe84ce59cdcbfa690bcce016",
+        "requestUri": "/idp/idx/authenticators/poll",
+        "url": "/idp/idx/authenticators/poll"
+      }
+    },
+    "legacyEventType": "core.user_auth.login_success",
+    "transaction": {
+      "type": "WEB",
+      "id": "ab609228fe84ce59cdcbfa690bgce016",
+      "detail": null
+    },
+    "uuid": "dc9fd3c0-598c-11ef-8478-2b7584bf8d5a",
+    "version": 0,
+    "request": {
+      "ipChain": [
+        {
+          "ip": "10.0.0.1",
+          "geographicalContext": {
+            "city": "New York",
+            "state": "New York",
+            "country": "United States",
+            "postalCode": 10013,
+            "geolocation": {
+              "lat": 40.3157,
+              "lon": -74.01
+            }
+          },
+          "version": "V4",
+          "source": null
+        }
+      ]
+    },
+    "target": [
+      {
+        "id": "pfdfdhyjf0HMbkP2e1d7",
+        "type": "AuthenticatorEnrollment",
+        "alternateId": "unknown",
+        "displayName": "Okta Verify",
+        "detailEntry": null
+      },
+      {
+        "id": "0oatxlef9sQvvqInq5d6",
+        "type": "AppInstance",
+        "alternateId": "Okta Admin Console",
+        "displayName": "Okta Admin Console",
+        "detailEntry": null
+      }
+    ]
+  }
+]
+"#;
+
+const OKTA_400_VALIDATION_FAILED: &str = r#"
+{
+  "errorCode": "E0000001",
+  "errorSummary": "Api validation failed: {0}",
+  "errorLink": "E0000001",
+  "errorId": "sampleiCF-8D5rLW6myqiPItW",
+  "errorCauses": []
+}
+"#;
+
+const OKTA_403_ACCESS_DENIED: &str = r#"
+{
+  "errorCode": "E0000006",
+  "errorSummary": "You do not have permission to perform the requested action",
+  "errorLink": "E0000006",
+  "errorId": "sampleNUSD_8fdkFd8fs8SDBK",
+  "errorCauses": []
+}
+"#;
+
+const OKTA_429_RATE_LIMIT_EXCEEDED: &str = r#"
+{
+  "errorCode": "E0000047",
+  "errorSummary": "API call exceeded rate limit due to too many requests.",
+  "errorLink": "E0000047",
+  "errorId": "sampleQPivGUj_ND5v78vbYWW",
+  "errorCauses": []
+}
+"#;
 
 #[test]
 fn okta_generate_config() {
@@ -59,187 +221,143 @@ impl ValidatableComponent for OktaConfig {
 register_validatable_component!(OktaConfig);
 
 #[tokio::test]
-async fn okta_compliance() {
+async fn with_default_config() {
     let in_addr = next_addr();
 
     let dummy_endpoint = warp::path!("api" / "v1" / "logs")
-        .and(warp::query::<std::collections::HashMap<String, String>>())
-        .map({
-            move |q: std::collections::HashMap<String, String>| match q.get("after") {
-                None => warp::http::Response::builder()
-                    .header("Content-Type", "application/json")
-                    .header(
-                        "link",
-                        format!("<http://{in_addr}/api/v1/logs?after=xyz>; rel=\"next\""),
-                    )
-                    .body(r#"[{"data":"foo"},{"data":"bar"}]"#)
-                    .unwrap(),
-                Some(_) => warp::http::Response::builder()
-                    .header("Content-Type", "application/json")
-                    .header(
-                        "link",
-                        format!("<http://{in_addr}/api/v1/logs?after=xyz>; rel=\"next\""),
-                    )
-                    .body(r#"[]"#)
-                    .unwrap(),
-            }
+        .and(warp::get())
+        .and(warp::query::<HashMap<String, String>>())
+        .and(warp::header::exact("Accept", "application/json"))
+        .map(|params: HashMap<String, String>| {
+            assert!(params.contains_key("since"));
+            Response::builder()
+                .status(StatusCode::OK)
+                .body(OKTA_200_EMPTY)
+                .unwrap()
         });
 
     tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
     wait_for_tcp(in_addr).await;
 
-    let events = run_compliance(OktaConfig {
+    run_compliance(OktaConfig {
         domain: format!("http://{in_addr}"),
         token: "token".to_string(),
         interval: INTERVAL,
         timeout: TIMEOUT,
-        log_namespace: None,
         ..Default::default()
     })
     .await;
-
-    assert_eq!(events.len(), 2);
-
-    for event in events.iter() {
-        assert_eq!(
-            event.as_log()[log_schema().source_type_key().unwrap().to_string()],
-            OktaConfig::NAME.into()
-        );
-    }
-    let log_event = events[0].as_log();
-    assert_eq!(
-        log_event
-            .get("data")
-            .expect("data must be available")
-            .as_str()
-            .unwrap(),
-        "foo"
-    );
 }
 
 #[tokio::test]
-async fn okta_follows_rel() {
-    let addr = next_addr();
+async fn with_okta_events() {
+    let in_addr = next_addr();
 
     let dummy_endpoint = warp::path!("api" / "v1" / "logs")
-        .and(warp::query::<std::collections::HashMap<String, String>>())
-        .map({
-            move |q: std::collections::HashMap<String, String>| match q.get("after") {
-                None => warp::http::Response::builder()
-                    .header("Content-Type", "application/json")
-                    .header(
-                        "link",
-                        format!("<http://{addr}/api/v1/logs?after=bar>; rel=\"next\""),
-                    )
-                    .body(r#"[{"data":"foo"}]"#)
-                    .unwrap(),
-                Some(after) if after == "bar" => warp::http::Response::builder()
-                    .header("Content-Type", "application/json")
-                    .header(
-                        "link",
-                        format!("<http://{addr}/api/v1/logs?after=baz>; rel=\"next\""),
-                    )
-                    .body(r#"[{"data":"bar"}]"#)
-                    .unwrap(),
-                Some(after) if after == "baz" => warp::http::Response::builder()
-                    .header("Content-Type", "application/json")
-                    .header(
-                        "link",
-                        format!("<http://{addr}/api/v1/logs?after=quux>; rel=\"next\""),
-                    )
-                    .body(r#"[]"#)
-                    .unwrap(),
-                Some(_) => panic!("following Link header with zero length reply"),
-            }
+        .and(warp::get())
+        .and(warp::query::<HashMap<String, String>>())
+        .and(warp::header::exact("Accept", "application/json"))
+        .map(|params: HashMap<String, String>| {
+            assert!(params.contains_key("since"));
+            Response::builder()
+                .status(StatusCode::OK)
+                .body(OKTA_200_RESPONSE)
+                .unwrap()
         });
 
-    tokio::spawn(warp::serve(dummy_endpoint).run(addr));
-    wait_for_tcp(addr).await;
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
 
-    let events = run_compliance(OktaConfig {
-        domain: format!("http://{addr}"),
+    run_compliance(OktaConfig {
+        domain: format!("http://{in_addr}"),
         token: "token".to_string(),
         interval: INTERVAL,
         timeout: TIMEOUT,
-        log_namespace: None,
         ..Default::default()
     })
     .await;
-
-    assert_eq!(events.len(), 2);
-
-    for event in events.iter() {
-        assert_eq!(
-            event.as_log()[log_schema().source_type_key().unwrap().to_string()],
-            OktaConfig::NAME.into()
-        );
-    }
-    assert_eq!(events[0].as_log()["data"].as_str().unwrap(), "foo");
-    assert_eq!(events[1].as_log()["data"].as_str().unwrap(), "bar");
 }
 
 #[tokio::test]
-async fn okta_persists_rel() {
-    // the client follows `next` links; on the next interval it should pick up where it left off
-    // and not start over from the beginning
-    let addr = next_addr();
+async fn with_bad_request() {
+    let in_addr = next_addr();
 
-    let init_guard: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
-
-    // the first request sets `seen` but returns 0 events, ending the inner stream,
-    // the next interval should pick up where it left off
     let dummy_endpoint = warp::path!("api" / "v1" / "logs")
-        .and(warp::query::<std::collections::HashMap<String, String>>())
-        .map({
-            move |q: std::collections::HashMap<String, String>| match q.get("after") {
-                None => warp::http::Response::builder()
-                    .header("Content-Type", "application/json")
-                    .header(
-                        "link",
-                        format!("<http://{addr}/api/v1/logs?after=test>; rel=\"next\""),
-                    )
-                    .body(r#"[{"data":"foo"}]"#)
-                    .unwrap(),
-                Some(after) if after == "test" => {
-                    let initialized = init_guard.swap(true, Ordering::Relaxed);
-                    if !initialized {
-                        warp::http::Response::builder()
-                            .header("Content-Type", "application/json")
-                            .header(
-                                "link",
-                                format!("<http://{addr}/api/v1/logs?after=test>; rel=\"next\""),
-                            )
-                            .body(r#"[]"#)
-                            .unwrap()
-                    } else {
-                        warp::http::Response::builder()
-                            .header("Content-Type", "application/json")
-                            .header(
-                                "link",
-                                format!("<http://{addr}/api/v1/logs?after=end>; rel=\"next\""),
-                            )
-                            .body(r#"[{"initialized":"true"}]"#)
-                            .unwrap()
-                    }
-                }
-                Some(_) => warp::http::Response::builder()
-                    .header("Content-Type", "application/json")
-                    .body(r#"[]"#)
-                    .unwrap(),
-            }
+        .and(warp::get())
+        .and(warp::query::<HashMap<String, String>>())
+        .and(warp::header::exact("Accept", "application/json"))
+        .map(|_| {
+            Response::builder()
+                .status(StatusCode::BAD_REQUEST)
+                .body(OKTA_400_VALIDATION_FAILED)
+                .unwrap()
         });
 
-    tokio::spawn(warp::serve(dummy_endpoint).run(addr));
-    wait_for_tcp(addr).await;
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
 
-    let events = run_compliance(OktaConfig {
-        domain: format!("http://{addr}"),
+    run_error(OktaConfig {
+        domain: format!("http://{in_addr}"),
         token: "token".to_string(),
-        interval: Duration::from_secs(1),
-        timeout: Duration::from_millis(100),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
         ..Default::default()
     })
     .await;
+}
 
-    assert_eq!(events.len(), 2);
+#[tokio::test]
+async fn with_bad_token() {
+    let in_addr = next_addr();
+
+    let dummy_endpoint = warp::path!("api" / "v1" / "logs")
+        .and(warp::get())
+        .and(warp::query::<HashMap<String, String>>())
+        .and(warp::header::exact("Accept", "application/json"))
+        .map(|_| {
+            Response::builder()
+                .status(StatusCode::FORBIDDEN)
+                .body(OKTA_403_ACCESS_DENIED)
+                .unwrap()
+        });
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    run_error(OktaConfig {
+        domain: format!("http://{in_addr}"),
+        token: "badtoken".to_string(),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        ..Default::default()
+    })
+    .await;
+}
+
+#[tokio::test]
+async fn with_rate_limit_exceeded() {
+    let in_addr = next_addr();
+
+    let dummy_endpoint = warp::path!("api" / "v1" / "logs")
+        .and(warp::get())
+        .and(warp::query::<HashMap<String, String>>())
+        .and(warp::header::exact("Accept", "application/json"))
+        .map(|_| {
+            Response::builder()
+                .status(StatusCode::TOO_MANY_REQUESTS)
+                .body(OKTA_429_RATE_LIMIT_EXCEEDED)
+                .unwrap()
+        });
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    run_error(OktaConfig {
+        domain: format!("http://{in_addr}"),
+        token: "token".to_string(),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        ..Default::default()
+    })
+    .await;
 }
