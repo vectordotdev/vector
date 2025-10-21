@@ -19,7 +19,7 @@ WORKDIR /git/vectordotdev/vector
 
 # Setup the env
 COPY scripts/environment/*.sh scripts/environment/
-RUN ./scripts/environment/bootstrap-ubuntu-24.04.sh
+RUN DISABLE_MOLD_IN_CARGO=true ./scripts/environment/bootstrap-ubuntu-24.04.sh
 
 # Setup the toolchain
 COPY scripts/Gemfile scripts/Gemfile.lock \
