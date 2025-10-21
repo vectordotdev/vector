@@ -1,5 +1,5 @@
 use metrics::counter;
-use vector_common::internal_event::{error_type, InternalEvent};
+use vector_common::internal_event::{InternalEvent, error_type};
 
 #[derive(Debug)]
 pub struct OdbcEventsReceived {

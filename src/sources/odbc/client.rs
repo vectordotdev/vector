@@ -1,12 +1,12 @@
-use crate::config::{log_schema, LogNamespace, SourceConfig, SourceContext, SourceOutput};
+use crate::config::{LogNamespace, SourceConfig, SourceContext, SourceOutput, log_schema};
 use crate::internal_events::{OdbcEventsReceived, OdbcFailedError, OdbcQueryExecuted};
 use crate::serde::default_decoding;
 use crate::sinks::prelude::*;
-use crate::sources::odbc::{
-    load_params, map_value, save_params, ClosedSnafu, Column, Columns, ConfigSnafu, DbSnafu,
-    OdbcError, OdbcSchedule, Rows,
-};
 use crate::sources::Source;
+use crate::sources::odbc::{
+    ClosedSnafu, Column, Columns, ConfigSnafu, DbSnafu, OdbcError, OdbcSchedule, Rows, load_params,
+    map_value, save_params,
+};
 use chrono::Utc;
 use chrono_tz::Tz;
 use futures::pin_mut;
@@ -15,8 +15,8 @@ use itertools::Itertools;
 use odbc_api::buffers::TextRowSet;
 use odbc_api::parameter::VarCharBox;
 use odbc_api::{ConnectionOptions, Cursor, Environment, IntoParameter, ResultSetMetadata};
-use serde_with::serde_as;
 use serde_with::DurationSeconds;
+use serde_with::serde_as;
 use snafu::{OptionExt, ResultExt};
 use std::collections::BTreeMap;
 use std::fmt::Debug;
