@@ -41,14 +41,14 @@ pub struct OdbcConfig {
     /// The connection string to use for odbc.
     /// If the `connection_string_filepath` is set, this value is ignored.
     #[configurable(metadata(
-        docs::examples = "driver={MySQL ODBC 8.0 ANSI Driver};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"
+        docs::examples = "driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"
     ))]
     pub connection_string: String,
 
     /// The path to the file that contains the connection string.
     /// If this is not set, or the file at the specified path does not exist, the `connection_string` field is used instead.`
     #[configurable(metadata(
-        docs::examples = "driver={MySQL ODBC 8.0 ANSI Driver};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"
+        docs::examples = "driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"
     ))]
     pub connection_string_filepath: Option<String>,
 
@@ -56,7 +56,7 @@ pub struct OdbcConfig {
     /// This SQL statement is executed periodically according to the `schedule`.
     /// The default is none. If no SQL statement is given, then an error will occur.
     /// If the `statement_filepath` is set, this value is ignored.
-    #[configurable(metadata(docs::examples = "SELECT * FROM users"))]
+    #[configurable(metadata(docs::examples = "SELECT * FROM users WHERE id = ?"))]
     pub statement: Option<String>,
 
     /// The path to the file that contains the SQL statement.
@@ -90,15 +90,10 @@ pub struct OdbcConfig {
     /// tracking_columns = ["id"]
     /// last_run_metadata_path = "/path/to/tracking.json"
     /// # The rest of the fields are omitted
-    ///
-    /// [sources.odbc.statement_init_params]
-    /// id = 0
     /// ```
-    #[configurable(metadata(docs::examples = "id = 0"))]
     #[configurable(metadata(
         docs::additional_props_description = "Initial value for the SQL statement parameters. The value is always a string."
     ))]
-    #[configurable(derived)]
     pub statement_init_params: Option<BTreeMap<String, String>>,
 
     /// Cron expression for scheduling database queries.
@@ -150,7 +145,7 @@ pub struct OdbcConfig {
     /// tracking_columns = ["id"]
     /// # The rest of the fields are omitted
     /// ```
-    #[configurable(metadata(docs::examples = "[\"id\"]"))]
+    #[configurable(metadata(docs::examples = "id"))]
     pub tracking_columns: Option<Vec<String>>,
 
     /// The path to the file where the last row of the result set will be saved.
@@ -165,7 +160,7 @@ pub struct OdbcConfig {
     /// ```json
     /// {"id":1, "name": "vector"}
     /// ```
-    #[configurable(metadata(docs::examples = "~/metadata_file"))]
+    #[configurable(metadata(docs::examples = "/path/to/tracking.json"))]
     pub last_run_metadata_path: Option<String>,
 
     /// Decoder to use on the HTTP responses.

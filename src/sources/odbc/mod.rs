@@ -32,7 +32,7 @@
 //! ```toml
 //! [sources.odbc]
 //! type = "odbc"
-//! connection_string = "driver={MySQL ODBC 8.0 ANSI Driver};server=<your server>;port=<your port>;database=<your database>;uid=<your uid>;pwd=<your password>;"
+//! connection_string = "driver={MariaDB Unicode};server=<your server>;port=<your port>;database=<your database>;uid=<your uid>;pwd=<your password>;"
 //! statement = "SELECT * FROM odbc_table WHERE id > ? LIMIT 1;"
 //! schedule = "*/5 * * * * *"
 //! schedule_timezone = "UTC"
