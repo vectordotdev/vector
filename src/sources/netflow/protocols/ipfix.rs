@@ -588,8 +588,6 @@ impl IpfixParser {
             if fields_parsed > 0 {
             // Check if this is Options Template data and handle accordingly
             if template.scope_field_count > 0 {
-                info!("Processing Options Template record: template_id={}, scope_fields={}, mode={}", 
-                       template_id, template.scope_field_count, self.options_template_mode);
                 match self.options_template_mode.as_str() {
                     "discard" => {
                         // Don't add to events - effectively discard
