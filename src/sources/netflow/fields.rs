@@ -75,8 +75,8 @@ impl DataType {
                     // Handle large unsigned values that would overflow i32
                     if value > i32::MAX as u32 {
                         // For values > i32::MAX, store as string to avoid PostgreSQL integer overflow
-                        debug!(
-                            "UInt32 value {} exceeds i32::MAX, storing as string to avoid PostgreSQL overflow",
+                        warn!(
+                            "UInt32 OVERFLOW: value {} exceeds i32::MAX, storing as string to avoid PostgreSQL overflow",
                             value
                         );
                         Ok(Value::Bytes(value.to_string().into()))

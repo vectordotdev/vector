@@ -577,16 +577,16 @@ impl IpfixParser {
 
                 let field_data = &data[field_offset..field_offset + field_length];
                 
-                // Debug: Log raw field data for problematic fields
-                if field.field_type == 96 || field.field_type == 236 || field.field_type == 32793 {
-                    debug!(
-                        "Field {} (type={}, length={}): raw_data={:?}",
-                        fields_parsed,
-                        field.field_type,
-                        field_length,
-                        &field_data[..std::cmp::min(field_data.len(), 16)]
-                    );
-                }
+                // Debug: Log all field parsing to identify overflow sources
+                debug!(
+                    "Parsing field {}: type={}, length={}, enterprise={:?}, scope={}, raw_data={:?}",
+                    fields_parsed,
+                    field.field_type,
+                    field_length,
+                    field.enterprise_number,
+                    field.is_scope,
+                    &field_data[..std::cmp::min(field_data.len(), 8)]
+                );
                 
                 self.field_parser.parse_field(field, field_data, &mut log_event);
 
