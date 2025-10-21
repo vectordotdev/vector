@@ -383,6 +383,12 @@ impl FieldParser {
         
         match field_info.data_type.parse(data, self.max_field_length) {
             Ok(value) => {
+                // Debug: Log the actual value being inserted
+                match &value {
+                    Value::Bytes(s) => info!("INSERTING STRING: {} = '{}'", field_info.name, String::from_utf8_lossy(s)),
+                    Value::Integer(i) => info!("INSERTING INTEGER: {} = {}", field_info.name, i),
+                    _ => info!("INSERTING OTHER: {} = {:?}", field_info.name, value),
+                }
                 log_event.insert(field_info.name, value.clone());
                 
                 // Add protocol name resolution for protocol fields
