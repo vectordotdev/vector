@@ -122,6 +122,8 @@ pub trait ContainerTestRunner: TestRunner {
                     config_environment_variables,
                     reuse_image,
                 )?;
+                // Remove any leftover container with the same name before creating
+                self.remove()?;
                 self.create()?;
                 self.start()?;
             }
