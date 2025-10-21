@@ -232,6 +232,7 @@ fn serializer_config_to_deserializer(
                 },
             })
         }
+        SerializerConfig::Influxdb(_) => DeserializerConfig::Influxdb(Default::default()),
         SerializerConfig::RawMessage | SerializerConfig::Text(_) => DeserializerConfig::Bytes,
     };
 

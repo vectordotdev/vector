@@ -125,7 +125,8 @@ impl Encoder<Framer> {
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
-                | Serializer::Text(_),
+                | Serializer::Text(_)
+                | Serializer::Influxdb(_),
                 _,
             ) => "text/plain",
         }

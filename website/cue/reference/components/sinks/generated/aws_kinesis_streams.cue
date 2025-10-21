@@ -353,6 +353,7 @@ generated: components: sinks: aws_kinesis_streams: configuration: {
 						[gelf]: https://docs.graylog.org/docs/gelf
 						[implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
 						"""
+					influxdb: "Encodes metric events using the InfluxDB line protocol."
 					json: """
 						Encodes an event as [JSON][json].
 
@@ -487,6 +488,12 @@ generated: components: sinks: aws_kinesis_streams: configuration: {
 					}
 				}
 			}
+			default_namespace: {
+				description:   "A default namespace applied when metrics do not specify one."
+				relevant_when: "codec = \"influxdb\""
+				required:      false
+				type: string: {}
+			}
 			except_fields: {
 				description: "List of fields that are excluded from the encoded event."
 				required:    false
@@ -563,6 +570,37 @@ generated: components: sinks: aws_kinesis_streams: configuration: {
 						required:    true
 						type: string: examples: ["package.Message"]
 					}
+				}
+			}
+			protocol_version: {
+				description:   "The protocol version to encode fields with."
+				relevant_when: "codec = \"influxdb\""
+				required:      false
+				type: string: {
+					default: "v2"
+					enum: {
+						v1: "Line protocol for InfluxDB v1.x."
+						v2: "Line protocol for InfluxDB v2.x."
+					}
+				}
+			}
+			quantiles: {
+				description:   "Quantiles to calculate when encoding distribution metrics."
+				relevant_when: "codec = \"influxdb\""
+				required:      false
+				type: array: {
+					default: [0.5, 0.75, 0.9, 0.95, 0.99]
+					items: type: float: {}
+				}
+			}
+			tags: {
+				description:   "Additional tags that are appended to every encoded metric."
+				relevant_when: "codec = \"influxdb\""
+				required:      false
+				type: object: options: "*": {
+					description: "A tag key/value pair that is appended to each measurement."
+					required:    true
+					type: string: {}
 				}
 			}
 			timestamp_format: {
