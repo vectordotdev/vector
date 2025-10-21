@@ -15,7 +15,7 @@ use vector_lib::{
     },
 };
 
-use tracing::{debug, error, info, trace};s
+use tracing::{info};
 
 #[derive(Debug, Snafu, PartialEq, Eq)]
 pub enum NormalizerError {
@@ -207,7 +207,25 @@ pub struct MetricEntry {
 
 impl ByteSizeOf for MetricEntry {
     fn allocated_bytes(&self) -> usize {
-        self.data.allocated_bytes() + self.metadata.allocated_bytes()
+        // Calculate the size of the data and metadata
+        let data_size = self.data.allocated_bytes();
+        let metadata_size = self.metadata.allocated_bytes();
+        
+        // Include struct overhead - size of self without double-counting fields
+        // that we already accounted for in their respective allocated_bytes() calls
+        let struct_size = std::mem::size_of::<Self>();
+        
+        let total = data_size + metadata_size + struct_size;
+        
+        info!(
+            message = "Entry allocated_bytes breakdown",
+            data_size = data_size,
+            metadata_size = metadata_size,
+            struct_size = struct_size,
+            total = total
+        );
+        
+        total
     }
 }
 
@@ -291,7 +309,6 @@ impl CapacityPolicy {
             let freed_memory = self.item_size(series, entry);
             info!(
                 message = "Freeing memory for item",
-                series_name = %series.name,
                 freed_bytes = freed_memory,
                 current_memory = self.current_memory,
                 max_memory = ?self.max_bytes
@@ -360,9 +377,11 @@ impl CapacityPolicy {
         
         info!(
             message = "Calculating item size",
-            series_name = %series.name,
+            series_name_str = %series.name.name,
+            series_hash = ?{let mut hasher = std::collections::hash::DefaultHasher::new(); std::hash::Hash::hash(series, &mut hasher); std::hash::Hasher::finish(&hasher)},
             series_size = series_size,
             entry_size = entry_size,
+            metric_kind = ?entry.data.kind,
             total_size = total_size
         );
         
@@ -432,6 +451,27 @@ pub struct MetricSet {
 }
 
 impl MetricSet {
+    /// Debugs memory usage across the cache
+    pub fn debug_memory(&self) -> String {
+        let total_tracked = self.capacity_policy
+            .as_ref()
+            .map(|cp| cp.current_memory())
+            .unwrap_or(0);
+        
+        // Calculate actual memory usage
+        let mut actual_usage = 0;
+        for (series, entry) in self.inner.iter() {
+            let series_size = series.allocated_bytes();
+            let entry_size = entry.allocated_bytes();
+            actual_usage += series_size + entry_size;
+        }
+        
+        format!(
+            "Tracked memory: {}, Actual usage: {}, Items: {}", 
+            total_tracked, actual_usage, self.inner.len()
+        )
+    }
+
     /// Creates a new MetricSet with the given settings.
     pub fn new(settings: MetricSetSettings) -> Self {
         // Create capacity policy if any capacity limit is set
@@ -516,12 +556,17 @@ impl MetricSet {
         // Keep evicting until we're within limits
         while capacity_policy.needs_eviction(self.inner.len()) {
             if let Some((series, entry)) = self.inner.pop_lru() {
+                let item_size = capacity_policy.item_size(&series, &entry);
                 info!(
                     message = "Evicting item due to capacity limits",
-                    series_name = %series.name,
-                    item_size = capacity_policy.item_size(&series, &entry),
+                    series_name_str = %series.name.name,
+                    series_hash = ?{let mut hasher = std::collections::hash::DefaultHasher::new(); std::hash::Hash::hash(&series, &mut hasher); std::hash::Hasher::finish(&hasher)},
+                    item_size = item_size,
                     current_memory = capacity_policy.current_memory(),
-                    entry_count = self.inner.len()
+                    memory_limit = ?capacity_policy.max_bytes,
+                    entry_count = self.inner.len(),
+                    entry_limit = ?capacity_policy.max_events,
+                    metric_kind = ?entry.data.kind
                 );
                 capacity_policy.free_item(&series, &entry);
             } else {
@@ -536,6 +581,9 @@ impl MetricSet {
             current_entries = self.inner.len(),
             max_entries = ?capacity_policy.max_events
         );
+        
+        // Log memory debug info
+        info!(message = "Memory after enforcement", debug = %self.debug_memory());
     }
 
     /// Perform TTL cleanup if configured and needed.
@@ -588,9 +636,45 @@ impl MetricSet {
             return; // No capacity limits configured, return immediately
         };
 
+        // Debug the series equality issue
+        info!(
+            message = "Inserting series",
+            series_name = ?series.name,
+            series_name_str = %series.name.name,  // Display the actual string name
+            series_tags = ?series.tags,
+            series_hash = ?{let mut hasher = std::collections::hash::DefaultHasher::new(); std::hash::Hash::hash(&series, &mut hasher); std::hash::Hasher::finish(&hasher)}
+        );
+        
+        // Iterate through entries to check for series with same name
+        let mut found_similar = false;
+        for (existing, _) in self.inner.iter() {
+            if existing.name == series.name && *existing != series {
+                found_similar = true;
+                let existing_hash = {
+                    let mut hasher = std::collections::hash::DefaultHasher::new(); 
+                    std::hash::Hash::hash(existing, &mut hasher); 
+                    std::hash::Hasher::finish(&hasher)
+                };
+                info!(
+                    message = "Series with same name not equal",
+                    existing_name = ?existing.name,
+                    existing_name_str = %existing.name.name,
+                    existing_tags = ?existing.tags,
+                    existing_hash = ?existing_hash,
+                    new_name = ?series.name,
+                    new_name_str = %series.name.name,
+                    new_tags = ?series.tags,
+                    new_hash = ?{let mut hasher = std::collections::hash::DefaultHasher::new(); std::hash::Hash::hash(&series, &mut hasher); std::hash::Hasher::finish(&hasher)}
+                );
+            }
+        }
+        
+        if !found_similar && series.name.name.len() > 0 {
+            info!(message = "No similar series found with name", name = ?series.name.name, name_str = %series.name.name);
+        }
+
         info!(
             message = "Inserting entry with tracking",
-            series_name = %series.name,
             current_memory = capacity_policy.current_memory(),
             max_memory = ?capacity_policy.max_bytes,
             current_entries = self.inner.len(),
@@ -605,9 +689,11 @@ impl MetricSet {
             if let Some(existing_entry) = self.inner.put(series.clone(), entry) {
                 // If we had an existing entry, calculate its size and adjust memory tracking
                 let existing_size = capacity_policy.item_size(&series, &existing_entry);
+                info!(message = "Found existing entry for series", series_name = ?series.name, series_name_str = %series.name.name);
                 capacity_policy.replace_memory(existing_size, entry_size);
             } else {
                 // No existing entry, just add the new entry's size
+                info!(message = "No existing entry for series", series_name = ?series.name, series_name_str = %series.name.name);
                 capacity_policy.replace_memory(0, entry_size);
             }
         } else {
@@ -617,6 +703,9 @@ impl MetricSet {
 
         // Enforce limits after insertion
         self.enforce_capacity_policy();
+        
+        // Log memory debug info
+        info!(message = "Memory after insertion", debug = %self.debug_memory());
     }
 
     /// Consumes this MetricSet and returns a vector of Metric.

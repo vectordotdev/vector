@@ -360,12 +360,13 @@ impl MetricValue {
 impl ByteSizeOf for MetricValue {
     fn allocated_bytes(&self) -> usize {
         match self {
-            Self::Counter { .. } | Self::Gauge { .. } => 0,
-            Self::Set { values } => values.allocated_bytes(),
-            Self::Distribution { samples, .. } => samples.allocated_bytes(),
-            Self::AggregatedHistogram { buckets, .. } => buckets.allocated_bytes(),
-            Self::AggregatedSummary { quantiles, .. } => quantiles.allocated_bytes(),
-            Self::Sketch { sketch } => sketch.allocated_bytes(),
+            // Account for the f64 value plus enum variant tag
+            Self::Counter { .. } | Self::Gauge { .. } => std::mem::size_of::<f64>(),
+            Self::Set { values } => values.allocated_bytes() + std::mem::size_of_val(values),
+            Self::Distribution { samples, .. } => samples.allocated_bytes() + std::mem::size_of_val(samples),
+            Self::AggregatedHistogram { buckets, .. } => buckets.allocated_bytes() + std::mem::size_of_val(buckets),
+            Self::AggregatedSummary { quantiles, .. } => quantiles.allocated_bytes() + std::mem::size_of_val(quantiles),
+            Self::Sketch { sketch } => sketch.allocated_bytes() + std::mem::size_of_val(sketch),
         }
     }
 }
@@ -596,7 +597,7 @@ impl PartialEq for Sample {
 
 impl ByteSizeOf for Sample {
     fn allocated_bytes(&self) -> usize {
-        0
+        std::mem::size_of::<Self>()  // Count the f64 value and u32 rate
     }
 }
 
@@ -670,7 +671,7 @@ impl PartialEq for Bucket {
 
 impl ByteSizeOf for Bucket {
     fn allocated_bytes(&self) -> usize {
-        0
+        std::mem::size_of::<Self>()  // Count the f64 upper_limit and u64 count
     }
 }
 
@@ -739,6 +740,6 @@ impl Quantile {
 
 impl ByteSizeOf for Quantile {
     fn allocated_bytes(&self) -> usize {
-        0
+        std::mem::size_of::<Self>()  // Count the two f64 fields
     }
 }
