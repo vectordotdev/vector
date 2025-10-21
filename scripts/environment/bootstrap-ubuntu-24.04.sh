@@ -156,23 +156,25 @@ if [ -z "${DISABLE_MOLD:-""}" ] ; then
     cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
     rm -rf "$TEMP"
 
-    # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
-    # anything linking calls to use `mold` instead of `ld`, etc.
-    CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
-    mkdir -p "$CARGO_BIN_DIR"
+    if [ -z "${DISABLE_MOLD_IN_CARGO:-""}" ] ; then
+      # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
+      # anything linking calls to use `mold` instead of `ld`, etc.
+      CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
+      mkdir -p "$CARGO_BIN_DIR"
 
-    RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
-    cat <<EOF >"$RUSTC_WRAPPER"
+      RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
+      cat <<EOF >"$RUSTC_WRAPPER"
 #!/bin/sh
 exec mold -run "\$@"
 EOF
-    chmod +x "$RUSTC_WRAPPER"
+      chmod +x "$RUSTC_WRAPPER"
 
-    # Now configure Cargo to use our rustc wrapper script.
-    cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+      # Now configure Cargo to use our rustc wrapper script.
+      cat <<EOF >>"$CARGO_OVERRIDE_CONF"
 [build]
 rustc-wrapper = "$RUSTC_WRAPPER"
 EOF
+    fi
 fi
 
 mkdir -p /var/lib/vector
