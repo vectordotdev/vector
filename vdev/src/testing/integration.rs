@@ -165,14 +165,6 @@ impl ComposeTest {
         let was_running = self.is_running()?;
         self.config.check_required()?;
 
-        // Check if test runner container is already in use
-        if matches!(self.runner.state()?, super::runner::RunnerState::Running) {
-            bail!(
-                "Test runner container {} is already running. Another test may be in progress.",
-                self.runner.container_name()
-            );
-        }
-
         if !was_running {
             self.start()?;
         }
