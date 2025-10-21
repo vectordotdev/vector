@@ -8,7 +8,7 @@ use arrow::{
         Float64Builder, Int64Builder, StringBuilder, TimestampMicrosecondBuilder,
         TimestampMillisecondBuilder, TimestampNanosecondBuilder, TimestampSecondBuilder,
     },
-    datatypes::{DataType, Schema, TimeUnit},
+    datatypes::{DataType, Schema, TimeUnit, i256},
     ipc::writer::StreamWriter,
     record_batch::RecordBatch,
 };
@@ -337,7 +337,6 @@ fn build_decimal128_array(
                 Some(Value::Float(f)) => {
                     if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
                         decimal.rescale(target_scale);
-                        // Convert to i128 representation (mantissa)
                         let mantissa = decimal.mantissa();
                         builder.append_value(mantissa);
                     } else {
@@ -365,8 +364,6 @@ fn build_decimal256_array(
     scale: i8,
     capacity: usize,
 ) -> Result<ArrayRef, ArrowEncodingError> {
-    use arrow::datatypes::i256;
-
     let mut builder = Decimal256Builder::with_capacity(capacity)
         .with_precision_and_scale(precision, scale)
         .map_err(|_| ArrowEncodingError::UnsupportedType {
@@ -382,7 +379,6 @@ fn build_decimal256_array(
                 Some(Value::Float(f)) => {
                     if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
                         decimal.rescale(target_scale);
-                        // Convert to i128 representation (mantissa)
                         let mantissa = decimal.mantissa();
                         // rust_decimal does not support i256 natively so we upcast here
                         builder.append_value(i256::from_i128(mantissa));
