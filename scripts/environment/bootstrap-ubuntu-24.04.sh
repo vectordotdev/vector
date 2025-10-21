@@ -169,10 +169,7 @@ EOF
     chmod +x "$RUSTC_WRAPPER"
 
     # Now configure Cargo to use our rustc wrapper script.
-    cat <<EOF >>"$CARGO_OVERRIDE_CONF"
-[build]
-rustc-wrapper = "$RUSTC_WRAPPER"
-EOF
+    echo -e "[build]\nrustc-wrapper = \"$RUSTC_WRAPPER\"" >> "$CARGO_OVERRIDE_CONF"
 fi
 
 mkdir -p /var/lib/vector
