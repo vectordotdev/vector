@@ -20,10 +20,8 @@ pub enum SignalTo {
     ReloadComponents(HashSet<ComponentKey>),
     /// Signal to reload config from a string.
     ReloadFromConfigBuilder(ConfigBuilder),
-    /// Signal to reload config from the filesystem.
+    /// Signal to reload config from the filesystem and reload components with external files.
     ReloadFromDisk,
-    /// Signal to reload config from the filesystem and transforms with external VRL files.
-    ReloadWithExternalVRL,
     /// Signal to reload all enrichment tables.
     ReloadEnrichmentTables,
     /// Signal to shutdown process.
@@ -41,7 +39,6 @@ impl PartialEq for SignalTo {
             // TODO: This will require a lot of plumbing but ultimately we can derive equality for config builders.
             (ReloadFromConfigBuilder(_), ReloadFromConfigBuilder(_)) => true,
             (ReloadFromDisk, ReloadFromDisk) => true,
-            (ReloadWithExternalVRL, ReloadWithExternalVRL) => true,
             (ReloadEnrichmentTables, ReloadEnrichmentTables) => true,
             (Shutdown(a), Shutdown(b)) => a == b,
             (Quit, Quit) => true,
@@ -216,7 +213,7 @@ fn os_signals(runtime: &Runtime) -> impl Stream<Item = SignalTo> + use<> {
                     },
                     _ = sighup.recv() => {
                         info!(message = "Signal received.", signal = "SIGHUP");
-                        SignalTo::ReloadWithExternalVRL
+                        SignalTo::ReloadFromDisk
                     },
                 };
                 yield signal;
