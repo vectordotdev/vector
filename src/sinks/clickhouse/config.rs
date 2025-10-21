@@ -243,8 +243,13 @@ impl SinkConfig for ClickhouseConfig {
                 {
                     Ok(schema) => {
                         debug!(
-                            "Successfully fetched schema with {} fields",
-                            schema.fields().len()
+                            "Successfully fetched Arrow schema with {} fields: {:?}",
+                            schema.fields().len(),
+                            schema
+                                .fields()
+                                .iter()
+                                .map(|f| format!("{}:{:?}", f.name(), f.data_type()))
+                                .collect::<Vec<_>>()
                         );
                         Some(schema)
                     }

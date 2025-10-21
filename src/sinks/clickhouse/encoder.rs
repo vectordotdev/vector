@@ -59,16 +59,6 @@ pub fn encode_events_to_arrow_stream(
         return Err(ArrowEncodingError::NoSchemaProvided);
     };
 
-    debug!(
-        "Built Arrow schema with {} fields: {:?}",
-        schema_ref.fields().len(),
-        schema_ref
-            .fields()
-            .iter()
-            .map(|f| format!("{}:{:?}", f.name(), f.data_type()))
-            .collect::<Vec<_>>()
-    );
-
     let record_batch = build_record_batch(Arc::<Schema>::clone(&schema_ref), events)?;
 
     debug!(
