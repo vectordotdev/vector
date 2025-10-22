@@ -2,6 +2,7 @@ use std::{
     borrow::Cow,
     env,
     ffi::{OsStr, OsString},
+    fmt::Write as _,
     path::PathBuf,
     process::{Command, ExitStatus},
     sync::{LazyLock, OnceLock},
@@ -122,7 +123,7 @@ impl CommandExt for Command {
         } else {
             bail!(
                 "{}",
-                format_command_error(&output, Some(&format!("Command: {:?}", self)))
+                format_command_error(&output, Some(&format!("Command: {self:?}")))
             )
         }
     }
@@ -211,13 +212,14 @@ fn format_command_error(
     }
 
     if let Some(description) = command_description {
-        error_msg.push_str(&format!("{}\n", description));
+        let _ = writeln!(error_msg, "{description}");
     }
 
-    error_msg.push_str(&format!(
+    let _ = write!(
+        error_msg,
         "failed with exit code: {}",
         output.status.code().unwrap()
-    ));
+    );
 
     error_msg
 }
