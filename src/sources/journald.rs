@@ -553,11 +553,11 @@ impl JournaldSource {
                     let line_str = String::from_utf8_lossy(&line);
                     let trimmed = line_str.trim();
                     if !trimmed.is_empty() {
-                        warn!("journalctl stderr: {}", trimmed);
+                        warn!("journalctl stderr: {trimmed}");
                     }
                 }
                 Err(err) => {
-                    error!("Error reading journalctl stderr: {}", err);
+                    error!("Error reading journalctl stderr: {err}");
                     break;
                 }
             }
