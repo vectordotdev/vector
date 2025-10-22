@@ -120,7 +120,10 @@ impl CommandExt for Command {
             // If the command exits successfully, return stdout as a string
             Ok(String::from_utf8(output.stdout)?)
         } else {
-            bail!("{}", format_command_error(&output, Some(&format!("Command: {:?}", self))))
+            bail!(
+                "{}",
+                format_command_error(&output, Some(&format!("Command: {:?}", self)))
+            )
         }
     }
 
@@ -211,7 +214,10 @@ fn format_command_error(
         error_msg.push_str(&format!("{}\n", description));
     }
 
-    error_msg.push_str(&format!("failed with exit code: {}", output.status.code().unwrap()));
+    error_msg.push_str(&format!(
+        "failed with exit code: {}",
+        output.status.code().unwrap()
+    ));
 
     error_msg
 }
