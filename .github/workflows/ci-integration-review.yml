@@ -111,7 +111,7 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/run-integration-test.sh int ${{ matrix.service }}
+          command: cargo vdev integration run ${{ matrix.service }} --build-all --reuse-image
 
   e2e-tests:
     needs: prep-pr
@@ -134,7 +134,7 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/run-integration-test.sh e2e datadog-logs
+          command: cargo vdev e2e run datadog-logs --build-all --reuse-image
 
       - name: datadog-e2e-metrics
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-metrics')
@@ -144,13 +144,13 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/run-integration-test.sh e2e datadog-metrics
+          command: cargo vdev e2e run datadog-metrics --build-all --reuse-image
 
       - name: e2e-opentelemetry-logs
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-logs')
           || startsWith(github.event.review.body, '/ci-run-e2e-all')
           || startsWith(github.event.review.body, '/ci-run-all') }}
-        run: bash scripts/run-integration-test.sh e2e opentelemetry-logs
+        run: cargo vdev e2e run opentelemetry-logs --build-all --reuse-image
 
   update-pr-status:
     name: Signal result to PR
