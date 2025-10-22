@@ -7,7 +7,7 @@ COPY . .
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     --mount=type=cache,target=/vector/target \
-    /usr/bin/mold -run cargo build --bin vector --release && \
+    cargo build --bin vector --release && \
     cp target/release/vector .
 
 #
