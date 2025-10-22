@@ -39,10 +39,10 @@ components: sources: odbc: {
 
 	output: {
 		logs: record: {
-			description: "The ODBC query result records."
+			description: "Records returned by the ODBC query."
 			fields: {
 				message: {
-					description: "The ODBC query results record in JSON format."
+					description: "The ODBC query result serialized as JSON."
 					required:    true
 					type: string: {
 						examples: [
@@ -98,13 +98,78 @@ components: sources: odbc: {
 				"""
 		}
 
+		examples: {
+			title: "Example ODBC Source Configuration"
+			body: """
+					This section walks through a simple example of configuring an ODBC data source and scheduling it.
+				"""
+			sub_sections: [
+				{
+					title: "Step 1: Configure Test Data"
+					body: """
+						Given the following MariaDB table and sample data:
+
+						```sql
+						create table odbc_table
+						(
+						  id int auto_increment primary key,
+						  name varchar(255) null,
+						  datetime datetime null
+						);
+
+						INSERT INTO odbc_table (name, datetime) VALUES
+						('test1', now()),
+						('test2', now()),
+						('test3', now()),
+						('test4', now()),
+						('test5', now());
+						```
+						"""
+				},
+				{
+					title: "Step 2: Configure ODBC Source"
+					body: """
+						The example below shows how to connect to a MariaDB database with the ODBC driver,
+						run a query periodically, and send the results to Vector.
+						Start by providing a database connection string.
+
+						```toml
+						[sources.odbc]
+						type = "odbc"
+						connection_string = "driver={MariaDB Unicode};server=<your server>;port=<your port>;database=<your database>;uid=<your uid>;pwd=<your password>;"
+						statement = "SELECT * FROM odbc_table WHERE id > ? LIMIT 1;"
+						statement_init_params = { id = "0" }
+						schedule = "*/5 * * * * *"
+						schedule_timezone = "UTC"
+						last_run_metadata_path = "/path/to/odbc_tracking.json"
+						tracking_columns = ["id"]
+
+						[sinks.console]
+						type = "console"
+						inputs = ["odbc"]
+						encoding.codec = "json"
+						```
+
+						Every five seconds, the source produces output similar to the following.
+
+						```json
+						{"message":[{"datetime":"2025-04-28T01:20:04Z","id":1,"name":"test1"}],"timestamp":"2025-04-28T01:50:45.075484Z"}
+						{"message":[{"datetime":"2025-04-28T01:20:04Z","id":2,"name":"test2"}],"timestamp":"2025-04-28T01:50:50.017276Z"}
+						{"message":[{"datetime":"2025-04-28T01:20:04Z","id":3,"name":"test3"}],"timestamp":"2025-04-28T01:50:55.016432Z"}
+						{"message":[{"datetime":"2025-04-28T01:20:04Z","id":4,"name":"test4"}],"timestamp":"2025-04-28T01:51:00.016328Z"}
+						{"message":[{"datetime":"2025-04-28T01:20:04Z","id":5,"name":"test5"}],"timestamp":"2025-04-28T01:51:05.010063Z"}
+						"""
+				},
+			]
+		}
+
 		check_license: {
 			title: "Check ODBC Driver License"
 			body:  """
-        Check the license on [the official unixODBC website](\(urls.unixodbc)).
+        Review the license information on [the official unixODBC website](\(urls.unixodbc)).
 
-        Also, ODBC drivers are provided by various vendors, each with different license terms.
-        Be sure to review and comply with the license terms of the ODBC driver you intend to use.
+        Because ODBC drivers are supplied by various vendors, each with different license terms,
+        be sure to review and comply with the terms for the driver you plan to use.
         """
 		}
 	}

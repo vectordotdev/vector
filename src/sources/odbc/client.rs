@@ -37,7 +37,7 @@ use vrl::prelude::*;
 ))]
 #[derive(Clone, Debug)]
 pub struct OdbcConfig {
-    /// The connection string to use for odbc.
+    /// The connection string to use for ODBC.
     /// If the `connection_string_filepath` is set, this value is ignored.
     #[configurable(metadata(
         docs::examples = "driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"
@@ -45,7 +45,7 @@ pub struct OdbcConfig {
     pub connection_string: String,
 
     /// The path to the file that contains the connection string.
-    /// If this is not set, or the file at the specified path does not exist, the `connection_string` field is used instead.`
+    /// If this is not set or the file at that path does not exist, the `connection_string` field is used instead.
     #[configurable(metadata(
         docs::examples = "driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"
     ))]
@@ -53,17 +53,17 @@ pub struct OdbcConfig {
 
     /// The SQL statement to execute.
     /// This SQL statement is executed periodically according to the `schedule`.
-    /// The default is none. If no SQL statement is given, then an error will occur.
+    /// Defaults to `None`. If no SQL statement is provided, the source returns an error.
     /// If the `statement_filepath` is set, this value is ignored.
     #[configurable(metadata(docs::examples = "SELECT * FROM users WHERE id = ?"))]
     pub statement: Option<String>,
 
     /// The path to the file that contains the SQL statement.
-    /// If this is not set or does not exist on the path, the `statement` field is used.
+    /// If this is unset or the file cannot be read, the value from `statement` is used instead.
     pub statement_filepath: Option<String>,
 
-    /// This is the maximum time to wait for the SQL statement to execute.
-    /// If the SQL statement does not complete within this time, it will be canceled and wait for the next schedule.
+    /// Maximum time to allow the SQL statement to run.
+    /// If the query does not finish within this window, it is canceled and retried at the next scheduled run.
     /// The default is 3 seconds.
     #[configurable(metadata(docs::examples = 3))]
     #[configurable(metadata(
@@ -75,12 +75,12 @@ pub struct OdbcConfig {
 
     /// Initial parameters for the first execution of the statement.
     /// Used if `last_run_metadata_path` does not exist.
-    /// Values must be strings and are set in the parameter name order.
+    /// Values must be strings and follow the parameter order defined in the query.
     ///
     /// # Examples
     ///
-    /// When the data source is first executed, the file at `last_run_metadata_path` does not exist.
-    /// In this case, you need to declare the initial value in `statement_init_params`.
+    /// When the source runs for the first time, the file at `last_run_metadata_path` does not exist.
+    /// In that case, declare the initial values in `statement_init_params`.
     ///
     /// ```toml
     /// [sources.odbc]
@@ -95,13 +95,13 @@ pub struct OdbcConfig {
     ))]
     pub statement_init_params: Option<ObjectMap>,
 
-    /// Cron expression for scheduling database queries.
-    /// If not set, the statement runs only once by default.
+    /// Cron expression used to schedule database queries.
+    /// When omitted, the statement runs only once by default.
     #[configurable(derived)]
     pub schedule: Option<OdbcSchedule>,
 
     /// The timezone to use for the `schedule`.
-    /// This is typically the timezone that you want to use for the cron expression.
+    /// Typically the timezone used when evaluating the cron expression.
     /// The default is UTC.
     ///
     /// [Wikipedia]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -124,7 +124,7 @@ pub struct OdbcConfig {
     #[serde(default = "default_odbc_batch_size")]
     pub odbc_max_str_limit: usize,
 
-    /// The timezone to use for the database date/time type without a timezone.
+    /// Timezone applied to database date/time columns that lack timezone information.
     /// The default is UTC.
     #[configurable(metadata(docs::examples = "UTC"))]
     #[configurable(metadata(
@@ -134,7 +134,7 @@ pub struct OdbcConfig {
     pub odbc_default_timezone: Tz,
 
     /// Specifies the columns to track from the last row of the statement result set.
-    /// This column is passed as a parameter to the SQL statement of the next schedule in order.
+    /// Their values are passed as parameters to the SQL statement in the next scheduled run.
     ///
     /// # Examples
     ///
@@ -149,7 +149,7 @@ pub struct OdbcConfig {
 
     /// The path to the file where the last row of the result set will be saved.
     /// The last row of the result set is saved in JSON format.
-    /// This file is used as a parameter for the SQL query of the next schedule.
+    /// This file provides parameters for the SQL query in the next scheduled run.
     /// If the file does not exist or the path is not specified, the initial value from `statement_init_params` is used.
     ///
     /// # Examples
@@ -162,7 +162,7 @@ pub struct OdbcConfig {
     #[configurable(metadata(docs::examples = "/path/to/tracking.json"))]
     pub last_run_metadata_path: Option<String>,
 
-    /// Decoder to use on the HTTP responses.
+    /// Decoder to use for query results.
     #[configurable(derived)]
     #[serde(default = "default_decoding")]
     pub decoding: DeserializerConfig,
@@ -223,7 +223,7 @@ impl Default for OdbcConfig {
 }
 
 impl OdbcConfig {
-    /// Returns the connection string to use for odbc.
+    /// Returns the connection string to use for ODBC.
     /// If the `connection_string_filepath` is set, read the file and return its content.
     pub fn connection_string_or_file(&self) -> String {
         self.connection_string_filepath
@@ -329,7 +329,7 @@ impl Context {
                     let instant = Instant::now();
                     if let Ok(result) = self.process(prev_result.clone()).await {
 
-                        // If there is a query result, update the latest result
+                        // Update the cached result when the query returns rows.
                         if let Some(_) = result {
                             prev_result = result;
                         }
@@ -344,9 +344,9 @@ impl Context {
                         })
                     }
 
-                    // If there is no schedule, we only run once
+                    // When no further schedule is defined, run once and then stop.
                     if next.is_none() {
-                        debug!("If there is no schedule, we only run once. Shutting down ODBC source.");
+                        debug!("No additional schedule configured. Shutting down ODBC source.");
                         break
                     }
 
@@ -355,7 +355,7 @@ impl Context {
                         count += 1;
                         if let Some(iterations) = self.cfg.iterations {
                             if count >= iterations {
-                                debug!("If there is no schedule, we only run once. Shutting down ODBC source.");
+                                debug!("No additional schedule configured. Shutting down ODBC source.");
                                 break;
                             }
                         }
@@ -377,8 +377,8 @@ impl Context {
         let log_schema = log_schema();
         let env = Arc::clone(&self.env);
 
-        // Load the last run metadata from the file.
-        // If the file does not exist or is not set, use the initial parameters or latest query result.
+        // Load the last-run metadata from disk when available.
+        // If the file is missing, fall back to the initial parameters or the latest query result.
         let stmt_params = self
             .cfg
             .last_run_metadata_path
@@ -401,8 +401,8 @@ impl Context {
             cfg.odbc_max_str_limit,
         )?;
 
-        // event with query results: `{"message":[{ ... }],"timestamp":"2025-10-21T00:00:00.05275Z"}`
-        // event with no query results: `{"message":[],"timestamp":"2025-10-21T00:00:00.05275Z"}`
+        // Example with query results: `{"message":[{ ... }],"timestamp":"2025-10-21T00:00:00.05275Z"}`
+        // Example with no query results: `{"message":[],"timestamp":"2025-10-21T00:00:00.05275Z"}`
         let mut event = LogEvent::default();
         event.maybe_insert(Some("timestamp"), Value::Timestamp(Utc::now()));
         event.maybe_insert(

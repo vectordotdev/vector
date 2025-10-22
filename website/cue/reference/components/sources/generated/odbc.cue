@@ -3,7 +3,7 @@ package metadata
 generated: components: sources: odbc: configuration: {
 	connection_string: {
 		description: """
-			The connection string to use for odbc.
+			The connection string to use for ODBC.
 			If the `connection_string_filepath` is set, this value is ignored.
 			"""
 		required: true
@@ -12,13 +12,13 @@ generated: components: sources: odbc: configuration: {
 	connection_string_filepath: {
 		description: """
 			The path to the file that contains the connection string.
-			If this is not set, or the file at the specified path does not exist, the `connection_string` field is used instead.`
+			If this is not set or the file at that path does not exist, the `connection_string` field is used instead.
 			"""
 		required: false
 		type: string: examples: ["driver={MariaDB Unicode};server=<ip or host>;port=<port number>;database=<database name>;uid=<user>;pwd=<password>"]
 	}
 	decoding: {
-		description: "Decoder to use on the HTTP responses."
+		description: "Decoder to use for query results."
 		required:    false
 		type: object: options: {
 			avro: {
@@ -317,7 +317,7 @@ generated: components: sources: odbc: configuration: {
 		description: """
 			The path to the file where the last row of the result set will be saved.
 			The last row of the result set is saved in JSON format.
-			This file is used as a parameter for the SQL query of the next schedule.
+			This file provides parameters for the SQL query in the next scheduled run.
 			If the file does not exist or the path is not specified, the initial value from `statement_init_params` is used.
 
 			# Examples
@@ -346,7 +346,7 @@ generated: components: sources: odbc: configuration: {
 	}
 	odbc_default_timezone: {
 		description: """
-			The timezone to use for the database date/time type without a timezone.
+			Timezone applied to database date/time columns that lack timezone information.
 			The default is UTC.
 			"""
 		required: false
@@ -372,8 +372,8 @@ generated: components: sources: odbc: configuration: {
 	}
 	schedule: {
 		description: """
-			Cron expression for scheduling database queries.
-			If not set, the statement runs only once by default.
+			Cron expression used to schedule database queries.
+			When omitted, the statement runs only once by default.
 			"""
 		required: false
 		type: string: {}
@@ -381,7 +381,7 @@ generated: components: sources: odbc: configuration: {
 	schedule_timezone: {
 		description: """
 			The timezone to use for the `schedule`.
-			This is typically the timezone that you want to use for the cron expression.
+			Typically the timezone used when evaluating the cron expression.
 			The default is UTC.
 
 			[Wikipedia]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
@@ -398,7 +398,7 @@ generated: components: sources: odbc: configuration: {
 		description: """
 			The SQL statement to execute.
 			This SQL statement is executed periodically according to the `schedule`.
-			The default is none. If no SQL statement is given, then an error will occur.
+			Defaults to `None`. If no SQL statement is provided, the source returns an error.
 			If the `statement_filepath` is set, this value is ignored.
 			"""
 		required: false
@@ -407,7 +407,7 @@ generated: components: sources: odbc: configuration: {
 	statement_filepath: {
 		description: """
 			The path to the file that contains the SQL statement.
-			If this is not set or does not exist on the path, the `statement` field is used.
+			If this is unset or the file cannot be read, the value from `statement` is used instead.
 			"""
 		required: false
 		type: string: {}
@@ -416,12 +416,12 @@ generated: components: sources: odbc: configuration: {
 		description: """
 			Initial parameters for the first execution of the statement.
 			Used if `last_run_metadata_path` does not exist.
-			Values must be strings and are set in the parameter name order.
+			Values must be strings and follow the parameter order defined in the query.
 
 			# Examples
 
-			When the data source is first executed, the file at `last_run_metadata_path` does not exist.
-			In this case, you need to declare the initial value in `statement_init_params`.
+			When the source runs for the first time, the file at `last_run_metadata_path` does not exist.
+			In that case, declare the initial values in `statement_init_params`.
 
 			```toml
 			[sources.odbc]
@@ -436,13 +436,13 @@ generated: components: sources: odbc: configuration: {
 		type: object: options: "*": {
 			description: "Initial value for the SQL statement parameters. The value is always a string."
 			required:    true
-			type: string: {}
+			type: "*": {}
 		}
 	}
 	statement_timeout: {
 		description: """
-			This is the maximum time to wait for the SQL statement to execute.
-			If the SQL statement does not complete within this time, it will be canceled and wait for the next schedule.
+			Maximum time to allow the SQL statement to run.
+			If the query does not finish within this window, it is canceled and retried at the next scheduled run.
 			The default is 3 seconds.
 			"""
 		required: false
@@ -457,7 +457,7 @@ generated: components: sources: odbc: configuration: {
 	tracking_columns: {
 		description: """
 			Specifies the columns to track from the last row of the statement result set.
-			This column is passed as a parameter to the SQL statement of the next schedule in order.
+			Their values are passed as parameters to the SQL statement in the next scheduled run.
 
 			# Examples
 

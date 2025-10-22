@@ -1,14 +1,14 @@
 //! ODBC Data Source
 //!
-//! This data source executes a database query via ODBC interface at the specified schedule.
-//! The result of the database query is passed to Vector as an array of key-value pairs.
-//! The last row of the result set is saved to disk and can be used as a parameter for the SQL query of the next schedule.
+//! This data source runs a database query through the ODBC interface on the configured schedule.
+//! Query results are sent to Vector as an array of key-value maps.
+//! The final row of the result set is saved to disk and used as a parameter for the next scheduled SQL query.
 //!
-//! The ODBC data source provides similar functionality to the [Logstash JDBC plugin](https://www.elastic.co/docs/reference/logstash/plugins/plugins-inputs-jdbc).
+//! The ODBC data source offers functionality similar to the [Logstash JDBC plugin](https://www.elastic.co/docs/reference/logstash/plugins/plugins-inputs-jdbc).
 //!
 //! # Example
 //!
-//! Assuming the following MySQL database table and data.
+//! Given the following MariaDB table and sample data:
 //!
 //! ```sql
 //! create table odbc_table
@@ -26,19 +26,20 @@
 //! ('test5', now());
 //! ```
 //!
-//! The following example shows how to connect to a MySQL database using the ODBC driver, execute a query periodically, and send the results to Vector.
-//! The database connection string must be specified.
+//! The example below shows how to connect to a MariaDB database with the ODBC driver,
+//! run a query periodically, and send the results to Vector.
+//! Provide a database connection string.
 //!
 //! ```toml
 //! [sources.odbc]
 //! type = "odbc"
 //! connection_string = "driver={MariaDB Unicode};server=<your server>;port=<your port>;database=<your database>;uid=<your uid>;pwd=<your password>;"
 //! statement = "SELECT * FROM odbc_table WHERE id > ? LIMIT 1;"
+//! statement_init_params = { id = "0", name = "test" }
 //! schedule = "*/5 * * * * *"
 //! schedule_timezone = "UTC"
-//! last_run_metadata_path = "odbc_tracking.json"
-//! tracking_columns = ["id", "name", "datetime"]
-//! statement_init_params = { id = "0", name = "test" }
+//! last_run_metadata_path = "/path/to/odbc_tracking.json"
+//! tracking_columns = ["id"]
 //!
 //! [sinks.console]
 //! type = "console"
@@ -46,7 +47,7 @@
 //! encoding.codec = "json"
 //! ```
 //!
-//! The output every 5 seconds is as follows.
+//! Every five seconds, the source produces output similar to the following.
 //!
 //! ```json
 //! {"message":[{"datetime":"2025-04-28T01:20:04Z","id":1,"name":"test1"}],"timestamp":"2025-04-28T01:50:45.075484Z"}
@@ -123,8 +124,7 @@ enum OdbcError {
     ConfigError { cause: &'static str },
 }
 
-/// Wrapper struct for Schedule.
-/// Wrapper for the Schedule struct to enable Configurable implementation.
+/// Newtype around `cron::Schedule` that enables a `Configurable` implementation.
 #[derive(Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct OdbcSchedule {
@@ -168,7 +168,7 @@ impl Debug for OdbcSchedule {
 }
 
 impl OdbcSchedule {
-    /// Creates a stream that asynchronously waits for the next scheduled cron time.
+    /// Creates a stream that asynchronously waits for each scheduled cron time.
     pub(crate) fn stream(self, tz: Tz) -> impl Stream<Item = DateTime<Tz>> {
         let schedule = self.inner.clone();
         stream::unfold(schedule, move |schedule| async move {
@@ -183,8 +183,8 @@ impl OdbcSchedule {
     }
 }
 
-/// Loads the last result as SQL parameters.
-/// Parameters are created in the order specified by `columns_order`.
+/// Loads the previously saved result and returns it as SQL parameters.
+/// Parameters are generated in the order specified by `columns_order`.
 fn load_params(path: &str, columns_order: Option<&Vec<String>>) -> Option<Vec<VarCharBox>> {
     let file = File::open(path).ok()?;
     let reader = BufReader::new(file);
@@ -210,7 +210,7 @@ fn order_params(map: ObjectMap, columns_order: Option<&Vec<String>>) -> Option<V
         .map(|col| col.as_str())
         .collect_vec();
 
-    // Parameters are filtered by the column order.
+    // Ensure parameters follow the declared column order.
     let params = columns_order
         .into_iter()
         .filter_map(|col| {
@@ -222,7 +222,7 @@ fn order_params(map: ObjectMap, columns_order: Option<&Vec<String>>) -> Option<V
     Some(params)
 }
 
-/// Saves the last result as SQL parameters.
+/// Serializes and persists the latest tracked values for reuse as SQL parameters.
 fn save_params(path: &str, obj: &ObjectMap) -> Result<(), OdbcError> {
     let json = serde_json::to_string(obj).context(JsonSnafu)?;
     fs::write(path, json).context(IoSnafu)
@@ -232,14 +232,14 @@ fn save_params(path: &str, obj: &ObjectMap) -> Result<(), OdbcError> {
 ///
 /// # Arguments
 /// * `data_type`: The ODBC data type.
-/// * `value`: The odbc value to convert.
+/// * `value`: The ODBC value to convert.
 /// * `tz`: The timezone to use for date/time conversions.
 ///
 /// # Returns
-/// A Vector value.
+/// A `Value` compatible with Vector events.
 fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Value {
     match data_type {
-        // To bytes
+        // Convert to bytes.
         odbc_api::DataType::Unknown
         | odbc_api::DataType::Char { .. }
         | odbc_api::DataType::WChar { .. }
@@ -258,7 +258,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
             Value::Bytes(Bytes::copy_from_slice(value))
         }
 
-        // To integer
+        // Convert to integer.
         odbc_api::DataType::TinyInt
         | odbc_api::DataType::SmallInt
         | odbc_api::DataType::BigInt
@@ -281,7 +281,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 .map_or(Value::Null, Value::Integer)
         }
 
-        // To float
+        // Convert to float.
         odbc_api::DataType::Float { .. }
         | odbc_api::DataType::Real
         | odbc_api::DataType::Decimal { .. }
@@ -297,7 +297,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 .map_or(Value::Null, Value::Float)
         }
 
-        // To timestamp
+        // Convert to timestamp.
         odbc_api::DataType::Timestamp { .. } => {
             let Some(value) = value else {
                 return Value::Null;
@@ -320,7 +320,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
             datetime.map(Value::Timestamp).unwrap_or(Value::Null)
         }
 
-        // To timestamp
+        // Convert to timestamp.
         odbc_api::DataType::Time { .. } => {
             let Some(value) = value else {
                 return Value::Null;
@@ -339,7 +339,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 .unwrap_or(Value::Null)
         }
 
-        // To timestamp
+        // Convert to timestamp.
         odbc_api::DataType::Date => {
             let Some(value) = value else {
                 return Value::Null;
@@ -358,7 +358,7 @@ fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Va
                 .unwrap_or(Value::Null)
         }
 
-        // To boolean
+        // Convert to boolean.
         odbc_api::DataType::Bit => {
             let Some(value) = value else {
                 return Value::Null;
