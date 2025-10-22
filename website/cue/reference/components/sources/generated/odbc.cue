@@ -315,7 +315,7 @@ generated: components: sources: odbc: configuration: {
 	}
 	last_run_metadata_path: {
 		description: """
-			The path to the file where the last row of the result set will be saved.
+			The path to the file where the last row of the result set is saved.
 			The last row of the result set is saved in JSON format.
 			This file provides parameters for the SQL query in the next scheduled run.
 			If the file does not exist or the path is not specified, the initial value from `statement_init_params` is used.
