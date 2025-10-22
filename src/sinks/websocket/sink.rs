@@ -19,8 +19,7 @@ use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt, stream::BoxStream
 use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
-    emit,
+    EstimatedJsonEncodedSizeOf, emit,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },

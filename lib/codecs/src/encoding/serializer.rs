@@ -11,7 +11,7 @@ use super::format::{
     JsonSerializer, JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig,
     NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
     ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig,
-    TextSerializer, TextSerializerConfig, SyslogSerializer, SyslogSerializerConfig
+    SyslogSerializer, SyslogSerializerConfig, TextSerializer, TextSerializerConfig,
 };
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};

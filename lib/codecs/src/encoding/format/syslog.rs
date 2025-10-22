@@ -112,15 +112,15 @@ impl<'a> ConfigDecanter<'a> {
             if app_name.len() > 48 {
                 app_name.truncate(48);
             }
-            if let Some(pid) = &mut proc_id {
-                if pid.len() > 128 {
-                    pid.truncate(128);
-                }
+            if let Some(pid) = &mut proc_id
+                && pid.len() > 128
+            {
+                pid.truncate(128);
             }
-            if let Some(mid) = &mut msg_id {
-                if mid.len() > 32 {
-                    mid.truncate(32);
-                }
+            if let Some(mid) = &mut msg_id
+                && mid.len() > 32
+            {
+                mid.truncate(32);
             }
         }
 
@@ -199,10 +199,10 @@ impl<'a> ConfigDecanter<'a> {
             if let Ok(val_from_name) = s.to_ascii_lowercase().parse::<T>() {
                 return val_from_name;
             }
-            if let Value::Integer(n) = value {
-                if let Some(val_from_num) = from_repr_fn(n as usize) {
-                    return val_from_num;
-                }
+            if let Value::Integer(n) = value
+                && let Some(val_from_num) = from_repr_fn(n as usize)
+            {
+                return val_from_num;
             }
         }
         default_value
@@ -503,7 +503,6 @@ mod tests {
         log.insert(event_path!("host"), "test-host.com");
         log
     }
-
 
     fn create_test_log() -> LogEvent {
         let mut log = create_simple_log();
