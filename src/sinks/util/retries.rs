@@ -168,11 +168,11 @@ where
                         return None;
                     }
                     *req = modify_request(req.clone());
-                    warn!(message = "OK/retrying partial after response.");
+                    warn!("OK/retrying partial after response.");
                     Some(self.build_retry())
                 }
                 RetryAction::DontRetry(reason) => {
-                    error!(message = "Not retriable; dropping the request.", reason = ?reason);
+                    error!(message = "Not retriable; dropping the request.", ?reason);
                     None
                 }
 
@@ -198,7 +198,7 @@ where
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     warn!(
-                        message = "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased."
+                        "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased."
                     );
                     Some(self.build_retry())
                 } else {

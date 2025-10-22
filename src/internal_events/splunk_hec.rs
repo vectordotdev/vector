@@ -185,7 +185,7 @@ mod sink {
 
     impl InternalEvent for SplunkEventTimestampMissing {
         fn emit(self) {
-            warn!(message = "Timestamp was not found. Deferring to Splunk to set the timestamp.");
+            warn!("Timestamp was not found. Deferring to Splunk to set the timestamp.");
         }
     }
 }

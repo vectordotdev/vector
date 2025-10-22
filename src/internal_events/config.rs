@@ -77,7 +77,7 @@ pub struct ConfigReloaded;
 
 impl InternalEvent for ConfigReloaded {
     fn emit(self) {
-        info!(message = "New configuration loaded successfully.",);
+        info!(message = "New configuration loaded successfully.");
 
         counter!("config_reloaded",).increment(1);
     }

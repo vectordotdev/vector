@@ -721,7 +721,7 @@ pub async fn reload_enrichment_tables(config: &Config) {
             let mut table = match table_outer.inner.build(&config.global).await {
                 Ok(table) => table,
                 Err(error) => {
-                    error!("Enrichment table \"{name}\" reload failed: {error}",);
+                    error!("Enrichment table \"{name}\" reload failed: {error}");
                     continue;
                 }
             };

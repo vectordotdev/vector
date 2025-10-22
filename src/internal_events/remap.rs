@@ -43,7 +43,7 @@ pub struct RemapMappingAbort {
 
 impl InternalEvent for RemapMappingAbort {
     fn emit(self) {
-        debug!(message = "Event mapping aborted.");
+        debug!("Event mapping aborted.");
 
         if self.event_dropped {
             emit!(ComponentEventsDropped::<INTENTIONAL> {
