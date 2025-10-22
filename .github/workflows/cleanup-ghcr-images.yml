@@ -1,0 +1,38 @@
+# Cleanup GHCR Images
+#
+# This workflow cleans up old images from GitHub Container Registry
+# to prevent unlimited storage growth. It runs weekly and removes:
+# 1. Untagged images from all packages (intermediate build artifacts)
+# 2. Old test-runner versions (keeps 50 most recent, deletes up to 50 oldest)
+
+name: Cleanup Untagged GHCR Images
+
+on:
+  schedule:
+    # Run weekly on Sundays at 2 AM UTC
+    - cron: '0 2 * * 0'
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+      contents: read
+    steps:
+      - name: Delete untagged vector images
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: vector
+          package-type: container
+          min-versions-to-keep: 0
+          delete-only-untagged-versions: true
+        continue-on-error: true
+
+      - name: Delete old vector-test-runner images
+        uses: actions/delete-package-versions@e5bc658cc4c965c472efe991f8beea3981499c55 # v5.0.0
+        with:
+          package-name: test-runner
+          package-type: container
+          min-versions-to-keep: 5
+          num-old-versions-to-delete: 50
