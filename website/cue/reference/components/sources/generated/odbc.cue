@@ -246,7 +246,7 @@ generated: components: sources: odbc: configuration: {
 				description: """
 					Signal types to attempt parsing, in priority order.
 
-					The deserializer will try parsing in the order specified. This allows you to optimize
+					The deserializer tries to parse signal types in the order specified. This allows you to optimize
 					performance when you know the expected signal types. For example, if you only receive
 					traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
 
