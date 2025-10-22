@@ -14,8 +14,6 @@ env:
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
-  RUST_BACKTRACE: full
-  CARGO_TERM_COLOR: always
   VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
