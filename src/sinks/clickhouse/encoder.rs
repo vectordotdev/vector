@@ -7,6 +7,7 @@ use arrow::{
         ArrayRef, BinaryBuilder, BooleanBuilder, Decimal128Builder, Decimal256Builder,
         Float64Builder, Int64Builder, StringBuilder, TimestampMicrosecondBuilder,
         TimestampMillisecondBuilder, TimestampNanosecondBuilder, TimestampSecondBuilder,
+        UInt8Builder, UInt16Builder, UInt32Builder, UInt64Builder,
     },
     datatypes::{DataType, Schema, TimeUnit, i256},
     ipc::writer::StreamWriter,
@@ -108,6 +109,10 @@ fn build_record_batch(
             }
             DataType::Utf8 => build_string_array(events, field_name, num_events)?,
             DataType::Int64 => build_int64_array(events, field_name, num_events)?,
+            DataType::UInt8 => build_uint8_array(events, field_name, num_events)?,
+            DataType::UInt16 => build_uint16_array(events, field_name, num_events)?,
+            DataType::UInt32 => build_uint32_array(events, field_name, num_events)?,
+            DataType::UInt64 => build_uint64_array(events, field_name, num_events)?,
             DataType::Float64 => build_float64_array(events, field_name, num_events)?,
             DataType::Boolean => build_boolean_array(events, field_name, num_events)?,
             DataType::Binary => build_binary_array(events, field_name, num_events)?,
@@ -239,6 +244,88 @@ fn build_int64_array(
         if let Event::Log(log) = event {
             match log.get(field_name) {
                 Some(Value::Integer(i)) => builder.append_value(*i),
+                _ => builder.append_null(),
+            }
+        }
+    }
+
+    Ok(Arc::new(builder.finish()))
+}
+
+fn build_uint8_array(
+    events: &[Event],
+    field_name: &str,
+    capacity: usize,
+) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = UInt8Builder::with_capacity(capacity);
+
+    for event in events {
+        if let Event::Log(log) = event {
+            match log.get(field_name) {
+                Some(Value::Integer(i)) if *i >= 0 && *i <= u8::MAX as i64 => {
+                    builder.append_value(*i as u8)
+                }
+                _ => builder.append_null(),
+            }
+        }
+    }
+
+    Ok(Arc::new(builder.finish()))
+}
+
+fn build_uint16_array(
+    events: &[Event],
+    field_name: &str,
+    capacity: usize,
+) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = UInt16Builder::with_capacity(capacity);
+
+    for event in events {
+        if let Event::Log(log) = event {
+            match log.get(field_name) {
+                Some(Value::Integer(i)) if *i >= 0 && *i <= u16::MAX as i64 => {
+                    builder.append_value(*i as u16)
+                }
+                _ => builder.append_null(),
+            }
+        }
+    }
+
+    Ok(Arc::new(builder.finish()))
+}
+
+fn build_uint32_array(
+    events: &[Event],
+    field_name: &str,
+    capacity: usize,
+) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = UInt32Builder::with_capacity(capacity);
+
+    for event in events {
+        if let Event::Log(log) = event {
+            match log.get(field_name) {
+                Some(Value::Integer(i)) if *i >= 0 && *i <= u32::MAX as i64 => {
+                    builder.append_value(*i as u32)
+                }
+                _ => builder.append_null(),
+            }
+        }
+    }
+
+    Ok(Arc::new(builder.finish()))
+}
+
+fn build_uint64_array(
+    events: &[Event],
+    field_name: &str,
+    capacity: usize,
+) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = UInt64Builder::with_capacity(capacity);
+
+    for event in events {
+        if let Event::Log(log) = event {
+            match log.get(field_name) {
+                Some(Value::Integer(i)) if *i >= 0 => builder.append_value(*i as u64),
                 _ => builder.append_null(),
             }
         }
@@ -1082,5 +1169,121 @@ mod tests {
 
         assert!(!decimal_array.is_null(0));
         assert_eq!(decimal_array.value(0), 1999_i128);
+    }
+
+    #[test]
+    fn test_encode_unsigned_integer_types() {
+        use arrow::array::{UInt16Array, UInt32Array, UInt64Array, UInt8Array};
+
+        let mut log = LogEvent::default();
+        log.insert("uint8_field", 255_i64);
+        log.insert("uint16_field", 65535_i64);
+        log.insert("uint32_field", 4294967295_i64);
+        log.insert("uint64_field", 9223372036854775807_i64);
+
+        let events = vec![Event::Log(log)];
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("uint8_field", DataType::UInt8, true),
+            Field::new("uint16_field", DataType::UInt16, true),
+            Field::new("uint32_field", DataType::UInt32, true),
+            Field::new("uint64_field", DataType::UInt64, true),
+        ]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 1);
+        assert_eq!(batch.num_columns(), 4);
+
+        // Verify uint8
+        let uint8_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt8Array>()
+            .unwrap();
+        assert_eq!(uint8_array.value(0), 255_u8);
+
+        // Verify uint16
+        let uint16_array = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<UInt16Array>()
+            .unwrap();
+        assert_eq!(uint16_array.value(0), 65535_u16);
+
+        // Verify uint32
+        let uint32_array = batch
+            .column(2)
+            .as_any()
+            .downcast_ref::<UInt32Array>()
+            .unwrap();
+        assert_eq!(uint32_array.value(0), 4294967295_u32);
+
+        // Verify uint64
+        let uint64_array = batch
+            .column(3)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap();
+        assert_eq!(uint64_array.value(0), 9223372036854775807_u64);
+    }
+
+    #[test]
+    fn test_encode_unsigned_integers_with_null_and_overflow() {
+        use arrow::array::{UInt32Array, UInt8Array};
+
+        let mut log1 = LogEvent::default();
+        log1.insert("uint8_field", 100_i64);
+        log1.insert("uint32_field", 1000_i64);
+
+        let mut log2 = LogEvent::default();
+        log2.insert("uint8_field", 300_i64); // Overflow - should be null
+        log2.insert("uint32_field", -1_i64); // Negative - should be null
+
+        let log3 = LogEvent::default();
+        // Missing fields - should be null
+
+        let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
+
+        let schema = Arc::new(Schema::new(vec![
+            Field::new("uint8_field", DataType::UInt8, true),
+            Field::new("uint32_field", DataType::UInt32, true),
+        ]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 3);
+
+        // Check uint8 column
+        let uint8_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<UInt8Array>()
+            .unwrap();
+        assert_eq!(uint8_array.value(0), 100_u8); // Valid
+        assert!(uint8_array.is_null(1)); // Overflow
+        assert!(uint8_array.is_null(2)); // Missing
+
+        // Check uint32 column
+        let uint32_array = batch
+            .column(1)
+            .as_any()
+            .downcast_ref::<UInt32Array>()
+            .unwrap();
+        assert_eq!(uint32_array.value(0), 1000_u32); // Valid
+        assert!(uint32_array.is_null(1)); // Negative
+        assert!(uint32_array.is_null(2)); // Missing
     }
 }
