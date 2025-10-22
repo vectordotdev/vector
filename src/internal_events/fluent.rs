@@ -11,7 +11,6 @@ pub struct FluentMessageReceived {
 impl InternalEvent for FluentMessageReceived {
     fn emit(self) {
         trace!(message = "Received fluent message.", byte_size = %self.byte_size);
-        counter!("component_received_events_total").increment(1);
     }
 }
 

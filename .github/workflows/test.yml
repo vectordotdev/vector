@@ -32,38 +32,43 @@ jobs:
   check-fmt:
     name: Check code format
     runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
       - run: make check-fmt
 
   check-clippy:
     name: Check clippy
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: sudo bash ./scripts/environment/install-protoc.sh
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
       - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - run: make check-clippy
 
   test:
     name: Unit and Component Validation tests - x86_64-unknown-linux-gnu
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash ./scripts/environment/prepare.sh --modules=cargo-nextest,datadog-ci
-
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-nextest: true
+          datadog-ci: true
+          protoc: true
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - name: Unit Test
         run: make test
         env:
@@ -77,19 +82,10 @@ jobs:
         run: scripts/upload-test-results.sh
         if: always()
 
-  check-version:
-    name: Check version
-    runs-on: ubuntu-24.04
-    needs: changes
-    steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          fetch-depth: 0
-      - run: make check-version
-
   check-scripts:
     name: Check scripts
     runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.scripts == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -98,90 +94,107 @@ jobs:
   check-events:
     name: Check events
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
       - run: make check-events
 
   check-licenses:
     name: Check that the 3rd-party license file is up to date
     runs-on: ubuntu-24.04
-    if: needs.changes.outputs.dependencies == 'true'
+    if: ${{ needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - run: bash ./scripts/environment/prepare.sh --modules=dd-rust-license-tool
+      - uses: ./.github/actions/setup
+        with:
+          cargo-cache: false
+          mold: false
+          dd-rust-license-tool: true
       - run: make check-licenses
 
   check-docs:
     name: Check Cue docs
     runs-on: ubuntu-24.04
-    if: needs.changes.outputs.cue == 'true'
+    if: ${{ needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cue: true
       - run: make check-docs
 
   check-markdown:
     name: Check Markdown
     runs-on: ubuntu-24.04
-    if: needs.changes.outputs.markdown == 'true'
+    if: ${{ needs.changes.outputs.markdown == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - run: bash ./scripts/environment/prepare.sh --modules=markdownlint
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          markdownlint: true
       - run: make check-markdown
 
   check-component-docs:
     name: Check Component Docs
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - run: sudo bash ./scripts/environment/install-protoc.sh
       - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          cue: true
       - run: make check-component-docs
 
   check-rust-docs:
     name: Check Rust Docs
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
       - run: cd rust-doc && make docs
 
   test-vrl:
     name: VRL - Linux
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: sudo bash ./scripts/environment/install-protoc.sh
-      - run: bash ./scripts/environment/prepare.sh --modules=wasm-pack
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          wasm-pack: true
       - run: make test-vrl
 
   build-vrl-playground:
     name: Build VRL Playground
     runs-on: ubuntu-24.04-8core
-    if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-      - run: bash ./scripts/environment/prepare.sh --modules=wasm-pack
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          wasm-pack: true
       - run: |
           cd lib/vector-vrl/web-playground/
           rustup target add wasm32-unknown-unknown
@@ -196,7 +209,6 @@ jobs:
       - check-fmt
       - check-clippy
       - test
-      - check-version
       - check-scripts
       - check-events
       - check-licenses

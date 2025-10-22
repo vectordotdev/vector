@@ -261,7 +261,7 @@ impl SourceConfig for DockerLogsConfig {
                 Err(error) => {
                     error!(
                         message = "Listing currently running containers failed.",
-                        %error
+                        ?error
                     );
                 }
             }

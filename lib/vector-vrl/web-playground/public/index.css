@@ -408,6 +408,17 @@ div#output-section {
   color: #212529;
   height: 36px;
   box-sizing: border-box;
+  cursor: pointer;
+  min-width: 200px;
+}
+
+#timezone-input:hover {
+  border-color: var(--datadog-gray-light);
+}
+
+#timezone-input:focus {
+  outline: 2px solid var(--datadog-purple-light);
+  border-color: var(--datadog-purple);
 }
 
 #output-cell-title .cell-title {

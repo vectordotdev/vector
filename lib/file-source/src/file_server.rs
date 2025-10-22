@@ -140,10 +140,6 @@ where
         let checkpoints = checkpointer.view();
 
         for (_key, path, file_id) in existing_files {
-            checkpointer
-                .maybe_upgrade(&path, file_id, &mut self.fingerprinter)
-                .await;
-
             self.watch_new_file(path, file_id, &mut fp_map, &checkpoints, true)
                 .await;
         }

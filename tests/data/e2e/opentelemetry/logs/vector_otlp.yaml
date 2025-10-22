@@ -22,16 +22,8 @@ sinks:
     protocol:
       type: http
       uri: http://otel-collector-sink:5318/v1/logs
-      method: post
       encoding:
-        codec: json
-      framing:
-        method: newline_delimited
-      batch:
-        max_events: 1
-      request:
-        headers:
-          content-type: application/json
+        codec: otlp
 
   otel_file_sink:
     type: file
@@ -41,8 +33,9 @@ sinks:
     encoding:
       codec: json
 
-  metrics_console_sink:
-    type: console
+  metrics_file_sink:
+    type: file
+    path: "/output/opentelemetry-logs/vector-internal-metrics-sink.log"
     inputs:
       - internal_metrics
     encoding:

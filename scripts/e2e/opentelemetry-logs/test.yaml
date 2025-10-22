@@ -24,3 +24,4 @@ paths:
   - "src/internal_events/opentelemetry_*"
   - "tests/e2e/opentelemetry/logs/**"
   - "scripts/e2e/opentelemetry-logs/**"
+  - "lib/codecs/src/**/otlp.rs"

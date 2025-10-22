@@ -6,13 +6,13 @@ use std::{
 use glob::Pattern;
 use tokio::task::JoinHandle;
 use tokio_stream::StreamExt;
-use vector_lib::api_client::{
+use vector_api_client::{
     Client, SubscriptionClient,
     gql::{ComponentsQueryExt, ComponentsSubscriptionExt, MetricsSubscriptionExt},
 };
 
-use super::state::{self, OutputMetrics};
-use crate::{config::ComponentKey, top::state::SentEventsMetric};
+use crate::state::{self, OutputMetrics, SentEventsMetric};
+use vector_common::config::ComponentKey;
 
 fn component_matches_patterns(component_id: &str, components_patterns: &[Pattern]) -> bool {
     if components_patterns.is_empty() {

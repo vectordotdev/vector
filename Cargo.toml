@@ -127,6 +127,7 @@ members = [
   "lib/vector-lookup",
   "lib/vector-stream",
   "lib/vector-tap",
+  "lib/vector-top",
   "lib/vector-vrl/cli",
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
@@ -138,23 +139,24 @@ members = [
 anyhow = { version = "1.0.99", default-features = false, features = ["std"] }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
-bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 base64 = { version = "0.22.1", default-features = false }
+bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.3", default-features = false }
 chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"] }
-clap = { version = "4.5.47", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.48", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "3.0.0", default-features = false }
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
+exitcode = { version = "1.1.2", default-features = false }
 flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
-humantime = { version = "2.2.0", default-features = false }
+humantime = { version = "2.3.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
 indoc = { version = "2.0.6" }
 inventory = { version = "0.3" }
@@ -167,7 +169,7 @@ nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
 paste = { version = "1.0.15" }
 pin-project = { version = "1.1.10", default-features = false }
-proptest = { version = "1.7" }
+proptest = { version = "1.8" }
 proptest-derive = { version = "0.6.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
@@ -183,18 +185,19 @@ serde_json = { version = "1.0.143", default-features = false, features = ["raw_v
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.8.9", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
-tempfile = "3.21.0"
+tempfile = "3.23.0"
 tokio = { version = "1.45.1", default-features = false }
 toml = { version = "0.9.5", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tracing = { version = "0.1.34", default-features = false }
 tracing-subscriber = { version = "0.3.20", default-features = false, features = ["fmt"]  }
+url = { version = "2.5.4", default-features = false, features = ["serde"] }
 uuid = { version = "1.18.1", features = ["v4", "v7", "serde"] }
-vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
+vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 
 [dependencies]
@@ -323,12 +326,6 @@ deadpool = { version = "0.12.2", default-features = false, features = ["managed"
 async-graphql = { version = "7.0.17", default-features = false, optional = true, features = ["chrono", "playground"] }
 async-graphql-warp = { version = "7.0.17", default-features = false, optional = true }
 
-# API client
-crossterm = { version = "0.29.0", default-features = false, features = ["event-stream", "windows"], optional = true }
-num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"], optional = true }
-number_prefix = { version = "0.4.0", default-features = false, features = ["std"], optional = true }
-ratatui = { version = "0.29.0", optional = true, default-features = false, features = ["crossterm"] }
-
 # Opentelemetry
 
 hex = { version = "0.4.3", default-features = false, optional = true }
@@ -358,7 +355,7 @@ encoding_rs = { version = "0.8.35", default-features = false, features = ["serde
 enum_dispatch = { version = "0.3.13", default-features = false }
 evmap = { version = "10.0.2", default-features = false, optional = true }
 evmap-derive = { version = "0.2.0", default-features = false, optional = true }
-exitcode = { version = "1.1.2", default-features = false }
+exitcode.workspace = true
 flate2.workspace = true
 futures-util.workspace = true
 glob.workspace = true
@@ -421,7 +418,7 @@ hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
 thread_local = { version = "1.1.9", default-features = false, optional = true }
 typetag = { version = "0.2.20", default-features = false }
-url = { version = "2.5.4", default-features = false, features = ["serde"] }
+url.workspace = true
 warp = { version = "0.3.7", default-features = false }
 zstd = { version = "0.13.0", default-features = false }
 arr_macro = { version = "0.2.1" }
@@ -432,7 +429,7 @@ heim = { git = "https://github.com/vectordotdev/heim.git", branch = "update-nix"
 
 # make sure to update the external docs when the Lua version changes
 mlua = { version = "0.10.5", default-features = false, features = ["lua54", "send", "vendored", "macros"], optional = true }
-sysinfo = "0.36.1"
+sysinfo = "0.37.2"
 byteorder = "1.5.0"
 
 [target.'cfg(windows)'.dependencies]
@@ -524,7 +521,7 @@ target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build",
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
-allocation-tracing = []
+allocation-tracing = ["vector-lib/allocation-tracing"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
@@ -542,13 +539,16 @@ api = [
 
 # API client
 api-client = [
-  "dep:crossterm",
-  "dep:num-format",
-  "dep:number_prefix",
-  "dep:ratatui",
+  "api-client-minimal",
+  "top",
+]
+
+api-client-minimal = [
   "vector-lib/api",
   "vector-lib/api-client",
 ]
+
+top = ["vector-lib/vector-top", "vector-lib/api-client"]
 
 aws-core = [
   "aws-runtime",
@@ -577,6 +577,7 @@ enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
 codecs-syslog = ["vector-lib/syslog"]
+codecs-opentelemetry = ["vector-lib/opentelemetry"]
 
 # Secrets
 secrets = ["secrets-aws-secrets-manager"]
@@ -668,7 +669,17 @@ sources-mqtt = ["dep:rumqttc"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
 sources-okta = ["sources-utils-http-client"]
-sources-opentelemetry = ["dep:hex", "vector-lib/opentelemetry", "dep:prost", "dep:prost-types", "sources-http_server", "sources-utils-http", "sources-utils-http-headers", "sources-vector"]
+sources-opentelemetry = [
+  "dep:hex",
+  "codecs-opentelemetry",
+  "vector-lib/opentelemetry",
+  "dep:prost",
+  "dep:prost-types",
+  "sources-http_server",
+  "sources-utils-http",
+  "sources-utils-http-headers",
+  "sources-vector",
+]
 sources-postgresql_metrics = ["dep:postgres-openssl", "dep:tokio-postgres"]
 sources-prometheus = ["sources-prometheus-scrape", "sources-prometheus-remote-write", "sources-prometheus-pushgateway"]
 sources-prometheus-scrape = ["sinks-prometheus", "sources-utils-http-client", "vector-lib/prometheus"]
@@ -855,7 +866,7 @@ sinks-mqtt = ["dep:rumqttc"]
 sinks-nats = ["dep:async-nats", "dep:nkeys"]
 sinks-new_relic_logs = ["sinks-http"]
 sinks-new_relic = []
-sinks-opentelemetry = ["sinks-http"]
+sinks-opentelemetry = ["sinks-http", "codecs-opentelemetry"]
 sinks-papertrail = ["dep:syslog"]
 sinks-prometheus = ["dep:base64", "dep:prost", "vector-lib/prometheus"]
 sinks-postgres = ["dep:sqlx"]
@@ -1004,7 +1015,9 @@ e2e-tests-opentelemetry = [
   "sources-internal_metrics",
   "transforms-remap",
   "sinks-console",
-  "sinks-file"
+  "sinks-file",
+  "codecs-opentelemetry",
+  "dep:prost-reflect"
 ]
 
 vector-api-tests = [

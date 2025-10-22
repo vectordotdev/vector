@@ -4,7 +4,7 @@ description: Use CloudWatch Log subscriptions and Kinesis Firehose to robustly c
 authors: ["jszwedko", "spencergilbert"]
 domains: ["sources", "transforms"]
 transforms: ["remap"]
-weight: 2
+weight: 1
 tags: ["aws", "cloudwatch", "logs", "firehose", "advanced", "guides", "guide"]
 ---
 

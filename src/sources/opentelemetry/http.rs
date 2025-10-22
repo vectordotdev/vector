@@ -11,7 +11,7 @@ use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::decoding::{ProtobufDeserializer, format::Deserializer},
+    codecs::decoding::{OtlpDeserializer, format::Deserializer},
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus},
     internal_event::{
@@ -86,6 +86,7 @@ pub(crate) async fn run_http_server(
     Ok(())
 }
 
+#[allow(clippy::too_many_arguments)] // TODO change to a builder struct
 pub(crate) fn build_warp_filter(
     acknowledgements: bool,
     log_namespace: LogNamespace,
@@ -93,7 +94,9 @@ pub(crate) fn build_warp_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers: Vec<HttpConfigParamKind>,
-    deserializer: Option<ProtobufDeserializer>,
+    logs_deserializer: Option<OtlpDeserializer>,
+    metrics_deserializer: Option<OtlpDeserializer>,
+    traces_deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let log_filters = build_warp_log_filter(
         acknowledgements,
@@ -102,21 +105,21 @@ pub(crate) fn build_warp_filter(
         bytes_received.clone(),
         events_received.clone(),
         headers.clone(),
-        deserializer.clone(),
+        logs_deserializer,
     );
     let metrics_filters = build_warp_metrics_filter(
         acknowledgements,
         out.clone(),
         bytes_received.clone(),
         events_received.clone(),
-        deserializer.clone(),
+        metrics_deserializer,
     );
     let trace_filters = build_warp_trace_filter(
         acknowledgements,
         out.clone(),
         bytes_received,
         events_received,
-        deserializer,
+        traces_deserializer,
     );
     log_filters
         .or(trace_filters)
@@ -188,7 +191,7 @@ fn build_warp_log_filter(
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
     headers_cfg: Vec<HttpConfigParamKind>,
-    deserializer: Option<ProtobufDeserializer>,
+    deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
         if let Some(d) = deserializer.as_ref() {
@@ -220,7 +223,7 @@ fn build_warp_metrics_filter(
     source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
-    deserializer: Option<ProtobufDeserializer>,
+    deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
         if let Some(d) = deserializer.as_ref() {
@@ -248,11 +251,11 @@ fn build_warp_trace_filter(
     source_sender: SourceSender,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
-    deserializer: Option<ProtobufDeserializer>,
+    deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
         if let Some(d) = deserializer.as_ref() {
-            d.parse_traces(body)
+            d.parse(body, LogNamespace::default())
                 .map(|r| r.into_vec())
                 .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
         } else {

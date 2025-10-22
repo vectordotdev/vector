@@ -119,6 +119,14 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     parse_ddtags: bool,
 
+    /// If this is set to `true`, metric names are split at the first '.' into a namespace and name.
+    /// For example, `system.cpu.usage` would be split into namespace `system` and name `cpu.usage`.
+    /// If `false`, the full metric name is used without splitting. This may be useful if you are using a
+    /// default namespace for metrics in sinks connected to this source.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default = "crate::serde::default_true")]
+    split_metric_namespace: bool,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
@@ -158,6 +166,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_traces: false,
             multiple_outputs: false,
             parse_ddtags: false,
+            split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
         })
@@ -189,6 +198,7 @@ impl SourceConfig for DatadogAgentConfig {
             logs_schema_definition,
             log_namespace,
             self.parse_ddtags,
+            self.split_metric_namespace,
         );
         let listener = tls.bind(&self.address).await?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
@@ -345,6 +355,7 @@ pub(crate) struct DatadogAgentSource {
     logs_schema_definition: Option<Arc<schema::Definition>>,
     events_received: Registered<EventsReceived>,
     parse_ddtags: bool,
+    split_metric_namespace: bool,
 }
 
 #[derive(Clone)]
@@ -382,6 +393,7 @@ impl DatadogAgentSource {
         logs_schema_definition: Option<schema::Definition>,
         log_namespace: LogNamespace,
         parse_ddtags: bool,
+        split_metric_namespace: bool,
     ) -> Self {
         Self {
             api_key_extractor: ApiKeyExtractor {
@@ -403,6 +415,7 @@ impl DatadogAgentSource {
             log_namespace,
             events_received: register!(EventsReceived),
             parse_ddtags,
+            split_metric_namespace,
         }
     }
 

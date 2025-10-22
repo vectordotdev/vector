@@ -860,7 +860,6 @@ impl Source {
                 },
                 resolved_max_line_bytes,
                 true,
-                resolved_max_line_bytes,
             ),
             oldest_first,
             // We do not remove the log files, `kubelet` is responsible for it.

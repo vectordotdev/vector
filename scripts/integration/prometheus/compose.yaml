@@ -21,3 +21,8 @@ services:
     command: --config.file=/etc/vector/prometheus.yaml
     volumes:
     - ../../../tests/data:/etc/vector:ro
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
