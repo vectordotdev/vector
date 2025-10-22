@@ -42,7 +42,6 @@ use url::Url;
 use uuid::Uuid;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::encoding::Serializer::Syslog,
     event::{Event, EventStatus},
     finalization::Finalizable,
     internal_event::{
@@ -84,18 +83,6 @@ impl WebSocketListenerSink {
             message_buffering: config.message_buffering,
             subprotocol: config.subprotocol,
         })
-    }
-
-    const fn should_encode_as_binary(&self) -> bool {
-        use vector_lib::codecs::encoding::Serializer::{
-            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text,
-        };
-
-        match self.encoder.serializer() {
-            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_)
-            | Syslog(_) => false,
-        }
     }
 
     fn extract_extra_tags(
@@ -363,7 +350,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
 
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
         let events_sent = register!(EventsSent::from(Output(None)));
-        let encode_as_binary = self.should_encode_as_binary();
+        let encode_as_binary = self.encoder.serializer().is_binary();
 
         let listener = self.tls.bind(&self.address).await.map_err(|_| ())?;
 

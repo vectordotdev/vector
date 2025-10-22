@@ -20,7 +20,6 @@ use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol:
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::encoding::Serializer::Syslog,
     emit,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
@@ -76,18 +75,6 @@ impl WebSocketSink {
         Ok(())
     }
 
-    const fn should_encode_as_binary(&self) -> bool {
-        use vector_lib::codecs::encoding::Serializer::{
-            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text,
-        };
-
-        match self.encoder.serializer() {
-            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_)
-            | Syslog(_) => false,
-        }
-    }
-
     async fn handle_events<I, WS, O>(
         &mut self,
         input: &mut I,
@@ -113,7 +100,7 @@ impl WebSocketSink {
 
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
         let events_sent = register!(EventsSent::from(Output(None)));
-        let encode_as_binary = self.should_encode_as_binary();
+        let encode_as_binary = self.encoder.serializer().is_binary();
 
         loop {
             let result = tokio::select! {
