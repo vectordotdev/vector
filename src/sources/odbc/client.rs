@@ -330,7 +330,7 @@ impl Context {
                     if let Ok(result) = self.process(prev_result.clone()).await {
 
                         // Update the cached result when the query returns rows.
-                        if let Some(_) = result {
+                        if result.is_some() {
                             prev_result = result;
                         }
 

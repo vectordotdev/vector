@@ -159,7 +159,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
     )
     .await;
 
-    println!("{}", serde_json::to_string_pretty(&events).unwrap());
+    debug!("{}", serde_json::to_string_pretty(&events).unwrap());
     assert_eq!(
         get_value_from_event(&events[0], "name"),
         Some("test1".into())
@@ -262,7 +262,7 @@ INSERT INTO odbc_table (name, datetime) VALUES
     )
     .await;
 
-    println!("{}", serde_json::to_string_pretty(&events).unwrap());
+    debug!("{}", serde_json::to_string_pretty(&events).unwrap());
     assert_eq!(
         get_value_from_event(&events[0], "name"),
         Some("test1".into())
@@ -419,11 +419,11 @@ INSERT INTO number_columns (
         1000,
     )
     .unwrap();
-    println!("Rows Count: {}", rows.len());
+    debug!("Rows Count: {}", rows.len());
     for row in &rows {
         if let Value::Object(map) = row {
             for (key, value) in map {
-                println!("{}: {:?}", key, value);
+                debug!("{key}: {value:?}");
             }
         }
     }
@@ -518,7 +518,7 @@ INSERT INTO number_columns (
         Value::Float(NotNan::new(99999999.99).unwrap())
     );
 
-    println!("{:#?}", rows);
+    debug!("{rows:#?}");
 }
 
 #[tokio::test]
@@ -710,11 +710,11 @@ VALUES (
     )
     .unwrap();
 
-    println!("Rows Count: {}", rows.len());
+    debug!("Rows Count: {}", rows.len());
     for row in &rows {
         if let Value::Object(map) = row {
             for (key, value) in map {
-                println!("{}: {:?}", key, value);
+                debug!("{key}: {value:?}");
             }
         }
     }
