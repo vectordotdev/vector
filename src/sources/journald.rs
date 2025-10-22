@@ -547,7 +547,6 @@ impl JournaldSource {
 
     /// Handle stderr stream from journalctl process
     async fn handle_stderr(mut stderr_stream: JournalStream) {
-        use futures::StreamExt;
         while let Some(result) = stderr_stream.next().await {
             match result {
                 Ok(line) => {
