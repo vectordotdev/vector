@@ -558,7 +558,7 @@ impl JournaldSource {
                     }
                 }
                 Err(err) => {
-                    warn!("Error reading journalctl stderr: {}", err);
+                    error!("Error reading journalctl stderr: {}", err);
                     break;
                 }
             }
