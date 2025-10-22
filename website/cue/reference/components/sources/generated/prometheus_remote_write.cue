@@ -123,6 +123,14 @@ generated: components: sources: prometheus_remote_write: configuration: {
 			}
 		}
 	}
+	path: {
+		description: "The URL path on which metric POST requests are accepted."
+		required:    false
+		type: string: {
+			default: "/"
+			examples: ["/api/v1/write", "/remote-write"]
+		}
+	}
 	skip_nan_values: {
 		description: """
 			Whether to skip/discard received samples with NaN values.

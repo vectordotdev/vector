@@ -50,6 +50,12 @@ pub struct PrometheusRemoteWriteConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:9090"))]
     address: SocketAddr,
 
+    /// The URL path on which metric POST requests are accepted.
+    #[serde(default = "default_path")]
+    #[configurable(metadata(docs::examples = "/api/v1/write"))]
+    #[configurable(metadata(docs::examples = "/remote-write"))]
+    path: String,
+
     #[configurable(derived)]
     tls: Option<TlsEnableableConfig>,
 
@@ -84,6 +90,7 @@ impl PrometheusRemoteWriteConfig {
     pub fn from_address(address: SocketAddr) -> Self {
         Self {
             address,
+            path: default_path(),
             tls: None,
             auth: None,
             metadata_conflict_strategy: MetadataConflictStrategy::default(),
@@ -94,10 +101,15 @@ impl PrometheusRemoteWriteConfig {
     }
 }
 
+fn default_path() -> String {
+    "/".to_string()
+}
+
 impl GenerateConfig for PrometheusRemoteWriteConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             address: "127.0.0.1:9090".parse().unwrap(),
+            path: default_path(),
             tls: None,
             auth: None,
             metadata_conflict_strategy: MetadataConflictStrategy::default(),
@@ -119,7 +131,7 @@ impl SourceConfig for PrometheusRemoteWriteConfig {
         };
         source.run(
             self.address,
-            "",
+            self.path.as_str(),
             HttpMethod::Post,
             StatusCode::OK,
             true,
@@ -230,6 +242,7 @@ mod test {
             .http_protocol_name();
         let source = PrometheusRemoteWriteConfig {
             address,
+            path: default_path(),
             auth: None,
             tls: tls.clone(),
             metadata_conflict_strategy: Default::default(),
@@ -318,7 +331,7 @@ mod test {
         // Send the request via HTTP POST
         let client = reqwest::Client::new();
         let response = client
-            .post(format!("http://localhost:{}/", port))
+            .post(format!("http://localhost:{}{}", port, default_path()))
             .header("Content-Type", "application/x-protobuf")
             .header("Content-Encoding", "snappy")
             .body(request_body)
@@ -375,7 +388,7 @@ mod test {
     async fn send_request(port: u16, request_body: Vec<u8>) -> reqwest::Response {
         let client = reqwest::Client::new();
         client
-            .post(format!("http://localhost:{}/", port))
+            .post(format!("http://localhost:{}{}", port, default_path()))
             .header("Content-Type", "application/x-protobuf")
             .header("Content-Encoding", "snappy")
             .body(request_body)
@@ -395,6 +408,7 @@ mod test {
 
         let source = PrometheusRemoteWriteConfig {
             address,
+            path: default_path(),
             auth: None,
             tls: None,
             metadata_conflict_strategy: Default::default(),
@@ -466,6 +480,7 @@ mod test {
 
         let source = PrometheusRemoteWriteConfig {
             address,
+            path: default_path(),
             auth: None,
             tls: None,
             metadata_conflict_strategy: Default::default(),
@@ -536,6 +551,7 @@ mod test {
 
         let source = PrometheusRemoteWriteConfig {
             address,
+            path: default_path(),
             auth: None,
             tls: None,
             metadata_conflict_strategy: Default::default(),
@@ -614,12 +630,176 @@ mod test {
     }
 
     #[tokio::test]
+    async fn receives_metrics_on_custom_path() {
+        let address = test_util::next_addr();
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+        let source = PrometheusRemoteWriteConfig {
+            address,
+            path: "/api/v1/write".to_string(),
+            auth: None,
+            tls: None,
+            metadata_conflict_strategy: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
+            skip_nan_values: false,
+        };
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        let sink = RemoteWriteConfig {
+            endpoint: format!("http://localhost:{}/api/v1/write", address.port()),
+            ..Default::default()
+        };
+        let (sink, _) = sink
+            .build(SinkContext::default())
+            .await
+            .expect("Error building config.");
+
+        let events = make_events();
+        let events_copy = events.clone();
+        let mut output = test_util::spawn_collect_ready(
+            async move {
+                sink.run_events(events_copy).await.unwrap();
+            },
+            rx,
+            1,
+        )
+        .await;
+
+        // The MetricBuffer used by the sink may reorder the metrics, so
+        // put them back into order before comparing.
+        output.sort_unstable_by_key(|event| event.as_metric().name().to_owned());
+
+        vector_lib::assert_event_data_eq!(events, output);
+    }
+
+    #[tokio::test]
+    async fn rejects_metrics_on_wrong_path() {
+        let address = test_util::next_addr();
+        let (tx, _rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+        let source = PrometheusRemoteWriteConfig {
+            address,
+            path: "/api/v1/write".to_string(),
+            auth: None,
+            tls: None,
+            metadata_conflict_strategy: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
+            skip_nan_values: false,
+        };
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        // Try to send to the root path, which should be rejected
+        let client = reqwest::Client::new();
+        let response = client
+            .post(format!("http://localhost:{}/wrong/path", address.port()))
+            .header("Content-Type", "application/x-protobuf")
+            .body(vec![])
+            .send()
+            .await
+            .unwrap();
+
+        // Should return an error status code since we're sending to the wrong path
+        assert!(
+            response.status().is_client_error(),
+            "Expected 4xx error, got {}",
+            response.status()
+        );
+    }
+
+    #[tokio::test]
+    async fn receives_metrics_on_default_path() {
+        let address = test_util::next_addr();
+        let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+        let source = PrometheusRemoteWriteConfig {
+            address,
+            path: default_path(),
+            auth: None,
+            tls: None,
+            metadata_conflict_strategy: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
+            skip_nan_values: false,
+        };
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        let request_body = create_conflicting_metadata_request_body();
+        send_request_and_assert(address.port(), request_body).await;
+
+        // Verify we received the metric data
+        let output = test_util::collect_ready(rx).await;
+        assert_eq!(output.len(), 1);
+
+        let metric = output[0].as_metric();
+        assert_eq!(metric.name(), "test_metric");
+        assert_eq!(metric.value(), &MetricValue::Gauge { value: 42.0 });
+    }
+
+    #[tokio::test]
+    async fn rejects_metrics_on_wrong_path_with_skip_nan_enabled() {
+        let address = test_util::next_addr();
+        let (tx, _rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
+
+        let source = PrometheusRemoteWriteConfig {
+            address,
+            path: "/api/v1/write".to_string(),
+            auth: None,
+            tls: None,
+            metadata_conflict_strategy: Default::default(),
+            acknowledgements: SourceAcknowledgementsConfig::default(),
+            keepalive: KeepaliveConfig::default(),
+            skip_nan_values: true,
+        };
+        let source = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(source);
+        wait_for_tcp(address).await;
+
+        // Try to send to the root path, which should be rejected
+        let client = reqwest::Client::new();
+        let response = client
+            .post(format!("http://localhost:{}/wrong/path", address.port()))
+            .header("Content-Type", "application/x-protobuf")
+            .body(vec![])
+            .send()
+            .await
+            .unwrap();
+
+        // Should return an error status code since we're sending to the wrong path
+        assert!(
+            response.status().is_client_error(),
+            "Expected 4xx error, got {}",
+            response.status()
+        );
+    }
+
+    #[tokio::test]
     async fn accepts_conflicting_metadata() {
         let address = test_util::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let source = PrometheusRemoteWriteConfig {
             address,
+            path: default_path(),
             auth: None,
             tls: None,
             metadata_conflict_strategy: MetadataConflictStrategy::Ignore,
@@ -660,6 +840,7 @@ mod test {
 
         let source = PrometheusRemoteWriteConfig {
             address,
+            path: default_path(),
             auth: None,
             tls: None,
             metadata_conflict_strategy: MetadataConflictStrategy::Reject,
@@ -714,6 +895,7 @@ mod integration_tests {
         // maybe there's a way to do a one-shot remote write from Prometheus? Not sure.
         let config = PrometheusRemoteWriteConfig {
             address: source_receive_address(),
+            path: default_path(),
             auth: None,
             tls: None,
             metadata_conflict_strategy: Default::default(),
