@@ -122,7 +122,6 @@ pub fn spawn_thread<'a>(
                         info!("Configuration file changed.");
                         if !changed_components.is_empty() {
                             info!(
-                                internal_log_rate_limit = true,
                                 "Component {:?} configuration changed.",
                                 changed_components.keys()
                             );
@@ -130,22 +129,19 @@ pub fn spawn_thread<'a>(
                                 .iter()
                                 .all(|(_, t)| *t == ComponentType::EnrichmentTable)
                             {
-                                info!(
-                                    internal_log_rate_limit = true,
-                                    "Only enrichment tables have changed."
-                                );
+                                info!("Only enrichment tables have changed.");
                                 _ = signal_tx.send(crate::signal::SignalTo::ReloadEnrichmentTables).map_err(|error| {
-                                error!(message = "Unable to reload enrichment tables.", cause = %error, internal_log_rate_limit = true)
+                                error!(message = "Unable to reload enrichment tables.", cause = %error)
                             });
                             } else {
                                 _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(changed_components.into_keys().collect())).map_err(|error| {
-                                error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error, internal_log_rate_limit = true)
+                                error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
                             });
                             }
                         } else {
                             _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk)
                             .map_err(|error| {
-                                error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error, internal_log_rate_limit = true)
+                                error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
                             });
                         }
                     } else {

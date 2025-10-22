@@ -152,12 +152,11 @@ where
                         error!(
                             message = "OK/retry response but retries exhausted; dropping the request.",
                             reason = ?reason,
-                            internal_log_rate_limit = true,
                         );
                         return None;
                     }
 
-                    warn!(message = "Retrying after response.", reason = %reason, internal_log_rate_limit = true);
+                    warn!(message = "Retrying after response.", reason = %reason);
                     Some(self.build_retry())
                 }
                 RetryAction::RetryPartial(modify_request) => {
@@ -165,19 +164,15 @@ where
                         error!(
                             message =
                                 "OK/retry response but retries exhausted; dropping the request.",
-                            internal_log_rate_limit = true,
                         );
                         return None;
                     }
                     *req = modify_request(req.clone());
-                    warn!(
-                        message = "OK/retrying partial after response.",
-                        internal_log_rate_limit = true
-                    );
+                    warn!(message = "OK/retrying partial after response.");
                     Some(self.build_retry())
                 }
                 RetryAction::DontRetry(reason) => {
-                    error!(message = "Not retriable; dropping the request.", reason = ?reason, internal_log_rate_limit = true);
+                    error!(message = "Not retriable; dropping the request.", reason = ?reason);
                     None
                 }
 
@@ -185,34 +180,31 @@ where
             },
             Err(error) => {
                 if self.remaining_attempts == 0 {
-                    error!(message = "Retries exhausted; dropping the request.", %error, internal_log_rate_limit = true);
+                    error!(message = "Retries exhausted; dropping the request.", %error);
                     return None;
                 }
 
                 if let Some(expected) = error.downcast_ref::<L::Error>() {
                     if self.logic.is_retriable_error(expected) {
                         self.logic.on_retriable_error(expected);
-                        warn!(message = "Retrying after error.", error = %expected, internal_log_rate_limit = true);
+                        warn!(message = "Retrying after error.", error = %expected);
                         Some(self.build_retry())
                     } else {
                         error!(
                             message = "Non-retriable error; dropping the request.",
                             %error,
-                            internal_log_rate_limit = true,
                         );
                         None
                     }
                 } else if error.downcast_ref::<Elapsed>().is_some() {
                     warn!(
-                        message = "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased.",
-                        internal_log_rate_limit = true
+                        message = "Request timed out. If this happens often while the events are actually reaching their destination, try decreasing `batch.max_bytes` and/or using `compression` if applicable. Alternatively `request.timeout_secs` can be increased."
                     );
                     Some(self.build_retry())
                 } else {
                     error!(
                         message = "Unexpected error type; dropping the request.",
-                        %error,
-                        internal_log_rate_limit = true
+                        %error
                     );
                     None
                 }

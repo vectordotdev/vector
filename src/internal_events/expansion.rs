@@ -20,7 +20,6 @@ impl InternalEvent for PairExpansionError<'_> {
                 error = %self.error,
                 error_type = error_type::PARSER_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_limit = true,
             );
 
             counter!(
@@ -40,7 +39,6 @@ impl InternalEvent for PairExpansionError<'_> {
                 error = %self.error,
                 error_type = error_type::PARSER_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_limit = true,
             );
         }
     }

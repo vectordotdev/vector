@@ -189,8 +189,7 @@ impl<'a> Builder<'a> {
                                 // Just report the error and continue.
                                 error!(message = "Unable to add index to reloaded enrichment table.",
                                     table = ?name.to_string(),
-                                    %error,
-                                    internal_log_rate_limit = true);
+                                    %error);
                                 continue 'tables;
                             }
                         }
@@ -722,10 +721,7 @@ pub async fn reload_enrichment_tables(config: &Config) {
             let mut table = match table_outer.inner.build(&config.global).await {
                 Ok(table) => table,
                 Err(error) => {
-                    error!(
-                        internal_log_rate_limit = true,
-                        "Enrichment table \"{name}\" reload failed: {error}",
-                    );
+                    error!("Enrichment table \"{name}\" reload failed: {error}",);
                     continue;
                 }
             };
@@ -741,7 +737,6 @@ pub async fn reload_enrichment_tables(config: &Config) {
                             // data, the previously loaded data will still need to be used.
                             // Just report the error and continue.
                             error!(
-                                internal_log_rate_limit = true,
                                 message = "Unable to add index to reloaded enrichment table.",
                                 table = ?name.to_string(),
                                 %error

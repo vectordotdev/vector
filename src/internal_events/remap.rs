@@ -18,7 +18,6 @@ impl InternalEvent for RemapMappingError {
             error = ?self.error,
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -44,10 +43,7 @@ pub struct RemapMappingAbort {
 
 impl InternalEvent for RemapMappingAbort {
     fn emit(self) {
-        debug!(
-            message = "Event mapping aborted.",
-            internal_log_rate_limit = true
-        );
+        debug!(message = "Event mapping aborted.");
 
         if self.event_dropped {
             emit!(ComponentEventsDropped::<INTENTIONAL> {
