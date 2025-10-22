@@ -122,8 +122,6 @@ pub trait ContainerTestRunner: TestRunner {
                     config_environment_variables,
                     reuse_image,
                 )?;
-                // Remove any leftover container with the same name before creating
-                self.remove()?;
                 self.create()?;
                 self.start()?;
             }
@@ -190,10 +188,12 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn remove(&self) -> Result<()> {
-        // Always try to remove the container. Docker rm --force succeeds (exit code 0)
-        // even if the container doesn't exist, though it prints an error to stderr.
-        docker_command(["rm", "--force", "--volumes", &self.container_name()])
-            .wait(format!("Removing container {}", self.container_name()))
+        if matches!(self.state()?, RunnerState::Missing) {
+            Ok(())
+        } else {
+            docker_command(["rm", "--force", "--volumes", &self.container_name()])
+                .wait(format!("Removing container {}", self.container_name()))
+        }
     }
 
     fn unpause(&self) -> Result<()> {
