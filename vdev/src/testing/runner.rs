@@ -164,7 +164,10 @@ pub trait ContainerTestRunner: TestRunner {
         // Otherwise, always rebuild to pick up local code changes.
         if reuse_image {
             let mut check_command = docker_command(["image", "inspect", &image_name]);
-            if check_command.output().is_ok() {
+            if check_command
+                .output()
+                .is_ok_and(|output| output.status.success())
+            {
                 info!("Image {image_name} already exists, skipping build");
                 return Ok(());
             }
