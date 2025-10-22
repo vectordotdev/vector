@@ -26,7 +26,7 @@ impl ConfigDiff {
             sources: Difference::new(&old.sources, &new.sources, &components_to_reload),
             transforms: Difference::new(&old.transforms, &new.transforms, &components_to_reload),
             sinks: Difference::new(&old.sinks, &new.sinks, &components_to_reload),
-            enrichment_tables: Difference::new_tables(
+            enrichment_tables: Difference::from_enrichment_tables(
                 &old.enrichment_tables,
                 &new.enrichment_tables,
             ),
@@ -113,32 +113,12 @@ impl Difference {
         }
     }
 
-    /// Helper function to extract component keys from enrichment tables.
-    fn extract_table_component_keys(
-        tables: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
-    ) -> HashSet<(&ComponentKey, ComponentKey)> {
-        tables
-            .iter()
-            .flat_map(|(table_key, table)| {
-                vec![
-                    table
-                        .as_source(table_key)
-                        .map(|(component_key, _)| (table_key, component_key)),
-                    table
-                        .as_sink(table_key)
-                        .map(|(component_key, _)| (table_key, component_key)),
-                ]
-            })
-            .flatten()
-            .collect()
-    }
-
-    fn new_tables(
+    fn from_enrichment_tables(
         old: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
         new: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
     ) -> Self {
-        let old_table_keys = Self::extract_table_component_keys(old);
-        let new_table_keys = Self::extract_table_component_keys(new);
+        let old_table_keys = extract_table_component_keys(old);
+        let new_table_keys = extract_table_component_keys(new);
 
         let to_change = old_table_keys
             .intersection(&new_table_keys)
@@ -225,6 +205,26 @@ impl Difference {
     }
 }
 
+/// Helper function to extract component keys from enrichment tables.
+fn extract_table_component_keys(
+    tables: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
+) -> HashSet<(&ComponentKey, ComponentKey)> {
+    tables
+        .iter()
+        .flat_map(|(table_key, table)| {
+            vec![
+                table
+                    .as_source(table_key)
+                    .map(|(component_key, _)| (table_key, component_key)),
+                table
+                    .as_sink(table_key)
+                    .map(|(component_key, _)| (table_key, component_key)),
+            ]
+        })
+        .flatten()
+        .collect()
+}
+
 #[cfg(test)]
 mod tests {
     use crate::config::ConfigBuilder;
@@ -233,7 +233,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn new_tables_uses_correct_keys() {
+    fn diff_enrichment_tables_uses_correct_keys() {
         let old_config: Config = serde_yaml::from_str::<ConfigBuilder>(indoc! {r#"
             enrichment_tables:
               memory_table:
@@ -302,8 +302,10 @@ mod tests {
         .build()
         .unwrap();
 
-        let diff =
-            Difference::new_tables(&old_config.enrichment_tables, &new_config.enrichment_tables);
+        let diff = Difference::from_enrichment_tables(
+            &old_config.enrichment_tables,
+            &new_config.enrichment_tables,
+        );
 
         assert_eq!(diff.to_add, HashSet::from_iter(["memory_table_new".into()]));
         assert_eq!(
