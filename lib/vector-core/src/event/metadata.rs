@@ -273,47 +273,10 @@ fn default_schema_definition() -> Arc<schema::Definition> {
 
 impl ByteSizeOf for EventMetadata {
     fn allocated_bytes(&self) -> usize {
-        // Always count the Arc pointer itself
-        let mut size = std::mem::size_of::<Arc<Inner>>();
-        
-        // If we're the only reference to the Inner, count all its contents too
-        // This ensures we properly account for shared vs owned memory
-        if Arc::strong_count(&self.0) == 1 {
-            // Count the finalizers
-            size += self.0.finalizers.allocated_bytes();
-            
-            // Count the value which might be a complex object
-            size += match &self.0.value {
-                Value::Object(map) => map.allocated_bytes(),
-                Value::Array(array) => array.allocated_bytes(),
-                Value::Bytes(s) => s.len(),
-                _ => 0, // Other value types don't allocate
-            };
-            
-            // Count the secrets map
-            size += self.0.secrets.0.len() * (std::mem::size_of::<String>() + 32); // Estimate for each key-value pair
-            
-            // Count dropped fields map
-            size += self.0.dropped_fields.len() * std::mem::size_of::<(String, Value)>();
-            
-            // Count optional fields if present
-            if let Some(source_id) = &self.0.source_id {
-                size += std::mem::size_of_val(&**source_id);
-            }
-            
-            if let Some(source_type) = &self.0.source_type {
-                size += source_type.len();
-            }
-            
-            if let Some(upstream_id) = &self.0.upstream_id {
-                size += std::mem::size_of_val(&**upstream_id);
-            }
-            
-            // Count the Inner struct itself
-            size += std::mem::size_of::<Inner>();
-        }
-        
-        size
+        // NOTE we don't count the `str` here because it's allocated somewhere
+        // else. We're just moving around the pointer, which is already captured
+        // by `ByteSizeOf::size_of`.
+        self.0.finalizers.allocated_bytes()
     }
 }
 

@@ -213,7 +213,7 @@ impl ByteSizeOf for MetricEntry {
         
         // Include struct overhead - size of self without double-counting fields
         // that we already accounted for in their respective allocated_bytes() calls
-        let struct_size = std::mem::size_of::<Self>();
+        let struct_size = size_of::<Self>();
         
         let total = data_size + metadata_size + struct_size;
         
@@ -378,10 +378,8 @@ impl CapacityPolicy {
         info!(
             message = "Calculating item size",
             series_name_str = %series.name.name,
-            series_hash = ?{let mut hasher = std::collections::hash::DefaultHasher::new(); std::hash::Hash::hash(series, &mut hasher); std::hash::Hasher::finish(&hasher)},
             series_size = series_size,
             entry_size = entry_size,
-            metric_kind = ?entry.data.kind,
             total_size = total_size
         );
         
@@ -560,7 +558,6 @@ impl MetricSet {
                 info!(
                     message = "Evicting item due to capacity limits",
                     series_name_str = %series.name.name,
-                    series_hash = ?{let mut hasher = std::collections::hash::DefaultHasher::new(); std::hash::Hash::hash(&series, &mut hasher); std::hash::Hasher::finish(&hasher)},
                     item_size = item_size,
                     current_memory = capacity_policy.current_memory(),
                     memory_limit = ?capacity_policy.max_bytes,
@@ -635,43 +632,6 @@ impl MetricSet {
             self.inner.put(series, entry);
             return; // No capacity limits configured, return immediately
         };
-
-        // Debug the series equality issue
-        info!(
-            message = "Inserting series",
-            series_name = ?series.name,
-            series_name_str = %series.name.name,  // Display the actual string name
-            series_tags = ?series.tags,
-            series_hash = ?{let mut hasher = std::collections::hash::DefaultHasher::new(); std::hash::Hash::hash(&series, &mut hasher); std::hash::Hasher::finish(&hasher)}
-        );
-        
-        // Iterate through entries to check for series with same name
-        let mut found_similar = false;
-        for (existing, _) in self.inner.iter() {
-            if existing.name == series.name && *existing != series {
-                found_similar = true;
-                let existing_hash = {
-                    let mut hasher = std::collections::hash::DefaultHasher::new(); 
-                    std::hash::Hash::hash(existing, &mut hasher); 
-                    std::hash::Hasher::finish(&hasher)
-                };
-                info!(
-                    message = "Series with same name not equal",
-                    existing_name = ?existing.name,
-                    existing_name_str = %existing.name.name,
-                    existing_tags = ?existing.tags,
-                    existing_hash = ?existing_hash,
-                    new_name = ?series.name,
-                    new_name_str = %series.name.name,
-                    new_tags = ?series.tags,
-                    new_hash = ?{let mut hasher = std::collections::hash::DefaultHasher::new(); std::hash::Hash::hash(&series, &mut hasher); std::hash::Hasher::finish(&hasher)}
-                );
-            }
-        }
-        
-        if !found_similar && series.name.name.len() > 0 {
-            info!(message = "No similar series found with name", name = ?series.name.name, name_str = %series.name.name);
-        }
 
         info!(
             message = "Inserting entry with tracking",
