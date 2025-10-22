@@ -113,60 +113,62 @@ impl Difference {
         }
     }
 
+    /// Helper function to extract component keys from enrichment tables.
+    fn extract_table_component_keys(
+        tables: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
+    ) -> HashSet<(&ComponentKey, ComponentKey)> {
+        tables
+            .iter()
+            .flat_map(|(table_key, table)| {
+                vec![
+                    table
+                        .as_source(table_key)
+                        .map(|(component_key, _)| (table_key, component_key)),
+                    table
+                        .as_sink(table_key)
+                        .map(|(component_key, _)| (table_key, component_key)),
+                ]
+            })
+            .flatten()
+            .collect()
+    }
+
     fn new_tables(
         old: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
         new: &IndexMap<ComponentKey, EnrichmentTableOuter<OutputId>>,
     ) -> Self {
-        let old_names = old
-            .iter()
-            .flat_map(|(original_key, t)| {
-                vec![
-                    t.as_source(original_key).map(|(k, _)| (original_key, k)),
-                    t.as_sink(original_key).map(|(k, _)| (original_key, k)),
-                ]
-            })
-            .flatten()
-            .collect::<HashSet<_>>();
-        let new_names = new
-            .iter()
-            .flat_map(|(original_key, t)| {
-                vec![
-                    t.as_source(original_key).map(|(k, _)| (original_key, k)),
-                    t.as_sink(original_key).map(|(k, _)| (original_key, k)),
-                ]
-            })
-            .flatten()
-            .collect::<HashSet<_>>();
+        let old_table_keys = Self::extract_table_component_keys(old);
+        let new_table_keys = Self::extract_table_component_keys(new);
 
-        let to_change = old_names
-            .intersection(&new_names)
-            .filter(|(original_key, _)| {
+        let to_change = old_table_keys
+            .intersection(&new_table_keys)
+            .filter(|(table_key, _derived_component_key)| {
                 // This is a hack around the issue of comparing two
                 // trait objects. Json is used here over toml since
                 // toml does not support serializing `None`
                 // to_value is used specifically (instead of string)
                 // to avoid problems comparing serialized HashMaps,
                 // which can iterate in varied orders.
-                let old_value = serde_json::to_value(&old[*original_key]).unwrap();
-                let new_value = serde_json::to_value(&new[*original_key]).unwrap();
+                let old_value = serde_json::to_value(&old[*table_key]).unwrap();
+                let new_value = serde_json::to_value(&new[*table_key]).unwrap();
                 old_value != new_value
             })
             .cloned()
-            .map(|(_, key)| key)
+            .map(|(_table_key, derived_component_key)| derived_component_key)
             .collect::<HashSet<_>>();
 
-        // Remove the original key, since it is no longer needed for changed lookup
-        let old_names = old_names
+        // Extract only the derived component keys for the final difference calculation
+        let old_component_keys = old_table_keys
             .into_iter()
-            .map(|(_, key)| key)
+            .map(|(_table_key, component_key)| component_key)
             .collect::<HashSet<_>>();
-        let new_names = new_names
+        let new_component_keys = new_table_keys
             .into_iter()
-            .map(|(_, key)| key)
+            .map(|(_table_key, component_key)| component_key)
             .collect::<HashSet<_>>();
 
-        let to_remove = &old_names - &new_names;
-        let to_add = &new_names - &old_names;
+        let to_remove = &old_component_keys - &new_component_keys;
+        let to_add = &new_component_keys - &old_component_keys;
 
         Self {
             to_remove,
