@@ -64,6 +64,16 @@ pub enum ParserError {
 
 vector_common::impl_event_data_eq!(ParserError);
 
+/// Defines how the parser should behave when encountering metadata conflicts.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MetadataConflictStrategy {
+    /// Silently ignore metadata conflicts, keeping the first metadata entry.
+    Ignore,
+    /// Reject requests with conflicting metadata.
+    #[default]
+    Reject,
+}
+
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct GroupKey {
     pub timestamp: Option<i64>,
@@ -339,11 +349,11 @@ impl MetricGroupSet {
         &mut self,
         name: String,
         kind: MetricKind,
-        reject_on_conflict: bool,
+        metadata_conflict_strategy: MetadataConflictStrategy,
     ) -> Result<(), ParserError> {
         match self.0.get(&name) {
             Some(group) if !group.matches_kind(kind) => {
-                if reject_on_conflict {
+                if matches!(metadata_conflict_strategy, MetadataConflictStrategy::Reject) {
                     Err(ParserError::MultipleMetricKinds { name })
                 } else {
                     Ok(())
@@ -395,7 +405,7 @@ impl MetricGroupSet {
 /// higher-level metric types based on the metadata.
 pub fn parse_request(
     request: proto::WriteRequest,
-    reject_on_conflict: bool,
+    metadata_conflict_strategy: MetadataConflictStrategy,
 ) -> Result<Vec<MetricGroup>, ParserError> {
     let mut groups = MetricGroupSet::default();
 
@@ -404,7 +414,7 @@ pub fn parse_request(
         let kind = proto::MetricType::try_from(metadata.r#type)
             .unwrap_or(proto::MetricType::Unknown)
             .into();
-        groups.insert_metadata(name, kind, reject_on_conflict)?;
+        groups.insert_metadata(name, kind, metadata_conflict_strategy)?;
     }
 
     for timeseries in request.timeseries {
@@ -753,14 +763,18 @@ mod test {
 
     #[test]
     fn parse_request_empty() {
-        let parsed = parse_request(write_request!([], []), false).unwrap();
+        let parsed =
+            parse_request(write_request!([], []), MetadataConflictStrategy::Ignore).unwrap();
         assert!(parsed.is_empty());
     }
 
     #[test]
     fn parse_request_only_metadata() {
-        let parsed =
-            parse_request(write_request!(["one" = Counter, "two" = Gauge], []), false).unwrap();
+        let parsed = parse_request(
+            write_request!(["one" = Counter, "two" = Gauge], []),
+            MetadataConflictStrategy::Ignore,
+        )
+        .unwrap();
         assert_eq!(parsed.len(), 2);
         match_group!(parsed[0], "one", Counter => |metrics: &MetricMap<SimpleMetric>| {
             assert!(metrics.is_empty());
@@ -774,7 +788,7 @@ mod test {
     fn parse_request_untyped() {
         let parsed = parse_request(
             write_request!([], [ [__name__ => "one", big => "small"] => [123 @ 1395066367500] ]),
-            false,
+            MetadataConflictStrategy::Ignore,
         )
         .unwrap();
 
@@ -798,7 +812,7 @@ mod test {
                     [__name__ => "two"] => [ 13 @ 1395066367700 ]
                 ]
             ),
-            false,
+            MetadataConflictStrategy::Ignore,
         )
         .unwrap();
 
@@ -836,7 +850,7 @@ mod test {
                     [__name__ => "one_total"] => [24 @ 1395066367700]
                 ]
             ),
-            false,
+            MetadataConflictStrategy::Ignore,
         )
         .unwrap();
 
@@ -878,7 +892,7 @@ mod test {
                     [__name__ => "one_total"] => [24 @ 1395066367700]
                 ]
             ),
-            false,
+            MetadataConflictStrategy::Ignore,
         )
         .unwrap();
 
@@ -937,7 +951,7 @@ mod test {
         };
 
         // Should succeed and use the first metadata entry (Gauge)
-        let parsed = parse_request(request.clone(), false).unwrap();
+        let parsed = parse_request(request.clone(), MetadataConflictStrategy::Ignore).unwrap();
         assert_eq!(parsed.len(), 1);
         match_group!(parsed[0], "go_memstats_alloc_bytes", Gauge => |metrics: &MetricMap<SimpleMetric>| {
             assert_eq!(metrics.len(), 1);
@@ -947,8 +961,8 @@ mod test {
             );
         });
 
-        // Should fail when reject_on_conflict is true
-        let err = parse_request(request, true).unwrap_err();
+        // Should fail when conflicts are rejected
+        let err = parse_request(request, MetadataConflictStrategy::Reject).unwrap_err();
         assert!(matches!(
             err,
             ParserError::MultipleMetricKinds { name } if name == "go_memstats_alloc_bytes"
