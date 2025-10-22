@@ -180,7 +180,20 @@ pub struct RootOpts {
     )]
     pub watch_config_poll_interval_seconds: NonZeroU64,
 
-    /// Set the internal log rate limit
+    /// Set the internal log rate limit in seconds.
+    ///
+    /// This controls the time window for rate limiting Vector's own internal logs.
+    /// Within each time window, the first occurrence of a log is emitted, the second
+    /// shows a suppression warning, and subsequent occurrences are silent until the
+    /// window expires.
+    ///
+    /// Logs are grouped by their location in the code and the `component_id` field, so logs
+    /// from different components are rate limited independently.
+    ///
+    /// Examples:
+    /// - 1: Very verbose, logs can repeat every second
+    /// - 10 (default): Logs can repeat every 10 seconds
+    /// - 60: Less verbose, logs can repeat every minute
     #[arg(
         short,
         long,

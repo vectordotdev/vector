@@ -225,11 +225,11 @@ impl<'a> Builder<'a> {
             .chain(
                 table_sources
                     .iter()
-                    .map(|(key, sink)| (key, sink))
+                    .map(|(key, source)| (key, source))
                     .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
             )
         {
-            debug!(component = %key, "Building new source.");
+            debug!(component_id = %key, "Building new source.");
 
             let typetag = source.inner.get_component_name();
             let source_outputs = source.inner.outputs(self.config.schema.log_namespace());
@@ -429,7 +429,7 @@ impl<'a> Builder<'a> {
             .transforms()
             .filter(|(key, _)| self.diff.transforms.contains_new(key))
         {
-            debug!(component = %key, "Building new transform.");
+            debug!(component_id = %key, "Building new transform.");
 
             let input_definitions = match schema::input_definitions(
                 &transform.inputs,
@@ -541,7 +541,7 @@ impl<'a> Builder<'a> {
                     .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
             )
         {
-            debug!(component = %key, "Building new sink.");
+            debug!(component_id = %key, "Building new sink.");
 
             let sink_inputs = &sink.inputs;
             let healthcheck = sink.healthcheck();
