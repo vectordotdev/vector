@@ -327,7 +327,7 @@ async-graphql = { version = "7.0.17", default-features = false, optional = true,
 async-graphql-warp = { version = "7.0.17", default-features = false, optional = true }
 
 # ODBC
-odbc-api = { version = "14.2.0", optional = true }
+odbc-api = { version = "19.1.0", optional = true }
 cron = { version = "0.15.0", features = ["serde"], optional = true }
 
 # Opentelemetry
