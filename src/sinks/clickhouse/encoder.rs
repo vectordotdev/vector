@@ -137,6 +137,17 @@ fn build_record_batch(
         .map_err(|source| ArrowEncodingError::RecordBatchCreation { source })
 }
 
+fn extract_timestamp(value: &Value) -> Option<DateTime<Utc>> {
+    match value {
+        Value::Timestamp(ts) => Some(*ts),
+        Value::Bytes(bytes) => std::str::from_utf8(bytes)
+            .ok()
+            .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+            .map(|dt| dt.with_timezone(&Utc)),
+        _ => None,
+    }
+}
+
 fn build_timestamp_array(
     events: &[Event],
     field_name: &str,
@@ -148,11 +159,21 @@ fn build_timestamp_array(
             let mut builder = <$builder>::with_capacity(capacity);
             for event in events {
                 if let Event::Log(log) = event {
-                    match log.get(field_name) {
-                        Some(Value::Timestamp(ts)) => builder.append_value($converter(ts)),
-                        Some(Value::Integer(i)) => builder.append_value(*i),
-                        _ => builder.append_null(),
-                    }
+                    let value_to_append = log.get(field_name).and_then(|value| {
+                        // First, try to extract it as a native or string timestamp
+                        if let Some(ts) = extract_timestamp(value) {
+                            $converter(&ts)
+                        }
+                        // Else, fall back to a raw integer
+                        else if let Value::Integer(i) = value {
+                            Some(*i)
+                        }
+                        // Else, it's an unsupported type (e.g., Bool, Float)
+                        else {
+                            None
+                        }
+                    });
+                    builder.append_option(value_to_append);
                 }
             }
             Ok(Arc::new(builder.finish()))
@@ -161,35 +182,23 @@ fn build_timestamp_array(
 
     match time_unit {
         TimeUnit::Second => {
-            build_array!(TimestampSecondBuilder, |ts: &DateTime<Utc>| ts.timestamp())
+            build_array!(TimestampSecondBuilder, |ts: &DateTime<Utc>| Some(
+                ts.timestamp()
+            ))
         }
         TimeUnit::Millisecond => {
-            build_array!(TimestampMillisecondBuilder, |ts: &DateTime<Utc>| ts
-                .timestamp_millis())
+            build_array!(TimestampMillisecondBuilder, |ts: &DateTime<Utc>| Some(
+                ts.timestamp_millis()
+            ))
         }
         TimeUnit::Microsecond => {
-            build_array!(TimestampMicrosecondBuilder, |ts: &DateTime<Utc>| ts
-                .timestamp_micros())
+            build_array!(TimestampMicrosecondBuilder, |ts: &DateTime<Utc>| Some(
+                ts.timestamp_micros()
+            ))
         }
         TimeUnit::Nanosecond => {
-            let mut builder = TimestampNanosecondBuilder::with_capacity(capacity);
-            for event in events {
-                if let Event::Log(log) = event {
-                    match log.get(field_name) {
-                        Some(Value::Timestamp(ts)) => {
-                            if let Some(nanos) = ts.timestamp_nanos_opt() {
-                                builder.append_value(nanos);
-                            } else {
-                                builder.append_null();
-                            }
-                        }
-
-                        Some(Value::Integer(i)) => builder.append_value(*i),
-                        _ => builder.append_null(),
-                    }
-                }
-            }
-            Ok(Arc::new(builder.finish()))
+            build_array!(TimestampNanosecondBuilder, |ts: &DateTime<Utc>| ts
+                .timestamp_nanos_opt())
         }
     }
 }
@@ -966,6 +975,165 @@ mod tests {
     }
 
     #[test]
+    fn test_encode_string_timestamps() {
+        // Test that RFC3339/ISO 8601 string timestamps are automatically parsed
+        let mut log1 = LogEvent::default();
+        log1.insert("timestamp", "2025-10-22T10:18:44.256Z");
+
+        let mut log2 = LogEvent::default();
+        log2.insert("timestamp", "2025-10-22T15:30:00.123456789Z");
+
+        let mut log3 = LogEvent::default();
+        log3.insert("timestamp", "2025-01-15T00:00:00Z");
+
+        let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "timestamp",
+            DataType::Timestamp(TimeUnit::Nanosecond, None),
+            true,
+        )]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 3);
+        assert_eq!(batch.num_columns(), 1);
+
+        let ts_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .unwrap();
+
+        // All timestamps should be properly parsed (not null)
+        assert!(!ts_array.is_null(0));
+        assert!(!ts_array.is_null(1));
+        assert!(!ts_array.is_null(2));
+
+        // Verify the parsed values are correct
+        // 2025-10-22T10:18:44.256Z
+        let expected1 = chrono::DateTime::parse_from_rfc3339("2025-10-22T10:18:44.256Z")
+            .unwrap()
+            .timestamp_nanos_opt()
+            .unwrap();
+        assert_eq!(ts_array.value(0), expected1);
+
+        // 2025-10-22T15:30:00.123456789Z
+        let expected2 = chrono::DateTime::parse_from_rfc3339("2025-10-22T15:30:00.123456789Z")
+            .unwrap()
+            .timestamp_nanos_opt()
+            .unwrap();
+        assert_eq!(ts_array.value(1), expected2);
+
+        // 2025-01-15T00:00:00Z
+        let expected3 = chrono::DateTime::parse_from_rfc3339("2025-01-15T00:00:00Z")
+            .unwrap()
+            .timestamp_nanos_opt()
+            .unwrap();
+        assert_eq!(ts_array.value(2), expected3);
+    }
+
+    #[test]
+    fn test_encode_mixed_timestamp_string_and_native() {
+        // Test mixing string timestamps with native Timestamp values
+        let mut log1 = LogEvent::default();
+        log1.insert("ts", "2025-10-22T10:18:44.256Z"); // String
+
+        let mut log2 = LogEvent::default();
+        log2.insert("ts", Utc::now()); // Native Timestamp
+
+        let mut log3 = LogEvent::default();
+        log3.insert("ts", 1729594724256000000_i64); // Integer (nanoseconds)
+
+        let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "ts",
+            DataType::Timestamp(TimeUnit::Nanosecond, None),
+            true,
+        )]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 3);
+
+        let ts_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .unwrap();
+
+        // All three should be non-null
+        assert!(!ts_array.is_null(0));
+        assert!(!ts_array.is_null(1));
+        assert!(!ts_array.is_null(2));
+
+        // First one should match the parsed string
+        let expected = chrono::DateTime::parse_from_rfc3339("2025-10-22T10:18:44.256Z")
+            .unwrap()
+            .timestamp_nanos_opt()
+            .unwrap();
+        assert_eq!(ts_array.value(0), expected);
+
+        // Third one should match the integer
+        assert_eq!(ts_array.value(2), 1729594724256000000_i64);
+    }
+
+    #[test]
+    fn test_encode_invalid_string_timestamp() {
+        // Test that invalid timestamp strings become null
+        let mut log1 = LogEvent::default();
+        log1.insert("timestamp", "not-a-timestamp");
+
+        let mut log2 = LogEvent::default();
+        log2.insert("timestamp", "2025-10-22T10:18:44.256Z"); // Valid
+
+        let mut log3 = LogEvent::default();
+        log3.insert("timestamp", "2025-99-99T99:99:99Z"); // Invalid
+
+        let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "timestamp",
+            DataType::Timestamp(TimeUnit::Nanosecond, None),
+            true,
+        )]));
+
+        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 3);
+
+        let ts_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<TimestampNanosecondArray>()
+            .unwrap();
+
+        // Invalid timestamps should be null
+        assert!(ts_array.is_null(0));
+        assert!(!ts_array.is_null(1)); // Valid one
+        assert!(ts_array.is_null(2));
+    }
+
+    #[test]
     fn test_encode_decimal128_from_float() {
         use arrow::array::Decimal128Array;
 
@@ -1173,7 +1341,7 @@ mod tests {
 
     #[test]
     fn test_encode_unsigned_integer_types() {
-        use arrow::array::{UInt16Array, UInt32Array, UInt64Array, UInt8Array};
+        use arrow::array::{UInt8Array, UInt16Array, UInt32Array, UInt64Array};
 
         let mut log = LogEvent::default();
         log.insert("uint8_field", 255_i64);
@@ -1236,7 +1404,7 @@ mod tests {
 
     #[test]
     fn test_encode_unsigned_integers_with_null_and_overflow() {
-        use arrow::array::{UInt32Array, UInt8Array};
+        use arrow::array::{UInt8Array, UInt32Array};
 
         let mut log1 = LogEvent::default();
         log1.insert("uint8_field", 100_i64);
