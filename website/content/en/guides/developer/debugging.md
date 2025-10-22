@@ -1,9 +1,10 @@
 ---
+date: "2025-03-19"
 title: A guide for debugging Vector pipelines
 short: Debugging Vector
 description: Step by step guide for debugging pipelines
 tags: [ "dev", "debugging", "guides", "guide" ]
-author_github: https://github.com/pront
+authors: ["pront"]
 domain: dev
 aliases: [ "/docs/guides/developer/debugging/debugging" ]
 weight: 1
