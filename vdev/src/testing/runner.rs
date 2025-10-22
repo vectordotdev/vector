@@ -187,12 +187,10 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn remove(&self) -> Result<()> {
-        if matches!(self.state()?, RunnerState::Missing) {
-            Ok(())
-        } else {
-            docker_command(["rm", "--force", "--volumes", &self.container_name()])
-                .wait(format!("Removing container {}", self.container_name()))
-        }
+        // Always try to remove the container. Docker rm --force succeeds (exit code 0)
+        // even if the container doesn't exist, though it prints an error to stderr.
+        docker_command(["rm", "--force", "--volumes", &self.container_name()])
+            .wait(format!("Removing container {}", self.container_name()))
     }
 
     fn unpause(&self) -> Result<()> {
