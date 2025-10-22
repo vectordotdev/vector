@@ -15,7 +15,7 @@ use vector_lib::{
     },
 };
 
-use tracing::{info};
+use tracing::{trace};
 
 #[derive(Debug, Snafu, PartialEq, Eq)]
 pub enum NormalizerError {
@@ -217,7 +217,7 @@ impl ByteSizeOf for MetricEntry {
         
         let total = data_size + metadata_size + struct_size;
         
-        info!(
+        trace!(
             message = "Entry allocated_bytes breakdown",
             data_size = data_size,
             metadata_size = metadata_size,
@@ -307,7 +307,7 @@ impl CapacityPolicy {
     pub fn free_item(&mut self, series: &MetricSeries, entry: &MetricEntry) {
         if self.max_bytes.is_some() {
             let freed_memory = self.item_size(series, entry);
-            info!(
+            trace!(
                 message = "Freeing memory for item",
                 freed_bytes = freed_memory,
                 current_memory = self.current_memory,
@@ -320,7 +320,7 @@ impl CapacityPolicy {
     /// Updates memory tracking.
     fn replace_memory(&mut self, old_bytes: usize, new_bytes: usize) {
         let new_total = self.current_memory.saturating_sub(old_bytes).saturating_add(new_bytes);
-        info!(
+        trace!(
             message = "Updating memory tracking",
             old_bytes = old_bytes,
             new_bytes = new_bytes, 
@@ -355,7 +355,7 @@ impl CapacityPolicy {
         let entries_exceeded = self.exceeds_entry_limit(entry_count);
         
         if memory_exceeded || entries_exceeded {
-            info!(
+            trace!(
                 message = "Eviction needed",
                 memory_exceeded = memory_exceeded,
                 entries_exceeded = entries_exceeded,
@@ -375,7 +375,7 @@ impl CapacityPolicy {
         let entry_size = entry.allocated_bytes();
         let total_size = series_size + entry_size;
         
-        info!(
+        trace!(
             message = "Calculating item size",
             series_name_str = %series.name.name,
             series_size = series_size,
@@ -543,7 +543,7 @@ impl MetricSet {
             return; // No capacity limits configured
         };
         
-        info!(
+        trace!(
             message = "Checking capacity policy",
             current_memory = capacity_policy.current_memory(),
             max_memory = ?capacity_policy.max_bytes,
@@ -555,7 +555,7 @@ impl MetricSet {
         while capacity_policy.needs_eviction(self.inner.len()) {
             if let Some((series, entry)) = self.inner.pop_lru() {
                 let item_size = capacity_policy.item_size(&series, &entry);
-                info!(
+                trace!(
                     message = "Evicting item due to capacity limits",
                     series_name_str = %series.name.name,
                     item_size = item_size,
@@ -571,7 +571,7 @@ impl MetricSet {
             }
         }
         
-        info!(
+        trace!(
             message = "After enforcement",
             current_memory = capacity_policy.current_memory(),
             max_memory = ?capacity_policy.max_bytes,
@@ -580,7 +580,7 @@ impl MetricSet {
         );
         
         // Log memory debug info
-        info!(message = "Memory after enforcement", debug = %self.debug_memory());
+        trace!(message = "Memory after enforcement", debug = %self.debug_memory());
     }
 
     /// Perform TTL cleanup if configured and needed.
@@ -633,7 +633,7 @@ impl MetricSet {
             return; // No capacity limits configured, return immediately
         };
 
-        info!(
+        trace!(
             message = "Inserting entry with tracking",
             current_memory = capacity_policy.current_memory(),
             max_memory = ?capacity_policy.max_bytes,
@@ -649,11 +649,11 @@ impl MetricSet {
             if let Some(existing_entry) = self.inner.put(series.clone(), entry) {
                 // If we had an existing entry, calculate its size and adjust memory tracking
                 let existing_size = capacity_policy.item_size(&series, &existing_entry);
-                info!(message = "Found existing entry for series", series_name = ?series.name, series_name_str = %series.name.name);
+                trace!(message = "Found existing entry for series", series_name = ?series.name, series_name_str = %series.name.name);
                 capacity_policy.replace_memory(existing_size, entry_size);
             } else {
                 // No existing entry, just add the new entry's size
-                info!(message = "No existing entry for series", series_name = ?series.name, series_name_str = %series.name.name);
+                trace!(message = "No existing entry for series", series_name = ?series.name, series_name_str = %series.name.name);
                 capacity_policy.replace_memory(0, entry_size);
             }
         } else {
@@ -665,7 +665,7 @@ impl MetricSet {
         self.enforce_capacity_policy();
         
         // Log memory debug info
-        info!(message = "Memory after insertion", debug = %self.debug_memory());
+        trace!(message = "Memory after insertion", debug = %self.debug_memory());
     }
 
     /// Consumes this MetricSet and returns a vector of Metric.
