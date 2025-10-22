@@ -397,7 +397,7 @@ impl SourceConfig for JournaldConfig {
                 })?
         };
 
-        if !self.current_boot_only && systemd_version >= 250 && systemd_version < 258 {
+        if (250..258).contains(&systemd_version) {
             // https://github.com/vectordotdev/vector/issues/18068
             warn!(
                 "`current_boot_only: false` not supported for systemd versions 250 through 257 (got {}).",
@@ -775,10 +775,8 @@ impl StartJournalctl {
             if self.systemd_version < 250 {
                 command.arg("--boot");
             }
-        } else {
-            if self.systemd_version >= 258 {
-                command.arg("--boot=all");
-            }
+        } else if self.systemd_version >= 258 {
+            command.arg("--boot=all");
         }
 
         if let Some(cursor) = checkpoint {
@@ -1657,6 +1655,7 @@ mod tests {
         assert!(cmd_line.contains("--boot=all"));
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn create_command(
         path: &Path,
         systemd_version: u32,
