@@ -353,12 +353,11 @@ impl Context {
                     #[cfg(test)]
                     {
                         count += 1;
-                        if let Some(iterations) = self.cfg.iterations {
-                            if count >= iterations {
+                        if let Some(iterations) = self.cfg.iterations
+                            && count >= iterations {
                                 debug!(message = "No additional schedule configured. Shutting down ODBC source.");
                                 break;
                             }
-                        }
                     }
                 }
             }
