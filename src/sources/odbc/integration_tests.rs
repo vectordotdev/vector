@@ -30,7 +30,7 @@ fn get_conn_str() -> String {
     std::env::var("ODBC_CONN_STRING").expect("Required environment variable 'ODBC_CONN_STRING'")
 }
 
-fn get_conn_opt() -> ConnectionOptions {
+const fn get_conn_opt() -> ConnectionOptions {
     ConnectionOptions {
         login_timeout_sec: Some(3),
         packet_size: None,
@@ -238,8 +238,8 @@ INSERT INTO odbc_table (name, datetime) VALUES
         .unwrap();
     let params = ObjectMap::from([("id".into(), 0.into())]);
 
-    let _ = fs::write(CONNECTION_STRING_FILE_PATH, conn_str).unwrap();
-    let _ = fs::write(
+    fs::write(CONNECTION_STRING_FILE_PATH, conn_str).unwrap();
+    fs::write(
         STATEMENT_FILE_PATH,
         "SELECT * FROM odbc_table WHERE id > ? LIMIT 1;",
     )

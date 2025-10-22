@@ -318,7 +318,7 @@ impl Context {
         loop {
             select! {
                 _ = shutdown.clone() => {
-                    debug!("Shutdown signal received. Shutting down ODBC source.");
+                    debug!(message = "Shutdown signal received. Shutting down ODBC source.");
                     break;
                 }
                 next = schedule.next() => {
@@ -346,7 +346,7 @@ impl Context {
 
                     // When no further schedule is defined, run once and then stop.
                     if next.is_none() {
-                        debug!("No additional schedule configured. Shutting down ODBC source.");
+                        debug!(message = "No additional schedule configured. Shutting down ODBC source.");
                         break
                     }
 
@@ -355,7 +355,7 @@ impl Context {
                         count += 1;
                         if let Some(iterations) = self.cfg.iterations {
                             if count >= iterations {
-                                debug!("No additional schedule configured. Shutting down ODBC source.");
+                                debug!(message = "No additional schedule configured. Shutting down ODBC source.");
                                 break;
                             }
                         }
