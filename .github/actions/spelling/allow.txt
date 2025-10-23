@@ -554,3 +554,5 @@ zst
 zstandard
 ZTE
 Zync
+IPFIX
+netflow

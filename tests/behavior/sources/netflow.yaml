@@ -1,0 +1,52 @@
+- name: netflow_v5_basic
+  expectation: success
+  events:
+    - log_builder:
+        flow_type: "netflow_v5_record"
+        src_addr: "192.168.1.1"
+        dst_addr: "10.0.0.1"
+        src_port: 80
+        dst_port: 443
+        protocol: 6
+        bytes: 1500
+        packets: 10
+        version: 5
+        peer_addr: "127.0.0.1:12345"
+
+- name: netflow_v9_template
+  expectation: success
+  events:
+    - log_builder:
+        flow_type: "netflow_v9_template"
+        template_id: 256
+        field_count: 10
+        protocol: "netflow_v9"
+        peer_addr: "127.0.0.1:12345"
+
+- name: ipfix_flow
+  expectation: success
+  events:
+    - log_builder:
+        flow_type: "ipfix_record"
+        src_addr: "192.168.1.2"
+        dst_addr: "10.0.0.2"
+        protocol: "ipfix"
+        peer_addr: "127.0.0.1:12345"
+
+- name: sflow_sample
+  expectation: success
+  events:
+    - log_builder:
+        flow_type: "sflow_sample"
+        protocol: "sflow"
+        peer_addr: "127.0.0.1:12345"
+
+- name: parse_error_handling
+  expectation: partial_success
+  events:
+    - log_builder:
+        flow_type: "parse_error"
+        detected_protocol: "unknown"
+        peer_addr: "127.0.0.1:12345"
+        packet_length: 4
+        parse_error: "Invalid packet format"
