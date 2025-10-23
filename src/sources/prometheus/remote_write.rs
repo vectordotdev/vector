@@ -347,6 +347,36 @@ mod test {
         );
     }
 
+    fn create_default_request_body() -> Vec<u8> {
+        use prost::Message;
+        use vector_lib::prometheus::parser::proto;
+
+        let request = proto::WriteRequest {
+            metadata: vec![proto::MetricMetadata {
+                r#type: proto::MetricType::Gauge as i32,
+                metric_family_name: "test_metric".into(),
+                help: "Gauge definition".into(),
+                unit: String::default(),
+            }],
+            timeseries: vec![proto::TimeSeries {
+                labels: vec![proto::Label {
+                    name: "__name__".into(),
+                    value: "test_metric".into(),
+                }],
+                samples: vec![proto::Sample {
+                    value: 42.0,
+                    timestamp: chrono::Utc::now().timestamp_millis(),
+                }],
+            }],
+        };
+
+        let mut buf = Vec::new();
+        request.encode(&mut buf).unwrap();
+
+        // Compress with snappy as expected by the remote_write endpoint
+        snap::raw::Encoder::new().compress_vec(&buf).unwrap()
+    }
+
     fn create_conflicting_metadata_request_body() -> Vec<u8> {
         use prost::Message;
         use vector_lib::prometheus::parser::proto;
@@ -740,7 +770,7 @@ mod test {
         tokio::spawn(source);
         wait_for_tcp(address).await;
 
-        let request_body = create_conflicting_metadata_request_body();
+        let request_body = create_default_request_body();
         send_request_and_assert(address.port(), request_body).await;
 
         // Verify we received the metric data
