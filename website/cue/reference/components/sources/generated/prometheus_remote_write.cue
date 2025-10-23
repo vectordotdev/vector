@@ -112,6 +112,17 @@ generated: components: sources: prometheus_remote_write: configuration: {
 			}
 		}
 	}
+	metadata_conflict_strategy: {
+		description: "Defines the behavior for handling conflicting metric metadata."
+		required:    false
+		type: string: {
+			default: "reject"
+			enum: {
+				ignore: "Silently ignore metadata conflicts, keeping the first metadata entry. This aligns with Prometheus/Thanos behavior."
+				reject: "Reject requests with conflicting metadata by returning an HTTP 400 error. This is the default to preserve backwards compatibility."
+			}
+		}
+	}
 	path: {
 		description: "The URL path on which metric POST requests are accepted."
 		required:    false

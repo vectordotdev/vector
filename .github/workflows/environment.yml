@@ -3,12 +3,18 @@ name: Environment Suite
 on:
   workflow_call:
   workflow_dispatch:
+    inputs:
+      push:
+        description: "Push image when manually triggered"
+        type: boolean
+        default: false
   schedule:
     - cron: '0 6 * * 1'  # Every Monday at 06:00 UTC
 
 env:
   VERBOSE: true
   CI: true
+  SHOULD_PUBLISH: ${{ (github.event_name != 'workflow_dispatch' && github.ref == 'refs/heads/master') || (github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true') }}
 
 permissions:
   statuses: write
@@ -43,7 +49,7 @@ jobs:
         uses: docker/setup-buildx-action@e468171a9de216ec08956ac3ada2f0791b6bd435 # v3.11.1
       - name: Login to DockerHub
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
-        if: github.ref == 'refs/heads/master'
+        if: env.SHOULD_PUBLISH == 'true'
         with:
           username: ${{ secrets.CI_DOCKER_USERNAME }}
           password: ${{ secrets.CI_DOCKER_PASSWORD }}
@@ -60,12 +66,37 @@ jobs:
             org.opencontainers.image.source=https://github.com/vectordotdev/vector/tree/master/scripts/environment/Dockerfile
             org.opencontainers.image.title=Vector development environment
             org.opencontainers.image.url=https://github.com/vectordotdev/vector
-      - name: Build and push
+
+      - name: Free disk space
+        shell: bash
+        run: sudo -E bash scripts/ci-free-disk-space.sh
+
+      - name: Build image (no push)
         uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
         with:
           context: .
           file: ./scripts/environment/Dockerfile
-          push: ${{ github.ref == 'refs/heads/master' }}
+          load: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+
+      - name: Test built image
+        run: |
+          IMAGE_TAG=$(echo "${{ steps.meta.outputs.tags }}" | head -n1)
+          echo "Running build test inside container: ${IMAGE_TAG}"
+          docker run --rm \
+            -v "${GITHUB_WORKSPACE}:/src" \
+            -w /src \
+            "${IMAGE_TAG}" \
+            cargo run --bin vector -- --version
+
+      - name: Push image
+        if: env.SHOULD_PUBLISH == 'true'
+        uses: docker/build-push-action@263435318d21b8e681c14492fe198d362a7d2c83 # v6.18.0
+        with:
+          context: .
+          file: ./scripts/environment/Dockerfile
+          push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
 
