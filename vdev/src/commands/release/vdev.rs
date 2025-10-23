@@ -47,11 +47,7 @@ impl Cli {
 
         // Validate version bump
         if self.version <= current_version {
-            bail!(
-                "New version {} must be greater than current version {}",
-                self.version,
-                current_version
-            );
+            bail!("New version {} must be greater than current version {current_version}", self.version);
         }
 
         // Check git status
@@ -63,7 +59,7 @@ impl Cli {
         if !self.yes {
             let summary = format_release_plan(&version, &tag_name);
             info!("{summary}");
-            if !confirm("Proceed with release?")? {
+            if !util::confirm("Proceed with release?")? {
                 bail!("Release cancelled");
             }
         }
@@ -72,7 +68,6 @@ impl Cli {
         info!("Updating Cargo.toml to version {version}");
         update_vdev_version(&vdev_cargo_toml, &current_version, &self.version)?;
 
-        // Commit the change
         let vdev_cargo_toml_relative = vdev_cargo_toml.strip_prefix(&repo_root)
             .unwrap_or(&vdev_cargo_toml);
         git::run_and_check_output(&["add", &vdev_cargo_toml_relative.display().to_string()])?;
@@ -80,11 +75,9 @@ impl Cli {
         git::commit(&commit_message)?;
         debug!("Created commit: {commit_message}");
 
-        // Create the tag
         info!("Creating tag {tag_name}");
         git::tag_version(&tag_name)?;
 
-        // Push to remote
         let current_branch = git::current_branch()?;
         info!("Pushing to origin");
         git::push_branch(&current_branch)?;
@@ -94,7 +87,6 @@ impl Cli {
         debug!("Pushed tag: {tag_name}");
 
         info!("Monitor release workflow: {PUBLISH_URL}");
-
         Ok(())
     }
 }
@@ -154,17 +146,4 @@ fn format_release_plan(version: &str, tag_name: &str) -> String {
            3. Create tag {tag_name}\n\
            4. Push the commit and tag to origin\n"
     )
-}
-
-#[allow(clippy::print_stdout)]
-fn confirm(prompt: &str) -> Result<bool> {
-    use std::io::{self, Write};
-
-    print!("{prompt} [y/N] ");
-    io::stdout().flush()?;
-
-    let mut input = String::new();
-    io::stdin().read_line(&mut input)?;
-
-    Ok(input.trim().eq_ignore_ascii_case("y") || input.trim().eq_ignore_ascii_case("yes"))
 }

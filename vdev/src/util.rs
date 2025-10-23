@@ -1,6 +1,3 @@
-#![allow(clippy::print_stderr)]
-#![allow(clippy::print_stdout)]
-
 use std::{
     collections::BTreeMap,
     ffi::{OsStr, OsString},
@@ -91,6 +88,7 @@ impl<T: AsRef<OsStr>> ChainArgs for [T] {
     }
 }
 
+#[allow(clippy::print_stderr)]
 pub fn run_command(cmd: &str) -> String {
     let output = Command::new("sh")
         .arg("-c")
@@ -117,4 +115,20 @@ pub fn get_repo_root() -> PathBuf {
         .parent()
         .expect("vdev must be in a subdirectory of the repo")
         .to_path_buf()
+}
+
+/// Prompt the user for confirmation with a yes/no question
+///
+/// Returns `Ok(true)` if the user confirms (y/yes), `Ok(false)` otherwise
+#[allow(clippy::print_stdout)]
+pub fn confirm(prompt: &str) -> Result<bool> {
+    use std::io::{self, Write};
+
+    print!("{prompt} [y/N] ");
+    io::stdout().flush()?;
+
+    let mut input = String::new();
+    io::stdin().read_line(&mut input)?;
+
+    Ok(input.trim().eq_ignore_ascii_case("y") || input.trim().eq_ignore_ascii_case("yes"))
 }
