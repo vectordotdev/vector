@@ -836,6 +836,18 @@ mod test {
             ),
             // Float attribute match (negate w/-).
             ("-@a:0.75", log_event!["a" => 0.74], log_event!["a" => 0.75]),
+            // Attribute match with dot in name
+            (
+                "@a.b:x",
+                log_event!["a" => serde_json::json!({"b": "x"})],
+                Event::Log(LogEvent::from(Value::from(serde_json::json!({"a.b": "x"})))),
+            ),
+            // Attribute with dot in name (flattened key) - requires escaped quotes.
+            (
+                r#"@\"a.b\":x"#,
+                Event::Log(LogEvent::from(Value::from(serde_json::json!({"a.b": "x"})))),
+                log_event!["a" => serde_json::json!({"b": "x"})],
+            ),
             // Wildcard prefix.
             (
                 "*bla",
