@@ -1,9 +1,39 @@
+//! Component utilization tracking and metrics.
+//!
+//! This module tracks how much time Vector components spend waiting for input versus actively processing data.
+//! Utilization is calculated as a number between `0` and `1`, where `1` means fully utilized and `0` means idle.
+//!
+//! # Architecture
+//!
+//! - **Stream Wrapper**: `Utilization<S>` wraps component input streams and sends timing messages when polling.
+//! - **Timer**: Tracks wait/active spans and calculates utilization via exponentially weighted moving average (EWMA).
+//! - **Emitter**: Centralized `UtilizationEmitter` receives timing messages from all components and periodically reports metrics.
+//!
+//! # Message Flow
+//!
+//! 1. Component polls wrapped stream → `Utilization::poll_next()` sends `StartWait` message with timestamp
+//! 2. Stream returns data → `Utilization::poll_next()` sends `StopWait` message with timestamp
+//! 3. Messages queue in async channel and are processed by `UtilizationEmitter`
+//! 4. Every `5` seconds, `Timer::report()` calculates utilization and updates the metric gauge
+//!
+//! # Delayed Message Handling
+//!
+//! Messages carry timestamps from when they were sent, but may be processed later due to channel queueing.
+//! To prevent invalid utilization calculations, `Timer::end_span()` clamps timestamps to the current reporting
+//! period boundary (`overall_start`), ensuring we only account for time within the current measurement window.
+
 use std::{
     collections::HashMap,
     pin::Pin,
     task::{Context, Poll, ready},
-    time::{Duration, Instant},
+    time::Duration,
 };
+
+#[cfg(not(test))]
+use std::time::Instant;
+
+#[cfg(test)]
+use mock_instant::global::Instant;
 
 #[cfg(debug_assertions)]
 use std::sync::Arc;
@@ -110,13 +140,10 @@ impl Timer {
     }
 
     /// Complete the current waiting span and begin a non-waiting span
-    pub(crate) fn stop_wait(&mut self, at: Instant) -> Instant {
+    pub(crate) fn stop_wait(&mut self, at: Instant) {
         if self.waiting {
-            let now = self.end_span(at);
+            self.end_span(at);
             self.waiting = false;
-            now
-        } else {
-            at
         }
     }
 
@@ -127,7 +154,8 @@ impl Timer {
         // End the current span so it can be accounted for, but do not change
         // whether or not we're in the waiting state. This way the next span
         // inherits the correct status.
-        let now = self.end_span(Instant::now());
+        let now = Instant::now();
+        self.end_span(now);
 
         let total_duration = now.duration_since(self.overall_start);
         let wait_ratio = self.total_wait.as_secs_f64() / total_duration.as_secs_f64();
@@ -136,6 +164,11 @@ impl Timer {
         self.ewma.update(utilization);
         let avg = self.ewma.average().unwrap_or(f64::NAN);
         let avg_rounded = (avg * 10000.0).round() / 10000.0; // 4 digit precision
+
+        self.gauge.set(avg_rounded);
+
+        self.overall_start = now;
+        self.total_wait = Duration::new(0, 0);
 
         #[cfg(debug_assertions)]
         {
@@ -146,20 +179,20 @@ impl Timer {
             }
             self.report_count = self.report_count.wrapping_add(1);
         }
-
-        self.gauge.set(avg_rounded);
-
-        // Reset overall statistics for the next reporting period.
-        self.overall_start = self.span_start;
-        self.total_wait = Duration::new(0, 0);
     }
 
-    fn end_span(&mut self, at: Instant) -> Instant {
+    fn end_span(&mut self, at: Instant) {
+        // Clamp the timestamp to the current reporting period to handle delayed messages.
+        // If 'at' is before overall_start (due to old timestamps from queued messages),
+        // clamp it to overall_start to prevent accounting for time outside this period.
+        let at_clamped = at.max(self.overall_start);
+
         if self.waiting {
-            self.total_wait += at - self.span_start;
+            // Similarly, clamp span_start to ensure we don't count wait time from before this period
+            let span_start_clamped = self.span_start.max(self.overall_start);
+            self.total_wait += at_clamped.saturating_duration_since(span_start_clamped);
         }
-        self.span_start = at;
-        self.span_start
+        self.span_start = at_clamped;
     }
 }
 
@@ -280,5 +313,179 @@ pub(crate) fn wrap<S>(
         timer_tx,
         component_key,
         inner,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mock_instant::global::MockClock;
+    use serial_test::serial;
+
+    use super::*;
+
+    #[test]
+    #[serial]
+    fn test_normal_utilization_within_bounds() {
+        // Reset mock clock to ensure test isolation
+        MockClock::set_time(Duration::ZERO);
+
+        // Advance mock time to T=100 to avoid issues with time 0
+        MockClock::advance(Duration::from_secs(100));
+
+        let mut timer = Timer::new(
+            metrics::gauge!("test_utilization"),
+            #[cfg(debug_assertions)]
+            "test_component".into(),
+        );
+
+        // Timer created at T=100. Advance 1 second and start waiting
+        MockClock::advance(Duration::from_secs(1));
+        timer.start_wait(Instant::now());
+
+        // Advance 2 seconds while waiting (T=101 to T=103)
+        MockClock::advance(Duration::from_secs(2));
+        timer.stop_wait(Instant::now());
+
+        // Advance 2 more seconds (not waiting), then report (T=103 to T=105)
+        MockClock::advance(Duration::from_secs(2));
+        timer.report();
+
+        // total_wait = 2 seconds, total_duration = 5 seconds (T=100 to T=105)
+        // wait_ratio = 2/5 = 0.4, utilization = 1.0 - 0.4 = 0.6
+        let avg = timer.ewma.average().unwrap();
+        assert!(
+            avg >= 0.0 && avg <= 1.0,
+            "Utilization {} is outside [0, 1]",
+            avg
+        );
+        assert!(
+            (avg - 0.6).abs() < 0.01,
+            "Expected utilization ~0.6, got {}",
+            avg
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_delayed_messages_can_cause_invalid_utilization() {
+        // Reset mock clock to ensure test isolation
+        MockClock::set_time(Duration::ZERO);
+
+        // Start at T=100 to avoid time 0 issues
+        MockClock::advance(Duration::from_secs(100));
+
+        let mut timer = Timer::new(
+            metrics::gauge!("test_utilization"),
+            #[cfg(debug_assertions)]
+            "test_component".into(),
+        );
+
+        // Timer created at T=100. Simulate that some time passes (to T=105)
+        // and a report period completes, resetting overall_start
+        MockClock::advance(Duration::from_secs(5));
+        let now = Instant::now(); // T=105
+        timer.overall_start = now; // Simulate report period reset
+
+        // Now simulate delayed messages with old timestamps from before T=105
+        // These represent messages sent at T=101, T=103, T=104 but processed after T=105
+        let t1 = now - Duration::from_secs(4); // T=101
+        let t3 = now - Duration::from_secs(2); // T=103
+        let t4 = now - Duration::from_secs(1); // T=104
+
+        // Process old messages - they should be clamped to overall_start (T=105)
+        timer.start_wait(t1); // Should be clamped to T=105
+        timer.stop_wait(t3); // Should be clamped to T=105 (no wait time added)
+        timer.start_wait(t4); // Should be clamped to T=105
+
+        // Advance 5 seconds and report (T=110)
+        MockClock::advance(Duration::from_secs(5));
+        timer.report();
+
+        // With clamping: all old timestamps treated as T=105
+        // So we waited from T=105 to T=110 = 5 seconds
+        // total_duration = 5 seconds, total_wait = 5 seconds
+        // wait_ratio = 1.0, utilization = 0.0
+        let avg = timer.ewma.average().unwrap();
+        assert!(
+            avg >= 0.0 && avg <= 1.0,
+            "Utilization {} is outside [0, 1]",
+            avg
+        );
+        assert!(
+            avg < 0.01,
+            "Expected utilization near 0 (always waiting), got {}",
+            avg
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_always_waiting_utilization() {
+        // Reset mock clock to ensure test isolation
+        MockClock::set_time(Duration::ZERO);
+
+        // Start at T=100 to avoid time 0 issues
+        MockClock::advance(Duration::from_secs(100));
+
+        let mut timer = Timer::new(
+            metrics::gauge!("test_utilization"),
+            #[cfg(debug_assertions)]
+            "test_component".into(),
+        );
+
+        // Timer created at T=100. Start waiting immediately
+        timer.start_wait(Instant::now());
+
+        // Advance 5 seconds while waiting (T=100 to T=105)
+        MockClock::advance(Duration::from_secs(5));
+        timer.report();
+
+        // We waited the entire time: total_wait = 5s, total_duration = 5s
+        // wait_ratio = 1.0, utilization = 0.0
+        let avg = timer.ewma.average().unwrap();
+        assert!(
+            avg >= 0.0 && avg <= 1.0,
+            "Utilization {} is outside [0, 1]",
+            avg
+        );
+        assert!(
+            avg < 0.01,
+            "Expected utilization near 0 (always waiting), got {}",
+            avg
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_never_waiting_utilization() {
+        // Reset mock clock to ensure test isolation
+        MockClock::set_time(Duration::ZERO);
+
+        // Start at T=100 to avoid time 0 issues
+        MockClock::advance(Duration::from_secs(100));
+
+        let mut timer = Timer::new(
+            metrics::gauge!("test_utilization"),
+            #[cfg(debug_assertions)]
+            "test_component".into(),
+        );
+
+        // Advance 5 seconds without waiting (T=100 to T=105)
+        MockClock::advance(Duration::from_secs(5));
+        timer.report();
+
+        // Never waited: total_wait = 0, total_duration = 5s
+        // wait_ratio = 0.0, utilization = 1.0
+        let avg = timer.ewma.average().unwrap();
+        assert!(
+            avg >= 0.0 && avg <= 1.0,
+            "Utilization {} is outside [0, 1]",
+            avg
+        );
+        assert!(
+            avg > 0.99,
+            "Expected utilization near 1.0 (never waiting), got {}",
+            avg
+        );
     }
 }
