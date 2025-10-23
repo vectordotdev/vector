@@ -1,5 +1,5 @@
 ---
-date: "2025-03-19"
+date: "2025-02-21"
 title: A guide for debugging Vector pipelines
 short: Debugging Vector
 description: Step by step guide for debugging pipelines

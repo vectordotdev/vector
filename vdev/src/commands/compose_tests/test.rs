@@ -13,7 +13,8 @@ pub fn exec(
     local_config: ComposeTestLocalConfig,
     integration: &str,
     environment: Option<&String>,
-    build_all: bool,
+    all_features: bool,
+    reuse_image: bool,
     retries: u8,
     args: &[String],
 ) -> Result<()> {
@@ -34,8 +35,15 @@ pub fn exec(
     };
 
     for environment in environments {
-        ComposeTest::generate(local_config, integration, environment, build_all, retries)?
-            .test(args.to_owned())?;
+        ComposeTest::generate(
+            local_config,
+            integration,
+            environment,
+            all_features,
+            reuse_image,
+            retries,
+        )?
+        .test(args.to_owned())?;
     }
     Ok(())
 }

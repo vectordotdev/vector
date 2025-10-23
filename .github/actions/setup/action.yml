@@ -90,10 +90,18 @@ runs:
                    "${{ inputs.wasm-pack }}"; do
           if [[ "$val" == "true" ]]; then
             rust="true"
+            break
           fi
         done
 
         echo "NEEDS_RUST=$rust" >> "$GITHUB_ENV"
+
+        if [[ "$rust" == "true" ]]; then
+          echo "RUST_BACKTRACE=full" >> "$GITHUB_ENV"
+          # Set nice CI colors
+          echo "CARGO_TERM_COLOR=always" >> "$GITHUB_ENV"
+        fi
+
 
     - name: Enable rust matcher
       if: ${{ env.NEEDS_RUST == 'true' }}
