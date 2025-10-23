@@ -23,16 +23,14 @@ jobs:
 
       - name: Bootstrap runner environment (Ubuntu)
         if: startsWith(matrix.os, 'ubuntu')
-        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+        run: |
+          sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
 
       - name: Bootstrap runner environment (macOS)
         if: startsWith(matrix.os, 'macos')
         run: bash scripts/environment/bootstrap-macos.sh
 
-      - name: Setup CI toolchain
-        uses: ./.github/actions/setup
-        with:
-          rust: true
+      - run: bash scripts/environment/prepare.sh --modules=rustup
 
       - name: Build
         working-directory: vdev

@@ -7,6 +7,7 @@ use std::path::PathBuf;
 use crate::{git, util};
 
 const PUBLISH_URL: &str = "https://github.com/vectordotdev/vector/actions/workflows/vdev_publish.yml";
+const MAIN_BRANCH: &str = "master";
 
 /// Release a new version of vdev
 ///
@@ -36,6 +37,12 @@ enum ReleaseType {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        // Check that we're on the master branch
+        let current_branch = git::current_branch()?;
+        if current_branch != MAIN_BRANCH {
+            bail!("Release cancelled. You must be on the '{MAIN_BRANCH}' branch to release (currently on: {current_branch})");
+        }
+
         // Check git status
         if !git::check_git_repository_clean()? {
             bail!("Release cancelled. You have uncommitted changes in your repository.");
@@ -83,10 +90,9 @@ impl Cli {
         info!("Creating tag {tag_name}");
         git::tag_version(&tag_name)?;
 
-        let current_branch = git::current_branch()?;
         info!("Pushing to origin");
-        git::push_branch(&current_branch)?;
-        debug!("Pushed branch: {current_branch}");
+        git::push_branch(MAIN_BRANCH)?;
+        debug!("Pushed to {MAIN_BRANCH} branch.");
 
         git::push_branch(&tag_name)?;
         debug!("Pushed tag: {tag_name}");
