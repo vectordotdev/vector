@@ -7,7 +7,7 @@ use std::{
     fmt::Debug,
     fs,
     io::{ErrorKind, IsTerminal},
-    path::Path,
+    path::{Path, PathBuf},
     process,
     process::{Command, Output},
     sync::LazyLock,
@@ -107,4 +107,14 @@ pub fn run_command(cmd: &str) -> String {
     }
 
     String::from_utf8_lossy(&output.stdout).to_string()
+}
+
+/// Get the root directory of the Vector repository
+///
+/// This is calculated relative to the vdev crate's manifest directory
+pub fn get_repo_root() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .expect("vdev must be in a subdirectory of the repo")
+        .to_path_buf()
 }
