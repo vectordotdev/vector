@@ -12,9 +12,11 @@ pub use format::{
     JsonSerializer, JsonSerializerConfig, JsonSerializerOptions, LogfmtSerializer,
     LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
     NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig,
-    ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, SyslogSerializer,
-    SyslogSerializerConfig, TextSerializer, TextSerializerConfig,
+    ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
+    TextSerializerConfig,
 };
+#[cfg(feature = "syslog")]
+pub use format::{SyslogSerializer, SyslogSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpSerializer, OtlpSerializerConfig};
 pub use framing::{

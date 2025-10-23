@@ -130,9 +130,10 @@ impl EncodingConfigWithFraming {
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
-                | Serializer::Text(_)
-                | Serializer::Syslog(_),
+                | Serializer::Text(_),
             ) => NewlineDelimitedEncoder::default().into(),
+            #[cfg(feature = "codecs-syslog")]
+            (None, Serializer::Syslog(_)) => NewlineDelimitedEncoder::default().into(),
             #[cfg(feature = "codecs-opentelemetry")]
             (None, Serializer::Otlp(_)) => BytesEncoder.into(),
         };
