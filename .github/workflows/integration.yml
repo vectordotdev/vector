@@ -193,6 +193,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: always()
     needs:
+      - build-test-runner
       - integration-tests
       - e2e-tests
     steps:
