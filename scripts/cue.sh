@@ -9,9 +9,14 @@ set -euo pipefail
 
 ROOT=$(git rev-parse --show-toplevel)
 CUE_SOURCES="${ROOT}/website/cue"
+JSON_OUT="${ROOT}/website/data/docs.json"
 
 list-docs-files() {
   find "${CUE_SOURCES}" -name '*.cue'
+}
+
+cmd_check() {
+  cargo vdev check docs
 }
 
 cmd_list() {
@@ -34,13 +39,27 @@ cmd_export() {
   list-docs-files | xargs cue export --all-errors "$@"
 }
 
+cmd_build() {
+  # Display the CUE version for CI debugging purposes
+  cue version
+
+  # The docs JSON file needs to be removed or else CUE errors
+  rm -f "${JSON_OUT}"
+
+  # Build the docs JSON object out of the CUE sources
+  list-docs-files | xargs cue export --all-errors "$@" --outfile "${JSON_OUT}"
+}
+
 usage() {
   cat >&2 <<-EOF
-Usage: $0 MODE
+Usage: $0 [build|check|fmt|list|vet|eval|export]
 
 Modes:
+  build   - build all of the CUE sources and export them into a Hugo-processable
+            JSON object
+  check   - check for the CUE sources' correctness
+  fmt     - format all CUE files using the built-in formatter
   list    - list all the documentation files
-  fmt     - format all the documentation files
   vet     - check the documentation files and print errors
   eval    - print the evaluated documentation,
             optionally pass the expression to evaluate via "-e EXPRESSION"
@@ -61,13 +80,18 @@ Examples:
 
     $0 export -e cli
 
+  Write all CUE data as JSON to ${JSON_OUT}:
+    make cue-build
+
+  Reformat the CUE sources:
+    make cue-fmt
 EOF
   exit 1
 }
 
 MODE="${1:-}"
 case "$MODE" in
-  list|fmt|vet|eval|export)
+  build|check|fmt|list|vet|eval|export)
     shift
     "cmd_$MODE" "$@"
     ;;

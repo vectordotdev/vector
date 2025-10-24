@@ -139,13 +139,17 @@ pub fn trace_init() {
     let color = {
         use std::io::IsTerminal;
         std::io::stdout().is_terminal()
+            || std::env::var("NEXTEST")
+                .ok()
+                .and(Some(true))
+                .unwrap_or(false)
     };
     // Windows: ANSI colors are not supported by cmd.exe
     // Color is false for everything except unix.
     #[cfg(not(unix))]
     let color = false;
 
-    let levels = std::env::var("TEST_LOG").unwrap_or_else(|_| "error".to_string());
+    let levels = std::env::var("VECTOR_LOG").unwrap_or_else(|_| "error".to_string());
 
     trace::init(color, false, &levels, 10);
 

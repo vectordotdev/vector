@@ -45,10 +45,14 @@ pub(super) fn open_file<P: AsRef<Path> + Debug>(path: P) -> Option<File> {
         Ok(f) => Some(f),
         Err(error) => {
             if let std::io::ErrorKind::NotFound = error.kind() {
-                error!(message = "Config file not found in path.", ?path);
+                error!(
+                    message = "Config file not found in path.",
+                    ?path,
+                    internal_log_rate_limit = false
+                );
                 None
             } else {
-                error!(message = "Error opening config file.", %error, ?path);
+                error!(message = "Error opening config file.", %error, ?path, internal_log_rate_limit = false);
                 None
             }
         }
@@ -89,7 +93,7 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
         };
 
         if matches.is_empty() {
-            error!(message = "Config file not found in path.", path = ?config_pattern);
+            error!(message = "Config file not found in path.", path = ?config_pattern, internal_log_rate_limit = false);
             std::process::exit(exitcode::CONFIG);
         }
 
@@ -175,6 +179,49 @@ pub async fn load_from_paths_with_provider_and_secrets(
     Ok(new_config)
 }
 
+pub async fn load_from_str_with_secrets(
+    input: &str,
+    format: Format,
+    signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
+) -> Result<Config, Vec<String>> {
+    // Load secret backends first
+    let mut secrets_backends_loader = load_secret_backends_from_input(input.as_bytes(), format)?;
+    // And then, if needed, retrieve secrets from configured backends
+    let mut builder = if secrets_backends_loader.has_secrets_to_retrieve() {
+        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
+        let resolved_secrets = secrets_backends_loader
+            .retrieve(&mut signal_handler.subscribe())
+            .await
+            .map_err(|e| vec![e])?;
+        load_builder_from_input_with_secrets(input.as_bytes(), format, resolved_secrets)?
+    } else {
+        debug!(message = "No secret placeholder found, skipping secret resolution.");
+        load_builder_from_input(input.as_bytes(), format)?
+    };
+
+    builder.allow_empty = allow_empty;
+    signal_handler.clear();
+    let (new_config, build_warnings) = builder.build_with_warnings()?;
+
+    validation::check_buffer_preconditions(&new_config).await?;
+
+    for warning in build_warnings {
+        warn!("{}", warning);
+    }
+
+    Ok(new_config)
+}
+
+fn loader_from_input<T, L, R>(mut loader: L, input: R, format: Format) -> Result<T, Vec<String>>
+where
+    T: serde::de::DeserializeOwned,
+    L: Loader<T> + Process,
+    R: std::io::Read,
+{
+    loader.load_from_str(input, format).map(|_| loader.take())
+}
+
 /// Iterators over `ConfigPaths`, and processes a file/dir according to a provided `Loader`.
 fn loader_from_paths<T, L>(mut loader: L, config_paths: &[ConfigPath]) -> Result<T, Vec<String>>
 where
@@ -217,12 +264,27 @@ pub fn load_builder_from_paths(config_paths: &[ConfigPath]) -> Result<ConfigBuil
     loader_from_paths(ConfigBuilderLoader::new(), config_paths)
 }
 
+fn load_builder_from_input<R: std::io::Read>(
+    input: R,
+    format: Format,
+) -> Result<ConfigBuilder, Vec<String>> {
+    loader_from_input(ConfigBuilderLoader::new(), input, format)
+}
+
 /// Uses `ConfigBuilderLoader` to process `ConfigPaths`, performing secret replacement and deserializing to a `ConfigBuilder`
 pub fn load_builder_from_paths_with_secrets(
     config_paths: &[ConfigPath],
     secrets: HashMap<String, String>,
 ) -> Result<ConfigBuilder, Vec<String>> {
     loader_from_paths(ConfigBuilderLoader::with_secrets(secrets), config_paths)
+}
+
+fn load_builder_from_input_with_secrets<R: std::io::Read>(
+    input: R,
+    format: Format,
+    secrets: HashMap<String, String>,
+) -> Result<ConfigBuilder, Vec<String>> {
+    loader_from_input(ConfigBuilderLoader::with_secrets(secrets), input, format)
 }
 
 /// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
@@ -237,6 +299,13 @@ pub fn load_secret_backends_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<SecretBackendLoader, Vec<String>> {
     loader_from_paths(SecretBackendLoader::new(), config_paths)
+}
+
+fn load_secret_backends_from_input<R: std::io::Read>(
+    input: R,
+    format: Format,
+) -> Result<SecretBackendLoader, Vec<String>> {
+    loader_from_input(SecretBackendLoader::new(), input, format)
 }
 
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {

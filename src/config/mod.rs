@@ -55,8 +55,8 @@ pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
 pub use loading::{
     COLLECTOR, CONFIG_PATHS, load, load_builder_from_paths, load_from_paths,
-    load_from_paths_with_provider_and_secrets, load_from_str, load_source_from_paths,
-    merge_path_lists, process_paths,
+    load_from_paths_with_provider_and_secrets, load_from_str, load_from_str_with_secrets,
+    load_source_from_paths, merge_path_lists, process_paths,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
@@ -250,6 +250,19 @@ impl Config {
                 self.propagate_acks_rec(inputs);
             }
         }
+    }
+
+    pub fn transform_keys_with_external_files(&self) -> HashSet<ComponentKey> {
+        self.transforms
+            .iter()
+            .filter_map(|(name, transform_outer)| {
+                if !transform_outer.inner.files_to_watch().is_empty() {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 

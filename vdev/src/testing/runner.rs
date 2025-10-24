@@ -1,6 +1,5 @@
-use std::{collections::HashSet, env, path::PathBuf, process::Command};
-
 use anyhow::Result;
+use std::{collections::HashSet, env, path::PathBuf, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::{
@@ -27,8 +26,7 @@ const TEST_COMMAND: &[&str] = &[
     "--no-default-features",
 ];
 // The upstream container we publish artifacts to on a successful master build.
-const UPSTREAM_IMAGE: &str =
-    "docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a";
+const UPSTREAM_IMAGE: &str = "docker.io/timberio/vector-dev:latest";
 
 pub enum RunnerState {
     Running,
@@ -57,6 +55,7 @@ pub trait TestRunner {
         features: Option<&[String]>,
         args: &[String],
         directory: &str,
+        reuse_image: bool,
     ) -> Result<()>;
 }
 
@@ -105,6 +104,7 @@ pub trait ContainerTestRunner: TestRunner {
         features: Option<&[String]>,
         directory: &str,
         config_environment_variables: &Environment,
+        reuse_image: bool,
     ) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
@@ -116,8 +116,12 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, directory, config_environment_variables)?;
-                self.ensure_volumes()?;
+                self.build(
+                    features,
+                    directory,
+                    config_environment_variables,
+                    reuse_image,
+                )?;
                 self.create()?;
                 self.start()?;
             }
@@ -150,18 +154,35 @@ pub trait ContainerTestRunner: TestRunner {
         features: Option<&[String]>,
         directory: &str,
         config_env_vars: &Environment,
+        reuse_image: bool,
     ) -> Result<()> {
+        let image_name = self.image_name();
+
+        // When reuse_image is true, skip build if image already exists (useful in CI).
+        // Otherwise, always rebuild to pick up local code changes.
+        if reuse_image {
+            let mut check_command = docker_command(["image", "inspect", &image_name]);
+            if check_command
+                .output()
+                .is_ok_and(|output| output.status.success())
+            {
+                info!("Image {image_name} already exists, skipping build");
+                return Ok(());
+            }
+        }
+
         let dockerfile: PathBuf = [app::path(), "scripts", directory, "Dockerfile"]
             .iter()
             .collect();
 
         let mut command =
-            prepare_build_command(&self.image_name(), &dockerfile, features, config_env_vars);
-        waiting!("Building image {}", self.image_name());
+            prepare_build_command(&image_name, &dockerfile, features, config_env_vars);
+        waiting!("Building image {}", image_name);
         command.check_run()
     }
 
     fn start(&self) -> Result<()> {
+        self.ensure_volumes()?;
         docker_command(["start", &self.container_name()])
             .wait(format!("Starting container {}", self.container_name()))
     }
@@ -196,6 +217,7 @@ pub trait ContainerTestRunner: TestRunner {
             .flat_map(|volume| ["--volume", volume])
             .collect();
 
+        self.ensure_volumes()?;
         docker_command(
             [
                 "create",
@@ -235,8 +257,14 @@ where
         features: Option<&[String]>,
         args: &[String],
         directory: &str,
+        reuse_image: bool,
     ) -> Result<()> {
-        self.ensure_running(features, directory, config_environment_variables)?;
+        self.ensure_running(
+            features,
+            directory,
+            config_environment_variables,
+            reuse_image,
+        )?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
@@ -276,15 +304,19 @@ impl IntegrationTestRunner {
         config: &IntegrationRunnerConfig,
         network: Option<String>,
     ) -> Result<Self> {
+        let mut volumes: Vec<String> = config
+            .volumes
+            .iter()
+            .map(|(a, b)| format!("{a}:{b}"))
+            .collect();
+
+        volumes.push(format!("{VOLUME_TARGET}:/output"));
+
         Ok(Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,
             network,
-            volumes: config
-                .volumes
-                .iter()
-                .map(|(a, b)| format!("{a}:{b}"))
-                .collect(),
+            volumes,
         })
     }
 
@@ -304,6 +336,26 @@ impl IntegrationTestRunner {
         } else {
             Ok(())
         }
+    }
+
+    pub(super) fn ensure_external_volumes(&self) -> Result<()> {
+        // Get list of existing volumes
+        let mut command = docker_command(["volume", "ls", "--format", "{{.Name}}"]);
+        let existing_volumes: HashSet<String> =
+            command.check_output()?.lines().map(String::from).collect();
+
+        // Extract volume names from self.volumes (format is "volume_name:/mount/path")
+        for volume_spec in &self.volumes {
+            if let Some((volume_name, _)) = volume_spec.split_once(':') {
+                // Only create named volumes (not paths like /host/path)
+                if !volume_name.starts_with('/') && !existing_volumes.contains(volume_name) {
+                    docker_command(["volume", "create", volume_name])
+                        .wait(format!("Creating volume {volume_name}"))?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -371,6 +423,7 @@ impl TestRunner for LocalTestRunner {
         _features: Option<&[String]>,
         args: &[String],
         _directory: &str,
+        _reuse_image: bool,
     ) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);
