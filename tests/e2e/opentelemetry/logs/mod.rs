@@ -7,8 +7,7 @@ use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEn
 use vector_lib::opentelemetry::proto::{DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE};
 use vrl::value::Value as VrlValue;
 
-const EXPECTED_LOG_COUNT: usize = 100;
-const EXPECTED_VECTOR_LOG_COUNT: usize = 200; // 100 via gRPC + 100 via HTTP
+const EXPECTED_TOTAL_LOG_COUNT: usize = 200; // 100 via gRPC + 100 via HTTP
 
 fn read_file_helper(filename: &str) -> Result<String, io::Error> {
     let local_path = Path::new("/output/opentelemetry-logs").join(filename);
@@ -187,7 +186,7 @@ fn vector_sink_otel_sink_logs_match() {
     let vector_request = parse_export_logs_request(&vector_content)
         .expect("Failed to parse vector logs as ExportLogsServiceRequest");
 
-    // Count total log records in collector output
+    // Count total log records
     let collector_log_count = collector_request
         .resource_logs
         .iter()
@@ -195,7 +194,6 @@ fn vector_sink_otel_sink_logs_match() {
         .flat_map(|sl| &sl.log_records)
         .count();
 
-    // Count total log records in vector output
     let vector_log_count = vector_request
         .resource_logs
         .iter()
@@ -204,13 +202,13 @@ fn vector_sink_otel_sink_logs_match() {
         .count();
 
     assert_eq!(
-        collector_log_count, EXPECTED_LOG_COUNT,
-        "Collector produced {collector_log_count} log records, expected {EXPECTED_LOG_COUNT}"
+        collector_log_count, EXPECTED_TOTAL_LOG_COUNT,
+        "Collector produced {collector_log_count} log records, expected {EXPECTED_TOTAL_LOG_COUNT}"
     );
 
     assert_eq!(
-        vector_log_count, EXPECTED_VECTOR_LOG_COUNT,
-        "Vector produced {vector_log_count} log records, expected {EXPECTED_VECTOR_LOG_COUNT}"
+        vector_log_count, EXPECTED_TOTAL_LOG_COUNT,
+        "Vector produced {vector_log_count} log records, expected {EXPECTED_TOTAL_LOG_COUNT}"
     );
 
     // Verify service.name attribute
@@ -221,7 +219,10 @@ fn vector_sink_otel_sink_logs_match() {
     assert_log_records_static_fields(&collector_request);
     assert_log_records_static_fields(&vector_request);
 
-    // Note: We don't compare collector_request == vector_request because Vector receives
-    // logs from both gRPC and HTTP exporters (200 logs vs 100 from collector file exporter).
-    // The assertions above verify that all logs have correct structure and content.
+    // Both collector and Vector receive 200 logs total (100 via gRPC + 100 via HTTP).
+    // Compare them directly to verify the entire pipeline works correctly.
+    assert_eq!(
+        collector_request, vector_request,
+        "Collector and Vector log requests should match"
+    );
 }
