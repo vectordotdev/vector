@@ -188,14 +188,14 @@ impl Timer {
         // Clamp the timestamp to the current reporting period to handle delayed messages.
         // If 'at' is before overall_start (due to old timestamps from queued messages),
         // clamp it to overall_start to prevent accounting for time outside this period.
-        let at_clamped = at.max(self.overall_start);
+        let at = at.max(self.overall_start);
 
         if self.waiting {
             // Similarly, clamp span_start to ensure we don't count wait time from before this period
-            let span_start_clamped = self.span_start.max(self.overall_start);
-            self.total_wait += at_clamped.saturating_duration_since(span_start_clamped);
+            let span_start = self.span_start.max(self.overall_start);
+            self.total_wait += at.saturating_duration_since(span_start);
         }
-        self.span_start = at_clamped;
+        self.span_start = at;
     }
 }
 
