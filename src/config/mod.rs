@@ -251,6 +251,19 @@ impl Config {
             }
         }
     }
+
+    pub fn transform_keys_with_external_files(&self) -> HashSet<ComponentKey> {
+        self.transforms
+            .iter()
+            .filter_map(|(name, transform_outer)| {
+                if !transform_outer.inner.files_to_watch().is_empty() {
+                    Some(name.clone())
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
 }
 
 /// Healthcheck options.
