@@ -14,6 +14,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     unzip \
     git \
+    unixodbc \
+    unixodbc-dev \
+    odbcinst \
+    odbc-mariadb \
+    odbc-postgresql \
   && rm -rf /var/lib/apt/lists/*
 
 COPY tests/data/ca/certs /certs
