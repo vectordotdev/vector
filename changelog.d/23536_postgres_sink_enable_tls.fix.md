@@ -1,4 +1,3 @@
-Fix an issue which made a TLS Postgres connection impossible since sqlx wasn't being compiled
-with the necessary feature flags.
+Fixed an issue in the `postgres` sink which made a TLS connection impossible due to a missing `sqlx` feature flag.
 
 authors: thomasqueirozb
