@@ -1,3 +1,4 @@
+use notify::{EventKind, RecursiveMode, recommended_watcher};
 use std::{
     collections::{HashMap, HashSet},
     path::{Path, PathBuf},
@@ -5,7 +6,6 @@ use std::{
     thread,
     time::Duration,
 };
-use notify::{EventKind, RecursiveMode, recommended_watcher};
 
 use crate::{
     Error,
@@ -103,8 +103,7 @@ pub fn spawn_thread<'a>(
                         debug!(message = "Configuration file change detected.", event = ?event);
 
                         // Collect paths from initial event
-                        let mut changed_paths: HashSet<PathBuf> =
-                            event.paths.into_iter().collect();
+                        let mut changed_paths: HashSet<PathBuf> = event.paths.into_iter().collect();
 
                         // Collect paths from subsequent events until delay amount of time has passed
                         while let Ok(Ok(subseq_event)) = receiver.recv_timeout(delay) {
