@@ -194,21 +194,19 @@ fn build_warp_log_filter(
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
-        if let Some(d) = deserializer.as_ref() {
-            d.parse(body, log_namespace)
-                .map(|r| r.into_vec())
-                .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
-        } else {
-            decode(encoding_header.as_deref(), body)
-                .and_then(|body| {
-                    bytes_received.emit(ByteSize(body.len()));
-                    decode_log_body(body, log_namespace, &events_received)
-                })
-                .map(|mut events| {
+        decode(encoding_header.as_deref(), body).and_then(|decoded_body| {
+            bytes_received.emit(ByteSize(decoded_body.len()));
+            if let Some(d) = deserializer.as_ref() {
+                d.parse(decoded_body, log_namespace)
+                    .map(|r| r.into_vec())
+                    .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+            } else {
+                decode_log_body(decoded_body, log_namespace, &events_received).map(|mut events| {
                     enrich_events(&mut events, &headers_cfg, &headers, log_namespace);
                     events
                 })
-        }
+            }
+        })
     };
 
     build_ingest_filter::<ExportLogsServiceResponse, _>(
@@ -226,16 +224,16 @@ fn build_warp_metrics_filter(
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
-        if let Some(d) = deserializer.as_ref() {
-            d.parse(body, LogNamespace::default())
-                .map(|r| r.into_vec())
-                .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
-        } else {
-            decode(encoding_header.as_deref(), body).and_then(|body| {
-                bytes_received.emit(ByteSize(body.len()));
-                decode_metrics_body(body, &events_received)
-            })
-        }
+        decode(encoding_header.as_deref(), body).and_then(|decoded_body| {
+            bytes_received.emit(ByteSize(decoded_body.len()));
+            if let Some(d) = deserializer.as_ref() {
+                d.parse(decoded_body, LogNamespace::default())
+                    .map(|r| r.into_vec())
+                    .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+            } else {
+                decode_metrics_body(decoded_body, &events_received)
+            }
+        })
     };
 
     build_ingest_filter::<ExportMetricsServiceResponse, _>(
@@ -254,16 +252,16 @@ fn build_warp_trace_filter(
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
-        if let Some(d) = deserializer.as_ref() {
-            d.parse(body, LogNamespace::default())
-                .map(|r| r.into_vec())
-                .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
-        } else {
-            decode(encoding_header.as_deref(), body).and_then(|body| {
-                bytes_received.emit(ByteSize(body.len()));
-                decode_trace_body(body, &events_received)
-            })
-        }
+        decode(encoding_header.as_deref(), body).and_then(|decoded_body| {
+            bytes_received.emit(ByteSize(decoded_body.len()));
+            if let Some(d) = deserializer.as_ref() {
+                d.parse(decoded_body, LogNamespace::default())
+                    .map(|r| r.into_vec())
+                    .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+            } else {
+                decode_trace_body(decoded_body, &events_received)
+            }
+        })
     };
 
     build_ingest_filter::<ExportTraceServiceResponse, _>(
