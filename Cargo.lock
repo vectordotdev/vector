@@ -2302,6 +2302,7 @@ dependencies = [
  "chrono",
  "csv-core",
  "derivative",
+ "derive_more",
  "dyn-clone",
  "flate2",
  "futures 0.3.31",
@@ -2316,14 +2317,17 @@ dependencies = [
  "regex",
  "rstest",
  "serde",
+ "serde-aux",
  "serde_json",
  "serde_with 3.14.0",
  "similar-asserts",
  "smallvec",
  "snafu 0.8.9",
+ "strum 0.26.3",
  "syslog_loose 0.23.0",
  "tokio",
  "tokio-util",
+ "toml 0.9.5",
  "tracing 0.1.41",
  "tracing-test",
  "uuid",
@@ -9606,6 +9610,18 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5f0e2c6ed6606019b4e29e69dbaba95b11854410e5347d525002456dbbb786b6"
 dependencies = [
  "serde_derive",
+]
+
+[[package]]
+name = "serde-aux"
+version = "4.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "207f67b28fe90fb596503a9bf0bf1ea5e831e21307658e177c5dfcdfc3ab8a0a"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde-value",
+ "serde_json",
 ]
 
 [[package]]
