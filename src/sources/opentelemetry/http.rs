@@ -34,7 +34,7 @@ use crate::{
     common::http::ErrorMessage,
     event::Event,
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{EventsReceived, HttpBadRequest, StreamClosedError},
     shutdown::ShutdownSignal,
     sources::{
         http_server::HttpConfigParamKind,
@@ -144,6 +144,26 @@ fn enrich_events(
     );
 }
 
+fn emit_decode_error(error: impl std::fmt::Display) -> ErrorMessage {
+    let message = format!("Could not decode request: {error}");
+    emit!(HttpBadRequest::new(
+        StatusCode::BAD_REQUEST.as_u16(),
+        &message
+    ));
+    ErrorMessage::new(StatusCode::BAD_REQUEST, message)
+}
+
+fn parse_with_deserializer(
+    deserializer: &OtlpDeserializer,
+    body: Bytes,
+    log_namespace: LogNamespace,
+) -> Result<Vec<Event>, ErrorMessage> {
+    deserializer
+        .parse(body, log_namespace)
+        .map(|r| r.into_vec())
+        .map_err(emit_decode_error)
+}
+
 fn build_ingest_filter<Resp, F>(
     telemetry_type: &'static str,
     acknowledgements: bool,
@@ -197,9 +217,7 @@ fn build_warp_log_filter(
         decode(encoding_header.as_deref(), body).and_then(|decoded_body| {
             bytes_received.emit(ByteSize(decoded_body.len()));
             if let Some(d) = deserializer.as_ref() {
-                d.parse(decoded_body, log_namespace)
-                    .map(|r| r.into_vec())
-                    .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+                parse_with_deserializer(d, decoded_body, log_namespace)
             } else {
                 decode_log_body(decoded_body, log_namespace, &events_received).map(|mut events| {
                     enrich_events(&mut events, &headers_cfg, &headers, log_namespace);
@@ -227,9 +245,7 @@ fn build_warp_metrics_filter(
         decode(encoding_header.as_deref(), body).and_then(|decoded_body| {
             bytes_received.emit(ByteSize(decoded_body.len()));
             if let Some(d) = deserializer.as_ref() {
-                d.parse(decoded_body, LogNamespace::default())
-                    .map(|r| r.into_vec())
-                    .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+                parse_with_deserializer(d, decoded_body, LogNamespace::default())
             } else {
                 decode_metrics_body(decoded_body, &events_received)
             }
@@ -255,9 +271,7 @@ fn build_warp_trace_filter(
         decode(encoding_header.as_deref(), body).and_then(|decoded_body| {
             bytes_received.emit(ByteSize(decoded_body.len()));
             if let Some(d) = deserializer.as_ref() {
-                d.parse(decoded_body, LogNamespace::default())
-                    .map(|r| r.into_vec())
-                    .map_err(|e| ErrorMessage::new(StatusCode::BAD_REQUEST, e.to_string()))
+                parse_with_deserializer(d, decoded_body, LogNamespace::default())
             } else {
                 decode_trace_body(decoded_body, &events_received)
             }
@@ -276,12 +290,7 @@ fn decode_trace_body(
     body: Bytes,
     events_received: &Registered<EventsReceived>,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    let request = ExportTraceServiceRequest::decode(body).map_err(|error| {
-        ErrorMessage::new(
-            StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {error}"),
-        )
-    })?;
+    let request = ExportTraceServiceRequest::decode(body).map_err(emit_decode_error)?;
 
     let events: Vec<Event> = request
         .resource_spans
@@ -302,12 +311,7 @@ fn decode_log_body(
     log_namespace: LogNamespace,
     events_received: &Registered<EventsReceived>,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    let request = ExportLogsServiceRequest::decode(body).map_err(|error| {
-        ErrorMessage::new(
-            StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {error}"),
-        )
-    })?;
+    let request = ExportLogsServiceRequest::decode(body).map_err(emit_decode_error)?;
 
     let events: Vec<Event> = request
         .resource_logs
@@ -327,12 +331,7 @@ fn decode_metrics_body(
     body: Bytes,
     events_received: &Registered<EventsReceived>,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    let request = ExportMetricsServiceRequest::decode(body).map_err(|error| {
-        ErrorMessage::new(
-            StatusCode::BAD_REQUEST,
-            format!("Could not decode request: {error}"),
-        )
-    })?;
+    let request = ExportMetricsServiceRequest::decode(body).map_err(emit_decode_error)?;
 
     let events: Vec<Event> = request
         .resource_metrics
