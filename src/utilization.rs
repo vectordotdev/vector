@@ -147,10 +147,20 @@ impl Timer {
         }
     }
 
+    #[cfg(debug_assertions)]
+    fn report(&mut self, utilization: f64) {
+        // Note that changing the reporting interval would also affect the actual metric reporting frequency.
+        // This check reduces debug log spamming.
+        if self.report_count.is_multiple_of(5) {
+            debug!(component_id = %self.component_id, %utilization);
+        }
+        self.report_count = self.report_count.wrapping_add(1);
+    }
+
     /// Meant to be called on a regular interval, this method calculates wait
     /// ratio since the last time it was called and reports the resulting
     /// utilization average.
-    pub(crate) fn report(&mut self) {
+    pub(crate) fn update_utilization(&mut self) {
         // End the current span so it can be accounted for, but do not change
         // whether or not we're in the waiting state. This way the next span
         // inherits the correct status.
@@ -171,14 +181,7 @@ impl Timer {
         self.total_wait = Duration::new(0, 0);
 
         #[cfg(debug_assertions)]
-        {
-            // Note that changing the reporting interval would also affect the actual metric reporting frequency.
-            // This check reduces debug log spamming.
-            if self.report_count.is_multiple_of(5) {
-                debug!(component_id = %self.component_id, utilization = %avg_rounded);
-            }
-            self.report_count = self.report_count.wrapping_add(1);
-        }
+        self.report(avg_rounded);
     }
 
     fn end_span(&mut self, at: Instant) {
@@ -284,7 +287,7 @@ impl UtilizationEmitter {
 
                 Some(_) = self.intervals.next() => {
                     for timer in self.timers.values_mut() {
-                        timer.report();
+                        timer.update_utilization();
                     }
                 },
 
@@ -348,7 +351,7 @@ mod tests {
 
         // Advance 2 more seconds (not waiting), then report (T=103 to T=105)
         MockClock::advance(Duration::from_secs(2));
-        timer.report();
+        timer.update_utilization();
 
         // total_wait = 2 seconds, total_duration = 5 seconds (T=100 to T=105)
         // wait_ratio = 2/5 = 0.4, utilization = 1.0 - 0.4 = 0.6
@@ -399,7 +402,7 @@ mod tests {
 
         // Advance 5 seconds and report (T=110)
         MockClock::advance(Duration::from_secs(5));
-        timer.report();
+        timer.update_utilization();
 
         // With clamping: all old timestamps treated as T=105
         // So we waited from T=105 to T=110 = 5 seconds
@@ -438,7 +441,7 @@ mod tests {
 
         // Advance 5 seconds while waiting (T=100 to T=105)
         MockClock::advance(Duration::from_secs(5));
-        timer.report();
+        timer.update_utilization();
 
         // We waited the entire time: total_wait = 5s, total_duration = 5s
         // wait_ratio = 1.0, utilization = 0.0
@@ -472,7 +475,7 @@ mod tests {
 
         // Advance 5 seconds without waiting (T=100 to T=105)
         MockClock::advance(Duration::from_secs(5));
-        timer.report();
+        timer.update_utilization();
 
         // Never waited: total_wait = 0, total_duration = 5s
         // wait_ratio = 0.0, utilization = 1.0
