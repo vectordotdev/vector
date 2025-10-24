@@ -1,0 +1,5 @@
+- The `azure_blob` sink now uses the official Azure SDK (azure_storage_blob) with azure_core, and supports per-sink HTTP proxy configuration.
+  - Requests are sent using a reqwest client injected via azure_core ClientOptions transport, enabling a sink-scoped proxy (configure via the sink’s `proxy` block) instead of relying on environment variables.
+  - SAS and AccountKey authentication are supported. SAS: provide `BlobEndpoint=...;SharedAccessSignature=...` in `connection_string`. AccountKey: provide `AccountName=...;AccountKey=...` (and `EndpointSuffix` or `BlobEndpoint`); the sink derives a scoped, time‑bound account‑signed SAS at runtime and rotates it in the background (the storage account must allow shared key access).
+  - Existing configuration remains compatible; for best results with healthchecks, prefer a SAS connection string that includes `BlobEndpoint` and `SharedAccessSignature`.
+  - Internal: reqwest 0.12 is isolated to the Azure path via a dependency alias to avoid http crate version conflicts with the rest of the project.

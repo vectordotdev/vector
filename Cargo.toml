@@ -280,15 +280,13 @@ aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.25", default-features = false, features = ["reqwest", "hmac_openssl"], optional = true }
-azure_identity = { version = "0.25", default-features = false, features = ["reqwest"], optional = true }
+azure_core = { version = "0.29.1", default-features = false, features = ["reqwest"], optional = true }
+azure_identity = { version = "0.29.0", default-features = false, optional = true }
 
-# Azure Storage
-azure_storage = { version = "0.21", default-features = false, optional = true }
-azure_storage_blobs = { version = "0.21", default-features = false, optional = true }
-
-# Needed to bridge with outdated version of azure_core used in azure_storage*
-azure_core_for_storage = { package = "azure_core", version = "0.21.0", default-features = false, features = ["enable_reqwest", "hmac_openssl"] }
+# Azure Storage (official)
+azure_storage_blob = { version = "0.6.0", default-features = false, optional = true }
+reqwest.workspace = true
+reqwest_0_12 = { package = "reqwest", version = "0.12.24", default-features = false, features = ["json", "gzip", "deflate", "rustls-tls-native-roots"] }
 
 
 # OpenDAL
@@ -454,10 +452,9 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 approx = "0.5.1"
 assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
-azure_core = { version = "0.25", default-features = false, features = ["reqwest", "hmac_openssl", "azurite_workaround"] }
-azure_identity = { version = "0.25", default-features = false, features = ["reqwest"] }
-azure_storage_blobs = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl", "azurite_workaround"] }
-azure_storage = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl"] }
+azure_core = { version = "0.29.1", default-features = false, features = ["reqwest"] }
+azure_identity = { version = "0.29.0", default-features = false }
+azure_storage_blob = { version = "0.6.0", default-features = false }
 base64 = "0.22.1"
 criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
@@ -837,7 +834,7 @@ sinks-aws_s3 = ["dep:base64", "dep:md-5", "aws-core", "dep:aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-http"]
-sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage", "dep:azure_storage_blobs"]
+sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage_blob"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []

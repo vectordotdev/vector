@@ -1,10 +1,10 @@
 use std::{
     result::Result as StdResult,
-    sync::Arc,
+    sync::{Arc, RwLock},
     task::{Context, Poll},
 };
 
-use azure_storage_blobs::prelude::*;
+use azure_core::http::RequestContent;
 use futures::future::BoxFuture;
 use tower::Service;
 use tracing::Instrument;
@@ -13,11 +13,13 @@ use crate::sinks::azure_common::config::{AzureBlobRequest, AzureBlobResponse};
 
 #[derive(Clone)]
 pub struct AzureBlobService {
-    client: Arc<ContainerClient>,
+    client: Arc<RwLock<Arc<azure_storage_blob::BlobContainerClient>>>,
 }
 
 impl AzureBlobService {
-    pub const fn new(client: Arc<ContainerClient>) -> AzureBlobService {
+    pub const fn new(
+        client: Arc<RwLock<Arc<azure_storage_blob::BlobContainerClient>>>,
+    ) -> AzureBlobService {
         AzureBlobService { client }
     }
 }
@@ -37,26 +39,23 @@ impl Service<AzureBlobRequest> for AzureBlobService {
         let this = self.clone();
 
         Box::pin(async move {
-            let client = this
-                .client
-                .blob_client(request.metadata.partition_key.as_str());
+            let container = this.client.read().expect("lock poisoned").clone();
+            let client = container.blob_client(request.metadata.partition_key.clone());
             let byte_size = request.blob_data.len();
-            let blob = client
-                .put_block_blob(request.blob_data)
-                .content_type(request.content_type);
-            let blob = match request.content_encoding {
-                Some(encoding) => blob.content_encoding(encoding),
-                None => blob,
-            };
 
-            let result = blob
-                .into_future()
+            let result = client
+                .upload(
+                    RequestContent::from(request.blob_data.to_vec()),
+                    false,
+                    byte_size as u64,
+                    None,
+                )
                 .instrument(info_span!("request").or_current())
                 .await
                 .map_err(|err| err.into());
 
-            result.map(|inner| AzureBlobResponse {
-                inner,
+            result.map(|_| AzureBlobResponse {
+                inner: (),
                 events_byte_size: request
                     .request_metadata
                     .into_events_estimated_json_encoded_byte_size(),

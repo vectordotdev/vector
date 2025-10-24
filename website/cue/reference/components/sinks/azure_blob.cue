@@ -64,7 +64,10 @@ components: sinks: azure_blob: {
 	support: {
 		requirements: []
 		warnings: []
-		notices: []
+		notices: [
+			"Per-sink proxy is supported via the sink's proxy configuration; avoid relying on environment variables.",
+			"Authentication is SAS-only in this iteration; provide BlobEndpoint and SharedAccessSignature in connection_string."
+		]
 	}
 
 	configuration: generated.components.sinks.azure_blob.configuration
