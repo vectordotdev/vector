@@ -199,6 +199,8 @@ vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+mock_instant = { version = "0.6" }
+serial_test = { version = "3.2" }
 
 [dependencies]
 cfg-if.workspace = true
@@ -453,6 +455,8 @@ openssl-src = { version = "300", default-features = false, features = ["force-en
 [dev-dependencies]
 approx = "0.5.1"
 assert_cmd = { version = "2.0.17", default-features = false }
+mock_instant.workspace = true
+serial_test.workspace = true
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
 azure_core = { version = "0.25", default-features = false, features = ["reqwest", "hmac_openssl", "azurite_workaround"] }
 azure_identity = { version = "0.25", default-features = false, features = ["reqwest"] }
