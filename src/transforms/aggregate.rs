@@ -394,7 +394,7 @@ impl Aggregate {
             kind: MetricKind::Absolute,
             value: MetricValue::Distribution {
                 samples,
-                statistic: StatisticKind::Summary,
+                statistic: StatisticKind::Histogram,
             },
         }
     }
@@ -474,6 +474,32 @@ mod tests {
         event.metadata_mut().set_source_type("unit_test_stream");
 
         event
+    }
+
+    // Helper function to verify distribution metric properties
+    fn assert_distribution_samples(
+        event: &Event,
+        expected_samples: &[f64],
+        expected_statistic: StatisticKind,
+    ) {
+        if let MetricValue::Distribution { samples, statistic } = event.as_metric().value() {
+            assert_eq!(
+                samples.len(),
+                expected_samples.len(),
+                "expected {} samples in distribution but got {}",
+                expected_samples.len(),
+                samples.len()
+            );
+            assert_eq!(*statistic, expected_statistic);
+
+            let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
+            assert_eq!(
+                values, expected_samples,
+                "samples should match expected values and be sorted"
+            );
+        } else {
+            panic!("Expected Distribution metric value");
+        }
     }
 
     #[test]
@@ -1270,44 +1296,27 @@ interval_ms = 999999
             MetricKind::Incremental,
             MetricValue::Counter { value: 110.0 },
         );
-        // Record four gauge values
-        agg.record(gauge_a_1);
-        agg.record(gauge_a_2);
-        agg.record(gauge_a_3);
-        agg.record(gauge_a_4);
-        agg.record(gauge_a_5);
-        agg.record(gauge_a_6);
-        agg.record(gauge_a_7);
-        // validating that if we add a counter it doesn't end up in the distribution.
+        // Record seven gauge values in non-sorted order to verify sorting
+        agg.record(gauge_a_4); // 36.0
+        agg.record(gauge_a_1); // 25.0
+        agg.record(gauge_a_7); // 39.0
+        agg.record(gauge_a_2); // 30.0
+        agg.record(gauge_a_5); // 37.0
+        agg.record(gauge_a_3); // 35.0
+        agg.record(gauge_a_6); // 38.0
+        // Verify that incremental metrics are ignored
         agg.record(counter_a_1);
 
         let mut out = vec![];
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
 
-        // Verify it's a distribution with 7 metrics
-        if let MetricValue::Distribution { samples, statistic } = out[0].as_metric().value() {
-            assert_eq!(
-                samples.len(),
-                7,
-                "expected 7 samples in distribution but got {:#?}",
-                samples.len()
-            );
-            assert_eq!(*statistic, StatisticKind::Histogram);
-
-            // Check sample values
-            let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
-            assert!(values.contains(&25.0));
-            assert!(values.contains(&30.0));
-            assert!(values.contains(&35.0));
-            assert!(values.contains(&36.0));
-            assert!(values.contains(&37.0));
-            assert!(values.contains(&38.0));
-            assert!(values.contains(&39.0));
-            assert!(!values.contains(&110.0));
-        } else {
-            panic!("Expected Distribution metric value");
-        }
+        // Verify it's a distribution with 7 samples, properly sorted
+        assert_distribution_samples(
+            &out[0],
+            &[25.0, 30.0, 35.0, 36.0, 37.0, 38.0, 39.0],
+            StatisticKind::Histogram,
+        );
     }
 
     #[test]
@@ -1322,7 +1331,7 @@ interval_ms = 999999
             "dist_a",
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: vec![25.0, 30.0, 35.0, 36.0]
+                samples: vec![35.0, 25.0, 36.0, 30.0] // Intentionally unsorted
                     .into_iter()
                     .map(|v| Sample { value: v, rate: 1 })
                     .collect(),
@@ -1333,7 +1342,7 @@ interval_ms = 999999
             "dist_a",
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: vec![37.0, 38.0, 39.0]
+                samples: vec![39.0, 37.0, 38.0] // Intentionally unsorted
                     .into_iter()
                     .map(|v| Sample { value: v, rate: 1 })
                     .collect(),
@@ -1344,14 +1353,14 @@ interval_ms = 999999
             "dist_a",
             MetricKind::Absolute,
             MetricValue::Distribution {
-                samples: vec![99.0, 113.0, 456.2]
+                samples: vec![456.2, 99.0, 113.0] // Intentionally unsorted
                     .into_iter()
                     .map(|v| Sample { value: v, rate: 1 })
                     .collect(),
                 statistic: StatisticKind::Summary,
             },
         );
-        // Record four Distribution values
+        // Record three Distribution values
         agg.record(distribution_a_1);
         agg.record(distribution_a_2);
         agg.record(distribution_a_3);
@@ -1360,31 +1369,12 @@ interval_ms = 999999
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
 
-        // Verify it's a distribution with 10 metrics
-        if let MetricValue::Distribution { samples, statistic } = out[0].as_metric().value() {
-            assert_eq!(
-                samples.len(),
-                10,
-                "expected 10 samples in distribution but got {:#?}",
-                samples.len()
-            );
-            assert_eq!(*statistic, StatisticKind::Histogram);
-
-            // Check sample values
-            let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
-            assert!(values.contains(&25.0));
-            assert!(values.contains(&30.0));
-            assert!(values.contains(&35.0));
-            assert!(values.contains(&36.0));
-            assert!(values.contains(&37.0));
-            assert!(values.contains(&38.0));
-            assert!(values.contains(&39.0));
-            assert!(values.contains(&99.0));
-            assert!(values.contains(&113.0));
-            assert!(values.contains(&456.2));
-        } else {
-            panic!("Expected Distribution metric value");
-        }
+        // Verify it's a distribution with 10 samples, properly sorted
+        assert_distribution_samples(
+            &out[0],
+            &[25.0, 30.0, 35.0, 36.0, 37.0, 38.0, 39.0, 99.0, 113.0, 456.2],
+            StatisticKind::Histogram,
+        );
     }
 
     #[test]
@@ -1487,22 +1477,8 @@ interval_ms = 999999
         agg.flush_into(&mut out);
         assert_eq!(1, out.len());
 
-        // Verify it's a distribution with 15 metrics
-        if let MetricValue::Distribution { samples, statistic } = out[0].as_metric().value() {
-            assert_eq!(
-                samples.len(),
-                15,
-                "expected 15 samples in distribution but got {:#?}",
-                samples.len()
-            );
-            assert_eq!(*statistic, StatisticKind::Histogram);
-
-            // Check sample values
-            let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
-            assert_eq!(values, expected_vals);
-        } else {
-            panic!("Expected Distribution metric value");
-        }
+        // Verify it's a distribution with 15 samples
+        assert_distribution_samples(&out[0], &expected_vals, StatisticKind::Histogram);
     }
 
     #[test]
@@ -1518,17 +1494,16 @@ interval_ms = 999999
             MetricKind::Absolute,
             MetricValue::Set {
                 values: vec![
+                    "39".into(),
                     "25".into(),
-                    "30".into(),
+                    "99".into(),
                     "35".into(),
+                    "113".into(),
+                    "30".into(),
+                    "456.2".into(),
                     "36".into(),
                     "37".into(),
                     "38".into(),
-                    "39".into(),
-                    "39".into(), // duplicate to verify set behavior
-                    "99".into(),
-                    "113".into(),
-                    "456.2".into(),
                 ]
                 .into_iter()
                 .collect(),
@@ -1540,17 +1515,16 @@ interval_ms = 999999
             MetricKind::Absolute,
             MetricValue::Set {
                 values: vec![
+                    "40".into(),
                     "26".into(),
-                    "31".into(),
+                    "100".into(),
                     "36".into(),
+                    "114".into(),
+                    "31".into(),
+                    "556.2".into(),
                     "37".into(),
                     "38".into(),
                     "39".into(),
-                    "40".into(),
-                    "40".into(), // duplicate to verify set behavior
-                    "100".into(),
-                    "114".into(),
-                    "556.2".into(),
                 ]
                 .into_iter()
                 .collect(),
@@ -1565,36 +1539,151 @@ interval_ms = 999999
         assert_eq!(
             1,
             out.len(),
-            "expected 1 output metric but got {:#?}",
+            "expected 1 output metric but got {}",
             out.len()
         );
 
-        // Verify it's a distribution with 10 metrics
-        if let MetricValue::Distribution { samples, statistic } = out[0].as_metric().value() {
-            assert_eq!(
-                samples.len(),
-                20,
-                "expected 20 samples in distribution but got {:#?}",
-                samples.len()
-            );
-            assert_eq!(*statistic, StatisticKind::Histogram);
+        // Verify it's a distribution with 20 samples (10 from each set), properly sorted
+        let expected = vec![
+            25.0, 26.0, 30.0, 31.0, 35.0, 36.0, 36.0, 37.0, 37.0, 38.0, 38.0, 39.0, 39.0, 40.0,
+            99.0, 100.0, 113.0, 114.0, 456.2, 556.2,
+        ];
+        assert_distribution_samples(&out[0], &expected, StatisticKind::Histogram);
+    }
 
-            // Check sample values
-            let values: Vec<f64> = samples.iter().map(|s| s.value).collect();
-            assert!(values.contains(&25.0));
-            assert!(values.contains(&30.0));
-            assert!(values.contains(&35.0));
-            assert!(values.contains(&36.0));
-            assert!(values.contains(&37.0));
-            assert!(values.contains(&38.0));
-            assert!(values.contains(&39.0));
-            assert!(values.contains(&40.0));
-            assert!(values.contains(&99.0));
-            assert!(values.contains(&113.0));
-            assert!(values.contains(&456.2));
-            assert!(values.contains(&556.2));
-        } else {
-            panic!("Expected Distribution metric value");
+    #[test]
+    fn distribution_mixed_types() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Distribution,
+        })
+        .unwrap();
+
+        // Test that different metric series can each become distributions
+        let gauge_a = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 10.0 },
+        );
+
+        let distribution_b = make_metric(
+            "dist_b",
+            MetricKind::Absolute,
+            MetricValue::Distribution {
+                samples: vec![20.0, 30.0]
+                    .into_iter()
+                    .map(|v| Sample { value: v, rate: 1 })
+                    .collect(),
+                statistic: StatisticKind::Summary,
+            },
+        );
+
+        let histogram_c = make_metric(
+            "histogram_c",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 2,
+                sum: 90.0,
+                buckets: vec![
+                    Bucket {
+                        upper_limit: 40.0,
+                        count: 1,
+                    },
+                    Bucket {
+                        upper_limit: 50.0,
+                        count: 1,
+                    },
+                ],
+            },
+        );
+
+        agg.record(gauge_a);
+        agg.record(distribution_b);
+        agg.record(histogram_c);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(3, out.len()); // Each different series produces its own distribution
+
+        // Verify all outputs are distributions
+        for event in out {
+            if let MetricValue::Distribution { samples, statistic } = event.as_metric().value() {
+                assert_eq!(*statistic, StatisticKind::Histogram);
+                assert!(samples.len() >= 1);
+            } else {
+                panic!("Expected Distribution metric value");
+            }
+        }
+    }
+
+    #[test]
+    fn distribution_set_with_invalid_values() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Distribution,
+        })
+        .unwrap();
+
+        let set_with_invalid = make_metric(
+            "set_a",
+            MetricKind::Absolute,
+            MetricValue::Set {
+                values: vec![
+                    "10.0".into(),
+                    "not_a_number".into(), // Should be skipped
+                    "20.0".into(),
+                    "invalid".into(), // Should be skipped
+                    "30.0".into(),
+                ]
+                .into_iter()
+                .collect(),
+            },
+        );
+
+        agg.record(set_with_invalid);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+        assert_eq!(1, out.len());
+
+        // Only the 3 valid numeric values should be included
+        assert_distribution_samples(&out[0], &[10.0, 20.0, 30.0], StatisticKind::Histogram);
+    }
+
+    #[test]
+    fn distribution_multiple_series() {
+        let mut agg = Aggregate::new(&AggregateConfig {
+            interval_ms: 1000_u64,
+            mode: AggregationMode::Distribution,
+        })
+        .unwrap();
+
+        let gauge_a = make_metric(
+            "gauge_a",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 10.0 },
+        );
+        let gauge_b = make_metric(
+            "gauge_b",
+            MetricKind::Absolute,
+            MetricValue::Gauge { value: 20.0 },
+        );
+
+        agg.record(gauge_a);
+        agg.record(gauge_b);
+
+        let mut out = vec![];
+        agg.flush_into(&mut out);
+
+        // Should produce 2 separate distributions
+        assert_eq!(2, out.len());
+
+        for event in out {
+            if let MetricValue::Distribution { samples, .. } = event.as_metric().value() {
+                assert_eq!(samples.len(), 1);
+            } else {
+                panic!("Expected Distribution metric value");
+            }
         }
     }
 }
