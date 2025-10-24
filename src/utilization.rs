@@ -326,20 +326,38 @@ mod tests {
 
     use super::*;
 
-    #[test]
-    #[serial]
-    fn test_normal_utilization_within_bounds() {
+    /// Helper function to reset mock clock and create a timer at T=100
+    fn setup_timer() -> Timer {
         // Reset mock clock to ensure test isolation
         MockClock::set_time(Duration::ZERO);
 
         // Advance mock time to T=100 to avoid issues with time 0
         MockClock::advance(Duration::from_secs(100));
 
-        let mut timer = Timer::new(
+        Timer::new(
             metrics::gauge!("test_utilization"),
             #[cfg(debug_assertions)]
             "test_component".into(),
+        )
+    }
+
+    /// Helper function to assert utilization is approximately equal to expected value
+    /// and within valid bounds [0, 1]
+    fn assert_approx_eq(actual: f64, expected: f64, tolerance: f64, description: &str) {
+        assert!(
+            actual >= 0.0 && actual <= 1.0,
+            "Utilization {actual} is outside [0, 1]"
         );
+        assert!(
+            (actual - expected).abs() < tolerance,
+            "Expected utilization {description}, got {actual}"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_normal_utilization_within_bounds() {
+        let mut timer = setup_timer();
 
         // Timer created at T=100. Advance 1 second and start waiting
         MockClock::advance(Duration::from_secs(1));
@@ -356,32 +374,13 @@ mod tests {
         // total_wait = 2 seconds, total_duration = 5 seconds (T=100 to T=105)
         // wait_ratio = 2/5 = 0.4, utilization = 1.0 - 0.4 = 0.6
         let avg = timer.ewma.average().unwrap();
-        assert!(
-            avg >= 0.0 && avg <= 1.0,
-            "Utilization {} is outside [0, 1]",
-            avg
-        );
-        assert!(
-            (avg - 0.6).abs() < 0.01,
-            "Expected utilization ~0.6, got {}",
-            avg
-        );
+        assert_approx_eq(avg, 0.6, 0.01, "~0.6");
     }
 
     #[test]
     #[serial]
     fn test_delayed_messages_can_cause_invalid_utilization() {
-        // Reset mock clock to ensure test isolation
-        MockClock::set_time(Duration::ZERO);
-
-        // Start at T=100 to avoid time 0 issues
-        MockClock::advance(Duration::from_secs(100));
-
-        let mut timer = Timer::new(
-            metrics::gauge!("test_utilization"),
-            #[cfg(debug_assertions)]
-            "test_component".into(),
-        );
+        let mut timer = setup_timer();
 
         // Timer created at T=100. Simulate that some time passes (to T=105)
         // and a report period completes, resetting overall_start
@@ -409,32 +408,13 @@ mod tests {
         // total_duration = 5 seconds, total_wait = 5 seconds
         // wait_ratio = 1.0, utilization = 0.0
         let avg = timer.ewma.average().unwrap();
-        assert!(
-            avg >= 0.0 && avg <= 1.0,
-            "Utilization {} is outside [0, 1]",
-            avg
-        );
-        assert!(
-            avg < 0.01,
-            "Expected utilization near 0 (always waiting), got {}",
-            avg
-        );
+        assert_approx_eq(avg, 0.0, 0.01, "near 0 (always waiting)");
     }
 
     #[test]
     #[serial]
     fn test_always_waiting_utilization() {
-        // Reset mock clock to ensure test isolation
-        MockClock::set_time(Duration::ZERO);
-
-        // Start at T=100 to avoid time 0 issues
-        MockClock::advance(Duration::from_secs(100));
-
-        let mut timer = Timer::new(
-            metrics::gauge!("test_utilization"),
-            #[cfg(debug_assertions)]
-            "test_component".into(),
-        );
+        let mut timer = setup_timer();
 
         // Timer created at T=100. Start waiting immediately
         timer.start_wait(Instant::now());
@@ -446,32 +426,13 @@ mod tests {
         // We waited the entire time: total_wait = 5s, total_duration = 5s
         // wait_ratio = 1.0, utilization = 0.0
         let avg = timer.ewma.average().unwrap();
-        assert!(
-            avg >= 0.0 && avg <= 1.0,
-            "Utilization {} is outside [0, 1]",
-            avg
-        );
-        assert!(
-            avg < 0.01,
-            "Expected utilization near 0 (always waiting), got {}",
-            avg
-        );
+        assert_approx_eq(avg, 0.0, 0.01, "near 0 (always waiting)");
     }
 
     #[test]
     #[serial]
     fn test_never_waiting_utilization() {
-        // Reset mock clock to ensure test isolation
-        MockClock::set_time(Duration::ZERO);
-
-        // Start at T=100 to avoid time 0 issues
-        MockClock::advance(Duration::from_secs(100));
-
-        let mut timer = Timer::new(
-            metrics::gauge!("test_utilization"),
-            #[cfg(debug_assertions)]
-            "test_component".into(),
-        );
+        let mut timer = setup_timer();
 
         // Advance 5 seconds without waiting (T=100 to T=105)
         MockClock::advance(Duration::from_secs(5));
@@ -480,15 +441,6 @@ mod tests {
         // Never waited: total_wait = 0, total_duration = 5s
         // wait_ratio = 0.0, utilization = 1.0
         let avg = timer.ewma.average().unwrap();
-        assert!(
-            avg >= 0.0 && avg <= 1.0,
-            "Utilization {} is outside [0, 1]",
-            avg
-        );
-        assert!(
-            avg > 0.99,
-            "Expected utilization near 1.0 (never waiting), got {}",
-            avg
-        );
+        assert_approx_eq(avg, 1.0, 0.01, "near 1.0 (never waiting)");
     }
 }
