@@ -176,7 +176,8 @@ impl RunningTopology {
 
                 error!(
                     components = ?remaining_components,
-                    "Failed to gracefully shut down in time. Killing components."
+                    message = "Failed to gracefully shut down in time. Killing components.",
+                    internal_log_rate_limit = false
                 );
             }) as future::BoxFuture<'static, ()>
         } else {
@@ -348,7 +349,10 @@ impl RunningTopology {
             return Ok(false);
         }
 
-        error!("Failed to restore old configuration.");
+        error!(
+            message = "Failed to restore old configuration.",
+            internal_log_rate_limit = false
+        );
 
         Err(())
     }
@@ -378,7 +382,10 @@ impl RunningTopology {
                     info!("All healthchecks passed.");
                     true
                 } else {
-                    error!("Sinks unhealthy.");
+                    error!(
+                        message = "Sinks unhealthy.",
+                        internal_log_rate_limit = false
+                    );
                     false
                 }
             } else {
@@ -1259,7 +1266,10 @@ impl RunningTopology {
                 }
             }
             (Some(_), Some(_)) => {
-                error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
+                error!(
+                    message = "Cannot set both `expire_metrics` and `expire_metrics_secs`.",
+                    internal_log_rate_limit = false
+                );
                 return None;
             }
             (None, Some(e)) => {
@@ -1283,7 +1293,7 @@ impl RunningTopology {
                     .unwrap_or_default(),
             )
         {
-            error!(message = "Invalid metrics expiry.", %error);
+            error!(message = "Invalid metrics expiry.", %error, internal_log_rate_limit = false);
             return None;
         }
 
