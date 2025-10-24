@@ -121,16 +121,29 @@ fn update_vdev_version(
     let contents = fs::read_to_string(cargo_toml_path)
         .with_context(|| format!("Failed to read {}", cargo_toml_path.display()))?;
 
-    let old_line = format!("version = \"{old_version}\"");
-    let new_line = format!("version = \"{new_version}\"");
+    // Parse the TOML to verify structure and preserve formatting
+    let mut doc = contents.parse::<toml_edit::DocumentMut>()
+        .with_context(|| format!("Failed to parse {}", cargo_toml_path.display()))?;
 
-    if !contents.contains(&old_line) {
-        bail!("Could not find exact version line '{old_line}' in {}", cargo_toml_path.display());
+    // Verify the package.version exists and matches old version
+    let current_version = doc
+        .get("package")
+        .and_then(|p| p.get("version"))
+        .and_then(|v| v.as_str())
+        .with_context(|| format!("Could not find package.version in {}", cargo_toml_path.display()))?;
+
+    if current_version != old_version.to_string() {
+        bail!(
+            "Version mismatch in {}: expected '{old_version}', found '{current_version}'",
+            cargo_toml_path.display(),
+        );
     }
 
-    let updated_contents = contents.replace(&old_line, &new_line);
+    // Update the version
+    doc["package"]["version"] = toml_edit::value(new_version.to_string());
 
-    fs::write(cargo_toml_path, updated_contents)
+    // Write back preserving formatting
+    fs::write(cargo_toml_path, doc.to_string())
         .with_context(|| format!("Failed to write {}", cargo_toml_path.display()))?;
 
     Ok(())
