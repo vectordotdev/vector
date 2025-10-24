@@ -189,8 +189,7 @@ impl<'a> Builder<'a> {
                                 // Just report the error and continue.
                                 error!(message = "Unable to add index to reloaded enrichment table.",
                                     table = ?name.to_string(),
-                                    %error,
-                                    internal_log_rate_limit = true);
+                                    %error);
                                 continue 'tables;
                             }
                         }
@@ -225,11 +224,11 @@ impl<'a> Builder<'a> {
             .chain(
                 table_sources
                     .iter()
-                    .map(|(key, sink)| (key, sink))
+                    .map(|(key, source)| (key, source))
                     .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
             )
         {
-            debug!(component = %key, "Building new source.");
+            debug!(component_id = %key, "Building new source.");
 
             let typetag = source.inner.get_component_name();
             let source_outputs = source.inner.outputs(self.config.schema.log_namespace());
@@ -429,7 +428,7 @@ impl<'a> Builder<'a> {
             .transforms()
             .filter(|(key, _)| self.diff.transforms.contains_new(key))
         {
-            debug!(component = %key, "Building new transform.");
+            debug!(component_id = %key, "Building new transform.");
 
             let input_definitions = match schema::input_definitions(
                 &transform.inputs,
@@ -541,7 +540,7 @@ impl<'a> Builder<'a> {
                     .filter(|(key, _)| self.diff.enrichment_tables.contains_new(key)),
             )
         {
-            debug!(component = %key, "Building new sink.");
+            debug!(component_id = %key, "Building new sink.");
 
             let sink_inputs = &sink.inputs;
             let healthcheck = sink.healthcheck();
@@ -722,10 +721,7 @@ pub async fn reload_enrichment_tables(config: &Config) {
             let mut table = match table_outer.inner.build(&config.global).await {
                 Ok(table) => table,
                 Err(error) => {
-                    error!(
-                        internal_log_rate_limit = true,
-                        "Enrichment table \"{name}\" reload failed: {error}",
-                    );
+                    error!("Enrichment table \"{name}\" reload failed: {error}");
                     continue;
                 }
             };
@@ -741,7 +737,6 @@ pub async fn reload_enrichment_tables(config: &Config) {
                             // data, the previously loaded data will still need to be used.
                             // Just report the error and continue.
                             error!(
-                                internal_log_rate_limit = true,
                                 message = "Unable to add index to reloaded enrichment table.",
                                 table = ?name.to_string(),
                                 %error

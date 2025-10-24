@@ -17,6 +17,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
+permissions:
+  packages: write
+  contents: read
+
 env:
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
@@ -29,9 +33,6 @@ env:
   VERBOSE: true
   CI: true
   PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   changes:
@@ -43,10 +44,26 @@ jobs:
       e2e_tests: true
     secrets: inherit
 
+  build-test-runner:
+    needs: changes
+    if: |
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'merge_group' &&
+         (needs.changes.outputs.dependencies == 'true' ||
+          needs.changes.outputs.integration-yml == 'true' ||
+          needs.changes.outputs.int-tests-any == 'true' ||
+          needs.changes.outputs.e2e-tests-any == 'true'))
+      }}
+    uses: ./.github/workflows/build-test-runner.yml
+    with:
+      commit_sha: ${{ github.sha }}
+
   integration-tests:
-    runs-on: ubuntu-24.04
+    runs-on: ubuntu-24.04-8core
     needs:
       - changes
+      - build-test-runner
 
     if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
@@ -72,6 +89,12 @@ jobs:
         with:
           name: int_tests_changes
 
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.sha }}
+
       - name: Run Integration Tests for ${{ matrix.service }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
@@ -92,9 +115,9 @@ jobs:
             fi
 
             # Check if any of the three conditions is true
-            if [[ "${{ github.event_name }}" == "merge_group" || \
-                  "${{ github.event_name }}" == "workflow_dispatch" || \
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
                   "${{ needs.changes.outputs.dependencies }}" == "true" || \
+                  "${{ needs.changes.outputs.integration-yml }}" == "true" || \
                   "$should_run" == "true" ]]; then
               # Only install dep if test runs
               bash scripts/environment/prepare.sh --modules=datadog-ci
@@ -109,6 +132,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     needs:
       - changes
+      - build-test-runner
     if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
@@ -120,29 +144,56 @@ jobs:
         with:
           submodules: "recursive"
 
-      - name: Run E2E Tests for ${{ matrix.service }}
-        run: |
-          if [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
-            echo "Skipping ${{ matrix.service }} test since only website changes were detected"
-            exit 0
-          fi
+      - name: Download JSON artifact from changes.yml
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        if: github.event_name == 'merge_group'
+        with:
+          name: e2e_tests_changes
 
-          # Check if any of the three conditions is true
-          if [[ "${{ github.event_name }}" == "merge_group" || \
-                "${{ github.event_name }}" == "workflow_dispatch" || \
-                "${{ needs.changes.outputs.dependencies }}" == "true" ]]; then
-            bash scripts/environment/prepare.sh --modules=datadog-ci
-            echo "Running test for ${{ matrix.service }}"
-            bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
-          else
-          echo "Skipping ${{ matrix.service }} test because run conditions were not met."
-          fi
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.sha }}
+
+      - name: Run E2E Tests for ${{ matrix.service }}
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
+        with:
+          timeout_minutes: 30
+          max_attempts: 3
+          command: |
+            if [[ -f e2e_tests_changes.json ]]; then
+              # Parse the JSON and check if the specific e2e test should run.
+              should_run=$(jq -r '."${{ matrix.service }}" // false' e2e_tests_changes.json)
+            else
+              # The `changes` job did not run (manual run) or the file is missing, default to false.
+              should_run=false
+            fi
+
+            if [[ "${{ needs.changes.outputs.website_only }}" == "true" ]]; then
+              echo "Skipping ${{ matrix.service }} test since only website changes were detected"
+              exit 0
+            fi
+
+            # Check if any of the three conditions is true
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" || \
+                  "${{ needs.changes.outputs.dependencies }}" == "true" || \
+                  "${{ needs.changes.outputs.integration-yml }}" == "true" ]] || \
+                  "$should_run" == "true" ]]; then
+              # Only install dep if test runs
+              bash scripts/environment/prepare.sh --modules=datadog-ci
+              echo "Running test for ${{ matrix.service }}"
+              bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+            else
+              echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
+            fi
 
   integration-test-suite:
     name: Integration Test Suite
     runs-on: ubuntu-24.04
     if: always()
     needs:
+      - build-test-runner
       - integration-tests
       - e2e-tests
     steps:
