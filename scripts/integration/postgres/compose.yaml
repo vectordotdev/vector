@@ -13,4 +13,13 @@ services:
     - ../../../tests/data/ca:/certs:ro
 
 volumes:
-  socket: {}
+  # Use external volume 'postgres_socket' that's shared with the test runner
+  # The runner creates this volume and mounts it at /pg_socket
+  socket:
+    name: postgres_socket
+    external: true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

@@ -5,22 +5,25 @@ use anyhow::{Result, bail};
 use crate::testing::{
     config::ComposeTestConfig,
     integration::{ComposeTest, ComposeTestLocalConfig},
-    state::EnvsDir,
 };
+
+use super::active_projects::find_active_environment_for_integration;
 
 pub fn exec(
     local_config: ComposeTestLocalConfig,
     integration: &str,
     environment: Option<&String>,
-    build_all: bool,
+    all_features: bool,
+    reuse_image: bool,
     retries: u8,
     args: &[String],
 ) -> Result<()> {
     let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, integration)?;
     let envs = config.environments();
 
-    let active = EnvsDir::new(integration).active()?;
-    debug!("Active environment: {environment:#?}");
+    let active =
+        find_active_environment_for_integration(local_config.directory, integration, &config)?;
+    debug!("Active environment: {active:#?}");
 
     let environments: Box<dyn Iterator<Item = &String>> = match (environment, &active) {
         (Some(environment), Some(active)) if environment != active => {
@@ -32,8 +35,15 @@ pub fn exec(
     };
 
     for environment in environments {
-        ComposeTest::generate(local_config, integration, environment, build_all, retries)?
-            .test(args.to_owned())?;
+        ComposeTest::generate(
+            local_config,
+            integration,
+            environment,
+            all_features,
+            reuse_image,
+            retries,
+        )?
+        .test(args.to_owned())?;
     }
     Ok(())
 }

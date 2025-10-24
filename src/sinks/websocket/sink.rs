@@ -25,9 +25,6 @@ use vector_lib::{
     },
 };
 
-#[cfg(feature = "codecs-opentelemetry")]
-use vector_lib::codecs::encoding::Serializer::Otlp;
-
 pub struct WebSocketSink {
     transformer: Transformer,
     encoder: Encoder<()>,
@@ -77,19 +74,6 @@ impl WebSocketSink {
         Ok(())
     }
 
-    const fn should_encode_as_binary(&self) -> bool {
-        use vector_lib::codecs::encoding::Serializer::{
-            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text,
-        };
-
-        match self.encoder.serializer() {
-            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            #[cfg(feature = "codecs-opentelemetry")]
-            Otlp(_) => true,
-            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
-        }
-    }
-
     async fn handle_events<I, WS, O>(
         &mut self,
         input: &mut I,
@@ -115,7 +99,7 @@ impl WebSocketSink {
 
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
         let events_sent = register!(EventsSent::from(Output(None)));
-        let encode_as_binary = self.should_encode_as_binary();
+        let encode_as_binary = self.encoder.serializer().is_binary();
 
         loop {
             let result = tokio::select! {

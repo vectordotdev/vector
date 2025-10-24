@@ -1,11 +1,12 @@
-# Generate protobuf test file
+# Protobuf Test Fixtures
 
-* After modifying a protobuf file e.g. `test_protobuf3.proto`, it needs to be recompiled.
-* There are many ways to create protobuf files. We are using `generate_example.py` here.
+## Regenerating
 
-```shell
-protoc -I ./ -o test_protobuf3.desc ./test_protobuf3.proto
-pip install protobuf
-protoc --python_out=. ./test_protobuf3.proto
-python generate_example.py
-```
+After modifying `.proto` or `.txt` files, run `make` (requires `protoc`).
+
+## Adding New Test Cases
+
+1. Edit/create `.proto` file in `protos/`
+2. Create text format `.txt` file in `pbs/`
+3. Update `Makefile`
+4. Run `make`

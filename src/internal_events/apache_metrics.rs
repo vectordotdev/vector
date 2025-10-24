@@ -44,7 +44,6 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
             endpoint = %self.endpoint,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
