@@ -20,7 +20,7 @@ pub enum SignalTo {
     ReloadComponents(HashSet<ComponentKey>),
     /// Signal to reload config from a string.
     ReloadFromConfigBuilder(ConfigBuilder),
-    /// Signal to reload config from the filesystem.
+    /// Signal to reload config from the filesystem and reload components with external files.
     ReloadFromDisk,
     /// Signal to reload all enrichment tables.
     ReloadEnrichmentTables,
