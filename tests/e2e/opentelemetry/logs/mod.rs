@@ -7,7 +7,7 @@ use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEn
 use vector_lib::opentelemetry::proto::{DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE};
 use vrl::value::Value as VrlValue;
 
-const EXPECTED_TOTAL_LOG_COUNT: usize = 200; // 100 via gRPC + 100 via HTTP
+const EXPECTED_LOG_COUNT: usize = 200; // 100 via gRPC + 100 via HTTP
 
 fn read_file_helper(filename: &str) -> Result<String, io::Error> {
     let local_path = Path::new("/output/opentelemetry-logs").join(filename);
@@ -202,13 +202,13 @@ fn vector_sink_otel_sink_logs_match() {
         .count();
 
     assert_eq!(
-        collector_log_count, EXPECTED_TOTAL_LOG_COUNT,
-        "Collector produced {collector_log_count} log records, expected {EXPECTED_TOTAL_LOG_COUNT}"
+        collector_log_count, EXPECTED_LOG_COUNT,
+        "Collector produced {collector_log_count} log records, expected {EXPECTED_LOG_COUNT}"
     );
 
     assert_eq!(
-        vector_log_count, EXPECTED_TOTAL_LOG_COUNT,
-        "Vector produced {vector_log_count} log records, expected {EXPECTED_TOTAL_LOG_COUNT}"
+        vector_log_count, EXPECTED_LOG_COUNT,
+        "Vector produced {vector_log_count} log records, expected {EXPECTED_LOG_COUNT}"
     );
 
     // Verify service.name attribute
