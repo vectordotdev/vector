@@ -21,7 +21,7 @@ use warp::{
     reject::Rejection,
 };
 
-use super::encoding::decode;
+use super::encoding::decompress_body;
 use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
@@ -57,7 +57,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
-        decode(encoding_header, body)
+        decompress_body(encoding_header, body)
     }
 
     #[allow(clippy::too_many_arguments)]

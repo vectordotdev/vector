@@ -39,7 +39,7 @@ use crate::{
     sources::{
         http_server::HttpConfigParamKind,
         opentelemetry::config::{LOGS, METRICS, OpentelemetryConfig, TRACES},
-        util::{add_headers, decode},
+        util::{add_headers, decompress_body},
     },
     tls::MaybeTlsSettings,
 };
@@ -214,7 +214,7 @@ fn build_warp_log_filter(
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
-        decode(encoding_header.as_deref(), body)
+        decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decode` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
@@ -254,7 +254,7 @@ fn build_warp_metrics_filter(
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
-        decode(encoding_header.as_deref(), body)
+        decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decode` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
@@ -290,7 +290,7 @@ fn build_warp_trace_filter(
     deserializer: Option<OtlpDeserializer>,
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
-        decode(encoding_header.as_deref(), body)
+        decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decode` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
