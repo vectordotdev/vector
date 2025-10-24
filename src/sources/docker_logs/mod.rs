@@ -616,7 +616,7 @@ impl DockerLogsSource {
                             }
                         }
                         None => {
-                            error!(message = "The docker_logs source main stream has ended unexpectedly.");
+                            error!(message = "The docker_logs source main stream has ended unexpectedly.", internal_log_rate_limit = false);
                             info!(message = "Shutting down docker_logs source.");
                             return;
                         }

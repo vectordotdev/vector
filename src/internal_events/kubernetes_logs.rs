@@ -72,7 +72,6 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -97,7 +96,6 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -123,7 +121,6 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -163,7 +160,6 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -192,7 +188,6 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             error_code = KUBERNETES_LIFECYCLE,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -222,7 +217,6 @@ impl InternalEvent for KubernetesMergedLineTooBigError<'_> {
             event = ?self.event,
             configured_limit = self.configured_limit,
             encountered_size_so_far = self.encountered_size_so_far,
-            internal_log_rate_limit = true,
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::RECEIVING,
         );

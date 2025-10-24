@@ -172,7 +172,7 @@ impl SinkConfig for MezmoConfig {
             batch_settings.timeout,
             client.clone(),
         )
-        .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error));
+        .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error, internal_log_rate_limit = false));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 

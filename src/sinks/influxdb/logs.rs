@@ -220,7 +220,7 @@ impl SinkConfig for InfluxDbLogsConfig {
             batch.timeout,
             client,
         )
-        .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error));
+        .sink_map_err(|error| error!(message = "Fatal influxdb_logs sink error.", %error, internal_log_rate_limit = false));
 
         #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))

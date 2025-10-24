@@ -149,7 +149,7 @@ impl ApplicationConfig {
                 }
                 Err(error) => {
                     let error = error.to_string();
-                    error!("An error occurred that Vector couldn't handle: {}.", error);
+                    error!(message = "An error occurred that Vector couldn't handle.", %error, internal_log_rate_limit = false);
                     _ = self
                         .topology
                         .abort_tx

@@ -188,10 +188,7 @@ fn decode_datadog_sketches(
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
         // The datadog agent may send an empty payload as a keep alive
-        debug!(
-            message = "Empty payload ignored.",
-            internal_log_rate_limit = true
-        );
+        debug!(message = "Empty payload ignored.");
         return Ok(Vec::new());
     }
 
@@ -218,10 +215,7 @@ fn decode_datadog_series_v2(
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
         // The datadog agent may send an empty payload as a keep alive
-        debug!(
-            message = "Empty payload ignored.",
-            internal_log_rate_limit = true
-        );
+        debug!(message = "Empty payload ignored.");
         return Ok(Vec::new());
     }
 
@@ -417,10 +411,7 @@ fn decode_datadog_series_v1(
 ) -> Result<Vec<Event>, ErrorMessage> {
     if body.is_empty() {
         // The datadog agent may send an empty payload as a keep alive
-        debug!(
-            message = "Empty payload ignored.",
-            internal_log_rate_limit = true
-        );
+        debug!(message = "Empty payload ignored.");
         return Ok(Vec::new());
     }
 

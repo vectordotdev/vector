@@ -45,10 +45,14 @@ pub(super) fn open_file<P: AsRef<Path> + Debug>(path: P) -> Option<File> {
         Ok(f) => Some(f),
         Err(error) => {
             if let std::io::ErrorKind::NotFound = error.kind() {
-                error!(message = "Config file not found in path.", ?path);
+                error!(
+                    message = "Config file not found in path.",
+                    ?path,
+                    internal_log_rate_limit = false
+                );
                 None
             } else {
-                error!(message = "Error opening config file.", %error, ?path);
+                error!(message = "Error opening config file.", %error, ?path, internal_log_rate_limit = false);
                 None
             }
         }
@@ -89,7 +93,7 @@ pub fn process_paths(config_paths: &[ConfigPath]) -> Option<Vec<ConfigPath>> {
         };
 
         if matches.is_empty() {
-            error!(message = "Config file not found in path.", path = ?config_pattern);
+            error!(message = "Config file not found in path.", path = ?config_pattern, internal_log_rate_limit = false);
             std::process::exit(exitcode::CONFIG);
         }
 

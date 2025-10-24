@@ -125,7 +125,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
             error_type = error_type::IO_FAILED,
             stage = error_stage::INITIALIZING,
             %mode,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -161,7 +160,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketMulticastGroupJoinError<E> {
             %mode,
             %group_addr,
             %interface,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -192,7 +190,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
             %mode,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -222,7 +219,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
             %mode,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
