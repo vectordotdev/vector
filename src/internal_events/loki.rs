@@ -1,9 +1,11 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{
     ComponentEventsDropped, INTENTIONAL, InternalEvent, error_stage, error_type,
 };
 
 #[derive(Debug)]
+#[internal_event]
 pub struct LokiEventUnlabeledError;
 
 impl InternalEvent for LokiEventUnlabeledError {
@@ -26,6 +28,7 @@ impl InternalEvent for LokiEventUnlabeledError {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct LokiOutOfOrderEventDroppedError {
     pub count: usize,
 }
@@ -57,6 +60,7 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct LokiOutOfOrderEventRewritten {
     pub count: usize,
 }
@@ -73,6 +77,7 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
 }
 
 #[derive(Debug)]
+#[internal_event]
 pub struct LokiTimestampNonParsableEventsDropped;
 
 impl InternalEvent for LokiTimestampNonParsableEventsDropped {

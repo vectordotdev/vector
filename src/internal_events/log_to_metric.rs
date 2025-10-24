@@ -1,10 +1,12 @@
 use std::num::ParseFloatError;
 
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
+#[internal_event]
 pub struct LogToMetricFieldNullError<'a> {
     pub field: &'a str,
 }
@@ -32,6 +34,7 @@ impl InternalEvent for LogToMetricFieldNullError<'_> {
     }
 }
 
+#[internal_event]
 pub struct LogToMetricParseFloatError<'a> {
     pub field: &'a str,
     pub error: ParseFloatError,
@@ -62,6 +65,7 @@ impl InternalEvent for LogToMetricParseFloatError<'_> {
 }
 
 //  Metric Metadata Events and Errors
+#[internal_event]
 pub struct MetricMetadataInvalidFieldValueError<'a> {
     pub field: &'a str,
     pub field_value: &'a str,
@@ -91,6 +95,7 @@ impl InternalEvent for MetricMetadataInvalidFieldValueError<'_> {
     }
 }
 
+#[internal_event]
 pub struct MetricMetadataParseError<'a> {
     pub field: &'a str,
     pub kind: &'a str,
@@ -119,6 +124,7 @@ impl InternalEvent for MetricMetadataParseError<'_> {
     }
 }
 
+#[internal_event]
 pub struct MetricMetadataMetricDetailsNotFoundError {}
 
 impl InternalEvent for MetricMetadataMetricDetailsNotFoundError {
