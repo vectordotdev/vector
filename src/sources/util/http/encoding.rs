@@ -7,6 +7,9 @@ use warp::http::StatusCode;
 
 use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
 
+/// Decompresses the body based on the Content-Encoding header.
+///
+/// Supports gzip, deflate, snappy, zstd, and identity (no compression).
 pub fn decode(header: Option<&str>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
     if let Some(encodings) = header {
         for encoding in encodings.rsplit(',').map(str::trim) {
