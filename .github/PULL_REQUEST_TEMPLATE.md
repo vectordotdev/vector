@@ -19,7 +19,7 @@ This should help the reviewers give feedback faster and with higher quality. -->
 - [ ] No
 
 ## Does this PR include user facing changes?
-<!-- If your changes alter Vector behavior it is considered a user facing change.
+<!-- If this PR alters Vector behavior in any way, for example, it adds a new config field or changes internal metrics it is considered a user facing change.
 Changes to CI, website, playground and similar are generally not considered user facing -->
 
 - [ ] Yes. Please add a changelog fragment based on our [guidelines](https://github.com/vectordotdev/vector/blob/master/changelog.d/README.md).
