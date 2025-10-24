@@ -215,7 +215,7 @@ fn build_warp_log_filter(
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
         decode(encoding_header.as_deref(), body)
-            .map_err(|err| {
+            .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decode` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
                     emit!(HttpBadRequest::new(
@@ -223,7 +223,6 @@ fn build_warp_log_filter(
                         err.message()
                     ));
                 }
-                err
             })
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
@@ -256,7 +255,7 @@ fn build_warp_metrics_filter(
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
         decode(encoding_header.as_deref(), body)
-            .map_err(|err| {
+            .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decode` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
                     emit!(HttpBadRequest::new(
@@ -264,7 +263,6 @@ fn build_warp_metrics_filter(
                         err.message()
                     ));
                 }
-                err
             })
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
@@ -293,7 +291,7 @@ fn build_warp_trace_filter(
 ) -> BoxedFilter<(Response,)> {
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
         decode(encoding_header.as_deref(), body)
-            .map_err(|err| {
+            .inspect_err(|err| {
                 // Other status codes are already handled by `sources::util::decode` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
                     emit!(HttpBadRequest::new(
@@ -301,7 +299,6 @@ fn build_warp_trace_filter(
                         err.message()
                     ));
                 }
-                err
             })
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
