@@ -104,19 +104,18 @@ impl Timer {
     /// Begin a new span representing time spent waiting
     pub(crate) fn start_wait(&mut self, at: Instant) {
         if !self.waiting {
-            self.end_span(at);
+            // Clamp start time in case of a late message
+            self.end_span(at.max(self.overall_start));
             self.waiting = true;
         }
     }
 
     /// Complete the current waiting span and begin a non-waiting span
-    pub(crate) fn stop_wait(&mut self, at: Instant) -> Instant {
+    pub(crate) fn stop_wait(&mut self, at: Instant) {
         if self.waiting {
-            let now = self.end_span(at);
+            // Clamp stop time in case of a late message
+            self.end_span(at.max(self.overall_start));
             self.waiting = false;
-            now
-        } else {
-            at
         }
     }
 
@@ -127,7 +126,8 @@ impl Timer {
         // End the current span so it can be accounted for, but do not change
         // whether or not we're in the waiting state. This way the next span
         // inherits the correct status.
-        let now = self.end_span(Instant::now());
+        let now = Instant::now();
+        self.end_span(now);
 
         let total_duration = now.duration_since(self.overall_start);
         let wait_ratio = self.total_wait.as_secs_f64() / total_duration.as_secs_f64();
@@ -150,16 +150,17 @@ impl Timer {
         self.gauge.set(avg_rounded);
 
         // Reset overall statistics for the next reporting period.
-        self.overall_start = self.span_start;
+        self.overall_start = now;
         self.total_wait = Duration::new(0, 0);
     }
 
-    fn end_span(&mut self, at: Instant) -> Instant {
+    fn end_span(&mut self, at: Instant) {
         if self.waiting {
-            self.total_wait += at - self.span_start;
+            // At can be before span start here, the result will be clamped to 0
+            // because `duration_since` returns zero if at is before span start
+            self.total_wait += at.duration_since(self.span_start);
         }
         self.span_start = at;
-        self.span_start
     }
 }
 
@@ -280,5 +281,41 @@ pub(crate) fn wrap<S>(
         timer_tx,
         component_key,
         inner,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use metrics::gauge;
+
+    use super::*;
+
+    #[test]
+    fn test_utilization_in_bounds_on_late_start() {
+        let mut timer = Timer::new(gauge!("test"), "test".into());
+
+        timer.report();
+
+        // Late message for start wait
+        timer.start_wait(Instant::now() - Duration::from_secs(1));
+
+        timer.report();
+        assert!(timer.ewma.average().unwrap_or(f64::NAN) >= 0.0);
+        assert!(timer.ewma.average().unwrap_or(f64::NAN) <= 1.0);
+    }
+
+    #[test]
+    fn test_utilization_in_bounds_on_late_stop() {
+        let mut timer = Timer::new(gauge!("test"), "test".into());
+
+        timer.waiting = true;
+        timer.report();
+
+        // Late message for stop wait
+        timer.stop_wait(Instant::now() - Duration::from_secs(4));
+
+        timer.report();
+        assert!(timer.ewma.average().unwrap_or(f64::NAN) >= 0.0);
+        assert!(timer.ewma.average().unwrap_or(f64::NAN) <= 1.0);
     }
 }
