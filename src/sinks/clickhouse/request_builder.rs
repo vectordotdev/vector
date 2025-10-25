@@ -8,11 +8,11 @@ use snafu::{ResultExt, Snafu};
 use vector_lib::codecs::encoding::Framer;
 use vector_lib::request_metadata::GroupedCountByteSize;
 
-#[cfg(feature = "sinks-clickhouse")]
-use super::arrow;
 use super::{config::Format, sink::PartitionKey};
 use crate::codecs::Encoder;
 use crate::sinks::util::Compressor;
+#[cfg(feature = "sinks-clickhouse")]
+use crate::sinks::util::arrow;
 use crate::sinks::util::encoding::Encoder as EncoderTrait;
 use crate::sinks::{prelude::*, util::http::HttpRequest};
 

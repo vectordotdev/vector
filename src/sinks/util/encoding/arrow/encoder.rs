@@ -1,5 +1,3 @@
-//! Arrow encoding for Clickhouse sink events.
-
 use std::sync::Arc;
 
 use arrow::{
