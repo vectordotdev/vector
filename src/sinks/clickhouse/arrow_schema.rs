@@ -208,46 +208,35 @@ fn parse_args(input: &str) -> Result<Vec<String>, String> {
 fn parse_decimal_type(ch_type: &str) -> DataType {
     let (type_name, args_str) = extract_identifier(ch_type);
 
-    let args = match parse_args(args_str) {
-        Ok(args) => args,
-        Err(_) => {
-            warn!("Could not parse Decimal type '{}'", ch_type);
-            return DataType::Null;
-        }
-    };
-
-    match type_name {
-        "Decimal" if args.len() == 2 => {
-            // Decimal(P, S) format
-            if let (Ok(precision), Ok(scale)) = (args[0].parse::<u8>(), args[1].parse::<i8>()) {
-                return if precision <= 38 {
-                    DataType::Decimal128(precision, scale)
-                } else {
-                    DataType::Decimal256(precision, scale)
-                };
-            }
-        }
+    let result = parse_args(args_str).ok().and_then(|args| match type_name {
+        "Decimal" if args.len() == 2 => args[0].parse::<u8>().ok().zip(args[1].parse::<i8>().ok()),
         "Decimal32" | "Decimal64" | "Decimal128" | "Decimal256" if args.len() == 1 => {
-            if let Ok(scale) = args[0].parse::<i8>() {
+            args[0].parse::<i8>().ok().map(|scale| {
                 let precision = match type_name {
-                    "Decimal32" => 9,
-                    "Decimal64" => 18,
-                    "Decimal128" => 38,
-                    "Decimal256" => 76,
+                    "Decimal32" => DECIMAL32_PRECISION,
+                    "Decimal64" => DECIMAL64_PRECISION,
+                    "Decimal128" => DECIMAL128_PRECISION,
+                    "Decimal256" => DECIMAL256_PRECISION,
                     _ => unreachable!(),
                 };
-                return if precision <= 38 {
-                    DataType::Decimal128(precision, scale)
-                } else {
-                    DataType::Decimal256(precision, scale)
-                };
-            }
+                (precision, scale)
+            })
         }
-        _ => {}
-    }
+        _ => None,
+    });
 
-    warn!("Could not parse Decimal type '{}'", ch_type);
-    DataType::Null
+    result
+        .map(|(precision, scale)| {
+            if precision <= DECIMAL128_PRECISION {
+                DataType::Decimal128(precision, scale)
+            } else {
+                DataType::Decimal256(precision, scale)
+            }
+        })
+        .unwrap_or_else(|| {
+            warn!("Could not parse Decimal type '{}'", ch_type);
+            DataType::Null
+        })
 }
 
 /// Parses DateTime64 precision and returns the appropriate Arrow timestamp type.
