@@ -13,7 +13,10 @@ use crate::{
         UriParseSnafu,
         prelude::*,
         prometheus::PrometheusRemoteWriteAuth,
-        util::{auth::Auth, http::http_response_retry_logic},
+        util::{
+            auth::Auth,
+            http::{RequestConfig, http_response_retry_logic},
+        },
     },
 };
 
@@ -79,7 +82,7 @@ pub struct RemoteWriteConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: RequestConfig,
 
     /// The tenant ID to send.
     ///
@@ -141,7 +144,7 @@ impl SinkConfig for RemoteWriteConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let request_settings = self.request.into_settings();
+        let request_settings = self.request.tower.into_settings();
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
         let default_namespace = self.default_namespace.clone();
@@ -178,11 +181,18 @@ impl SinkConfig for RemoteWriteConfig {
             None => None,
         };
 
+        // Split headers into static and template-based
+        let (static_headers, _template_headers) = self.request.split_headers();
+
+        // Validate that custom headers don't conflict with auth
+        crate::sinks::util::http::validate_headers(&static_headers)?;
+
         let healthcheck = healthcheck(
             client.clone(),
             endpoint.clone(),
             self.compression,
             auth.clone(),
+            static_headers.clone(),
         )
         .boxed();
 
@@ -191,6 +201,7 @@ impl SinkConfig for RemoteWriteConfig {
             client,
             auth,
             compression: self.compression,
+            headers: static_headers,
         };
         let service = ServiceBuilder::new()
             .settings(request_settings, http_response_retry_logic())
@@ -225,10 +236,19 @@ async fn healthcheck(
     endpoint: Uri,
     compression: Compression,
     auth: Option<Auth>,
+    headers: std::collections::BTreeMap<String, String>,
 ) -> crate::Result<()> {
     let body = bytes::Bytes::new();
-    let request =
-        build_request(http::Method::GET, &endpoint, compression, body, None, auth).await?;
+    let request = build_request(
+        http::Method::GET,
+        &endpoint,
+        compression,
+        body,
+        None,
+        auth,
+        headers,
+    )
+    .await?;
     let response = client.send(request).await?;
 
     match response.status() {
