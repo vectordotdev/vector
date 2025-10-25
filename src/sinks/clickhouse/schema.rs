@@ -104,9 +104,9 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
         "DateTime" => DataType::Timestamp(TimeUnit::Second, None),
         _ if base_type.starts_with("DateTime64") => parse_datetime64_precision(base_type),
         _ if base_type.starts_with("Decimal") => parse_decimal_type(base_type),
-        _ if base_type.starts_with("Array") => DataType::Utf8, // Serialize as JSON
-        _ if base_type.starts_with("Map") => DataType::Utf8,   // Serialize as JSON
-        _ if base_type.starts_with("Tuple") => DataType::Utf8, // Serialize as JSON
+        _ if base_type.starts_with("Array") => DataType::Utf8,
+        _ if base_type.starts_with("Map") => DataType::Utf8,
+        _ if base_type.starts_with("Tuple") => DataType::Utf8,
         _ => {
             warn!("Unknown ClickHouse type '{}', defaulting to Utf8", ch_type);
             DataType::Utf8

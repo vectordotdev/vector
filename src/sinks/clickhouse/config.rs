@@ -12,7 +12,6 @@ use super::{
     sink::{ClickhouseSink, PartitionKey},
 };
 
-#[cfg(feature = "sinks-clickhouse")]
 use super::schema;
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
@@ -43,7 +42,7 @@ pub enum Format {
     /// JSONAsString.
     JsonAsString,
 
-    /// Arrow.
+    /// ArrowStream.
     ArrowStream,
 }
 
@@ -222,7 +221,6 @@ impl SinkConfig for ClickhouseConfig {
                 .expect("'default' should be a valid template")
         });
 
-        #[cfg(feature = "sinks-clickhouse")]
         let arrow_schema = if self.format == Format::ArrowStream {
             if !self.table.is_dynamic() && !database.is_dynamic() {
                 let table_str = self.table.get_ref();
@@ -282,7 +280,6 @@ impl SinkConfig for ClickhouseConfig {
                 ),
             ),
             format: self.format,
-            #[cfg(feature = "sinks-clickhouse")]
             arrow_schema,
         };
 

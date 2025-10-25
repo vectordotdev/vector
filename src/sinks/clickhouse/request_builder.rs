@@ -11,7 +11,6 @@ use vector_lib::request_metadata::GroupedCountByteSize;
 use super::{config::Format, sink::PartitionKey};
 use crate::codecs::Encoder;
 use crate::sinks::util::Compressor;
-#[cfg(feature = "sinks-clickhouse")]
 use crate::sinks::util::arrow;
 use crate::sinks::util::encoding::Encoder as EncoderTrait;
 use crate::sinks::{prelude::*, util::http::HttpRequest};
@@ -41,7 +40,6 @@ pub(super) struct ClickhouseRequestBuilder {
     pub(super) compression: Compression,
     pub(super) encoding: (Transformer, Encoder<Framer>),
     pub(super) format: Format,
-    #[cfg(feature = "sinks-clickhouse")]
     pub(super) arrow_schema: Option<Arc<::arrow::datatypes::Schema>>,
 }
 
@@ -72,7 +70,6 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
         ((key, finalizers), builder, events)
     }
 
-    #[cfg(feature = "sinks-clickhouse")]
     fn encode_events(
         &self,
         events: Self::Events,
@@ -121,7 +118,6 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
     }
 }
 
-#[cfg(feature = "sinks-clickhouse")]
 impl ClickhouseRequestBuilder {
     fn build_arrow_request_payload(
         &self,
