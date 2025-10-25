@@ -217,13 +217,13 @@ impl ByteSizeOf for MetricEntry {
         
         let total = data_size + metadata_size + struct_size;
         
-        trace!(
-            message = "Entry allocated_bytes breakdown",
-            data_size = data_size,
-            metadata_size = metadata_size,
-            struct_size = struct_size,
-            total = total
-        );
+        // trace!(
+        //     message = "Entry allocated_bytes breakdown",
+        //     data_size = data_size,
+        //     metadata_size = metadata_size,
+        //     struct_size = struct_size,
+        //     total = total
+        // );
         
         total
     }
@@ -375,13 +375,13 @@ impl CapacityPolicy {
         let entry_size = entry.allocated_bytes();
         let total_size = series_size + entry_size;
         
-        trace!(
-            message = "Calculating item size",
-            series_name_str = %series.name.name,
-            series_size = series_size,
-            entry_size = entry_size,
-            total_size = total_size
-        );
+        // trace!(
+        //     message = "Calculating item size",
+        //     series_name_str = %series.name.name,
+        //     series_size = series_size,
+        //     entry_size = entry_size,
+        //     total_size = total_size
+        // );
         
         total_size
     }
@@ -635,6 +635,7 @@ impl MetricSet {
 
         trace!(
             message = "Inserting entry with tracking",
+            series_name = ?series.name,
             current_memory = capacity_policy.current_memory(),
             max_memory = ?capacity_policy.max_bytes,
             current_entries = self.inner.len(),
@@ -651,10 +652,12 @@ impl MetricSet {
                 let existing_size = capacity_policy.item_size(&series, &existing_entry);
                 trace!(message = "Found existing entry for series", series_name = ?series.name, series_name_str = %series.name.name);
                 capacity_policy.replace_memory(existing_size, entry_size);
+                self.inner.get(&series);
             } else {
                 // No existing entry, just add the new entry's size
                 trace!(message = "No existing entry for series", series_name = ?series.name, series_name_str = %series.name.name);
                 capacity_policy.replace_memory(0, entry_size);
+                self.inner.get(&series);
             }
         } else {
             // When not tracking memory (only entry count limits), just put directly
