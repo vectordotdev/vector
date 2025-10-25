@@ -82,14 +82,20 @@ fn parse_schema_from_response(response: &str) -> crate::Result<Arc<Schema>> {
     Ok(Arc::new(Schema::new(fields)))
 }
 
+/// Unwraps ClickHouse type modifiers like Nullable() and LowCardinality().
+/// For example: "Nullable(LowCardinality(String))" -> "String"
+fn unwrap_type_modifiers(ch_type: &str) -> &str {
+    let mut base = ch_type;
+    for prefix in ["Nullable(", "LowCardinality("] {
+        if let Some(inner) = base.strip_prefix(prefix) {
+            base = inner.strip_suffix(')').unwrap_or(inner);
+        }
+    }
+    base
+}
+
 fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
-    let mut base_type = ch_type;
-    if let Some(inner) = base_type.strip_prefix("Nullable(") {
-        base_type = inner.strip_suffix(')').unwrap_or(inner);
-    }
-    if let Some(inner) = base_type.strip_prefix("LowCardinality(") {
-        base_type = inner.strip_suffix(')').unwrap_or(inner);
-    }
+    let base_type = unwrap_type_modifiers(ch_type);
 
     match base_type {
         "String" | "FixedString" => DataType::Utf8,
