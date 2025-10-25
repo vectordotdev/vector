@@ -114,6 +114,64 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
     }
 }
 
+/// Extracts an identifier from the start of a string.
+/// Returns (identifier, remaining_string).
+fn extract_identifier(input: &str) -> (&str, &str) {
+    for (i, c) in input.char_indices() {
+        if c.is_alphabetic() || c == '_' || (i > 0 && c.is_numeric()) {
+            continue;
+        }
+        return (&input[..i], &input[i..]);
+    }
+    (input, "")
+}
+
+/// Parses comma-separated arguments from a parenthesized string.
+/// Input: "(arg1, arg2, arg3)" -> Output: Ok(vec!["arg1".to_string(), "arg2".to_string(), "arg3".to_string()])
+/// Returns an error if parentheses are malformed.
+fn parse_args(input: &str) -> Result<Vec<String>, String> {
+    let trimmed = input.trim();
+    if !trimmed.starts_with('(') || !trimmed.ends_with(')') {
+        return Err(format!(
+            "Expected parentheses around arguments in '{}'",
+            input
+        ));
+    }
+
+    let inner = trimmed[1..trimmed.len() - 1].trim();
+    if inner.is_empty() {
+        return Ok(vec![]);
+    }
+
+    // Split by comma, handling nested parentheses and quotes
+    let mut args = Vec::new();
+    let mut current_arg = String::new();
+    let mut depth = 0;
+    let mut in_quotes = false;
+
+    for c in inner.chars() {
+        match c {
+            '\'' if !in_quotes => in_quotes = true,
+            '\'' if in_quotes => in_quotes = false,
+            '(' if !in_quotes => depth += 1,
+            ')' if !in_quotes => depth -= 1,
+            ',' if depth == 0 && !in_quotes => {
+                args.push(current_arg.trim().to_string());
+                current_arg = String::new();
+                continue;
+            }
+            _ => {}
+        }
+        current_arg.push(c);
+    }
+
+    if !current_arg.trim().is_empty() {
+        args.push(current_arg.trim().to_string());
+    }
+
+    Ok(args)
+}
+
 /// Parses ClickHouse Decimal types and returns the appropriate Arrow decimal type.
 /// ClickHouse formats:
 /// - Decimal(P, S) -> generic decimal with precision P and scale S
@@ -122,51 +180,53 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
 /// - Decimal128(S) -> precision up to 38, scale S
 /// - Decimal256(S) -> precision up to 76, scale S
 fn parse_decimal_type(ch_type: &str) -> DataType {
-    // Try to parse Decimal(P, S) format
-    if let Some(params) = ch_type.strip_prefix("Decimal(")
-        && let Some(params) = params.strip_suffix(')')
-    {
-        let parts: Vec<&str> = params.split(',').map(|s| s.trim()).collect();
-        if parts.len() == 2
-            && let (Ok(precision), Ok(scale)) = (parts[0].parse::<u8>(), parts[1].parse::<i8>())
-        {
-            return if precision <= 38 {
-                DataType::Decimal128(precision, scale)
-            } else {
-                DataType::Decimal256(precision, scale)
-            };
-        }
-    }
+    let (type_name, args_str) = extract_identifier(ch_type);
 
-    // Try to parse Decimal32(S), Decimal64(S), Decimal128(S), Decimal256(S)
-    let (prefix, max_precision) = if ch_type.starts_with("Decimal256(") {
-        ("Decimal256(", 76)
-    } else if ch_type.starts_with("Decimal128(") {
-        ("Decimal128(", 38)
-    } else if ch_type.starts_with("Decimal64(") {
-        ("Decimal64(", 18)
-    } else if ch_type.starts_with("Decimal32(") {
-        ("Decimal32(", 9)
-    } else {
-        warn!(
-            "Could not parse Decimal type '{}', defaulting to Float64",
-            ch_type
-        );
-        return DataType::Float64;
+    let args = match parse_args(args_str) {
+        Ok(args) => args,
+        Err(_) => {
+            warn!(
+                "Could not parse Decimal type '{}', defaulting to Float64",
+                ch_type
+            );
+            return DataType::Float64;
+        }
     };
 
-    if let Some(scale_str) = ch_type
-        .strip_prefix(prefix)
-        .and_then(|s| s.strip_suffix(')'))
-        && let Ok(scale) = scale_str.trim().parse::<i8>()
-    {
-        return if max_precision <= 38 {
-            DataType::Decimal128(max_precision, scale)
-        } else {
-            DataType::Decimal256(max_precision, scale)
-        };
+    match type_name {
+        "Decimal" if args.len() == 2 => {
+            // Decimal(P, S) format
+            if let (Ok(precision), Ok(scale)) = (args[0].parse::<u8>(), args[1].parse::<i8>()) {
+                return if precision <= 38 {
+                    DataType::Decimal128(precision, scale)
+                } else {
+                    DataType::Decimal256(precision, scale)
+                };
+            }
+        }
+        "Decimal32" | "Decimal64" | "Decimal128" | "Decimal256" if args.len() == 1 => {
+            if let Ok(scale) = args[0].parse::<i8>() {
+                let precision = match type_name {
+                    "Decimal32" => 9,
+                    "Decimal64" => 18,
+                    "Decimal128" => 38,
+                    "Decimal256" => 76,
+                    _ => unreachable!(),
+                };
+                return if precision <= 38 {
+                    DataType::Decimal128(precision, scale)
+                } else {
+                    DataType::Decimal256(precision, scale)
+                };
+            }
+        }
+        _ => {}
     }
 
+    warn!(
+        "Could not parse Decimal type '{}', defaulting to Float64",
+        ch_type
+    );
     DataType::Float64
 }
 
@@ -176,32 +236,41 @@ fn parse_decimal_type(ch_type: &str) -> DataType {
 /// DateTime64(6) -> Microsecond
 /// DateTime64(9) -> Nanosecond
 fn parse_datetime64_precision(ch_type: &str) -> DataType {
-    // Extract precision from DateTime64(N)
-    if let Some(precision_str) = ch_type
-        .strip_prefix("DateTime64(")
-        .and_then(|s| s.split(')').next())
-        .and_then(|s| s.split(',').next())
-    {
-        match precision_str.trim().parse::<u8>() {
-            Ok(0) => DataType::Timestamp(TimeUnit::Second, None),
-            Ok(1..=3) => DataType::Timestamp(TimeUnit::Millisecond, None),
-            Ok(4..=6) => DataType::Timestamp(TimeUnit::Microsecond, None),
-            Ok(7..=9) => DataType::Timestamp(TimeUnit::Nanosecond, None),
-            _ => {
-                warn!(
-                    "Unsupported DateTime64 precision in '{}', defaulting to Millisecond",
-                    ch_type
-                );
-                DataType::Timestamp(TimeUnit::Millisecond, None)
-            }
+    let (_type_name, args_str) = extract_identifier(ch_type);
+
+    let args = match parse_args(args_str) {
+        Ok(args) => args,
+        Err(_) => {
+            warn!(
+                "Could not parse DateTime64 precision from '{}', defaulting to Millisecond",
+                ch_type
+            );
+            return DataType::Timestamp(TimeUnit::Millisecond, None);
         }
-    } else {
-        // Default to millisecond if we can't parse
+    };
+
+    // DateTime64(precision) or DateTime64(precision, 'timezone')
+    if args.is_empty() {
         warn!(
             "Could not parse DateTime64 precision from '{}', defaulting to Millisecond",
             ch_type
         );
-        DataType::Timestamp(TimeUnit::Millisecond, None)
+        return DataType::Timestamp(TimeUnit::Millisecond, None);
+    }
+
+    // Parse the precision (first argument)
+    match args[0].parse::<u8>() {
+        Ok(0) => DataType::Timestamp(TimeUnit::Second, None),
+        Ok(1..=3) => DataType::Timestamp(TimeUnit::Millisecond, None),
+        Ok(4..=6) => DataType::Timestamp(TimeUnit::Microsecond, None),
+        Ok(7..=9) => DataType::Timestamp(TimeUnit::Nanosecond, None),
+        _ => {
+            warn!(
+                "Unsupported DateTime64 precision in '{}', defaulting to Millisecond",
+                ch_type
+            );
+            DataType::Timestamp(TimeUnit::Millisecond, None)
+        }
     }
 }
 
@@ -346,6 +415,116 @@ mod tests {
         assert_eq!(
             schema.field(2).data_type(),
             &DataType::Timestamp(TimeUnit::Second, None)
+        );
+    }
+
+    #[test]
+    fn test_extract_identifier() {
+        assert_eq!(extract_identifier("Decimal(10, 2)"), ("Decimal", "(10, 2)"));
+        assert_eq!(extract_identifier("DateTime64(3)"), ("DateTime64", "(3)"));
+        assert_eq!(extract_identifier("Int32"), ("Int32", ""));
+        assert_eq!(
+            extract_identifier("LowCardinality(String)"),
+            ("LowCardinality", "(String)")
+        );
+        assert_eq!(extract_identifier("Decimal128(10)"), ("Decimal128", "(10)"));
+    }
+
+    #[test]
+    fn test_parse_args() {
+        // Simple cases
+        assert_eq!(
+            parse_args("(10, 2)").unwrap(),
+            vec!["10".to_string(), "2".to_string()]
+        );
+        assert_eq!(parse_args("(3)").unwrap(), vec!["3".to_string()]);
+        assert_eq!(parse_args("()").unwrap(), Vec::<String>::new());
+
+        // With spaces
+        assert_eq!(
+            parse_args("( 10 , 2 )").unwrap(),
+            vec!["10".to_string(), "2".to_string()]
+        );
+
+        // With nested parentheses
+        assert_eq!(
+            parse_args("(Nullable(String))").unwrap(),
+            vec!["Nullable(String)".to_string()]
+        );
+        assert_eq!(
+            parse_args("(Array(Int32), String)").unwrap(),
+            vec!["Array(Int32)".to_string(), "String".to_string()]
+        );
+
+        // With quotes
+        assert_eq!(
+            parse_args("(3, 'UTC')").unwrap(),
+            vec!["3".to_string(), "'UTC'".to_string()]
+        );
+        assert_eq!(
+            parse_args("(9, 'America/New_York')").unwrap(),
+            vec!["9".to_string(), "'America/New_York'".to_string()]
+        );
+
+        // Complex nested case
+        assert_eq!(
+            parse_args("(Tuple(Int32, String), Array(Float64))").unwrap(),
+            vec![
+                "Tuple(Int32, String)".to_string(),
+                "Array(Float64)".to_string()
+            ]
+        );
+
+        // Error cases
+        assert!(parse_args("10, 2").is_err()); // Missing parentheses
+        assert!(parse_args("(10, 2").is_err()); // Missing closing paren
+    }
+
+    #[test]
+    fn test_decimal_type_parsing_with_new_parser() {
+        // Generic Decimal(P, S) - edge cases
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal(10,2)"),
+            DataType::Decimal128(10, 2)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal( 18 , 6 )"),
+            DataType::Decimal128(18, 6)
+        );
+
+        // Sized decimal types without spaces
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal32(4)"),
+            DataType::Decimal128(9, 4)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal64(8)"),
+            DataType::Decimal128(18, 8)
+        );
+    }
+
+    #[test]
+    fn test_datetime64_parsing_with_new_parser() {
+        // Without timezone
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(3)"),
+            DataType::Timestamp(TimeUnit::Millisecond, None)
+        );
+
+        // With timezone (should ignore timezone for now)
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(6, 'UTC')"),
+            DataType::Timestamp(TimeUnit::Microsecond, None)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(9, 'America/New_York')"),
+            DataType::Timestamp(TimeUnit::Nanosecond, None)
+        );
+
+        // With spaces
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64( 3 )"),
+            DataType::Timestamp(TimeUnit::Millisecond, None)
         );
     }
 }
