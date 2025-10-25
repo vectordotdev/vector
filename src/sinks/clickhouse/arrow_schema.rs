@@ -308,9 +308,17 @@ mod tests {
             clickhouse_type_to_arrow("DateTime64(9)"),
             DataType::Timestamp(TimeUnit::Nanosecond, None)
         );
-        // Test with timezone
+        // Test with timezones
         assert_eq!(
             clickhouse_type_to_arrow("DateTime64(9, 'UTC')"),
+            DataType::Timestamp(TimeUnit::Nanosecond, None)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(6, 'UTC')"),
+            DataType::Timestamp(TimeUnit::Microsecond, None)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64(9, 'America/New_York')"),
             DataType::Timestamp(TimeUnit::Nanosecond, None)
         );
         // Test edge cases for precision ranges
@@ -325,6 +333,11 @@ mod tests {
         assert_eq!(
             clickhouse_type_to_arrow("DateTime64(7)"),
             DataType::Timestamp(TimeUnit::Nanosecond, None)
+        );
+        // Test with spaces
+        assert_eq!(
+            clickhouse_type_to_arrow("DateTime64( 3 )"),
+            DataType::Timestamp(TimeUnit::Millisecond, None)
         );
     }
 
@@ -367,16 +380,34 @@ mod tests {
             DataType::Decimal256(50, 10)
         );
 
+        // Generic Decimal without spaces and with spaces
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal(10,2)"),
+            DataType::Decimal128(10, 2)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal( 18 , 6 )"),
+            DataType::Decimal128(18, 6)
+        );
+
         // Decimal32(S) - precision up to 9
         assert_eq!(
             clickhouse_type_to_arrow("Decimal32(2)"),
             DataType::Decimal128(9, 2)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal32(4)"),
+            DataType::Decimal128(9, 4)
         );
 
         // Decimal64(S) - precision up to 18
         assert_eq!(
             clickhouse_type_to_arrow("Decimal64(4)"),
             DataType::Decimal128(18, 4)
+        );
+        assert_eq!(
+            clickhouse_type_to_arrow("Decimal64(8)"),
+            DataType::Decimal128(18, 8)
         );
 
         // Decimal128(S) - precision up to 38
@@ -478,53 +509,5 @@ mod tests {
         // Error cases
         assert!(parse_args("10, 2").is_err()); // Missing parentheses
         assert!(parse_args("(10, 2").is_err()); // Missing closing paren
-    }
-
-    #[test]
-    fn test_decimal_type_parsing_with_new_parser() {
-        // Generic Decimal(P, S) - edge cases
-        assert_eq!(
-            clickhouse_type_to_arrow("Decimal(10,2)"),
-            DataType::Decimal128(10, 2)
-        );
-        assert_eq!(
-            clickhouse_type_to_arrow("Decimal( 18 , 6 )"),
-            DataType::Decimal128(18, 6)
-        );
-
-        // Sized decimal types without spaces
-        assert_eq!(
-            clickhouse_type_to_arrow("Decimal32(4)"),
-            DataType::Decimal128(9, 4)
-        );
-        assert_eq!(
-            clickhouse_type_to_arrow("Decimal64(8)"),
-            DataType::Decimal128(18, 8)
-        );
-    }
-
-    #[test]
-    fn test_datetime64_parsing_with_new_parser() {
-        // Without timezone
-        assert_eq!(
-            clickhouse_type_to_arrow("DateTime64(3)"),
-            DataType::Timestamp(TimeUnit::Millisecond, None)
-        );
-
-        // With timezone (should ignore timezone for now)
-        assert_eq!(
-            clickhouse_type_to_arrow("DateTime64(6, 'UTC')"),
-            DataType::Timestamp(TimeUnit::Microsecond, None)
-        );
-        assert_eq!(
-            clickhouse_type_to_arrow("DateTime64(9, 'America/New_York')"),
-            DataType::Timestamp(TimeUnit::Nanosecond, None)
-        );
-
-        // With spaces
-        assert_eq!(
-            clickhouse_type_to_arrow("DateTime64( 3 )"),
-            DataType::Timestamp(TimeUnit::Millisecond, None)
-        );
     }
 }
