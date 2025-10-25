@@ -9,7 +9,7 @@ use vector_lib::codecs::encoding::Framer;
 use vector_lib::request_metadata::GroupedCountByteSize;
 
 #[cfg(feature = "sinks-clickhouse")]
-use super::encoder;
+use super::arrow;
 use super::{config::Format, sink::PartitionKey};
 use crate::codecs::Encoder;
 use crate::sinks::util::Compressor;
@@ -19,7 +19,7 @@ use crate::sinks::{prelude::*, util::http::HttpRequest};
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
     #[snafu(display("Failed to encode events to Arrow: {}", source))]
-    ArrowEncoding { source: encoder::ArrowEncodingError },
+    ArrowEncoding { source: arrow::ArrowEncodingError },
 
     #[snafu(display("Failed to compress payload: {}", source))]
     Compression { source: std::io::Error },
@@ -42,7 +42,7 @@ pub(super) struct ClickhouseRequestBuilder {
     pub(super) encoding: (Transformer, Encoder<Framer>),
     pub(super) format: Format,
     #[cfg(feature = "sinks-clickhouse")]
-    pub(super) arrow_schema: Option<Arc<arrow::datatypes::Schema>>,
+    pub(super) arrow_schema: Option<Arc<::arrow::datatypes::Schema>>,
 }
 
 impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
@@ -128,9 +128,8 @@ impl ClickhouseRequestBuilder {
         events: Vec<Event>,
     ) -> Result<EncodeResult<Bytes>, RequestBuilderError> {
         // Encode events to Arrow IPC format using provided schema
-        let arrow_bytes =
-            encoder::encode_events_to_arrow_stream(&events, self.arrow_schema.clone())
-                .context(ArrowEncodingSnafu)?;
+        let arrow_bytes = arrow::encode_events_to_arrow_stream(&events, self.arrow_schema.clone())
+            .context(ArrowEncodingSnafu)?;
 
         let uncompressed_byte_size = arrow_bytes.len();
 

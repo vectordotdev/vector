@@ -2,7 +2,7 @@
 
 use std::sync::Arc;
 
-use arrow::datatypes::{DataType, Field, Schema, TimeUnit};
+use ::arrow::datatypes::{DataType, Field, Schema, TimeUnit};
 use http::{Request, StatusCode};
 use hyper::Body;
 use serde::Deserialize;
