@@ -50,7 +50,7 @@ pub async fn fetch_table_schema(
     match response.status() {
         StatusCode::OK => {
             let body_bytes = hyper::body::to_bytes(response.into_body()).await?;
-            let body_str = String::from_utf8(body_bytes.to_vec())
+            let body_str = String::from_utf8(body_bytes.into())
                 .map_err(|e| format!("Failed to parse response as UTF-8: {}", e))?;
 
             parse_schema_from_response(&body_str)
