@@ -101,6 +101,7 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
         "Bool" => DataType::Boolean,
         "Date" => DataType::Date32,
         "Date32" => DataType::Date32,
+        // Timezones are not currently handled, defaults to UTC
         "DateTime" => DataType::Timestamp(TimeUnit::Second, None),
         _ if base_type.starts_with("DateTime64") => parse_datetime64_precision(base_type),
         _ if base_type.starts_with("Decimal") => parse_decimal_type(base_type),
@@ -185,11 +186,8 @@ fn parse_decimal_type(ch_type: &str) -> DataType {
     let args = match parse_args(args_str) {
         Ok(args) => args,
         Err(_) => {
-            warn!(
-                "Could not parse Decimal type '{}', defaulting to Float64",
-                ch_type
-            );
-            return DataType::Float64;
+            warn!("Could not parse Decimal type '{}'", ch_type);
+            return DataType::Null;
         }
     };
 
@@ -223,11 +221,8 @@ fn parse_decimal_type(ch_type: &str) -> DataType {
         _ => {}
     }
 
-    warn!(
-        "Could not parse Decimal type '{}', defaulting to Float64",
-        ch_type
-    );
-    DataType::Float64
+    warn!("Could not parse Decimal type '{}'", ch_type);
+    DataType::Null
 }
 
 /// Parses DateTime64 precision and returns the appropriate Arrow timestamp type.
@@ -241,21 +236,15 @@ fn parse_datetime64_precision(ch_type: &str) -> DataType {
     let args = match parse_args(args_str) {
         Ok(args) => args,
         Err(_) => {
-            warn!(
-                "Could not parse DateTime64 precision from '{}', defaulting to Millisecond",
-                ch_type
-            );
-            return DataType::Timestamp(TimeUnit::Millisecond, None);
+            warn!("Could not parse DateTime64 precision from '{}'", ch_type);
+            return DataType::Null;
         }
     };
 
     // DateTime64(precision) or DateTime64(precision, 'timezone')
     if args.is_empty() {
-        warn!(
-            "Could not parse DateTime64 precision from '{}', defaulting to Millisecond",
-            ch_type
-        );
-        return DataType::Timestamp(TimeUnit::Millisecond, None);
+        warn!("Could not parse DateTime64 precision from '{}'", ch_type);
+        return DataType::Null;
     }
 
     // Parse the precision (first argument)
@@ -265,11 +254,8 @@ fn parse_datetime64_precision(ch_type: &str) -> DataType {
         Ok(4..=6) => DataType::Timestamp(TimeUnit::Microsecond, None),
         Ok(7..=9) => DataType::Timestamp(TimeUnit::Nanosecond, None),
         _ => {
-            warn!(
-                "Unsupported DateTime64 precision in '{}', defaulting to Millisecond",
-                ch_type
-            );
-            DataType::Timestamp(TimeUnit::Millisecond, None)
+            warn!("Unsupported DateTime64 precision in '{}'", ch_type);
+            DataType::Null
         }
     }
 }
