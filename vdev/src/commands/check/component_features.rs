@@ -1,26 +1,6 @@
-use std::env;
-
 use anyhow::Result;
 
 use crate::{app, util::CargoToml};
-
-const CARGO: &str = "cargo";
-const BASE_ARGS: [&str; 5] = [
-    "check",
-    "--tests",
-    "--bin",
-    "vector",
-    "--no-default-features",
-];
-const PARALLEL_ARGS: [&str; 7] = [
-    "--group",
-    "--verbose",
-    "--retries",
-    "2",
-    "scripts/check-one-feature",
-    "{}",
-    ":::",
-];
 
 /// Check that all component features are set up properly
 #[derive(clap::Args, Debug)]
@@ -28,50 +8,54 @@ const PARALLEL_ARGS: [&str; 7] = [
 pub struct Cli {}
 
 impl Cli {
-    #[allow(clippy::dbg_macro)]
     pub fn exec(self) -> Result<()> {
         app::set_repo_dir()?;
 
         let features = extract_features()?;
+        let feature_list = features.join(",");
 
-        // Prime the pump to build most of the artifacts
-        app::exec(CARGO, BASE_ARGS, true)?;
+        // cargo-hack will check each feature individually
         app::exec(
-            CARGO,
-            BASE_ARGS.into_iter().chain(["--features", "default"]),
-            true,
-        )?;
-        app::exec(
-            CARGO,
-            BASE_ARGS
-                .into_iter()
-                .chain(["--features", "all-integration-tests"]),
-            true,
-        )?;
-
-        // The feature builds already run in parallel below, so don't overload the parallelism
-        unsafe {
-            env::set_var("CARGO_BUILD_JOBS", "1");
-        }
-
-        app::exec(
-            "parallel",
-            PARALLEL_ARGS
-                .into_iter()
-                .chain(features.iter().map(String::as_str)),
+            "cargo",
+            [
+                "hack",
+                "check",
+                "--tests",
+                "--bin",
+                "vector",
+                "--each-feature",
+                "--include-features",
+                &feature_list,
+            ],
             true,
         )
     }
 }
 
 fn extract_features() -> Result<Vec<String>> {
+    use std::collections::HashSet;
+
+    // Exclude default feature - already tested separately and is a cargo convention
+    let excluded_defaults: HashSet<&str> = ["default"].into();
+
+    // Exclude meta-features - aggregate features that enable multiple components together
+    // Testing these would check all features at once, not in isolation
+    let excluded_meta_features: HashSet<&str> = [
+        "all-integration-tests",
+        "all-e2e-tests",
+        "vector-api-tests",
+        "vector-unit-test-tests",
+    ]
+    .into();
+
     Ok(CargoToml::load()?
         .features
         .into_keys()
         .filter(|feature| {
+            // Exclude utility features - internal helpers not meant to be enabled standalone
             !feature.contains("-utils")
-                && feature != "default"
-                && feature != "all-integration-tests"
+                && !excluded_defaults.contains(feature.as_str())
+                && !excluded_meta_features.contains(feature.as_str())
         })
         .collect())
 }
