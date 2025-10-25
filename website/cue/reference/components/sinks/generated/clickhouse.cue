@@ -326,6 +326,7 @@ generated: components: sinks: clickhouse: configuration: {
 		type: string: {
 			default: "json_each_row"
 			enum: {
+				arrow_stream:   "ArrowStream."
 				json_as_object: "JSONAsObject."
 				json_as_string: "JSONAsString."
 				json_each_row:  "JSONEachRow."

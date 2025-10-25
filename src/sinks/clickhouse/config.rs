@@ -11,6 +11,8 @@ use super::{
     service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
     sink::{ClickhouseSink, PartitionKey},
 };
+
+use super::arrow_schema;
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
@@ -39,6 +41,9 @@ pub enum Format {
 
     /// JSONAsString.
     JsonAsString,
+
+    /// ArrowStream.
+    ArrowStream,
 }
 
 impl fmt::Display for Format {
@@ -47,6 +52,7 @@ impl fmt::Display for Format {
             Format::JsonEachRow => write!(f, "JSONEachRow"),
             Format::JsonAsObject => write!(f, "JSONAsObject"),
             Format::JsonAsString => write!(f, "JSONAsString"),
+            Format::ArrowStream => write!(f, "ArrowStream"),
         }
     }
 }
@@ -215,6 +221,55 @@ impl SinkConfig for ClickhouseConfig {
                 .expect("'default' should be a valid template")
         });
 
+        let arrow_schema = if self.format == Format::ArrowStream {
+            if !self.table.is_dynamic() && !database.is_dynamic() {
+                let table_str = self.table.get_ref();
+                let database_str = database.get_ref();
+
+                debug!(
+                    "Fetching schema for table {}.{} at startup",
+                    database_str, table_str
+                );
+                match arrow_schema::fetch_table_schema(
+                    &client,
+                    &endpoint.to_string(),
+                    database_str,
+                    table_str,
+                    auth.as_ref(),
+                )
+                .await
+                {
+                    Ok(schema) => {
+                        debug!(
+                            "Successfully fetched Arrow schema with {} fields: {:?}",
+                            schema.fields().len(),
+                            schema
+                                .fields()
+                                .iter()
+                                .map(|f| format!("{}:{:?}", f.name(), f.data_type()))
+                                .collect::<Vec<_>>()
+                        );
+                        Some(schema)
+                    }
+                    Err(e) => {
+                        return Err(format!(
+                            "Failed to fetch schema for {}.{}: {}. Schema inference is not supported for ArrowStream format.",
+                            database_str,
+                            table_str,
+                            e
+                        ).into());
+                    }
+                }
+            } else {
+                return Err(
+                    "ArrowStream format requires a static table and database (no templates). Schema inference is not supported."
+                        .into(),
+                );
+            }
+        } else {
+            None
+        };
+
         let request_builder = ClickhouseRequestBuilder {
             compression: self.compression,
             encoding: (
@@ -224,6 +279,8 @@ impl SinkConfig for ClickhouseConfig {
                     JsonSerializerConfig::default().build().into(),
                 ),
             ),
+            format: self.format,
+            arrow_schema,
         };
 
         let sink = ClickhouseSink::new(
