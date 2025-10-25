@@ -11,6 +11,7 @@ use crate::util::get_channel;
 pub struct Cli {}
 
 impl Cli {
+    #[allow(clippy::unnecessary_wraps)]
     pub fn exec(self) -> Result<()> {
         let channel = get_channel();
 
