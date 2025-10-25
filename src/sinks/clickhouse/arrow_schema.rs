@@ -9,6 +9,11 @@ use serde::Deserialize;
 
 use crate::http::{Auth, HttpClient};
 
+const DECIMAL32_PRECISION: u8 = 9;
+const DECIMAL64_PRECISION: u8 = 18;
+const DECIMAL128_PRECISION: u8 = 38;
+const DECIMAL256_PRECISION: u8 = 76;
+
 #[derive(Debug, Deserialize)]
 struct ColumnInfo {
     name: String,
