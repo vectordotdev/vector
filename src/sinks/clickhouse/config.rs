@@ -12,7 +12,7 @@ use super::{
     sink::{ClickhouseSink, PartitionKey},
 };
 
-use super::schema;
+use super::arrow_schema;
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
@@ -230,7 +230,7 @@ impl SinkConfig for ClickhouseConfig {
                     "Fetching schema for table {}.{} at startup",
                     database_str, table_str
                 );
-                match schema::fetch_table_schema(
+                match arrow_schema::fetch_table_schema(
                     &client,
                     &endpoint.to_string(),
                     database_str,
