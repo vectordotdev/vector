@@ -98,7 +98,11 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
     let base_type = unwrap_type_modifiers(ch_type);
 
     match base_type {
-        "String" | "FixedString" => DataType::Utf8,
+        // String types
+        "String" => DataType::Utf8,
+        _ if base_type.starts_with("FixedString") => DataType::Utf8,
+
+        // Integer types
         "Int8" => DataType::Int8,
         "Int16" => DataType::Int16,
         "Int32" => DataType::Int32,
@@ -107,18 +111,28 @@ fn clickhouse_type_to_arrow(ch_type: &str) -> DataType {
         "UInt16" => DataType::UInt16,
         "UInt32" => DataType::UInt32,
         "UInt64" => DataType::UInt64,
+
+        // Floating point types
         "Float32" => DataType::Float32,
         "Float64" => DataType::Float64,
+
+        // Boolean
         "Bool" => DataType::Boolean,
-        "Date" => DataType::Date32,
-        "Date32" => DataType::Date32,
-        // Timezones are not currently handled, defaults to UTC
+
+        // Date and time types (timezones not currently handled, defaults to UTC)
+        "Date" | "Date32" => DataType::Date32,
         "DateTime" => DataType::Timestamp(TimeUnit::Second, None),
         _ if base_type.starts_with("DateTime64") => parse_datetime64_precision(base_type),
+
+        // Decimal types
         _ if base_type.starts_with("Decimal") => parse_decimal_type(base_type),
+
+        // Complex types (fallback to Utf8 for now)
         _ if base_type.starts_with("Array") => DataType::Utf8,
         _ if base_type.starts_with("Map") => DataType::Utf8,
         _ if base_type.starts_with("Tuple") => DataType::Utf8,
+
+        // Unknown types
         _ => {
             warn!("Unknown ClickHouse type '{}', defaulting to Utf8", ch_type);
             DataType::Utf8
