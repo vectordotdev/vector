@@ -43,8 +43,6 @@ impl Function for FindVectorMetrics {
     fn compile(
         &self,
         _state: &TypeState,
-        // TODO: Store metrics store in Compile context - just read it from here - we need a
-        // separate process to update it unfortunately, to reduce locking as much as possible
         ctx: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled {
