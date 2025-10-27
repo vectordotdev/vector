@@ -1,4 +1,4 @@
-ARG RUST_VERSION=1.85
+ARG RUST_VERSION
 ARG FEATURES
 
 FROM docker.io/rust:${RUST_VERSION}-slim-trixie
