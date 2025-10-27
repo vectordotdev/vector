@@ -57,43 +57,16 @@ You can escape environment variables by prefacing them with a `$` character. For
 example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above
 environment variable example.
 
-## Interpolation Pitfalls
+## Security Restrictions
 
+Vector prevents security issues related to environment variable interpolation by rejecting environment variables that contain newline 
+characters. This also prevents injection of multi-line configuration blocks.
 
-It is possible to inject multiline blocks.
-
-{{< warning >}}
-Support for block interpolation feature may be removed in the future.
-We do not recommend using this feature, as it can lead to unwanted injections.
-For example, a malicious actor could inject components that execute arbitrary code.
-Of course this assumes said actor penetrated the system and has write access to the environment variables.
-{{< /warning >}}
-
-For example, the following section of a config:
-
-```yaml
-${SOURCES_BLOCK}
-```
-
-will be replaced by the following value:
+If you need to inject multi-line configuration blocks, use a config pre-processing step with a mature tool like `envsubst`. 
+This approach gives you more control over the configuration and allows you to inspect the result before passing it to Vector:
 
 ```shell
-export SOURCES_BLOCK="sources:\"
-  demo:
-    type: demo_logs
-    format: json
-    interval: 1
-```
-
-A better approach is to introduce a config pre-processing step with a mature tool. This also has the benefit of giving the user
-more control over the configuration and the result can be inspected before it is passed to Vector. See the following example:
-
-```shell
-envsubst < snippet_in.yaml > snippet_out.yaml
-cat snippet_out.yaml
-sources:"
-  demo:
-    type: demo_logs
-    format: json
-    interval: 1
+envsubst < config_template.yaml > config.yaml
+# Inspect config.yaml before starting Vector
+vector --config config.yaml
 ```
