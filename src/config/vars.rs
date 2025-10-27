@@ -165,7 +165,6 @@ mod test {
 
         // Verify error messages are helpful
         let err = interpolate("$MULTILINE_VAR", &vars).unwrap_err();
-        println!("Errors: {:?}", err);
         assert!(err.iter().any(|e| e.contains("newline character")));
         assert!(err.iter().any(|e| e.contains("MULTILINE_VAR")));
     }
