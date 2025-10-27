@@ -1,4 +1,4 @@
-ARG RUST_VERSION
+ARG RUST_VERSION=1
 FROM docker.io/rust:${RUST_VERSION}-slim-trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
