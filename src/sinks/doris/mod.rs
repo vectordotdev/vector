@@ -11,7 +11,6 @@
 mod common;
 mod config;
 mod health;
-mod progress;
 mod request_builder;
 mod retry;
 mod service;

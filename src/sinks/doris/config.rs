@@ -1,6 +1,6 @@
 //! Configuration for the `Doris` sink.
 
-use super::{progress::ProgressReporter, sink::DorisSink};
+use super::sink::DorisSink;
 
 use crate::{
     codecs::EncodingConfigWithFraming,
@@ -16,7 +16,7 @@ use crate::{
 };
 use futures;
 use futures_util::TryFutureExt;
-use std::{collections::HashMap, sync::Arc};
+use std::collections::HashMap;
 
 /// Configuration for the `doris` sink.
 #[configurable_component(sink("doris", "Deliver log data to an Apache Doris database."))]
@@ -48,11 +48,6 @@ pub struct DorisConfig {
     /// Enable request logging.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub log_request: bool,
-
-    /// Progress reporting interval in seconds.
-    /// Set to 0 to disable progress reporting.
-    #[serde(default = "default_log_progress_interval")]
-    pub log_progress_interval: u64,
 
     /// Custom HTTP headers to add to the request.
     #[serde(default)]
@@ -103,10 +98,6 @@ fn default_label_prefix() -> String {
     "vector".to_string()
 }
 
-fn default_log_progress_interval() -> u64 {
-    10
-}
-
 fn default_max_retries() -> isize {
     -1
 }
@@ -119,7 +110,6 @@ impl Default for DorisConfig {
             table: Template::try_from("").unwrap(),
             label_prefix: default_label_prefix(),
             log_request: false,
-            log_progress_interval: default_log_progress_interval(),
             headers: HashMap::new(),
             encoding: (
                 Some(vector_lib::codecs::encoding::FramingConfig::NewlineDelimited),
@@ -154,29 +144,16 @@ impl SinkConfig for DorisConfig {
 
         let client = HttpClient::new(common.tls_settings.clone(), &cx.proxy)?;
 
-        // Create and start the progress reporter
-        let reporter = ProgressReporter::new(self.log_progress_interval);
-        let reporter_clone = reporter.clone();
-        // Create a new noop shutdown signal - it will be automatically closed when the Vector process shuts down
-        let shutdown = vector_lib::shutdown::ShutdownSignal::noop();
-        tokio::spawn(async move {
-            reporter_clone.report(Some(shutdown)).await;
-        });
-
         // Setup retry logic using the configured request settings
         let request_settings = self.request.into_settings();
 
         let health_config = self.endpoint_health.clone().unwrap_or_default();
-
-        // Wrap reporter in Arc for sharing
-        let reporter_arc = Arc::new(reporter);
 
         let services_futures = commons
             .iter()
             .cloned()
             .map(|common| {
                 let client_clone = client.clone();
-                let reporter_arc_clone = Arc::clone(&reporter_arc);
                 let compression = self.compression.clone();
                 let label_prefix = self.label_prefix.clone();
                 let headers = self.headers.clone();
@@ -197,8 +174,7 @@ impl SinkConfig for DorisConfig {
 
                     let doris_client_safe = doris_client.into_thread_safe();
 
-                    let service =
-                        DorisService::new(doris_client_safe, log_request, reporter_arc_clone);
+                    let service = DorisService::new(doris_client_safe, log_request);
 
                     Ok::<_, crate::Error>((endpoint, service))
                 }
@@ -273,7 +249,6 @@ mod tests {
     #[test]
     fn test_default_values() {
         assert_eq!(default_label_prefix(), "vector");
-        assert_eq!(default_log_progress_interval(), 10);
         assert_eq!(default_max_retries(), -1);
     }
 
@@ -293,7 +268,6 @@ mod tests {
         assert_eq!(config.table.to_string(), "test_table");
         assert_eq!(config.label_prefix, "vector");
         assert!(!config.log_request); // Default is false (opt-in)
-        assert_eq!(config.log_progress_interval, 10);
         assert_eq!(config.max_retries, -1);
     }
 
@@ -306,7 +280,6 @@ mod tests {
             table = "custom_table"
             label_prefix = "custom_prefix"
             log_request = false
-            log_progress_interval = 30
             max_retries = 5
             "#,
         )
@@ -320,7 +293,6 @@ mod tests {
         assert_eq!(config.table.to_string(), "custom_table");
         assert_eq!(config.label_prefix, "custom_prefix");
         assert!(!config.log_request); // Explicitly set to false in config
-        assert_eq!(config.log_progress_interval, 30);
         assert_eq!(config.max_retries, 5);
     }
 

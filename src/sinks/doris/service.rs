@@ -1,19 +1,19 @@
-use crate::sinks::{
-    doris::{
-        client::{DorisStreamLoadResponse, StreamLoadStatus, ThreadSafeDorisSinkClient},
-        sink::DorisPartitionKey,
+use crate::{
+    internal_events::{DorisRowsFiltered, DorisRowsLoaded},
+    sinks::{
+        doris::{
+            client::{DorisStreamLoadResponse, StreamLoadStatus, ThreadSafeDorisSinkClient},
+            sink::DorisPartitionKey,
+        },
+        prelude::{BoxFuture, DriverResponse, Service},
+        util::http::HttpRequest,
     },
-    prelude::{BoxFuture, DriverResponse, Service},
-    util::http::HttpRequest,
 };
 use bytes::Bytes;
 use http::Response;
 use serde_json;
 use snafu::Snafu;
-use std::{
-    sync::Arc,
-    task::{Context, Poll},
-};
+use std::task::{Context, Poll};
 use tracing::{info, warn};
 use vector_common::{
     finalization::EventStatus,
@@ -24,26 +24,22 @@ use vector_common::{
 pub struct DorisService {
     client: ThreadSafeDorisSinkClient,
     log_request: bool,
-    reporter: Arc<super::progress::ProgressReporter>,
 }
 
 impl DorisService {
     pub fn new(
         client: ThreadSafeDorisSinkClient,
         log_request: bool,
-        reporter: Arc<super::progress::ProgressReporter>,
     ) -> DorisService {
         DorisService {
             client,
             log_request,
-            reporter,
         }
     }
     pub(crate) async fn reporter_run(
         &self,
         response: DorisStreamLoadResponse,
     ) -> Result<(), crate::Error> {
-        let reporter = Arc::clone(&self.reporter);
         let stream_load_status = response.stream_load_status;
         let http_status_code = response.http_status_code;
         let response_json = response.response_json;
@@ -68,24 +64,27 @@ impl DorisService {
         }
         if http_status_code.is_success() {
             if stream_load_status == StreamLoadStatus::Successful {
-                // Update byte count statistics
-                if let Some(load_bytes) = response_json.get("LoadBytes").and_then(|b| b.as_i64()) {
-                    reporter.incr_total_bytes(load_bytes);
-                }
-                // Update row count statistics
-                if let Some(loaded_rows) = response_json
+                // Emit metrics for successfully loaded data
+                let load_bytes = response_json.get("LoadBytes").and_then(|b| b.as_i64()).unwrap_or(0);
+                let loaded_rows = response_json
                     .get("NumberLoadedRows")
                     .and_then(|r| r.as_i64())
-                {
-                    reporter.incr_total_rows(loaded_rows);
+                    .unwrap_or(0);
+                
+                if loaded_rows > 0 || load_bytes > 0 {
+                    emit!(DorisRowsLoaded {
+                        loaded_rows,
+                        load_bytes,
+                    });
                 }
-                // Update filtered row count statistics
+
+                // Emit metrics for filtered rows
                 if let Some(filtered_rows) = response_json
                     .get("NumberFilteredRows")
                     .and_then(|r| r.as_i64())
                 {
                     if filtered_rows > 0 {
-                        reporter.incr_failed_rows(filtered_rows);
+                        emit!(DorisRowsFiltered { filtered_rows });
                     }
                 }
             }
