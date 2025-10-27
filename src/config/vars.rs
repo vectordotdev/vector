@@ -31,9 +31,9 @@ pub fn interpolate(input: &str, vars: &HashMap<String, String>) -> Result<String
                 .or_else(|| caps.get(2))
                 .map(|m| m.as_str())
                 .map(|name| {
-                    // Get the value and check for newlines
+                    // Get the value and check for newlines (LF or CR)
                     let val = vars.get(name).and_then(|v| {
-                        if v.contains('\n') || v.contains('\r') {
+                        if v.contains(['\n', '\r']) {
                             errors.push(format!(
                                 "Environment variable contains newline character. name = {name:?}",
                             ));
