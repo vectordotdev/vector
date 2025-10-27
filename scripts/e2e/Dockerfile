@@ -3,7 +3,7 @@ ARG FEATURES
 
 FROM docker.io/rust:${RUST_VERSION}-slim-trixie
 
-RUN apt-get update && apt-get -y --no-install-recommends install \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     curl \
@@ -13,10 +13,11 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
     libsasl2-dev \
     libssl-dev \
     libxxhash-dev \
-    unzip \
     zlib1g-dev \
     zlib1g \
-    mold
+    unzip \
+    mold \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY tests/data/ca/certs /certs
 
