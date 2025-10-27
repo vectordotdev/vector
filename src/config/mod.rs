@@ -598,12 +598,12 @@ pub struct TestOutput<T: 'static = OutputId> {
 
 #[cfg(all(test, feature = "sources-file", feature = "sinks-console"))]
 mod tests {
-    use std::{collections::HashMap, path::PathBuf};
+    use std::path::PathBuf;
 
     use indoc::indoc;
 
     use super::{ComponentKey, ConfigDiff, Format, builder::ConfigBuilder, format, load_from_str};
-    use crate::{config, topology};
+    use crate::{config, topology::builder::TopologyPiecesBuilder};
 
     async fn load(config: &str, format: config::Format) -> Result<Vec<String>, Vec<String>> {
         match config::load_from_str(config, format) {
@@ -612,8 +612,7 @@ mod tests {
                 let c2 = config::load_from_str(config, format).unwrap();
                 match (
                     config::warnings(&c2),
-                    topology::TopologyPieces::build(&c, &diff, HashMap::new(), Default::default())
-                        .await,
+                    TopologyPiecesBuilder::new(&c, &diff).build().await,
                 ) {
                     (warnings, Ok(_pieces)) => Ok(warnings),
                     (_, Err(errors)) => Err(errors),
