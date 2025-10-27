@@ -45,19 +45,23 @@ pub struct MetricsStorage {
 }
 
 impl MetricsStorage {
-    pub(crate) fn get_metric(&self, metric: &str) -> Option<Metric> {
+    pub(crate) fn get_metric(
+        &self,
+        metric: &str,
+        tags: BTreeMap<String, String>,
+    ) -> Option<Metric> {
         self.cache
             .load()
             .iter()
-            .find(|m| m.name() == metric)
+            .find(|m| m.name() == metric && tags.iter().all(|(k, v)| m.tag_matches(k, v)))
             .cloned()
     }
 
-    pub(crate) fn find_metrics(&self, metric: &str) -> Vec<Metric> {
+    pub(crate) fn find_metrics(&self, metric: &str, tags: BTreeMap<String, String>) -> Vec<Metric> {
         self.cache
             .load()
             .iter()
-            .filter(|m| m.name() == metric)
+            .filter(|m| m.name() == metric && tags.iter().all(|(k, v)| m.tag_matches(k, v)))
             .cloned()
             .collect()
     }
@@ -133,7 +137,7 @@ pub(crate) fn metric_into_vrl(value: &Metric) -> Value {
             Value::Bytes(
                 match value.kind() {
                     vector_core::event::MetricKind::Incremental => "incremental",
-                    vector_core::event::MetricKind::Absolute => "Absolute",
+                    vector_core::event::MetricKind::Absolute => "absolute",
                 }
                 .into(),
             ),

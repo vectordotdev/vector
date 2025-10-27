@@ -1,13 +1,16 @@
-use vrl::prelude::*;
+use std::collections::BTreeMap;
+
+use vrl::prelude::{expression::Expr, *};
 
 use crate::common::{metric_into_vrl, metrics_vrl_typedef, Error, MetricsStorage};
 
 fn get_metric(
     metrics_storage: &MetricsStorage,
     key: Value,
+    tags: BTreeMap<String, String>,
 ) -> std::result::Result<Value, ExpressionError> {
     let key_str = key.as_str().expect("argument must be a string");
-    let value = match metrics_storage.get_metric(&key_str) {
+    let value = match metrics_storage.get_metric(&key_str, tags) {
         Some(value) => metric_into_vrl(&value),
         None => Value::Null,
     };
@@ -49,7 +52,8 @@ impl Function for GetVectorMetric {
             .ok_or(Box::new(Error::MetricsStorageNotLoaded) as Box<dyn DiagnosticMessage>)?
             .clone();
         let key = arguments.required("key");
-        Ok(GetVectorMetricFn { metrics, key }.as_expr())
+        let tags = arguments.optional_object("tags")?.unwrap_or_default();
+        Ok(GetVectorMetricFn { metrics, key, tags }.as_expr())
     }
 }
 
@@ -57,12 +61,25 @@ impl Function for GetVectorMetric {
 struct GetVectorMetricFn {
     metrics: MetricsStorage,
     key: Box<dyn Expression>,
+    tags: BTreeMap<KeyString, Expr>,
 }
 
 impl FunctionExpression for GetVectorMetricFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let key = self.key.resolve(ctx)?;
-        get_metric(&self.metrics, key)
+        let tags = self
+            .tags
+            .iter()
+            .map(|(k, v)| {
+                v.resolve(ctx).map(|v| {
+                    (
+                        k.clone().into(),
+                        v.as_str().expect("tag must be a string").into_owned(),
+                    )
+                })
+            })
+            .collect::<Result<_, _>>()?;
+        get_metric(&self.metrics, key, tags)
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
