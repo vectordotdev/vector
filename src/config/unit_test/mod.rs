@@ -424,6 +424,14 @@ async fn build_unit_test(
         .collect::<Vec<_>>();
     valid_components.extend(unexpanded_transforms);
 
+    // We currently don't check if a transform uses enrichment table
+    // We can't be sure if an enrichment table is needed for a test, so they are all considered
+    config_builder
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, c)| c.as_sink(key).map(|(_, sink)| sink.inputs))
+        .for_each(|i| valid_components.extend(i.into_iter()));
+
     // Remove all transforms that are not relevant to the current test
     config_builder.transforms = config_builder
         .transforms
