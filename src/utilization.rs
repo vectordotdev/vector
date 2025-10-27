@@ -297,11 +297,8 @@ mod tests {
 
     /// Helper function to reset mock clock and create a timer at T=100
     fn setup_timer() -> Timer {
-        // Reset mock clock to ensure test isolation
-        MockClock::set_time(Duration::ZERO);
-
-        // Advance mock time to T=100 to avoid issues with time 0
-        MockClock::advance(Duration::from_secs(100));
+        // Set mock clock to T=100
+        MockClock::set_time(Duration::from_secs(100));
 
         Timer::new(
             metrics::gauge!("test_utilization"),
