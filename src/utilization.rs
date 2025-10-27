@@ -164,8 +164,8 @@ impl Timer {
 
     fn end_span(&mut self, at: Instant) {
         if self.waiting {
-            // At can be before span start here, the result will be clamped to 0
-            // because `duration_since` returns zero if at is before span start
+            // `at` can be before span start here, the result will be clamped to 0
+            // because `duration_since` returns zero if `at` is before span start
             self.total_wait += at.duration_since(self.span_start);
         }
         self.span_start = at;
