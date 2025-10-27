@@ -42,4 +42,3 @@ impl InternalEvent for DorisRowsFiltered {
         counter!("doris_rows_filtered_total").increment(self.filtered_rows as u64);
     }
 }
-

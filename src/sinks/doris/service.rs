@@ -27,10 +27,7 @@ pub struct DorisService {
 }
 
 impl DorisService {
-    pub fn new(
-        client: ThreadSafeDorisSinkClient,
-        log_request: bool,
-    ) -> DorisService {
+    pub fn new(client: ThreadSafeDorisSinkClient, log_request: bool) -> DorisService {
         DorisService {
             client,
             log_request,
@@ -65,12 +62,15 @@ impl DorisService {
         if http_status_code.is_success() {
             if stream_load_status == StreamLoadStatus::Successful {
                 // Emit metrics for successfully loaded data
-                let load_bytes = response_json.get("LoadBytes").and_then(|b| b.as_i64()).unwrap_or(0);
+                let load_bytes = response_json
+                    .get("LoadBytes")
+                    .and_then(|b| b.as_i64())
+                    .unwrap_or(0);
                 let loaded_rows = response_json
                     .get("NumberLoadedRows")
                     .and_then(|r| r.as_i64())
                     .unwrap_or(0);
-                
+
                 if loaded_rows > 0 || load_bytes > 0 {
                     emit!(DorisRowsLoaded {
                         loaded_rows,
