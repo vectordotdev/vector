@@ -185,8 +185,14 @@ async fn validate_components(
     diff: &ConfigDiff,
     fmt: &mut Formatter,
 ) -> Option<TopologyPieces> {
-    match topology::TopologyPieces::build(config, diff, HashMap::new(), ExtraContext::default())
-        .await
+    match topology::TopologyPieces::build(
+        config,
+        diff,
+        HashMap::new(),
+        ExtraContext::default(),
+        None,
+    )
+    .await
     {
         Ok(pieces) => {
             fmt.success("Component configuration");

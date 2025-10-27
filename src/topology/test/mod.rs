@@ -947,7 +947,8 @@ async fn topology_transform_error_definition() {
     let config = config.build().unwrap();
     let diff = ConfigDiff::initial(&config);
     let errors =
-        match TopologyPieces::build(&config, &diff, HashMap::new(), Default::default()).await {
+        match TopologyPieces::build(&config, &diff, HashMap::new(), Default::default(), None).await
+        {
             Ok(_) => panic!("build pieces should not succeed"),
             Err(err) => err,
         };

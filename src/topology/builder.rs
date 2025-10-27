@@ -92,6 +92,7 @@ impl<'a> Builder<'a> {
         diff: &'a ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
+        utilization_emitter: Option<UtilizationEmitter>,
     ) -> Self {
         Self {
             config,
@@ -105,7 +106,7 @@ impl<'a> Builder<'a> {
             healthchecks: HashMap::new(),
             detach_triggers: HashMap::new(),
             extra_context,
-            utilization_emitter: UtilizationEmitter::new(),
+            utilization_emitter: utilization_emitter.unwrap_or_else(|| UtilizationEmitter::new()),
         }
     }
 
@@ -514,7 +515,7 @@ impl<'a> Builder<'a> {
 
             let (transform_task, transform_outputs) = {
                 let _span = span.enter();
-                build_transform(transform, node, input_rx, &mut self.utilization_emitter)
+                build_transform(transform, node, input_rx, &self.utilization_emitter)
             };
 
             self.outputs.extend(transform_outputs);
@@ -772,8 +773,10 @@ impl TopologyPieces {
         diff: &ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
+        utilization_emitter: Option<UtilizationEmitter>,
     ) -> Option<Self> {
-        match TopologyPieces::build(config, diff, buffers, extra_context).await {
+        match TopologyPieces::build(config, diff, buffers, extra_context, utilization_emitter).await
+        {
             Err(errors) => {
                 for error in errors {
                     error!(message = "Configuration error.", %error);
@@ -790,8 +793,9 @@ impl TopologyPieces {
         diff: &ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
+        utilization_emitter: Option<UtilizationEmitter>,
     ) -> Result<Self, Vec<String>> {
-        Builder::new(config, diff, buffers, extra_context)
+        Builder::new(config, diff, buffers, extra_context, utilization_emitter)
             .build()
             .await
     }
@@ -842,7 +846,7 @@ fn build_transform(
     transform: Transform,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
-    utilization_emitter: &mut UtilizationEmitter,
+    utilization_emitter: &UtilizationEmitter,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     match transform {
         // TODO: avoid the double boxing for function transforms here
@@ -866,7 +870,7 @@ fn build_sync_transform(
     t: Box<dyn SyncTransform>,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
-    utilization_emitter: &mut UtilizationEmitter,
+    utilization_emitter: &UtilizationEmitter,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (outputs, controls) = TransformOutputs::new(node.outputs, &node.key);
 
@@ -1047,7 +1051,7 @@ fn build_task_transform(
     typetag: &str,
     key: &ComponentKey,
     outputs: &[TransformOutput],
-    utilization_emitter: &mut UtilizationEmitter,
+    utilization_emitter: &UtilizationEmitter,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut fanout, control) = Fanout::new();
 

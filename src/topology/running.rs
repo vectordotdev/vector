@@ -35,6 +35,7 @@ use crate::{
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
+    utilization::UtilizationEmitter,
 };
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
@@ -54,6 +55,7 @@ pub struct RunningTopology {
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
+    utilization_emitter: Option<UtilizationEmitter>,
     utilization_task: Option<TaskHandle>,
     utilization_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
@@ -75,6 +77,7 @@ impl RunningTopology {
             running: Arc::new(AtomicBool::new(true)),
             graceful_shutdown_duration: config.graceful_shutdown_duration,
             config,
+            utilization_emitter: None,
             utilization_task: None,
             utilization_task_shutdown_trigger: None,
             pending_reload: None,
@@ -308,6 +311,7 @@ impl RunningTopology {
             &diff,
             buffers.clone(),
             extra_context.clone(),
+            self.utilization_emitter.clone(),
         )
         .await
         {
@@ -334,9 +338,14 @@ impl RunningTopology {
         warn!("Failed to completely load new configuration. Restoring old configuration.");
 
         let diff = diff.flip();
-        if let Some(mut new_pieces) =
-            TopologyPieces::build_or_log_errors(&self.config, &diff, buffers, extra_context.clone())
-                .await
+        if let Some(mut new_pieces) = TopologyPieces::build_or_log_errors(
+            &self.config,
+            &diff,
+            buffers,
+            extra_context.clone(),
+            self.utilization_emitter.clone(),
+        )
+        .await
             && self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
@@ -1238,9 +1247,14 @@ impl RunningTopology {
         extra_context: ExtraContext,
     ) -> Option<(Self, ShutdownErrorReceiver)> {
         let diff = ConfigDiff::initial(&config);
-        let pieces =
-            TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new(), extra_context)
-                .await?;
+        let pieces = TopologyPieces::build_or_log_errors(
+            &config,
+            &diff,
+            HashMap::new(),
+            extra_context,
+            None,
+        )
+        .await?;
         Self::start_validated(config, diff, pieces).await
     }
 
@@ -1314,6 +1328,7 @@ impl RunningTopology {
 
         let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
             ShutdownSignal::new_wired();
+        running_topology.utilization_emitter = Some(utilization_emitter.clone());
         running_topology.utilization_task_shutdown_trigger =
             Some(utilization_task_shutdown_trigger);
         running_topology.utilization_task = Some(tokio::spawn(Task::new(
