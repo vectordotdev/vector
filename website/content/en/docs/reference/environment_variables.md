@@ -59,14 +59,34 @@ environment variable example.
 
 ## Security Restrictions
 
-Vector prevents security issues related to environment variable interpolation by rejecting environment variables that contain newline 
+Vector prevents security issues related to environment variable interpolation by rejecting environment variables that contain newline
 characters. This also prevents injection of multi-line configuration blocks.
 
-If you need to inject multi-line configuration blocks, use a config pre-processing step with a mature tool like `envsubst`. 
+If you need to inject multi-line configuration blocks, use a config pre-processing step with a mature tool like `envsubst`.
 This approach gives you more control over the configuration and allows you to inspect the result before passing it to Vector:
 
 ```shell
+# config_template.yaml
+${SOURCES_BLOCK}
+sinks:
+  console:
+    type: console
+    inputs: ["demo"]
+    encoding:
+      codec: json
+```
+
+```shell
+# Export multi-line block
+export SOURCES_BLOCK="sources:
+  demo:
+    type: demo_logs
+    format: json
+    interval: 1"
+
+# Process template and inspect result
 envsubst < config_template.yaml > config.yaml
-# Inspect config.yaml before starting Vector
+
+# Start Vector with processed config
 vector --config config.yaml
 ```
