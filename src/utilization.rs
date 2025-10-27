@@ -116,9 +116,9 @@ impl Timer {
     }
 
     /// Complete the current waiting span and begin a non-waiting span
-    pub(crate) fn stop_wait(&mut self) {
+    pub(crate) fn stop_wait(&mut self, at: Instant) {
         if self.waiting {
-            self.end_span(Instant::now());
+            self.end_span(at);
             self.waiting = false;
         }
     }
@@ -247,8 +247,8 @@ impl UtilizationEmitter {
                         Some(UtilizationTimerMessage::StartWait(key, start_time)) => {
                             self.timers.get_mut(&key).expect("Utilization timer missing for component").start_wait(start_time);
                         }
-                        Some(UtilizationTimerMessage::StopWait(key, _stop_time)) => {
-                            self.timers.get_mut(&key).expect("Utilization timer missing for component").stop_wait();
+                        Some(UtilizationTimerMessage::StopWait(key, stop_time)) => {
+                            self.timers.get_mut(&key).expect("Utilization timer missing for component").stop_wait(stop_time);
                         }
                         None => break,
                     }
@@ -316,7 +316,7 @@ mod tests {
     /// and within valid bounds [0, 1]
     fn assert_approx_eq(actual: f64, expected: f64, description: &str) {
         assert!(
-            actual >= 0.0 && actual <= 1.0,
+            (0.0..=1.0).contains(&actual),
             "Utilization {actual} is outside [0, 1]"
         );
         assert!(
@@ -336,7 +336,7 @@ mod tests {
 
         // Advance 2 seconds while waiting (T=101 to T=103)
         MockClock::advance(Duration::from_secs(2));
-        timer.stop_wait();
+        timer.stop_wait(Instant::now());
 
         // Advance 2 more seconds (not waiting), then report (T=103 to T=105)
         MockClock::advance(Duration::from_secs(2));
