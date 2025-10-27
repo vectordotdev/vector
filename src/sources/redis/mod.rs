@@ -3,24 +3,24 @@ use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{
-    decoding::{DeserializerConfig, FramingConfig},
-    StreamDecodingError,
-};
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
-};
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path, path, OwnedValuePath};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
     EstimatedJsonEncodedSizeOf,
+    codecs::{
+        StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    },
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::Kind;
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
-    config::{log_schema, GenerateConfig, SourceConfig, SourceContext, SourceOutput},
+    config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
     serde::{default_decoding, default_framing_message_based},
@@ -309,20 +309,20 @@ mod test {
 #[cfg(all(test, feature = "redis-integration-tests"))]
 mod integration_test {
     use redis::AsyncCommands;
+    use vrl::value;
 
     use super::*;
     use crate::{
+        SourceSender,
         config::log_schema,
         test_util::{
             collect_n,
-            components::{run_and_assert_source_compliance_n, SOURCE_TAGS},
+            components::{SOURCE_TAGS, run_and_assert_source_compliance_n},
             random_string,
         },
-        SourceSender,
     };
-    use vrl::value;
 
-    const REDIS_SERVER: &str = "redis://redis:6379/0";
+    const REDIS_SERVER: &str = "redis://redis-primary:6379/0";
 
     #[tokio::test]
     async fn redis_source_list_rpop() {

@@ -1,19 +1,26 @@
 use std::{
     collections::HashMap,
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
     time::{Duration, Instant},
 };
-use tokio::sync::mpsc::{channel, Receiver, Sender};
+
+#[cfg(debug_assertions)]
+use std::sync::Arc;
 
 use futures::{Stream, StreamExt};
 use metrics::Gauge;
 use pin_project::pin_project;
-use tokio::time::interval;
+use tokio::{
+    sync::mpsc::{Receiver, Sender, channel},
+    time::interval,
+};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{id::ComponentKey, shutdown::ShutdownSignal};
 
 use crate::stats;
+
+const UTILIZATION_EMITTER_DURATION: Duration = Duration::from_secs(5);
 
 #[pin_project]
 pub(crate) struct Utilization<S> {
@@ -64,6 +71,10 @@ pub(crate) struct Timer {
     total_wait: Duration,
     ewma: stats::Ewma,
     gauge: Gauge,
+    #[cfg(debug_assertions)]
+    report_count: u32,
+    #[cfg(debug_assertions)]
+    component_id: Arc<str>,
 }
 
 /// A simple, specialized timer for tracking spans of waiting vs not-waiting
@@ -75,7 +86,7 @@ pub(crate) struct Timer {
 /// to be of uniform length and used to aggregate span data into time-weighted
 /// averages.
 impl Timer {
-    pub(crate) fn new(gauge: Gauge) -> Self {
+    pub(crate) fn new(gauge: Gauge, #[cfg(debug_assertions)] component_id: Arc<str>) -> Self {
         Self {
             overall_start: Instant::now(),
             span_start: Instant::now(),
@@ -83,6 +94,10 @@ impl Timer {
             total_wait: Duration::new(0, 0),
             ewma: stats::Ewma::new(0.9),
             gauge,
+            #[cfg(debug_assertions)]
+            report_count: 0,
+            #[cfg(debug_assertions)]
+            component_id,
         }
     }
 
@@ -120,8 +135,19 @@ impl Timer {
 
         self.ewma.update(utilization);
         let avg = self.ewma.average().unwrap_or(f64::NAN);
-        debug!(utilization = %avg);
-        self.gauge.set(avg);
+        let avg_rounded = (avg * 10000.0).round() / 10000.0; // 4 digit precision
+
+        #[cfg(debug_assertions)]
+        {
+            // Note that changing the reporting interval would also affect the actual metric reporting frequency.
+            // This check reduces debug log spamming.
+            if self.report_count.is_multiple_of(5) {
+                debug!(component_id = %self.component_id, utilization = %avg_rounded);
+            }
+            self.report_count = self.report_count.wrapping_add(1);
+        }
+
+        self.gauge.set(avg_rounded);
 
         // Reset overall statistics for the next reporting period.
         self.overall_start = self.span_start;
@@ -180,7 +206,7 @@ impl UtilizationEmitter {
         let (timer_tx, timer_rx) = channel(4096);
         Self {
             timers: HashMap::default(),
-            intervals: IntervalStream::new(interval(Duration::from_secs(5))),
+            intervals: IntervalStream::new(interval(UTILIZATION_EMITTER_DURATION)),
             timer_tx,
             timer_rx,
         }
@@ -194,7 +220,14 @@ impl UtilizationEmitter {
         key: ComponentKey,
         gauge: Gauge,
     ) -> UtilizationComponentSender {
-        self.timers.insert(key.clone(), Timer::new(gauge));
+        self.timers.insert(
+            key.clone(),
+            Timer::new(
+                gauge,
+                #[cfg(debug_assertions)]
+                key.id().into(),
+            ),
+        );
         UtilizationComponentSender {
             timer_tx: self.timer_tx.clone(),
             component_key: key,

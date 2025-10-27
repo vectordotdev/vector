@@ -1,18 +1,24 @@
-use std::borrow::Cow;
-use std::num::{NonZero, TryFromIntError};
-use std::{collections::BTreeMap, convert::TryFrom, marker::PhantomData};
+use std::{
+    borrow::Cow,
+    collections::BTreeMap,
+    convert::TryFrom,
+    marker::PhantomData,
+    num::{NonZero, TryFromIntError},
+};
 
-use lookup::lookup_v2::OwnedSegment;
-use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix};
+use lookup::{OwnedTargetPath, OwnedValuePath, PathPrefix, lookup_v2::OwnedSegment};
 use snafu::Snafu;
-use vrl::compiler::value::VrlValueConvert;
-use vrl::compiler::{ProgramInfo, SecretTarget, Target};
-use vrl::prelude::Collection;
-use vrl::value::{Kind, ObjectMap, Value};
+use vrl::{
+    compiler::{ProgramInfo, SecretTarget, Target, value::VrlValueConvert},
+    prelude::Collection,
+    value::{Kind, ObjectMap, Value},
+};
 
-use super::{metric::TagValue, Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent};
-use crate::config::{log_schema, LogNamespace};
-use crate::schema::Definition;
+use super::{Event, EventMetadata, LogEvent, Metric, MetricKind, TraceEvent, metric::TagValue};
+use crate::{
+    config::{LogNamespace, log_schema},
+    schema::Definition,
+};
 
 const VALID_METRIC_PATHS_SET: &str = ".name, .namespace, .interval_ms, .timestamp, .kind, .tags";
 
@@ -198,25 +204,25 @@ fn move_field_definitions_into_message(mut definition: Definition) -> Definition
     message.remove_object();
     message.remove_array();
 
-    if !message.is_never() {
-        if let Some(message_key) = log_schema().message_key() {
-            // We need to add the given message type to a field called `message`
-            // in the event.
-            let message = Kind::object(Collection::from(BTreeMap::from([(
-                message_key.to_string().into(),
-                message,
-            )])));
+    if !message.is_never()
+        && let Some(message_key) = log_schema().message_key()
+    {
+        // We need to add the given message type to a field called `message`
+        // in the event.
+        let message = Kind::object(Collection::from(BTreeMap::from([(
+            message_key.to_string().into(),
+            message,
+        )])));
 
-            definition.event_kind_mut().remove_bytes();
-            definition.event_kind_mut().remove_integer();
-            definition.event_kind_mut().remove_float();
-            definition.event_kind_mut().remove_boolean();
-            definition.event_kind_mut().remove_timestamp();
-            definition.event_kind_mut().remove_regex();
-            definition.event_kind_mut().remove_null();
+        definition.event_kind_mut().remove_bytes();
+        definition.event_kind_mut().remove_integer();
+        definition.event_kind_mut().remove_float();
+        definition.event_kind_mut().remove_boolean();
+        definition.event_kind_mut().remove_timestamp();
+        definition.event_kind_mut().remove_regex();
+        definition.event_kind_mut().remove_null();
 
-            *definition.event_kind_mut() = definition.event_kind().union(message);
-        }
+        *definition.event_kind_mut() = definition.event_kind().union(message);
     }
 
     definition
@@ -275,12 +281,12 @@ impl Target for VrlTarget {
         let path = &target_path.path;
         match target_path.prefix {
             PathPrefix::Event => match self {
-                VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
+                VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
                     log.insert(path, value);
                     Ok(())
                 }
                 VrlTarget::Metric {
-                    ref mut metric,
+                    metric,
                     value: metric_value,
                     multi_value_tags,
                 } => {
@@ -344,7 +350,7 @@ impl Target for VrlTarget {
                                     path: &path.to_string(),
                                     expected: VALID_METRIC_PATHS_SET,
                                 }
-                                .to_string())
+                                .to_string());
                             }
                         }
 
@@ -404,11 +410,11 @@ impl Target for VrlTarget {
     ) -> Result<Option<vrl::value::Value>, String> {
         match target_path.prefix {
             PathPrefix::Event => match self {
-                VrlTarget::LogEvent(ref mut log, _) | VrlTarget::Trace(ref mut log, _) => {
+                VrlTarget::LogEvent(log, _) | VrlTarget::Trace(log, _) => {
                     Ok(log.remove(&target_path.path, compact))
                 }
                 VrlTarget::Metric {
-                    ref mut metric,
+                    metric,
                     value,
                     multi_value_tags: _,
                 } => {
@@ -441,7 +447,7 @@ impl Target for VrlTarget {
                                     path: &target_path.path.to_string(),
                                     expected: VALID_METRIC_PATHS_SET,
                                 }
-                                .to_string())
+                                .to_string());
                             }
                         };
 
@@ -639,9 +645,9 @@ fn precompute_metric_value(metric: &Metric, info: &ProgramInfo, multi_value_tags
                 &mut timestamp,
                 &mut tags,
             ];
-            properties
-                .iter_mut()
-                .for_each(|property| property.insert(metric, &mut map));
+            for property in &mut properties {
+                property.insert(metric, &mut map);
+            }
             break;
         }
 
@@ -678,14 +684,12 @@ enum MetricPathError<'a> {
 
 #[cfg(test)]
 mod test {
-    use chrono::{offset::TimeZone, Utc};
+    use chrono::{Utc, offset::TimeZone};
     use lookup::owned_value_path;
     use similar_asserts::assert_eq;
-    use vrl::btreemap;
-    use vrl::value::kind::Index;
+    use vrl::{btreemap, value::kind::Index};
 
-    use super::super::MetricValue;
-    use super::*;
+    use super::{super::MetricValue, *};
     use crate::metric_tags;
 
     #[test]

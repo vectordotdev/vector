@@ -3,12 +3,11 @@ use std::{
     sync::atomic::Ordering,
 };
 
-use crate::internal_telemetry::allocations::TRACK_ALLOCATIONS;
-
 use super::{
-    token::{try_with_suspended_allocation_group, AllocationGroupId},
+    token::{AllocationGroupId, try_with_suspended_allocation_group},
     tracer::Tracer,
 };
+use crate::internal_telemetry::allocations::TRACK_ALLOCATIONS;
 
 /// A tracing allocator that groups allocation events by groups.
 ///

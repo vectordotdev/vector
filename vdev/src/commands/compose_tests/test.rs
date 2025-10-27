@@ -1,42 +1,49 @@
-use anyhow::{bail, Result};
+use std::iter::once;
+
+use anyhow::{Result, bail};
 
 use crate::testing::{
     config::ComposeTestConfig,
     integration::{ComposeTest, ComposeTestLocalConfig},
-    state::EnvsDir,
 };
+
+use super::active_projects::find_active_environment_for_integration;
 
 pub fn exec(
     local_config: ComposeTestLocalConfig,
     integration: &str,
     environment: Option<&String>,
-    build_all: bool,
+    all_features: bool,
+    reuse_image: bool,
     retries: u8,
     args: &[String],
 ) -> Result<()> {
     let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, integration)?;
     let envs = config.environments();
 
-    let active = EnvsDir::new(integration).active()?;
+    let active =
+        find_active_environment_for_integration(local_config.directory, integration, &config)?;
+    debug!("Active environment: {active:#?}");
 
-    match (environment, &active) {
+    let environments: Box<dyn Iterator<Item = &String>> = match (environment, &active) {
         (Some(environment), Some(active)) if environment != active => {
             bail!("Requested environment {environment:?} does not match active one {active:?}")
         }
-        (Some(environment), _) => {
-            ComposeTest::generate(local_config, integration, environment, build_all, retries)?
-                .test(args.to_owned())
-        }
-        (None, Some(active)) => {
-            ComposeTest::generate(local_config, integration, active, build_all, retries)?
-                .test(args.to_owned())
-        }
-        (None, None) => {
-            for env_name in envs.keys() {
-                ComposeTest::generate(local_config, integration, env_name, build_all, retries)?
-                    .test(args.to_owned())?;
-            }
-            Ok(())
-        }
+        (Some(environment), _) => Box::new(once(environment)),
+        (None, Some(active)) => Box::new(once(active)),
+        (None, None) => Box::new(envs.keys()),
+    };
+
+    for environment in environments {
+        ComposeTest::generate(
+            local_config,
+            integration,
+            environment,
+            all_features,
+            reuse_image,
+            retries,
+        )?
+        .test(args.to_owned())?;
     }
+    Ok(())
 }

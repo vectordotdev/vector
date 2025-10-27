@@ -2,11 +2,13 @@
 //! Enrichment data is loaded from any database in [MaxMind][maxmind] format.
 //!
 //! [maxmind]: https://maxmind.com
-use std::{fs, net::IpAddr, sync::Arc, time::SystemTime};
+use std::{fs, net::IpAddr, path::PathBuf, sync::Arc, time::SystemTime};
 
 use maxminddb::Reader;
-use vector_lib::configurable::configurable_component;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use vector_lib::{
+    configurable::configurable_component,
+    enrichment::{Case, Condition, IndexHandle, Table},
+};
 use vrl::value::{ObjectMap, Value};
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
@@ -18,13 +20,13 @@ pub struct MmdbConfig {
     /// Path to the [MaxMind][maxmind] database
     ///
     /// [maxmind]: https://maxmind.com
-    pub path: String,
+    pub path: PathBuf,
 }
 
 impl GenerateConfig for MmdbConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            path: "/path/to/GeoLite2-City.mmdb".to_string(),
+            path: "/path/to/GeoLite2-City.mmdb".into(),
         })
         .unwrap()
     }
@@ -50,7 +52,7 @@ pub struct Mmdb {
 impl Mmdb {
     /// Creates a new Mmdb struct from the provided config.
     pub fn new(config: MmdbConfig) -> crate::Result<Self> {
-        let dbreader = Arc::new(Reader::open_readfile(config.path.clone())?);
+        let dbreader = Arc::new(Reader::open_readfile(&config.path)?);
 
         // Check if we can read database with dummy Ip.
         let ip = IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
@@ -166,14 +168,15 @@ impl Table for Mmdb {
 
 impl std::fmt::Debug for Mmdb {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Maxmind database {})", self.config.path)
+        write!(f, "Maxmind database {})", self.config.path.display())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vrl::value::Value;
+
+    use super::*;
 
     #[test]
     fn city_partial_lookup() {
@@ -261,7 +264,7 @@ mod tests {
 
     fn find_select(ip: &str, database: &str, select: Option<&[String]>) -> Option<ObjectMap> {
         Mmdb::new(MmdbConfig {
-            path: database.to_string(),
+            path: database.into(),
         })
         .unwrap()
         .find_table_rows(

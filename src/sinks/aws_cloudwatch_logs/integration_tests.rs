@@ -1,26 +1,22 @@
-use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 use aws_config::Region;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_sdk_kms::Client as KMSClient;
 use chrono::Duration;
-use futures::{stream, StreamExt};
+use futures::{StreamExt, stream};
 use similar_asserts::assert_eq;
-use vector_lib::codecs::TextSerializerConfig;
-use vector_lib::lookup;
+use vector_lib::{codecs::TextSerializerConfig, lookup};
 
 use super::*;
-use crate::aws::{create_client, ClientBuilder};
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use crate::{
-    config::{log_schema, ProxyConfig, SinkConfig, SinkContext},
+    aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
+    config::{ProxyConfig, SinkConfig, SinkContext, log_schema},
     event::{Event, LogEvent, Value},
-    sinks::util::BatchConfig,
+    sinks::{aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder, util::BatchConfig},
     template::Template,
     test_util::{
-        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_lines, random_lines_with_stream, random_string, trace_init,
     },
 };

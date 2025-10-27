@@ -1,6 +1,6 @@
 use metrics::counter;
 
-use super::{emit, error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
+use super::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL, emit, error_stage, error_type};
 
 #[derive(Debug)]
 pub struct PollReadyError<E> {
@@ -44,7 +44,6 @@ impl<E: std::fmt::Debug> InternalEvent for CallError<E> {
             request_id = self.request_id,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
-
         );
         counter!(
             "component_errors_total",

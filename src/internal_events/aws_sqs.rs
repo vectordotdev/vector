@@ -1,3 +1,5 @@
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use metrics::counter;
 #[cfg(feature = "sources-aws_s3")]
 pub use s3::*;
@@ -30,7 +32,6 @@ mod s3 {
                 error_code = "failed_processing_sqs_message",
                 error_type = error_type::PARSER_FAILED,
                 stage = error_stage::PROCESSING,
-
             );
             counter!(
                 "component_errors_total",
@@ -74,7 +75,6 @@ mod s3 {
                 error_code = "failed_deleting_some_sqs_messages",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::PROCESSING,
-
             );
             counter!(
                 "component_errors_total",
@@ -104,7 +104,6 @@ mod s3 {
                 error_code = "failed_deleting_all_sqs_messages",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::PROCESSING,
-
             );
             counter!(
                 "component_errors_total",
@@ -148,7 +147,6 @@ mod s3 {
                 error_code = "failed_deferring_some_sqs_messages",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -178,7 +176,6 @@ mod s3 {
                 error_code = "failed_deferring_all_sqs_messages",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -204,7 +201,6 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'_, E> {
             error_code = "failed_fetching_sqs_events",
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-
         );
         counter!(
             "component_errors_total",
@@ -257,7 +253,6 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'_, E> {
             error = %self.error,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::PROCESSING,
-
         );
         counter!(
             "component_errors_total",

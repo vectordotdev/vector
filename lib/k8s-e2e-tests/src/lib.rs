@@ -8,10 +8,12 @@ use k8s_openapi::{
     apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta},
 };
 use k8s_test_framework::{
-    test_pod, wait_for_resource::WaitFor, CommandBuilder, Framework, Interface, Manager, Reader,
+    CommandBuilder, Framework, Interface, Manager, Reader, test_pod, wait_for_resource::WaitFor,
 };
-use rand::distr::{Alphanumeric, SampleString};
-use rand::rng;
+use rand::{
+    distr::{Alphanumeric, SampleString},
+    rng,
+};
 use tracing::{debug, error, info};
 
 pub mod metrics;
@@ -274,7 +276,9 @@ where
                 // We got an EOF error, this is most likely some very long line,
                 // we don't produce lines this bing is our test cases, so we'll
                 // just skip the error - as if it wasn't a JSON string.
-                error!("The JSON line we just got was incomplete, most likely it was too long, so we're skipping it");
+                error!(
+                    "The JSON line we just got was incomplete, most likely it was too long, so we're skipping it"
+                );
                 continue;
             }
             Err(err) => return Err(err.into()),

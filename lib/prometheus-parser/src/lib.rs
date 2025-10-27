@@ -64,6 +64,16 @@ pub enum ParserError {
 
 vector_common::impl_event_data_eq!(ParserError);
 
+/// Defines how the parser should behave when encountering metadata conflicts.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub enum MetadataConflictStrategy {
+    /// Silently ignore metadata conflicts, keeping the first metadata entry.
+    Ignore,
+    /// Reject requests with conflicting metadata.
+    #[default]
+    Reject,
+}
+
 #[derive(Debug, Eq, Hash, PartialEq)]
 pub struct GroupKey {
     pub timestamp: Option<i64>,
@@ -155,9 +165,7 @@ impl GroupKind {
         let value = metric.value;
 
         match self {
-            Self::Counter(ref mut metrics)
-            | Self::Gauge(ref mut metrics)
-            | Self::Untyped(ref mut metrics) => {
+            Self::Counter(metrics) | Self::Gauge(metrics) | Self::Untyped(metrics) => {
                 if !suffix.is_empty() {
                     return Ok(Some(Metric {
                         name: metric.name,
@@ -168,7 +176,7 @@ impl GroupKind {
                 }
                 metrics.insert(key, SimpleMetric { value });
             }
-            Self::Histogram(ref mut metrics) => match suffix {
+            Self::Histogram(metrics) => match suffix {
                 "_bucket" => {
                     let bucket = key.labels.remove("le").ok_or(ParserError::ExpectedLeTag)?;
                     let (_, bucket) = line::Metric::parse_value(&bucket)
@@ -193,10 +201,10 @@ impl GroupKind {
                         timestamp: key.timestamp,
                         labels: key.labels,
                         value,
-                    }))
+                    }));
                 }
             },
-            Self::Summary(ref mut metrics) => match suffix {
+            Self::Summary(metrics) => match suffix {
                 "" => {
                     let quantile = key
                         .labels
@@ -224,7 +232,7 @@ impl GroupKind {
                         timestamp: key.timestamp,
                         labels: key.labels,
                         value,
-                    }))
+                    }));
                 }
             },
         }
@@ -337,10 +345,19 @@ impl MetricGroupSet {
         self.0.get_full_mut(name).unwrap()
     }
 
-    fn insert_metadata(&mut self, name: String, kind: MetricKind) -> Result<(), ParserError> {
+    fn insert_metadata(
+        &mut self,
+        name: String,
+        kind: MetricKind,
+        metadata_conflict_strategy: MetadataConflictStrategy,
+    ) -> Result<(), ParserError> {
         match self.0.get(&name) {
             Some(group) if !group.matches_kind(kind) => {
-                Err(ParserError::MultipleMetricKinds { name })
+                if matches!(metadata_conflict_strategy, MetadataConflictStrategy::Reject) {
+                    Err(ParserError::MultipleMetricKinds { name })
+                } else {
+                    Ok(())
+                }
             }
             Some(_) => Ok(()), // metadata already exists and is the right type
             None => {
@@ -386,7 +403,10 @@ impl MetricGroupSet {
 
 /// Parse the given remote_write request, grouping the metrics into
 /// higher-level metric types based on the metadata.
-pub fn parse_request(request: proto::WriteRequest) -> Result<Vec<MetricGroup>, ParserError> {
+pub fn parse_request(
+    request: proto::WriteRequest,
+    metadata_conflict_strategy: MetadataConflictStrategy,
+) -> Result<Vec<MetricGroup>, ParserError> {
     let mut groups = MetricGroupSet::default();
 
     for metadata in request.metadata {
@@ -394,7 +414,7 @@ pub fn parse_request(request: proto::WriteRequest) -> Result<Vec<MetricGroup>, P
         let kind = proto::MetricType::try_from(metadata.r#type)
             .unwrap_or(proto::MetricType::Unknown)
             .into();
-        groups.insert_metadata(name, kind)?;
+        groups.insert_metadata(name, kind, metadata_conflict_strategy)?;
     }
 
     for timeseries in request.timeseries {
@@ -743,13 +763,18 @@ mod test {
 
     #[test]
     fn parse_request_empty() {
-        let parsed = parse_request(write_request!([], [])).unwrap();
+        let parsed =
+            parse_request(write_request!([], []), MetadataConflictStrategy::Ignore).unwrap();
         assert!(parsed.is_empty());
     }
 
     #[test]
     fn parse_request_only_metadata() {
-        let parsed = parse_request(write_request!(["one" = Counter, "two" = Gauge], [])).unwrap();
+        let parsed = parse_request(
+            write_request!(["one" = Counter, "two" = Gauge], []),
+            MetadataConflictStrategy::Ignore,
+        )
+        .unwrap();
         assert_eq!(parsed.len(), 2);
         match_group!(parsed[0], "one", Counter => |metrics: &MetricMap<SimpleMetric>| {
             assert!(metrics.is_empty());
@@ -761,10 +786,10 @@ mod test {
 
     #[test]
     fn parse_request_untyped() {
-        let parsed = parse_request(write_request!(
-            [],
-            [ [__name__ => "one", big => "small"] => [123 @ 1395066367500] ]
-        ))
+        let parsed = parse_request(
+            write_request!([], [ [__name__ => "one", big => "small"] => [123 @ 1395066367500] ]),
+            MetadataConflictStrategy::Ignore,
+        )
         .unwrap();
 
         assert_eq!(parsed.len(), 1);
@@ -779,13 +804,16 @@ mod test {
 
     #[test]
     fn parse_request_gauge() {
-        let parsed = parse_request(write_request!(
-            ["one" = Gauge],
-            [
-                [__name__ => "one"] => [ 12 @ 1395066367600, 14 @ 1395066367800 ],
-                [__name__ => "two"] => [ 13 @ 1395066367700 ]
-            ]
-        ))
+        let parsed = parse_request(
+            write_request!(
+                ["one" = Gauge],
+                [
+                    [__name__ => "one"] => [ 12 @ 1395066367600, 14 @ 1395066367800 ],
+                    [__name__ => "two"] => [ 13 @ 1395066367700 ]
+                ]
+            ),
+            MetadataConflictStrategy::Ignore,
+        )
         .unwrap();
 
         assert_eq!(parsed.len(), 2);
@@ -811,16 +839,19 @@ mod test {
 
     #[test]
     fn parse_request_histogram() {
-        let parsed = parse_request(write_request!(
-            ["one" = Histogram],
-            [
-                [__name__ => "one_bucket", le => "1"] => [ 15 @ 1395066367700 ],
-                [__name__ => "one_bucket", le => "+Inf"] => [ 19 @ 1395066367700 ],
-                [__name__ => "one_count"] => [ 19 @ 1395066367700 ],
-                [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
-                [__name__ => "one_total"] => [24 @ 1395066367700]
-            ]
-        ))
+        let parsed = parse_request(
+            write_request!(
+                ["one" = Histogram],
+                [
+                    [__name__ => "one_bucket", le => "1"] => [ 15 @ 1395066367700 ],
+                    [__name__ => "one_bucket", le => "+Inf"] => [ 19 @ 1395066367700 ],
+                    [__name__ => "one_count"] => [ 19 @ 1395066367700 ],
+                    [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
+                    [__name__ => "one_total"] => [24 @ 1395066367700]
+                ]
+            ),
+            MetadataConflictStrategy::Ignore,
+        )
         .unwrap();
 
         assert_eq!(parsed.len(), 2);
@@ -850,16 +881,19 @@ mod test {
 
     #[test]
     fn parse_request_summary() {
-        let parsed = parse_request(write_request!(
-            ["one" = Summary],
-            [
-                [__name__ => "one", quantile => "0.5"] => [ 15 @ 1395066367700 ],
-                [__name__ => "one", quantile => "0.9"] => [ 19 @ 1395066367700 ],
-                [__name__ => "one_count"] => [ 21 @ 1395066367700 ],
-                [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
-                [__name__ => "one_total"] => [24 @ 1395066367700]
-            ]
-        ))
+        let parsed = parse_request(
+            write_request!(
+                ["one" = Summary],
+                [
+                    [__name__ => "one", quantile => "0.5"] => [ 15 @ 1395066367700 ],
+                    [__name__ => "one", quantile => "0.9"] => [ 19 @ 1395066367700 ],
+                    [__name__ => "one_count"] => [ 21 @ 1395066367700 ],
+                    [__name__ => "one_sum"] => [ 12 @ 1395066367700 ],
+                    [__name__ => "one_total"] => [24 @ 1395066367700]
+                ]
+            ),
+            MetadataConflictStrategy::Ignore,
+        )
         .unwrap();
 
         assert_eq!(parsed.len(), 2);
@@ -885,5 +919,53 @@ mod test {
             assert_eq!(metrics.len(), 1);
             assert_eq!(metrics.get_index(0).unwrap(), simple_metric!(Some(1395066367700), labels!(), 24.0));
         });
+    }
+
+    #[test]
+    fn parse_request_conflicting_metadata() {
+        let request = proto::WriteRequest {
+            metadata: vec![
+                proto::MetricMetadata {
+                    r#type: proto::MetricType::Gauge as i32,
+                    metric_family_name: "go_memstats_alloc_bytes".into(),
+                    help: "Number of bytes allocated and still in use.".into(),
+                    unit: String::default(),
+                },
+                proto::MetricMetadata {
+                    r#type: proto::MetricType::Counter as i32,
+                    metric_family_name: "go_memstats_alloc_bytes".into(),
+                    help: "Total number of bytes allocated, even if freed.".into(),
+                    unit: String::default(),
+                },
+            ],
+            timeseries: vec![proto::TimeSeries {
+                labels: vec![proto::Label {
+                    name: "__name__".into(),
+                    value: "go_memstats_alloc_bytes".into(),
+                }],
+                samples: vec![proto::Sample {
+                    value: 12345.0,
+                    timestamp: 1395066367500,
+                }],
+            }],
+        };
+
+        // Should succeed and use the first metadata entry (Gauge)
+        let parsed = parse_request(request.clone(), MetadataConflictStrategy::Ignore).unwrap();
+        assert_eq!(parsed.len(), 1);
+        match_group!(parsed[0], "go_memstats_alloc_bytes", Gauge => |metrics: &MetricMap<SimpleMetric>| {
+            assert_eq!(metrics.len(), 1);
+            assert_eq!(
+                metrics.get_index(0).unwrap(),
+                simple_metric!(Some(1395066367500), labels!(), 12345.0)
+            );
+        });
+
+        // Should fail when conflicts are rejected
+        let err = parse_request(request, MetadataConflictStrategy::Reject).unwrap_err();
+        assert!(matches!(
+            err,
+            ParserError::MultipleMetricKinds { name } if name == "go_memstats_alloc_bytes"
+        ));
     }
 }

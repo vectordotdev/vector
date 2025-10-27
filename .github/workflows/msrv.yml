@@ -13,16 +13,13 @@ env:
   RUST_BACKTRACE: full
   CI: true
   PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   check-msrv:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           ref: ${{ inputs.checkout_ref }}
       - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh

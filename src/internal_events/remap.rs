@@ -1,7 +1,6 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
 use vector_lib::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL,
+    ComponentEventsDropped, INTENTIONAL, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
 #[derive(Debug)]
@@ -19,7 +18,6 @@ impl InternalEvent for RemapMappingError {
             error = ?self.error,
             error_type = error_type::CONVERSION_FAILED,
             stage = error_stage::PROCESSING,
-
         );
         counter!(
             "component_errors_total",
@@ -45,10 +43,7 @@ pub struct RemapMappingAbort {
 
 impl InternalEvent for RemapMappingAbort {
     fn emit(self) {
-        debug!(
-            message = "Event mapping aborted.",
-            internal_log_rate_limit = true
-        );
+        debug!("Event mapping aborted.");
 
         if self.event_dropped {
             emit!(ComponentEventsDropped::<INTENTIONAL> {

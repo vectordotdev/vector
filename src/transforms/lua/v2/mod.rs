@@ -2,19 +2,19 @@ use std::{path::PathBuf, sync::Arc, time::Duration};
 
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use vector_lib::codecs::MetricTagValues;
-use vector_lib::configurable::configurable_component;
 pub use vector_lib::event::lua;
-use vector_lib::transform::runtime_transform::{RuntimeTransform, Timer};
+use vector_lib::{
+    codecs::MetricTagValues,
+    configurable::configurable_component,
+    transform::runtime_transform::{RuntimeTransform, Timer},
+};
 
-use crate::config::{ComponentKey, OutputId};
-use crate::event::lua::event::LuaEvent;
-use crate::schema::Definition;
 use crate::{
-    config::{self, DataType, Input, TransformOutput, CONFIG_PATHS},
-    event::Event,
+    config::{self, CONFIG_PATHS, ComponentKey, DataType, Input, OutputId, TransformOutput},
+    event::{Event, lua::event::LuaEvent},
     internal_events::{LuaBuildError, LuaGcTriggered},
     schema,
+    schema::Definition,
     transforms::Transform,
 };
 
@@ -343,7 +343,7 @@ impl Lua {
 
     fn attempt_gc(&mut self) {
         self.invocations_after_gc += 1;
-        if self.invocations_after_gc % GC_INTERVAL == 0 {
+        if self.invocations_after_gc.is_multiple_of(GC_INTERVAL) {
             emit!(LuaGcTriggered {
                 used_memory: self.lua.used_memory()
             });
@@ -461,19 +461,21 @@ mod tests {
     use std::{future::Future, sync::Arc};
 
     use similar_asserts::assert_eq;
-    use tokio::sync::mpsc::{self, Receiver, Sender};
-    use tokio::sync::Mutex;
+    use tokio::sync::{
+        Mutex,
+        mpsc::{self, Receiver, Sender},
+    };
     use tokio_stream::wrappers::ReceiverStream;
 
     use super::*;
-    use crate::test_util::{components::assert_transform_compliance, random_string};
-    use crate::transforms::test::create_topology;
     use crate::{
         event::{
-            metric::{Metric, MetricKind, MetricValue},
             Event, LogEvent, Value,
+            metric::{Metric, MetricKind, MetricValue},
         },
         test_util,
+        test_util::{components::assert_transform_compliance, random_string},
+        transforms::test::create_topology,
     };
 
     fn format_error(error: &mlua::Error) -> String {

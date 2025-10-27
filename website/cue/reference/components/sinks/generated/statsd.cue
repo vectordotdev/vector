@@ -12,7 +12,7 @@ generated: components: sinks: statsd: configuration: {
 		required: false
 		type: object: options: enabled: {
 			description: """
-				Whether or not end-to-end acknowledgements are enabled.
+				Controls whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source that supports end-to-end
 				acknowledgements that is connected to that sink waits for events
@@ -165,7 +165,7 @@ generated: components: sinks: statsd: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming or outgoing connections.
+					Whether to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.

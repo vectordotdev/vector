@@ -1,8 +1,9 @@
 use std::num::ParseFloatError;
 
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+};
 
 pub struct LogToMetricFieldNullError<'a> {
     pub field: &'a str,
@@ -16,8 +17,7 @@ impl InternalEvent for LogToMetricFieldNullError<'_> {
             error_code = "field_null",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            null_field = %self.field,
-            internal_log_rate_limit = true
+            null_field = %self.field
         );
         counter!(
             "component_errors_total",
@@ -46,8 +46,7 @@ impl InternalEvent for LogToMetricParseFloatError<'_> {
             field = %self.field,
             error_code = "failed_parsing_float",
             error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true
+            stage = error_stage::PROCESSING
         );
         counter!(
             "component_errors_total",
@@ -77,8 +76,7 @@ impl InternalEvent for MetricMetadataInvalidFieldValueError<'_> {
             field_value = %self.field_value,
             error_code = "failed_parsing_float",
             error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true
+            stage = error_stage::PROCESSING
         );
         counter!(
             "component_errors_total",
@@ -106,8 +104,7 @@ impl InternalEvent for MetricMetadataParseError<'_> {
             field = %self.field,
             error_code = format!("failed_parsing_{}", self.kind),
             error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true
+            stage = error_stage::PROCESSING
         );
         counter!(
             "component_errors_total",
@@ -131,8 +128,7 @@ impl InternalEvent for MetricMetadataMetricDetailsNotFoundError {
             message = reason,
             error_code = "missing_metric_details",
             error_type = error_type::PARSER_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true
+            stage = error_stage::PROCESSING
         );
         counter!(
             "component_errors_total",

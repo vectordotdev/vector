@@ -1,10 +1,13 @@
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use std::borrow::Cow;
 
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+};
 
-fn truncate_string_at(s: &str, maxlen: usize) -> Cow<str> {
+fn truncate_string_at(s: &str, maxlen: usize) -> Cow<'_, str> {
     let ellipsis: &str = "[...]";
     if s.len() >= maxlen {
         let mut len = maxlen - ellipsis.len();
@@ -29,7 +32,7 @@ impl InternalEvent for ParserMatchError<'_> {
             error_code = "no_match_found",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
+            field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..]
         );
         counter!(
             "component_errors_total",
@@ -59,8 +62,7 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
             field = %self.field,
             error_code = "field_not_found",
             error_type = error_type::CONDITION_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true
+            stage = error_stage::PROCESSING
         );
         counter!(
             "component_errors_total",
@@ -91,8 +93,7 @@ impl InternalEvent for ParserConversionError<'_> {
             error = ?self.error,
             error_code = "type_conversion",
             error_type = error_type::CONVERSION_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true
+            stage = error_stage::PROCESSING
         );
         counter!(
             "component_errors_total",

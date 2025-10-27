@@ -8,10 +8,10 @@ use futures::{
 use http::Request;
 use hyper::Body;
 use tower::{Service, ServiceExt};
-use vector_lib::stream::DriverResponse;
 use vector_lib::{
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
     sensitive_string::SensitiveString,
+    stream::DriverResponse,
 };
 
 use crate::{

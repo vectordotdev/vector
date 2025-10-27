@@ -1,9 +1,12 @@
 use snafu::Snafu;
-use vector_lib::config::LegacyKey;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
+use vector_lib::{
+    config::LegacyKey,
+    configurable::configurable_component,
+    lookup::{lookup_v2::OptionalValuePath, owned_value_path},
+};
 use vrl::value::Kind;
 
+use super::transform::{Sample, SampleMode};
 use crate::{
     conditions::AnyCondition,
     config::{
@@ -14,8 +17,6 @@ use crate::{
     template::Template,
     transforms::Transform,
 };
-
-use super::transform::{Sample, SampleMode};
 
 #[derive(Debug, Snafu)]
 pub enum SampleError {

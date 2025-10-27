@@ -1,40 +1,40 @@
 //! `AMQP` source.
 //! Handles version AMQP 0.9.1 which is used by RabbitMQ.
-use crate::{
-    amqp::AmqpConfig,
-    codecs::{Decoder, DecodingConfig},
-    config::{SourceConfig, SourceContext, SourceOutput},
-    event::{BatchNotifier, BatchStatus},
-    internal_events::{
-        source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
-        StreamClosedError,
-    },
-    serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    shutdown::ShutdownSignal,
-    SourceSender,
-};
+use std::{io::Cursor, pin::Pin};
+
 use async_stream::stream;
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
-use lapin::{acker::Acker, message::Delivery, Channel};
+use lapin::{Channel, acker::Acker, message::Delivery};
 use snafu::Snafu;
-use std::{io::Cursor, pin::Pin};
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path};
 use vector_lib::{
-    config::{log_schema, LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
-    event::{Event, LogEvent},
     EstimatedJsonEncodedSizeOf,
-};
-use vector_lib::{
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, log_schema},
+    configurable::configurable_component,
+    event::{Event, LogEvent},
     finalizer::UnorderedFinalizer,
     internal_event::{CountByteSize, EventsReceived, InternalEventHandle as _},
+    lookup::{lookup_v2::OptionalValuePath, metadata_path, owned_value_path, path},
 };
 use vrl::value::Kind;
+
+use crate::{
+    SourceSender,
+    amqp::AmqpConfig,
+    codecs::{Decoder, DecodingConfig},
+    config::{SourceConfig, SourceContext, SourceOutput},
+    event::{BatchNotifier, BatchStatus},
+    internal_events::{
+        StreamClosedError,
+        source::{AmqpAckError, AmqpBytesReceived, AmqpEventError, AmqpRejectError},
+    },
+    serde::{bool_or_struct, default_decoding, default_framing_message_based},
+    shutdown::ShutdownSignal,
+};
 
 #[derive(Debug, Snafu)]
 enum BuildError {
@@ -432,7 +432,7 @@ async fn run_amqp_source(
         )
         .await
         .map_err(|error| {
-            error!(message = "Failed to consume.", error = ?error, internal_log_rate_limit = true);
+            error!(message = "Failed to consume.", ?error);
         })?
         .fuse();
     let mut shutdown = shutdown.fuse();
@@ -490,9 +490,7 @@ async fn handle_ack(status: BatchStatus, entry: FinalizerEntry) {
 
 #[cfg(test)]
 pub mod test {
-    use vector_lib::lookup::OwnedTargetPath;
-    use vector_lib::schema::Definition;
-    use vector_lib::tls::TlsConfig;
+    use vector_lib::{lookup::OwnedTargetPath, schema::Definition, tls::TlsConfig};
     use vrl::value::kind::Collection;
 
     use super::*;
@@ -605,36 +603,37 @@ pub mod test {
 #[cfg(feature = "amqp-integration-tests")]
 #[cfg(test)]
 mod integration_test {
-    use super::test::*;
-    use super::*;
+    use chrono::Utc;
+    use lapin::{BasicProperties, options::*};
+    use tokio::time::Duration;
+    use vector_lib::config::log_schema;
+
+    use super::{test::*, *};
     use crate::{
+        SourceSender,
         amqp::await_connection,
         shutdown::ShutdownSignal,
         test_util::{
-            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, run_and_assert_source_compliance},
             random_string,
         },
-        SourceSender,
     };
-    use chrono::Utc;
-    use lapin::options::*;
-    use lapin::BasicProperties;
-    use tokio::time::Duration;
-    use vector_lib::config::log_schema;
 
     #[tokio::test]
     async fn amqp_source_create_ok() {
         let config = make_config();
         await_connection(&config.connection).await;
-        assert!(amqp_source(
-            &config,
-            ShutdownSignal::noop(),
-            SourceSender::new_test().0,
-            LogNamespace::Legacy,
-            false,
-        )
-        .await
-        .is_ok());
+        assert!(
+            amqp_source(
+                &config,
+                ShutdownSignal::noop(),
+                SourceSender::new_test().0,
+                LogNamespace::Legacy,
+                false,
+            )
+            .await
+            .is_ok()
+        );
     }
 
     #[tokio::test]
@@ -642,15 +641,17 @@ mod integration_test {
         let config = make_tls_config();
         await_connection(&config.connection).await;
 
-        assert!(amqp_source(
-            &config,
-            ShutdownSignal::noop(),
-            SourceSender::new_test().0,
-            LogNamespace::Legacy,
-            false,
-        )
-        .await
-        .is_ok());
+        assert!(
+            amqp_source(
+                &config,
+                ShutdownSignal::noop(),
+                SourceSender::new_test().0,
+                LogNamespace::Legacy,
+                false,
+            )
+            .await
+            .is_ok()
+        );
     }
 
     async fn send_event(

@@ -89,7 +89,7 @@ generated: components: sources: heroku_logs: configuration: {
 					schema: {
 						description: """
 																The Avro schema definition.
-																Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+																**Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
 																* `Date`
 																* `Decimal`
 																* `Duration`
@@ -101,7 +101,7 @@ generated: components: sources: heroku_logs: configuration: {
 					}
 					strip_schema_id_prefix: {
 						description: """
-																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to true to strip the schema ID prefix.
+																For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix.
 																According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
 																"""
 						required: true
@@ -127,7 +127,7 @@ generated: components: sources: heroku_logs: configuration: {
 															This codec is experimental for the following reason:
 
 															The GELF specification is more strict than the actual Graylog receiver.
-															Vector's decoder currently adheres more strictly to the GELF spec, with
+															Vector's decoder adheres more strictly to the GELF spec, with
 															the exception that some characters such as `@`  are allowed in field names.
 
 															Other GELF codecs such as Loki's, use a [Go SDK][implementation] that is maintained
@@ -169,6 +169,14 @@ generated: components: sources: heroku_logs: configuration: {
 															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
+						otlp: """
+															Decodes the raw bytes as [OTLP (OpenTelemetry Protocol)][otlp] protobuf format.
+
+															This decoder handles the three OTLP signal types: logs, metrics, and traces.
+															It automatically detects which type of OTLP message is being decoded.
+
+															[otlp]: https://opentelemetry.io/docs/specs/otlp/
+															"""
 						protobuf: """
 															Decodes the raw bytes as [protobuf][protobuf].
 
@@ -197,7 +205,7 @@ generated: components: sources: heroku_logs: configuration: {
 				required:      false
 				type: object: options: lossy: {
 					description: """
-						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+						Determines whether to replace invalid UTF-8 sequences instead of failing.
 
 						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
@@ -213,7 +221,7 @@ generated: components: sources: heroku_logs: configuration: {
 				required:      false
 				type: object: options: lossy: {
 					description: """
-						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+						Determines whether to replace invalid UTF-8 sequences instead of failing.
 
 						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
@@ -229,7 +237,7 @@ generated: components: sources: heroku_logs: configuration: {
 				required:      false
 				type: object: options: lossy: {
 					description: """
-						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+						Determines whether to replace invalid UTF-8 sequences instead of failing.
 
 						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
@@ -245,7 +253,7 @@ generated: components: sources: heroku_logs: configuration: {
 				required:      false
 				type: object: options: lossy: {
 					description: """
-						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+						Determines whether to replace invalid UTF-8 sequences instead of failing.
 
 						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
@@ -264,7 +272,7 @@ generated: components: sources: heroku_logs: configuration: {
 						description: """
 																The path to the protobuf descriptor set file.
 
-																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`.
 
 																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
 																"""
@@ -279,6 +287,41 @@ generated: components: sources: heroku_logs: configuration: {
 							examples: ["package.Message"]
 						}
 					}
+					use_json_names: {
+						description: """
+																Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+
+																When enabled, the deserializer will output fields using their JSON names as defined
+																in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+
+																This is useful when working with data that needs to be converted to JSON or
+																when interfacing with systems that use JSON naming conventions.
+																"""
+						required: false
+						type: bool: default: false
+					}
+				}
+			}
+			signal_types: {
+				description: """
+					Signal types to attempt parsing, in priority order.
+
+					The deserializer will try parsing in the order specified. This allows you to optimize
+					performance when you know the expected signal types. For example, if you only receive
+					traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
+
+					If not specified, defaults to trying all types in order: logs, metrics, traces.
+					Duplicate signal types are automatically removed while preserving order.
+					"""
+				relevant_when: "codec = \"otlp\""
+				required:      false
+				type: array: {
+					default: ["logs", "metrics", "traces"]
+					items: type: string: enum: {
+						logs:    "OTLP logs signal (ExportLogsServiceRequest)"
+						metrics: "OTLP metrics signal (ExportMetricsServiceRequest)"
+						traces:  "OTLP traces signal (ExportTraceServiceRequest)"
+					}
 				}
 			}
 			syslog: {
@@ -287,7 +330,7 @@ generated: components: sources: heroku_logs: configuration: {
 				required:      false
 				type: object: options: lossy: {
 					description: """
-						Determines whether or not to replace invalid UTF-8 sequences instead of failing.
+						Determines whether to replace invalid UTF-8 sequences instead of failing.
 
 						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
@@ -319,7 +362,7 @@ generated: components: sources: heroku_logs: configuration: {
 																time zone. The time zone name may be any name in the [TZ database][tz_database], or `local`
 																to indicate system local time.
 
-																If not set, `local` will be used.
+																If not set, `local` is used.
 
 																[tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
 																"""
@@ -393,7 +436,7 @@ generated: components: sources: heroku_logs: configuration: {
 																be dropped. If this option is not set, the decoder does not limit the length of messages and
 																the per-message memory is unbounded.
 
-																Note that a message can be composed of multiple chunks and this limit is applied to the whole
+																**Note**: A message can be composed of multiple chunks and this limit is applied to the whole
 																message, not to individual chunks.
 
 																This limit takes only into account the message's payload and the GELF header bytes are excluded from the calculation.
@@ -449,6 +492,12 @@ generated: components: sources: heroku_logs: configuration: {
 					}
 				}
 			}
+			max_frame_length: {
+				description:   "Maximum frame length"
+				relevant_when: "method = \"varint_length_delimited\""
+				required:      false
+				type: uint: default: 8388608
+			}
 			method: {
 				description: "The framing method."
 				required:    false
@@ -468,6 +517,10 @@ generated: components: sources: heroku_logs: configuration: {
 															Byte frames according to the [octet counting][octet_counting] format.
 
 															[octet_counting]: https://tools.ietf.org/html/rfc6587#section-3.4.1
+															"""
+						varint_length_delimited: """
+															Byte frames which are prefixed by a varint indicating the length.
+															This is compatible with protobuf's length-delimited encoding.
 															"""
 					}
 				}
@@ -593,7 +646,7 @@ generated: components: sources: heroku_logs: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming or outgoing connections.
+					Whether to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.

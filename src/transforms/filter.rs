@@ -1,6 +1,8 @@
-use vector_lib::config::clone_input_definitions;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{Count, InternalEventHandle as _, Registered};
+use vector_lib::{
+    config::clone_input_definitions,
+    configurable::configurable_component,
+    internal_event::{Count, InternalEventHandle as _, Registered},
+};
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -100,13 +102,15 @@ mod test {
 
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::config::ComponentKey;
-    use vector_lib::event::{Metric, MetricKind, MetricValue};
+    use vector_lib::{
+        config::ComponentKey,
+        event::{Metric, MetricKind, MetricValue},
+    };
 
     use super::*;
-    use crate::config::schema::Definition;
     use crate::{
         conditions::ConditionConfig,
+        config::schema::Definition,
         event::{Event, LogEvent},
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,

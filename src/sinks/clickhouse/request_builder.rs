@@ -1,9 +1,10 @@
 //! `RequestBuilder` implementation for the `Clickhouse` sink.
 
-use super::sink::PartitionKey;
-use crate::sinks::{prelude::*, util::http::HttpRequest};
 use bytes::Bytes;
 use vector_lib::codecs::encoding::Framer;
+
+use super::sink::PartitionKey;
+use crate::sinks::{prelude::*, util::http::HttpRequest};
 
 pub(super) struct ClickhouseRequestBuilder {
     pub(super) compression: Compression,

@@ -2,6 +2,7 @@
 use std::{collections::HashMap, env, path::PathBuf};
 
 use bollard::{
+    API_DEFAULT_VERSION, Docker,
     errors::Error as DockerError,
     models::HostConfig,
     query_parameters::{
@@ -9,7 +10,6 @@ use bollard::{
         RemoveContainerOptions, StartContainerOptions, StopContainerOptions,
     },
     secret::ContainerCreateBody,
-    Docker, API_DEFAULT_VERSION,
 };
 use futures::StreamExt;
 use http::uri::Uri;
@@ -77,7 +77,8 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
                     .map_err(Into::into)
                 }
                 Some("unix") | Some("npipe") | None => {
-                    Docker::connect_with_defaults().map_err(Into::into)
+                    Docker::connect_with_socket(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                        .map_err(Into::into)
                 }
                 Some(scheme) => Err(format!("Unknown scheme: {scheme}").into()),
             }

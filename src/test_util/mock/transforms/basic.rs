@@ -3,10 +3,11 @@ use std::collections::BTreeSet;
 use async_trait::async_trait;
 use vector_lib::configurable::configurable_component;
 use vector_lib::{
-    config::{DataType, Input, TransformOutput},
+    config::{DataType, Input, LogNamespace, TransformOutput},
+    configurable::configurable_component,
     event::{
-        metric::{MetricData, Sample},
         Event, MetricValue,
+        metric::{MetricData, Sample},
     },
     schema,
     transform::{FunctionTransform, OutputBuffer, Transform},

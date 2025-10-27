@@ -1,6 +1,6 @@
 use metrics::counter;
 use vector_lib::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
 use crate::internal_events::SocketOutgoingConnectionError;
@@ -39,7 +39,7 @@ pub struct UdpSendIncompleteError {
 
 impl InternalEvent for UdpSendIncompleteError {
     fn emit(self) {
-        let reason = "Could not send all data in one UDP packet.";
+        let reason = "Could not send all data in one UDP datagram.";
         error!(
             message = reason,
             data_size = self.data_size,
@@ -56,6 +56,33 @@ impl InternalEvent for UdpSendIncompleteError {
         .increment(1);
         // deprecated
         counter!("connection_send_errors_total", "mode" => "udp").increment(1);
+
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+    }
+}
+
+#[derive(Debug)]
+pub struct UdpChunkingError {
+    pub error: vector_common::Error,
+    pub data_size: usize,
+}
+
+impl InternalEvent for UdpChunkingError {
+    fn emit(self) {
+        let reason = "Could not chunk UDP datagram.";
+        error!(
+            message = reason,
+            data_size = self.data_size,
+            error = self.error,
+            error_type = error_type::WRITER_FAILED,
+            stage = error_stage::SENDING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_type" => error_type::WRITER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
     }

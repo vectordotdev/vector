@@ -4,7 +4,7 @@ use tokio::time::timeout;
 use tracing::Instrument;
 
 use crate::{
-    test::{acknowledge, install_tracing_helpers, with_temp_dir, SizedRecord},
+    test::{SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::tests::{create_default_buffer_v2, set_file_length},
 };
 

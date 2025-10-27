@@ -13,3 +13,8 @@ services:
       - RABBITMQ_SSL_FAIL_IF_NO_PEER_CERT=false
     volumes:
       - ../../..:/code
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

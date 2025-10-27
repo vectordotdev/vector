@@ -1,9 +1,10 @@
 use std::net::Ipv4Addr;
 
 use metrics::{counter, histogram};
-use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
 use vector_lib::{
-    internal_event::{error_stage, error_type},
+    internal_event::{
+        ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
 
@@ -124,7 +125,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
             error_type = error_type::IO_FAILED,
             stage = error_stage::INITIALIZING,
             %mode,
-
         );
         counter!(
             "component_errors_total",
@@ -160,7 +160,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketMulticastGroupJoinError<E> {
             %mode,
             %group_addr,
             %interface,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -191,7 +190,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
             %mode,
-
         );
         counter!(
             "component_errors_total",
@@ -221,7 +219,6 @@ impl<E: std::fmt::Display> InternalEvent for SocketSendError<E> {
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
             %mode,
-
         );
         counter!(
             "component_errors_total",

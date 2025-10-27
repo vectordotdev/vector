@@ -3,9 +3,10 @@ use std::io;
 use bytes::BytesMut;
 use itertools::{Itertools, Position};
 use tokio_util::codec::Encoder as _;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::{config::telemetry, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, codecs::encoding::Framer, config::telemetry,
+    request_metadata::GroupedCountByteSize,
+};
 
 use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
 
@@ -147,18 +148,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-    use std::env;
-    use std::path::PathBuf;
+    use std::{collections::BTreeMap, env, path::PathBuf};
 
     use bytes::{BufMut, Bytes};
-    use vector_lib::codecs::encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions};
-    use vector_lib::codecs::{
-        CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
-        NewlineDelimitedEncoder, TextSerializerConfig,
+    use vector_lib::{
+        codecs::{
+            CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
+            NewlineDelimitedEncoder, TextSerializerConfig,
+            encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions},
+        },
+        event::LogEvent,
+        internal_event::CountByteSize,
+        json_size::JsonSize,
     };
-    use vector_lib::event::LogEvent;
-    use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
     use vrl::value::{KeyString, Value};
 
     use super::*;
@@ -404,6 +406,7 @@ mod tests {
             protobuf: ProtobufSerializerOptions {
                 desc_file: test_data_dir().join("test_proto.desc"),
                 message_type: "test_proto.User".to_string(),
+                use_json_names: false,
             },
         };
 
@@ -458,6 +461,7 @@ mod tests {
             protobuf: ProtobufSerializerOptions {
                 desc_file: test_data_dir().join("test_proto.desc"),
                 message_type: "test_proto.User".to_string(),
+                use_json_names: false,
             },
         };
 

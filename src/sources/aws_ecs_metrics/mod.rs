@@ -5,11 +5,15 @@ use hyper::{Body, Request};
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_lib::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+};
 
 use crate::{
+    SourceSender,
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput},
     http::HttpClient,
     internal_events::{
@@ -17,7 +21,6 @@ use crate::{
         HttpClientHttpResponseError, StreamClosedError,
     },
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 mod parser;
@@ -246,19 +249,19 @@ async fn aws_ecs_metrics(
 #[cfg(test)]
 mod test {
     use hyper::{
-        service::{make_service_fn, service_fn},
         Body, Response, Server,
+        service::{make_service_fn, service_fn},
     };
     use tokio::time::Duration;
 
     use super::*;
     use crate::{
+        Error,
         event::MetricValue,
         test_util::{
-            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, run_and_assert_source_compliance},
             next_addr, wait_for_tcp,
         },
-        Error,
     };
 
     #[tokio::test]
@@ -611,7 +614,7 @@ mod integration_tests {
     use tokio::time::Duration;
 
     use super::*;
-    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
+    use crate::test_util::components::{SOURCE_TAGS, run_and_assert_source_compliance};
 
     fn ecs_address() -> String {
         env::var("ECS_ADDRESS").unwrap_or_else(|_| "http://localhost:9088".into())

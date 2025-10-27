@@ -3,13 +3,13 @@ use std::{error::Error, num::NonZeroUsize};
 use async_trait::async_trait;
 
 use crate::{
+    Bufferable,
     buffer_usage_data::BufferUsageHandle,
     config::MemoryBufferSize,
     topology::{
         builder::IntoBuffer,
-        channel::{limited, ReceiverAdapter, SenderAdapter},
+        channel::{ReceiverAdapter, SenderAdapter, limited},
     },
-    Bufferable,
 };
 
 pub struct MemoryBuffer {

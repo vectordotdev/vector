@@ -1,8 +1,7 @@
 pub mod v1;
 pub mod v2;
 
-use vector_lib::config::ComponentKey;
-use vector_lib::configurable::configurable_component;
+use vector_lib::{config::ComponentKey, configurable::configurable_component};
 
 use crate::{
     config::{GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput},

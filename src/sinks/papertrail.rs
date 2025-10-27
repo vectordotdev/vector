@@ -9,7 +9,7 @@ use crate::{
     event::Event,
     internal_events::TemplateRenderingError,
     schema,
-    sinks::util::{tcp::TcpSinkConfig, UriSerde},
+    sinks::util::{UriSerde, tcp::TcpSinkConfig},
     tcp::TcpKeepaliveConfig,
     template::Template,
     tls::TlsEnableableConfig,
@@ -182,21 +182,22 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
 
 #[cfg(test)]
 mod tests {
-    use serde::Deserialize;
     use std::convert::TryFrom;
 
     use bytes::BytesMut;
     use futures::{future::ready, stream};
+    use serde::Deserialize;
     use tokio_util::codec::Encoder as _;
-    use vector_lib::codecs::JsonSerializerConfig;
-    use vector_lib::event::{Event, LogEvent};
-
-    use crate::test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
-        http::{always_200_response, spawn_blackhole_http_server},
+    use vector_lib::{
+        codecs::JsonSerializerConfig,
+        event::{Event, LogEvent},
     };
 
     use super::*;
+    use crate::test_util::{
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
+        http::{always_200_response, spawn_blackhole_http_server},
+    };
 
     #[test]
     fn generate_config() {
@@ -208,8 +209,10 @@ mod tests {
         let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
         let config = PapertrailConfig::generate_config().to_string();
-        let mut config = PapertrailConfig::deserialize(toml::de::ValueDeserializer::new(&config))
-            .expect("config should be valid");
+        let mut config = PapertrailConfig::deserialize(
+            toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
+        )
+        .expect("config should be valid");
         config.endpoint = mock_endpoint.into();
         config.tls = Some(TlsEnableableConfig::default());
 

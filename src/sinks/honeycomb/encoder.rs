@@ -1,13 +1,14 @@
 //! Encoding for the `honeycomb` sink.
 
+use std::io;
+
 use bytes::Bytes;
 use chrono::{SecondsFormat, Utc};
 use serde_json::{json, to_vec};
-use std::io;
 
 use crate::sinks::{
     prelude::*,
-    util::encoding::{write_all, Encoder as SinkEncoder},
+    util::encoding::{Encoder as SinkEncoder, write_all},
 };
 
 pub(super) struct HoneycombEncoder {

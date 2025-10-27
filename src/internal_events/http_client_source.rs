@@ -1,7 +1,8 @@
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
 use vector_lib::{
-    internal_event::{error_stage, error_type},
+    internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
@@ -49,7 +50,6 @@ impl InternalEvent for HttpClientHttpResponseError {
             stage = error_stage::RECEIVING,
             error_type = error_type::REQUEST_FAILED,
             error_code = %http_error_code(self.code.as_u16()),
-
         );
         counter!(
             "component_errors_total",
@@ -76,7 +76,6 @@ impl InternalEvent for HttpClientHttpError {
             error = ?self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-
         );
         counter!(
             "component_errors_total",

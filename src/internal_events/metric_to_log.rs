@@ -1,7 +1,8 @@
 use metrics::counter;
 use serde_json::Error;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+};
 
 #[derive(Debug)]
 pub struct MetricToLogSerializeError {
@@ -15,7 +16,7 @@ impl InternalEvent for MetricToLogSerializeError {
             message = reason,
             error = ?self.error,
             error_type = error_type::ENCODER_FAILED,
-            stage = error_stage::PROCESSING,
+            stage = error_stage::PROCESSING
         );
         counter!(
             "component_errors_total",

@@ -1,8 +1,10 @@
 use std::{
     fmt, io, mem,
     path::PathBuf,
-    sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
-    sync::Arc,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
+    },
     time::Instant,
 };
 
@@ -11,17 +13,17 @@ use bytes::BytesMut;
 use crossbeam_utils::atomic::AtomicCell;
 use fslock::LockFile;
 use futures::StreamExt;
-use rkyv::{with::Atomic, Archive, Serialize};
+use rkyv::{Archive, Serialize, with::Atomic};
 use snafu::{ResultExt, Snafu};
 use tokio::{fs, io::AsyncWriteExt, sync::Notify};
 use vector_common::finalizer::OrderedFinalizer;
 
 use super::{
+    Filesystem,
     backed_archive::BackedArchive,
-    common::{align16, DiskBufferConfig, MAX_FILE_ID},
+    common::{DiskBufferConfig, MAX_FILE_ID, align16},
     io::{AsyncFile, WritableMemoryMap},
     ser::SerializeError,
-    Filesystem,
 };
 use crate::buffer_usage_data::BufferUsageHandle;
 
@@ -314,7 +316,6 @@ where
     ///
     /// This is purely a future-looking operation i.e. what would the file ID be if it was
     /// incremented from its current value.  It does not alter the current writer file ID.
-    #[cfg(test)]
     pub fn get_next_writer_file_id(&self) -> u16 {
         self.state().get_next_writer_file_id()
     }
@@ -465,11 +466,7 @@ where
             Ordering::Release,
             Ordering::Relaxed,
             |n| {
-                if n == 0 {
-                    None
-                } else {
-                    Some(n - 1)
-                }
+                if n == 0 { None } else { Some(n - 1) }
             },
         );
 
@@ -603,7 +600,7 @@ where
                         break;
                     }
                     Err(SerializeError::FailedToSerialize(reason)) => {
-                        return Err(LedgerLoadCreateError::FailedToSerialize { reason })
+                        return Err(LedgerLoadCreateError::FailedToSerialize { reason });
                     }
                     // Our buffer wasn't big enough, but that's OK!  Resize it and try again.
                     Err(SerializeError::BackingStoreTooSmall(_, min_len)) => buf.resize(min_len, 0),
@@ -628,7 +625,7 @@ where
             Err(e) => {
                 return Err(LedgerLoadCreateError::FailedToDeserialize {
                     reason: e.into_inner(),
-                })
+                });
             }
         };
 

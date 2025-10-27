@@ -30,10 +30,11 @@ name: CI Integration Review Trigger
 
 on:
   pull_request_review:
-    types: [submitted]
+    types: [ submitted ]
 
 permissions:
   statuses: write
+  packages: write
 
 env:
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
@@ -43,7 +44,7 @@ env:
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
   PROFILE: debug
@@ -80,8 +81,17 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-  integration-tests:
+  build-test-runner:
     needs: prep-pr
+    uses: ./.github/workflows/build-test-runner.yml
+    with:
+      commit_sha: ${{ github.event.review.commit_id }}
+      checkout_ref: ${{ github.event.review.commit_id }}
+
+  integration-tests:
+    needs:
+      - prep-pr
+      - build-test-runner
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
@@ -94,14 +104,18 @@ jobs:
           "redis", "splunk", "webhdfs"
         ]
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
-      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.event.review.commit_id }}
 
-      - run: docker image prune -af ; docker container prune -f
+      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
       - name: Integration Tests - ${{ matrix.service }}
         if: ${{ startsWith(github.event.review.body, '/ci-run-integration-all')
@@ -111,30 +125,37 @@ jobs:
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/int-e2e-test.sh int ${{ matrix.service }}
+          command: bash scripts/run-integration-test.sh int ${{ matrix.service }}
 
   e2e-tests:
-    needs: prep-pr
+    needs:
+      - prep-pr
+      - build-test-runner
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.event.review.commit_id }}
+
       - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
-      - run: docker image prune -af ; docker container prune -f
       - name: e2e-datadog-logs
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-logs')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
+          || startsWith(github.event.review.body, '/ci-run-e2e-all')
           || startsWith(github.event.review.body, '/ci-run-all') }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/int-e2e-test.sh e2e datadog-logs
+          command: bash scripts/run-integration-test.sh e2e datadog-logs
 
       - name: datadog-e2e-metrics
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-metrics')
@@ -144,13 +165,13 @@ jobs:
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/int-e2e-test.sh e2e datadog-metrics
+          command: bash scripts/run-integration-test.sh e2e datadog-metrics
 
       - name: e2e-opentelemetry-logs
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-logs')
           || startsWith(github.event.review.body, '/ci-run-e2e-all')
           || startsWith(github.event.review.body, '/ci-run-all') }}
-        run: bash scripts/int-e2e-test.sh e2e opentelemetry-logs
+        run: bash scripts/run-integration-test.sh e2e opentelemetry-logs
 
   update-pr-status:
     name: Signal result to PR
@@ -159,9 +180,9 @@ jobs:
     needs:
       - integration-tests
       - e2e-tests
-    if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all'))
+    if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-e2e'))
     env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
+      FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -186,10 +207,11 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
 
-      - run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ env.FAILED }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi

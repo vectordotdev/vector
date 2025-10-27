@@ -1,5 +1,4 @@
-use std::collections::BTreeMap;
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use chrono::TimeZone;
 use ordered_float::NotNan;
@@ -17,7 +16,7 @@ pub use metric::Value as MetricValue;
 pub use proto_event::*;
 use vrl::value::{ObjectMap, Value as VrlValue};
 
-use super::{array, metric::MetricSketch, EventMetadata};
+use super::{EventMetadata, array, metric::MetricSketch};
 
 impl event_array::Events {
     // We can't use the standard `From` traits here because the actual
@@ -679,8 +678,7 @@ impl From<Metadata> for EventMetadata {
                 Err(error) => {
                     error!(
                         message = "Failed to parse source_event_id: {}",
-                        %error,
-                        internal_log_rate_limit = true
+                        %error
                     );
                     None
                 }

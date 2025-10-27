@@ -2,11 +2,9 @@
 
 #![deny(missing_docs, missing_debug_implementations)]
 
-use std::fmt;
-use std::path::Path;
-use std::str::FromStr;
+use std::{fmt, path::Path, str::FromStr};
 
-use serde::{de, Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de};
 use vector_config_macros::Configurable;
 
 /// A type alias to better capture the semantics.

@@ -1,17 +1,8 @@
 name: opentelemetry-vector-e2e
 services:
-  cleanup-logs:
-    image: busybox
-    container_name: cleanup-logs
-    command: [ "sh", "-c", "rm -f /tmp/*.log" ]
-    volumes:
-      - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/output
-        target: /tmp
-
   otel-collector-source:
-    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
     container_name: otel-collector-source
+    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}
     init: true
     volumes:
       - type: bind
@@ -24,62 +15,79 @@ services:
     command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
 
   logs-generator:
-    image: python:3.11-alpine
     container_name: logs-generator
     build:
-      context: ./generator
+      context: ../../../
+      dockerfile: ./scripts/e2e/opentelemetry-logs/telemetrygen.Dockerfile
     init: true
     depends_on:
-      - otel-collector-source
-    volumes:
-      - type: bind
-        source: ./generator
-        target: /generator
-    environment:
-      - PYTHONUNBUFFERED=1
-    command: [ "python", "/generator/logs_generator.py", "-n", "100" ]
+      otel-collector-source:
+        condition: service_started
+      vector:
+        condition: service_started
+      otel-collector-sink:
+        condition: service_started
+    command:
+      - "-c"
+      - |
+        until nc -z otel-collector-source 4318; do
+          sleep 0.5
+        done
+        telemetrygen logs \
+          --otlp-endpoint=otel-collector-source:4318 \
+          --otlp-insecure \
+          --otlp-http \
+          --logs=100 \
+          --rate=0
 
   otel-collector-sink:
-    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION:-latest}
     container_name: otel-collector-sink
+    build:
+      context: ../../../
+      dockerfile: ./scripts/e2e/opentelemetry-logs/collector.Dockerfile
+      args:
+        CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
     init: true
+    user: "0:0" # test only, override special user with root
+    command: [ "--config", "/etc/otelcol-contrib/config.yaml" ]
     volumes:
       - type: bind
         source: ../../../tests/data/e2e/opentelemetry/logs/collector-sink.yaml
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
-      - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/output
-        target: /tmp
-    depends_on:
-      - cleanup-logs
+      - type: volume
+        source: vector_target
+        target: /output
     ports:
       - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
 
   vector:
+    container_name: vector-otel-logs-e2e
     build:
       context: ../../../
       dockerfile: ./scripts/e2e/Dockerfile
       args:
         FEATURES: e2e-tests-opentelemetry
         RUST_VERSION: ${RUST_VERSION:-1.88}
-    image: vector-e2e:opentelemetry-logs
-    container_name: vector
     init: true
-    depends_on:
-      - cleanup-logs
-      - otel-collector-source
-      - otel-collector-sink
     volumes:
       - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/vector.yaml
+        source: ../../../tests/data/e2e/opentelemetry/logs/${CONFIG_VECTOR_CONFIG}
         target: /etc/vector/vector.yaml
         read_only: true
-      - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/output
-        target: /tmp
+      - type: volume
+        source: vector_target
+        target: /output
     environment:
       - VECTOR_LOG=${VECTOR_LOG:-info}
       - FEATURES=e2e-tests-opentelemetry
-      - OTEL_E2E_OUTPUT_PATH
     command: [ "vector", "-c", "/etc/vector/vector.yaml" ]
+
+volumes:
+  vector_target:
+    external: true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

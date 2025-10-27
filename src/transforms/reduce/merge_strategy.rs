@@ -1,12 +1,13 @@
 use std::collections::HashSet;
 
-use crate::event::{LogEvent, Value};
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use dyn_clone::DynClone;
 use ordered_float::NotNan;
 use vector_lib::configurable::configurable_component;
 use vrl::path::OwnedTargetPath;
+
+use crate::event::{LogEvent, Value};
 
 /// Strategies for merging events.
 #[configurable_component]
@@ -570,7 +571,7 @@ impl ReduceValueMerger for MinNumberMerger {
 pub trait ReduceValueMerger: std::fmt::Debug + Send + Sync + DynClone {
     fn add(&mut self, v: Value) -> Result<(), String>;
     fn insert_into(self: Box<Self>, path: &OwnedTargetPath, v: &mut LogEvent)
-        -> Result<(), String>;
+    -> Result<(), String>;
 }
 
 dyn_clone::clone_trait_object!(ReduceValueMerger);
@@ -665,10 +666,11 @@ pub(crate) fn get_value_merger(
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::event::LogEvent;
     use serde_json::json;
     use vrl::owned_event_path;
+
+    use super::*;
+    use crate::event::LogEvent;
 
     #[test]
     fn initial_values() {

@@ -2,27 +2,27 @@
 use std::{collections::HashMap, fmt, net::SocketAddr};
 
 use bytes::Bytes;
-use headers::{authorization::Credentials, Authorization};
-use http::{header::AUTHORIZATION, HeaderMap, HeaderValue, StatusCode};
+use headers::{Authorization, authorization::Credentials};
+use http::{HeaderMap, HeaderValue, StatusCode, header::AUTHORIZATION};
 use serde::{
-    de::{Error, MapAccess, Visitor},
     Deserialize,
+    de::{Error, MapAccess, Visitor},
 };
 use vector_config::configurable_component;
 use vector_lib::{
-    compile_vrl,
+    TimeZone, compile_vrl,
     event::{Event, LogEvent, VrlTarget},
     sensitive_string::SensitiveString,
-    TimeZone,
 };
 use vector_vrl_metrics::MetricsStorage;
 use vrl::{
-    compiler::{runtime::Runtime, CompilationResult, CompileConfig, Program},
+    compiler::{CompilationResult, CompileConfig, Program, runtime::Runtime},
     core::Value,
-    diagnostic::Formatter,
     prelude::TypeState,
     value::{KeyString, ObjectMap},
 };
+
+use crate::format_vrl_diagnostics;
 
 use super::ErrorMessage;
 
@@ -164,16 +164,15 @@ impl HttpServerAuthConfig {
                     program,
                     warnings,
                     config: _,
-                } = compile_vrl(source, &functions, &state, config).map_err(|diagnostics| {
-                    Formatter::new(source, diagnostics).colored().to_string()
-                })?;
+                } = compile_vrl(source, &functions, &state, config)
+                    .map_err(|diagnostics| format_vrl_diagnostics(source, diagnostics))?;
 
                 if !program.final_type_info().result.is_boolean() {
                     return Err("VRL conditions must return a boolean.".into());
                 }
 
                 if !warnings.is_empty() {
-                    let warnings = Formatter::new(source, warnings).colored().to_string();
+                    let warnings = format_vrl_diagnostics(source, warnings);
                     warn!(message = "VRL compilation warning.", %warnings);
                 }
 
@@ -291,10 +290,10 @@ impl HttpServerAuthMatcher {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::{next_addr, random_string};
     use indoc::indoc;
 
     use super::*;
+    use crate::test_util::{next_addr, random_string};
 
     impl HttpServerAuthMatcher {
         fn auth_header(self) -> (HeaderValue, &'static str) {

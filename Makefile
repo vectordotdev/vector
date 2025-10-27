@@ -48,7 +48,7 @@ export CURRENT_DIR = $(shell pwd)
 # Override this to automatically enter a container containing the correct, full, official build environment for Vector, ready for development
 export ENVIRONMENT ?= false
 # The upstream container we publish artifacts to on a successful master build.
-export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a
+export ENVIRONMENT_UPSTREAM ?= docker.io/timberio/vector-dev:latest
 # Override to disable building the container, having it pull from the GitHub packages repo instead
 # TODO: Disable this by default. Blocked by `docker pull` from GitHub Packages requiring authenticated login
 export ENVIRONMENT_AUTOBUILD ?= true
@@ -119,6 +119,9 @@ define MAYBE_ENVIRONMENT_COPY_ARTIFACTS
 endef
 endif
 
+# docker container id file needs to live in the host machine and is later mounted into the container
+CIDFILE := $(shell mktemp -u /tmp/vector-environment-docker-cid.XXXXXX)
+
 # We use a volume here as non-Linux hosts are extremely slow to share disks, and Linux hosts tend to get permissions clobbered.
 define ENVIRONMENT_EXEC
 	${ENVIRONMENT_PREPARE}
@@ -134,11 +137,13 @@ define ENVIRONMENT_EXEC
 			$(if $(ENVIRONMENT_NETWORK),--network $(ENVIRONMENT_NETWORK),) \
 			--mount type=bind,source=${CURRENT_DIR},target=/git/vectordotdev/vector \
 			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=/var/run/docker.sock$(COMMA)target=/var/run/docker.sock,) \
+			$(if $(findstring docker,$(CONTAINER_TOOL)),--cidfile $(CIDFILE),) \
+			$(if $(findstring docker,$(CONTAINER_TOOL)),--mount type=bind$(COMMA)source=$(CIDFILE)$(COMMA)target=/.docker-container-id,) \
 			--mount type=volume,source=vector-target,target=/git/vectordotdev/vector/target \
 			--mount type=volume,source=vector-cargo-cache,target=/root/.cargo \
 			--mount type=volume,source=vector-rustup-cache,target=/root/.rustup \
 			$(foreach publish,$(ENVIRONMENT_PUBLISH),--publish $(publish)) \
-			$(ENVIRONMENT_UPSTREAM)
+			$(ENVIRONMENT_UPSTREAM); rm -f $(CIDFILE)
 endef
 
 
@@ -257,8 +262,9 @@ CARGO_HANDLES_FRESHNESS:
 cross-image-%: export TRIPLE =$($(strip @):cross-image-%=%)
 cross-image-%:
 	$(CONTAINER_TOOL) build \
+		--build-arg TARGET=${TRIPLE} \
+		--file scripts/cross/Dockerfile \
 		--tag vector-cross-env:${TRIPLE} \
-		--file scripts/cross/${TRIPLE}.dockerfile \
 		.
 
 # This is basically a shorthand for folks.
@@ -450,7 +456,7 @@ check: ## Run prerequisite code checks
 .PHONY: check-all
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-docs
-check-all: check-version check-examples check-component-features
+check-all: check-examples check-component-features
 check-all: check-scripts check-deny check-component-docs check-licenses
 
 .PHONY: check-component-features
@@ -459,7 +465,7 @@ check-component-features: ## Check that all component features are setup properl
 
 .PHONY: check-clippy
 check-clippy: ## Check code with Clippy
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust --clippy
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust
 
 .PHONY: check-docs
 check-docs: ## Check that all /docs file are valid
@@ -476,10 +482,6 @@ check-licenses: ## Check that the 3rd-party license file is up to date
 .PHONY: check-markdown
 check-markdown: ## Check that markdown is styled properly
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check markdown
-
-.PHONY: check-version
-check-version: ## Check that Vector's version is correct accounting for recent changes
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check version
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid
@@ -631,7 +633,7 @@ release-github: ## Release to GitHub
 
 .PHONY: release-homebrew
 release-homebrew: ## Release to vectordotdev Homebrew tap
-	@cargo vdev release homebrew
+	@cargo vdev release homebrew --vector-version $(VECTOR_VERSION)
 
 .PHONY: release-prepare
 release-prepare: ## Prepares the release with metadata and highlights
@@ -665,10 +667,6 @@ compile-vrl-wasm: ## Compile VRL crates to WASM target
 clean: environment-clean ## Clean everything
 	cargo clean
 
-.PHONY: fmt
-fmt: ## Format code
-	${MAYBE_ENVIRONMENT_EXEC} cargo fmt
-
 .PHONY: generate-kubernetes-manifests
 generate-kubernetes-manifests: ## Generate Kubernetes manifests from latest Helm chart
 	cargo vdev build manifests
@@ -700,3 +698,15 @@ cargo-install-%:
 .PHONY: ci-generate-publish-metadata
 ci-generate-publish-metadata: ## Generates the necessary metadata required for building/publishing Vector.
 	cargo vdev build publish-metadata
+
+.PHONY: clippy-fix
+clippy-fix:
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check rust --fix
+
+.PHONY: fmt
+fmt:
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev fmt
+
+.PHONY: build-licenses
+build-licenses:
+	${MAYBE_ENVIRONMENT_EXEC} cargo vdev build licenses

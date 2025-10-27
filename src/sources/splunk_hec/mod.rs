@@ -12,32 +12,39 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
-use hyper::{service::make_service_fn, Server};
-use serde::de::DeserializeOwned;
-use serde::Serialize;
+use hyper::{Server, service::make_service_fn};
+use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{
-    de::{Read as JsonRead, StrRead},
     Deserializer, Value as JsonValue,
+    de::{Read as JsonRead, StrRead},
 };
 use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::lookup::{self, event_path, owned_value_path};
-use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
-    event::BatchNotifier,
-    schema::meaning,
     EstimatedJsonEncodedSizeOf,
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    event::BatchNotifier,
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    lookup::{self, event_path, lookup_v2::OptionalValuePath, owned_value_path},
+    schema::meaning,
+    sensitive_string::SensitiveString,
+    tls::MaybeTlsIncomingStream,
 };
-use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStream};
-use vrl::path::OwnedTargetPath;
-use vrl::value::{kind::Collection, Kind};
-use warp::http::header::{HeaderValue, CONTENT_TYPE};
-use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
+use vrl::{
+    path::OwnedTargetPath,
+    value::{Kind, kind::Collection},
+};
+use warp::{
+    Filter, Reply,
+    filters::BoxedFilter,
+    http::header::{CONTENT_TYPE, HeaderValue},
+    path,
+    reject::Rejection,
+    reply::Response,
+};
 
 use self::{
     acknowledgements::{
@@ -47,16 +54,16 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
-    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
+    SourceSender,
+    config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::{Event, LogEvent, Value},
-    http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
     serde::bool_or_struct,
     source_sender::ClosedError,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-    SourceSender,
 };
 
 mod acknowledgements;
@@ -426,10 +433,10 @@ impl SplunkSource {
                             }
                         }
 
-                        if !events.is_empty() {
-                            if let Err(ClosedError) = out.send_batch(events).await {
-                                return Err(Rejection::from(ApiError::ServerShutdown));
-                            }
+                        if !events.is_empty()
+                            && let Err(ClosedError) = out.send_batch(events).await
+                        {
+                            return Err(Rejection::from(ApiError::ServerShutdown));
                         }
 
                         if let Some(error) = error {
@@ -1016,16 +1023,16 @@ impl DefaultExtractor {
         }
 
         // Add data field
-        if let Some(index) = self.value.as_ref() {
-            if let Some(metadata_key) = self.to_field.path.as_ref() {
-                self.log_namespace.insert_source_metadata(
-                    SplunkConfig::NAME,
-                    log,
-                    Some(LegacyKey::Overwrite(metadata_key)),
-                    &self.to_field.path.clone().unwrap_or(owned_value_path!("")),
-                    index.clone(),
-                )
-            }
+        if let Some(index) = self.value.as_ref()
+            && let Some(metadata_key) = self.to_field.path.as_ref()
+        {
+            self.log_namespace.insert_source_metadata(
+                SplunkConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(metadata_key)),
+                &self.to_field.path.clone().unwrap_or(owned_value_path!("")),
+                index.clone(),
+            )
         }
     }
 }
@@ -1295,35 +1302,38 @@ mod tests {
     use http::Uri;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
-    use vector_lib::codecs::{
-        decoding::DeserializerConfig, BytesDecoderConfig, JsonSerializerConfig,
-        TextSerializerConfig,
+    use vector_lib::{
+        codecs::{
+            BytesDecoderConfig, JsonSerializerConfig, TextSerializerConfig,
+            decoding::DeserializerConfig,
+        },
+        event::EventStatus,
+        schema::Definition,
+        sensitive_string::SensitiveString,
     };
-    use vector_lib::sensitive_string::SensitiveString;
-    use vector_lib::{event::EventStatus, schema::Definition};
     use vrl::path::PathPrefix;
 
     use super::*;
     use crate::{
+        SourceSender,
         codecs::{DecodingConfig, EncodingConfig},
         components::validation::prelude::*,
-        config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
+        config::{SinkConfig, SinkContext, SourceConfig, SourceContext, log_schema},
         event::{Event, LogEvent},
         sinks::{
+            Healthcheck, VectorSink,
             splunk_hec::logs::config::HecLogsSinkConfig,
             util::{BatchConfig, Compression, TowerRequestConfig},
-            Healthcheck, VectorSink,
         },
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
             collect_n,
             components::{
-                assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
-                HTTP_PUSH_SOURCE_TAGS,
+                COMPONENT_ERROR_TAGS, HTTP_PUSH_SOURCE_TAGS, assert_source_compliance,
+                assert_source_error,
             },
             next_addr, wait_for_tcp,
         },
-        SourceSender,
     };
 
     #[test]
@@ -2252,10 +2262,12 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()],
                 message.into()
             );
-            assert!(event
-                .as_log()
-                .get((PathPrefix::Event, log_schema().host_key().unwrap()))
-                .is_none());
+            assert!(
+                event
+                    .as_log()
+                    .get((PathPrefix::Event, log_schema().host_key().unwrap()))
+                    .is_none()
+            );
         })
         .await;
     }

@@ -1,18 +1,19 @@
-use crate::serde::default_decoding;
 use std::{collections::VecDeque, net::SocketAddr, num::NonZeroUsize};
 
 use bytes::Bytes;
 use derivative::Derivative;
-use tokio_tungstenite::tungstenite::{handshake::server::Request, Message};
+use tokio_tungstenite::tungstenite::{Message, handshake::server::Request};
 use url::Url;
 use uuid::Uuid;
 use vector_config::configurable_component;
 use vector_lib::{
-    codecs::decoding::{format::Deserializer as _, DeserializerConfig},
+    codecs::decoding::{DeserializerConfig, format::Deserializer as _},
     event::{Event, MaybeAsLogMut},
     lookup::lookup_v2::ConfigValuePath,
 };
 use vrl::prelude::VrlValueConvert;
+
+use crate::serde::default_decoding;
 
 /// Configuration for message buffering which enables message replay for clients that connect later.
 #[configurable_component]
@@ -212,7 +213,7 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
                 {
                     match Uuid::parse_str(&last_received_param_value) {
                         Ok(last_received_val) => {
-                            return BufferReplayRequest::with_replay_from(last_received_val)
+                            return BufferReplayRequest::with_replay_from(last_received_val);
                         }
                         Err(err) => {
                             warn!(message = "Parsing last received message UUID failed.", %err)
@@ -236,13 +237,12 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
             message_id_path: Some(message_id_path),
             ..
         }) = self
+            && let Some(log) = event.maybe_as_log_mut()
         {
-            if let Some(log) = event.maybe_as_log_mut() {
-                let mut buffer = [0; 36];
-                let uuid = message_id.hyphenated().encode_lower(&mut buffer);
-                log.value_mut()
-                    .insert(message_id_path, Bytes::copy_from_slice(uuid.as_bytes()));
-            }
+            let mut buffer = [0; 36];
+            let uuid = message_id.hyphenated().encode_lower(&mut buffer);
+            log.value_mut()
+                .insert(message_id_path, Bytes::copy_from_slice(uuid.as_bytes()));
         }
         message_id
     }

@@ -112,6 +112,35 @@ generated: components: sources: prometheus_remote_write: configuration: {
 			}
 		}
 	}
+	metadata_conflict_strategy: {
+		description: "Defines the behavior for handling conflicting metric metadata."
+		required:    false
+		type: string: {
+			default: "reject"
+			enum: {
+				ignore: "Silently ignore metadata conflicts, keeping the first metadata entry. This aligns with Prometheus/Thanos behavior."
+				reject: "Reject requests with conflicting metadata by returning an HTTP 400 error. This is the default to preserve backwards compatibility."
+			}
+		}
+	}
+	path: {
+		description: "The URL path on which metric POST requests are accepted."
+		required:    false
+		type: string: {
+			default: "/"
+			examples: ["/api/v1/write", "/remote-write"]
+		}
+	}
+	skip_nan_values: {
+		description: """
+			Whether to skip/discard received samples with NaN values.
+
+			When enabled, any metric sample with a NaN value will be filtered out
+			during parsing, preventing downstream processing of invalid metrics.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	tls: {
 		description: "Configures the TLS options for incoming/outgoing connections."
 		required:    false
@@ -149,7 +178,7 @@ generated: components: sources: prometheus_remote_write: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming or outgoing connections.
+					Whether to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.

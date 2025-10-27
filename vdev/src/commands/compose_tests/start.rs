@@ -9,16 +9,26 @@ pub(crate) fn exec(
     local_config: ComposeTestLocalConfig,
     integration: &str,
     environment: Option<&String>,
-    build_all: bool,
+    all_features: bool,
+    reuse_image: bool,
 ) -> Result<()> {
     let environment = if let Some(environment) = environment {
         environment.clone()
     } else {
         let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, integration)?;
         let envs = config.environments();
+        trace!("Available environments: {envs:#?}");
         let env = envs.keys().next().expect("Integration has no environments");
         env.clone()
     };
-
-    ComposeTest::generate(local_config, integration, environment, build_all, 0)?.start()
+    debug!("Selected environment: {environment:#?}");
+    ComposeTest::generate(
+        local_config,
+        integration,
+        environment,
+        all_features,
+        reuse_image,
+        0,
+    )?
+    .start()
 }

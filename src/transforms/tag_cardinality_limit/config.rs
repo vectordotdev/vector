@@ -1,12 +1,15 @@
 use std::collections::HashMap;
 
-use crate::config::{
-    DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput,
-};
-use crate::schema;
-use crate::transforms::tag_cardinality_limit::TagCardinalityLimit;
-use crate::transforms::Transform;
 use vector_lib::configurable::configurable_component;
+
+use crate::{
+    config::{
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
+    schema,
+    transforms::{Transform, tag_cardinality_limit::TagCardinalityLimit},
+};
 
 /// Configuration for the `tag_cardinality_limit` transform.
 #[configurable_component(transform(

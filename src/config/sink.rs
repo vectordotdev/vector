@@ -1,27 +1,28 @@
-use std::cell::RefCell;
-use std::time::Duration;
+use std::{cell::RefCell, path::PathBuf, time::Duration};
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
 use serde_with::serde_as;
-use std::path::PathBuf;
-use vector_lib::buffers::{BufferConfig, BufferType};
-use vector_lib::configurable::attributes::CustomAttribute;
-use vector_lib::configurable::schema::{SchemaGenerator, SchemaObject};
-use vector_lib::configurable::{
-    configurable_component, Configurable, GenerateError, Metadata, NamedComponent,
-};
 use vector_lib::{
+    buffers::{BufferConfig, BufferType},
     config::{AcknowledgementsConfig, GlobalOptions, Input},
+    configurable::{
+        Configurable, GenerateError, Metadata, NamedComponent,
+        attributes::CustomAttribute,
+        configurable_component,
+        schema::{SchemaGenerator, SchemaObject},
+    },
     id::Inputs,
     sink::VectorSink,
 };
 use vector_vrl_metrics::MetricsStorage;
 
-use super::{dot_graph::GraphConfig, schema, ComponentKey, ProxyConfig, Resource};
-use crate::extra_context::ExtraContext;
-use crate::sinks::{util::UriSerde, Healthcheck};
+use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
+use crate::{
+    extra_context::ExtraContext,
+    sinks::{Healthcheck, util::UriSerde},
+};
 
 pub type BoxedSink = Box<dyn SinkConfig>;
 
@@ -123,7 +124,9 @@ where
 
     pub fn healthcheck(&self) -> SinkHealthcheckOptions {
         if self.healthcheck_uri.is_some() && self.healthcheck.uri.is_some() {
-            warn!("Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`.")
+            warn!(
+                "Both `healthcheck.uri` and `healthcheck_uri` options are specified. Using value of `healthcheck.uri`."
+            )
         } else if self.healthcheck_uri.is_some() {
             warn!(
                 "The `healthcheck_uri` option has been deprecated, use `healthcheck.uri` instead."
@@ -269,7 +272,7 @@ pub trait SinkConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sync
 
 dyn_clone::clone_trait_object!(SinkConfig);
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct SinkContext {
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,

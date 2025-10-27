@@ -1,6 +1,7 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+};
 
 #[derive(Debug)]
 pub struct LargeEventDroppedError {
@@ -17,7 +18,6 @@ impl InternalEvent for LargeEventDroppedError {
             length = %self.length,
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::SENDING,
-
         );
         counter!(
             "component_errors_total",

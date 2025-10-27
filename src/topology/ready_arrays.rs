@@ -1,8 +1,8 @@
 use std::{cmp, num::NonZeroUsize, pin::Pin};
 
 use futures::{
+    Stream, StreamExt,
     task::{Context, Poll},
-    {Stream, StreamExt},
 };
 
 use crate::event::{EventArray, EventContainer};

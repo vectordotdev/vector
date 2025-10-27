@@ -1,13 +1,16 @@
 //! Encoding for the `Pulsar` sink.
+use std::io;
+
+use bytes::BytesMut;
+use tokio_util::codec::Encoder as _;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, config::telemetry, request_metadata::GroupedCountByteSize,
+};
+
 use crate::{
     event::Event,
-    sinks::util::encoding::{write_all, Encoder},
+    sinks::util::encoding::{Encoder, write_all},
 };
-use bytes::BytesMut;
-use std::io;
-use tokio_util::codec::Encoder as _;
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::{config::telemetry, EstimatedJsonEncodedSizeOf};
 
 #[derive(Clone, Debug)]
 pub(super) struct PulsarEncoder {

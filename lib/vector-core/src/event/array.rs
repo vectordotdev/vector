@@ -4,7 +4,7 @@
 
 use std::{iter, slice, sync::Arc, vec};
 
-use futures::{stream, Stream};
+use futures::{Stream, stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
 use vector_buffers::EventCount;
@@ -173,7 +173,7 @@ impl EventArray {
     }
 
     /// Iterate over references to this array's events.
-    pub fn iter_events(&self) -> impl Iterator<Item = EventRef> {
+    pub fn iter_events(&self) -> impl Iterator<Item = EventRef<'_>> {
         match self {
             Self::Logs(array) => EventArrayIter::Logs(array.iter()),
             Self::Metrics(array) => EventArrayIter::Metrics(array.iter()),
@@ -182,7 +182,7 @@ impl EventArray {
     }
 
     /// Iterate over mutable references to this array's events.
-    pub fn iter_events_mut(&mut self) -> impl Iterator<Item = EventMutRef> {
+    pub fn iter_events_mut(&mut self) -> impl Iterator<Item = EventMutRef<'_>> {
         match self {
             Self::Logs(array) => EventArrayIterMut::Logs(array.iter_mut()),
             Self::Metrics(array) => EventArrayIterMut::Metrics(array.iter_mut()),
@@ -333,7 +333,7 @@ impl Arbitrary for EventArray {
         let choice: u8 = u8::arbitrary(g);
         // Quickcheck can't derive Arbitrary for enums, see
         // https://github.com/BurntSushi/quickcheck/issues/98
-        if choice % 2 == 0 {
+        if choice.is_multiple_of(2) {
             let mut logs = Vec::new();
             for _ in 0..len {
                 logs.push(LogEvent::arbitrary(g));

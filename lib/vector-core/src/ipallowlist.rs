@@ -1,9 +1,8 @@
-use serde::{Deserialize, Serialize};
 use std::cell::RefCell;
-use vector_config::GenerateError;
 
 use ipnet::IpNet;
-use vector_config::{configurable_component, Configurable, Metadata, ToValue};
+use serde::{Deserialize, Serialize};
+use vector_config::{Configurable, GenerateError, Metadata, ToValue, configurable_component};
 use vector_config_common::schema::{InstanceType, SchemaGenerator, SchemaObject};
 
 /// List of allowed origin IP networks. IP addresses must be in CIDR notation.

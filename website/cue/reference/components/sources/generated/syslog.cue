@@ -105,7 +105,7 @@ generated: components: sources: syslog: configuration: {
 		type: uint: {}
 	}
 	tls: {
-		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
+		description:   "`TlsEnableableConfig` for `sources`, adding metadata from the client certificate."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: object: options: {
@@ -147,7 +147,7 @@ generated: components: sources: syslog: configuration: {
 			}
 			enabled: {
 				description: """
-					Whether or not to require TLS for incoming or outgoing connections.
+					Whether to require TLS for incoming or outgoing connections.
 
 					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
 					more information.

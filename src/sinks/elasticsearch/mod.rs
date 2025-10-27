@@ -19,10 +19,11 @@ use std::{convert::TryFrom, fmt};
 pub use common::*;
 pub use config::*;
 pub use encoder::ElasticsearchEncoder;
-use http::{uri::InvalidUri, Request};
+use http::{Request, uri::InvalidUri};
 use snafu::Snafu;
-use vector_lib::sensitive_string::SensitiveString;
-use vector_lib::{configurable::configurable_component, internal_event};
+use vector_lib::{
+    configurable::configurable_component, internal_event, sensitive_string::SensitiveString,
+};
 
 use crate::{
     event::{EventRef, LogEvent},

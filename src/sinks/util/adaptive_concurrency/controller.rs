@@ -8,7 +8,7 @@ use tokio::sync::OwnedSemaphorePermit;
 use tower::timeout::error::Elapsed;
 use vector_lib::internal_event::{InternalEventHandle as _, Registered};
 
-use super::{instant_now, semaphore::ShrinkableSemaphore, AdaptiveConcurrencySettings};
+use super::{AdaptiveConcurrencySettings, instant_now, semaphore::ShrinkableSemaphore};
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use crate::{
@@ -292,7 +292,7 @@ where
                 } else {
                     warn!(
                         message = "Unhandled error response.",
-                        %error,
+                        %error
                     );
                     false
                 }

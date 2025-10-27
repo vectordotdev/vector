@@ -1,30 +1,9 @@
 use std::sync::Arc;
 
 use http::Request;
-use serde::{Deserialize, Serialize};
 
 use super::NewRelicCredentials;
 use crate::{http::HttpClient, sinks::HealthcheckError};
-
-#[derive(Serialize, Deserialize, Debug)]
-struct NewRelicStatusModel {
-    page: NewRelicStatusPage,
-    components: Vec<NewRelicStatusComponent>,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct NewRelicStatusPage {
-    id: String,
-    name: String,
-    url: String,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-struct NewRelicStatusComponent {
-    id: String,
-    name: String,
-    status: String,
-}
 
 pub(crate) async fn healthcheck(
     client: HttpClient,

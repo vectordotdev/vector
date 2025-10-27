@@ -1,8 +1,8 @@
-use super::config::AmqpSinkConfig;
-use super::service::AmqpError;
-use crate::amqp::AmqpConfig;
 use deadpool::managed::Pool;
 use lapin::options::ConfirmSelectOptions;
+
+use super::{config::AmqpSinkConfig, service::AmqpError};
+use crate::amqp::AmqpConfig;
 
 pub type AmqpSinkChannels = Pool<AmqpSinkChannelManager>;
 
@@ -41,7 +41,7 @@ impl deadpool::managed::Manager for AmqpSinkChannelManager {
         let channel = Self::new_channel(&self.config).await?;
         info!(
             message = "Created a new channel to the AMQP broker.",
-            id = channel.id()
+            id = channel.id(),
         );
         Ok(channel)
     }
