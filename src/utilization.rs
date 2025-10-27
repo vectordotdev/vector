@@ -110,7 +110,8 @@ impl Timer {
     /// Begin a new span representing time spent waiting
     pub(crate) fn start_wait(&mut self, at: Instant) {
         if !self.waiting {
-            self.end_span(at);
+            // Clamp start time in case of a late message
+            self.end_span(at.max(self.overall_start));
             self.waiting = true;
         }
     }
@@ -118,7 +119,8 @@ impl Timer {
     /// Complete the current waiting span and begin a non-waiting span
     pub(crate) fn stop_wait(&mut self, at: Instant) {
         if self.waiting {
-            self.end_span(at);
+            // Clamp stop time in case of a late message
+            self.end_span(at.max(self.overall_start));
             self.waiting = false;
         }
     }
@@ -143,7 +145,7 @@ impl Timer {
         self.gauge.set(avg_rounded);
 
         // Reset overall statistics for the next reporting period.
-        self.overall_start = self.span_start;
+        self.overall_start = now;
         self.total_wait = Duration::new(0, 0);
 
         #[cfg(debug_assertions)]
@@ -162,7 +164,9 @@ impl Timer {
 
     fn end_span(&mut self, at: Instant) {
         if self.waiting {
-            self.total_wait += at - self.span_start;
+            // `at` can be before span start here, the result will be clamped to 0
+            // because `duration_since` returns zero if `at` is before span start
+            self.total_wait += at.duration_since(self.span_start);
         }
         self.span_start = at;
     }
@@ -320,6 +324,49 @@ mod tests {
             (actual - expected).abs() < TOLERANCE,
             "Expected utilization {description}, got {actual}"
         );
+    }
+
+    #[test]
+    #[serial]
+    fn test_utilization_in_bounds_on_late_start() {
+        let mut timer = setup_timer();
+
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.update_utilization();
+
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 1.0, "near 1.0 (never waiting)");
+
+        // Late message for start wait
+        timer.start_wait(Instant::now() - Duration::from_secs(1));
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.update_utilization();
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.1, "~0.1");
+    }
+
+    #[test]
+    #[serial]
+    fn test_utilization_in_bounds_on_late_stop() {
+        let mut timer = setup_timer();
+
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.waiting = true;
+        timer.update_utilization();
+
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.0, "near 0 (always waiting)");
+
+        // Late message for stop wait
+        timer.stop_wait(Instant::now() - Duration::from_secs(4));
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.update_utilization();
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.9, "~0.9");
     }
 
     #[test]
