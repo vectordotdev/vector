@@ -825,7 +825,7 @@ impl<'a> TopologyPiecesBuilder<'a> {
         match self.build().await {
             Err(errors) => {
                 for error in errors {
-                    error!(message = "Configuration error.", %error);
+                    error!(message = "Configuration error.", %error, internal_log_rate_limit = false);
                 }
                 None
             }
