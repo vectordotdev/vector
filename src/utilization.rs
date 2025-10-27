@@ -335,13 +335,16 @@ mod tests {
 
         timer.update_utilization();
 
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 1.0, "near 1.0 (never waiting)");
+
         // Late message for start wait
         timer.start_wait(Instant::now() - Duration::from_secs(1));
         MockClock::advance(Duration::from_secs(5));
 
         timer.update_utilization();
-        assert!(timer.ewma.average().unwrap_or(f64::NAN) >= 0.0);
-        assert!(timer.ewma.average().unwrap_or(f64::NAN) <= 1.0);
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.1, "~0.1");
     }
 
     #[test]
@@ -354,13 +357,16 @@ mod tests {
         timer.waiting = true;
         timer.update_utilization();
 
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.0, "near 0 (always waiting)");
+
         // Late message for stop wait
         timer.stop_wait(Instant::now() - Duration::from_secs(4));
         MockClock::advance(Duration::from_secs(5));
 
         timer.update_utilization();
-        assert!(timer.ewma.average().unwrap_or(f64::NAN) >= 0.0);
-        assert!(timer.ewma.average().unwrap_or(f64::NAN) <= 1.0);
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.9, "~0.9");
     }
 
     #[test]
