@@ -62,7 +62,7 @@ environment variable example.
 Vector prevents security issues related to environment variable interpolation by rejecting environment variables that contain newline
 characters. This also prevents injection of multi-line configuration blocks.
 
-If you need to inject multi-line configuration blocks, use a config pre-processing step with a mature tool like `envsubst`.
+If you need to inject multi-line configuration blocks, use a config pre-processing step with a tool like `envsubst`.
 This approach gives you more control over the configuration and allows you to inspect the result before passing it to Vector:
 
 ```shell
