@@ -216,7 +216,7 @@ fn build_warp_log_filter(
     let make_events = move |encoding_header: Option<String>, headers: HeaderMap, body: Bytes| {
         decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
-                // Other status codes are already handled by `sources::util::decode` (tech debt).
+                // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
                     emit!(HttpBadRequest::new(
                         err.status_code().as_u16(),
@@ -256,7 +256,7 @@ fn build_warp_metrics_filter(
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
         decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
-                // Other status codes are already handled by `sources::util::decode` (tech debt).
+                // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
                     emit!(HttpBadRequest::new(
                         err.status_code().as_u16(),
@@ -292,7 +292,7 @@ fn build_warp_trace_filter(
     let make_events = move |encoding_header: Option<String>, _headers: HeaderMap, body: Bytes| {
         decompress_body(encoding_header.as_deref(), body)
             .inspect_err(|err| {
-                // Other status codes are already handled by `sources::util::decode` (tech debt).
+                // Other status codes are already handled by `sources::util::decompress_body` (tech debt).
                 if err.status_code() == StatusCode::UNSUPPORTED_MEDIA_TYPE {
                     emit!(HttpBadRequest::new(
                         err.status_code().as_u16(),
