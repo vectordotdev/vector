@@ -5,20 +5,20 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     curl \
+    git \
     g++ \
     libclang1 \
     libsasl2-dev \
     libssl-dev \
     llvm \
-    pkg-config \
-    zlib1g-dev \
-    unzip \
-    git \
-    unixodbc \
-    unixodbc-dev \
     odbcinst \
     odbc-mariadb \
     odbc-postgresql \
+    pkg-config \
+    zlib1g-dev \
+    unzip \
+    unixodbc \
+    unixodbc-dev \
   && rm -rf /var/lib/apt/lists/*
 
 COPY tests/data/ca/certs /certs

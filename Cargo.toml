@@ -199,6 +199,8 @@ vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+mock_instant = { version = "0.6" }
+serial_test = { version = "3.2" }
 
 [dependencies]
 cfg-if.workspace = true
@@ -460,17 +462,19 @@ assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
 azure_core = { version = "0.25", default-features = false, features = ["reqwest", "hmac_openssl", "azurite_workaround"] }
 azure_identity = { version = "0.25", default-features = false, features = ["reqwest"] }
-azure_storage_blobs = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl", "azurite_workaround"] }
 azure_storage = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl"] }
+azure_storage_blobs = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl", "azurite_workaround"] }
 base64 = "0.22.1"
 criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
 libc.workspace = true
-similar-asserts = "1.7.0"
+mock_instant.workspace = true
 proptest.workspace = true
 quickcheck = "1.0.3"
 reqwest.workspace = true
 rstest = { version = "0.26.1" }
+serial_test.workspace = true
+similar-asserts = "1.7.0"
 tempfile.workspace = true
 test-generator = "0.3.1"
 tokio = { workspace = true, features = ["test-util"] }
@@ -648,7 +652,7 @@ sources-aws_ecs_metrics = ["sources-utils-http-client"]
 sources-aws_kinesis_firehose = ["dep:base64"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
-sources-datadog_agent = ["sources-utils-http-error", "protobuf-build", "dep:prost"]
+sources-datadog_agent = ["sources-utils-http-encoding", "protobuf-build", "dep:prost"]
 sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "dep:dnstap-parser", "protobuf-build", "dep:prost"]
 sources-docker_logs = ["docker"]

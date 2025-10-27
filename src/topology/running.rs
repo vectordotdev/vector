@@ -22,7 +22,7 @@ use vector_lib::{
 
 use super::{
     BuiltBuffer, TaskHandle,
-    builder::{self, TopologyPieces, reload_enrichment_tables},
+    builder::{self, TopologyPieces, TopologyPiecesBuilder, reload_enrichment_tables},
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
     task::{Task, TaskOutput},
@@ -176,7 +176,8 @@ impl RunningTopology {
 
                 error!(
                     components = ?remaining_components,
-                    "Failed to gracefully shut down in time. Killing components."
+                    message = "Failed to gracefully shut down in time. Killing components.",
+                    internal_log_rate_limit = false
                 );
             }) as future::BoxFuture<'static, ()>
         } else {
@@ -302,13 +303,11 @@ impl RunningTopology {
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
-        if let Some(mut new_pieces) = TopologyPieces::build_or_log_errors(
-            &new_config,
-            &diff,
-            buffers.clone(),
-            extra_context.clone(),
-        )
-        .await
+        if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&new_config, &diff)
+            .with_buffers(buffers.clone())
+            .with_extra_context(extra_context.clone())
+            .build_or_log_errors()
+            .await
         {
             // If healthchecks are configured for any of the changing/new components, try running
             // them before moving forward with connecting and spawning.  In some cases, healthchecks
@@ -333,9 +332,11 @@ impl RunningTopology {
         warn!("Failed to completely load new configuration. Restoring old configuration.");
 
         let diff = diff.flip();
-        if let Some(mut new_pieces) =
-            TopologyPieces::build_or_log_errors(&self.config, &diff, buffers, extra_context.clone())
-                .await
+        if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&self.config, &diff)
+            .with_buffers(buffers)
+            .with_extra_context(extra_context.clone())
+            .build_or_log_errors()
+            .await
             && self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
@@ -348,7 +349,10 @@ impl RunningTopology {
             return Ok(false);
         }
 
-        error!("Failed to restore old configuration.");
+        error!(
+            message = "Failed to restore old configuration.",
+            internal_log_rate_limit = false
+        );
 
         Err(())
     }
@@ -378,7 +382,10 @@ impl RunningTopology {
                     info!("All healthchecks passed.");
                     true
                 } else {
-                    error!("Sinks unhealthy.");
+                    error!(
+                        message = "Sinks unhealthy.",
+                        internal_log_rate_limit = false
+                    );
                     false
                 }
             } else {
@@ -1231,9 +1238,10 @@ impl RunningTopology {
         extra_context: ExtraContext,
     ) -> Option<(Self, ShutdownErrorReceiver)> {
         let diff = ConfigDiff::initial(&config);
-        let pieces =
-            TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new(), extra_context)
-                .await?;
+        let pieces = TopologyPiecesBuilder::new(&config, &diff)
+            .with_extra_context(extra_context)
+            .build_or_log_errors()
+            .await?;
         Self::start_validated(config, diff, pieces).await
     }
 
@@ -1259,7 +1267,10 @@ impl RunningTopology {
                 }
             }
             (Some(_), Some(_)) => {
-                error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
+                error!(
+                    message = "Cannot set both `expire_metrics` and `expire_metrics_secs`.",
+                    internal_log_rate_limit = false
+                );
                 return None;
             }
             (None, Some(e)) => {
@@ -1283,7 +1294,7 @@ impl RunningTopology {
                     .unwrap_or_default(),
             )
         {
-            error!(message = "Invalid metrics expiry.", %error);
+            error!(message = "Invalid metrics expiry.", %error, internal_log_rate_limit = false);
             return None;
         }
 
