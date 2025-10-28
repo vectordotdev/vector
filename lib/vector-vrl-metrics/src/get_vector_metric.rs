@@ -26,11 +26,18 @@ impl Function for GetVectorMetric {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "key",
-            kind: kind::BYTES,
-            required: true,
-        }]
+        &[
+            Parameter {
+                keyword: "key",
+                kind: kind::BYTES,
+                required: true,
+            },
+            Parameter {
+                keyword: "tags",
+                kind: kind::OBJECT,
+                required: false,
+            },
+        ]
     }
 
     fn examples(&self) -> &'static [Example] {

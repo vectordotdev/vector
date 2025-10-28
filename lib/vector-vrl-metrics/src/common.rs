@@ -154,3 +154,206 @@ pub(crate) fn metric_into_vrl(value: &Metric) -> Value {
         ),
     ]))
 }
+
+#[cfg(test)]
+mod tests {
+    use vector_core::{
+        compile_vrl,
+        event::{Event, LogEvent, MetricKind, MetricTags, VrlTarget},
+    };
+    use vrl::{
+        compiler::{
+            runtime::{Runtime, Terminate},
+            CompilationResult, CompileConfig,
+        },
+        diagnostic::DiagnosticList,
+    };
+
+    use super::*;
+
+    fn compile(
+        storage: MetricsStorage,
+        vrl_source: &str,
+    ) -> Result<CompilationResult, DiagnosticList> {
+        let functions = vrl::stdlib::all().into_iter();
+
+        let functions = functions.chain(crate::all()).collect::<Vec<_>>();
+
+        let state = TypeState::default();
+
+        let mut config = CompileConfig::default();
+        config.set_custom(storage.clone());
+        config.set_read_only();
+
+        compile_vrl(vrl_source, &functions, &state, config)
+    }
+
+    fn compile_and_run(storage: MetricsStorage, vrl_source: &str) -> Result<Value, Terminate> {
+        let CompilationResult {
+            program,
+            warnings: _,
+            config: _,
+        } = compile(storage, vrl_source).expect("compilation failed");
+
+        let mut target = VrlTarget::new(Event::Log(LogEvent::default()), program.info(), false);
+        Runtime::default().resolve(&mut target, &program, &TimeZone::default())
+    }
+
+    #[test]
+    fn test_get_vector_metric() {
+        let storage = MetricsStorage::default();
+        storage.cache.store(
+            vec![Metric::new(
+                "test",
+                MetricKind::Absolute,
+                vector_core::event::MetricValue::Gauge { value: 1.0 },
+            )]
+            .into(),
+        );
+
+        let result = compile_and_run(
+            storage,
+            r#"
+            get_vector_metric("test")
+        "#,
+        )
+        .expect("vrl failed");
+        let result = result.as_object().unwrap();
+
+        assert_eq!(result.get("name").unwrap().as_str().unwrap(), "test");
+        assert_eq!(
+            result.get("value").unwrap().as_float().unwrap(),
+            NotNan::new(1.0).unwrap()
+        );
+    }
+
+    #[test]
+    fn test_find_vector_metrics() {
+        let storage = MetricsStorage::default();
+        storage.cache.store(
+            vec![
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "a".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "b".to_string(),
+                )]))),
+            ]
+            .into(),
+        );
+
+        let result = compile_and_run(
+            storage,
+            r#"
+            find_vector_metrics("test")
+        "#,
+        )
+        .expect("vrl failed");
+        let result = result.as_array_unwrap();
+
+        let metric_a = result[0].as_object().unwrap();
+        assert_eq!(metric_a.get("name").unwrap().as_str().unwrap(), "test");
+        assert_eq!(
+            metric_a.get("value").unwrap().as_float().unwrap(),
+            NotNan::new(1.0).unwrap()
+        );
+        let metric_a_tags = metric_a.get("tags").unwrap().as_object().unwrap();
+        assert_eq!(
+            metric_a_tags
+                .get("component_id")
+                .unwrap()
+                .as_array_unwrap()
+                .first()
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "a"
+        );
+
+        let metric_b = result[1].as_object().unwrap();
+        assert_eq!(metric_b.get("name").unwrap().as_str().unwrap(), "test");
+        assert_eq!(
+            metric_b.get("value").unwrap().as_float().unwrap(),
+            NotNan::new(1.0).unwrap()
+        );
+        let metric_b_tags = metric_b.get("tags").unwrap().as_object().unwrap();
+        assert_eq!(
+            metric_b_tags
+                .get("component_id")
+                .unwrap()
+                .as_array_unwrap()
+                .first()
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "b"
+        );
+    }
+
+    #[test]
+    fn test_get_vector_metric_by_tag() {
+        let storage = MetricsStorage::default();
+        storage.cache.store(
+            vec![
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "a".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "b".to_string(),
+                )]))),
+            ]
+            .into(),
+        );
+
+        let result = compile_and_run(
+            storage,
+            r#"
+            get_vector_metric("test", tags: { "component_id": "b" })
+        "#,
+        )
+        .expect("vrl failed");
+        let result = result.as_object().unwrap();
+
+        assert_eq!(result.get("name").unwrap().as_str().unwrap(), "test");
+        assert_eq!(
+            result.get("value").unwrap().as_float().unwrap(),
+            NotNan::new(1.0).unwrap()
+        );
+        let metric_tags = result.get("tags").unwrap().as_object().unwrap();
+        assert_eq!(
+            metric_tags
+                .get("component_id")
+                .unwrap()
+                .as_array_unwrap()
+                .first()
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "b"
+        );
+    }
+}

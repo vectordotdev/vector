@@ -29,11 +29,18 @@ impl Function for FindVectorMetrics {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "key",
-            kind: kind::BYTES,
-            required: true,
-        }]
+        &[
+            Parameter {
+                keyword: "key",
+                kind: kind::BYTES,
+                required: true,
+            },
+            Parameter {
+                keyword: "tags",
+                kind: kind::OBJECT,
+                required: false,
+            },
+        ]
     }
 
     fn examples(&self) -> &'static [Example] {
