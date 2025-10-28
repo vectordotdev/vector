@@ -325,7 +325,7 @@ impl TemplateCache {
             
             // DashMap DOES support iteration via retain()
             // This is lock-free and efficient
-            self.cache.retain(|_key, (template, last_used_timestamp)| {
+            self.cache.retain(|_key, (_template, last_used_timestamp)| {
                 let last_used = last_used_timestamp.load(Ordering::Relaxed);
                 let should_keep = last_used > cutoff;
                 
