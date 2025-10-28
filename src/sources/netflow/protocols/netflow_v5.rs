@@ -781,11 +781,11 @@ mod tests {
        let record = NetflowV5Record::from_bytes(&record_data).unwrap();
        assert!(record.validate().is_err());
        
-       // Invalid: last < first
+       // Invalid: last < first by more than 1 hour (3600 seconds)
        record_data[16..20].copy_from_slice(&10u32.to_be_bytes());   // packets
        record_data[20..24].copy_from_slice(&1500u32.to_be_bytes()); // octets
-       record_data[24..28].copy_from_slice(&200u32.to_be_bytes());  // first
-       record_data[28..32].copy_from_slice(&100u32.to_be_bytes());  // last
+       record_data[24..28].copy_from_slice(&4000u32.to_be_bytes()); // first
+       record_data[28..32].copy_from_slice(&100u32.to_be_bytes());  // last (3900 seconds difference)
        let record = NetflowV5Record::from_bytes(&record_data).unwrap();
        assert!(record.validate().is_err());
    }
