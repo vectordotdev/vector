@@ -227,6 +227,9 @@ vector-config-macros.workspace = true
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
+# Performance optimizations
+dashmap.workspace = true
+
 # Tokio / Futures
 async-stream.workspace = true
 async-trait.workspace = true

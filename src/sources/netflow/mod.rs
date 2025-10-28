@@ -11,6 +11,10 @@ use crate::sources::netflow::events::*;
 use tokio::net::UdpSocket;
 use tokio::time::Duration;
 use vector_lib::internal_event::InternalEvent;
+use std::sync::Arc;
+use tracing::{debug, error, info};
+use socket2::{Socket, Domain, Type, Protocol};
+use std::net::SocketAddr as StdSocketAddr;
 
 pub mod config;
 pub mod events;
@@ -20,24 +24,132 @@ pub mod templates;
 
 pub use config::NetflowConfig;
 
-/// Main netflow source implementation
+/// Create a UDP socket with SO_REUSEPORT enabled for multi-worker support.
+/// 
+/// SO_REUSEPORT allows multiple sockets to bind to the same address,
+/// enabling kernel-level load balancing across workers.
+async fn create_reuseport_socket(address: std::net::SocketAddr) -> Result<UdpSocket, std::io::Error> {
+    let domain = if address.is_ipv4() {
+        Domain::IPV4
+    } else {
+        Domain::IPV6
+    };
+    
+    let socket = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))?;
+    
+    // Enable SO_REUSEPORT for multi-worker support
+    socket.set_reuse_port(true)?;
+    socket.set_reuse_address(true)?;  // Also add this for faster restart
+    
+    // Bind to the address
+    socket.bind(&StdSocketAddr::from(address))?;
+    
+    // CRITICAL: Must be nonblocking for tokio
+    socket.set_nonblocking(true)?;
+    
+    // Convert to tokio UdpSocket
+    let std_socket: std::net::UdpSocket = socket.into();
+    UdpSocket::from_std(std_socket)
+}
+
+/// High-performance NetFlow source implementation with multi-socket support.
+/// 
+/// Uses multiple UDP sockets with SO_REUSEPORT to distribute packet processing
+/// across all available CPU cores, optimized for high-throughput scenarios
+/// (20M+ records/minute).
 async fn netflow_source(
     config: NetflowConfig,
     mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
-    let socket = UdpSocket::bind(config.address).await.map_err(|error| {
-        NetflowBindError { 
-            address: config.address,
-            error,
-        }.emit();
-    })?;
+    // Determine number of worker threads based on available parallelism
+    let num_workers = std::thread::available_parallelism()
+        .map(|n| n.get())
+        .unwrap_or(1)
+        .max(1);
+    
+    debug!(
+        address = %config.address,
+        num_workers = num_workers,
+        "Starting NetFlow source with multi-socket support"
+    );
 
-    let template_cache = templates::TemplateCache::new_with_buffering(
+    // Create shared template cache and protocol parser
+    let template_cache = Arc::new(templates::TemplateCache::new_with_buffering(
         config.max_templates, 
         config.max_buffered_records
+    ));
+    let protocol_parser = Arc::new(protocols::ProtocolParser::new(&config, template_cache.clone()));
+    
+    // Spawn worker tasks
+    let mut worker_handles = Vec::with_capacity(num_workers);
+    
+    for worker_id in 0..num_workers {
+        // Create socket with SO_REUSEPORT to allow multiple sockets on same address
+        let socket = create_reuseport_socket(config.address).await.map_err(|error| {
+            NetflowBindError { 
+                address: config.address,
+                error,
+            }.emit();
+        })?;
+        
+        // Clone shared resources for this worker
+        let template_cache = template_cache.clone();
+        let protocol_parser = protocol_parser.clone();
+        let config = config.clone();
+        let shutdown = shutdown.clone();
+        let out = out.clone();
+        
+        // Spawn worker task
+        let handle = tokio::spawn(async move {
+            netflow_worker(
+                worker_id,
+                socket,
+                config,
+                template_cache,
+                protocol_parser,
+                out,
+                shutdown,
+            ).await
+        });
+        
+        worker_handles.push(handle);
+    }
+    
+    // Wait for all workers to complete
+    for (worker_id, handle) in worker_handles.into_iter().enumerate() {
+        if let Err(e) = handle.await {
+            error!(
+                worker_id = worker_id,
+                error = %e,
+                "NetFlow worker task failed"
+            );
+            return Err(());
+        }
+    }
+    
+    info!("All NetFlow workers completed");
+    Ok(())
+}
+
+/// Individual NetFlow worker task that processes packets from a single UDP socket.
+/// 
+/// Each worker runs in its own task and processes packets independently,
+/// sharing the template cache and protocol parser with other workers.
+async fn netflow_worker(
+    worker_id: usize,
+    socket: UdpSocket,
+    config: NetflowConfig,
+    template_cache: Arc<templates::TemplateCache>,
+    protocol_parser: Arc<protocols::ProtocolParser>,
+    mut out: SourceSender,
+    mut shutdown: ShutdownSignal,
+) -> Result<(), ()> {
+    debug!(
+        worker_id = worker_id,
+        address = %config.address,
+        "NetFlow worker started"
     );
-    let protocol_parser = protocols::ProtocolParser::new(&config, template_cache.clone());
     
     // Pre-allocate multiple buffers for better performance
     let mut buffers = Vec::with_capacity(8);
@@ -72,7 +184,11 @@ async fn netflow_source(
                             }.emit();
 
                             if let Err(error) = out.send_batch(events).await {
-                                error!(message = "Error sending events", %error);
+                                error!(
+                                    worker_id = worker_id,
+                                    message = "Error sending events", 
+                                    %error
+                                );
                                 return Err(());
                             }
                         }
@@ -80,8 +196,8 @@ async fn netflow_source(
                         // Rotate buffer for next packet
                         buffer_index = (buffer_index + 1) % buffers.len();
 
-                        // Periodic template cleanup
-                        if last_cleanup.elapsed() > Duration::from_secs(300) {
+                        // Periodic template cleanup (only one worker should do this)
+                        if worker_id == 0 && last_cleanup.elapsed() > Duration::from_secs(300) {
                             template_cache.cleanup_expired(config.template_timeout);
                             last_cleanup = std::time::Instant::now();
                         }
@@ -93,12 +209,19 @@ async fn netflow_source(
                 }
             }
             _ = &mut shutdown => {
-                info!("NetFlow source shutting down");
+                debug!(
+                    worker_id = worker_id,
+                    "NetFlow worker shutting down"
+                );
                 break;
             }
         }
     }
 
+    debug!(
+        worker_id = worker_id,
+        "NetFlow worker completed"
+    );
     Ok(())
 }
 
@@ -155,6 +278,7 @@ mod tests {
             buffer_missing_templates: true,
             max_buffered_records: 100,
             options_template_mode: "emit_metadata".to_string(),
+            strict_validation: true,
         };
 
         let parser = ProtocolParser::new(&config, template_cache.clone());
@@ -292,6 +416,7 @@ mod tests {
             buffer_missing_templates: true,
             max_buffered_records: 100,
             options_template_mode: "emit_metadata".to_string(),
+            strict_validation: true,
         };
 
         let (tx, rx) = SourceSender::new_test();

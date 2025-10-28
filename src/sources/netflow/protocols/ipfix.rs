@@ -464,10 +464,10 @@ impl IpfixParser {
         let key = (peer_addr, observation_domain_id, template_id);
 
         let template = match template_cache.get(&key) {
-            Some(template) => {
+            Some(template_arc) => {
                 debug!("Retrieved template for data set: template_id={}, scope_field_count={}", 
-                       template_id, template.scope_field_count);
-                template
+                       template_id, template_arc.scope_field_count);
+                template_arc
             },
             None => {
                 debug!(
