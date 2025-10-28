@@ -444,6 +444,7 @@ impl TemplateCache {
             // DashMap doesn't support efficient iteration
             // For debugging purposes, we return an empty vector
             // Consider using alternative debugging approaches for production
+            let _ = limit; // Suppress unused variable warning in production builds
             debug!("debug_templates called with DashMap - iteration not supported");
             Vec::new()
         }
