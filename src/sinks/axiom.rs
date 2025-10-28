@@ -211,10 +211,7 @@ mod test {
             ..Default::default()
         };
         let endpoint = config.build_endpoint();
-        assert_eq!(
-            endpoint,
-            "https://mumbai.axiomdomain.co/v1/ingest/test-3"
-        );
+        assert_eq!(endpoint, "https://mumbai.axiomdomain.co/v1/ingest/test-3");
     }
 
     #[test]
@@ -225,10 +222,7 @@ mod test {
             ..Default::default()
         };
         let endpoint = config.build_endpoint();
-        assert_eq!(
-            endpoint,
-            "https://api.axiom.co/v1/datasets/foo/ingest"
-        );
+        assert_eq!(endpoint, "https://api.axiom.co/v1/datasets/foo/ingest");
     }
 
     #[test]
@@ -240,10 +234,7 @@ mod test {
             ..Default::default()
         };
         let endpoint = config.build_endpoint();
-        assert_eq!(
-            endpoint,
-            "http://localhost:3400/ingest"
-        );
+        assert_eq!(endpoint, "http://localhost:3400/ingest");
     }
 
     #[test]
@@ -255,10 +246,7 @@ mod test {
             ..Default::default()
         };
         let endpoint = config.build_endpoint();
-        assert_eq!(
-            endpoint,
-            "https://api.eu.axiom.co/v1/datasets/qoo/ingest"
-        );
+        assert_eq!(endpoint, "https://api.eu.axiom.co/v1/datasets/qoo/ingest");
 
         // Also test with trailing slash
         let config = super::AxiomConfig {
@@ -267,10 +255,7 @@ mod test {
             ..Default::default()
         };
         let endpoint = config.build_endpoint();
-        assert_eq!(
-            endpoint,
-            "https://api.eu.axiom.co/v1/datasets/qoo/ingest"
-        );
+        assert_eq!(endpoint, "https://api.eu.axiom.co/v1/datasets/qoo/ingest");
     }
 
     #[test]
@@ -283,10 +268,7 @@ mod test {
             ..Default::default()
         };
         let endpoint = config.build_endpoint();
-        assert_eq!(
-            endpoint,
-            "http://localhost:3400/ingest"
-        );
+        assert_eq!(endpoint, "http://localhost:3400/ingest");
     }
 
     #[test]
