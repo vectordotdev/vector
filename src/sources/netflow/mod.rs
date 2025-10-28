@@ -14,7 +14,6 @@ use vector_lib::internal_event::InternalEvent;
 use std::sync::Arc;
 use tracing::{debug, error, info};
 use socket2::{Socket, Domain, Type, Protocol};
-use std::net::SocketAddr as StdSocketAddr;
 
 pub mod config;
 pub mod events;
@@ -59,8 +58,8 @@ async fn create_reuseport_socket(address: std::net::SocketAddr) -> Result<UdpSoc
 /// (20M+ records/minute).
 async fn netflow_source(
     config: NetflowConfig,
-    mut shutdown: ShutdownSignal,
-    mut out: SourceSender,
+    shutdown: ShutdownSignal,
+    out: SourceSender,
 ) -> Result<(), ()> {
     // Determine number of worker threads based on available parallelism
     let num_workers = std::thread::available_parallelism()

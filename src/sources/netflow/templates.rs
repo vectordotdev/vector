@@ -6,8 +6,7 @@
 
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::time::{Duration, Instant, SystemTime};
+use std::time::{Duration, Instant};
 use std::collections::VecDeque;
 
 #[cfg(not(test))]
