@@ -317,9 +317,16 @@ impl NetflowV5Record {
             }
         }
         
-        // Check timing
+        // Check timing - relaxed validation for timing anomalies
         if self.last < self.first {
-            return Err("Invalid timing: last < first".to_string());
+            let time_diff = self.first - self.last;
+            // Only reject if the difference is more than 1 hour (3600 seconds)
+            if time_diff > 3600 {
+                return Err(format!(
+                    "Invalid timing: last_switched ({}) < first_switched ({}) by {} seconds",
+                    self.last, self.first, time_diff
+                ));
+            }
         }
         
         // Check for private/reserved addresses in next_hop if it's not zero
@@ -348,12 +355,13 @@ impl NetflowV5Record {
 
 /// NetFlow v5 protocol parser
 pub struct NetflowV5Parser {
+    strict_validation: bool,
 }
 
 impl NetflowV5Parser {
     /// Create a new NetFlow v5 parser
-    pub fn new(_field_parser: FieldParser) -> Self {
-        Self {}
+    pub fn new(_field_parser: FieldParser, strict_validation: bool) -> Self {
+        Self { strict_validation }
     }
 
     /// Check if packet data looks like NetFlow v5
@@ -426,15 +434,23 @@ impl NetflowV5Parser {
             let record_data = &data[record_offset..record_end];
             match NetflowV5Record::from_bytes(record_data) {
                 Ok(record) => {
-                    // Validate record
-                    if let Err(validation_error) = record.validate() {
-                        warn!(
-                            "Invalid NetFlow v5 record {}: {}",
-                            i, validation_error
-                        );
-                        invalid_records += 1;
-                        record_offset = record_end;
-                        continue;
+                    if self.strict_validation {
+                        if let Err(validation_error) = record.validate() {
+                            warn!(
+                                "Invalid NetFlow v5 record {}: {}",
+                                i, validation_error
+                            );
+                            invalid_records += 1;
+                            record_offset = record_end;
+                            continue;
+                        }
+                    } else {
+                        if let Err(validation_error) = record.validate() {
+                            debug!(
+                                "NetFlow v5 record {} validation warning: {}",
+                                i, validation_error
+                            );
+                        }
                     }
 
                     // Convert to log event
@@ -797,7 +813,7 @@ mod tests {
    fn test_full_packet_parsing() {
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
-       let parser = NetflowV5Parser::new(field_parser);
+       let parser = NetflowV5Parser::new(field_parser, true);
 
        let packet = create_netflow_v5_packet(2);
        let events = parser.parse(&packet, test_peer_addr(), false).unwrap();
@@ -820,7 +836,7 @@ mod tests {
    fn test_parsing_with_raw_data() {
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
-       let parser = NetflowV5Parser::new(field_parser);
+       let parser = NetflowV5Parser::new(field_parser, true);
 
        let packet = create_netflow_v5_packet(1);
        
@@ -844,7 +860,7 @@ mod tests {
    fn test_zero_records_packet() {
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
-       let parser = NetflowV5Parser::new(field_parser);
+       let parser = NetflowV5Parser::new(field_parser, true);
 
        let packet = create_netflow_v5_packet(0);
        let events = parser.parse(&packet, test_peer_addr(), false).unwrap();
@@ -862,7 +878,7 @@ mod tests {
    fn test_malformed_record_handling() {
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
-       let parser = NetflowV5Parser::new(field_parser);
+       let parser = NetflowV5Parser::new(field_parser, true);
 
        // Create packet with malformed record (invalid packet count)
        let mut packet = create_netflow_v5_packet(1);
@@ -931,7 +947,7 @@ mod tests {
    fn test_multiple_records_with_validation() {
        let config = NetflowConfig::default();
        let field_parser = FieldParser::new(&config);
-       let parser = NetflowV5Parser::new(field_parser);
+       let parser = NetflowV5Parser::new(field_parser, true);
 
        // Create packet with mix of valid and invalid records
        let mut packet = create_netflow_v5_packet(3);

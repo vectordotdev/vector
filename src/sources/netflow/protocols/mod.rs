@@ -74,7 +74,7 @@ impl ProtocolParser {
         let field_parser = FieldParser::new(config);
 
         Self {
-            netflow_v5: NetflowV5Parser::new(field_parser.clone()),
+            netflow_v5: NetflowV5Parser::new(field_parser.clone(), config.strict_validation),
             netflow_v9: NetflowV9Parser::new(field_parser.clone()),
             ipfix: IpfixParser::new(field_parser.clone(), config.options_template_mode.clone()),
             sflow: SflowParser::new(),

@@ -39,12 +39,17 @@ async fn netflow_source(
     );
     let protocol_parser = protocols::ProtocolParser::new(&config, template_cache.clone());
     
-    let mut buf = vec![0; config.max_packet_size];
+    // Pre-allocate multiple buffers for better performance
+    let mut buffers = Vec::with_capacity(8);
+    for _ in 0..8 {
+        buffers.push(vec![0u8; config.max_packet_size]);
+    }
+    let mut buffer_index = 0;
     let mut last_cleanup = std::time::Instant::now();
 
     loop {
         tokio::select! {
-            recv_result = socket.recv_from(&mut buf) => {
+            recv_result = socket.recv_from(&mut buffers[buffer_index]) => {
                 match recv_result {
                     Ok((len, peer_addr)) => {
                         if len > config.max_packet_size {
@@ -56,7 +61,7 @@ async fn netflow_source(
                             continue;
                         }
 
-                        let data = &buf[..len];
+                        let data = &buffers[buffer_index][..len];
                         let events = protocol_parser.parse(data, peer_addr, &template_cache);
                         
                         if !events.is_empty() {
@@ -71,6 +76,9 @@ async fn netflow_source(
                                 return Err(());
                             }
                         }
+
+                        // Rotate buffer for next packet
+                        buffer_index = (buffer_index + 1) % buffers.len();
 
                         // Periodic template cleanup
                         if last_cleanup.elapsed() > Duration::from_secs(300) {

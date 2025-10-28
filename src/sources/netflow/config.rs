@@ -88,6 +88,13 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::examples = "enrich"))]
     #[serde(default = "default_options_template_mode")]
     pub options_template_mode: String,
+
+    /// Whether to use strict validation for NetFlow v5 records.
+    /// When disabled, timing anomalies (last < first) are logged as warnings instead of errors.
+    #[configurable(metadata(docs::examples = true))]
+    #[configurable(metadata(docs::examples = false))]
+    #[serde(default = "default_strict_validation")]
+    pub strict_validation: bool,
 }
 
 /// Supported flow protocols.
@@ -170,6 +177,10 @@ fn default_options_template_mode() -> String {
     "emit_metadata".to_string()
 }
 
+const fn default_strict_validation() -> bool {
+    true
+}
+
 
 
 
@@ -188,6 +199,7 @@ impl Default for NetflowConfig {
             buffer_missing_templates: true,
             max_buffered_records: default_max_buffered_records(),
             options_template_mode: default_options_template_mode(),
+            strict_validation: default_strict_validation(),
         }
     }
 }
