@@ -106,7 +106,7 @@ CREATE TABLE odbc_table
 (
     id int auto_increment primary key,
     name varchar(255) null,
-    datetime datetime null
+    `datetime` datetime null
 );
     "#
                 }
@@ -205,7 +205,7 @@ CREATE TABLE odbc_table
 (
     id int auto_increment primary key,
     name varchar(255) null,
-    datetime datetime null
+    `datetime` datetime null
 );"#
                 }
                 DbType::Postgres => {

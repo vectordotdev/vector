@@ -114,7 +114,7 @@ components: sources: odbc: {
 						(
 						  id int auto_increment primary key,
 						  name varchar(255) null,
-						  datetime datetime null
+						  `datetime` datetime null
 						);
 
 						INSERT INTO odbc_table (name, datetime) VALUES

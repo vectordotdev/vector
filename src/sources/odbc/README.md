@@ -39,7 +39,7 @@ odbcinst -j
 # DRIVERS............: /opt/homebrew/etc/odbcinst.ini
 # SYSTEM DATA SOURCES: /opt/homebrew/etc/odbc.ini
 # FILE DATA SOURCES..: /opt/homebrew/etc/ODBCDataSources
-# USER DATA SOURCES..: /Users/powerumc/.odbc.ini
+# USER DATA SOURCES..: /Users/<username>/.odbc.ini
 # SQLULEN Size.......: 8
 # SQLLEN Size........: 8
 # SQLSETPOSIROW Size.: 8
