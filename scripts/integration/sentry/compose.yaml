@@ -1,0 +1,14 @@
+version: "3"
+
+services:
+  sentry-mock:
+    image: docker.io/wiremock/wiremock:${CONFIG_VERSION}
+    command:
+      - --global-response-templating
+      - --port
+      - "8080"
+      - --verbose
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./wiremock-mappings:/home/wiremock/mappings:ro
