@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 
-use std::{collections::HashMap, fmt, fs::remove_dir_all, path::PathBuf};
+use std::{fmt, fs::remove_dir_all, path::PathBuf};
 
 use clap::Parser;
 use colored::*;
@@ -8,8 +8,10 @@ use exitcode::ExitCode;
 
 use crate::{
     config::{self, Config, ConfigDiff},
-    extra_context::ExtraContext,
-    topology::{self, builder::TopologyPieces},
+    topology::{
+        self,
+        builder::{TopologyPieces, TopologyPiecesBuilder},
+    },
 };
 
 const TEMPORARY_DIRECTORY: &str = "validate_tmp";
@@ -185,15 +187,7 @@ async fn validate_components(
     diff: &ConfigDiff,
     fmt: &mut Formatter,
 ) -> Option<TopologyPieces> {
-    match topology::TopologyPieces::build(
-        config,
-        diff,
-        HashMap::new(),
-        ExtraContext::default(),
-        None,
-    )
-    .await
-    {
+    match TopologyPiecesBuilder::new(config, diff).build().await {
         Ok(pieces) => {
             fmt.success("Component configuration");
             Some(pieces)

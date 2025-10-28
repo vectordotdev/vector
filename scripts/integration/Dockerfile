@@ -1,10 +1,11 @@
-ARG RUST_VERSION=1.85
+ARG RUST_VERSION=1
 FROM docker.io/rust:${RUST_VERSION}-slim-trixie
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     curl \
+    git \
     g++ \
     libclang1 \
     libsasl2-dev \
@@ -13,7 +14,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     pkg-config \
     zlib1g-dev \
     unzip \
-    git \
   && rm -rf /var/lib/apt/lists/*
 
 COPY tests/data/ca/certs /certs
