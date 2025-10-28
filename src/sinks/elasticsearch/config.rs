@@ -73,6 +73,19 @@ impl Default for OpenSearchServiceType {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct ElasticsearchConfig {
+    /// Elastic Cloud ID for Elastic Cloud deployments.
+    ///
+    /// This option automatically configures the Elasticsearch endpoint for Elastic Cloud.
+    /// The cloud ID can be found in your Elastic Cloud deployment details.
+    ///
+    /// This option is mutually exclusive with `endpoint` and `endpoints`.
+    ///
+    /// When using `cloud_id`, set `auth.strategy` to `cloud` and provide credentials
+    /// in `auth.credentials` in "username:password" format.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "staging:dXMtZWFzdC0xLmF3cy5mb3VuZC5pbyRjZWM2ZjI2MWE3NGJmMjRjZTMzYmI4ODExYjg0Mjk0ZiQ="))]
+    pub cloud_id: Option<String>,
+
     /// The Elasticsearch endpoint to send logs to.
     ///
     /// The endpoint must contain an HTTP scheme, and may specify a
@@ -93,6 +106,8 @@ pub struct ElasticsearchConfig {
     ///
     /// If `auth` is specified and the endpoint contains credentials,
     /// a configuration error will be raised.
+    ///
+    /// This option is mutually exclusive with `cloud_id`.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "http://10.24.32.122:9000"))]
     #[configurable(metadata(docs::examples = "https://example.com"))]
@@ -238,6 +253,7 @@ fn query_examples() -> HashMap<String, String> {
 impl Default for ElasticsearchConfig {
     fn default() -> Self {
         Self {
+            cloud_id: None,
             endpoint: None,
             endpoints: vec![],
             doc_type: default_doc_type(),
@@ -279,6 +295,70 @@ impl ElasticsearchConfig {
             ElasticsearchMode::DataStream => Ok(ElasticsearchCommonMode::DataStream(
                 self.data_stream.clone().unwrap_or_default(),
             )),
+        }
+    }
+
+    fn validate_endpoint_config(&self) -> crate::Result<()> {
+        use super::ParseError;
+
+        let has_cloud_id = self.cloud_id.is_some();
+        let has_endpoint = self.endpoint.is_some();
+        let has_endpoints = !self.endpoints.is_empty();
+
+        // Validate cloud_id and endpoints are mutually exclusive
+        if has_cloud_id && (has_endpoint || has_endpoints) {
+            return Err(ParseError::CloudIdAndEndpointsExclusive.into());
+        }
+
+        // Validate at least one endpoint source is configured
+        if !has_cloud_id && !has_endpoint && !has_endpoints {
+            return Err(ParseError::EndpointRequired.into());
+        }
+
+        // Validate cloud authentication strategy
+        self.validate_cloud_auth()?;
+
+        Ok(())
+    }
+
+    fn validate_cloud_auth(&self) -> crate::Result<()> {
+        use super::{ElasticsearchAuthConfig, ParseError};
+
+        match (&self.cloud_id, &self.auth) {
+            // cloud_id with cloud auth strategy - valid
+            (Some(_), Some(ElasticsearchAuthConfig::Cloud { .. })) => Ok(()),
+
+            // cloud_id with basic auth - warn but allow (backward compatibility)
+            (Some(_), Some(ElasticsearchAuthConfig::Basic { .. })) => {
+                warn!(
+                    message = "Using auth.strategy = \"basic\" with cloud_id. \
+                              Consider using auth.strategy = \"cloud\" for Elastic Cloud deployments."
+                );
+                Ok(())
+            }
+
+            // cloud_id with AWS auth - invalid
+            #[cfg(feature = "aws-core")]
+            (Some(_), Some(ElasticsearchAuthConfig::Aws(_))) => {
+                Err(ParseError::CloudIdWithAwsAuth.into())
+            }
+
+            // cloud auth strategy without cloud_id - invalid
+            (None, Some(ElasticsearchAuthConfig::Cloud { .. })) => {
+                Err(ParseError::CloudAuthRequiresCloudId.into())
+            }
+
+            // cloud_id without auth - warn
+            (Some(_), None) => {
+                warn!(
+                    message = "Using cloud_id without authentication. \
+                              Elastic Cloud deployments typically require authentication."
+                );
+                Ok(())
+            }
+
+            // All other combinations are valid
+            _ => Ok(()),
         }
     }
 }
@@ -545,6 +625,9 @@ impl DataStreamConfig {
 #[typetag::serde(name = "elasticsearch")]
 impl SinkConfig for ElasticsearchConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        // Validate configuration before attempting to build
+        self.validate_endpoint_config()?;
+
         let commons = ElasticsearchCommon::parse_many(self, cx.proxy()).await?;
         let common = commons[0].clone();
 
@@ -756,5 +839,100 @@ mod tests {
         );
         assert!(matches!(config.auth, Some(ElasticsearchAuthConfig::Aws(_))));
         assert_eq!(config.api_version, ElasticsearchApiVersion::Auto);
+    }
+
+    #[test]
+    fn parse_cloud_id_with_cloud_auth() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            cloud_id = "staging:dXMtZWFzdC0xLmF3cy5mb3VuZC5pbyRjZWM2ZjI2MWE3NGJmMjRjZTMzYmI4ODExYjg0Mjk0ZiQ="
+            auth.strategy = "cloud"
+            auth.credentials = "elastic:changeme"
+        "#,
+        )
+        .unwrap();
+
+        assert!(config.cloud_id.is_some());
+        assert!(config.endpoints.is_empty());
+        assert!(matches!(
+            config.auth,
+            Some(ElasticsearchAuthConfig::Cloud { .. })
+        ));
+        assert!(config.validate_endpoint_config().is_ok());
+    }
+
+    #[test]
+    fn parse_cloud_id_with_basic_auth() {
+        // Test backward compatibility: basic auth should still work with cloud_id
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            cloud_id = "test:dXMtZWFzdC0xLmF3cy5mb3VuZC5pbyRjZWM="
+            auth.strategy = "basic"
+            auth.user = "elastic"
+            auth.password = "changeme"
+        "#,
+        )
+        .unwrap();
+
+        assert!(config.cloud_id.is_some());
+        assert!(config.validate_endpoint_config().is_ok());
+    }
+
+    #[test]
+    fn cloud_auth_without_cloud_id_fails() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            endpoints = ["http://localhost:9200"]
+            auth.strategy = "cloud"
+            auth.credentials = "elastic:password"
+        "#,
+        )
+        .unwrap();
+
+        // Should fail validation
+        assert!(config.validate_endpoint_config().is_err());
+    }
+
+    #[test]
+    fn cloud_id_and_endpoints_mutually_exclusive() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            cloud_id = "test:dXMtZWFzdC0xLmF3cy5mb3VuZC5pbyRjZWM="
+            endpoints = ["http://localhost:9200"]
+            auth.strategy = "cloud"
+            auth.credentials = "elastic:password"
+        "#,
+        )
+        .unwrap();
+
+        assert!(config.validate_endpoint_config().is_err());
+    }
+
+    #[cfg(feature = "aws-core")]
+    #[test]
+    fn cloud_id_with_aws_auth_fails() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            cloud_id = "test:dXMtZWFzdC0xLmF3cy5mb3VuZC5pbyRjZWM="
+            auth.strategy = "aws"
+        "#,
+        )
+        .unwrap();
+
+        // AWS auth is not compatible with cloud_id
+        assert!(config.validate_endpoint_config().is_err());
+    }
+
+    #[test]
+    fn cloud_id_without_auth() {
+        let config = toml::from_str::<ElasticsearchConfig>(
+            r#"
+            cloud_id = "test:dXMtZWFzdC0xLmF3cy5mb3VuZC5pbyRjZWM="
+        "#,
+        )
+        .unwrap();
+
+        // Should validate successfully (with warning in logs)
+        assert!(config.validate_endpoint_config().is_ok());
     }
 }

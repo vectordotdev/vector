@@ -1,3 +1,4 @@
+mod cloud;
 mod common;
 mod config;
 pub mod encoder;
@@ -36,7 +37,7 @@ use crate::{
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields, rename_all = "snake_case", tag = "strategy")]
 #[configurable(metadata(
-    docs::enum_tag_description = "The authentication strategy to use.\n\nAmazon OpenSearch Serverless requires this option to be set to `aws`."
+    docs::enum_tag_description = "The authentication strategy to use.\n\nAmazon OpenSearch Serverless requires this option to be set to `aws`.\n\nFor Elastic Cloud deployments, use the `cloud` strategy with `cloud_id`."
 ))]
 pub enum ElasticsearchAuthConfig {
     /// HTTP Basic Authentication.
@@ -50,6 +51,20 @@ pub enum ElasticsearchAuthConfig {
         #[configurable(metadata(docs::examples = "${ELASTICSEARCH_PASSWORD}"))]
         #[configurable(metadata(docs::examples = "password"))]
         password: SensitiveString,
+    },
+
+    /// Elastic Cloud Authentication.
+    ///
+    /// Use this strategy when connecting to Elastic Cloud deployments with `cloud_id`.
+    /// Credentials are provided in "username:password" format, matching the Elastic Cloud auth format.
+    Cloud {
+        /// Elastic Cloud authentication credentials in "username:password" format.
+        ///
+        /// This is typically provided by your Elastic Cloud deployment.
+        /// The format matches Filebeat's `cloud.auth` configuration.
+        #[configurable(metadata(docs::examples = "elastic:${ELASTIC_PASSWORD}"))]
+        #[configurable(metadata(docs::examples = "${ELASTIC_CLOUD_AUTH}"))]
+        credentials: SensitiveString,
     },
 
     #[cfg(feature = "aws-core")]
@@ -350,4 +365,14 @@ pub enum ParseError {
     ServerlessElasticsearchApiVersionMustBeAuto,
     #[snafu(display("Amazon OpenSearch Serverless requires `auth.strategy` value to be `aws`"))]
     OpenSearchServerlessRequiresAwsAuth,
+    #[snafu(display(
+        "cloud_id and endpoint/endpoints are mutually exclusive. Use cloud_id for Elastic Cloud deployments or endpoints for self-managed clusters."
+    ))]
+    CloudIdAndEndpointsExclusive,
+    #[snafu(display("auth.strategy = \"cloud\" requires cloud_id to be set"))]
+    CloudAuthRequiresCloudId,
+    #[snafu(display("Cannot use auth.strategy = \"aws\" with cloud_id. Use auth.strategy = \"cloud\" for Elastic Cloud deployments."))]
+    CloudIdWithAwsAuth,
+    #[snafu(display("Failed to decode cloud_id: {}", source))]
+    CloudIdDecode { source: cloud::CloudIdError },
 }

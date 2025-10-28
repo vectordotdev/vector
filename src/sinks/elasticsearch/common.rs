@@ -255,6 +255,20 @@ impl ElasticsearchCommon {
                 let auth = auth.choose_one(&uri.auth)?.unwrap();
                 Some(Auth::Basic(auth))
             }
+            Some(ElasticsearchAuthConfig::Cloud { credentials }) => {
+                if uri.auth.is_some() {
+                    return Err("auth.strategy = \"cloud\" and credentials embedded in URL are mutually exclusive".into());
+                }
+
+                // Parse cloud credentials format: "username:password"
+                let (username, password) = super::cloud::parse_cloud_auth(credentials.inner())
+                    .map_err(|e| ParseError::CloudIdDecode { source: e })?;
+
+                Some(Auth::Basic(crate::http::Auth::Basic {
+                    user: username,
+                    password: password.into(),
+                }))
+            }
             #[cfg(feature = "aws-core")]
             Some(ElasticsearchAuthConfig::Aws(aws)) => {
                 let region = config
@@ -292,6 +306,24 @@ impl ElasticsearchCommon {
         proxy_config: &ProxyConfig,
     ) -> crate::Result<Vec<Self>> {
         let mut version = None;
+
+        // Handle cloud_id if present
+        if let Some(cloud_id) = &config.cloud_id {
+            info!("Using Elastic Cloud ID for endpoint configuration");
+
+            let cloud_config = super::cloud::CloudConfig::decode(cloud_id)
+                .map_err(|e| ParseError::CloudIdDecode { source: e })?;
+
+            info!(
+                message = "Decoded Elastic Cloud endpoint",
+                elasticsearch_url = %cloud_config.elasticsearch_url,
+            );
+
+            return Ok(vec![
+                Self::parse_config(config, &cloud_config.elasticsearch_url, proxy_config, &mut version).await?,
+            ]);
+        }
+
         if let Some(endpoint) = config.endpoint.as_ref() {
             warn!(
                 message = "DEPRECATION, use of deprecated option `endpoint`. Please use `endpoints` option instead."
