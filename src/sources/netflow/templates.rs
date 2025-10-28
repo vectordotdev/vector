@@ -6,7 +6,8 @@
 
 use std::net::SocketAddr;
 use std::sync::{Arc, RwLock};
-use std::time::{Duration, Instant};
+use std::sync::atomic::{AtomicU64, Ordering};
+use std::time::{Duration, Instant, SystemTime};
 use std::collections::VecDeque;
 
 #[cfg(not(test))]
@@ -434,7 +435,7 @@ impl TemplateCache {
     /// 
     /// Note: DashMap doesn't support efficient iteration, so this method
     /// provides limited functionality in production builds.
-    pub fn debug_templates(&self, limit: usize) -> Vec<(TemplateKey, Template)> {
+    pub fn debug_templates(&self, _limit: usize) -> Vec<(TemplateKey, Template)> {
         #[cfg(not(test))]
         {
             // DashMap doesn't support efficient iteration
