@@ -250,12 +250,12 @@ impl TemplateCache {
     /// Uses concurrent insert for high performance. Templates are stored as Arc<Template>
     /// to enable cheap cloning during reads. Initializes atomic timestamp for LRU tracking.
     pub fn insert(&self, key: TemplateKey, template: Template) {
-        let now = SystemTime::now()
-            .duration_since(SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_secs();
         #[cfg(not(test))]
         {
+            let now = SystemTime::now()
+                .duration_since(SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_secs();
             // Check if this would cause an eviction (approximate)
             let current_size = self.cache.len();
             let would_evict = current_size >= self.max_size && !self.cache.contains_key(&key);
@@ -450,7 +450,7 @@ impl TemplateCache {
             if let Ok(cache) = self.cache.read() {
                 cache.iter()
                     .take(limit)
-                    .map(|(k, v)| (*k, (*v).clone()))
+                    .map(|(k, v)| (*k, (**v).clone()))
                     .collect()
             } else {
                 Vec::new()

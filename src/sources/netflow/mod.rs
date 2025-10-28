@@ -42,7 +42,7 @@ async fn create_reuseport_socket(address: std::net::SocketAddr) -> Result<UdpSoc
     socket.set_reuse_address(true)?;  // Also add this for faster restart
     
     // Bind to the address
-    socket.bind(&StdSocketAddr::from(address))?;
+    socket.bind(&address.into())?;
     
     // CRITICAL: Must be nonblocking for tokio
     socket.set_nonblocking(true)?;
@@ -79,7 +79,7 @@ async fn netflow_source(
         config.max_templates, 
         config.max_buffered_records
     ));
-    let protocol_parser = Arc::new(protocols::ProtocolParser::new(&config, template_cache.clone()));
+    let protocol_parser = Arc::new(protocols::ProtocolParser::new(&config, (*template_cache).clone()));
     
     // Spawn worker tasks
     let mut worker_handles = Vec::with_capacity(num_workers);
