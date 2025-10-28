@@ -213,10 +213,18 @@ impl ComposeTest {
             args.push(self.retries.to_string());
         }
 
+        // When all_features=true: build with 'all-integration-tests' or 'all-e2e-tests'
+        // When all_features=false: build with test-specific features from test.yaml
+        let build_features = if self.all_features {
+            vec![self.local_config.feature_flag.to_string()]
+        } else {
+            self.config.features.clone()
+        };
+
         self.runner.test(
             &env_vars,
             &self.config.runner.env,
-            Some(&self.config.features),
+            Some(&build_features),
             &args,
             self.local_config.directory,
             self.reuse_image,

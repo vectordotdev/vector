@@ -152,7 +152,7 @@ pub trait ContainerTestRunner: TestRunner {
     fn build(
         &self,
         features: Option<&[String]>,
-        directory: &str,
+        _directory: &str,
         config_env_vars: &Environment,
         reuse_image: bool,
     ) -> Result<()> {
@@ -171,7 +171,7 @@ pub trait ContainerTestRunner: TestRunner {
             }
         }
 
-        let dockerfile: PathBuf = [app::path(), "scripts", directory, "Dockerfile"]
+        let dockerfile: PathBuf = [app::path(), "scripts", "integration", "Dockerfile"]
             .iter()
             .collect();
 
