@@ -10,7 +10,7 @@ use crate::{common::http::ErrorMessage, internal_events::HttpDecompressError};
 /// Decompresses the body based on the Content-Encoding header.
 ///
 /// Supports gzip, deflate, snappy, zstd, and identity (no compression).
-pub fn decode(header: Option<&str>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
+pub fn decompress_body(header: Option<&str>, mut body: Bytes) -> Result<Bytes, ErrorMessage> {
     if let Some(encodings) = header {
         for encoding in encodings.rsplit(',').map(str::trim) {
             body = match encoding {
@@ -19,22 +19,22 @@ pub fn decode(header: Option<&str>, mut body: Bytes) -> Result<Bytes, ErrorMessa
                     let mut decoded = Vec::new();
                     MultiGzDecoder::new(body.reader())
                         .read_to_end(&mut decoded)
-                        .map_err(|error| handle_decode_error(encoding, error))?;
+                        .map_err(|error| emit_decompress_error(encoding, error))?;
                     decoded.into()
                 }
                 "deflate" => {
                     let mut decoded = Vec::new();
                     ZlibDecoder::new(body.reader())
                         .read_to_end(&mut decoded)
-                        .map_err(|error| handle_decode_error(encoding, error))?;
+                        .map_err(|error| emit_decompress_error(encoding, error))?;
                     decoded.into()
                 }
                 "snappy" => SnappyDecoder::new()
                     .decompress_vec(&body)
-                    .map_err(|error| handle_decode_error(encoding, error))?
+                    .map_err(|error| emit_decompress_error(encoding, error))?
                     .into(),
                 "zstd" => zstd::decode_all(body.reader())
-                    .map_err(|error| handle_decode_error(encoding, error))?
+                    .map_err(|error| emit_decompress_error(encoding, error))?
                     .into(),
                 encoding => {
                     return Err(ErrorMessage::new(
@@ -49,7 +49,7 @@ pub fn decode(header: Option<&str>, mut body: Bytes) -> Result<Bytes, ErrorMessa
     Ok(body)
 }
 
-fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
+pub fn emit_decompress_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
     emit!(HttpDecompressError {
         encoding,
         error: &error
