@@ -380,32 +380,40 @@ fn load_from_inputs(
     }
 }
 
-pub fn prepare_input<R: std::io::Read>(mut input: R) -> Result<String, Vec<String>> {
+pub fn prepare_input<R: std::io::Read>(
+    mut input: R,
+    interpolate_env: bool,
+) -> Result<String, Vec<String>> {
     let mut source_string = String::new();
     input
         .read_to_string(&mut source_string)
         .map_err(|e| vec![e.to_string()])?;
 
-    let mut vars: HashMap<String, String> = std::env::vars_os()
-        .filter_map(|(k, v)| match (k.into_string(), v.into_string()) {
-            (Ok(k), Ok(v)) => Some((k, v)),
-            _ => None,
-        })
-        .collect();
+    if interpolate_env {
+        let mut vars: HashMap<String, String> = std::env::vars_os()
+            .filter_map(|(k, v)| match (k.into_string(), v.into_string()) {
+                (Ok(k), Ok(v)) => Some((k, v)),
+                _ => None,
+            })
+            .collect();
 
-    if !vars.contains_key("HOSTNAME")
-        && let Ok(hostname) = crate::get_hostname()
-    {
-        vars.insert("HOSTNAME".into(), hostname);
+        if !vars.contains_key("HOSTNAME")
+            && let Ok(hostname) = crate::get_hostname()
+        {
+            vars.insert("HOSTNAME".into(), hostname);
+        }
+        vars::interpolate(&source_string, &vars)
+    } else {
+        Ok(source_string)
     }
-    vars::interpolate(&source_string, &vars)
 }
 
 pub fn load<R: std::io::Read, T>(input: R, format: Format) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
 {
-    let with_vars = prepare_input(input)?;
+    // Via configurations that load from raw string, skip interpolation of env
+    let with_vars = prepare_input(input, false)?;
 
     format::deserialize(&with_vars, format)
 }

@@ -35,16 +35,8 @@ impl ConfigBuilderLoader {
 
 impl Process for ConfigBuilderLoader {
     /// Prepares input for a `ConfigBuilder` by interpolating environment variables.
-    fn prepare<R: Read>(&mut self, mut input: R) -> Result<String, Vec<String>> {
-        let prepared_input = if self.interpolate_env {
-            prepare_input(input)?
-        } else {
-            let mut s = String::new();
-            input
-                .read_to_string(&mut s)
-                .map_err(|e| vec![e.to_string()])?;
-            s
-        };
+    fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
+        let prepared_input = prepare_input(input, self.interpolate_env)?;
         let prepared_input = self
             .secrets
             .as_ref()
