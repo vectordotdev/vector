@@ -593,4 +593,196 @@ mod tests {
             Some(vec![("component_id", "start.c.end")]),
         );
     }
+
+    #[test]
+    fn test_aggreagate_vector_metrics_sum() {
+        let storage = MetricsStorage::default();
+        storage.cache.store(
+            vec![
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 6.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "start.a.end".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "something_else".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 3.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "start.c.end".to_string(),
+                )]))),
+            ]
+            .into(),
+        );
+
+        let result = compile_and_run(
+            storage,
+            r#"
+            aggregate_vector_metrics("sum", "test", tags: { "component_id": "start.*.end" })
+        "#,
+        )
+        .expect("vrl failed");
+        let result = result.as_float().unwrap();
+
+        assert_eq!(result.into_inner(), 9.0);
+    }
+
+    #[test]
+    fn test_aggreagate_vector_metrics_avg() {
+        let storage = MetricsStorage::default();
+        storage.cache.store(
+            vec![
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 6.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "start.a.end".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "something_else".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 3.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "start.c.end".to_string(),
+                )]))),
+            ]
+            .into(),
+        );
+
+        let result = compile_and_run(
+            storage,
+            r#"
+            aggregate_vector_metrics("avg", "test", tags: { "component_id": "start.*.end" })
+        "#,
+        )
+        .expect("vrl failed");
+        let result = result.as_float().unwrap();
+
+        assert_eq!(result.into_inner(), 4.5);
+    }
+
+    #[test]
+    fn test_aggreagate_vector_metrics_max() {
+        let storage = MetricsStorage::default();
+        storage.cache.store(
+            vec![
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 6.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "start.a.end".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "something_else".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 3.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "start.c.end".to_string(),
+                )]))),
+            ]
+            .into(),
+        );
+
+        let result = compile_and_run(
+            storage,
+            r#"
+            aggregate_vector_metrics("max", "test", tags: { "component_id": "start.*.end" })
+        "#,
+        )
+        .expect("vrl failed");
+        let result = result.as_float().unwrap();
+
+        assert_eq!(result.into_inner(), 6.0);
+    }
+
+    #[test]
+    fn test_aggreagate_vector_metrics_min() {
+        let storage = MetricsStorage::default();
+        storage.cache.store(
+            vec![
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 6.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "start.a.end".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "something_else".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 3.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "start.c.end".to_string(),
+                )]))),
+            ]
+            .into(),
+        );
+
+        let result = compile_and_run(
+            storage,
+            r#"
+            aggregate_vector_metrics("min", "test", tags: { "component_id": "start.*.end" })
+        "#,
+        )
+        .expect("vrl failed");
+        let result = result.as_float().unwrap();
+
+        assert_eq!(result.into_inner(), 3.0);
+    }
 }
