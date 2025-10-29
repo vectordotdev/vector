@@ -6,12 +6,33 @@ set -euo pipefail
 # SUMMARY
 #
 #   Checks that all text files have correct line endings and no trailing spaces.
+#
+# USAGE
+#
+#   ./scripts/check-style.sh [--fix] [--all]
+#
+#   --fix: Fix issues instead of just reporting them
+#   --all: Check all files (default: only check modified files)
 
-if [ "${1:-}" == "--fix" ]; then
-  MODE="fix"
-else
-  MODE="check"
-fi
+MODE="check"
+CHECK_ALL=false
+
+# Parse arguments
+for arg in "$@"; do
+  case "$arg" in
+    --fix)
+      MODE="fix"
+      ;;
+    --all)
+      CHECK_ALL=true
+      ;;
+    *)
+      echo "Unknown option: $arg"
+      echo "Usage: $0 [--fix] [--all]"
+      exit 1
+      ;;
+  esac
+done
 
 ised() {
   local PAT="$1"
@@ -23,8 +44,22 @@ ised() {
   rm "$FILE.bak"
 }
 
+# Determine which files to check
+if [ "$CHECK_ALL" = true ]; then
+  # Check all files tracked by git
+  FILES=$(git ls-files)
+else
+  # Check only modified files (staged + unstaged changes)
+  FILES=$(git diff --name-only HEAD)
+
+  # If no modified files, we're on a clean checkout - check all files
+  if [ -z "$FILES" ]; then
+    FILES=$(git ls-files)
+  fi
+fi
+
 EXIT_CODE=0
-for FILE in $(git ls-files); do
+for FILE in $FILES; do
   # Ignore binary files and generated files.
   case "$FILE" in
     *png) continue;;
