@@ -129,7 +129,7 @@ jobs:
     timeout-minutes: 5
     needs: changes
     # Run this job even if `changes` job is skipped
-    if: ${{ !failure() && !cancelled() && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
+    if: ${{ !failure() && !cancelled() && github.event_name != 'pull_request' && needs.changes.outputs.website_only != 'true' && needs.changes.outputs.k8s != 'false' }}
     outputs:
       matrix: ${{ steps.set-matrix.outputs.matrix }}
     steps:
