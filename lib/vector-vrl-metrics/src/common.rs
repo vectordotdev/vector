@@ -595,7 +595,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aggreagate_vector_metrics_sum() {
+    fn test_aggregate_vector_metrics_sum() {
         let storage = MetricsStorage::default();
         storage.cache.store(
             vec![
@@ -643,7 +643,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aggreagate_vector_metrics_avg() {
+    fn test_aggregate_vector_metrics_avg() {
         let storage = MetricsStorage::default();
         storage.cache.store(
             vec![
@@ -691,7 +691,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aggreagate_vector_metrics_max() {
+    fn test_aggregate_vector_metrics_max() {
         let storage = MetricsStorage::default();
         storage.cache.store(
             vec![
@@ -739,7 +739,7 @@ mod tests {
     }
 
     #[test]
-    fn test_aggreagate_vector_metrics_min() {
+    fn test_aggregate_vector_metrics_min() {
         let storage = MetricsStorage::default();
         storage.cache.store(
             vec![
