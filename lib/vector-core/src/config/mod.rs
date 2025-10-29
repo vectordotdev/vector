@@ -354,7 +354,7 @@ impl From<SourceAcknowledgementsConfig> for AcknowledgementsConfig {
 )]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AcknowledgementsConfig {
-    /// Whether or not end-to-end acknowledgements are enabled.
+    /// Controls whether or not end-to-end acknowledgements are enabled.
     ///
     /// When enabled for a sink, any source that supports end-to-end
     /// acknowledgements that is connected to that sink waits for events

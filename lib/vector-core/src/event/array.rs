@@ -333,7 +333,7 @@ impl Arbitrary for EventArray {
         let choice: u8 = u8::arbitrary(g);
         // Quickcheck can't derive Arbitrary for enums, see
         // https://github.com/BurntSushi/quickcheck/issues/98
-        if choice % 2 == 0 {
+        if choice.is_multiple_of(2) {
             let mut logs = Vec::new();
             for _ in 0..len {
                 logs.push(LogEvent::arbitrary(g));

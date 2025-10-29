@@ -72,7 +72,7 @@ properly formatted. To run CUE's autoformatting, first [install cue](https://cue
 then run this command from the `vector` root:
 
 ```bash
-./website/scripts/cue.sh fmt
+./scripts/cue.sh fmt
 ```
 
 If that rewrites any files, make sure to commit your changes or else you'll see

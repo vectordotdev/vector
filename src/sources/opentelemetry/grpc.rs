@@ -3,7 +3,7 @@ use prost::Message;
 use tonic::{Request, Response, Status};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::decoding::{ProtobufDeserializer, format::Deserializer},
+    codecs::decoding::{OtlpDeserializer, format::Deserializer},
     config::LogNamespace,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
     internal_event::{CountByteSize, InternalEventHandle as _, Registered},
@@ -34,7 +34,7 @@ pub(super) struct Service {
     pub acknowledgements: bool,
     pub events_received: Registered<EventsReceived>,
     pub log_namespace: LogNamespace,
-    pub deserializer: Option<ProtobufDeserializer>,
+    pub deserializer: Option<OtlpDeserializer>,
 }
 
 #[tonic::async_trait]
@@ -47,7 +47,7 @@ impl TraceService for Service {
             let raw_bytes = request.get_ref().encode_to_vec();
             let bytes = bytes::Bytes::from(raw_bytes);
             deserializer
-                .parse_traces(bytes)
+                .parse(bytes, self.log_namespace)
                 .map_err(|e| Status::invalid_argument(e.to_string()))
                 .map(|buf| buf.into_vec())?
         } else {

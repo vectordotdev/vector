@@ -49,8 +49,7 @@ impl InternalEvent for GrpcInvalidCompressionSchemeError<'_> {
             message = "Invalid compression scheme.",
             error = ?self.status.message(),
             error_type = error_type::REQUEST_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true
+            stage = error_stage::RECEIVING
         );
         counter!(
             "component_errors_total",
@@ -75,8 +74,7 @@ where
             message = "Grpc error.",
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true
+            stage = error_stage::RECEIVING
         );
         counter!(
             "component_errors_total",

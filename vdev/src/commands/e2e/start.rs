@@ -14,6 +14,10 @@ pub struct Cli {
     #[arg(short = 'a', long)]
     build_all: bool,
 
+    /// Reuse existing test runner image instead of rebuilding (useful in CI)
+    #[arg(long)]
+    reuse_image: bool,
+
     /// The desired environment name to start. If omitted, the first environment name is used.
     environment: Option<String>,
 }
@@ -25,6 +29,7 @@ impl Cli {
             &self.test,
             self.environment.as_ref(),
             self.build_all,
+            self.reuse_image,
         )
     }
 }

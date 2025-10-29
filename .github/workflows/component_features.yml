@@ -3,7 +3,7 @@
 # Validates that each component feature compiles
 #
 # Runs on:
-#  - scheduled UTC midnight Tues-Sat
+#  - scheduled 10:00 UTC Monday (6 AM EST / 5 AM EDT NYC)
 #  - on PR review (see comment-trigger.yml)
 #  - on demand from github actions UI
 
@@ -13,8 +13,7 @@ on:
   workflow_call:
   workflow_dispatch:
   schedule:
-    # At midnight UTC Tue-Sat
-    - cron: '0 0 * * 2-6'
+    - cron: '0 10 * * 1' # 10:00 UTC Monday (6 AM EST NYC)
 
 permissions:
   statuses: write
@@ -23,6 +22,7 @@ jobs:
   check-component-features:
     # use free tier on schedule and 8 core to expedite results on demand invocation
     runs-on: ${{ github.event_name == 'schedule' && 'ubuntu-24.04' || 'ubuntu-24.04-8core' }}
+    timeout-minutes: 180 # Usually takes 2h but this prevents it from hanging for an indefinite time
     if: github.event_name == 'pull_request_review' || github.event_name == 'workflow_dispatch' || github.event_name == 'schedule'
     steps:
       - name: (PR review) Set latest commit status as pending

@@ -54,7 +54,7 @@ Compile Vector:
 
 The `FEATURES` environment variable is optional. You can override the default features using this variable. See [feature flags](#feature-flags) for more info.
 
-When finished, the Vector binary is placed in `target/<target>/release/vector`. If you're building Vector on your Mac, for example, the target triple is `x86_64-apple-darwin` and the Vector binary will be located at `target/x86_64-apple-darwin/release/vector`.
+When finished, the Vector binary is placed in `target/<target>/release/vector`. If you're building Vector on your Mac, for example, the target triple is `arm64-apple-darwin` and the Vector binary will be located at `target/arm64-apple-darwin/release/vector`.
 
 Finally, you can start Vector:
 

@@ -1,3 +1,15 @@
+pub const LOGS_REQUEST_MESSAGE_TYPE: &str =
+    "opentelemetry.proto.collector.logs.v1.ExportLogsServiceRequest";
+pub const TRACES_REQUEST_MESSAGE_TYPE: &str =
+    "opentelemetry.proto.collector.trace.v1.ExportTraceServiceRequest";
+pub const METRICS_REQUEST_MESSAGE_TYPE: &str =
+    "opentelemetry.proto.collector.metrics.v1.ExportMetricsServiceRequest";
+
+// JSON names (camelCase) for the same fields, used when use_json_names is enabled
+pub const RESOURCE_LOGS_JSON_FIELD: &str = "resourceLogs";
+pub const RESOURCE_METRICS_JSON_FIELD: &str = "resourceMetrics";
+pub const RESOURCE_SPANS_JSON_FIELD: &str = "resourceSpans";
+
 /// Service stub and clients.
 pub mod collector {
     pub mod trace {

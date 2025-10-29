@@ -2,7 +2,7 @@ version: '3'
 
 services:
   squid:
-    image: docker.io/babim/squid
+    image: docker.io/ubuntu/squid:latest
     depends_on:
     - nginx-proxy
     networks:
@@ -22,4 +22,7 @@ services:
     - proxy
 
 networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
   proxy: {}

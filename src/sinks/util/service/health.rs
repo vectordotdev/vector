@@ -235,7 +235,7 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // Poll inner
         let this = self.project();
-        let output = ready!(this.inner.poll(cx)).map_err(Into::into);
+        let output = ready!(this.inner.poll(cx));
 
         match this.logic.is_healthy(&output) {
             None => (),

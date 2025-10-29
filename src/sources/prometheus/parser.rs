@@ -1,7 +1,11 @@
-use chrono::{DateTime, TimeZone, Utc};
 #[cfg(feature = "sources-prometheus-remote-write")]
-use vector_lib::prometheus::parser::proto;
+use super::remote_write::MetadataConflictStrategy;
+use chrono::{DateTime, TimeZone, Utc};
 use vector_lib::prometheus::parser::{GroupKind, MetricGroup, ParserError};
+#[cfg(feature = "sources-prometheus-remote-write")]
+use vector_lib::prometheus::parser::{
+    MetadataConflictStrategy as ParserMetadataConflictStrategy, proto,
+};
 
 use crate::event::{
     Event,
@@ -42,9 +46,10 @@ fn parse_text_with_nan_filtering(packet: &str) -> Result<Vec<Event>, ParserError
 #[cfg(feature = "sources-prometheus-remote-write")]
 pub(super) fn parse_request(
     request: proto::WriteRequest,
+    metadata_conflict_strategy: MetadataConflictStrategy,
     skip_nan_values: bool,
 ) -> Result<Vec<Event>, ParserError> {
-    vector_lib::prometheus::parser::parse_request(request)
+    vector_lib::prometheus::parser::parse_request(request, metadata_conflict_strategy.into())
         .map(|group| reparse_groups(group, vec![], false, skip_nan_values))
 }
 
@@ -196,6 +201,16 @@ fn reparse_groups(
     }
 
     result
+}
+
+#[cfg(feature = "sources-prometheus-remote-write")]
+impl From<MetadataConflictStrategy> for ParserMetadataConflictStrategy {
+    fn from(strategy: MetadataConflictStrategy) -> Self {
+        match strategy {
+            MetadataConflictStrategy::Ignore => Self::Ignore,
+            MetadataConflictStrategy::Reject => Self::Reject,
+        }
+    }
 }
 
 fn combine_tags(

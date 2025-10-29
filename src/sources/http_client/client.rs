@@ -23,13 +23,13 @@ use vector_lib::{
 };
 use vrl::{
     compiler::{CompileConfig, Function, Program, runtime::Runtime},
-    diagnostic::Formatter,
     prelude::TypeState,
 };
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
+    format_vrl_diagnostics,
     http::{Auth, ParamType, ParameterValue, QueryParameterValue, QueryParameters},
     serde::{default_decoding, default_framing_message_based},
     sources,
@@ -248,18 +248,15 @@ impl Query {
             match compile_vrl(param.value(), functions, &state, config) {
                 Ok(compilation_result) => {
                     if !compilation_result.warnings.is_empty() {
-                        let warnings = Formatter::new(param.value(), compilation_result.warnings)
-                            .colored()
-                            .to_string();
-                        warn!(message = "VRL compilation warnings.", %warnings, internal_log_rate_limit = true);
+                        let warnings =
+                            format_vrl_diagnostics(param.value(), compilation_result.warnings);
+                        warn!(message = "VRL compilation warnings.", %warnings);
                     }
                     Some(compilation_result.program)
                 }
                 Err(diagnostics) => {
-                    let error = Formatter::new(param.value(), diagnostics)
-                        .colored()
-                        .to_string();
-                    warn!(message = "VRL compilation failed.", %error, internal_log_rate_limit = true);
+                    let error = format_vrl_diagnostics(param.value(), diagnostics);
+                    warn!(message = "VRL compilation failed.", %error);
                     None
                 }
             }
@@ -428,7 +425,7 @@ fn resolve_vrl(value: &str, program: &Program) -> Option<String> {
     Runtime::default()
         .resolve(&mut target, program, &timezone)
         .map_err(|error| {
-            warn!(message = "VRL runtime error.", source = %value, %error, internal_log_rate_limit = true);
+            warn!(message = "VRL runtime error.", source = %value, %error);
         })
         .ok()
         .and_then(|vrl_value| {

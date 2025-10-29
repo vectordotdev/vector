@@ -16,8 +16,7 @@ impl InternalEvent for MetricToLogSerializeError {
             message = reason,
             error = ?self.error,
             error_type = error_type::ENCODER_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true
+            stage = error_stage::PROCESSING
         );
         counter!(
             "component_errors_total",

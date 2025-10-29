@@ -343,7 +343,7 @@ impl Lua {
 
     fn attempt_gc(&mut self) {
         self.invocations_after_gc += 1;
-        if self.invocations_after_gc % GC_INTERVAL == 0 {
+        if self.invocations_after_gc.is_multiple_of(GC_INTERVAL) {
             emit!(LuaGcTriggered {
                 used_memory: self.lua.used_memory()
             });

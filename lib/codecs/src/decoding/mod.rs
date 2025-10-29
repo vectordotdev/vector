@@ -17,6 +17,8 @@ pub use format::{
     NativeJsonDeserializerConfig, NativeJsonDeserializerOptions, ProtobufDeserializer,
     ProtobufDeserializerConfig, ProtobufDeserializerOptions,
 };
+#[cfg(feature = "opentelemetry")]
+pub use format::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType};
 #[cfg(feature = "syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
 pub use framing::{
@@ -243,6 +245,15 @@ pub enum DeserializerConfig {
     /// [protobuf]: https://protobuf.dev/
     Protobuf(ProtobufDeserializerConfig),
 
+    #[cfg(feature = "opentelemetry")]
+    /// Decodes the raw bytes as [OTLP (OpenTelemetry Protocol)][otlp] protobuf format.
+    ///
+    /// This decoder handles the three OTLP signal types: logs, metrics, and traces.
+    /// It automatically detects which type of OTLP message is being decoded.
+    ///
+    /// [otlp]: https://opentelemetry.io/docs/specs/otlp/
+    Otlp(OtlpDeserializerConfig),
+
     #[cfg(feature = "syslog")]
     /// Decodes the raw bytes as a Syslog message.
     ///
@@ -366,6 +377,8 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => Ok(Deserializer::Bytes(BytesDeserializerConfig.build())),
             DeserializerConfig::Json(config) => Ok(Deserializer::Json(config.build())),
             DeserializerConfig::Protobuf(config) => Ok(Deserializer::Protobuf(config.build()?)),
+            #[cfg(feature = "opentelemetry")]
+            DeserializerConfig::Otlp(config) => Ok(Deserializer::Otlp(config.build())),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => Ok(Deserializer::Syslog(config.build())),
             DeserializerConfig::Native => {
@@ -390,6 +403,8 @@ impl DeserializerConfig {
                 FramingConfig::NewlineDelimited(Default::default())
             }
             DeserializerConfig::Protobuf(_) => FramingConfig::Bytes,
+            #[cfg(feature = "opentelemetry")]
+            DeserializerConfig::Otlp(_) => FramingConfig::Bytes,
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(_) => FramingConfig::NewlineDelimited(Default::default()),
             DeserializerConfig::Vrl(_) => FramingConfig::Bytes,
@@ -417,6 +432,8 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => BytesDeserializerConfig.output_type(),
             DeserializerConfig::Json(config) => config.output_type(),
             DeserializerConfig::Protobuf(config) => config.output_type(),
+            #[cfg(feature = "opentelemetry")]
+            DeserializerConfig::Otlp(config) => config.output_type(),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => config.output_type(),
             DeserializerConfig::Native => NativeDeserializerConfig.output_type(),
@@ -437,6 +454,8 @@ impl DeserializerConfig {
             DeserializerConfig::Bytes => BytesDeserializerConfig.schema_definition(log_namespace),
             DeserializerConfig::Json(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Protobuf(config) => config.schema_definition(log_namespace),
+            #[cfg(feature = "opentelemetry")]
+            DeserializerConfig::Otlp(config) => config.schema_definition(log_namespace),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => config.schema_definition(log_namespace),
             DeserializerConfig::Native => NativeDeserializerConfig.schema_definition(log_namespace),
@@ -470,6 +489,8 @@ impl DeserializerConfig {
                 "application/octet-stream"
             }
             (DeserializerConfig::Protobuf(_), _) => "application/octet-stream",
+            #[cfg(feature = "opentelemetry")]
+            (DeserializerConfig::Otlp(_), _) => "application/x-protobuf",
             (
                 DeserializerConfig::Json(_)
                 | DeserializerConfig::NativeJson(_)
@@ -497,6 +518,9 @@ pub enum Deserializer {
     Json(JsonDeserializer),
     /// Uses a `ProtobufDeserializer` for deserialization.
     Protobuf(ProtobufDeserializer),
+    #[cfg(feature = "opentelemetry")]
+    /// Uses an `OtlpDeserializer` for deserialization.
+    Otlp(OtlpDeserializer),
     #[cfg(feature = "syslog")]
     /// Uses a `SyslogDeserializer` for deserialization.
     Syslog(SyslogDeserializer),
@@ -525,6 +549,8 @@ impl format::Deserializer for Deserializer {
             Deserializer::Bytes(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Json(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Protobuf(deserializer) => deserializer.parse(bytes, log_namespace),
+            #[cfg(feature = "opentelemetry")]
+            Deserializer::Otlp(deserializer) => deserializer.parse(bytes, log_namespace),
             #[cfg(feature = "syslog")]
             Deserializer::Syslog(deserializer) => deserializer.parse(bytes, log_namespace),
             Deserializer::Native(deserializer) => deserializer.parse(bytes, log_namespace),

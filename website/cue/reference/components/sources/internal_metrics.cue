@@ -889,6 +889,22 @@ components: sources: internal_metrics: {
 			tags:              _internal_metrics_tags
 		}
 
+		// config metrics
+		config_reload_rejected: {
+			description:       "Number of configuration reload attempts that were rejected."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _internal_metrics_tags & {
+				reason: _reason
+			}
+		}
+		config_reloaded: {
+			description:       "Number of times a new configuration was loaded successfully."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+
 		// Helpful tag groupings
 		_component_tags: _internal_metrics_tags & {
 			component_kind: _component_kind

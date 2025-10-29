@@ -123,7 +123,7 @@ pub struct CsvSerializerOptions {
     pub quote_style: QuoteStyle,
 
     /// Sets the capacity (in bytes) of the internal buffer used in the CSV writer.
-    /// This defaults to 8KB.
+    /// This defaults to 8192 bytes (8KB).
     #[serde(default = "default_capacity")]
     pub capacity: usize,
 

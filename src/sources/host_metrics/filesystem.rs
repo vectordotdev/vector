@@ -161,7 +161,7 @@ mod tests {
             .await;
         let metrics = buffer.metrics;
         assert!(!metrics.is_empty());
-        assert!(metrics.len() % 4 == 0);
+        assert!(metrics.len().is_multiple_of(4));
         assert!(all_gauges(&metrics));
 
         // There are exactly three filesystem_* names

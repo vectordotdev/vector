@@ -14,7 +14,10 @@ use evmap::{
 use evmap_derive::ShallowCopy;
 use futures::{StreamExt, stream::BoxStream};
 use thread_local::ThreadLocal;
-use tokio::time::interval;
+use tokio::{
+    sync::broadcast::{Receiver, Sender},
+    time::interval,
+};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
@@ -88,6 +91,15 @@ struct MemoryMetadata {
     byte_size: u64,
 }
 
+/// [`MemoryEntry`] combined with its key
+#[derive(Clone)]
+pub(super) struct MemoryEntryPair {
+    /// Key of this entry
+    pub(super) key: String,
+    /// The value of this entry
+    pub(super) entry: MemoryEntry,
+}
+
 // Used to ensure that these 2 are locked together
 pub(super) struct MemoryWriter {
     pub(super) write_handle: evmap::WriteHandle<String, MemoryEntry>,
@@ -96,16 +108,23 @@ pub(super) struct MemoryWriter {
 
 /// A struct that implements [vector_lib::enrichment::Table] to handle loading enrichment data from a memory structure.
 pub struct Memory {
-    pub(super) read_handle_factory: evmap::ReadHandleFactory<String, MemoryEntry>,
-    pub(super) read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
+    read_handle_factory: evmap::ReadHandleFactory<String, MemoryEntry>,
+    read_handle: ThreadLocal<evmap::ReadHandle<String, MemoryEntry>>,
     pub(super) write_handle: Arc<Mutex<MemoryWriter>>,
     pub(super) config: MemoryConfig,
+    #[allow(dead_code)]
+    expired_items_receiver: Receiver<Vec<MemoryEntryPair>>,
+    expired_items_sender: Sender<Vec<MemoryEntryPair>>,
 }
 
 impl Memory {
     /// Creates a new [Memory] based on the provided config.
     pub fn new(config: MemoryConfig) -> Self {
         let (read_handle, write_handle) = evmap::new();
+        // Buffer could only be used if source is stuck exporting available items, but in that case,
+        // publishing will not happen either, because the lock would be held, so this buffer is not
+        // that important
+        let (expired_tx, expired_rx) = tokio::sync::broadcast::channel(5);
         Self {
             config,
             read_handle_factory: read_handle.factory(),
@@ -114,12 +133,18 @@ impl Memory {
                 write_handle,
                 metadata: MemoryMetadata::default(),
             })),
+            expired_items_sender: expired_tx,
+            expired_items_receiver: expired_rx,
         }
     }
 
     pub(super) fn get_read_handle(&self) -> &evmap::ReadHandle<String, MemoryEntry> {
         self.read_handle
             .get_or(|| self.read_handle_factory.handle())
+    }
+
+    pub(super) fn subscribe_to_expired_items(&self) -> Receiver<Vec<MemoryEntryPair>> {
+        self.expired_items_sender.subscribe()
     }
 
     fn handle_value(&self, value: ObjectMap) {
@@ -214,6 +239,38 @@ impl Memory {
     }
 
     fn flush(&self, mut writer: MutexGuard<'_, MemoryWriter>) {
+        // First publish items to be removed, if needed
+        if self
+            .config
+            .source_config
+            .as_ref()
+            .map(|c| c.export_expired_items)
+            .unwrap_or_default()
+        {
+            let pending_removal = writer
+                .write_handle
+                .pending()
+                .iter()
+                // We only use empty operation to remove keys
+                .filter_map(|o| match o {
+                    evmap::Operation::Empty(k) => Some(k),
+                    _ => None,
+                })
+                .filter_map(|key| {
+                    writer.write_handle.get_one(key).map(|v| MemoryEntryPair {
+                        key: key.to_string(),
+                        entry: v.clone(),
+                    })
+                })
+                .collect::<Vec<_>>();
+            if let Err(error) = self.expired_items_sender.send(pending_removal) {
+                error!(
+                    message = "Error exporting expired items from memory enrichment table.",
+                    error = %error,
+                );
+            }
+        }
+
         writer.write_handle.refresh();
         if let Some(reader) = self.get_read_handle().read() {
             let mut byte_size = 0;
@@ -250,6 +307,8 @@ impl Clone for Memory {
             read_handle: ThreadLocal::new(),
             write_handle: Arc::clone(&self.write_handle),
             config: self.config.clone(),
+            expired_items_sender: self.expired_items_sender.clone(),
+            expired_items_receiver: self.expired_items_sender.subscribe(),
         }
     }
 }
@@ -403,7 +462,7 @@ mod tests {
     use super::*;
     use crate::{
         enrichment_tables::memory::{
-            internal_events::InternalMetricsConfig, source::MemorySourceConfig,
+            config::MemorySourceConfig, internal_events::InternalMetricsConfig,
         },
         event::{Event, LogEvent},
         test_util::components::{
@@ -954,9 +1013,10 @@ mod tests {
     async fn source_spec_compliance() {
         let mut memory_config = MemoryConfig::default();
         memory_config.source_config = Some(MemorySourceConfig {
-            export_interval: NonZeroU64::try_from(1).unwrap(),
+            export_interval: Some(NonZeroU64::try_from(1).unwrap()),
             export_batch_size: None,
             remove_after_export: false,
+            export_expired_items: false,
             source_key: "test".to_string(),
         });
         let memory = memory_config.get_or_build_memory().await;

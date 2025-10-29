@@ -10,7 +10,7 @@ pub mod service;
 
 use std::ops::{Add, AddAssign};
 
-pub use bytes_received::BytesReceived;
+pub use bytes_received::{BytesReceived, BytesReceivedHandle};
 pub use bytes_sent::BytesSent;
 #[allow(clippy::module_name_repetitions)]
 pub use cached_event::{RegisterTaggedInternalEvent, RegisteredEventCache};

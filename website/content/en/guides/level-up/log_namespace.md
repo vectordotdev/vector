@@ -1,8 +1,9 @@
 ---
+date: "2025-05-05"
 title: The Log Namespace feature
 short: Log Namespace
 description: Learn how the log namespacing works.
-author_github: https://github.com/pront
+authors: ["pront"]
 domain: schemas
 weight: 2
 tags: ["log_namespace", "logs", "namespace", "level up", "guides", "guide"]

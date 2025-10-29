@@ -82,7 +82,7 @@ impl SampleMode {
     fn hash_within_ratio(&self, value: &[u8]) -> bool {
         let hash = seahash::hash(value);
         match self {
-            Self::Rate { rate, .. } => hash % rate == 0,
+            Self::Rate { rate, .. } => hash.is_multiple_of(*rate),
             Self::Ratio {
                 hash_ratio_threshold,
                 ..

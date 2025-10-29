@@ -250,7 +250,7 @@ pub enum TimestampFormat {
     /// Represent the timestamp as a Unix timestamp in milliseconds.
     UnixMs,
 
-    /// Represent the timestamp as a Unix timestamp in microseconds
+    /// Represent the timestamp as a Unix timestamp in microseconds.
     UnixUs,
 
     /// Represent the timestamp as a Unix timestamp in nanoseconds.

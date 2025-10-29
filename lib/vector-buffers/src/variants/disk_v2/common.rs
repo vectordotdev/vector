@@ -447,7 +447,7 @@ mod tests {
 
             // Make sure we're actually aligned.
             let aligned = align16(input);
-            prop_assert!(aligned % SERIALIZER_ALIGNMENT == 0);
+            prop_assert!(aligned.is_multiple_of(SERIALIZER_ALIGNMENT));
 
             // Make sure we're not overaligned, too.
             let delta = if aligned >= input {
