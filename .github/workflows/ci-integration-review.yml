@@ -173,6 +173,13 @@ jobs:
           || startsWith(github.event.review.body, '/ci-run-all') }}
         run: bash scripts/run-integration-test.sh e2e opentelemetry-logs
 
+      - name: e2e-opentelemetry-metrics
+        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-metrics')
+          || startsWith(github.event.review.body, '/ci-run-e2e-all')
+          || startsWith(github.event.review.body, '/ci-run-all') }}
+        run: bash scripts/run-integration-test.sh e2e opentelemetry-logs
+
+
   update-pr-status:
     name: Signal result to PR
     runs-on: ubuntu-24.04
