@@ -5,6 +5,7 @@ use vector_lib::opentelemetry::proto::collector::metrics::v1::ExportMetricsServi
 use vector_lib::opentelemetry::proto::common::v1::KeyValue;
 use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEnum;
 use vector_lib::opentelemetry::proto::metrics::v1::metric::Data as MetricData;
+use vector_lib::opentelemetry::proto::metrics::v1::{Gauge, Sum};
 
 const EXPECTED_METRIC_COUNT: usize = 400; // 200 via gRPC + 200 via HTTP (50 of each type: Gauge, Sum, Histogram, ExponentialHistogram)
 
@@ -85,13 +86,15 @@ fn assert_metric_data_points(request: &ExportMetricsServiceRequest) {
                 assert!(!metric.name.is_empty(), "{prefix} metric name is empty");
 
                 // Get data points based on metric type
-                let data_points_count = match &metric.data {
-                    Some(MetricData::Gauge(gauge)) => {
-                        assert!(
-                            !gauge.data_points.is_empty(),
-                            "{prefix} gauge has no data points"
-                        );
-                        for (dp_idx, dp) in gauge.data_points.iter().enumerate() {
+                let data_points_count = match &metric
+                    .data
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{prefix} has no data"))
+                {
+                    MetricData::Gauge(Gauge { data_points, .. })
+                    | MetricData::Sum(Sum { data_points, .. }) => {
+                        assert!(!data_points.is_empty(), "{prefix} has no data points");
+                        for (dp_idx, dp) in data_points.iter().enumerate() {
                             assert!(
                                 dp.time_unix_nano > 0,
                                 "{prefix}.gauge.data_points[{dp_idx}] has invalid timestamp"
@@ -101,33 +104,16 @@ fn assert_metric_data_points(request: &ExportMetricsServiceRequest) {
                                 "{prefix}.gauge.data_points[{dp_idx}] has no value"
                             );
                         }
-                        gauge.data_points.len()
+                        data_points.len()
                     }
-                    Some(MetricData::Sum(sum)) => {
-                        assert!(
-                            !sum.data_points.is_empty(),
-                            "{prefix} sum has no data points"
-                        );
-                        for (dp_idx, dp) in sum.data_points.iter().enumerate() {
-                            assert!(
-                                dp.time_unix_nano > 0,
-                                "{prefix}.sum.data_points[{dp_idx}] has invalid timestamp"
-                            );
-                            assert!(
-                                dp.value.is_some(),
-                                "{prefix}.sum.data_points[{dp_idx}] has no value"
-                            );
-                        }
-                        sum.data_points.len()
-                    }
-                    Some(MetricData::Histogram(histogram)) => {
+                    MetricData::Histogram(histogram) => {
                         assert!(
                             !histogram.data_points.is_empty(),
                             "{prefix} histogram has no data points"
                         );
                         histogram.data_points.len()
                     }
-                    Some(MetricData::ExponentialHistogram(exp_histogram)) => {
+                    MetricData::ExponentialHistogram(exp_histogram) => {
                         assert!(
                             !exp_histogram.data_points.is_empty(),
                             "{prefix} exponential histogram has no data points"
@@ -135,8 +121,7 @@ fn assert_metric_data_points(request: &ExportMetricsServiceRequest) {
                         exp_histogram.data_points.len()
                     }
                     // not supported by telemetrygen
-                    Some(MetricData::Summary(_)) => panic!("Unexpected Summary metric"),
-                    None => panic!("{prefix} has no data"),
+                    MetricData::Summary(_) => panic!("Unexpected Summary metric"),
                 };
 
                 assert!(data_points_count > 0, "{prefix} has zero data points");
