@@ -61,13 +61,17 @@ impl Cli {
     }
 
     pub fn exec(self) -> Result<()> {
+        info!("Checking Vector workspace...");
         app::exec("cargo", self.build_vector_args(), true)?;
+
+        info!("Checking vdev crate...");
         app::exec("cargo", self.build_vdev_args(), true)?;
 
         // If --fix was used, check for changes and commit them.
         if self.fix {
             let has_changes = !git::get_modified_files()?.is_empty();
             if has_changes {
+                info!("Committing fixes...");
                 git::commit("chore(vdev): apply vdev rust check fixes")?;
             }
         }

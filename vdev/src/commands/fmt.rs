@@ -9,8 +9,13 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
+        info!("Checking style (trailing spaces, line endings)...");
         app::exec("scripts/check-style.sh", ["--fix"], true)?;
+
+        info!("Formatting Vector workspace...");
         app::exec("cargo", ["fmt", "--all"], true)?;
+
+        info!("Formatting vdev...");
         app::exec("cargo", ["fmt", "--manifest-path=vdev/Cargo.toml", "--all"], true)
     }
 }

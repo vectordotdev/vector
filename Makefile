@@ -66,11 +66,12 @@ export ENVIRONMENT_PUBLISH ?=
 export AWS_ACCESS_KEY_ID ?= "dummy"
 export AWS_SECRET_ACCESS_KEY ?= "dummy"
 
-# vdev is now a standalone crate. Use installed binary if available, otherwise build from source.
-VDEV ?= $(shell command -v vdev >/dev/null 2>&1 && echo vdev || echo "cargo run --manifest-path vdev/Cargo.toml --")
+# vdev is now a standalone crate. Always build from source (cargo is smart about rebuilding).
+VDEV := cargo build --manifest-path vdev/Cargo.toml && vdev/target/debug/vdev
 
-# Set version
-export VERSION ?= $(shell command -v cargo >/dev/null && $(VDEV) version || echo unknown)
+# Set version (evaluated lazily)
+VERSION = $(shell vdev/target/debug/vdev version 2>/dev/null || echo unknown)
+export VERSION
 
 # Set if you are on the CI and actually want the things to happen. (Non-CI users should never set this.)
 export CI ?= false
