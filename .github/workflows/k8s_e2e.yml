@@ -50,7 +50,7 @@ env:
 jobs:
   changes:
     # Only evaluate files changed on pull request trigger
-    if: ${{ github.event_name == 'pull_request' || github.event_name == 'merge_group' }}
+    if: ${{ github.event_name == 'merge_group' }}
     uses: ./.github/workflows/changes.yml
     secrets: inherit
 
