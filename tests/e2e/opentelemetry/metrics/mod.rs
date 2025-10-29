@@ -154,6 +154,181 @@ fn assert_metric_data_points(request: &ExportMetricsServiceRequest) {
     }
 }
 
+/// Asserts that each metric has the expected telemetry attribute "metric.type"
+fn assert_metric_attributes(request: &ExportMetricsServiceRequest) {
+    for (rm_idx, rm) in request.resource_metrics.iter().enumerate() {
+        for (sm_idx, sm) in rm.scope_metrics.iter().enumerate() {
+            for (m_idx, metric) in sm.metrics.iter().enumerate() {
+                let prefix = format!("resource_metrics[{rm_idx}].scope_metrics[{sm_idx}].metrics[{m_idx}]");
+
+                // Determine expected attribute value based on metric name
+                let expected_attr_value = match metric.name.as_str() {
+                    "gauge_metric" => "gauge",
+                    "sum_metric" => "sum",
+                    "histogram_metric" => "histogram",
+                    "exponential_histogram_metric" => "exponential_histogram",
+                    _ => panic!("{prefix} has unexpected metric name: {}", metric.name),
+                };
+
+                // Get data points and verify attributes
+                let data_points_with_attrs = match &metric.data {
+                    Some(MetricData::Gauge(g)) => &g.data_points,
+                    Some(MetricData::Sum(s)) => &s.data_points,
+                    Some(MetricData::Histogram(h)) => {
+                        // Histogram data points have attributes
+                        for (dp_idx, dp) in h.data_points.iter().enumerate() {
+                            let attr = dp
+                                .attributes
+                                .iter()
+                                .find(|kv| kv.key == "metric.type")
+                                .unwrap_or_else(|| {
+                                    panic!("{prefix}.histogram.data_points[{dp_idx}] missing 'metric.type' attribute")
+                                });
+
+                            if let Some(AnyValueEnum::StringValue(s)) = attr.value.as_ref().and_then(|v| v.value.as_ref()) {
+                                assert_eq!(
+                                    s, expected_attr_value,
+                                    "{prefix}.histogram.data_points[{dp_idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
+                                );
+                            } else {
+                                panic!("{prefix}.histogram.data_points[{dp_idx}] 'metric.type' is not a string value");
+                            }
+                        }
+                        continue; // Already verified histogram attributes above
+                    }
+                    Some(MetricData::ExponentialHistogram(eh)) => {
+                        // ExponentialHistogram data points have attributes
+                        for (dp_idx, dp) in eh.data_points.iter().enumerate() {
+                            let attr = dp
+                                .attributes
+                                .iter()
+                                .find(|kv| kv.key == "metric.type")
+                                .unwrap_or_else(|| {
+                                    panic!("{prefix}.exponential_histogram.data_points[{dp_idx}] missing 'metric.type' attribute")
+                                });
+
+                            if let Some(AnyValueEnum::StringValue(s)) = attr.value.as_ref().and_then(|v| v.value.as_ref()) {
+                                assert_eq!(
+                                    s, expected_attr_value,
+                                    "{prefix}.exponential_histogram.data_points[{dp_idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
+                                );
+                            } else {
+                                panic!("{prefix}.exponential_histogram.data_points[{dp_idx}] 'metric.type' is not a string value");
+                            }
+                        }
+                        continue; // Already verified exponential histogram attributes above
+                    }
+                    Some(MetricData::Summary(s)) => {
+                        for (dp_idx, dp) in s.data_points.iter().enumerate() {
+                            let attr = dp
+                                .attributes
+                                .iter()
+                                .find(|kv| kv.key == "metric.type")
+                                .unwrap_or_else(|| {
+                                    panic!("{prefix}.summary.data_points[{dp_idx}] missing 'metric.type' attribute")
+                                });
+
+                            if let Some(AnyValueEnum::StringValue(s)) = attr.value.as_ref().and_then(|v| v.value.as_ref()) {
+                                assert_eq!(
+                                    s, expected_attr_value,
+                                    "{prefix}.summary.data_points[{dp_idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
+                                );
+                            } else {
+                                panic!("{prefix}.summary.data_points[{dp_idx}] 'metric.type' is not a string value");
+                            }
+                        }
+                        continue; // Already verified summary attributes above
+                    }
+                    None => panic!("{prefix} has no data"),
+                };
+
+                // Verify gauge and sum data point attributes
+                for (dp_idx, dp) in data_points_with_attrs.iter().enumerate() {
+                    let attr = dp
+                        .attributes
+                        .iter()
+                        .find(|kv| kv.key == "metric.type")
+                        .unwrap_or_else(|| {
+                            panic!("{prefix}.data_points[{dp_idx}] missing 'metric.type' attribute")
+                        });
+
+                    if let Some(AnyValueEnum::StringValue(s)) = attr.value.as_ref().and_then(|v| v.value.as_ref()) {
+                        assert_eq!(
+                            s, expected_attr_value,
+                            "{prefix}.data_points[{dp_idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
+                        );
+                    } else {
+                        panic!("{prefix}.data_points[{dp_idx}] 'metric.type' is not a string value");
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Asserts that metrics have the expected names and counts by type
+/// Expected: 100 gauge_metric (50 gRPC + 50 HTTP), 100 sum_metric, 100 histogram_metric, 100 exponential_histogram_metric
+fn assert_metric_names_and_types(request: &ExportMetricsServiceRequest) {
+    use std::collections::HashMap;
+
+    let mut metric_type_counts: HashMap<(&str, &str), usize> = HashMap::new();
+
+    for rm in &request.resource_metrics {
+        for sm in &rm.scope_metrics {
+            for metric in &sm.metrics {
+                let type_name = match &metric.data {
+                    Some(MetricData::Gauge(_)) => "Gauge",
+                    Some(MetricData::Sum(_)) => "Sum",
+                    Some(MetricData::Histogram(_)) => "Histogram",
+                    Some(MetricData::ExponentialHistogram(_)) => "ExponentialHistogram",
+                    Some(MetricData::Summary(_)) => "Summary",
+                    None => "Unknown",
+                };
+
+                *metric_type_counts.entry((&metric.name, type_name)).or_insert(0) += 1;
+            }
+        }
+    }
+
+    // Verify we have exactly 100 of each metric type with the correct name
+    // (50 via gRPC + 50 via HTTP = 100 total per type)
+    assert_eq!(
+        metric_type_counts.get(&("gauge_metric", "Gauge")),
+        Some(&100),
+        "Expected 100 gauge_metric (Gauge), got {:?}",
+        metric_type_counts.get(&("gauge_metric", "Gauge"))
+    );
+
+    assert_eq!(
+        metric_type_counts.get(&("sum_metric", "Sum")),
+        Some(&100),
+        "Expected 100 sum_metric (Sum), got {:?}",
+        metric_type_counts.get(&("sum_metric", "Sum"))
+    );
+
+    assert_eq!(
+        metric_type_counts.get(&("histogram_metric", "Histogram")),
+        Some(&100),
+        "Expected 100 histogram_metric (Histogram), got {:?}",
+        metric_type_counts.get(&("histogram_metric", "Histogram"))
+    );
+
+    assert_eq!(
+        metric_type_counts.get(&("exponential_histogram_metric", "ExponentialHistogram")),
+        Some(&100),
+        "Expected 100 exponential_histogram_metric (ExponentialHistogram), got {:?}",
+        metric_type_counts.get(&("exponential_histogram_metric", "ExponentialHistogram"))
+    );
+
+    // Verify total count
+    let total_count: usize = metric_type_counts.values().sum();
+    assert_eq!(
+        total_count, EXPECTED_METRIC_COUNT,
+        "Total metric count mismatch. Breakdown: {:?}",
+        metric_type_counts
+    );
+}
+
 #[test]
 fn vector_sink_otel_sink_metrics_match() {
     let collector_content = read_file_helper("metrics", "collector-file-exporter.log")
@@ -204,6 +379,14 @@ fn vector_sink_otel_sink_metrics_match() {
     // Verify metric data points are valid
     assert_metric_data_points(&collector_request);
     assert_metric_data_points(&vector_request);
+
+    // Verify metric names and types match expectations
+    assert_metric_names_and_types(&collector_request);
+    assert_metric_names_and_types(&vector_request);
+
+    // Verify metric attributes are correct
+    assert_metric_attributes(&collector_request);
+    assert_metric_attributes(&vector_request);
 
     // Both collector and Vector receive 400 metrics total (200 via gRPC + 200 via HTTP).
     // The 200 metrics consist of 50 each of: Gauge, Sum, Histogram, and ExponentialHistogram.

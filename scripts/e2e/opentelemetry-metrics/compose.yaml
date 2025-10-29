@@ -40,6 +40,8 @@ services:
           --otlp-http \
           --metrics=50 \
           --metric-type=Gauge \
+          --otlp-metric-name=gauge_metric \
+          --telemetry-attributes='metric.type="gauge"' \
           --rate=0
         # Generate 50 Sum metrics
         telemetrygen metrics \
@@ -48,6 +50,9 @@ services:
           --otlp-http \
           --metrics=50 \
           --metric-type=Sum \
+          --otlp-metric-name=sum_metric \
+          --aggregation-temporality=cumulative \
+          --telemetry-attributes='metric.type="sum"' \
           --rate=0
         # Generate 50 Histogram metrics
         telemetrygen metrics \
@@ -56,6 +61,9 @@ services:
           --otlp-http \
           --metrics=50 \
           --metric-type=Histogram \
+          --otlp-metric-name=histogram_metric \
+          --aggregation-temporality=cumulative \
+          --telemetry-attributes='metric.type="histogram"' \
           --rate=0
         # Generate 50 ExponentialHistogram metrics
         telemetrygen metrics \
@@ -64,6 +72,9 @@ services:
           --otlp-http \
           --metrics=50 \
           --metric-type=ExponentialHistogram \
+          --otlp-metric-name=exponential_histogram_metric \
+          --aggregation-temporality=cumulative \
+          --telemetry-attributes='metric.type="exponential_histogram"' \
           --rate=0
 
   otel-collector-sink:
