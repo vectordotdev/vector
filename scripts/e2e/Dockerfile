@@ -29,7 +29,7 @@ COPY scripts/environment/release-flags.sh /
 RUN bash /prepare.sh --modules=cargo-nextest
 RUN bash /install-protoc.sh
 
-WORKDIR /vector
+WORKDIR /vectorm
 COPY . .
 ARG FEATURES
 

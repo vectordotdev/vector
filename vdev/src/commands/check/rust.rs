@@ -51,7 +51,17 @@ impl Cli {
     }
 
     pub fn exec(self) -> Result<()> {
+        // Check Vector workspace
         app::exec("cargo", self.build_args(), true)?;
+
+        // Check vdev separately (it's a standalone crate now)
+        info!("Checking vdev crate...");
+        let mut vdev_args = self.build_args();
+        // Replace --workspace with --manifest-path for vdev
+        if let Some(pos) = vdev_args.iter().position(|arg| arg == "--workspace") {
+            vdev_args[pos] = "--manifest-path=vdev/Cargo.toml".into();
+        }
+        app::exec("cargo", vdev_args, true)?;
 
         // If --fix was used, check for changes and commit them.
         if self.fix {

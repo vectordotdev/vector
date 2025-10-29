@@ -10,6 +10,10 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         app::exec::<&str>("scripts/check-style.sh", [], true)?;
-        app::exec("cargo", ["fmt", "--", "--check"], true)
+        app::exec("cargo", ["fmt", "--", "--check"], true)?;
+
+        // Check vdev formatting (standalone crate)
+        info!("Checking vdev formatting...");
+        app::exec("cargo", ["fmt", "--manifest-path=vdev/Cargo.toml", "--", "--check"], true)
     }
 }
