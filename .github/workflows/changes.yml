@@ -322,7 +322,7 @@ jobs:
 
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which
-      # sources the paths from the scripts/integration/.../test.yaml files
+      # sources the paths from the tests/integration/.../config/test.yaml files
       - name: Create filter rules for integrations
         run: vdev int ci-paths > int_test_filters.yaml
 
