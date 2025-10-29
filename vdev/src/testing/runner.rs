@@ -55,8 +55,8 @@ pub trait TestRunner {
         inner_env: &Environment,
         features: Option<&[String]>,
         args: &[String],
-        directory: &str,
         reuse_image: bool,
+        build: bool,
     ) -> Result<()>;
 }
 
@@ -249,12 +249,9 @@ where
         config_environment_variables: &Environment,
         features: Option<&[String]>,
         args: &[String],
-        directory: &str,
         reuse_image: bool,
+        build: bool,
     ) -> Result<()> {
-        // Integration tests (scripts/integration) don't pre-build Vector, E2E tests (scripts/e2e) do
-        let build = directory == "e2e";
-
         self.ensure_running(features, config_environment_variables, reuse_image, build)?;
 
         let mut command = docker_command(["exec"]);
@@ -413,8 +410,8 @@ impl TestRunner for LocalTestRunner {
         inner_env: &Environment,
         _features: Option<&[String]>,
         args: &[String],
-        _directory: &str,
         _reuse_image: bool,
+        _build: bool,
     ) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);

@@ -218,8 +218,8 @@ impl ComposeTest {
             &self.config.runner.env,
             Some(&self.config.features),
             &args,
-            self.local_config.directory,
             self.reuse_image,
+            self.local_config.kind == ComposeTestKind::E2E,
         )?;
 
         Ok(())
