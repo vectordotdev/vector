@@ -1,5 +1,4 @@
 use std::{
-    collections::HashMap,
     iter,
     sync::{
         Arc,
@@ -30,7 +29,7 @@ use crate::{
         },
         start_topology, trace_init,
     },
-    topology::{RunningTopology, TopologyPieces},
+    topology::{RunningTopology, builder::TopologyPiecesBuilder},
 };
 
 mod backpressure;
@@ -946,11 +945,10 @@ async fn topology_transform_error_definition() {
 
     let config = config.build().unwrap();
     let diff = ConfigDiff::initial(&config);
-    let errors =
-        match TopologyPieces::build(&config, &diff, HashMap::new(), Default::default()).await {
-            Ok(_) => panic!("build pieces should not succeed"),
-            Err(err) => err,
-        };
+    let errors = match TopologyPiecesBuilder::new(&config, &diff).build().await {
+        Ok(_) => panic!("build pieces should not succeed"),
+        Err(err) => err,
+    };
 
     assert_eq!(
         r#"Transform "transform": It all went horribly wrong"#,

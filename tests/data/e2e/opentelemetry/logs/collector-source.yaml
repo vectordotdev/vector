@@ -9,8 +9,12 @@ processors:
   batch: { }
 
 exporters:
-  otlp:
+  otlp/grpc:
     endpoint: vector:4317
+    tls:
+      insecure: true
+  otlphttp/vector:
+    endpoint: http://vector:4318
     tls:
       insecure: true
   debug: { }
@@ -20,7 +24,7 @@ service:
     logs:
       receivers: [ otlp ]
       processors: [ batch ]
-      exporters: [ debug, otlp ]
+      exporters: [ debug, otlp/grpc, otlphttp/vector ]
 
     metrics:
       receivers: [ otlp ]

@@ -766,6 +766,74 @@ pub struct TopologyPieces {
     pub(crate) utilization_emitter: Option<UtilizationEmitter>,
 }
 
+/// Builder for constructing TopologyPieces with a fluent API.
+///
+/// # Examples
+///
+/// ```ignore
+/// let pieces = TopologyPiecesBuilder::new(&config, &diff)
+///     .with_buffers(buffers)
+///     .with_extra_context(extra_context)
+///     .build()
+///     .await?;
+/// ```
+pub struct TopologyPiecesBuilder<'a> {
+    config: &'a Config,
+    diff: &'a ConfigDiff,
+    buffers: HashMap<ComponentKey, BuiltBuffer>,
+    extra_context: ExtraContext,
+}
+
+impl<'a> TopologyPiecesBuilder<'a> {
+    /// Creates a new builder with required parameters.
+    pub fn new(config: &'a Config, diff: &'a ConfigDiff) -> Self {
+        Self {
+            config,
+            diff,
+            buffers: HashMap::new(),
+            extra_context: ExtraContext::default(),
+        }
+    }
+
+    /// Sets the buffers for the topology.
+    pub fn with_buffers(mut self, buffers: HashMap<ComponentKey, BuiltBuffer>) -> Self {
+        self.buffers = buffers;
+        self
+    }
+
+    /// Sets the extra context for the topology.
+    pub fn with_extra_context(mut self, extra_context: ExtraContext) -> Self {
+        self.extra_context = extra_context;
+        self
+    }
+
+    /// Builds the topology pieces, returning errors if any occur.
+    ///
+    /// Use this method when you need to handle errors explicitly,
+    /// such as in tests or validation code.
+    pub async fn build(self) -> Result<TopologyPieces, Vec<String>> {
+        Builder::new(self.config, self.diff, self.buffers, self.extra_context)
+            .build()
+            .await
+    }
+
+    /// Builds the topology pieces, logging any errors that occur.
+    ///
+    /// Use this method for runtime configuration loading where
+    /// errors should be logged and execution should continue.
+    pub async fn build_or_log_errors(self) -> Option<TopologyPieces> {
+        match self.build().await {
+            Err(errors) => {
+                for error in errors {
+                    error!(message = "Configuration error.", %error, internal_log_rate_limit = false);
+                }
+                None
+            }
+            Ok(new_pieces) => Some(new_pieces),
+        }
+    }
+}
+
 impl TopologyPieces {
     pub async fn build_or_log_errors(
         config: &Config,
@@ -773,15 +841,11 @@ impl TopologyPieces {
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
     ) -> Option<Self> {
-        match TopologyPieces::build(config, diff, buffers, extra_context).await {
-            Err(errors) => {
-                for error in errors {
-                    error!(message = "Configuration error.", %error);
-                }
-                None
-            }
-            Ok(new_pieces) => Some(new_pieces),
-        }
+        TopologyPiecesBuilder::new(config, diff)
+            .with_buffers(buffers)
+            .with_extra_context(extra_context)
+            .build_or_log_errors()
+            .await
     }
 
     /// Builds only the new pieces, and doesn't check their topology.
@@ -791,7 +855,9 @@ impl TopologyPieces {
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
     ) -> Result<Self, Vec<String>> {
-        Builder::new(config, diff, buffers, extra_context)
+        TopologyPiecesBuilder::new(config, diff)
+            .with_buffers(buffers)
+            .with_extra_context(extra_context)
             .build()
             .await
     }

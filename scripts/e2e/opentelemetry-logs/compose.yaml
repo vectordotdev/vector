@@ -63,12 +63,7 @@ services:
 
   vector:
     container_name: vector-otel-logs-e2e
-    build:
-      context: ../../../
-      dockerfile: ./scripts/e2e/Dockerfile
-      args:
-        FEATURES: e2e-tests-opentelemetry
-        RUST_VERSION: ${RUST_VERSION:-1.88}
+    image: ${CONFIG_VECTOR_IMAGE}
     init: true
     volumes:
       - type: bind

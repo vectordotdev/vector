@@ -222,10 +222,6 @@ impl ComposeTest {
             self.reuse_image,
         )?;
 
-        if self.is_running()? {
-            self.runner.remove()?;
-            self.stop()?;
-        }
         Ok(())
     }
 
@@ -266,10 +262,11 @@ impl ComposeTest {
                 bail!("No environment for {} is up.", self.test_name);
             }
 
-            self.runner.remove()?;
             let project_name = self.project_name();
             compose.stop(&self.env_config, &project_name)?;
         }
+
+        self.runner.remove()?;
 
         Ok(())
     }

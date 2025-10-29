@@ -410,7 +410,7 @@ pub enum WatchConfigMethod {
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
     for error in errors {
-        error!(message = "Configuration error.", %error);
+        error!(message = "Configuration error.", %error, internal_log_rate_limit = false);
     }
 
     exitcode::CONFIG

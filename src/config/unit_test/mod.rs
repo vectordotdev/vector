@@ -42,7 +42,10 @@ use crate::{
     },
     event::{Event, EventMetadata, LogEvent},
     signal,
-    topology::{RunningTopology, builder::TopologyPieces},
+    topology::{
+        RunningTopology,
+        builder::{TopologyPieces, TopologyPiecesBuilder},
+    },
 };
 
 pub struct UnitTest {
@@ -455,7 +458,7 @@ async fn build_unit_test(
     }
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
-    let pieces = TopologyPieces::build(&config, &diff, HashMap::new(), Default::default()).await?;
+    let pieces = TopologyPiecesBuilder::new(&config, &diff).build().await?;
 
     Ok(UnitTest {
         name: test.name,

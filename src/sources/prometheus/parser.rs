@@ -1,10 +1,10 @@
 #[cfg(feature = "sources-prometheus-remote-write")]
 use super::remote_write::MetadataConflictStrategy;
 use chrono::{DateTime, TimeZone, Utc};
+use vector_lib::prometheus::parser::{GroupKind, MetricGroup, ParserError};
 #[cfg(feature = "sources-prometheus-remote-write")]
-use vector_lib::prometheus::parser::proto;
 use vector_lib::prometheus::parser::{
-    GroupKind, MetadataConflictStrategy as ParserMetadataConflictStrategy, MetricGroup, ParserError,
+    MetadataConflictStrategy as ParserMetadataConflictStrategy, proto,
 };
 
 use crate::event::{
