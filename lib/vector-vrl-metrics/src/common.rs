@@ -155,6 +155,7 @@ pub(crate) fn metric_into_vrl(value: &Metric) -> Value {
     ]))
 }
 
+// Tests are defined here to simplify them - enabling access to `MetricsStorage`
 #[cfg(test)]
 mod tests {
     use vector_core::{
