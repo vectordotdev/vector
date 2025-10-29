@@ -12,9 +12,6 @@ use std::time::Instant;
 #[cfg(test)]
 use mock_instant::global::Instant;
 
-#[cfg(debug_assertions)]
-use std::sync::Arc;
-
 use futures::{Stream, StreamExt};
 use metrics::Gauge;
 use pin_project::pin_project;
