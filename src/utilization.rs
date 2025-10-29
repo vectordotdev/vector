@@ -232,6 +232,11 @@ impl UtilizationRegistry {
             component_key: key,
         }
     }
+
+    /// Removes a component from this utilization metric emitter
+    pub(crate) fn remove_component(&self, key: &ComponentKey) {
+        self.timers.lock().expect("mutex poisoned").remove(key);
+    }
 }
 
 pub(crate) struct UtilizationEmitter {
@@ -259,10 +264,16 @@ impl UtilizationEmitter {
                 message = self.timer_rx.recv() => {
                     match message {
                         Some(UtilizationTimerMessage::StartWait(key, start_time)) => {
-                            self.timers.lock().expect("mutex poisoned").get_mut(&key).expect("Utilization timer missing for component").start_wait(start_time);
+                            // Timer could be removed in the registry while message is still in the queue
+                            if let Some(timer) = self.timers.lock().expect("mutex poisoned").get_mut(&key) {
+                                timer.start_wait(start_time);
+                            }
                         }
                         Some(UtilizationTimerMessage::StopWait(key, stop_time)) => {
-                            self.timers.lock().expect("mutex poisoned").get_mut(&key).expect("Utilization timer missing for component").stop_wait(stop_time);
+                            // Timer could be removed in the registry while message is still in the queue
+                            if let Some(timer) = self.timers.lock().expect("mutex poisoned").get_mut(&key) {
+                                timer.stop_wait(stop_time);
+                            }
                         }
                         None => break,
                     }

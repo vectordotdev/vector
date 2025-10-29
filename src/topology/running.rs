@@ -465,6 +465,10 @@ impl RunningTopology {
 
             self.remove_inputs(key, diff, new_config).await;
             self.remove_outputs(key);
+
+            if let Some(registry) = self.utilization_registry.as_ref() {
+                registry.remove_component(key);
+            }
         }
 
         for key in &diff.transforms.to_change {
@@ -591,6 +595,10 @@ impl RunningTopology {
         for key in &removed_sinks {
             debug!(component_id = %key, "Removing sink.");
             self.remove_inputs(key, diff, new_config).await;
+
+            if let Some(registry) = self.utilization_registry.as_ref() {
+                registry.remove_component(key);
+            }
         }
 
         // After that, for any changed sinks, we temporarily detach their inputs (not remove) so
