@@ -1,80 +1,10 @@
-use prost::Message as ProstMessage;
-use prost_reflect::{DescriptorPool, prost::Message as ProstReflectMessage};
-use serde_json::Value as JsonValue;
-use std::{io, path::Path, process::Command};
+use vector_lib::opentelemetry::proto::LOGS_REQUEST_MESSAGE_TYPE;
 use vector_lib::opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
 use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEnum;
-use vector_lib::opentelemetry::proto::{DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE};
-use vrl::value::Value as VrlValue;
+
+use crate::opentelemetry::{parse_line_to_export_type_request, read_file_helper};
 
 const EXPECTED_LOG_COUNT: usize = 200; // 100 via gRPC + 100 via HTTP
-
-fn read_file_helper(filename: &str) -> Result<String, io::Error> {
-    let local_path = Path::new("/output/opentelemetry-logs").join(filename);
-    if local_path.exists() {
-        // Running inside the runner container, volume is mounted
-        std::fs::read_to_string(local_path)
-    } else {
-        // Running on host
-        let out = Command::new("docker")
-            .args([
-                "run",
-                "--rm",
-                "-v",
-                "opentelemetry-logs_vector_target:/output",
-                "alpine:3.20",
-                "cat",
-                &format!("/output/{filename}"),
-            ])
-            .output()?;
-
-        if !out.status.success() {
-            return Err(io::Error::other(format!(
-                "docker run failed: {}\n{}",
-                out.status,
-                String::from_utf8_lossy(&out.stderr)
-            )));
-        }
-
-        Ok(String::from_utf8_lossy(&out.stdout).into_owned())
-    }
-}
-
-fn parse_line_to_export_logs_request(line: &str) -> Result<ExportLogsServiceRequest, String> {
-    // Parse JSON and convert to VRL Value
-    let vrl_value: VrlValue = serde_json::from_str::<JsonValue>(line)
-        .map_err(|e| format!("Failed to parse JSON: {e}"))?
-        .into();
-
-    // Get the message descriptor from the descriptor pool
-    let descriptor_pool = DescriptorPool::decode(DESCRIPTOR_BYTES)
-        .map_err(|e| format!("Failed to decode descriptor pool: {e}"))?;
-
-    let message_descriptor = descriptor_pool
-        .get_message_by_name(LOGS_REQUEST_MESSAGE_TYPE)
-        .ok_or_else(|| {
-            format!("Message type '{LOGS_REQUEST_MESSAGE_TYPE}' not found in descriptor pool",)
-        })?;
-
-    // Encode VRL Value to DynamicMessage using VRL's encode_message with JSON names enabled
-    let dynamic_message = vrl::protobuf::encode::encode_message(
-        &message_descriptor,
-        vrl_value,
-        &vrl::protobuf::encode::Options {
-            use_json_names: true,
-        },
-    )
-    .map_err(|e| format!("Failed to encode VRL value to protobuf: {e}"))?;
-
-    // Encode DynamicMessage to bytes (using prost 0.13.5)
-    let mut buf = Vec::new();
-    ProstReflectMessage::encode(&dynamic_message, &mut buf)
-        .map_err(|e| format!("Failed to encode dynamic message to bytes: {e}"))?;
-
-    // Decode bytes into ExportLogsServiceRequest (using prost 0.12.6)
-    ProstMessage::decode(&buf[..])
-        .map_err(|e| format!("Failed to decode ExportLogsServiceRequest: {e}"))
-}
 
 fn parse_export_logs_request(content: &str) -> Result<ExportLogsServiceRequest, String> {
     // The file may contain multiple lines, each with a JSON object containing an array of resourceLogs
@@ -90,9 +20,12 @@ fn parse_export_logs_request(content: &str) -> Result<ExportLogsServiceRequest, 
 
         // Merge resource_logs from this request into the accumulated result
         merged_request.resource_logs.extend(
-            parse_line_to_export_logs_request(line)
-                .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
-                .resource_logs,
+            parse_line_to_export_type_request::<ExportLogsServiceRequest>(
+                LOGS_REQUEST_MESSAGE_TYPE,
+                line,
+            )
+            .map_err(|e| format!("Line {}: {}", line_num + 1, e))?
+            .resource_logs,
         );
     }
 
@@ -176,10 +109,10 @@ fn assert_log_records_static_fields(request: &ExportLogsServiceRequest) {
 
 #[test]
 fn vector_sink_otel_sink_logs_match() {
-    let collector_content =
-        read_file_helper("collector-file-exporter.log").expect("Failed to read collector file");
+    let collector_content = read_file_helper("logs", "collector-file-exporter.log")
+        .expect("Failed to read collector file");
     let vector_content =
-        read_file_helper("vector-file-sink.log").expect("Failed to read vector file");
+        read_file_helper("logs", "vector-file-sink.log").expect("Failed to read vector file");
 
     let collector_request = parse_export_logs_request(&collector_content)
         .expect("Failed to parse collector logs as ExportLogsServiceRequest");
