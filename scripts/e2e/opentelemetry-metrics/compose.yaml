@@ -33,11 +33,37 @@ services:
         until nc -z otel-collector-source 4318; do
           sleep 0.5
         done
+        # Generate 50 Gauge metrics
         telemetrygen metrics \
           --otlp-endpoint=otel-collector-source:4318 \
           --otlp-insecure \
           --otlp-http \
-          --metrics=100 \
+          --metrics=50 \
+          --metric-type=Gauge \
+          --rate=0
+        # Generate 50 Sum metrics
+        telemetrygen metrics \
+          --otlp-endpoint=otel-collector-source:4318 \
+          --otlp-insecure \
+          --otlp-http \
+          --metrics=50 \
+          --metric-type=Sum \
+          --rate=0
+        # Generate 50 Histogram metrics
+        telemetrygen metrics \
+          --otlp-endpoint=otel-collector-source:4318 \
+          --otlp-insecure \
+          --otlp-http \
+          --metrics=50 \
+          --metric-type=Histogram \
+          --rate=0
+        # Generate 50 ExponentialHistogram metrics
+        telemetrygen metrics \
+          --otlp-endpoint=otel-collector-source:4318 \
+          --otlp-insecure \
+          --otlp-http \
+          --metrics=50 \
+          --metric-type=ExponentialHistogram \
           --rate=0
 
   otel-collector-sink:

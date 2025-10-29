@@ -5,7 +5,7 @@ use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEn
 use vector_lib::opentelemetry::proto::metrics::v1::metric::Data as MetricData;
 use vector_lib::opentelemetry::proto::METRICS_REQUEST_MESSAGE_TYPE;
 
-const EXPECTED_METRIC_COUNT: usize = 200; // 100 via gRPC + 100 via HTTP
+const EXPECTED_METRIC_COUNT: usize = 400; // 200 via gRPC + 200 via HTTP (50 of each type: Gauge, Sum, Histogram, ExponentialHistogram)
 
 fn parse_export_metrics_request(content: &str) -> Result<ExportMetricsServiceRequest, String> {
     // The file may contain multiple lines, each with a JSON object containing an array of
@@ -205,7 +205,8 @@ fn vector_sink_otel_sink_metrics_match() {
     assert_metric_data_points(&collector_request);
     assert_metric_data_points(&vector_request);
 
-    // Both collector and Vector receive 200 metrics total (100 via gRPC + 100 via HTTP).
+    // Both collector and Vector receive 400 metrics total (200 via gRPC + 200 via HTTP).
+    // The 200 metrics consist of 50 each of: Gauge, Sum, Histogram, and ExponentialHistogram.
     // Compare them directly to verify the entire pipeline works correctly.
     assert_eq!(
         collector_request, vector_request,

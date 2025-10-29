@@ -198,7 +198,7 @@ vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
-vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "protobuf-int-to-double", features = ["arbitrary", "cli", "test", "test_framework"] }
 mock_instant = { version = "0.6" }
 serial_test = { version = "3.2" }
 
