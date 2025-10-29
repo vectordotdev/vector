@@ -88,7 +88,7 @@ impl Function for AggregateVectorMetrics {
                 result: Ok("0.0"),
             },
             Example {
-                title: "min of vector internal metrics matching the name",
+                title: "Min of vector internal metrics matching the name",
                 source: r#"aggregate_vector_metrics("max", "utilization")"#,
                 result: Ok("0.0"),
             },

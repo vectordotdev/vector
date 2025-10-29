@@ -41,6 +41,7 @@ remap: {
 		"Cryptography",
 		"IP",
 		"Map",
+		"Metrics",
 		"Number",
 		"Object",
 		"Parse",
@@ -113,5 +114,13 @@ remap: {
 		include an
 		[`enrichment_tables`](\(urls.vector_configuration_global)/#enrichment_tables)
 		parameter.
+		"""
+
+	_vector_metrics_explainer: """
+		Internal Vector metrics functions work with a snapshot of the metrics. The interval at which
+		the snapshot is updated is controlled via
+		[`metrics_storage_refresh_period`](\(urls.vector_configuration_global)/#metrics_storage_refresh_period)
+		global option. Higher values can reduce performance impact of that process, but will result
+		in stale metrics data in the snapshot.
 		"""
 }
