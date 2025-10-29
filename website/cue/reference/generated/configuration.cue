@@ -848,6 +848,16 @@ generated: configuration: configuration: {
 			}
 		}
 	}
+	metrics_storage_refresh_period: {
+		description: """
+			The amount of time, in seconds, that internal metrics cache used for VRL will be refreshed.
+
+			Higher values will lead to stale metric values from `get_vector_metric`,
+			`find_vector_metrics` and `aggregate_vector_metrics` functions.
+			"""
+		required: false
+		type: float: {}
+	}
 	proxy: {
 		common: false
 		description: """
