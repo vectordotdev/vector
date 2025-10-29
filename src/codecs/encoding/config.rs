@@ -1,4 +1,4 @@
-use crate::codecs::Transformer;
+use crate::codecs::{Encoder, EncoderKind, Transformer};
 use vector_lib::{
     codecs::{
         CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
@@ -137,6 +137,13 @@ impl EncodingConfigWithFraming {
         };
 
         Ok((framer, serializer))
+    }
+
+    /// Build the `Transformer` and `EncoderKind` for this config.
+    pub fn build_encoder(&self, sink_type: SinkType) -> crate::Result<(Transformer, EncoderKind)> {
+        let (framer, serializer) = self.build(sink_type)?;
+        let encoder = EncoderKind::Framed(Encoder::<Framer>::new(framer, serializer));
+        Ok((self.transformer(), encoder))
     }
 }
 

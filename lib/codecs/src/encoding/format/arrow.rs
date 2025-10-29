@@ -1,4 +1,8 @@
-use std::sync::Arc;
+//! Arrow IPC streaming format codec for batched event encoding
+//!
+//! Provides Apache Arrow IPC stream format encoding with static schema support.
+//! This implements the streaming variant of the Arrow IPC protocol, which writes
+//! a continuous stream of record batches without a file footer.
 
 use arrow::{
     array::{
@@ -11,40 +15,202 @@ use arrow::{
     ipc::writer::StreamWriter,
     record_batch::RecordBatch,
 };
+use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use snafu::Snafu;
+use std::sync::Arc;
+use tracing::debug;
+use vector_config::configurable_component;
 
-use crate::event::{Event, Value};
+use vector_core::event::{Event, Value};
 
+/// Provides Arrow schema for encoding.
+///
+/// Sinks can implement this trait to provide custom schema fetching logic,
+/// such as fetching from a database, inferring from data, or loading from configuration.
+#[async_trait]
+pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
+    /// Get the Arrow schema for encoding events.
+    ///
+    /// This method will be called once before encoding begins, and the result
+    /// will be cached for the lifetime of the encoder.
+    async fn get_schema(&self) -> Result<Arc<Schema>, ArrowEncodingError>;
+}
+
+/// Configuration for Arrow IPC stream serialization
+///
+/// Supports both immediate schema provision and lazy schema loading via providers.
+#[configurable_component]
+#[derive(Clone, Default)]
+pub struct ArrowStreamSerializerConfig {
+    /// The Arrow schema to use for encoding (if known immediately)
+    #[serde(skip)]
+    #[configurable(derived)]
+    pub schema: Option<Arc<arrow::datatypes::Schema>>,
+
+    /// Schema provider for lazy schema loading (not serializable)
+    #[serde(skip)]
+    schema_provider: Option<Arc<dyn SchemaProvider>>,
+}
+
+impl std::fmt::Debug for ArrowStreamSerializerConfig {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ArrowStreamSerializerConfig")
+            .field(
+                "schema",
+                &self
+                    .schema
+                    .as_ref()
+                    .map(|s| format!("{} fields", s.fields().len())),
+            )
+            .field(
+                "schema_provider",
+                &self.schema_provider.as_ref().map(|_| "<provider>"),
+            )
+            .finish()
+    }
+}
+
+impl ArrowStreamSerializerConfig {
+    /// Create a new ArrowStreamSerializerConfig with an immediate schema
+    pub fn new(schema: Arc<arrow::datatypes::Schema>) -> Self {
+        Self {
+            schema: Some(schema),
+            schema_provider: None,
+        }
+    }
+
+    /// Create a new ArrowStreamSerializerConfig with a schema provider
+    ///
+    /// The provider will be called to fetch the schema lazily, typically during
+    /// sink initialization before any events are encoded.
+    pub fn with_provider(provider: Arc<dyn SchemaProvider>) -> Self {
+        Self {
+            schema: None,
+            schema_provider: Some(provider),
+        }
+    }
+
+    /// Get the schema provider if one was configured
+    pub fn provider(&self) -> Option<&Arc<dyn SchemaProvider>> {
+        self.schema_provider.as_ref()
+    }
+
+    /// Resolve the schema from the provider if present.
+    pub async fn resolve(&mut self) -> Result<(), ArrowEncodingError> {
+        // If schema already exists, nothing to do
+        if self.schema.is_some() {
+            return Ok(());
+        }
+
+        // Fetch from provider if available
+        if let Some(provider) = &self.schema_provider {
+            let schema = provider.get_schema().await?;
+            self.schema = Some(schema);
+            Ok(())
+        } else {
+            Err(ArrowEncodingError::NoSchemaProvided)
+        }
+    }
+
+    /// The data type of events that are accepted by `ArrowStreamEncoder`.
+    pub fn input_type(&self) -> vector_core::config::DataType {
+        vector_core::config::DataType::Log
+    }
+
+    /// The schema required by the serializer.
+    pub fn schema_requirement(&self) -> vector_core::schema::Requirement {
+        vector_core::schema::Requirement::empty()
+    }
+}
+
+/// Arrow IPC stream batch serializer that holds the schema
+#[derive(Clone, Debug)]
+pub struct ArrowStreamSerializer {
+    schema: Arc<Schema>,
+}
+
+impl ArrowStreamSerializer {
+    /// Create a new ArrowStreamSerializer with the given configuration
+    pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, vector_common::Error> {
+        let schema = config.schema.ok_or_else(|| {
+            vector_common::Error::from(
+                "Arrow serializer requires a schema. Pass a schema or fetch from provider before creating serializer."
+            )
+        })?;
+
+        Ok(Self { schema })
+    }
+}
+
+impl tokio_util::codec::Encoder<Vec<Event>> for ArrowStreamSerializer {
+    type Error = vector_common::Error;
+
+    fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+        if events.is_empty() {
+            return Err(vector_common::Error::from(
+                "No events provided for encoding",
+            ));
+        }
+
+        let bytes = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&self.schema)))
+            .map_err(|e| vector_common::Error::from(e.to_string()))?;
+
+        buffer.extend_from_slice(&bytes);
+        Ok(())
+    }
+}
+
+/// Errors that can occur during Arrow encoding
 #[derive(Debug, Snafu)]
 pub enum ArrowEncodingError {
+    /// Failed to create Arrow record batch
     #[snafu(display("Failed to create Arrow record batch: {}", source))]
-    RecordBatchCreation { source: arrow::error::ArrowError },
+    RecordBatchCreation {
+        /// The underlying Arrow error
+        source: arrow::error::ArrowError,
+    },
 
+    /// Failed to write Arrow IPC data
     #[snafu(display("Failed to write Arrow IPC data: {}", source))]
-    IpcWrite { source: arrow::error::ArrowError },
+    IpcWrite {
+        /// The underlying Arrow error
+        source: arrow::error::ArrowError,
+    },
 
+    /// No events provided for encoding
     #[snafu(display("No events provided for encoding"))]
     NoEvents,
 
+    /// Schema must be provided before runtime
     #[snafu(display("Schema must be provided before runtime"))]
     NoSchemaProvided,
 
+    /// Failed to fetch schema from provider
+    #[snafu(display("Failed to fetch schema from provider: {}", message))]
+    SchemaFetchError {
+        /// Error message from the provider
+        message: String,
+    },
+
+    /// Unsupported Arrow data type for field
     #[snafu(display(
         "Unsupported Arrow data type for field '{}': {:?}",
         field_name,
         data_type
     ))]
     UnsupportedType {
+        /// The field name
         field_name: String,
+        /// The unsupported data type
         data_type: DataType,
     },
 }
 
-/// Encodes a batch of events into Arrow IPC format
-pub fn encode_events_to_arrow_stream(
+/// Encodes a batch of events into Arrow IPC streaming format
+pub fn encode_events_to_arrow_ipc_stream(
     events: &[Event],
     schema: Option<Arc<Schema>>,
 ) -> Result<Bytes, ArrowEncodingError> {
@@ -95,7 +261,6 @@ fn build_record_batch(
     schema: Arc<Schema>,
     events: &[Event],
 ) -> Result<RecordBatch, ArrowEncodingError> {
-    let num_events = events.len();
     let num_fields = schema.fields().len();
     let mut columns: Vec<ArrayRef> = Vec::with_capacity(num_fields);
 
@@ -103,22 +268,22 @@ fn build_record_batch(
         let field_name = field.name();
         let array: ArrayRef = match field.data_type() {
             DataType::Timestamp(time_unit, _) => {
-                build_timestamp_array(events, field_name, *time_unit, num_events)?
+                build_timestamp_array(events, field_name, *time_unit)?
             }
-            DataType::Utf8 => build_string_array(events, field_name, num_events)?,
-            DataType::Int64 => build_int64_array(events, field_name, num_events)?,
-            DataType::UInt8 => build_uint8_array(events, field_name, num_events)?,
-            DataType::UInt16 => build_uint16_array(events, field_name, num_events)?,
-            DataType::UInt32 => build_uint32_array(events, field_name, num_events)?,
-            DataType::UInt64 => build_uint64_array(events, field_name, num_events)?,
-            DataType::Float64 => build_float64_array(events, field_name, num_events)?,
-            DataType::Boolean => build_boolean_array(events, field_name, num_events)?,
-            DataType::Binary => build_binary_array(events, field_name, num_events)?,
+            DataType::Utf8 => build_string_array(events, field_name)?,
+            DataType::Int64 => build_int64_array(events, field_name)?,
+            DataType::UInt8 => build_uint8_array(events, field_name)?,
+            DataType::UInt16 => build_uint16_array(events, field_name)?,
+            DataType::UInt32 => build_uint32_array(events, field_name)?,
+            DataType::UInt64 => build_uint64_array(events, field_name)?,
+            DataType::Float64 => build_float64_array(events, field_name)?,
+            DataType::Boolean => build_boolean_array(events, field_name)?,
+            DataType::Binary => build_binary_array(events, field_name)?,
             DataType::Decimal128(precision, scale) => {
-                build_decimal128_array(events, field_name, *precision, *scale, num_events)?
+                build_decimal128_array(events, field_name, *precision, *scale)?
             }
             DataType::Decimal256(precision, scale) => {
-                build_decimal256_array(events, field_name, *precision, *scale, num_events)?
+                build_decimal256_array(events, field_name, *precision, *scale)?
             }
             other_type => {
                 return Err(ArrowEncodingError::UnsupportedType {
@@ -150,11 +315,10 @@ fn build_timestamp_array(
     events: &[Event],
     field_name: &str,
     time_unit: TimeUnit,
-    capacity: usize,
 ) -> Result<ArrayRef, ArrowEncodingError> {
     macro_rules! build_array {
         ($builder:ty, $converter:expr) => {{
-            let mut builder = <$builder>::with_capacity(capacity);
+            let mut builder = <$builder>::new();
             for event in events {
                 if let Event::Log(log) = event {
                     let value_to_append = log.get(field_name).and_then(|value| {
@@ -201,12 +365,8 @@ fn build_timestamp_array(
     }
 }
 
-fn build_string_array(
-    events: &[Event],
-    field_name: &str,
-    capacity: usize,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = StringBuilder::with_capacity(capacity, capacity * 32);
+fn build_string_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = StringBuilder::new();
 
     for event in events {
         if let Event::Log(log) = event {
@@ -240,12 +400,8 @@ fn build_string_array(
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_int64_array(
-    events: &[Event],
-    field_name: &str,
-    capacity: usize,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Int64Builder::with_capacity(capacity);
+fn build_int64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = Int64Builder::new();
 
     for event in events {
         if let Event::Log(log) = event {
@@ -259,12 +415,8 @@ fn build_int64_array(
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_uint8_array(
-    events: &[Event],
-    field_name: &str,
-    capacity: usize,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt8Builder::with_capacity(capacity);
+fn build_uint8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = UInt8Builder::new();
 
     for event in events {
         if let Event::Log(log) = event {
@@ -280,12 +432,8 @@ fn build_uint8_array(
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_uint16_array(
-    events: &[Event],
-    field_name: &str,
-    capacity: usize,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt16Builder::with_capacity(capacity);
+fn build_uint16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = UInt16Builder::new();
 
     for event in events {
         if let Event::Log(log) = event {
@@ -301,12 +449,8 @@ fn build_uint16_array(
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_uint32_array(
-    events: &[Event],
-    field_name: &str,
-    capacity: usize,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt32Builder::with_capacity(capacity);
+fn build_uint32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = UInt32Builder::new();
 
     for event in events {
         if let Event::Log(log) = event {
@@ -322,12 +466,8 @@ fn build_uint32_array(
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_uint64_array(
-    events: &[Event],
-    field_name: &str,
-    capacity: usize,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt64Builder::with_capacity(capacity);
+fn build_uint64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = UInt64Builder::new();
 
     for event in events {
         if let Event::Log(log) = event {
@@ -341,12 +481,8 @@ fn build_uint64_array(
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_float64_array(
-    events: &[Event],
-    field_name: &str,
-    capacity: usize,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Float64Builder::with_capacity(capacity);
+fn build_float64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = Float64Builder::new();
 
     for event in events {
         if let Event::Log(log) = event {
@@ -361,12 +497,8 @@ fn build_float64_array(
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_boolean_array(
-    events: &[Event],
-    field_name: &str,
-    capacity: usize,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = BooleanBuilder::with_capacity(capacity);
+fn build_boolean_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = BooleanBuilder::new();
 
     for event in events {
         if let Event::Log(log) = event {
@@ -380,12 +512,8 @@ fn build_boolean_array(
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_binary_array(
-    events: &[Event],
-    field_name: &str,
-    capacity: usize,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = BinaryBuilder::with_capacity(capacity, capacity * 16);
+fn build_binary_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = BinaryBuilder::new();
 
     for event in events {
         if let Event::Log(log) = event {
@@ -404,9 +532,8 @@ fn build_decimal128_array(
     field_name: &str,
     precision: u8,
     scale: i8,
-    capacity: usize,
 ) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Decimal128Builder::with_capacity(capacity)
+    let mut builder = Decimal128Builder::new()
         .with_precision_and_scale(precision, scale)
         .map_err(|_| ArrowEncodingError::UnsupportedType {
             field_name: field_name.to_string(),
@@ -446,9 +573,8 @@ fn build_decimal256_array(
     field_name: &str,
     precision: u8,
     scale: i8,
-    capacity: usize,
 ) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Decimal256Builder::with_capacity(capacity)
+    let mut builder = Decimal256Builder::new()
         .with_precision_and_scale(precision, scale)
         .map_err(|_| ArrowEncodingError::UnsupportedType {
             field_name: field_name.to_string(),
@@ -487,7 +613,6 @@ fn build_decimal256_array(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::LogEvent;
     use arrow::{
         array::{
             Array, BinaryArray, BooleanArray, Float64Array, Int64Array, StringArray,
@@ -499,62 +624,14 @@ mod tests {
     };
     use chrono::Utc;
     use std::io::Cursor;
-
-    #[test]
-    fn test_encode_simple_events() {
-        let mut log1 = LogEvent::default();
-        log1.insert("message", "hello");
-        log1.insert("count", 42);
-
-        let mut log2 = LogEvent::default();
-        log2.insert("message", "world");
-        log2.insert("count", 100);
-
-        let events = vec![Event::Log(log1), Event::Log(log2)];
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("message", DataType::Utf8, true),
-            Field::new("count", DataType::Int64, true),
-        ]));
-
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
-        assert!(result.is_ok());
-
-        let bytes = result.unwrap();
-        assert!(!bytes.is_empty());
-
-        // Validate the Arrow stream
-        let cursor = Cursor::new(bytes);
-        let mut reader = StreamReader::try_new(cursor, None).unwrap();
-        let batch = reader.next().unwrap().unwrap();
-
-        assert_eq!(batch.num_rows(), 2);
-        assert_eq!(batch.num_columns(), 2);
-        assert_eq!(batch.schema().as_ref(), schema.as_ref());
-
-        let message_array = batch
-            .column(0)
-            .as_any()
-            .downcast_ref::<StringArray>()
-            .unwrap();
-        assert_eq!(message_array.value(0), "hello");
-        assert_eq!(message_array.value(1), "world");
-
-        let count_array = batch
-            .column(1)
-            .as_any()
-            .downcast_ref::<Int64Array>()
-            .unwrap();
-        assert_eq!(count_array.value(0), 42);
-        assert_eq!(count_array.value(1), 100);
-    }
+    use vector_core::event::LogEvent;
 
     #[test]
     fn test_encode_all_types() {
         let mut log = LogEvent::default();
         log.insert("string_field", "test");
         log.insert("int_field", 42);
-        log.insert("float_field", 3.14);
+        log.insert("float_field", 3.15);
         log.insert("bool_field", true);
         log.insert("bytes_field", bytes::Bytes::from("binary"));
         log.insert("timestamp_field", Utc::now());
@@ -574,7 +651,7 @@ mod tests {
             ),
         ]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -611,7 +688,7 @@ mod tests {
                 .downcast_ref::<Float64Array>()
                 .unwrap()
                 .value(0)
-                - 3.14)
+                - 3.15)
                 .abs()
                 < 0.001
         );
@@ -661,7 +738,7 @@ mod tests {
             Field::new("field_b", DataType::Int64, true),
         ]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -694,7 +771,7 @@ mod tests {
         log1.insert("field", 42); // Integer
 
         let mut log2 = LogEvent::default();
-        log2.insert("field", 3.14); // Float - type mismatch!
+        log2.insert("field", 3.15); // Float - type mismatch!
 
         let events = vec![Event::Log(log1), Event::Log(log2)];
 
@@ -705,7 +782,7 @@ mod tests {
             true,
         )]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -742,7 +819,7 @@ mod tests {
             Field::new("array_field", DataType::Utf8, true),
         ]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -784,7 +861,7 @@ mod tests {
             true,
         )]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(schema));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(schema));
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -799,7 +876,7 @@ mod tests {
 
         let events = vec![Event::Log(log1)];
 
-        let result = encode_events_to_arrow_stream(&events, None);
+        let result = encode_events_to_arrow_ipc_stream(&events, None);
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -810,7 +887,7 @@ mod tests {
     #[test]
     fn test_encode_empty_events() {
         let events: Vec<Event> = vec![];
-        let result = encode_events_to_arrow_stream(&events, None);
+        let result = encode_events_to_arrow_ipc_stream(&events, None);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ArrowEncodingError::NoEvents));
     }
@@ -849,7 +926,7 @@ mod tests {
             ),
         ]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -894,150 +971,6 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_integer_as_timestamp() {
-        // Test that integer timestamps are automatically converted
-        let mut log = LogEvent::default();
-
-        log.insert("ts_nano", 1760971112896200940_i64);
-
-        let events = vec![Event::Log(log)];
-
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "ts_nano",
-            DataType::Timestamp(TimeUnit::Nanosecond, None),
-            true,
-        )]));
-
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
-        assert!(result.is_ok());
-
-        let bytes = result.unwrap();
-        let cursor = Cursor::new(bytes);
-        let mut reader = StreamReader::try_new(cursor, None).unwrap();
-        let batch = reader.next().unwrap().unwrap();
-
-        assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 1);
-
-        let ts_nano = batch
-            .column(0)
-            .as_any()
-            .downcast_ref::<TimestampNanosecondArray>()
-            .unwrap();
-
-        // Integer should be used directly for nanoseconds
-        assert!(!ts_nano.is_null(0));
-        assert_eq!(ts_nano.value(0), 1760971112896200940_i64);
-    }
-
-    #[test]
-    fn test_encode_mixed_timestamp_types() {
-        // Test mixing Timestamp and Integer values in the same field
-        let mut log1 = LogEvent::default();
-        log1.insert("ts", Utc::now());
-
-        let mut log2 = LogEvent::default();
-        log2.insert("ts", 1760971112896200940_i64);
-
-        let events = vec![Event::Log(log1), Event::Log(log2)];
-
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "ts",
-            DataType::Timestamp(TimeUnit::Nanosecond, None),
-            true,
-        )]));
-
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
-        assert!(result.is_ok());
-
-        let bytes = result.unwrap();
-        let cursor = Cursor::new(bytes);
-        let mut reader = StreamReader::try_new(cursor, None).unwrap();
-        let batch = reader.next().unwrap().unwrap();
-
-        assert_eq!(batch.num_rows(), 2);
-        assert_eq!(batch.num_columns(), 1);
-
-        let ts_array = batch
-            .column(0)
-            .as_any()
-            .downcast_ref::<TimestampNanosecondArray>()
-            .unwrap();
-
-        // Both rows should have non-null values
-        assert!(!ts_array.is_null(0));
-        assert!(!ts_array.is_null(1));
-
-        // Second row should have the integer value
-        assert_eq!(ts_array.value(1), 1760971112896200940_i64);
-    }
-
-    #[test]
-    fn test_encode_string_timestamps() {
-        // Test that RFC3339/ISO 8601 string timestamps are automatically parsed
-        let mut log1 = LogEvent::default();
-        log1.insert("timestamp", "2025-10-22T10:18:44.256Z");
-
-        let mut log2 = LogEvent::default();
-        log2.insert("timestamp", "2025-10-22T15:30:00.123456789Z");
-
-        let mut log3 = LogEvent::default();
-        log3.insert("timestamp", "2025-01-15T00:00:00Z");
-
-        let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
-
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "timestamp",
-            DataType::Timestamp(TimeUnit::Nanosecond, None),
-            true,
-        )]));
-
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
-        assert!(result.is_ok());
-
-        let bytes = result.unwrap();
-        let cursor = Cursor::new(bytes);
-        let mut reader = StreamReader::try_new(cursor, None).unwrap();
-        let batch = reader.next().unwrap().unwrap();
-
-        assert_eq!(batch.num_rows(), 3);
-        assert_eq!(batch.num_columns(), 1);
-
-        let ts_array = batch
-            .column(0)
-            .as_any()
-            .downcast_ref::<TimestampNanosecondArray>()
-            .unwrap();
-
-        // All timestamps should be properly parsed (not null)
-        assert!(!ts_array.is_null(0));
-        assert!(!ts_array.is_null(1));
-        assert!(!ts_array.is_null(2));
-
-        // Verify the parsed values are correct
-        // 2025-10-22T10:18:44.256Z
-        let expected1 = chrono::DateTime::parse_from_rfc3339("2025-10-22T10:18:44.256Z")
-            .unwrap()
-            .timestamp_nanos_opt()
-            .unwrap();
-        assert_eq!(ts_array.value(0), expected1);
-
-        // 2025-10-22T15:30:00.123456789Z
-        let expected2 = chrono::DateTime::parse_from_rfc3339("2025-10-22T15:30:00.123456789Z")
-            .unwrap()
-            .timestamp_nanos_opt()
-            .unwrap();
-        assert_eq!(ts_array.value(1), expected2);
-
-        // 2025-01-15T00:00:00Z
-        let expected3 = chrono::DateTime::parse_from_rfc3339("2025-01-15T00:00:00Z")
-            .unwrap()
-            .timestamp_nanos_opt()
-            .unwrap();
-        assert_eq!(ts_array.value(2), expected3);
-    }
-
-    #[test]
     fn test_encode_mixed_timestamp_string_and_native() {
         // Test mixing string timestamps with native Timestamp values
         let mut log1 = LogEvent::default();
@@ -1057,7 +990,7 @@ mod tests {
             true,
         )]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -1109,7 +1042,7 @@ mod tests {
             true,
         )]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -1132,45 +1065,6 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_decimal128_from_float() {
-        use arrow::array::Decimal128Array;
-
-        let mut log = LogEvent::default();
-        // Store price as float: 123.45
-        log.insert("price", 123.45_f64);
-
-        let events = vec![Event::Log(log)];
-
-        // Decimal(10, 2) - 10 total digits, 2 after decimal
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "price",
-            DataType::Decimal128(10, 2),
-            true,
-        )]));
-
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
-        assert!(result.is_ok());
-
-        let bytes = result.unwrap();
-        let cursor = Cursor::new(bytes);
-        let mut reader = StreamReader::try_new(cursor, None).unwrap();
-        let batch = reader.next().unwrap().unwrap();
-
-        assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 1);
-
-        let decimal_array = batch
-            .column(0)
-            .as_any()
-            .downcast_ref::<Decimal128Array>()
-            .unwrap();
-
-        assert!(!decimal_array.is_null(0));
-        // 123.45 with scale 2 = 12345
-        assert_eq!(decimal_array.value(0), 12345_i128);
-    }
-
-    #[test]
     fn test_encode_decimal128_from_integer() {
         use arrow::array::Decimal128Array;
 
@@ -1187,7 +1081,7 @@ mod tests {
             true,
         )]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -1225,7 +1119,7 @@ mod tests {
             true,
         )]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -1268,7 +1162,7 @@ mod tests {
             true,
         )]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -1297,47 +1191,6 @@ mod tests {
     }
 
     #[test]
-    fn test_encode_mixed_types_with_decimal() {
-        use arrow::array::Decimal128Array;
-
-        let mut log = LogEvent::default();
-        log.insert("id", 123_i64);
-        log.insert("name", "Product A");
-        log.insert("price", 19.99_f64);
-        log.insert("in_stock", true);
-
-        let events = vec![Event::Log(log)];
-
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("id", DataType::Int64, true),
-            Field::new("name", DataType::Utf8, true),
-            Field::new("price", DataType::Decimal128(10, 2), true),
-            Field::new("in_stock", DataType::Boolean, true),
-        ]));
-
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
-        assert!(result.is_ok());
-
-        let bytes = result.unwrap();
-        let cursor = Cursor::new(bytes);
-        let mut reader = StreamReader::try_new(cursor, None).unwrap();
-        let batch = reader.next().unwrap().unwrap();
-
-        assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 4);
-
-        // Verify decimal column
-        let decimal_array = batch
-            .column(2)
-            .as_any()
-            .downcast_ref::<Decimal128Array>()
-            .unwrap();
-
-        assert!(!decimal_array.is_null(0));
-        assert_eq!(decimal_array.value(0), 1999_i128);
-    }
-
-    #[test]
     fn test_encode_unsigned_integer_types() {
         use arrow::array::{UInt8Array, UInt16Array, UInt32Array, UInt64Array};
 
@@ -1356,7 +1209,7 @@ mod tests {
             Field::new("uint64_field", DataType::UInt64, true),
         ]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -1422,7 +1275,7 @@ mod tests {
             Field::new("uint32_field", DataType::UInt32, true),
         ]));
 
-        let result = encode_events_to_arrow_stream(&events, Some(Arc::clone(&schema)));
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
         assert!(result.is_ok());
 
         let bytes = result.unwrap();

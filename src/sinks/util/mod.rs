@@ -45,8 +45,6 @@ pub use buffer::{
 pub use builder::SinkBuilderExt;
 use chrono::{FixedOffset, Offset, Utc};
 pub use compressor::Compressor;
-#[cfg(feature = "sinks-clickhouse")]
-pub use encoding::arrow;
 pub use normalizer::Normalizer;
 pub use request_builder::{IncrementalRequestBuilder, RequestBuilder};
 pub use service::{

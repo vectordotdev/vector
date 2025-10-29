@@ -9,7 +9,6 @@
 //!
 //! This sink only supports logs for now but could support metrics and traces as well in the future.
 
-mod arrow_schema;
 pub mod config;
 #[cfg(all(test, feature = "clickhouse-integration-tests"))]
 mod integration_tests;

@@ -6,6 +6,10 @@ pub mod format;
 pub mod framing;
 pub mod serializer;
 pub use chunking::{Chunker, Chunking, GelfChunker};
+#[cfg(feature = "arrow")]
+pub use format::{
+    ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
+};
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
@@ -24,6 +28,8 @@ pub use framing::{
     NewlineDelimitedEncoderConfig, VarintLengthDelimitedEncoder,
     VarintLengthDelimitedEncoderConfig,
 };
+#[cfg(feature = "arrow")]
+pub use serializer::BatchSerializerConfig;
 pub use serializer::{Serializer, SerializerConfig};
 
 /// An error that occurred while building an encoder.

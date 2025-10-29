@@ -3,6 +3,8 @@
 
 #![deny(missing_docs)]
 
+#[cfg(feature = "arrow")]
+mod arrow;
 mod avro;
 mod cef;
 mod common;
@@ -20,6 +22,10 @@ mod text;
 
 use std::fmt::Debug;
 
+#[cfg(feature = "arrow")]
+pub use arrow::{
+    ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
+};
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};
 use dyn_clone::DynClone;

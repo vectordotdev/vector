@@ -339,7 +339,6 @@ arc-swap = { version = "1.7", default-features = false, optional = true }
 async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
-arrow-schema = { version = "56.2.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { workspace = true, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
@@ -580,8 +579,9 @@ enrichment-tables-mmdb = ["dep:maxminddb"]
 enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
-codecs-syslog = ["vector-lib/syslog"]
+codecs-arrow = ["vector-lib/arrow"]
 codecs-opentelemetry = ["vector-lib/opentelemetry"]
+codecs-syslog = ["vector-lib/syslog"]
 
 # Secrets
 secrets = ["secrets-aws-secrets-manager"]
@@ -845,7 +845,7 @@ sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage",
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
-sinks-clickhouse = ["dep:arrow", "dep:arrow-schema", "dep:rust_decimal"]
+sinks-clickhouse = []
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
 sinks-datadog_events = []
