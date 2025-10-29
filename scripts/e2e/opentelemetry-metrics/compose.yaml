@@ -104,7 +104,7 @@ services:
     init: true
     volumes:
       - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/metrics/${CONFIG_VECTOR_CONFIG}
+        source: ../../../tests/data/e2e/opentelemetry/metrics/vector_otlp.yaml
         target: /etc/vector/vector.yaml
         read_only: true
       - type: volume
