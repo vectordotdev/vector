@@ -132,7 +132,6 @@ members = [
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
   "lib/vector-vrl/web-playground",
-  "vdev",
 ]
 
 [workspace.dependencies]

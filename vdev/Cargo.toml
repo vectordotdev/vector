@@ -16,37 +16,40 @@ include = [
   "src/**",
 ]
 
+# vdev is a standalone crate, not part of the Vector workspace
+[workspace]
+
 [dependencies]
-anyhow.workspace = true
-chrono.workspace = true
-clap.workspace = true
+anyhow = { version = "1.0.99", default-features = false, features = ["std"] }
+cfg-if = { version = "1.0.3", default-features = false }
+chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
+clap = { version = "4.5.48", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 clap-verbosity-flag = "3.0.4"
 clap_complete = "4.5.58"
 confy = "1.0.0"
 directories = "6.0.0"
 # remove this when stabilized https://doc.rust-lang.org/stable/std/path/fn.absolute.html
 dunce = "1.0.5"
-glob.workspace = true
+git2 = { version = "0.20.2" }
+glob = { version = "0.3.3", default-features = false }
 hex = "0.4.3"
-indexmap.workspace = true
+indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
+indoc = { version = "2.0.6" }
 indicatif = { version = "0.18.0", features = ["improved_unicode"] }
-itertools.workspace = true
+itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
 log = "0.4.27"
 # watch https://github.com/epage/anstyle for official interop with Clap
 owo-colors = { version = "4.2.2", features = ["supports-colors"] }
-paste.workspace = true
-regex.workspace = true
-reqwest = { workspace = true, features = ["blocking"] }
-serde.workspace = true
-serde_json.workspace = true
-serde_yaml.workspace = true
+paste = { version = "1.0.15" }
+regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
+reqwest = { version = "0.11.26", features = ["json", "blocking"] }
+semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
+serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
+serde_json = { version = "1.0.143", default-features = false, features = ["raw_value", "std"] }
+serde_yaml = { version = "0.9.34", default-features = false }
 sha2 = "0.10.9"
-tempfile.workspace = true
-toml.workspace = true
-semver.workspace = true
-indoc.workspace = true
-git2 = { version = "0.20.2" }
-cfg-if.workspace = true
+tempfile = "3.23.0"
+toml = { version = "0.9.5", default-features = false, features = ["serde", "display", "parse"] }
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/vdev-v{ version }/{ name }-{ target }-v{ version }.tgz"
