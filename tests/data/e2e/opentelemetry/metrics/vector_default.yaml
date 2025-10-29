@@ -19,26 +19,53 @@ transforms:
     inputs:
       - source0.metrics
     source: |
+      # Convert Vector's internal metric representation to OTLP JSON format
+      metric_type = .kind
+
+      # Build the data point based on metric type
+      data_point = {
+        "timeUnixNano": to_string(to_unix_timestamp!(.timestamp, unit: "nanoseconds")),
+        "attributes": []
+      }
+
+      # Add value based on metric kind
+      if metric_type == "incremental" || metric_type == "absolute" {
+        if is_float(.value) {
+          data_point.asDouble = .value
+        } else {
+          data_point.asInt = to_string(.value)
+        }
+      }
+
+      # Build the metric structure
+      metric_data = {}
+      if metric_type == "incremental" || metric_type == "absolute" {
+        metric_data.sum = {
+          "dataPoints": [data_point],
+          "aggregationTemporality": if metric_type == "incremental" { 1 } else { 2 },
+          "isMonotonic": true
+        }
+      } else {
+        metric_data.gauge = {
+          "dataPoints": [data_point]
+        }
+      }
+
       . = {
-        "resourceLogs": [
+        "resourceMetrics": [
           {
             "resource": {
               "attributes": [
-                { "key": "service.name", "value": { "stringValue": "telemetrygen" } }
+                { "key": "service.name", "value": { "stringValue": get!(.tags, ["service.name"]) ?? "telemetrygen" } }
               ]
             },
-            "scopeLogs": [
+            "scopeMetrics": [
               {
                 "scope": {
-                  "name": "log-generator"
+                  "name": "telemetrygen"
                 },
-                "logRecords": [
-                  {
-                    "timeUnixNano": to_unix_timestamp!(.timestamp),
-                    "severityText": .severity_text,
-                    "body": { "stringValue": .message },
-                    "attributes": []
-                  }
+                "metrics": [
+                  merge!({"name": .name, "unit": ""}, metric_data)
                 ]
               }
             ]

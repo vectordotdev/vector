@@ -1,8 +1,9 @@
 use crate::opentelemetry::{parse_line_to_export_type_request, read_file_helper};
 
-use vector_lib::opentelemetry::proto::METRICS_REQUEST_MESSAGE_TYPE;
 use vector_lib::opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
 use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEnum;
+use vector_lib::opentelemetry::proto::metrics::v1::metric::Data as MetricData;
+use vector_lib::opentelemetry::proto::METRICS_REQUEST_MESSAGE_TYPE;
 
 const EXPECTED_METRIC_COUNT: usize = 200; // 100 via gRPC + 100 via HTTP
 
@@ -68,41 +69,86 @@ fn assert_service_name(request: &ExportMetricsServiceRequest) {
     }
 }
 
-/// Asserts that all metric records have static field values:
-/// - `body`: `"the message"`
-/// - `severityText`: `"Info"`
-fn assert_metric_records_static_fields(request: &ExportMetricsServiceRequest) {
-    for (rl_idx, rl) in request.resource_metrics.iter().enumerate() {
-        for (sl_idx, sl) in rl.scope_metrics.iter().enumerate() {
-            for (lr_idx, metric) in sl.metrics.iter().enumerate() {
-                let prefix =
-                    format!("resource_metrics[{rl_idx}].scope_metrics[{sl_idx}].metrics[{lr_idx}]");
+/// Asserts that all metrics have:
+/// - A non-empty name
+/// - At least one data point
+/// - Each data point has a valid timestamp and value
+fn assert_metric_data_points(request: &ExportMetricsServiceRequest) {
+    for (rm_idx, rm) in request.resource_metrics.iter().enumerate() {
+        for (sm_idx, sm) in rm.scope_metrics.iter().enumerate() {
+            for (m_idx, metric) in sm.metrics.iter().enumerate() {
+                let prefix = format!("resource_metrics[{rm_idx}].scope_metrics[{sm_idx}].metrics[{m_idx}]");
 
-                // Assert body is "the message"
-                let body_value = metric
-                    .body
-                    .as_ref()
-                    .unwrap_or_else(|| panic!("{prefix} missing body"))
-                    .value
-                    .as_ref()
-                    .unwrap_or_else(|| panic!("{prefix} body has no value"));
-
-                if let AnyValueEnum::StringValue(s) = body_value {
-                    assert_eq!(
-                        s, "the message",
-                        "{prefix} body expected 'the message', got '{s}'"
-                    );
-                } else {
-                    panic!("{prefix} body is not a string value");
-                }
-
-                // Assert severityText is "Info"
-                assert_eq!(
-                    metric.severity_text, "Info",
-                    "{prefix} severityText expected 'Info', got '{}'",
-                    metric.severity_text
+                // Assert metric has a name
+                assert!(
+                    !metric.name.is_empty(),
+                    "{prefix} metric name is empty"
                 );
-                // timeUnixNano is ignored as it varies
+
+                // Get data points based on metric type
+                let data_points_count = match &metric.data {
+                    Some(MetricData::Gauge(gauge)) => {
+                        assert!(
+                            !gauge.data_points.is_empty(),
+                            "{prefix} gauge has no data points"
+                        );
+                        for (dp_idx, dp) in gauge.data_points.iter().enumerate() {
+                            assert!(
+                                dp.time_unix_nano > 0,
+                                "{prefix}.gauge.data_points[{dp_idx}] has invalid timestamp"
+                            );
+                            assert!(
+                                dp.value.is_some(),
+                                "{prefix}.gauge.data_points[{dp_idx}] has no value"
+                            );
+                        }
+                        gauge.data_points.len()
+                    }
+                    Some(MetricData::Sum(sum)) => {
+                        assert!(
+                            !sum.data_points.is_empty(),
+                            "{prefix} sum has no data points"
+                        );
+                        for (dp_idx, dp) in sum.data_points.iter().enumerate() {
+                            assert!(
+                                dp.time_unix_nano > 0,
+                                "{prefix}.sum.data_points[{dp_idx}] has invalid timestamp"
+                            );
+                            assert!(
+                                dp.value.is_some(),
+                                "{prefix}.sum.data_points[{dp_idx}] has no value"
+                            );
+                        }
+                        sum.data_points.len()
+                    }
+                    Some(MetricData::Histogram(histogram)) => {
+                        assert!(
+                            !histogram.data_points.is_empty(),
+                            "{prefix} histogram has no data points"
+                        );
+                        histogram.data_points.len()
+                    }
+                    Some(MetricData::ExponentialHistogram(exp_histogram)) => {
+                        assert!(
+                            !exp_histogram.data_points.is_empty(),
+                            "{prefix} exponential histogram has no data points"
+                        );
+                        exp_histogram.data_points.len()
+                    }
+                    Some(MetricData::Summary(summary)) => {
+                        assert!(
+                            !summary.data_points.is_empty(),
+                            "{prefix} summary has no data points"
+                        );
+                        summary.data_points.len()
+                    }
+                    None => panic!("{prefix} has no data"),
+                };
+
+                assert!(
+                    data_points_count > 0,
+                    "{prefix} has zero data points"
+                );
             }
         }
     }
@@ -116,47 +162,53 @@ fn vector_sink_otel_sink_metrics_match() {
         read_file_helper("metrics", "vector-file-sink.log").expect("Failed to read vector file");
 
     let collector_request = parse_export_metrics_request(&collector_content)
-        .expect("Failed to parse collector metrics as ExportLogsServiceRequest");
+        .expect("Failed to parse collector metrics as ExportMetricsServiceRequest");
     let vector_request = parse_export_metrics_request(&vector_content)
-        .expect("Failed to parse vector metrics as ExportLogsServiceRequest");
+        .expect("Failed to parse vector metrics as ExportMetricsServiceRequest");
 
-    // Count total log records
-    let collector_metric_count = collector_request
-        .resource_metrics
-        .iter()
-        .flat_map(|rl| &rl.scope_metrics)
-        .flat_map(|sl| &sl.metrics)
-        .count();
+    // Count total data points across all metric types
+    let count_data_points = |request: &ExportMetricsServiceRequest| -> usize {
+        request
+            .resource_metrics
+            .iter()
+            .flat_map(|rm| &rm.scope_metrics)
+            .flat_map(|sm| &sm.metrics)
+            .map(|m| match &m.data {
+                Some(MetricData::Gauge(g)) => g.data_points.len(),
+                Some(MetricData::Sum(s)) => s.data_points.len(),
+                Some(MetricData::Histogram(h)) => h.data_points.len(),
+                Some(MetricData::ExponentialHistogram(eh)) => eh.data_points.len(),
+                Some(MetricData::Summary(s)) => s.data_points.len(),
+                None => 0,
+            })
+            .sum()
+    };
 
-    let vector_metric_count = vector_request
-        .resource_metrics
-        .iter()
-        .flat_map(|rl| &rl.scope_metrics)
-        .flat_map(|sl| &sl.metrics)
-        .count();
+    let collector_metric_count = count_data_points(&collector_request);
+    let vector_metric_count = count_data_points(&vector_request);
 
     assert_eq!(
         collector_metric_count, EXPECTED_METRIC_COUNT,
-        "Collector produced {collector_metric_count} metrics, expected {EXPECTED_METRIC_COUNT}"
+        "Collector produced {collector_metric_count} metric data points, expected {EXPECTED_METRIC_COUNT}"
     );
 
     assert_eq!(
         vector_metric_count, EXPECTED_METRIC_COUNT,
-        "Vector produced {vector_metric_count} metrics, expected {EXPECTED_METRIC_COUNT}"
+        "Vector produced {vector_metric_count} metric data points, expected {EXPECTED_METRIC_COUNT}"
     );
 
     // Verify service.name attribute
     assert_service_name(&collector_request);
     assert_service_name(&vector_request);
 
-    // Verify static log record fields
-    assert_metric_records_static_fields(&collector_request);
-    assert_metric_records_static_fields(&vector_request);
+    // Verify metric data points are valid
+    assert_metric_data_points(&collector_request);
+    assert_metric_data_points(&vector_request);
 
     // Both collector and Vector receive 200 metrics total (100 via gRPC + 100 via HTTP).
     // Compare them directly to verify the entire pipeline works correctly.
     assert_eq!(
         collector_request, vector_request,
-        "Collector and Vector log requests should match"
+        "Collector and Vector metric requests should match"
     );
 }

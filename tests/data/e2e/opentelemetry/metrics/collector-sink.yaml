@@ -17,7 +17,7 @@ exporters:
 
 service:
   pipelines:
-    logs:
+    metrics:
       receivers: [ otlp ]
       processors: [ batch ]
       exporters: [ debug, file ]
