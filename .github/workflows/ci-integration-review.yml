@@ -177,7 +177,7 @@ jobs:
         if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-metrics')
           || startsWith(github.event.review.body, '/ci-run-e2e-all')
           || startsWith(github.event.review.body, '/ci-run-all') }}
-        run: bash scripts/run-integration-test.sh e2e opentelemetry-logs
+        run: bash scripts/run-integration-test.sh e2e opentelemetry-metrics
 
 
   update-pr-status:
