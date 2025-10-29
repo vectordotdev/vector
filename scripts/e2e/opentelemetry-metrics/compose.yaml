@@ -18,7 +18,7 @@ services:
     container_name: metrics-generator
     build:
       context: ../../../
-      dockerfile: ./scripts/e2e/opentelemetry-metrics/telemetrygen.Dockerfile
+      dockerfile: ./scripts/e2e/opentelemetry-common/telemetrygen.Dockerfile
     init: true
     depends_on:
       otel-collector-source:
@@ -81,7 +81,7 @@ services:
     container_name: otel-collector-sink
     build:
       context: ../../../
-      dockerfile: ./scripts/e2e/opentelemetry-metrics/collector.Dockerfile
+      dockerfile: ./scripts/e2e/opentelemetry-common/collector.Dockerfile
       args:
         CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
     init: true
