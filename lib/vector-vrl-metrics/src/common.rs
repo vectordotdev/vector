@@ -53,7 +53,7 @@ impl MetricsStorage {
         self.cache
             .load()
             .iter()
-            .find(|m| m.name() == metric && tags.iter().all(|(k, v)| m.tag_matches(k, v)))
+            .find(|m| m.name() == metric && tags.iter().all(|tag| tag_matches(m, tag)))
             .cloned()
     }
 
@@ -61,7 +61,7 @@ impl MetricsStorage {
         self.cache
             .load()
             .iter()
-            .filter(|m| m.name() == metric && tags.iter().all(|(k, v)| m.tag_matches(k, v)))
+            .filter(|m| m.name() == metric && tags.iter().all(|tag| tag_matches(m, tag)))
             .cloned()
             .collect()
     }
@@ -89,6 +89,20 @@ impl MetricsStorage {
                 }
             }
         }
+    }
+}
+
+/// Checks if the tag matches - also considers wildcards
+fn tag_matches(metric: &Metric, (tag_key, tag_value): (&String, &String)) -> bool {
+    if let Some(wildcard_index) = tag_value.find('*') {
+        let Some(metric_tag_value) = metric.tag_value(tag_key) else {
+            return false;
+        };
+
+        metric_tag_value.starts_with(&tag_value[0..wildcard_index])
+            && metric_tag_value.ends_with(&tag_value[(wildcard_index + 1)..])
+    } else {
+        metric.tag_matches(tag_key, tag_value)
     }
 }
 
@@ -200,6 +214,36 @@ mod tests {
         Runtime::default().resolve(&mut target, &program, &TimeZone::default())
     }
 
+    fn assert_metric_matches(
+        metric: &BTreeMap<KeyString, Value>,
+        name: &str,
+        value: f64,
+        tags: Option<Vec<(&str, &str)>>,
+    ) {
+        assert_eq!(metric.get("name").unwrap().as_str().unwrap(), name);
+        assert_eq!(
+            metric.get("value").unwrap().as_float().unwrap(),
+            NotNan::new(value).unwrap()
+        );
+
+        if let Some(tags) = tags {
+            let metric_tags = metric.get("tags").unwrap().as_object().unwrap();
+            for (key, value) in tags {
+                assert_eq!(
+                    metric_tags
+                        .get(key)
+                        .unwrap()
+                        .as_array_unwrap()
+                        .first()
+                        .unwrap()
+                        .as_str()
+                        .unwrap(),
+                    value
+                );
+            }
+        }
+    }
+
     #[test]
     fn test_get_vector_metric() {
         let storage = MetricsStorage::default();
@@ -221,11 +265,7 @@ mod tests {
         .expect("vrl failed");
         let result = result.as_object().unwrap();
 
-        assert_eq!(result.get("name").unwrap().as_str().unwrap(), "test");
-        assert_eq!(
-            result.get("value").unwrap().as_float().unwrap(),
-            NotNan::new(1.0).unwrap()
-        );
+        assert_metric_matches(result, "test", 1.0, None);
     }
 
     #[test]
@@ -264,42 +304,17 @@ mod tests {
         .expect("vrl failed");
         let result = result.as_array_unwrap();
 
-        let metric_a = result[0].as_object().unwrap();
-        assert_eq!(metric_a.get("name").unwrap().as_str().unwrap(), "test");
-        assert_eq!(
-            metric_a.get("value").unwrap().as_float().unwrap(),
-            NotNan::new(1.0).unwrap()
+        assert_metric_matches(
+            result[0].as_object().unwrap(),
+            "test",
+            1.0,
+            Some(vec![("component_id", "a")]),
         );
-        let metric_a_tags = metric_a.get("tags").unwrap().as_object().unwrap();
-        assert_eq!(
-            metric_a_tags
-                .get("component_id")
-                .unwrap()
-                .as_array_unwrap()
-                .first()
-                .unwrap()
-                .as_str()
-                .unwrap(),
-            "a"
-        );
-
-        let metric_b = result[1].as_object().unwrap();
-        assert_eq!(metric_b.get("name").unwrap().as_str().unwrap(), "test");
-        assert_eq!(
-            metric_b.get("value").unwrap().as_float().unwrap(),
-            NotNan::new(1.0).unwrap()
-        );
-        let metric_b_tags = metric_b.get("tags").unwrap().as_object().unwrap();
-        assert_eq!(
-            metric_b_tags
-                .get("component_id")
-                .unwrap()
-                .as_array_unwrap()
-                .first()
-                .unwrap()
-                .as_str()
-                .unwrap(),
-            "b"
+        assert_metric_matches(
+            result[1].as_object().unwrap(),
+            "test",
+            1.0,
+            Some(vec![("component_id", "b")]),
         );
     }
 
@@ -339,22 +354,243 @@ mod tests {
         .expect("vrl failed");
         let result = result.as_object().unwrap();
 
-        assert_eq!(result.get("name").unwrap().as_str().unwrap(), "test");
-        assert_eq!(
-            result.get("value").unwrap().as_float().unwrap(),
-            NotNan::new(1.0).unwrap()
+        assert_metric_matches(result, "test", 1.0, Some(vec![("component_id", "b")]));
+    }
+
+    #[test]
+    fn test_find_vector_metrics_wildcard() {
+        let storage = MetricsStorage::default();
+        storage.cache.store(
+            vec![
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "a".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "b".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                ),
+            ]
+            .into(),
         );
-        let metric_tags = result.get("tags").unwrap().as_object().unwrap();
-        assert_eq!(
-            metric_tags
-                .get("component_id")
-                .unwrap()
-                .as_array_unwrap()
-                .first()
-                .unwrap()
-                .as_str()
-                .unwrap(),
-            "b"
+
+        let result = compile_and_run(
+            storage,
+            r#"
+            find_vector_metrics("test", tags: { "component_id": "*" })
+        "#,
+        )
+        .expect("vrl failed");
+        let result = result.as_array_unwrap();
+
+        // 2 metrics, because they have component_id, 3rd one doesn't
+        assert_eq!(result.len(), 2);
+        assert_metric_matches(
+            result[0].as_object().unwrap(),
+            "test",
+            1.0,
+            Some(vec![("component_id", "a")]),
+        );
+        assert_metric_matches(
+            result[1].as_object().unwrap(),
+            "test",
+            1.0,
+            Some(vec![("component_id", "b")]),
+        );
+    }
+
+    #[test]
+    fn test_find_vector_metrics_wildcard_start() {
+        let storage = MetricsStorage::default();
+        storage.cache.store(
+            vec![
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "prefix.a".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "something_else".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "prefix.c".to_string(),
+                )]))),
+            ]
+            .into(),
+        );
+
+        let result = compile_and_run(
+            storage,
+            r#"
+            find_vector_metrics("test", tags: { "component_id": "prefix.*" })
+        "#,
+        )
+        .expect("vrl failed");
+        let result = result.as_array_unwrap();
+
+        assert_eq!(result.len(), 2);
+        assert_metric_matches(
+            result[0].as_object().unwrap(),
+            "test",
+            1.0,
+            Some(vec![("component_id", "prefix.a")]),
+        );
+        assert_metric_matches(
+            result[1].as_object().unwrap(),
+            "test",
+            1.0,
+            Some(vec![("component_id", "prefix.c")]),
+        );
+    }
+
+    #[test]
+    fn test_find_vector_metrics_wildcard_end() {
+        let storage = MetricsStorage::default();
+        storage.cache.store(
+            vec![
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "a.suffix".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "something_else".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "c.suffix".to_string(),
+                )]))),
+            ]
+            .into(),
+        );
+
+        let result = compile_and_run(
+            storage,
+            r#"
+            find_vector_metrics("test", tags: { "component_id": "*.suffix" })
+        "#,
+        )
+        .expect("vrl failed");
+        let result = result.as_array_unwrap();
+
+        assert_eq!(result.len(), 2);
+        assert_metric_matches(
+            result[0].as_object().unwrap(),
+            "test",
+            1.0,
+            Some(vec![("component_id", "a.suffix")]),
+        );
+        assert_metric_matches(
+            result[1].as_object().unwrap(),
+            "test",
+            1.0,
+            Some(vec![("component_id", "c.suffix")]),
+        );
+    }
+
+    #[test]
+    fn test_find_vector_metrics_wildcard_middle() {
+        let storage = MetricsStorage::default();
+        storage.cache.store(
+            vec![
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "start.a.end".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "something_else".to_string(),
+                )]))),
+                Metric::new(
+                    "test",
+                    MetricKind::Absolute,
+                    vector_core::event::MetricValue::Gauge { value: 1.0 },
+                )
+                .with_tags(Some(MetricTags::from_iter([(
+                    "component_id".to_string(),
+                    "start.c.end".to_string(),
+                )]))),
+            ]
+            .into(),
+        );
+
+        let result = compile_and_run(
+            storage,
+            r#"
+            find_vector_metrics("test", tags: { "component_id": "start.*.end" })
+        "#,
+        )
+        .expect("vrl failed");
+        let result = result.as_array_unwrap();
+
+        assert_eq!(result.len(), 2);
+        assert_metric_matches(
+            result[0].as_object().unwrap(),
+            "test",
+            1.0,
+            Some(vec![("component_id", "start.a.end")]),
+        );
+        assert_metric_matches(
+            result[1].as_object().unwrap(),
+            "test",
+            1.0,
+            Some(vec![("component_id", "start.c.end")]),
         );
     }
 }
