@@ -34,6 +34,7 @@ ALL_MODULES=(
   cargo-nextest
   cargo-deny
   cargo-msrv
+  cargo-hack
   dd-rust-license-tool
   wasm-pack
   markdownlint
@@ -72,6 +73,7 @@ Modules:
   cargo-nextest
   cargo-deny
   cargo-msrv
+  cargo-hack
   dd-rust-license-tool
   wasm-pack
   markdownlint
@@ -105,7 +107,7 @@ contains_module() {
 # Always ensure git safe.directory is set
 git config --global --add safe.directory "$(pwd)"
 
-REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv wasm-pack vdev)
+REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack wasm-pack vdev)
 
 REQUIRES_BINSTALL=("${REQUIRES_RUSTUP[@]}")
 unset -v 'REQUIRES_BINSTALL[0]' # remove dd-rust-license-tool
@@ -171,6 +173,12 @@ fi
 if contains_module cargo-msrv; then
   if ! cargo-msrv --version 2>/dev/null | grep -q '^cargo-msrv 0.18.4'; then
     cargo "${install[@]}" cargo-msrv --version 0.18.4 --force --locked
+  fi
+fi
+
+if contains_module cargo-hack; then
+  if ! cargo-hack --version 2>/dev/null | grep -q '^cargo-hack 0.6.39'; then
+    cargo "${install[@]}" cargo-hack --version 0.6.39 --force --locked
   fi
 fi
 
