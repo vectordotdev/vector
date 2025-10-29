@@ -1,9 +1,9 @@
 use crate::opentelemetry::{parse_line_to_export_type_request, read_file_helper};
 
+use vector_lib::opentelemetry::proto::METRICS_REQUEST_MESSAGE_TYPE;
 use vector_lib::opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
 use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEnum;
 use vector_lib::opentelemetry::proto::metrics::v1::metric::Data as MetricData;
-use vector_lib::opentelemetry::proto::METRICS_REQUEST_MESSAGE_TYPE;
 
 const EXPECTED_METRIC_COUNT: usize = 400; // 200 via gRPC + 200 via HTTP (50 of each type: Gauge, Sum, Histogram, ExponentialHistogram)
 
@@ -77,13 +77,11 @@ fn assert_metric_data_points(request: &ExportMetricsServiceRequest) {
     for (rm_idx, rm) in request.resource_metrics.iter().enumerate() {
         for (sm_idx, sm) in rm.scope_metrics.iter().enumerate() {
             for (m_idx, metric) in sm.metrics.iter().enumerate() {
-                let prefix = format!("resource_metrics[{rm_idx}].scope_metrics[{sm_idx}].metrics[{m_idx}]");
+                let prefix =
+                    format!("resource_metrics[{rm_idx}].scope_metrics[{sm_idx}].metrics[{m_idx}]");
 
                 // Assert metric has a name
-                assert!(
-                    !metric.name.is_empty(),
-                    "{prefix} metric name is empty"
-                );
+                assert!(!metric.name.is_empty(), "{prefix} metric name is empty");
 
                 // Get data points based on metric type
                 let data_points_count = match &metric.data {
@@ -135,20 +133,12 @@ fn assert_metric_data_points(request: &ExportMetricsServiceRequest) {
                         );
                         exp_histogram.data_points.len()
                     }
-                    Some(MetricData::Summary(summary)) => {
-                        assert!(
-                            !summary.data_points.is_empty(),
-                            "{prefix} summary has no data points"
-                        );
-                        summary.data_points.len()
-                    }
+                    // not supported by telemetrygen
+                    Some(MetricData::Summary(_)) => panic!("Unexpected Summary metric"),
                     None => panic!("{prefix} has no data"),
                 };
 
-                assert!(
-                    data_points_count > 0,
-                    "{prefix} has zero data points"
-                );
+                assert!(data_points_count > 0, "{prefix} has zero data points");
             }
         }
     }
@@ -159,7 +149,8 @@ fn assert_metric_attributes(request: &ExportMetricsServiceRequest) {
     for (rm_idx, rm) in request.resource_metrics.iter().enumerate() {
         for (sm_idx, sm) in rm.scope_metrics.iter().enumerate() {
             for (m_idx, metric) in sm.metrics.iter().enumerate() {
-                let prefix = format!("resource_metrics[{rm_idx}].scope_metrics[{sm_idx}].metrics[{m_idx}]");
+                let prefix =
+                    format!("resource_metrics[{rm_idx}].scope_metrics[{sm_idx}].metrics[{m_idx}]");
 
                 // Determine expected attribute value based on metric name
                 let expected_attr_value = match metric.name.as_str() {
@@ -185,13 +176,17 @@ fn assert_metric_attributes(request: &ExportMetricsServiceRequest) {
                                     panic!("{prefix}.histogram.data_points[{dp_idx}] missing 'metric.type' attribute")
                                 });
 
-                            if let Some(AnyValueEnum::StringValue(s)) = attr.value.as_ref().and_then(|v| v.value.as_ref()) {
+                            if let Some(AnyValueEnum::StringValue(s)) =
+                                attr.value.as_ref().and_then(|v| v.value.as_ref())
+                            {
                                 assert_eq!(
                                     s, expected_attr_value,
                                     "{prefix}.histogram.data_points[{dp_idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
                                 );
                             } else {
-                                panic!("{prefix}.histogram.data_points[{dp_idx}] 'metric.type' is not a string value");
+                                panic!(
+                                    "{prefix}.histogram.data_points[{dp_idx}] 'metric.type' is not a string value"
+                                );
                             }
                         }
                         continue; // Already verified histogram attributes above
@@ -207,38 +202,23 @@ fn assert_metric_attributes(request: &ExportMetricsServiceRequest) {
                                     panic!("{prefix}.exponential_histogram.data_points[{dp_idx}] missing 'metric.type' attribute")
                                 });
 
-                            if let Some(AnyValueEnum::StringValue(s)) = attr.value.as_ref().and_then(|v| v.value.as_ref()) {
+                            if let Some(AnyValueEnum::StringValue(s)) =
+                                attr.value.as_ref().and_then(|v| v.value.as_ref())
+                            {
                                 assert_eq!(
                                     s, expected_attr_value,
                                     "{prefix}.exponential_histogram.data_points[{dp_idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
                                 );
                             } else {
-                                panic!("{prefix}.exponential_histogram.data_points[{dp_idx}] 'metric.type' is not a string value");
+                                panic!(
+                                    "{prefix}.exponential_histogram.data_points[{dp_idx}] 'metric.type' is not a string value"
+                                );
                             }
                         }
                         continue; // Already verified exponential histogram attributes above
                     }
-                    Some(MetricData::Summary(s)) => {
-                        for (dp_idx, dp) in s.data_points.iter().enumerate() {
-                            let attr = dp
-                                .attributes
-                                .iter()
-                                .find(|kv| kv.key == "metric.type")
-                                .unwrap_or_else(|| {
-                                    panic!("{prefix}.summary.data_points[{dp_idx}] missing 'metric.type' attribute")
-                                });
-
-                            if let Some(AnyValueEnum::StringValue(s)) = attr.value.as_ref().and_then(|v| v.value.as_ref()) {
-                                assert_eq!(
-                                    s, expected_attr_value,
-                                    "{prefix}.summary.data_points[{dp_idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
-                                );
-                            } else {
-                                panic!("{prefix}.summary.data_points[{dp_idx}] 'metric.type' is not a string value");
-                            }
-                        }
-                        continue; // Already verified summary attributes above
-                    }
+                    // not supported by telemetrygen
+                    Some(MetricData::Summary(_)) => panic!("Unexpected Summary metric"),
                     None => panic!("{prefix} has no data"),
                 };
 
@@ -252,13 +232,17 @@ fn assert_metric_attributes(request: &ExportMetricsServiceRequest) {
                             panic!("{prefix}.data_points[{dp_idx}] missing 'metric.type' attribute")
                         });
 
-                    if let Some(AnyValueEnum::StringValue(s)) = attr.value.as_ref().and_then(|v| v.value.as_ref()) {
+                    if let Some(AnyValueEnum::StringValue(s)) =
+                        attr.value.as_ref().and_then(|v| v.value.as_ref())
+                    {
                         assert_eq!(
                             s, expected_attr_value,
                             "{prefix}.data_points[{dp_idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
                         );
                     } else {
-                        panic!("{prefix}.data_points[{dp_idx}] 'metric.type' is not a string value");
+                        panic!(
+                            "{prefix}.data_points[{dp_idx}] 'metric.type' is not a string value"
+                        );
                     }
                 }
             }
@@ -281,11 +265,12 @@ fn assert_metric_names_and_types(request: &ExportMetricsServiceRequest) {
                     Some(MetricData::Sum(_)) => "Sum",
                     Some(MetricData::Histogram(_)) => "Histogram",
                     Some(MetricData::ExponentialHistogram(_)) => "ExponentialHistogram",
-                    Some(MetricData::Summary(_)) => "Summary",
-                    None => "Unknown",
+                    Some(MetricData::Summary(_)) | None => panic!("unexpected MetricData type"),
                 };
 
-                *metric_type_counts.entry((&metric.name, type_name)).or_insert(0) += 1;
+                *metric_type_counts
+                    .entry((&metric.name, type_name))
+                    .or_insert(0) += 1;
             }
         }
     }
@@ -353,7 +338,7 @@ fn vector_sink_otel_sink_metrics_match() {
                 Some(MetricData::Sum(s)) => s.data_points.len(),
                 Some(MetricData::Histogram(h)) => h.data_points.len(),
                 Some(MetricData::ExponentialHistogram(eh)) => eh.data_points.len(),
-                Some(MetricData::Summary(s)) => s.data_points.len(),
+                Some(MetricData::Summary(_)) => panic!("Unexpected Summary metric"),
                 None => 0,
             })
             .sum()
