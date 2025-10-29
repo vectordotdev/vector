@@ -82,7 +82,7 @@ impl ApplicationConfig {
             watcher_conf,
             opts.require_healthy,
             opts.allow_empty_config,
-            opts.disable_env_var_interpolation,
+            !opts.disable_env_var_interpolation,
             graceful_shutdown_duration,
             signal_handler,
         )
