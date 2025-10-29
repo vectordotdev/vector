@@ -141,6 +141,8 @@ on:
         value: ${{ jobs.e2e_tests.outputs.datadog-metrics }}
       e2e-opentelemetry-logs:
         value: ${{ jobs.e2e_tests.outputs.opentelemetry-logs }}
+      e2e-opentelemetry-metrics:
+        value: ${{ jobs.e2e_tests.outputs.opentelemetry-metrics }}
       int-tests-any:
         value: ${{ jobs.int_tests.outputs.any }}
       e2e-tests-any:
@@ -396,6 +398,7 @@ jobs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
       opentelemetry-logs: ${{ steps.filter.outputs.opentelemetry-logs }}
+      opentelemetry-metrics: ${{ steps.filter.outputs.opentelemetry-metrics }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -422,7 +425,8 @@ jobs:
           {
             "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
             "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
-            "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }}
+            "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }},
+            "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }}
           }
           EOF
           )
