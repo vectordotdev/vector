@@ -28,6 +28,11 @@ jobs:
         with:
           ref: ${{ inputs.checkout_ref || inputs.commit_sha }}
 
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          vdev: true
+
       - name: Login to GitHub Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
@@ -38,7 +43,7 @@ jobs:
       - name: Build and push integration test runner image
         run: |
           # Build integration test runner image with all-integration-tests feature
-          cargo vdev int build
+          vdev int build
           # Get rust version from rust-toolchain.toml (same as vdev does)
           RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
           LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
