@@ -1,6 +1,8 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, InternalEvent};
 
+#[internal_event]
 pub struct TagCardinalityLimitRejectingEvent<'a> {
     pub metric_name: &'a str,
     pub tag_key: &'a str,
@@ -24,6 +26,7 @@ impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
     }
 }
 
+#[internal_event]
 pub struct TagCardinalityLimitRejectingTag<'a> {
     pub metric_name: &'a str,
     pub tag_key: &'a str,
@@ -42,6 +45,7 @@ impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
     }
 }
 
+#[internal_event]
 pub struct TagCardinalityValueLimitReached<'a> {
     pub key: &'a str,
 }

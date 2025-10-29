@@ -3,6 +3,7 @@
 use metrics::counter;
 #[cfg(feature = "sources-aws_s3")]
 pub use s3::*;
+use vector_config::internal_event;
 use vector_lib::internal_event::InternalEvent;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs"))]
 use vector_lib::internal_event::{error_stage, error_type};
@@ -17,6 +18,7 @@ mod s3 {
     use super::*;
     use crate::sources::aws_s3::sqs::ProcessingError;
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SqsMessageProcessingError<'a> {
         pub message_id: &'a str,
@@ -43,6 +45,7 @@ mod s3 {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SqsMessageDeleteSucceeded {
         pub message_ids: Vec<DeleteMessageBatchResultEntry>,
@@ -59,6 +62,7 @@ mod s3 {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SqsMessageDeletePartialError {
         pub entries: Vec<BatchResultErrorEntry>,
@@ -86,6 +90,7 @@ mod s3 {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SqsMessageDeleteBatchError<E> {
         pub entries: Vec<DeleteMessageBatchRequestEntry>,
@@ -115,6 +120,7 @@ mod s3 {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SqsMessageSentSucceeded {
         pub message_ids: Vec<SendMessageBatchResultEntry>,
@@ -131,6 +137,7 @@ mod s3 {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SqsMessageSentPartialError {
         pub entries: Vec<BatchResultErrorEntry>,
@@ -158,6 +165,7 @@ mod s3 {
         }
     }
 
+    #[internal_event]
     #[derive(Debug)]
     pub struct SqsMessageSendBatchError<E> {
         pub entries: Vec<SendMessageBatchRequestEntry>,
@@ -188,6 +196,7 @@ mod s3 {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct SqsMessageReceiveError<'a, E> {
     pub error: &'a E,
@@ -212,6 +221,7 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'_, E> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct SqsMessageReceiveSucceeded {
     pub count: usize,
@@ -225,6 +235,7 @@ impl InternalEvent for SqsMessageReceiveSucceeded {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct SqsMessageProcessingSucceeded<'a> {
     pub message_id: &'a str,
@@ -240,6 +251,7 @@ impl InternalEvent for SqsMessageProcessingSucceeded<'_> {
 // AWS SQS source
 
 #[cfg(feature = "sources-aws_sqs")]
+#[internal_event]
 #[derive(Debug)]
 pub struct SqsMessageDeleteError<'a, E> {
     pub error: &'a E,
@@ -265,6 +277,7 @@ impl<E: std::fmt::Display> InternalEvent for SqsMessageDeleteError<'_, E> {
 
 // AWS s3 source
 
+#[internal_event]
 #[derive(Debug)]
 pub struct SqsS3EventRecordInvalidEventIgnored<'a> {
     pub bucket: &'a str,

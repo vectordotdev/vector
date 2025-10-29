@@ -1,4 +1,5 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::{
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
@@ -6,6 +7,7 @@ use vector_lib::{
 
 use crate::sources::apache_metrics;
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ApacheMetricsEventsReceived<'a> {
     pub byte_size: JsonSize,
@@ -30,6 +32,7 @@ impl InternalEvent for ApacheMetricsEventsReceived<'_> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ApacheMetricsParseError<'a> {
     pub error: apache_metrics::ParseError,

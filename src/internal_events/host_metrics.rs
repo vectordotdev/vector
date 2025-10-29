@@ -1,6 +1,8 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
+#[internal_event]
 #[derive(Debug)]
 pub struct HostMetricsScrapeError {
     pub message: &'static str,
@@ -23,6 +25,7 @@ impl InternalEvent for HostMetricsScrapeError {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct HostMetricsScrapeDetailError<E> {
     pub message: &'static str,
@@ -47,6 +50,7 @@ impl<E: std::fmt::Display> InternalEvent for HostMetricsScrapeDetailError<E> {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct HostMetricsScrapeFilesystemError {
     pub message: &'static str,
