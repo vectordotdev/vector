@@ -51,7 +51,7 @@ use crate::{
     spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{UtilizationComponentSender, UtilizationEmitter, wrap},
+    utilization::{UtilizationComponentSender, UtilizationEmitter, UtilizationRegistry, wrap},
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
@@ -83,7 +83,8 @@ struct Builder<'a> {
     healthchecks: HashMap<ComponentKey, Task>,
     detach_triggers: HashMap<ComponentKey, Trigger>,
     extra_context: ExtraContext,
-    utilization_emitter: UtilizationEmitter,
+    utilization_emitter: Option<UtilizationEmitter>,
+    utilization_registry: UtilizationRegistry,
 }
 
 impl<'a> Builder<'a> {
@@ -92,8 +93,16 @@ impl<'a> Builder<'a> {
         diff: &'a ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
-        utilization_emitter: Option<UtilizationEmitter>,
+        utilization_registry: Option<UtilizationRegistry>,
     ) -> Self {
+        // If registry is not passed, we need to build a whole new utilization emitter + registry
+        // Otherwise, we just store the registry and reuse it for this build
+        let (emitter, registry) = if let Some(registry) = utilization_registry {
+            (None, registry)
+        } else {
+            let (emitter, registry) = UtilizationEmitter::new();
+            (Some(emitter), registry)
+        };
         Self {
             config,
             diff,
@@ -106,7 +115,8 @@ impl<'a> Builder<'a> {
             healthchecks: HashMap::new(),
             detach_triggers: HashMap::new(),
             extra_context,
-            utilization_emitter: utilization_emitter.unwrap_or_else(|| UtilizationEmitter::new()),
+            utilization_emitter: emitter,
+            utilization_registry: registry,
         }
     }
 
@@ -130,7 +140,9 @@ impl<'a> Builder<'a> {
                 healthchecks: self.healthchecks,
                 shutdown_coordinator: self.shutdown_coordinator,
                 detach_triggers: self.detach_triggers,
-                utilization_emitter: Some(self.utilization_emitter),
+                utilization: self
+                    .utilization_emitter
+                    .map(|e| (e, self.utilization_registry)),
             })
         } else {
             Err(self.errors)
@@ -515,7 +527,7 @@ impl<'a> Builder<'a> {
 
             let (transform_task, transform_outputs) = {
                 let _span = span.enter();
-                build_transform(transform, node, input_rx, &self.utilization_emitter)
+                build_transform(transform, node, input_rx, &self.utilization_registry)
             };
 
             self.outputs.extend(transform_outputs);
@@ -620,7 +632,7 @@ impl<'a> Builder<'a> {
             let (trigger, tripwire) = Tripwire::new();
 
             let utilization_sender = self
-                .utilization_emitter
+                .utilization_registry
                 .add_component(key.clone(), gauge!("utilization"));
             let component_key = key.clone();
             let sink = async move {
@@ -764,7 +776,7 @@ pub struct TopologyPieces {
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
-    pub(crate) utilization_emitter: Option<UtilizationEmitter>,
+    pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
 }
 
 /// Builder for constructing TopologyPieces with a fluent API.
@@ -783,7 +795,7 @@ pub struct TopologyPiecesBuilder<'a> {
     diff: &'a ConfigDiff,
     buffers: HashMap<ComponentKey, BuiltBuffer>,
     extra_context: ExtraContext,
-    utilization_emitter: Option<UtilizationEmitter>,
+    utilization_registry: Option<UtilizationRegistry>,
 }
 
 impl<'a> TopologyPiecesBuilder<'a> {
@@ -794,7 +806,7 @@ impl<'a> TopologyPiecesBuilder<'a> {
             diff,
             buffers: HashMap::new(),
             extra_context: ExtraContext::default(),
-            utilization_emitter: None,
+            utilization_registry: None,
         }
     }
 
@@ -810,9 +822,9 @@ impl<'a> TopologyPiecesBuilder<'a> {
         self
     }
 
-    /// Sets the utilization emitter for the topology.
-    pub fn with_utilization_emitter(mut self, emitter: Option<UtilizationEmitter>) -> Self {
-        self.utilization_emitter = emitter;
+    /// Sets the utilization registry for the topology.
+    pub fn with_utilization_registry(mut self, registry: Option<UtilizationRegistry>) -> Self {
+        self.utilization_registry = registry;
         self
     }
 
@@ -826,7 +838,7 @@ impl<'a> TopologyPiecesBuilder<'a> {
             self.diff,
             self.buffers,
             self.extra_context,
-            self.utilization_emitter,
+            self.utilization_registry,
         )
         .build()
         .await
@@ -855,12 +867,12 @@ impl TopologyPieces {
         diff: &ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
-        utilization_emitter: Option<UtilizationEmitter>,
+        utilization_registry: Option<UtilizationRegistry>,
     ) -> Option<Self> {
         TopologyPiecesBuilder::new(config, diff)
             .with_buffers(buffers)
             .with_extra_context(extra_context)
-            .with_utilization_emitter(utilization_emitter)
+            .with_utilization_registry(utilization_registry)
             .build_or_log_errors()
             .await
     }
@@ -871,12 +883,12 @@ impl TopologyPieces {
         diff: &ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
-        utilization_emitter: Option<UtilizationEmitter>,
+        utilization_registry: Option<UtilizationRegistry>,
     ) -> Result<Self, Vec<String>> {
         TopologyPiecesBuilder::new(config, diff)
             .with_buffers(buffers)
             .with_extra_context(extra_context)
-            .with_utilization_emitter(utilization_emitter)
+            .with_utilization_registry(utilization_registry)
             .build()
             .await
     }
@@ -927,14 +939,14 @@ fn build_transform(
     transform: Transform,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
-    utilization_emitter: &UtilizationEmitter,
+    utilization_registry: &UtilizationRegistry,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     match transform {
         // TODO: avoid the double boxing for function transforms here
         Transform::Function(t) => {
-            build_sync_transform(Box::new(t), node, input_rx, utilization_emitter)
+            build_sync_transform(Box::new(t), node, input_rx, utilization_registry)
         }
-        Transform::Synchronous(t) => build_sync_transform(t, node, input_rx, utilization_emitter),
+        Transform::Synchronous(t) => build_sync_transform(t, node, input_rx, utilization_registry),
         Transform::Task(t) => build_task_transform(
             t,
             input_rx,
@@ -942,7 +954,7 @@ fn build_transform(
             node.typetag,
             &node.key,
             &node.outputs,
-            utilization_emitter,
+            utilization_registry,
         ),
     }
 }
@@ -951,11 +963,11 @@ fn build_sync_transform(
     t: Box<dyn SyncTransform>,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
-    utilization_emitter: &UtilizationEmitter,
+    utilization_registry: &UtilizationRegistry,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (outputs, controls) = TransformOutputs::new(node.outputs, &node.key);
 
-    let sender = utilization_emitter.add_component(node.key.clone(), gauge!("utilization"));
+    let sender = utilization_registry.add_component(node.key.clone(), gauge!("utilization"));
     let runner = Runner::new(t, input_rx, sender, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
         runner.run_concurrently().boxed()
@@ -1132,11 +1144,11 @@ fn build_task_transform(
     typetag: &str,
     key: &ComponentKey,
     outputs: &[TransformOutput],
-    utilization_emitter: &UtilizationEmitter,
+    utilization_registry: &UtilizationRegistry,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut fanout, control) = Fanout::new();
 
-    let sender = utilization_emitter.add_component(key.clone(), gauge!("utilization"));
+    let sender = utilization_registry.add_component(key.clone(), gauge!("utilization"));
     let input_rx = wrap(sender, key.clone(), input_rx.into_stream());
 
     let events_received = register!(EventsReceived);

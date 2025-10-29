@@ -201,34 +201,16 @@ impl UtilizationComponentSender {
     }
 }
 
-pub struct UtilizationEmitter {
+/// Registry for components sending utilization data.
+///
+/// Cloning this is cheap and does not clone the underlying data.
+#[derive(Clone)]
+pub struct UtilizationRegistry {
     timers: Arc<Mutex<HashMap<ComponentKey, Timer>>>,
-    timer_rx: Option<Receiver<UtilizationTimerMessage>>,
     timer_tx: Sender<UtilizationTimerMessage>,
 }
 
-impl Clone for UtilizationEmitter {
-    /// Cloning for UtilizationEmitter skipps the timer received. Only one instance is expected to
-    /// hold it and that instance should be running the `run_utilization` task.
-    fn clone(&self) -> Self {
-        Self {
-            timers: self.timers.clone(),
-            timer_rx: None,
-            timer_tx: self.timer_tx.clone(),
-        }
-    }
-}
-
-impl UtilizationEmitter {
-    pub(crate) fn new() -> Self {
-        let (timer_tx, timer_rx) = channel(4096);
-        Self {
-            timers: Arc::new(Mutex::new(HashMap::default())),
-            timer_tx,
-            timer_rx: Some(timer_rx).into(),
-        }
-    }
-
+impl UtilizationRegistry {
     /// Adds a new component to this utilization metric emitter
     ///
     /// Returns a sender which can be used to send utilization information back to the emitter
@@ -250,16 +232,31 @@ impl UtilizationEmitter {
             component_key: key,
         }
     }
+}
 
-    pub(crate) async fn run_utilization(&mut self, mut shutdown: ShutdownSignal) {
+pub(crate) struct UtilizationEmitter {
+    timers: Arc<Mutex<HashMap<ComponentKey, Timer>>>,
+    timer_rx: Receiver<UtilizationTimerMessage>,
+}
+
+impl UtilizationEmitter {
+    pub(crate) fn new() -> (Self, UtilizationRegistry) {
+        let (timer_tx, timer_rx) = channel(4096);
+        let timers = Arc::new(Mutex::new(HashMap::default()));
+        (
+            Self {
+                timers: Arc::clone(&timers),
+                timer_rx,
+            },
+            UtilizationRegistry { timers, timer_tx },
+        )
+    }
+
+    pub(crate) async fn run_utilization(mut self, mut shutdown: ShutdownSignal) {
         let mut intervals = IntervalStream::new(interval(UTILIZATION_EMITTER_DURATION));
-        let Some(mut timer_rx) = self.timer_rx.take() else {
-            warn!("Utilization metric emitter failed to start! Missing timer message receiver!");
-            return;
-        };
         loop {
             tokio::select! {
-                message = timer_rx.recv() => {
+                message = self.timer_rx.recv() => {
                     match message {
                         Some(UtilizationTimerMessage::StartWait(key, start_time)) => {
                             self.timers.lock().expect("mutex poisoned").get_mut(&key).expect("Utilization timer missing for component").start_wait(start_time);
