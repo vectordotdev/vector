@@ -30,7 +30,6 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
-          rust: true
           vdev: true
 
       - name: Login to GitHub Container Registry

@@ -318,7 +318,6 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
-          rust: true
           vdev: true
 
       # creates a yaml file that contains the filters for each integration,
@@ -407,7 +406,6 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
-          rust: true
           vdev: true
 
       # creates a yaml file that contains the filters for each test,
