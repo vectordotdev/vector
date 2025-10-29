@@ -925,6 +925,7 @@ all-integration-tests = [
   "logstash-integration-tests",
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
+  "mqtt-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
   "odbc-integration-tests",
