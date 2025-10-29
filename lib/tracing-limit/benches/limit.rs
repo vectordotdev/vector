@@ -58,8 +58,7 @@ fn bench(c: &mut Criterion) {
                             foo = "foo",
                             bar = "bar",
                             baz = 3,
-                            quuux = ?0.99,
-                            internal_log_rate_limit = true
+                            quuux = ?0.99
                         )
                     }
                 })

@@ -340,14 +340,12 @@ impl HttpResourceOutputContext<'_> {
                                     Ok(Some((events, decoded_byte_size))) => {
                                         if should_reject {
                                             info!(
-                                                internal_log_rate_limit = true,
                                                 "HTTP server external output resource decoded {decoded_byte_size:?} bytes but test case configured to reject.",
                                             );
                                         } else {
                                             let mut output_runner_metrics =
                                                 output_runner_metrics.lock().await;
                                             info!(
-                                                internal_log_rate_limit = true,
                                                 "HTTP server external output resource decoded {decoded_byte_size:?} bytes."
                                             );
 

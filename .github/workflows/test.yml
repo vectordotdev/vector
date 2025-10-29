@@ -14,15 +14,10 @@ env:
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
-  RUST_BACKTRACE: full
-  CARGO_TERM_COLOR: always
   VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
   PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   changes:
