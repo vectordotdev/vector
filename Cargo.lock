@@ -12634,7 +12634,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.27.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=protobuf-int-to-double#4dfe508d30f9cead6b2c0c12bf05c2c42bfa5011"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#90ea34f09903e3ee85f9b3e4813f44992f6e7c68"
 dependencies = [
  "aes",
  "aes-siv",
