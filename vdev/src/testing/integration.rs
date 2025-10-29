@@ -238,6 +238,7 @@ impl ComposeTest {
                 self.local_config.directory,
                 &self.env_config,
                 false, // Always rebuild for E2E tests
+                true,  // E2E tests build Vector in the image
             )?;
         }
 
