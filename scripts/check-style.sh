@@ -49,10 +49,10 @@ if [ "$CHECK_ALL" = true ]; then
   # Check all files tracked by git
   FILES=$(git ls-files)
 else
-  # Check only modified files (staged + unstaged changes)
-  FILES=$(git diff --name-only HEAD)
+  # Check only files changed in current branch compared to origin/master
+  FILES=$(git diff --name-only "origin/master"...HEAD)
 
-  # If no modified files, we're on a clean checkout - check all files
+  # If no changed files, fall back to checking all files
   if [ -z "$FILES" ]; then
     FILES=$(git ls-files)
   fi
