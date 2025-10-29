@@ -1,7 +1,8 @@
 use anyhow::Result;
-use std::{collections::HashSet, env, path::PathBuf, process::Command};
+use std::{collections::HashSet, env, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
+use crate::testing::test_runner_dockerfile;
 use crate::{
     app::{self, CommandExt as _},
     environment::{Environment, append_environment_variables},
@@ -54,8 +55,8 @@ pub trait TestRunner {
         inner_env: &Environment,
         features: Option<&[String]>,
         args: &[String],
-        directory: &str,
         reuse_image: bool,
+        build: bool,
     ) -> Result<()>;
 }
 
@@ -102,9 +103,9 @@ pub trait ContainerTestRunner: TestRunner {
     fn ensure_running(
         &self,
         features: Option<&[String]>,
-        directory: &str,
         config_environment_variables: &Environment,
         reuse_image: bool,
+        build: bool,
     ) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
@@ -116,12 +117,7 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(
-                    features,
-                    directory,
-                    config_environment_variables,
-                    reuse_image,
-                )?;
+                self.build(features, config_environment_variables, reuse_image, build)?;
                 self.create()?;
                 self.start()?;
             }
@@ -152,9 +148,9 @@ pub trait ContainerTestRunner: TestRunner {
     fn build(
         &self,
         features: Option<&[String]>,
-        directory: &str,
         config_env_vars: &Environment,
         reuse_image: bool,
+        build: bool,
     ) -> Result<()> {
         let image_name = self.image_name();
 
@@ -171,12 +167,9 @@ pub trait ContainerTestRunner: TestRunner {
             }
         }
 
-        let dockerfile: PathBuf = [app::path(), "scripts", directory, "Dockerfile"]
-            .iter()
-            .collect();
-
+        let dockerfile = test_runner_dockerfile();
         let mut command =
-            prepare_build_command(&image_name, &dockerfile, features, config_env_vars);
+            prepare_build_command(&image_name, &dockerfile, features, config_env_vars, build);
         waiting!("Building image {}", image_name);
         command.check_run()
     }
@@ -256,15 +249,10 @@ where
         config_environment_variables: &Environment,
         features: Option<&[String]>,
         args: &[String],
-        directory: &str,
         reuse_image: bool,
+        build: bool,
     ) -> Result<()> {
-        self.ensure_running(
-            features,
-            directory,
-            config_environment_variables,
-            reuse_image,
-        )?;
+        self.ensure_running(features, config_environment_variables, reuse_image, build)?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
@@ -422,8 +410,8 @@ impl TestRunner for LocalTestRunner {
         inner_env: &Environment,
         _features: Option<&[String]>,
         args: &[String],
-        _directory: &str,
         _reuse_image: bool,
+        _build: bool,
     ) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);
