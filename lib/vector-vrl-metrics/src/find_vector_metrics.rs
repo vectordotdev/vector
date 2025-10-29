@@ -44,11 +44,22 @@ impl Function for FindVectorMetrics {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
-            title: "Find the datadog api key",
-            source: r#"find_vector_metrics("utilization")"#,
-            result: Ok("secret value"),
-        }]
+        &[
+            Example {
+                title: "Find vector internal metrics matching the name",
+                source: r#"find_vector_metrics("utilization")"#,
+                result: Ok(
+                    indoc! { r#"[{"name": "utilization", "tags": {}, "type": "gauge", "kind": "absolute", "value": 0.5}]"# },
+                ),
+            },
+            Example {
+                title: "Find vector internal metrics matching the name and tags",
+                source: r#"find_vector_metrics("utilization", tags: {"component_id": "test"}})"#,
+                result: Ok(
+                    indoc! { r#"[{"name": "utilization", "tags": {"component_id": ["test"]}, "type": "gauge", "kind": "absolute", "value": 0.5}]"# },
+                ),
+            },
+        ]
     }
 
     fn compile(

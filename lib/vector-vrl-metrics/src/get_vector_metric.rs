@@ -41,11 +41,22 @@ impl Function for GetVectorMetric {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
-            title: "Get the datadog api key",
-            source: r#"get_vector_metric("utilization")"#,
-            result: Ok("secret value"),
-        }]
+        &[
+            Example {
+                title: "Get a vector internal metric matching the name",
+                source: r#"get_vector_metrics("utilization")"#,
+                result: Ok(
+                    indoc! { r#"{"name": "utilization", "tags": {}, "type": "gauge", "kind": "absolute", "value": 0.5}"# },
+                ),
+            },
+            Example {
+                title: "Get a vector internal metric matching the name and tags",
+                source: r#"get_vector_metrics("utilization", tags: {"component_id": "test"}})"#,
+                result: Ok(
+                    indoc! { r#"{"name": "utilization", "tags": {"component_id": ["test"]}, "type": "gauge", "kind": "absolute", "value": 0.5}"# },
+                ),
+            },
+        ]
     }
 
     fn compile(
@@ -90,6 +101,8 @@ impl FunctionExpression for GetVectorMetricFn {
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
-        TypeDef::object(metrics_vrl_typedef()).infallible()
+        TypeDef::object(metrics_vrl_typedef())
+            .or_null()
+            .infallible()
     }
 }
