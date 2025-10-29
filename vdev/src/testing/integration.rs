@@ -235,7 +235,6 @@ impl ComposeTest {
         if self.local_config.kind == ComposeTestKind::E2E {
             self.runner.build(
                 Some(&self.config.features),
-                self.local_config.directory,
                 &self.env_config,
                 false, // Always rebuild for E2E tests
                 true,  // E2E tests build Vector in the image

@@ -103,7 +103,6 @@ pub trait ContainerTestRunner: TestRunner {
     fn ensure_running(
         &self,
         features: Option<&[String]>,
-        directory: &str,
         config_environment_variables: &Environment,
         reuse_image: bool,
         build: bool,
@@ -118,13 +117,7 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(
-                    features,
-                    directory,
-                    config_environment_variables,
-                    reuse_image,
-                    build,
-                )?;
+                self.build(features, config_environment_variables, reuse_image, build)?;
                 self.create()?;
                 self.start()?;
             }
@@ -155,7 +148,6 @@ pub trait ContainerTestRunner: TestRunner {
     fn build(
         &self,
         features: Option<&[String]>,
-        _directory: &str,
         config_env_vars: &Environment,
         reuse_image: bool,
         build: bool,
@@ -263,13 +255,7 @@ where
         // Integration tests (scripts/integration) don't pre-build Vector, E2E tests (scripts/e2e) do
         let build = directory == "e2e";
 
-        self.ensure_running(
-            features,
-            directory,
-            config_environment_variables,
-            reuse_image,
-            build,
-        )?;
+        self.ensure_running(features, config_environment_variables, reuse_image, build)?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
