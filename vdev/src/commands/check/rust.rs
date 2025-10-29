@@ -18,8 +18,8 @@ pub struct Cli {
 }
 
 impl Cli {
-    /// Build the argument vector for cargo invocation.
-    fn build_args(&self) -> Vec<OsString> {
+    /// Build args with specific workspace target
+    fn build_args_with_target(&self, workspace_arg: &str) -> Vec<OsString> {
         let tool = if self.clippy { "clippy" } else { "check" };
 
         let pre_args = if self.fix {
@@ -44,24 +44,25 @@ impl Cli {
             ]
         };
 
-        [tool, "--workspace", "--all-targets"]
+        [tool, workspace_arg, "--all-targets"]
             .chain_args(feature_args)
             .chain_args(pre_args)
             .chain_args(clippy_args)
     }
 
-    pub fn exec(self) -> Result<()> {
-        // Check Vector workspace
-        app::exec("cargo", self.build_args(), true)?;
+    /// Build args for checking Vector workspace
+    fn build_vector_args(&self) -> Vec<OsString> {
+        self.build_args_with_target("--workspace")
+    }
 
-        // Check vdev separately (it's a standalone crate now)
-        info!("Checking vdev crate...");
-        let mut vdev_args = self.build_args();
-        // Replace --workspace with --manifest-path for vdev
-        if let Some(pos) = vdev_args.iter().position(|arg| arg == "--workspace") {
-            vdev_args[pos] = "--manifest-path=vdev/Cargo.toml".into();
-        }
-        app::exec("cargo", vdev_args, true)?;
+    /// Build args for checking vdev crate
+    fn build_vdev_args(&self) -> Vec<OsString> {
+        self.build_args_with_target("--manifest-path=vdev/Cargo.toml")
+    }
+
+    pub fn exec(self) -> Result<()> {
+        app::exec("cargo", self.build_vector_args(), true)?;
+        app::exec("cargo", self.build_vdev_args(), true)?;
 
         // If --fix was used, check for changes and commit them.
         if self.fix {
