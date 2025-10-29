@@ -2,6 +2,7 @@ use crate::opentelemetry::{parse_line_to_export_type_request, read_file_helper};
 
 use vector_lib::opentelemetry::proto::METRICS_REQUEST_MESSAGE_TYPE;
 use vector_lib::opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
+use vector_lib::opentelemetry::proto::common::v1::KeyValue;
 use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEnum;
 use vector_lib::opentelemetry::proto::metrics::v1::metric::Data as MetricData;
 
@@ -152,84 +153,40 @@ fn assert_metric_attributes(request: &ExportMetricsServiceRequest) {
                 let prefix =
                     format!("resource_metrics[{rm_idx}].scope_metrics[{sm_idx}].metrics[{m_idx}]");
 
-                // Determine expected attribute value based on metric name
-                let expected_attr_value = match metric.name.as_str() {
-                    "gauge_metric" => "gauge",
-                    "sum_metric" => "sum",
-                    "histogram_metric" => "histogram",
-                    "exponential_histogram_metric" => "exponential_histogram",
-                    _ => panic!("{prefix} has unexpected metric name: {}", metric.name),
-                };
-
                 // Get data points and verify attributes
-                let data_points_with_attrs = match &metric.data {
-                    Some(MetricData::Gauge(g)) => &g.data_points,
-                    Some(MetricData::Sum(s)) => &s.data_points,
-                    Some(MetricData::Histogram(h)) => {
-                        // Histogram data points have attributes
-                        for (dp_idx, dp) in h.data_points.iter().enumerate() {
-                            let attr = dp
-                                .attributes
-                                .iter()
-                                .find(|kv| kv.key == "metric.type")
-                                .unwrap_or_else(|| {
-                                    panic!("{prefix}.histogram.data_points[{dp_idx}] missing 'metric.type' attribute")
-                                });
-
-                            if let Some(AnyValueEnum::StringValue(s)) =
-                                attr.value.as_ref().and_then(|v| v.value.as_ref())
-                            {
-                                assert_eq!(
-                                    s, expected_attr_value,
-                                    "{prefix}.histogram.data_points[{dp_idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
-                                );
-                            } else {
-                                panic!(
-                                    "{prefix}.histogram.data_points[{dp_idx}] 'metric.type' is not a string value"
-                                );
-                            }
-                        }
-                        continue; // Already verified histogram attributes above
+                let attrs: Box<dyn Iterator<Item = &Vec<KeyValue>>> = match metric
+                    .data
+                    .as_ref()
+                    .unwrap_or_else(|| panic!("{prefix} has no data"))
+                {
+                    MetricData::Gauge(g) => {
+                        assert_eq!(metric.name.as_str(), "gauge_metric");
+                        Box::new(g.data_points.iter().map(|g| &g.attributes))
                     }
-                    Some(MetricData::ExponentialHistogram(eh)) => {
-                        // ExponentialHistogram data points have attributes
-                        for (dp_idx, dp) in eh.data_points.iter().enumerate() {
-                            let attr = dp
-                                .attributes
-                                .iter()
-                                .find(|kv| kv.key == "metric.type")
-                                .unwrap_or_else(|| {
-                                    panic!("{prefix}.exponential_histogram.data_points[{dp_idx}] missing 'metric.type' attribute")
-                                });
-
-                            if let Some(AnyValueEnum::StringValue(s)) =
-                                attr.value.as_ref().and_then(|v| v.value.as_ref())
-                            {
-                                assert_eq!(
-                                    s, expected_attr_value,
-                                    "{prefix}.exponential_histogram.data_points[{dp_idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
-                                );
-                            } else {
-                                panic!(
-                                    "{prefix}.exponential_histogram.data_points[{dp_idx}] 'metric.type' is not a string value"
-                                );
-                            }
-                        }
-                        continue; // Already verified exponential histogram attributes above
+                    MetricData::Sum(s) => {
+                        assert_eq!(metric.name.as_str(), "sum_metric");
+                        Box::new(s.data_points.iter().map(|s| &s.attributes))
+                    }
+                    MetricData::Histogram(h) => {
+                        assert_eq!(metric.name.as_str(), "histogram_metric");
+                        Box::new(h.data_points.iter().map(|h| &h.attributes))
+                    }
+                    MetricData::ExponentialHistogram(h) => {
+                        assert_eq!(metric.name.as_str(), "exponential_histogram_metric");
+                        Box::new(h.data_points.iter().map(|h| &h.attributes))
                     }
                     // not supported by telemetrygen
-                    Some(MetricData::Summary(_)) => panic!("Unexpected Summary metric"),
-                    None => panic!("{prefix} has no data"),
+                    MetricData::Summary(_) => panic!("Unexpected Summary metric"),
                 };
+                let expected_attr_value = metric.name.strip_suffix("_metric").unwrap();
 
                 // Verify gauge and sum data point attributes
-                for (dp_idx, dp) in data_points_with_attrs.iter().enumerate() {
-                    let attr = dp
-                        .attributes
+                for (idx, attributes) in attrs.enumerate() {
+                    let attr = attributes
                         .iter()
                         .find(|kv| kv.key == "metric.type")
                         .unwrap_or_else(|| {
-                            panic!("{prefix}.data_points[{dp_idx}] missing 'metric.type' attribute")
+                            panic!("{prefix}.data_points[{idx}] missing 'metric.type' attribute")
                         });
 
                     if let Some(AnyValueEnum::StringValue(s)) =
@@ -237,12 +194,10 @@ fn assert_metric_attributes(request: &ExportMetricsServiceRequest) {
                     {
                         assert_eq!(
                             s, expected_attr_value,
-                            "{prefix}.data_points[{dp_idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
+                            "{prefix}.data_points[{idx}] 'metric.type' expected '{expected_attr_value}', got '{s}'"
                         );
                     } else {
-                        panic!(
-                            "{prefix}.data_points[{dp_idx}] 'metric.type' is not a string value"
-                        );
+                        panic!("{prefix}.data_points[{idx}] 'metric.type' is not a string value");
                     }
                 }
             }
