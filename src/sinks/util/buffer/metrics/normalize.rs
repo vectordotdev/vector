@@ -853,49 +853,57 @@ mod tests {
                          
         assert!(has_recent, "Expected at least one of the most recent metrics to be retained");
     }
-    //
-    // #[test]
-    // fn test_incremental_to_absolute_conversion() {
-    //     let mut metric_set = MetricSet::default();
-    //
-    //     // Create a series of incremental counter metrics with the same series
-    //     let tags = Some(HashMap::from([("host".to_string(), "test-host".to_string())]));
-    //
-    //     // Process a sequence of incremental metrics
-    //     let incremental1 = create_test_metric("test-metric", MetricKind::Incremental, 1.0, tags.clone());
-    //     let absolute1 = metric_set.make_absolute(incremental1.clone()).unwrap();
-    //
-    //     // First metric should be converted to absolute with the same value
-    //     assert_eq!(absolute1.kind(), MetricKind::Absolute);
-    //     match absolute1.value() {
-    //         MetricValue::Counter { value } => assert_eq!(*value, 1.0),
-    //         _ => panic!("Expected counter metric"),
-    //     }
-    //
-    //     // Send a second incremental metric
-    //     let incremental2 = create_test_metric("test-metric", MetricKind::Incremental, 2.0, tags.clone());
-    //     let absolute2 = metric_set.make_absolute(incremental2.clone()).unwrap();
-    //
-    //     // Second metric should be converted to absolute with accumulated value (1.0 + 2.0 = 3.0)
-    //     assert_eq!(absolute2.kind(), MetricKind::Absolute);
-    //     match absolute2.value() {
-    //         MetricValue::Counter { value } => assert_eq!(*value, 3.0),
-    //         _ => panic!("Expected counter metric"),
-    //     }
-    //
-    //     // Verify gauges are handled correctly
-    //     let gauge_metric = create_gauge_metric("test-gauge", MetricKind::Incremental, 5.0, tags.clone());
-    //
-    //     // Process the gauge metric
-    //     let gauge_absolute = metric_set.make_absolute(gauge_metric.clone()).unwrap();
-    //
-    //     // Gauge should be converted to absolute with the same value
-    //     assert_eq!(gauge_absolute.kind(), MetricKind::Absolute);
-    //     match gauge_absolute.value() {
-    //         MetricValue::Gauge { value } => assert_eq!(*value, 5.0),
-    //         _ => panic!("Expected gauge metric"),
-    //     }
-    // }
+        #[test]
+    fn test_incremental_to_absolute_conversion() {
+        let mut metric_set = MetricSet::default();
+
+        // Process a sequence of incremental counter metrics
+        let incremental1 = create_test_metric(
+            "test-metric",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 1.0 },
+        );
+        let absolute1 = metric_set.make_absolute(incremental1.clone()).unwrap();
+
+        // First metric should be converted to absolute with the same value
+        assert_eq!(absolute1.kind(), MetricKind::Absolute);
+        match absolute1.value() {
+            MetricValue::Counter { value } => assert_eq!(*value, 1.0),
+            _ => panic!("Expected counter metric"),
+        }
+
+        // Send a second incremental metric
+        let incremental2 = create_test_metric(
+            "test-metric",
+            MetricKind::Incremental,
+            MetricValue::Counter { value: 2.0 },
+        );
+        let absolute2 = metric_set.make_absolute(incremental2.clone()).unwrap();
+
+        // Second metric should be converted to absolute with accumulated value (1.0 + 2.0 = 3.0)
+        assert_eq!(absolute2.kind(), MetricKind::Absolute);
+        match absolute2.value() {
+            MetricValue::Counter { value } => assert_eq!(*value, 3.0),
+            _ => panic!("Expected counter metric"),
+        }
+
+        // Verify gauges are handled correctly
+        let gauge_metric = create_test_metric(
+            "test-gauge", 
+            MetricKind::Incremental,
+            MetricValue::Gauge { value: 5.0 },
+        );
+
+        // Process the gauge metric
+        let gauge_absolute = metric_set.make_absolute(gauge_metric.clone()).unwrap();
+
+        // Gauge should be converted to absolute with the same value
+        assert_eq!(gauge_absolute.kind(), MetricKind::Absolute);
+        match gauge_absolute.value() {
+            MetricValue::Gauge { value } => assert_eq!(*value, 5.0),
+            _ => panic!("Expected gauge metric"),
+        }
+    }
     //
     // #[test]
     // fn test_absolute_to_incremental_conversion() {
