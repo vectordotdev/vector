@@ -97,6 +97,17 @@ generated: components: sinks: axiom: configuration: {
 		required: false
 		type: string: examples: ["${AXIOM_ORG_ID}", "123abc"]
 	}
+	region: {
+		description: """
+			The Axiom regional edge domain to use for ingestion.
+
+			Specify the domain name only (no scheme, no path).
+			When set, data will be sent to `https://{region}/v1/ingest/{dataset}`.
+			Cannot be used together with `url`.
+			"""
+		required: false
+		type: string: examples: ["${AXIOM_REGION}", "mumbai.axiom.co", "eu-central-1.aws.edge.axiom.co"]
+	}
 	request: {
 		description: "Outbound HTTP request settings."
 		required:    false
@@ -401,9 +412,11 @@ generated: components: sinks: axiom: configuration: {
 		description: """
 			URI of the Axiom endpoint to send data to.
 
-			Only required if not using Axiom Cloud.
+			If a path is provided, the URL is used as-is.
+			If no path (or only `/`) is provided, `/v1/datasets/{dataset}/ingest` is appended for backwards compatibility.
+			This takes precedence over `region` if both are set (but both should not be set).
 			"""
 		required: false
-		type: string: examples: ["https://axiom.my-domain.com", "${AXIOM_URL}"]
+		type: string: examples: ["https://api.eu.axiom.co", "http://localhost:3400/ingest", "${AXIOM_URL}"]
 	}
 }
