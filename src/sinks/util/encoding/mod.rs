@@ -10,6 +10,9 @@ use vector_lib::{
 
 use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
 
+#[cfg(feature = "sinks-clickhouse")]
+pub mod arrow;
+
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
     ///
