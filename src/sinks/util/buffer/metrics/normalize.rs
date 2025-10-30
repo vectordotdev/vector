@@ -268,8 +268,6 @@ pub struct CapacityPolicy {
     pub max_events: Option<usize>,
     /// Current memory usage tracking
     current_memory: usize,
-    /// Counter for evictions. Used for metrics tacking
-    eviction_count: usize,
 }
 
 impl CapacityPolicy {
@@ -279,7 +277,6 @@ impl CapacityPolicy {
             max_bytes,
             max_events,
             current_memory: 0,
-            eviction_count: 0,
         }
     }
 
@@ -288,30 +285,17 @@ impl CapacityPolicy {
         self.current_memory
     }
 
-    /// Get the current eviction count
-    pub const fn eviction_count(&self) -> usize {
-        self.eviction_count
-    }
-
-    /// Reset the eviction count and return the previous value
-    pub fn reset_eviction_count(&mut self) -> usize {
-        let count = self.eviction_count;
-        self.eviction_count = 0;
-        count
-    }
 
     /// Updates memory tracking when an entry is removed.
     const fn remove_memory(&mut self, bytes: usize) {
         self.current_memory = self.current_memory.saturating_sub(bytes);
     }
 
-    /// Frees the memory for an item if max_bytes is set.
-    /// Only calculates and tracks memory when max_bytes is specified.
+    /// Frees the memory for an item, always tracking memory usage.
+    /// Memory tracking now happens regardless of whether max_bytes is set.
     pub fn free_item(&mut self, series: &MetricSeries, entry: &MetricEntry) {
-        if self.max_bytes.is_some() {
-            let freed_memory = self.item_size(series, entry);
-            self.remove_memory(freed_memory);
-        }
+        let freed_memory = self.item_size(series, entry);
+        self.remove_memory(freed_memory);
     }
 
     /// Updates memory tracking.
@@ -410,30 +394,11 @@ pub struct MetricSet {
     capacity_policy: Option<CapacityPolicy>,
     /// Optional TTL policy for time-based expiration
     ttl_policy: Option<TtlPolicy>,
+    /// Counter for evictions. Used for metrics tracking
+    eviction_count: usize,
 }
 
 impl MetricSet {
-    /// Debugs memory usage across the cache
-    pub fn debug_memory(&self) -> String {
-        let total_tracked = self.capacity_policy
-            .as_ref()
-            .map(|cp| cp.current_memory())
-            .unwrap_or(0);
-        
-        // Calculate actual memory usage
-        let mut actual_usage = 0;
-        for (series, entry) in self.inner.iter() {
-            let series_size = series.allocated_bytes();
-            let entry_size = entry.allocated_bytes();
-            actual_usage += series_size + entry_size;
-        }
-        
-        format!(
-            "Tracked memory: {}, Actual usage: {}, Items: {}", 
-            total_tracked, actual_usage, self.inner.len()
-        )
-    }
-
     /// Creates a new MetricSet with the given settings.
     pub fn new(settings: MetricSetSettings) -> Self {
         // Create capacity policy if any capacity limit is set
@@ -461,6 +426,7 @@ impl MetricSet {
             inner: LruCache::unbounded(),
             capacity_policy,
             ttl_policy,
+            eviction_count: 0,
         }
     }
 
@@ -511,22 +477,17 @@ impl MetricSet {
         while capacity_policy.needs_eviction(self.inner.len()) {
             if let Some((series, entry)) = self.inner.pop_lru() {
                 capacity_policy.free_item(&series, &entry);
-                capacity_policy.eviction_count += 1;
+                self.eviction_count += 1;
             } else {
                 break; // No more entries to evict
             }
         }
-        // Log memory debug info
-        info!(message = "Memory after enforcement", debug = %self.debug_memory());
     }
 
     // Method to get eviction count and reset the counter
-    pub fn get_and_reset_eviction_count(&mut self) -> usize {
-        if let Some(ref mut capacity_policy) = self.capacity_policy {
-            capacity_policy.reset_eviction_count()
-        } else {
-            0
-        }
+    pub fn get_eviction_count(&mut self) -> usize {
+        let count = self.eviction_count;
+        count
     }
 
     /// Perform TTL cleanup if configured and needed.
@@ -564,10 +525,11 @@ impl MetricSet {
 
         // Remove expired entries and update memory tracking (if max_bytes is set)
         for series in expired_keys {
-            if let Some(entry) = self.inner.pop(&series)
-                && let Some(ref mut capacity_policy) = self.capacity_policy
-            {
-                capacity_policy.free_item(&series, &entry);
+            if let Some(entry) = self.inner.pop(&series) {
+                self.eviction_count += 1;
+                if let Some(ref mut capacity_policy) = self.capacity_policy {
+                    capacity_policy.free_item(&series, &entry);
+                }
             }
         }
     }
@@ -579,21 +541,15 @@ impl MetricSet {
             return; // No capacity limits configured, return immediately
         };
 
-        // Handle differently based on whether we need to track memory
-        if capacity_policy.max_bytes.is_some() {
-            // When tracking memory, we need to calculate sizes before and after
-            let entry_size = capacity_policy.item_size(&series, &entry);
-            if let Some(existing_entry) = self.inner.put(series.clone(), entry) {
-                // If we had an existing entry, calculate its size and adjust memory tracking
-                let existing_size = capacity_policy.item_size(&series, &existing_entry);
-                capacity_policy.replace_memory(existing_size, entry_size);
-            } else {
-                // No existing entry, just add the new entry's size
-                capacity_policy.replace_memory(0, entry_size);
-            }
+        // Always track memory when capacity policy exists
+        let entry_size = capacity_policy.item_size(&series, &entry);
+        if let Some(existing_entry) = self.inner.put(series.clone(), entry) {
+            // If we had an existing entry, calculate its size and adjust memory tracking
+            let existing_size = capacity_policy.item_size(&series, &existing_entry);
+            capacity_policy.replace_memory(existing_size, entry_size);
         } else {
-            // When not tracking memory (only entry count limits), just put directly
-            self.inner.put(series.clone(), entry);
+            // No existing entry, just add the new entry's size
+            capacity_policy.replace_memory(0, entry_size);
         }
 
         // Get item; move to back of LRU cache
@@ -601,9 +557,6 @@ impl MetricSet {
         
         // Enforce limits after insertion
         self.enforce_capacity_policy();
-        
-        // Log memory debug info
-        debug!(message = "Memory after insertion", debug = %self.debug_memory());
     }
 
     /// Consumes this MetricSet and returns a vector of Metric.

@@ -86,16 +86,17 @@ impl IncrementalToAbsolute {
 
     // Emit metrics on cache entries, internally tracked size, and eviction count
     fn emit_metrics(&mut self) {
-        // Always emit the entries count
-        if let Some(cp) = self.data.capacity_policy() {
-            if cp.max_bytes.is_some() {
-                emit!(IncrementalToAbsoluteMetricsCache {
-                    size: cp.current_memory(),
-                    count: self.data.len(),
-                    evictions: self.data.get_and_reset_eviction_count(),
-                }); 
-            }
-        }
+        let (size, has_capacity_policy) = match self.data.capacity_policy() {
+            Some(cp) => (cp.current_memory(), true),
+            None => (0, false),
+        };
+        
+        emit!(IncrementalToAbsoluteMetricsCache {
+            size,
+            count: self.data.len(),
+            evictions: self.data.get_eviction_count(),
+            has_capacity_policy,
+        });
     }
 }
 
@@ -112,8 +113,8 @@ impl TaskTransform<Event> for IncrementalToAbsolute {
         // Emit initial metrics
         inner.emit_metrics();
 
-        // Set up periodic metrics emission
-        let mut interval = tokio::time::interval(Duration::from_secs(60));
+        // Set up periodic metrics emission every 2 seconds
+        let mut interval = tokio::time::interval(Duration::from_secs(2));
 
         Box::pin(task
             .filter_map(move |v| {
