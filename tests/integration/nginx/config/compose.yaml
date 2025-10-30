@@ -11,13 +11,13 @@ services:
   nginx:
     image: docker.io/nginx:${CONFIG_VERSION}
     volumes:
-    - ../data/nginx/:/etc/nginx:ro
+    - ../data/:/etc/nginx:ro
     networks:
     - default
   nginx-proxy:
     image: docker.io/nginx:${CONFIG_VERSION}
     volumes:
-    - ../data/nginx/:/etc/nginx:ro
+    - ../data/:/etc/nginx:ro
     networks:
     - proxy
 

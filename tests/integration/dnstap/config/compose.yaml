@@ -3,7 +3,7 @@ version: "3"
 services:
   dnstap:
     build:
-      context: ../data/dnstap
+      context: ../data
     container_name: vector_dnstap
     hostname: ns.example.com
     volumes:

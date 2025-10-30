@@ -5,7 +5,7 @@ services:
     image: docker.io/minio/minio
     command: server /data
     volumes:
-      - ../data/databend/miniodat/:/data
+      - ../data/miniodat/:/data
   databend:
     image: docker.io/datafuselabs/databend:${CONFIG_VERSION}
     environment:

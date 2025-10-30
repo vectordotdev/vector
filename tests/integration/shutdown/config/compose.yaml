@@ -33,7 +33,7 @@ services:
     volumes:
     - ../../../data/ca/intermediate_server/private/kafka.pass:/etc/kafka/secrets/kafka.pass:ro
     - ../../../data/ca/intermediate_server/private/kafka.p12:/etc/kafka/secrets/kafka.p12:ro
-    - ../../../data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+    - ../../shared/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
 
 networks:
   default:

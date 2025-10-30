@@ -5,13 +5,13 @@ services:
     image: docker.elastic.co/beats/heartbeat:${CONFIG_VERSION}
     command: -environment=container -strict.perms=false
     volumes:
-    - ../data/logstash/heartbeat.yml:/usr/share/heartbeat/heartbeat.yml:ro
+    - ../data/heartbeat.yml:/usr/share/heartbeat/heartbeat.yml:ro
   logstash:
     image: docker.elastic.co/logstash/logstash:7.13.1
     volumes:
     - /dev/null:/usr/share/logstash/pipeline/logstash.yml
-    - ../../../data/host.docker.internal.crt:/tmp/logstash.crt
-    - ../data/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
+    - ../../shared/data/host.docker.internal.crt:/tmp/logstash.crt
+    - ../data/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
 
 networks:
   default:
