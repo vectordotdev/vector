@@ -4,11 +4,15 @@ services:
     container_name: otel-collector-source
     image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}
     init: true
+    user: "0:0" # test only, override special user with root
     volumes:
       - type: bind
         source: ../../../tests/data/e2e/opentelemetry/traces/collector-source.yaml
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
+      - type: volume
+        source: vector_target
+        target: /output
     ports:
       - "${OTEL_COLLECTOR_SOURCE_GRPC_PORT:-4317}:4317"
       - "${OTEL_COLLECTOR_SOURCE_HTTP_PORT:-4318}:4318"

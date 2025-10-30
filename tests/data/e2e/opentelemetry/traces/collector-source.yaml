@@ -18,10 +18,15 @@ exporters:
     tls:
       insecure: true
   debug: { }
+  file:
+    path: /output/opentelemetry-traces/collector-source-file-exporter.log
+    rotation:
+      max_megabytes: 10
+      max_days: 1
 
 service:
   pipelines:
     traces:
       receivers: [ otlp ]
       processors: [ batch ]
-      exporters: [ debug, otlp/grpc, otlphttp/vector ]
+      exporters: [ debug, otlp/grpc, otlphttp/vector, file ]
