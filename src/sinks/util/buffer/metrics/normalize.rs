@@ -268,6 +268,8 @@ pub struct CapacityPolicy {
     pub max_events: Option<usize>,
     /// Current memory usage tracking
     current_memory: usize,
+    /// Counter for evictions. Used for metrics tacking
+    eviction_count: usize,
 }
 
 impl CapacityPolicy {
@@ -277,12 +279,25 @@ impl CapacityPolicy {
             max_bytes,
             max_events,
             current_memory: 0,
+            eviction_count: 0,
         }
     }
 
     /// Gets the current memory usage.
     pub const fn current_memory(&self) -> usize {
         self.current_memory
+    }
+
+    /// Get the current eviction count
+    pub const fn eviction_count(&self) -> usize {
+        self.eviction_count
+    }
+
+    /// Reset the eviction count and return the previous value
+    pub fn reset_eviction_count(&mut self) -> usize {
+        let count = self.eviction_count;
+        self.eviction_count = 0;
+        count
     }
 
     /// Updates memory tracking when an entry is removed.
@@ -496,12 +511,22 @@ impl MetricSet {
         while capacity_policy.needs_eviction(self.inner.len()) {
             if let Some((series, entry)) = self.inner.pop_lru() {
                 capacity_policy.free_item(&series, &entry);
+                capacity_policy.eviction_count += 1;
             } else {
                 break; // No more entries to evict
             }
         }
         // Log memory debug info
         info!(message = "Memory after enforcement", debug = %self.debug_memory());
+    }
+
+    // Method to get eviction count and reset the counter
+    pub fn get_and_reset_eviction_count(&mut self) -> usize {
+        if let Some(ref mut capacity_policy) = self.capacity_policy {
+            capacity_policy.reset_eviction_count()
+        } else {
+            0
+        }
     }
 
     /// Perform TTL cleanup if configured and needed.
