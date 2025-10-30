@@ -15,8 +15,6 @@ use vector_lib::{
     },
 };
 
-use tracing::{debug, info};
-
 #[derive(Debug, Snafu, PartialEq, Eq)]
 pub enum NormalizerError {
     #[snafu(display("`max_bytes` must be greater than zero"))]
@@ -215,17 +213,7 @@ impl ByteSizeOf for MetricEntry {
         // that we already accounted for in their respective allocated_bytes() calls
         let struct_size = size_of::<Self>();
         
-        let total = data_size + metadata_size + struct_size;
-        
-        // debug!(
-        //     message = "Entry allocated_bytes breakdown",
-        //     data_size = data_size,
-        //     metadata_size = metadata_size,
-        //     struct_size = struct_size,
-        //     total = total
-        // );
-        
-        total
+        data_size + metadata_size + struct_size
     }
 }
 
@@ -284,7 +272,7 @@ pub struct CapacityPolicy {
 
 impl CapacityPolicy {
     /// Creates a new capacity policy with both memory and entry limits.
-    pub const fn new(max_bytes: Option<usize>, max_events: Option<usize>) -> Self {
+    pub fn new(max_bytes: Option<usize>, max_events: Option<usize>) -> Self {
         Self {
             max_bytes,
             max_events,
@@ -307,28 +295,13 @@ impl CapacityPolicy {
     pub fn free_item(&mut self, series: &MetricSeries, entry: &MetricEntry) {
         if self.max_bytes.is_some() {
             let freed_memory = self.item_size(series, entry);
-            debug!(
-                message = "Freeing memory for item",
-                freed_bytes = freed_memory,
-                current_memory = self.current_memory,
-                max_memory = ?self.max_bytes
-            );
             self.remove_memory(freed_memory);
         }
     }
 
     /// Updates memory tracking.
     fn replace_memory(&mut self, old_bytes: usize, new_bytes: usize) {
-        let new_total = self.current_memory.saturating_sub(old_bytes).saturating_add(new_bytes);
-        debug!(
-            message = "Updating memory tracking",
-            old_bytes = old_bytes,
-            new_bytes = new_bytes, 
-            old_total = self.current_memory,
-            new_total = new_total,
-            max_memory = ?self.max_bytes
-        );
-        self.current_memory = new_total;
+        self.current_memory = self.current_memory.saturating_sub(old_bytes).saturating_add(new_bytes);a
     }
 
     /// Checks if the current state exceeds memory limits.
@@ -351,40 +324,12 @@ impl CapacityPolicy {
 
     /// Returns true if any limits are currently exceeded.
     fn needs_eviction(&self, entry_count: usize) -> bool {
-        let memory_exceeded = self.exceeds_memory_limit();
-        let entries_exceeded = self.exceeds_entry_limit(entry_count);
-        
-        if memory_exceeded || entries_exceeded {
-            info!(
-                message = "Eviction needed",
-                memory_exceeded = memory_exceeded,
-                entries_exceeded = entries_exceeded,
-                current_memory = self.current_memory,
-                max_memory = ?self.max_bytes,
-                entry_count = entry_count,
-                max_entries = ?self.max_events
-            );
-        }
-        
-        memory_exceeded || entries_exceeded
+        self.exceeds_memory_limit() || self.exceeds_entry_limit(entry_count)
     }
 
     /// Gets the total memory size of entry/series, excluding LRU cache overhead.
-    pub fn item_size(&self, _series: &MetricSeries, _entry: &MetricEntry) -> usize {
-        // let series_size = series.allocated_bytes();
-        // let entry_size = entry.allocated_bytes();
-        // let total_size = series_size + entry_size;
-        //
-        // debug!(
-        //     message = "Calculating item size",
-        //     series_name_str = %series.name.name,
-        //     series_size = series_size,
-        //     entry_size = entry_size,
-        //     total_size = total_size
-        // );
-        200
-        //
-        // total_size
+    pub fn item_size(&self, series: &MetricSeries, entry: &MetricEntry) -> usize {
+        series.allocated_bytes() + entry.allocated_bytes()
     }
 }
 
@@ -543,43 +488,15 @@ impl MetricSet {
         let Some(ref mut capacity_policy) = self.capacity_policy else {
             return; // No capacity limits configured
         };
-        
-        debug!(
-            message = "Checking capacity policy",
-            current_memory = capacity_policy.current_memory(),
-            max_memory = ?capacity_policy.max_bytes,
-            current_entries = self.inner.len(),
-            max_entries = ?capacity_policy.max_events
-        );
 
         // Keep evicting until we're within limits
         while capacity_policy.needs_eviction(self.inner.len()) {
             if let Some((series, entry)) = self.inner.pop_lru() {
-                let item_size = capacity_policy.item_size(&series, &entry);
-                info!(
-                    message = "Evicting item due to capacity limits",
-                    series_name_str = %series.name.name,
-                    item_size = item_size,
-                    current_memory = capacity_policy.current_memory(),
-                    memory_limit = ?capacity_policy.max_bytes,
-                    entry_count = self.inner.len(),
-                    entry_limit = ?capacity_policy.max_events,
-                    metric_kind = ?entry.data.kind
-                );
                 capacity_policy.free_item(&series, &entry);
             } else {
                 break; // No more entries to evict
             }
         }
-        
-        info!(
-            message = "After enforcement",
-            current_memory = capacity_policy.current_memory(),
-            max_memory = ?capacity_policy.max_bytes,
-            current_entries = self.inner.len(),
-            max_entries = ?capacity_policy.max_events
-        );
-        
         // Log memory debug info
         info!(message = "Memory after enforcement", debug = %self.debug_memory());
     }
@@ -646,18 +563,17 @@ impl MetricSet {
         // Handle differently based on whether we need to track memory
         if capacity_policy.max_bytes.is_some() {
             // When tracking memory, we need to calculate sizes before and after
-            // let entry_size = capacity_policy.item_size(&series, &entry);
-            capacity_policy.replace_memory(0, 200)
-            // if let Some(existing_entry) = self.inner.put(series, entry) {
-            //     // If we had an existing entry, calculate its size and adjust memory tracking
-            //     let existing_size = capacity_policy.item_size(&series, &existing_entry);
-            //     capacity_policy.replace_memory(existing_size, entry_size);
-            //     self.inner.get(&series);
-            // } else {
-            //     // No existing entry, just add the new entry's size
-            //     capacity_policy.replace_memory(0, entry_size);
-            //     self.inner.get(&series);
-            // }
+            let entry_size = capacity_policy.item_size(&series, &entry);
+            if let Some(existing_entry) = self.inner.put(series.clone(), entry) {
+                // If we had an existing entry, calculate its size and adjust memory tracking
+                let existing_size = capacity_policy.item_size(&series, &existing_entry);
+                capacity_policy.replace_memory(existing_size, entry_size);
+                self.inner.get(&series);
+            } else {
+                // No existing entry, just add the new entry's size
+                capacity_policy.replace_memory(0, entry_size);
+                self.inner.get(&series);
+            }
         } else {
             // When not tracking memory (only entry count limits), just put directly
             self.inner.put(series, entry);
