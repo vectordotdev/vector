@@ -301,7 +301,7 @@ impl CapacityPolicy {
 
     /// Updates memory tracking.
     fn replace_memory(&mut self, old_bytes: usize, new_bytes: usize) {
-        self.current_memory = self.current_memory.saturating_sub(old_bytes).saturating_add(new_bytes);a
+        self.current_memory = self.current_memory.saturating_sub(old_bytes).saturating_add(new_bytes);
     }
 
     /// Checks if the current state exceeds memory limits.
@@ -323,13 +323,13 @@ impl CapacityPolicy {
     }
 
     /// Returns true if any limits are currently exceeded.
-    fn needs_eviction(&self, entry_count: usize) -> bool {
+    const fn needs_eviction(&self, entry_count: usize) -> bool {
         self.exceeds_memory_limit() || self.exceeds_entry_limit(entry_count)
     }
 
     /// Gets the total memory size of entry/series, excluding LRU cache overhead.
     pub fn item_size(&self, series: &MetricSeries, entry: &MetricEntry) -> usize {
-        series.allocated_bytes() + entry.allocated_bytes()
+        entry.allocated_bytes() + series.allocated_bytes()
     }
 }
 
@@ -551,15 +551,6 @@ impl MetricSet {
             return; // No capacity limits configured, return immediately
         };
 
-        debug!(
-            message = "Inserting entry with tracking",
-            series_name = ?series.name,
-            current_memory = capacity_policy.current_memory(),
-            max_memory = ?capacity_policy.max_bytes,
-            current_entries = self.inner.len(),
-            max_entries = ?capacity_policy.max_events
-        );
-
         // Handle differently based on whether we need to track memory
         if capacity_policy.max_bytes.is_some() {
             // When tracking memory, we need to calculate sizes before and after
@@ -568,17 +559,18 @@ impl MetricSet {
                 // If we had an existing entry, calculate its size and adjust memory tracking
                 let existing_size = capacity_policy.item_size(&series, &existing_entry);
                 capacity_policy.replace_memory(existing_size, entry_size);
-                self.inner.get(&series);
             } else {
                 // No existing entry, just add the new entry's size
                 capacity_policy.replace_memory(0, entry_size);
-                self.inner.get(&series);
             }
         } else {
             // When not tracking memory (only entry count limits), just put directly
             self.inner.put(series, entry);
         }
 
+        // Get item; move to back of LRU cache
+        self.inner.get(&series);
+        
         // Enforce limits after insertion
         self.enforce_capacity_policy();
         
