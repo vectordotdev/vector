@@ -483,9 +483,11 @@ impl MetricSet {
         }
     }
 
-    // Method to get eviction count and reset the counter
-    pub const fn get_eviction_count(&mut self) -> usize {
-        self.eviction_count
+    /// Reset the eviction count and return the previous value
+    pub fn reset_eviction_count(&mut self) -> usize {
+        let count = self.eviction_count;
+        self.eviction_count = 0;
+        count
     }
 
     /// Perform TTL cleanup if configured and needed.
