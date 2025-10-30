@@ -35,6 +35,7 @@ use crate::{
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
+    utilization::UtilizationRegistry,
 };
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
@@ -54,6 +55,7 @@ pub struct RunningTopology {
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
+    utilization_registry: Option<UtilizationRegistry>,
     utilization_task: Option<TaskHandle>,
     utilization_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
@@ -75,6 +77,7 @@ impl RunningTopology {
             running: Arc::new(AtomicBool::new(true)),
             graceful_shutdown_duration: config.graceful_shutdown_duration,
             config,
+            utilization_registry: None,
             utilization_task: None,
             utilization_task_shutdown_trigger: None,
             pending_reload: None,
@@ -306,6 +309,7 @@ impl RunningTopology {
         if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&new_config, &diff)
             .with_buffers(buffers.clone())
             .with_extra_context(extra_context.clone())
+            .with_utilization_registry(self.utilization_registry.clone())
             .build_or_log_errors()
             .await
         {
@@ -335,6 +339,7 @@ impl RunningTopology {
         if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&self.config, &diff)
             .with_buffers(buffers)
             .with_extra_context(extra_context.clone())
+            .with_utilization_registry(self.utilization_registry.clone())
             .build_or_log_errors()
             .await
             && self
@@ -460,6 +465,10 @@ impl RunningTopology {
 
             self.remove_inputs(key, diff, new_config).await;
             self.remove_outputs(key);
+
+            if let Some(registry) = self.utilization_registry.as_ref() {
+                registry.remove_component(key);
+            }
         }
 
         for key in &diff.transforms.to_change {
@@ -586,6 +595,10 @@ impl RunningTopology {
         for key in &removed_sinks {
             debug!(component_id = %key, "Removing sink.");
             self.remove_inputs(key, diff, new_config).await;
+
+            if let Some(registry) = self.utilization_registry.as_ref() {
+                registry.remove_component(key);
+            }
         }
 
         // After that, for any changed sinks, we temporarily detach their inputs (not remove) so
@@ -1298,8 +1311,8 @@ impl RunningTopology {
             return None;
         }
 
-        let mut utilization_emitter = pieces
-            .utilization_emitter
+        let (utilization_emitter, utilization_registry) = pieces
+            .utilization
             .take()
             .expect("Topology is missing the utilization metric emitter!");
         let mut running_topology = Self::new(config, abort_tx);
@@ -1315,6 +1328,7 @@ impl RunningTopology {
 
         let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
             ShutdownSignal::new_wired();
+        running_topology.utilization_registry = Some(utilization_registry.clone());
         running_topology.utilization_task_shutdown_trigger =
             Some(utilization_task_shutdown_trigger);
         running_topology.utilization_task = Some(tokio::spawn(Task::new(
