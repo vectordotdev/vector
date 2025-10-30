@@ -19,17 +19,11 @@ impl InternalEvent for IncrementalToAbsoluteMetricsCache {
             evictions = %self.evictions,
             has_capacity_policy = %self.has_capacity_policy,
         );
-        
         // Only emit component_cache_bytes if capacity policy is defined
         if self.has_capacity_policy {
-            gauge!("component_cache_bytes")
-                .set(self.size as f64);
+            gauge!("component_cache_bytes").set(self.size as f64);
         }
-        
-        gauge!("component_cache_events")
-            .set(self.count as f64);
-        
-        counter!("component_cache_evictions_total")
-            .increment(self.evictions as u64);
+        gauge!("component_cache_events").set(self.count as f64);
+        counter!("component_cache_evictions_total").increment(self.evictions as u64);
     }
 }

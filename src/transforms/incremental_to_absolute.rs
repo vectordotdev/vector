@@ -90,7 +90,7 @@ impl IncrementalToAbsolute {
             Some(cp) => (cp.current_memory(), true),
             None => (0, false),
         };
-        
+
         emit!(IncrementalToAbsoluteMetricsCache {
             size,
             count: self.data.len(),
@@ -116,17 +116,15 @@ impl TaskTransform<Event> for IncrementalToAbsolute {
         // Set up periodic metrics emission every 2 seconds
         let mut interval = tokio::time::interval(Duration::from_secs(2));
 
-        Box::pin(task
-            .filter_map(move |v| {
-                let mut cx = std::task::Context::from_waker(futures::task::noop_waker_ref());
-                // Poll the interval and emit metrics if ready
-                while interval.poll_tick(&mut cx).is_ready() {
-                    inner.emit_metrics();
-                }
-                // Process the event as before
-                futures::future::ready(inner.transform_one(v))
-            })
-        )
+        Box::pin(task.filter_map(move |v| {
+            let mut cx = std::task::Context::from_waker(futures::task::noop_waker_ref());
+            // Poll the interval and emit metrics if ready
+            while interval.poll_tick(&mut cx).is_ready() {
+                inner.emit_metrics();
+            }
+            // Process the event as before
+            futures::future::ready(inner.transform_one(v))
+        }))
     }
 }
 

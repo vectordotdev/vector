@@ -208,11 +208,11 @@ impl ByteSizeOf for MetricEntry {
         // Calculate the size of the data and metadata
         let data_size = self.data.allocated_bytes();
         let metadata_size = self.metadata.allocated_bytes();
-        
+
         // Include struct overhead - size of self without double-counting fields
         // that we already accounted for in their respective allocated_bytes() calls
         let struct_size = size_of::<Self>();
-        
+
         data_size + metadata_size + struct_size
     }
 }
@@ -284,7 +284,6 @@ impl CapacityPolicy {
     pub const fn current_memory(&self) -> usize {
         self.current_memory
     }
-
 
     /// Updates memory tracking when an entry is removed.
     const fn remove_memory(&mut self, bytes: usize) {
@@ -485,9 +484,8 @@ impl MetricSet {
     }
 
     // Method to get eviction count and reset the counter
-    pub fn get_eviction_count(&mut self) -> usize {
-        let count = self.eviction_count;
-        count
+    pub const fn get_eviction_count(&mut self) -> usize {
+        self.eviction_count
     }
 
     /// Perform TTL cleanup if configured and needed.
@@ -554,7 +552,7 @@ impl MetricSet {
 
         // Get item; move to back of LRU cache
         self.inner.get(&series);
-        
+
         // Enforce limits after insertion
         self.enforce_capacity_policy();
     }

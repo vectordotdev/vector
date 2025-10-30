@@ -363,8 +363,12 @@ impl ByteSizeOf for MetricValue {
             Self::Counter { .. } | Self::Gauge { .. } => size_of::<f64>(),
             Self::Set { values } => values.allocated_bytes() + size_of_val(values),
             Self::Distribution { samples, .. } => samples.allocated_bytes() + size_of_val(samples),
-            Self::AggregatedHistogram { buckets, .. } => buckets.allocated_bytes() + size_of_val(buckets),
-            Self::AggregatedSummary { quantiles, .. } => quantiles.allocated_bytes() + size_of_val(quantiles),
+            Self::AggregatedHistogram { buckets, .. } => {
+                buckets.allocated_bytes() + size_of_val(buckets)
+            }
+            Self::AggregatedSummary { quantiles, .. } => {
+                quantiles.allocated_bytes() + size_of_val(quantiles)
+            }
             Self::Sketch { sketch } => sketch.allocated_bytes() + size_of_val(sketch),
         }
     }
