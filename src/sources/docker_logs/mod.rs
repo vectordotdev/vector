@@ -524,7 +524,8 @@ impl DockerLogsSource {
             main_recv,
             hostname,
             backoff_duration: backoff_secs,
-            events_backoff: ExponentialBackoff::from_millis(backoff_secs.as_millis() as u64)
+            events_backoff: ExponentialBackoff::from_millis(2)
+                .factor(1000)
                 .max_delay(Duration::from_secs(300)),
         })
     }
