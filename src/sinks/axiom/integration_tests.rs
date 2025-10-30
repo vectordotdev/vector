@@ -8,7 +8,7 @@ use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 use super::*;
 use crate::{
     config::SinkContext,
-    test_util::components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+    test_util::components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
 };
 
 #[tokio::test]
@@ -116,4 +116,3 @@ async fn axiom_logs_put_data() {
     };
     assert_eq!("message_1", snd.get("message").unwrap().as_str().unwrap());
 }
-
