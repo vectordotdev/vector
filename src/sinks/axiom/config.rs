@@ -42,7 +42,7 @@ pub struct UrlOrRegion {
     /// The Axiom regional edge domain to use for ingestion.
     ///
     /// Specify the domain name only (no scheme, no path).
-    /// When set, data will be sent to `https://{region}/v1/ingest/{dataset}`.
+    /// When set, data is sent to `https://{region}/v1/ingest/{dataset}`.
     /// Cannot be used together with `url`.
     #[configurable(metadata(docs::examples = "${AXIOM_REGION}"))]
     #[configurable(metadata(docs::examples = "mumbai.axiom.co"))]
