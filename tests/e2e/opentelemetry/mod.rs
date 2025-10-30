@@ -10,8 +10,8 @@ use vector_lib::opentelemetry::proto::{
 };
 use vrl::value::Value as VrlValue;
 
-fn read_file_helper(test_type: &str, filename: &str) -> Result<String, io::Error> {
-    let local_path = Path::new(&format!("/output/opentelemetry-{test_type}")).join(filename);
+fn read_file_helper(data_type: &str, filename: &str) -> Result<String, io::Error> {
+    let local_path = Path::new(&format!("/output/opentelemetry-{data_type}")).join(filename);
     if local_path.exists() {
         // Running inside the runner container, volume is mounted
         std::fs::read_to_string(local_path)
@@ -22,7 +22,7 @@ fn read_file_helper(test_type: &str, filename: &str) -> Result<String, io::Error
                 "run",
                 "--rm",
                 "-v",
-                &format!("opentelemetry-{test_type}_vector_target:/output"),
+                &format!("opentelemetry-{data_type}_vector_target:/output"),
                 "alpine:3.20",
                 "cat",
                 &format!("/output/{filename}"),
