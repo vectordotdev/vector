@@ -2,7 +2,9 @@ use vector_lib::opentelemetry::proto::LOGS_REQUEST_MESSAGE_TYPE;
 use vector_lib::opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
 use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEnum;
 
-use crate::opentelemetry::{parse_line_to_export_type_request, read_file_helper};
+use crate::opentelemetry::{
+    assert_service_name_with, parse_line_to_export_type_request, read_file_helper,
+};
 
 const EXPECTED_LOG_COUNT: usize = 200; // 100 via gRPC + 100 via HTTP
 
@@ -34,37 +36,6 @@ fn parse_export_logs_request(content: &str) -> Result<ExportLogsServiceRequest, 
     }
 
     Ok(merged_request)
-}
-
-/// Asserts that all resource logs have a `service.name` attribute set to `"telemetrygen"`.
-fn assert_service_name(request: &ExportLogsServiceRequest) {
-    for (i, rl) in request.resource_logs.iter().enumerate() {
-        let resource = rl
-            .resource
-            .as_ref()
-            .unwrap_or_else(|| panic!("resource_logs[{i}] missing resource"));
-
-        let service_name_attr = resource
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "service.name")
-            .unwrap_or_else(|| panic!("resource_logs[{i}] missing 'service.name' attribute"));
-
-        let actual_value = service_name_attr
-            .value
-            .as_ref()
-            .and_then(|v| v.value.as_ref())
-            .unwrap_or_else(|| panic!("resource_logs[{i}] 'service.name' has no value"));
-
-        if let AnyValueEnum::StringValue(s) = actual_value {
-            assert_eq!(
-                s, "telemetrygen",
-                "resource_logs[{i}] 'service.name' expected 'telemetrygen', got '{s}'"
-            );
-        } else {
-            panic!("resource_logs[{i}] 'service.name' is not a string value");
-        }
-    }
 }
 
 /// Asserts that all log records have static field values:
@@ -145,8 +116,18 @@ fn vector_sink_otel_sink_logs_match() {
     );
 
     // Verify service.name attribute
-    assert_service_name(&collector_request);
-    assert_service_name(&vector_request);
+    assert_service_name_with(
+        &collector_request.resource_logs,
+        "resource_logs",
+        "telemetrygen",
+        |rl| rl.resource.as_ref(),
+    );
+    assert_service_name_with(
+        &vector_request.resource_logs,
+        "resource_logs",
+        "telemetrygen",
+        |rl| rl.resource.as_ref(),
+    );
 
     // Verify static log record fields
     assert_log_records_static_fields(&collector_request);

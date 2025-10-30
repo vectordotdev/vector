@@ -5,7 +5,9 @@ use std::{io, path::Path, process::Command};
 
 use prost::Message as ProstMessage;
 use prost_reflect::{DescriptorPool, prost::Message as ProstReflectMessage};
-use vector_lib::opentelemetry::proto::DESCRIPTOR_BYTES;
+use vector_lib::opentelemetry::proto::{
+    DESCRIPTOR_BYTES, common::v1::any_value::Value as AnyValueEnum, resource::v1::Resource,
+};
 use vrl::value::Value as VrlValue;
 
 fn read_file_helper(test_type: &str, filename: &str) -> Result<String, io::Error> {
@@ -79,4 +81,36 @@ where
     // Decode bytes into T (using prost 0.12.6)
     ProstMessage::decode(&buf[..])
         .map_err(|e| format!("Failed to decode ExportLogsServiceRequest: {e}"))
+}
+
+pub fn assert_service_name_with<ResourceT, F>(
+    request: &[ResourceT],
+    resource_name: &str,
+    expected_name: &str,
+    get_resource: F,
+) where
+    F: Fn(&ResourceT) -> Option<&Resource>,
+{
+    for (i, item) in request.iter().enumerate() {
+        let resource =
+            get_resource(item).unwrap_or_else(|| panic!("{resource_name}[{i}] missing resource"));
+        let service_name_attr = resource
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "service.name")
+            .unwrap_or_else(|| panic!("{resource_name}[{i}] missing 'service.name' attribute"));
+        let actual_value = service_name_attr
+            .value
+            .as_ref()
+            .and_then(|v| v.value.as_ref())
+            .unwrap_or_else(|| panic!("{resource_name}[{i}] 'service.name' has no value"));
+        if let AnyValueEnum::StringValue(s) = actual_value {
+            assert_eq!(
+                s, expected_name,
+                "{resource_name}[{i}] 'service.name' expected '{expected_name}', got '{s}'"
+            );
+        } else {
+            panic!("{resource_name}[{i}] 'service.name' is not a string value");
+        }
+    }
 }

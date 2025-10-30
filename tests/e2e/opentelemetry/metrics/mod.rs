@@ -1,4 +1,6 @@
-use crate::opentelemetry::{parse_line_to_export_type_request, read_file_helper};
+use crate::opentelemetry::{
+    assert_service_name_with, parse_line_to_export_type_request, read_file_helper,
+};
 
 use vector_lib::opentelemetry::proto::METRICS_REQUEST_MESSAGE_TYPE;
 use vector_lib::opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
@@ -38,37 +40,6 @@ fn parse_export_metrics_request(content: &str) -> Result<ExportMetricsServiceReq
     }
 
     Ok(merged_request)
-}
-
-/// Asserts that all resource metrics have a `service.name` attribute set to `"telemetrygen"`.
-fn assert_service_name(request: &ExportMetricsServiceRequest) {
-    for (i, rl) in request.resource_metrics.iter().enumerate() {
-        let resource = rl
-            .resource
-            .as_ref()
-            .unwrap_or_else(|| panic!("resource_metrics[{i}] missing resource"));
-
-        let service_name_attr = resource
-            .attributes
-            .iter()
-            .find(|kv| kv.key == "service.name")
-            .unwrap_or_else(|| panic!("resource_metrics[{i}] missing 'service.name' attribute"));
-
-        let actual_value = service_name_attr
-            .value
-            .as_ref()
-            .and_then(|v| v.value.as_ref())
-            .unwrap_or_else(|| panic!("resource_metrics[{i}] 'service.name' has no value"));
-
-        if let AnyValueEnum::StringValue(s) = actual_value {
-            assert_eq!(
-                s, "telemetrygen",
-                "resource_metrics[{i}] 'service.name' expected 'telemetrygen', got '{s}'"
-            );
-        } else {
-            panic!("resource_metrics[{i}] 'service.name' is not a string value");
-        }
-    }
 }
 
 /// Asserts that all metrics have:
@@ -298,8 +269,18 @@ fn vector_sink_otel_sink_metrics_match() {
     );
 
     // Verify service.name attribute
-    assert_service_name(&collector_request);
-    assert_service_name(&vector_request);
+    assert_service_name_with(
+        &collector_request.resource_metrics,
+        "resource_metrics",
+        "telemetrygen",
+        |rl| rl.resource.as_ref(),
+    );
+    assert_service_name_with(
+        &vector_request.resource_metrics,
+        "resource_metrics",
+        "telemetrygen",
+        |rl| rl.resource.as_ref(),
+    );
 
     // Verify metric data points are valid
     assert_metric_data_points(&collector_request);
