@@ -291,6 +291,24 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		component_cache_events: {
+			description:       "The number of events in this component's metrics normalizer cache."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags
+		}
+		component_cache_bytes: {
+			description:       "The number of events in this component's metrics normalizer cache."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags
+		}
+		component_cache_events: {
+			description:       "The total number of errors encountered by this component."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags
+		}
 		component_discarded_events_total: {
 			description:       "The number of events dropped by this component."
 			type:              "counter"

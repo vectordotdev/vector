@@ -94,7 +94,7 @@ impl IncrementalToAbsolute {
         emit!(IncrementalToAbsoluteMetricsCache {
             size,
             count: self.data.len(),
-            evictions: self.data.get_eviction_count(),
+            evictions: self.data.get_and_reset_eviction_count(),
             has_capacity_policy,
         });
     }
