@@ -242,7 +242,8 @@ impl<T: Bufferable> BufferSender<T> {
                 );
             }
         }
-        if let (Some(send_duration), Some(send_reference)) = (self.send_duration.as_ref(), send_reference) {
+        if let Some(send_duration) = self.send_duration.as_ref()
+            && let Some(send_reference) = send_reference {
             send_duration.emit(send_reference.elapsed());
         }
 
