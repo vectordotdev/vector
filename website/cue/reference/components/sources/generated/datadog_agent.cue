@@ -126,6 +126,14 @@ generated: components: sources: datadog_agent: configuration: {
 															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
+						otlp: """
+															Decodes the raw bytes as [OTLP (OpenTelemetry Protocol)][otlp] protobuf format.
+
+															This decoder handles the three OTLP signal types: logs, metrics, and traces.
+															It automatically detects which type of OTLP message is being decoded.
+
+															[otlp]: https://opentelemetry.io/docs/specs/otlp/
+															"""
 						protobuf: """
 															Decodes the raw bytes as [protobuf][protobuf].
 
@@ -235,6 +243,41 @@ generated: components: sources: datadog_agent: configuration: {
 							default: ""
 							examples: ["package.Message"]
 						}
+					}
+					use_json_names: {
+						description: """
+																Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+
+																When enabled, the deserializer will output fields using their JSON names as defined
+																in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+
+																This is useful when working with data that needs to be converted to JSON or
+																when interfacing with systems that use JSON naming conventions.
+																"""
+						required: false
+						type: bool: default: false
+					}
+				}
+			}
+			signal_types: {
+				description: """
+					Signal types to attempt parsing, in priority order.
+
+					The deserializer will try parsing in the order specified. This allows you to optimize
+					performance when you know the expected signal types. For example, if you only receive
+					traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
+
+					If not specified, defaults to trying all types in order: logs, metrics, traces.
+					Duplicate signal types are automatically removed while preserving order.
+					"""
+				relevant_when: "codec = \"otlp\""
+				required:      false
+				type: array: {
+					default: ["logs", "metrics", "traces"]
+					items: type: string: enum: {
+						logs:    "OTLP logs signal (ExportLogsServiceRequest)"
+						metrics: "OTLP metrics signal (ExportMetricsServiceRequest)"
+						traces:  "OTLP traces signal (ExportTraceServiceRequest)"
 					}
 				}
 			}
@@ -540,6 +583,16 @@ generated: components: sources: datadog_agent: configuration: {
 			"""
 		required: false
 		type: bool: default: false
+	}
+	split_metric_namespace: {
+		description: """
+			If this is set to `true`, metric names are split at the first '.' into a namespace and name.
+			For example, `system.cpu.usage` would be split into namespace `system` and name `cpu.usage`.
+			If `false`, the full metric name is used without splitting. This may be useful if you are using a
+			default namespace for metrics in sinks connected to this source.
+			"""
+		required: false
+		type: bool: default: true
 	}
 	store_api_key: {
 		description: """

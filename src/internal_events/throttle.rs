@@ -11,7 +11,7 @@ impl InternalEvent for ThrottleEventDiscarded {
     fn emit(self) {
         let message = "Rate limit exceeded.";
 
-        debug!(message, key = self.key, internal_log_rate_limit = true);
+        debug!(message, key = self.key);
         if self.emit_events_discarded_per_key {
             // TODO: Technically, the Component Specification states that the discarded events metric
             // must _only_ have the `intentional` tag, in addition to the core tags like

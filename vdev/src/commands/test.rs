@@ -16,6 +16,10 @@ pub struct Cli {
     #[arg(short = 'C', long)]
     container: bool,
 
+    /// Reuse existing test runner image instead of rebuilding (useful in CI)
+    #[arg(long)]
+    reuse_image: bool,
+
     /// Environment variables in the form KEY[=VALUE]
     #[arg(short, long)]
     env: Option<Vec<String>>,
@@ -53,7 +57,8 @@ impl Cli {
             &BTreeMap::default(),
             None,
             &args,
-            "",
+            self.reuse_image,
+            false, // Don't pre-build Vector for direct test runs
         )
     }
 }

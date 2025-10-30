@@ -1,9 +1,10 @@
-ARG RUST_VERSION=1.85
+ARG RUST_VERSION=1
 ARG FEATURES
+ARG BUILD=false
 
 FROM docker.io/rust:${RUST_VERSION}-slim-trixie
 
-RUN apt-get update && apt-get -y --no-install-recommends install \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     build-essential \
     cmake \
     curl \
@@ -13,10 +14,11 @@ RUN apt-get update && apt-get -y --no-install-recommends install \
     libsasl2-dev \
     libssl-dev \
     libxxhash-dev \
-    unzip \
     zlib1g-dev \
     zlib1g \
-    mold
+    unzip \
+    mold \
+  && rm -rf /var/lib/apt/lists/*
 
 COPY tests/data/ca/certs /certs
 
@@ -31,10 +33,13 @@ RUN bash /install-protoc.sh
 WORKDIR /vector
 COPY . .
 ARG FEATURES
+ARG BUILD
 
 RUN --mount=type=cache,target=/vector/target \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
-    /usr/bin/mold -run cargo build --tests --lib --bin vector \
-    --no-default-features --features $FEATURES && \
-    cp target/debug/vector /usr/bin/vector
+    if [ "$BUILD" = "true" ]; then \
+        /usr/bin/mold -run cargo build --tests --lib --bin vector \
+        --no-default-features --features $FEATURES && \
+        cp target/debug/vector /usr/bin/vector; \
+    fi
