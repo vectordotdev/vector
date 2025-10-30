@@ -272,7 +272,7 @@ pub struct CapacityPolicy {
 
 impl CapacityPolicy {
     /// Creates a new capacity policy with both memory and entry limits.
-    pub fn new(max_bytes: Option<usize>, max_events: Option<usize>) -> Self {
+    pub const fn new(max_bytes: Option<usize>, max_events: Option<usize>) -> Self {
         Self {
             max_bytes,
             max_events,
@@ -300,8 +300,11 @@ impl CapacityPolicy {
     }
 
     /// Updates memory tracking.
-    fn replace_memory(&mut self, old_bytes: usize, new_bytes: usize) {
-        self.current_memory = self.current_memory.saturating_sub(old_bytes).saturating_add(new_bytes);
+    const fn replace_memory(&mut self, old_bytes: usize, new_bytes: usize) {
+        self.current_memory = self
+            .current_memory
+            .saturating_sub(old_bytes)
+            .saturating_add(new_bytes);
     }
 
     /// Checks if the current state exceeds memory limits.
@@ -565,7 +568,7 @@ impl MetricSet {
             }
         } else {
             // When not tracking memory (only entry count limits), just put directly
-            self.inner.put(series, entry);
+            self.inner.put(series.clone(), entry);
         }
 
         // Get item; move to back of LRU cache
