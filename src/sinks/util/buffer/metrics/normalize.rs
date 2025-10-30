@@ -370,11 +370,11 @@ impl CapacityPolicy {
     }
 
     /// Gets the total memory size of entry/series, excluding LRU cache overhead.
-    pub fn item_size(&self, series: &MetricSeries, entry: &MetricEntry) -> usize {
-        let series_size = series.allocated_bytes();
-        let entry_size = entry.allocated_bytes();
-        let total_size = series_size + entry_size;
-        
+    pub fn item_size(&self, _series: &MetricSeries, _entry: &MetricEntry) -> usize {
+        // let series_size = series.allocated_bytes();
+        // let entry_size = entry.allocated_bytes();
+        // let total_size = series_size + entry_size;
+        //
         // debug!(
         //     message = "Calculating item size",
         //     series_name_str = %series.name.name,
@@ -382,8 +382,9 @@ impl CapacityPolicy {
         //     entry_size = entry_size,
         //     total_size = total_size
         // );
-        
-        total_size
+        200
+        //
+        // total_size
     }
 }
 
@@ -580,7 +581,7 @@ impl MetricSet {
         );
         
         // Log memory debug info
-        debug!(message = "Memory after enforcement", debug = %self.debug_memory());
+        info!(message = "Memory after enforcement", debug = %self.debug_memory());
     }
 
     /// Perform TTL cleanup if configured and needed.
@@ -645,20 +646,18 @@ impl MetricSet {
         // Handle differently based on whether we need to track memory
         if capacity_policy.max_bytes.is_some() {
             // When tracking memory, we need to calculate sizes before and after
-            let entry_size = capacity_policy.item_size(&series, &entry);
-
-            if let Some(existing_entry) = self.inner.put(series.clone(), entry) {
-                // If we had an existing entry, calculate its size and adjust memory tracking
-                let existing_size = capacity_policy.item_size(&series, &existing_entry);
-                debug!(message = "Found existing entry for series", series_name = ?series.name, series_name_str = %series.name.name);
-                capacity_policy.replace_memory(existing_size, entry_size);
-                self.inner.get(&series);
-            } else {
-                // No existing entry, just add the new entry's size
-                debug!(message = "No existing entry for series", series_name = ?series.name, series_name_str = %series.name.name);
-                capacity_policy.replace_memory(0, entry_size);
-                self.inner.get(&series);
-            }
+            // let entry_size = capacity_policy.item_size(&series, &entry);
+            capacity_policy.replace_memory(0, 200)
+            // if let Some(existing_entry) = self.inner.put(series, entry) {
+            //     // If we had an existing entry, calculate its size and adjust memory tracking
+            //     let existing_size = capacity_policy.item_size(&series, &existing_entry);
+            //     capacity_policy.replace_memory(existing_size, entry_size);
+            //     self.inner.get(&series);
+            // } else {
+            //     // No existing entry, just add the new entry's size
+            //     capacity_policy.replace_memory(0, entry_size);
+            //     self.inner.get(&series);
+            // }
         } else {
             // When not tracking memory (only entry count limits), just put directly
             self.inner.put(series, entry);
