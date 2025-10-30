@@ -13,9 +13,9 @@ services:
       - PULSAR_PREFIX_tlsCertificateFilePath=/etc/pulsar/certs/pulsar.cert.pem
       - PULSAR_PREFIX_tlsTrustCertsFilePath=/etc/pulsar/certs/ca-chain.cert.pem
     volumes:
-      - ../../shared/data/ca/intermediate_server/private/pulsar.key.pem:/etc/pulsar/certs/pulsar.key.pem:ro
-      - ../../../tests/data//ca/intermediate_server/certs/pulsar.cert.pem:/etc/pulsar/certs/pulsar.cert.pem:ro
-      - ../../shared/data/ca/intermediate_server/certs/ca-chain.cert.pem:/etc/pulsar/certs/ca-chain.cert.pem:ro
+      - ../../../data/ca/intermediate_server/private/pulsar.key.pem:/etc/pulsar/certs/pulsar.key.pem:ro
+      - ../../../data/ca/intermediate_server/certs/pulsar.cert.pem:/etc/pulsar/certs/pulsar.cert.pem:ro
+      - ../../../data/ca/intermediate_server/certs/ca-chain.cert.pem:/etc/pulsar/certs/ca-chain.cert.pem:ro
 
 networks:
   default:

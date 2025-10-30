@@ -10,7 +10,7 @@ services:
     volumes:
     - socket:/var/run/postgresql
     - ../data/postgres-init.sh:/postgres-init.sh:ro
-    - ../../shared/data/ca:/certs:ro
+    - ../../../data/ca:/certs:ro
 
 volumes:
   # Use external volume 'postgres_socket' that's shared with the test runner

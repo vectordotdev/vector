@@ -5,7 +5,7 @@ services:
     image: docker.io/eventstore/eventstore:${CONFIG_VERSION}
     command: --insecure --stats-period-sec=1
     volumes:
-    - ../../../tests/data:/etc/vector:ro
+    - ../../../data:/etc/vector:ro
 
 networks:
   default:

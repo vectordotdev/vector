@@ -8,7 +8,7 @@ services:
     - SPLUNK_PASSWORD=password
     - SPLUNK_HEC_TOKEN=abcd1234
     volumes:
-    - ../../../tests/data/splunk/default.yml:/tmp/defaults/default.yml
+    - ../../../data/splunk/default.yml:/tmp/defaults/default.yml
     ports:
     - 8000:8000
     - 8088:8088

@@ -31,9 +31,9 @@ services:
     - 9092:9092
     - 9093:9093
     volumes:
-    - ../../shared/data/ca/intermediate_server/private/kafka.pass:/etc/kafka/secrets/kafka.pass:ro
-    - ../../shared/data/ca/intermediate_server/private/kafka.p12:/etc/kafka/secrets/kafka.p12:ro
-    - ../../shared/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+    - ../../../data/ca/intermediate_server/private/kafka.pass:/etc/kafka/secrets/kafka.pass:ro
+    - ../../../data/ca/intermediate_server/private/kafka.p12:/etc/kafka/secrets/kafka.p12:ro
+    - ../../../data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
 
 networks:
   default:

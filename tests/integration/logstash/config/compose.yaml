@@ -10,7 +10,7 @@ services:
     image: docker.elastic.co/logstash/logstash:7.13.1
     volumes:
     - /dev/null:/usr/share/logstash/pipeline/logstash.yml
-    - ../../shared/data/host.docker.internal.crt:/tmp/logstash.crt
+    - ../../../data/host.docker.internal.crt:/tmp/logstash.crt
     - ../data/logstash/logstash.conf:/usr/share/logstash/pipeline/logstash.conf
 
 networks:

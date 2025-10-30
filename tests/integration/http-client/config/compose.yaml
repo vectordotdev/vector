@@ -27,8 +27,8 @@ services:
     - /data
     volumes:
     - ../data/http-client/serve:/data
-    - ../../shared/data/ca/intermediate_server/certs/dufs-https-chain.cert.pem:/certs/ca.cert.pem
-    - ../../shared/data/ca/intermediate_server/private/dufs-https.key.pem:/certs/ca.key.pem
+    - ../../../data/ca/intermediate_server/certs/dufs-https-chain.cert.pem:/certs/ca.cert.pem
+    - ../../../data/ca/intermediate_server/private/dufs-https.key.pem:/certs/ca.key.pem
 
 networks:
   default:
