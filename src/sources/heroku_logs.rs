@@ -405,8 +405,7 @@ fn line_to_events(
     } else {
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
-            fields = parts.len(),
-            internal_log_rate_limit = true
+            fields = parts.len()
         );
 
         events.push(LogEvent::from_str_legacy(line).into())

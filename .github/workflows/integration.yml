@@ -17,6 +17,10 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.event.number || github.event.merge_group.head_sha }}
   cancel-in-progress: true
 
+permissions:
+  packages: write
+  contents: read
+
 env:
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
@@ -29,9 +33,6 @@ env:
   VERBOSE: true
   CI: true
   PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   changes:
@@ -43,10 +44,26 @@ jobs:
       e2e_tests: true
     secrets: inherit
 
+  build-test-runner:
+    needs: changes
+    if: |
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'merge_group' &&
+         (needs.changes.outputs.dependencies == 'true' ||
+          needs.changes.outputs.integration-yml == 'true' ||
+          needs.changes.outputs.int-tests-any == 'true' ||
+          needs.changes.outputs.e2e-tests-any == 'true'))
+      }}
+    uses: ./.github/workflows/build-test-runner.yml
+    with:
+      commit_sha: ${{ github.sha }}
+
   integration-tests:
     runs-on: ubuntu-24.04-8core
     needs:
       - changes
+      - build-test-runner
 
     if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
@@ -57,7 +74,7 @@ jobs:
           "amqp", "appsignal", "axiom", "aws", "azure", "clickhouse", "databend", "datadog-agent",
           "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "elasticsearch",
           "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
-          "loki", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
+          "loki", "mqtt", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
           "redis", "webhdfs"
         ]
     timeout-minutes: 90
@@ -71,6 +88,12 @@ jobs:
         if: github.event_name == 'merge_group'
         with:
           name: int_tests_changes
+
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.sha }}
 
       - name: Run Integration Tests for ${{ matrix.service }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
@@ -109,10 +132,11 @@ jobs:
     runs-on: ubuntu-24.04-8core
     needs:
       - changes
+      - build-test-runner
     if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
-        service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs" ]
+        service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics" ]
     timeout-minutes: 90
 
     steps:
@@ -125,6 +149,12 @@ jobs:
         if: github.event_name == 'merge_group'
         with:
           name: e2e_tests_changes
+
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.sha }}
 
       - name: Run E2E Tests for ${{ matrix.service }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
@@ -163,6 +193,7 @@ jobs:
     runs-on: ubuntu-24.04
     if: always()
     needs:
+      - build-test-runner
       - integration-tests
       - e2e-tests
     steps:

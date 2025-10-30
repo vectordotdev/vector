@@ -18,7 +18,7 @@ services:
     container_name: logs-generator
     build:
       context: ../../../
-      dockerfile: ./scripts/e2e/opentelemetry-logs/telemetrygen.Dockerfile
+      dockerfile: ./scripts/e2e/opentelemetry-common/telemetrygen.Dockerfile
     init: true
     depends_on:
       otel-collector-source:
@@ -44,7 +44,7 @@ services:
     container_name: otel-collector-sink
     build:
       context: ../../../
-      dockerfile: ./scripts/e2e/opentelemetry-logs/collector.Dockerfile
+      dockerfile: ./scripts/e2e/opentelemetry-common/collector.Dockerfile
       args:
         CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
     init: true
@@ -63,12 +63,7 @@ services:
 
   vector:
     container_name: vector-otel-logs-e2e
-    build:
-      context: ../../../
-      dockerfile: ./scripts/e2e/Dockerfile
-      args:
-        FEATURES: e2e-tests-opentelemetry
-        RUST_VERSION: ${RUST_VERSION:-1.88}
+    image: ${CONFIG_VECTOR_IMAGE}
     init: true
     volumes:
       - type: bind

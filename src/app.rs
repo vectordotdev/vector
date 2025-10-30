@@ -149,7 +149,7 @@ impl ApplicationConfig {
                 }
                 Err(error) => {
                     let error = error.to_string();
-                    error!("An error occurred that Vector couldn't handle: {}.", error);
+                    error!(message = "An error occurred that Vector couldn't handle.", %error, internal_log_rate_limit = false);
                     _ = self
                         .topology
                         .abort_tx
@@ -383,6 +383,22 @@ async fn handle_signal(
                 allow_empty_config,
             )
             .await;
+
+            if let Ok(ref config) = new_config {
+                // Find all transforms that have external files to watch
+                let transform_keys_to_reload = config.transform_keys_with_external_files();
+
+                // Add these transforms to reload set
+                if !transform_keys_to_reload.is_empty() {
+                    info!(
+                        message = "Reloading transforms with external files.",
+                        count = transform_keys_to_reload.len()
+                    );
+                    topology_controller
+                        .topology
+                        .extend_reload_set(transform_keys_to_reload);
+                }
+            }
 
             reload_config_from_result(topology_controller, new_config).await
         }

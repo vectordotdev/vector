@@ -1,8 +1,9 @@
 ---
+date: "2022-02-25"
 title: Using Vector `tap`
 short: Vector tap
 description: Learn how to use the Vector `tap` CLI command to examine events as they flow through your pipeline and troubleshoot issues.
-author_github: https://github.com/001wwang
+authors: ["001wwang"]
 domain: operations
 weight: 6
 tags: ["cli", "tap", "level up", "guides", "guide"]
