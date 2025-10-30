@@ -298,14 +298,14 @@ components: sources: internal_metrics: {
 			tags: _component_tags
 		}
 		component_cache_bytes: {
-			description:       "The number of events in this component's metrics normalizer cache."
+			description:       "The size in bytes of events in this component's metrics normalizer cache."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags
 		}
-		component_cache_events: {
-			description:       "The total number of errors encountered by this component."
-			type:              "gauge"
+		component_cache_evictions_total: {
+			description:       "The total number of cache evictions by this component's metrics normalizer cache."
+			type:              "counter"
 			default_namespace: "vector"
 			tags: _component_tags
 		}
