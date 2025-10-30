@@ -171,7 +171,7 @@ impl WebSocketConnector {
                 }
             }
 
-            time::sleep(backoff.next().unwrap()).await;
+            time::sleep(backoff.next().expect("backoff iterator always returns some value")()).await;
         }
     }
 
