@@ -3,7 +3,7 @@ use std::{collections::HashMap, pin::Pin, time::Duration};
 use futures::{Stream, StreamExt};
 use vector_lib::{config::LogNamespace, configurable::configurable_component};
 
-use crate::internal_events::{IncrementalToAbsoluteMetricsCache};
+use crate::internal_events::incremental_to_absolute::IncrementalToAbsoluteMetricsCache;
 
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
@@ -90,8 +90,8 @@ impl IncrementalToAbsolute {
         if let Some(cp) = self.data.capacity_policy() {
             if cp.max_bytes.is_some() {
                 emit!(IncrementalToAbsoluteMetricsCache {
-                      size: cp.current_memory();
-                      count: self.data.len(),
+                    size: cp.current_memory(),
+                    count: self.data.len(),
                     evictions: self.data.get_and_reset_eviction_count(),
                 }); 
             }
