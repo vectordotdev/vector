@@ -484,7 +484,7 @@ impl MetricSet {
     }
 
     /// Reset the eviction count and return the previous value
-    pub fn get_and_reset_eviction_count(&mut self) -> usize {
+    pub const fn get_and_reset_eviction_count(&mut self) -> usize {
         let count = self.eviction_count;
         self.eviction_count = 0;
         count
