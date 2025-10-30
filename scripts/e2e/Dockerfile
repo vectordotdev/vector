@@ -14,8 +14,12 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libsasl2-dev \
     libssl-dev \
     libxxhash-dev \
+    odbcinst \
+    odbc-mariadb \
+    odbc-postgresql \
     zlib1g-dev \
     zlib1g \
+    unixodbc \
     unzip \
     mold \
   && rm -rf /var/lib/apt/lists/*
