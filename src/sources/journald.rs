@@ -1215,7 +1215,8 @@ mod tests {
             let source = config.build(cx).await.unwrap();
             tokio::spawn(async move { source.await.unwrap() });
 
-            sleep(Duration::from_millis(100)).await;
+            // Hack: Sleep to ensure journalctl process starts and emits events before shutdown.
+            sleep(Duration::from_secs(1)).await;
             shutdown
                 .shutdown_all(Some(Instant::now() + Duration::from_secs(1)))
                 .await;
@@ -1407,7 +1408,8 @@ mod tests {
         // Make sure the checkpointer cursor is empty
         assert_eq!(checkpointer.get().await.unwrap(), None);
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Hack: Sleep to ensure journalctl process starts and emits events.
+        sleep(Duration::from_secs(1)).await;
 
         // Acknowledge all the received events.
         let mut count = 0;
@@ -1419,7 +1421,7 @@ mod tests {
         }
         assert_eq!(count, 8);
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
         assert_eq!(checkpointer.get().await.unwrap().as_deref(), Some("8"));
     }
 
