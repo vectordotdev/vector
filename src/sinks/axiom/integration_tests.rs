@@ -7,7 +7,8 @@ use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
 
 use super::*;
 use crate::{
-    config::SinkContext,
+    config::{SinkConfig, SinkContext},
+    sinks::axiom::config::UrlOrRegion,
     test_util::components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
 };
 
