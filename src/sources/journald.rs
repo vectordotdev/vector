@@ -366,36 +366,7 @@ impl SourceConfig for JournaldConfig {
             .clone()
             .unwrap_or_else(|| JOURNALCTL.clone());
 
-        let systemd_version = {
-            let stdout = Command::new(&journalctl_path)
-                .arg("--version")
-                .output()
-                .await
-                .context(JournalctlSpawnSnafu)?
-                .stdout;
-
-            // output format: `systemd {version_number} ({full_version}){newline}{config ...}`
-            let stdout = String::from_utf8_lossy(&stdout);
-            stdout
-                .split_whitespace()
-                .nth(1)
-                .and_then(|s| s.parse::<u32>().ok())
-                .ok_or_else(|| BuildError::JournalctlParseVersion {
-                    output: {
-                        let cutoff = 40;
-                        let length = stdout.chars().count();
-                        format!(
-                            "{}{}",
-                            stdout.chars().take(cutoff).collect::<String>(),
-                            if length > cutoff {
-                                format!(" ..{} more char(s)", length - cutoff)
-                            } else {
-                                "".to_string()
-                            }
-                        )
-                    },
-                })?
-        };
+        let systemd_version = get_systemd_version_from_journalctl(&journalctl_path).await?;
 
         if (250..258).contains(&systemd_version) {
             // https://github.com/vectordotdev/vector/issues/18068
@@ -827,6 +798,37 @@ impl Drop for RunningJournalctl {
             _ = kill(Pid::from_raw(pid), Signal::SIGTERM);
         }
     }
+}
+
+async fn get_systemd_version_from_journalctl(journalctl_path: &PathBuf) -> crate::Result<u32> {
+    let stdout = Command::new(journalctl_path)
+        .arg("--version")
+        .output()
+        .await
+        .context(JournalctlSpawnSnafu)?
+        .stdout;
+
+    // output format: `systemd {version_number} ({full_version}){newline}{config ...}`
+    let stdout = String::from_utf8_lossy(&stdout);
+    Ok(stdout
+        .split_whitespace()
+        .nth(1)
+        .and_then(|s| s.parse::<u32>().ok())
+        .ok_or_else(|| BuildError::JournalctlParseVersion {
+            output: {
+                let cutoff = 40;
+                let length = stdout.chars().count();
+                format!(
+                    "{}{}",
+                    stdout.chars().take(cutoff).collect::<String>(),
+                    if length > cutoff {
+                        format!(" ..{} more char(s)", length - cutoff)
+                    } else {
+                        "".to_string()
+                    }
+                )
+            },
+        })?)
 }
 
 fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
