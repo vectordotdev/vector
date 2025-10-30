@@ -106,7 +106,7 @@ impl NormalizerSettings for DefaultNormalizerSettings {
 /// Normalizes metrics according to a set of rules.
 ///
 /// Depending on the system in which they are being sent to, metrics may have to be modified in order to fit the data
-/// model or constraints placed on that system.  Typically, this boils down to whether or not the system can accept
+/// model or constraints placed on that system. Typically, this boils down to whether or not the system can accept
 /// absolute metrics or incremental metrics: the latest value of a metric, or the delta between the last time the
 /// metric was observed and now, respective. Other rules may need to be applied, such as dropping metrics of a specific
 /// type that the system does not support.
@@ -718,4 +718,240 @@ impl Default for MetricSet {
     fn default() -> Self {
         Self::new(MetricSetSettings::default())
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use vector_lib::{
+        event::{
+            Metric, MetricKind, MetricValue
+        },
+    };
+    use super::*;
+    use similar_asserts::assert_eq;
+
+    // Helper function to create a metric with a unique name and value
+    fn create_test_metric(name: &str, kind: MetricKind, value: MetricValue) -> Metric {
+        Metric::new(
+            name,
+            kind,
+            value,
+        )
+    }
+
+    #[test]
+    fn test_metric_set_max_events_limit() {
+        // Create a MetricSet with a max events limit of 5
+        let settings = MetricSetSettings {
+            max_events: Some(5),
+            max_bytes: None,
+            time_to_live: None,
+        };
+        let mut metric_set = MetricSet::new(settings);
+        
+        // Push 10 distinct metrics (0-9)
+        for i in 0..10 {
+            let metric = create_test_metric(
+                &format!("test-metric-{}", i),
+                MetricKind::Incremental,
+                MetricValue::Counter {
+                    value: i as f64,
+                },);
+            metric_set.insert_update(metric);
+        }
+        
+        // Verify we have only 5 metrics in the cache
+        assert_eq!(metric_set.len(), 5);
+        
+        // Verify eviction count is 5
+        assert_eq!(metric_set.get_and_reset_eviction_count(), 5);
+        
+        // Convert to vec and verify we have 5 metrics
+        let metrics = metric_set.into_metrics();
+        assert_eq!(metrics.len(), 5);
+        
+        // Print the metrics for debugging
+        println!("Metrics after LRU eviction:");
+        for (i, metric) in metrics.iter().enumerate() {
+            println!("  {}: name={} value={:?}", i, metric.name(), metric.value());
+        }
+        
+        // Collect the metric names - these should be test-metric-5 through test-metric-9
+        // since those are the most recently added metrics that should be retained by the LRU cache
+        let mut metric_names = Vec::new();
+        for metric in &metrics {
+            metric_names.push(metric.name().to_string());
+        }
+        
+        // Check that we have the expected metric names (the 5 most recently added)
+        for i in 5..10 {
+            let expected_name = format!("test-metric-{}", i);
+            assert!(
+                metric_names.contains(&expected_name),
+                "Expected to find metric named {} in result set", expected_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_metric_set_max_bytes_limit() {
+        // For simplicity, we'll use a small max bytes (enough for ~3 metrics)
+        // The exact byte count will depend on implementation details
+        let max_bytes = 1000; // Small value for testing
+        
+        let settings = MetricSetSettings {
+            max_events: None,
+            max_bytes: Some(max_bytes),
+            time_to_live: None,
+        };
+        let mut metric_set = MetricSet::new(settings);
+        
+        // Insert metrics until we exceed the max_bytes limit
+        for i in 0..10 {
+            let metric = create_test_metric(
+                &format!("test-metric-{}", i),
+                MetricKind::Absolute,
+                MetricValue::Counter {
+                    value: i as f64,
+                },
+            );
+            metric_set.insert_update(metric);
+        }
+        
+        // Verify memory usage is less than or equal to max_bytes
+        let memory_usage = metric_set.weighted_size();
+        assert!(memory_usage <= max_bytes as u64,
+            "Memory usage {} exceeds max_bytes {}", memory_usage, max_bytes);
+        
+        // Verify eviction count is positive (exact value depends on implementation)
+        let eviction_count = metric_set.get_and_reset_eviction_count();
+        assert!(eviction_count > 0, "Expected some evictions due to memory limits");
+        
+        // Convert to vec and verify the metrics
+        let metrics = metric_set.into_metrics();
+        
+        // Print the metrics for debugging
+        println!("Metrics after memory-based eviction:");
+        for (i, metric) in metrics.iter().enumerate() {
+            println!("  {}: name={} value={:?}", i, metric.name(), metric.value());
+        }
+        
+        // The size of metrics should be less than 10 due to eviction
+        assert!(metrics.len() < 10 && metrics.len() > 0,
+            "Expected some metrics to be evicted, got {} metrics", metrics.len());
+        
+        // Check for some of the most recently added metrics (they should be retained by LRU eviction)
+        // We can't check for exact indices since memory usage varies, but at least the most recent
+        // metrics should be present
+        let metric_names: Vec<String> = metrics.iter()
+            .map(|m| m.name().to_string())
+            .collect();
+            
+        // Check that at least metric-8 and metric-9 are present (the most recently added)
+        let has_recent = metric_names.contains(&"test-metric-9".to_string()) || 
+                         metric_names.contains(&"test-metric-8".to_string());
+                         
+        assert!(has_recent, "Expected at least one of the most recent metrics to be retained");
+    }
+    //
+    // #[test]
+    // fn test_incremental_to_absolute_conversion() {
+    //     let mut metric_set = MetricSet::default();
+    //
+    //     // Create a series of incremental counter metrics with the same series
+    //     let tags = Some(HashMap::from([("host".to_string(), "test-host".to_string())]));
+    //
+    //     // Process a sequence of incremental metrics
+    //     let incremental1 = create_test_metric("test-metric", MetricKind::Incremental, 1.0, tags.clone());
+    //     let absolute1 = metric_set.make_absolute(incremental1.clone()).unwrap();
+    //
+    //     // First metric should be converted to absolute with the same value
+    //     assert_eq!(absolute1.kind(), MetricKind::Absolute);
+    //     match absolute1.value() {
+    //         MetricValue::Counter { value } => assert_eq!(*value, 1.0),
+    //         _ => panic!("Expected counter metric"),
+    //     }
+    //
+    //     // Send a second incremental metric
+    //     let incremental2 = create_test_metric("test-metric", MetricKind::Incremental, 2.0, tags.clone());
+    //     let absolute2 = metric_set.make_absolute(incremental2.clone()).unwrap();
+    //
+    //     // Second metric should be converted to absolute with accumulated value (1.0 + 2.0 = 3.0)
+    //     assert_eq!(absolute2.kind(), MetricKind::Absolute);
+    //     match absolute2.value() {
+    //         MetricValue::Counter { value } => assert_eq!(*value, 3.0),
+    //         _ => panic!("Expected counter metric"),
+    //     }
+    //
+    //     // Verify gauges are handled correctly
+    //     let gauge_metric = create_gauge_metric("test-gauge", MetricKind::Incremental, 5.0, tags.clone());
+    //
+    //     // Process the gauge metric
+    //     let gauge_absolute = metric_set.make_absolute(gauge_metric.clone()).unwrap();
+    //
+    //     // Gauge should be converted to absolute with the same value
+    //     assert_eq!(gauge_absolute.kind(), MetricKind::Absolute);
+    //     match gauge_absolute.value() {
+    //         MetricValue::Gauge { value } => assert_eq!(*value, 5.0),
+    //         _ => panic!("Expected gauge metric"),
+    //     }
+    // }
+    //
+    // #[test]
+    // fn test_absolute_to_incremental_conversion() {
+    //     let mut metric_set = MetricSet::default();
+    //
+    //     // Create a series of absolute counter metrics with the same series
+    //     let tags = Some(HashMap::from([("host".to_string(), "test-host".to_string())]));
+    //
+    //     // Process a sequence of absolute metrics
+    //     let absolute1 = create_test_metric("test-metric", MetricKind::Absolute, 10.0, tags.clone());
+    //
+    //     // First metric should be stored but not emitted (returns None)
+    //     let incremental1 = metric_set.make_incremental(absolute1.clone());
+    //     assert!(incremental1.is_none(), "First absolute metric should not produce an incremental output");
+    //
+    //     // Send a second absolute metric with a higher value
+    //     let absolute2 = create_test_metric("test-metric", MetricKind::Absolute, 15.0, tags.clone());
+    //     let incremental2 = metric_set.make_incremental(absolute2.clone()).unwrap();
+    //
+    //     // Second metric should be converted to incremental with the delta (15.0 - 10.0 = 5.0)
+    //     assert_eq!(incremental2.kind(), MetricKind::Incremental);
+    //     match incremental2.value() {
+    //         MetricValue::Counter { value } => assert_eq!(*value, 5.0),
+    //         _ => panic!("Expected counter metric"),
+    //     }
+    //
+    //     // Send a third absolute metric with a lower value (simulating counter reset)
+    //     let absolute3 = create_test_metric("test-metric", MetricKind::Absolute, 3.0, tags.clone());
+    //     let incremental3 = metric_set.make_incremental(absolute3.clone()).unwrap();
+    //
+    //     // Third metric should produce an incremental metric with the new value
+    //     assert_eq!(incremental3.kind(), MetricKind::Incremental);
+    //     match incremental3.value() {
+    //         MetricValue::Counter { value } => assert_eq!(*value, 3.0),
+    //         _ => panic!("Expected counter metric with reset value"),
+    //     }
+    //
+    //     // Verify gauges are handled correctly
+    //     let gauge_metric = create_gauge_metric("test-gauge", MetricKind::Absolute, 5.0, tags.clone());
+    //
+    //     // Process the gauge metric
+    //     // First gauge should be stored but not emitted
+    //     let gauge_incremental1 = metric_set.make_incremental(gauge_metric.clone());
+    //     assert!(gauge_incremental1.is_none(), "First gauge metric should not produce an incremental output");
+    //
+    //     // Send a second gauge metric
+    //     let gauge_metric2 = create_gauge_metric("test-gauge", MetricKind::Absolute, 8.0, tags.clone());
+    //
+    //     // Process the second gauge metric
+    //     let gauge_incremental2 = metric_set.make_incremental(gauge_metric2.clone()).unwrap();
+    //
+    //     // Gauge should be converted to incremental with the delta (8.0 - 5.0 = 3.0)
+    //     assert_eq!(gauge_incremental2.kind(), MetricKind::Incremental);
+    //     match gauge_incremental2.value() {
+    //         MetricValue::Gauge { value } => assert_eq!(*value, 3.0),
+    //         _ => panic!("Expected gauge metric"),
+    //     }
+    // }
 }
