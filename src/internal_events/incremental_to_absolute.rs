@@ -12,7 +12,7 @@ pub struct IncrementalToAbsoluteMetricsCache {
 impl InternalEvent for IncrementalToAbsoluteMetricsCache {
     fn emit(self) {
         trace!(
-            message = "Metrics cache current size.",
+            message = "Metrics cache stats.",
             size = %self.size,
             count = %self.count,
             evictions = %self.evictions,
