@@ -70,10 +70,10 @@ fn assert_span_static_fields(request: &ExportTraceServiceRequest) {
 /// Works for both span_id (8 bytes) and trace_id (16 bytes).
 fn decode_span_id(id: &[u8]) -> Vec<u8> {
     // Check if it's hex-encoded (even length, all ASCII hex characters)
-    if id.len() % 2 == 0
+    if id.len().is_multiple_of(2)
         && id.len() >= 16
         && id.iter().all(|&b| {
-            (b'0'..=b'9').contains(&b) || (b'a'..=b'f').contains(&b) || (b'A'..=b'F').contains(&b)
+            b.is_ascii_digit() || (b'a'..=b'f').contains(&b) || (b'A'..=b'F').contains(&b)
         })
     {
         // It's hex-encoded, decode it
@@ -89,9 +89,9 @@ fn decode_span_id(id: &[u8]) -> Vec<u8> {
 
     // Check if it's base64-encoded (contains only base64 characters)
     if id.iter().all(|&b| {
-        (b'A'..=b'Z').contains(&b)
-            || (b'a'..=b'z').contains(&b)
-            || (b'0'..=b'9').contains(&b)
+        b.is_ascii_uppercase()
+            || b.is_ascii_lowercase()
+            || b.is_ascii_digit()
             || b == b'+'
             || b == b'/'
             || b == b'='
