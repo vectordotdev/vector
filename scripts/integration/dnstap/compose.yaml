@@ -12,4 +12,11 @@ services:
       - dnstap-sockets:/bind3/etc/bind/socket
 
 volumes:
-  dnstap-sockets: {}
+  dnstap-sockets:
+    name: dnstap_dnstap-sockets
+    external: true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

@@ -18,7 +18,7 @@ pub use format::{
     ProtobufDeserializerConfig, ProtobufDeserializerOptions,
 };
 #[cfg(feature = "opentelemetry")]
-pub use format::{OtlpDeserializer, OtlpDeserializerConfig};
+pub use format::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType};
 #[cfg(feature = "syslog")]
 pub use format::{SyslogDeserializer, SyslogDeserializerConfig, SyslogDeserializerOptions};
 pub use framing::{
@@ -378,7 +378,7 @@ impl DeserializerConfig {
             DeserializerConfig::Json(config) => Ok(Deserializer::Json(config.build())),
             DeserializerConfig::Protobuf(config) => Ok(Deserializer::Protobuf(config.build()?)),
             #[cfg(feature = "opentelemetry")]
-            DeserializerConfig::Otlp(config) => Ok(Deserializer::Otlp(config.build()?)),
+            DeserializerConfig::Otlp(config) => Ok(Deserializer::Otlp(config.build())),
             #[cfg(feature = "syslog")]
             DeserializerConfig::Syslog(config) => Ok(Deserializer::Syslog(config.build())),
             DeserializerConfig::Native => {
