@@ -22,4 +22,4 @@ runs:
       shell: bash
       run: |
         echo "Building vdev from source (cache miss)"
-        cargo install --path vdev --locked
+        cargo install --path vdev --locked --force
