@@ -1,5 +1,6 @@
 ARG RUST_VERSION=1
 ARG FEATURES
+ARG BUILD=false
 
 FROM docker.io/rust:${RUST_VERSION}-slim-trixie
 
@@ -32,10 +33,13 @@ RUN bash /install-protoc.sh
 WORKDIR /vector
 COPY . .
 ARG FEATURES
+ARG BUILD
 
 RUN --mount=type=cache,target=/vector/target \
     --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
-    /usr/bin/mold -run cargo build --tests --lib --bin vector \
-    --no-default-features --features $FEATURES && \
-    cp target/debug/vector /usr/bin/vector
+    if [ "$BUILD" = "true" ]; then \
+        /usr/bin/mold -run cargo build --tests --lib --bin vector \
+        --no-default-features --features $FEATURES && \
+        cp target/debug/vector /usr/bin/vector; \
+    fi

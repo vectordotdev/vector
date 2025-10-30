@@ -57,8 +57,8 @@ impl Cli {
             &BTreeMap::default(),
             None,
             &args,
-            "",
             self.reuse_image,
+            false, // Don't pre-build Vector for direct test runs
         )
     }
 }
