@@ -37,7 +37,7 @@ pub(crate) struct ComposeTestLocalConfig {
 }
 
 impl ComposeTestLocalConfig {
-    /// Integration tests are located in the `scripts/integration` dir,
+    /// Integration tests are located in the `tests/integration` dir,
     /// and are the full feature flag is `all-integration-tests`.
     pub(crate) fn integration() -> Self {
         Self {
