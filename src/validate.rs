@@ -76,6 +76,14 @@ pub struct Opts {
         value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
+
+    /// Disable interpolation of environment variables in configuration files.
+    #[arg(
+        long,
+        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub disable_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -141,9 +149,10 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    let builder = config::load_builder_from_paths_with_opts(&paths, true)
-        .map_err(&mut report_error)
-        .ok()?;
+    let builder =
+        config::load_builder_from_paths_with_opts(&paths, !opts.disable_env_var_interpolation)
+            .map_err(&mut report_error)
+            .ok()?;
     config::init_log_schema(builder.global.log_schema.clone(), true);
 
     // Build
