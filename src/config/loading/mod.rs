@@ -277,7 +277,7 @@ pub fn load_builder_from_paths_with_opts(
     interpolate_env: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
     loader_from_paths(
-        ConfigBuilderLoader::new_with_opts(interpolate_env),
+        ConfigBuilderLoader::new(interpolate_env, None),
         config_paths,
     )
 }
@@ -288,7 +288,7 @@ fn load_builder_from_input_with_opts<R: std::io::Read>(
     interpolate_env: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
     loader_from_input(
-        ConfigBuilderLoader::new_with_opts(interpolate_env),
+        ConfigBuilderLoader::new(interpolate_env, None),
         input,
         format,
     )
@@ -301,7 +301,7 @@ pub fn load_builder_from_paths_with_opts_with_secrets_and_opts(
     interpolate_env: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
     loader_from_paths(
-        ConfigBuilderLoader::with_secrets_and_opts(secrets, interpolate_env),
+        ConfigBuilderLoader::new(interpolate_env, Some(secrets)),
         config_paths,
     )
 }
@@ -313,7 +313,7 @@ fn load_builder_from_input_with_secrets_and_opts<R: std::io::Read>(
     interpolate_env: bool,
 ) -> Result<ConfigBuilder, Vec<String>> {
     loader_from_input(
-        ConfigBuilderLoader::with_secrets_and_opts(secrets, interpolate_env),
+        ConfigBuilderLoader::new(interpolate_env, Some(secrets)),
         input,
         format,
     )

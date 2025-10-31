@@ -16,18 +16,10 @@ pub struct ConfigBuilderLoader {
 }
 
 impl ConfigBuilderLoader {
-    pub fn new_with_opts(interpolate_env: bool) -> Self {
+    pub fn new(interpolate_env: bool, secrets: Option<HashMap<String, String>>) -> Self {
         Self {
             builder: ConfigBuilder::default(),
-            secrets: None,
-            interpolate_env,
-        }
-    }
-
-    pub fn with_secrets_and_opts(secrets: HashMap<String, String>, interpolate_env: bool) -> Self {
-        Self {
-            builder: ConfigBuilder::default(),
-            secrets: Some(secrets),
+            secrets: secrets,
             interpolate_env,
         }
     }
