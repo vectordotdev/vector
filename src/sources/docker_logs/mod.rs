@@ -694,18 +694,18 @@ impl DockerLogsSource {
     /// Returns true if retry was attempted, false if exhausted or shutdown
     async fn retry_events_stream_with_backoff(&mut self, reason: &str) -> bool {
         if let Some(delay) = self.events_backoff.next() {
+            warn!(
+                message = reason,
+                action = "retrying with backoff",
+                delay_ms = delay.as_millis()
+            );
             tokio::select! {
                 _ = tokio::time::sleep(delay) => {
-                    warn!(
-                        message = reason,
-                        action = "retrying with backoff",
-                        delay_ms = delay.as_millis()
-                    );
                     self.events = Box::pin(self.esb.core.docker_logs_event_stream());
                     true
                 }
                 _ = self.esb.shutdown.clone() => {
-                    info!(message = "Shutdown signal received during retry backoff.", reason = reason);
+                    info!(message = "Shutdown signal received during retry backoff.");
                     false
                 }
             }
