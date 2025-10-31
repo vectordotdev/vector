@@ -9,6 +9,7 @@ mod ready_frames;
 
 pub use decoding::{Decoder, DecodingConfig};
 pub use encoding::{
-    Encoder, EncodingConfig, EncodingConfigWithFraming, SinkType, TimestampFormat, Transformer,
+    BatchEncoder, BatchSerializer, Encoder, EncoderKind, EncodingConfig, EncodingConfigWithFraming,
+    SinkType, TimestampFormat, Transformer,
 };
 pub use ready_frames::ReadyFrames;
