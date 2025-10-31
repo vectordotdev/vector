@@ -766,7 +766,7 @@ mod integration_tests {
         // will return a `400 BAD_REQUEST`.
         let log_type = "INVALID";
         let (sink, healthcheck) =
-            config_build(log_type, "/home/vector/scripts/integration/gcp/auth.json")
+            config_build(log_type, "/home/vector/tests/integration/gcp/auth.json")
                 .await
                 .expect("Building sink failed");
 
