@@ -118,9 +118,9 @@ remap: {
 
 	_vector_metrics_explainer: """
 		Internal Vector metrics functions work with a snapshot of the metrics. The interval at which
-		the snapshot is updated is controlled via
+		the snapshot is updated is controlled through the
 		[`metrics_storage_refresh_period`](\(urls.vector_configuration_global)/#metrics_storage_refresh_period)
-		global option. Higher values can reduce performance impact of that process, but will result
-		in stale metrics data in the snapshot.
+		global option. Higher values can reduce performance impact of that process, but may cause
+		stale metrics data in the snapshot.
 		"""
 }
