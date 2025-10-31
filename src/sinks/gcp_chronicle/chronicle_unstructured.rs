@@ -719,7 +719,7 @@ mod integration_tests {
 
         let log_type = random_string(10);
         let (sink, healthcheck) =
-            config_build(&log_type, "/home/vector/scripts/integration/gcp/auth.json")
+            config_build(&log_type, "/home/vector/tests/integration/gcp/auth.json")
                 .await
                 .expect("Building sink failed");
 
@@ -751,7 +751,7 @@ mod integration_tests {
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
         let sink = config_build(
             &log_type,
-            "/home/vector/scripts/integration/gcp/invalidauth.json",
+            "/home/vector/tests/integration/gcp/invalidauth.json",
         )
         .await;
 
