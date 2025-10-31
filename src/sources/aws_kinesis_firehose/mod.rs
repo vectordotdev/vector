@@ -430,7 +430,7 @@ mod tests {
         let handle = tokio::spawn(async move {
             send(address, timestamp, records, key, gzip, record_compression).await
         });
-        sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(500)).await;
         handle
     }
 
