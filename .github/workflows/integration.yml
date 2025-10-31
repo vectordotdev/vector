@@ -122,7 +122,7 @@ jobs:
               # Only install dep if test runs
               bash scripts/environment/prepare.sh --modules=datadog-ci
               echo "Running test for ${{ matrix.service }}"
-              bash scripts/run-integration-test.sh int ${{ matrix.service }}
+              cargo vdev integration run ${{ matrix.service }} --build-all --reuse-image
             else
               echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
             fi
@@ -183,7 +183,7 @@ jobs:
               # Only install dep if test runs
               bash scripts/environment/prepare.sh --modules=datadog-ci
               echo "Running test for ${{ matrix.service }}"
-              bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
+              cargo vdev e2e run ${{ matrix.service }} --build-all --reuse-image
             else
               echo "Skipping ${{ matrix.service }} test as the value is false or conditions not met."
             fi
