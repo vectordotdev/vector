@@ -209,6 +209,24 @@ runs:
       if: ${{ inputs.vdev == 'true' }}
       uses: ./.github/actions/install-vdev
 
+    - name: Cache prepare.sh binaries
+      id: cache-prepare-binaries
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: |
+          ~/.cargo/bin/cargo-deb
+          ~/.cargo/bin/cross
+          ~/.cargo/bin/cargo-nextest
+          ~/.cargo/bin/cargo-deny
+          ~/.cargo/bin/cargo-msrv
+          ~/.cargo/bin/dd-rust-license-tool
+          ~/.cargo/bin/wasm-pack
+          /usr/local/bin/markdownlint
+          /usr/local/bin/datadog-ci
+        key: ${{ runner.os }}-prepare-binaries-${{ hashFiles('scripts/environment/prepare.sh', 'scripts/environment/binstall.sh', 'scripts/environment/release-flags.sh') }}
+        restore-keys: |
+          ${{ runner.os }}-prepare-binaries-
+
     - name: Run prepare.sh
       shell: bash
       run: |
