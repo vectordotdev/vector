@@ -363,7 +363,7 @@ mod tests {
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::config::ComponentKey;
+    use vector_lib::config::{ComponentKey, LogNamespace};
     use vrl::value::Kind;
 
     use super::*;

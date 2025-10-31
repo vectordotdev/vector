@@ -179,7 +179,7 @@ mod test {
     use std::collections::HashMap;
 
     use indoc::indoc;
-    use vector_lib::transform::TransformOutputsBuf;
+    use vector_lib::{config::LogNamespace, transform::TransformOutputsBuf};
 
     use super::*;
     use crate::{

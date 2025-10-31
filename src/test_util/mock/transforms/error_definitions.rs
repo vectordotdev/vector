@@ -1,7 +1,7 @@
 use async_trait::async_trait;
 use snafu::Snafu;
 use vector_lib::{
-    config::{DataType, Input, LogNamespace, TransformOutput},
+    config::{DataType, Input, TransformOutput},
     configurable::configurable_component,
     schema::Definition,
     transform::Transform,

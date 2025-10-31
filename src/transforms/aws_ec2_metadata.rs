@@ -712,7 +712,7 @@ enum Ec2MetadataError {
 
 #[cfg(test)]
 mod test {
-    use vector_lib::{enrichment::TableRegistry, lookup::OwnedTargetPath};
+    use vector_lib::lookup::OwnedTargetPath;
     use vrl::{owned_value_path, value::Kind};
 
     use crate::{
@@ -731,9 +731,8 @@ mod test {
             Definition::new(Kind::bytes(), Kind::any_object(), [LogNamespace::Vector]);
 
         let mut outputs = transform_config.outputs(
-            TableRegistry::default(),
+            &Default::default(),
             &[(OutputId::dummy(), input_definition)],
-            LogNamespace::Vector,
         );
         assert_eq!(outputs.len(), 1);
         let output = outputs.pop().unwrap();

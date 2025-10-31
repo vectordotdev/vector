@@ -366,7 +366,7 @@ mod test {
 
     use super::*;
     use crate::{
-        config::{LogNamespace, OutputId, TransformConfig, schema, schema::Definition},
+        config::{OutputId, TransformConfig, schema, schema::Definition},
         event::{LogEvent, Value},
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,
@@ -400,20 +400,15 @@ group_by = [ "request_id" ]
                     None,
                 );
             let schema_definitions = reduce_config
-                .outputs(
-                    vector_lib::enrichment::TableRegistry::default(),
-                    &[("test".into(), input_definition)],
-                    LogNamespace::Legacy,
-                )
+                .outputs(&Default::default(), &[("test".into(), input_definition)])
                 .first()
                 .unwrap()
                 .schema_definitions(true)
                 .clone();
 
             let new_schema_definition = reduce_config.outputs(
-                TableRegistry::default(),
+                &Default::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
-                LogNamespace::Legacy,
             )[0]
             .clone()
             .log_schema_definitions
@@ -502,9 +497,8 @@ merge_strategies.baz = "max"
             let (tx, rx) = mpsc::channel(1);
 
             let new_schema_definition = reduce_config.outputs(
-                TableRegistry::default(),
+                &Default::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
-                LogNamespace::Legacy,
             )[0]
             .clone()
             .log_schema_definitions
@@ -572,9 +566,8 @@ group_by = [ "request_id" ]
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
             let new_schema_definition = reduce_config.outputs(
-                TableRegistry::default(),
+                &Default::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
-                LogNamespace::Legacy,
             )[0]
             .clone()
             .log_schema_definitions
@@ -781,9 +774,8 @@ merge_strategies.bar = "concat"
             let (tx, rx) = mpsc::channel(1);
 
             let new_schema_definition = reduce_config.outputs(
-                TableRegistry::default(),
+                &Default::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
-                LogNamespace::Legacy,
             )[0]
             .clone()
             .log_schema_definitions
