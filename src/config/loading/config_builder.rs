@@ -19,7 +19,7 @@ impl ConfigBuilderLoader {
     pub fn new(interpolate_env: bool, secrets: Option<HashMap<String, String>>) -> Self {
         Self {
             builder: ConfigBuilder::default(),
-            secrets: secrets,
+            secrets,
             interpolate_env,
         }
     }
