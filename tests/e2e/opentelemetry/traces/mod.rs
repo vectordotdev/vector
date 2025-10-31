@@ -239,10 +239,42 @@ fn vector_sink_otel_sink_traces_match() {
     // Both use the collector's file exporter with hex encoding, so they should match perfectly
     assert_span_ids_match(&collector_source_request, &collector_sink_request);
 
+    // Deduplicate collector-sink data by span_id before comparison
+    // Vector receives the same data via both gRPC and HTTP, so collector-sink has duplicates
+    let mut deduped_sink_request = ExportTraceServiceRequest {
+        resource_spans: Vec::new(),
+    };
+
+    let mut seen_span_ids = std::collections::HashSet::new();
+    for rs in &collector_sink_request.resource_spans {
+        let mut deduped_rs = rs.clone();
+        deduped_rs.scope_spans.clear();
+
+        for ss in &rs.scope_spans {
+            let mut deduped_ss = ss.clone();
+            deduped_ss.spans.clear();
+
+            for span in &ss.spans {
+                let span_id = decode_span_id(&span.span_id);
+                if seen_span_ids.insert(span_id) {
+                    deduped_ss.spans.push(span.clone());
+                }
+            }
+
+            if !deduped_ss.spans.is_empty() {
+                deduped_rs.scope_spans.push(deduped_ss);
+            }
+        }
+
+        if !deduped_rs.scope_spans.is_empty() {
+            deduped_sink_request.resource_spans.push(deduped_rs);
+        }
+    }
+
     // Compare the full requests to verify Vector correctly forwarded all trace data via OTLP
     // This tests the complete pipeline: telemetrygen -> collector-source -> Vector -> collector-sink
     assert_eq!(
-        collector_source_request, collector_sink_request,
-        "Traces received by collector-source should match traces forwarded through Vector to collector-sink"
+        collector_source_request, deduped_sink_request,
+        "Traces received by collector-source should match deduplicated traces forwarded through Vector to collector-sink"
     );
 }
