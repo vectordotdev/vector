@@ -673,14 +673,14 @@ impl DockerLogsSource {
                             });
                             // Retry events stream with exponential backoff
                             if !self.retry_events_stream_with_backoff("Docker events stream failed").await {
-                                error!("Docker events stream failed and retry exhausted, shutting down");
+                                error!("Docker events stream failed and retry exhausted, shutting down.");
                                 return;
                             }
                         },
                         None => {
                             // Retry events stream with exponential backoff
                             if !self.retry_events_stream_with_backoff("Docker events stream ended").await {
-                                error!("Docker events stream ended and retry exhausted, shutting down");
+                                error!("Docker events stream ended and retry exhausted, shutting down.");
                                 return;
                             }
                         }
@@ -705,12 +705,12 @@ impl DockerLogsSource {
                     true
                 }
                 _ = self.esb.shutdown.clone() => {
-                    info!(message = "Shutdown signal received during retry backoff", reason = reason);
+                    info!(message = "Shutdown signal received during retry backoff.", reason = reason);
                     false
                 }
             }
         } else {
-            error!(message = "Events stream retry exhausted", reason = reason);
+            error!(message = "Events stream retry exhausted.", reason = reason);
             false
         }
     }
