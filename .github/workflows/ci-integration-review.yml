@@ -162,6 +162,12 @@ jobs:
           max_attempts: 3
           command: bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
 
+      - name: e2e-opentelemetry-traces
+        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces')
+          || startsWith(github.event.review.body, '/ci-run-e2e-all')
+          || startsWith(github.event.review.body, '/ci-run-all') }}
+        run: bash scripts/run-integration-test.sh e2e opentelemetry-traces
+
 
   update-pr-status:
     name: Signal result to PR
