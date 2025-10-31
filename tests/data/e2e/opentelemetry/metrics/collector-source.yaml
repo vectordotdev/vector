@@ -21,12 +21,7 @@ exporters:
 
 service:
   pipelines:
-    logs:
-      receivers: [ otlp ]
-      processors: [ batch ]
-      exporters: [ debug, otlp/grpc, otlphttp/vector ]
-
     metrics:
       receivers: [ otlp ]
       processors: [ batch ]
-      exporters: [ debug ]
+      exporters: [ debug, otlp/grpc, otlphttp/vector ]

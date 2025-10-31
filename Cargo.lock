@@ -12460,6 +12460,7 @@ dependencies = [
  "metrics",
  "metrics-tracing-context",
  "mlua",
+ "mock_instant",
  "mongodb",
  "netlink-packet-core",
  "netlink-packet-sock-diag",
@@ -12508,6 +12509,7 @@ dependencies = [
  "serde_json",
  "serde_with 3.14.0",
  "serde_yaml",
+ "serial_test",
  "similar-asserts",
  "smallvec",
  "smpl_jwt",
@@ -12938,7 +12940,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.27.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#dbfeee575e0527f46264667339f37a795362099e"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#90ea34f09903e3ee85f9b3e4813f44992f6e7c68"
 dependencies = [
  "aes",
  "aes-siv",
