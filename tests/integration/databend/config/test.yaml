@@ -15,4 +15,4 @@ matrix:
 paths:
 - "src/sinks/databend/**"
 - "src/sinks/util/**"
-- "scripts/integration/databend/**"
+- "tests/integration/databend/**"

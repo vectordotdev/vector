@@ -19,4 +19,4 @@ paths:
 - "src/internal_events/dnstap.rs"
 - "src/sources/dnstap/**"
 - "src/sources/util/**"
-- "scripts/integration/dnstap/**"
+- "tests/integration/dnstap/**"

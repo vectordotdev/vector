@@ -12,4 +12,4 @@ paths:
 - "src/internal_events/eventstoredb_metrics.rs"
 - "src/sources/eventstoredb_metrics/**"
 - "src/sources/util/**"
-- "scripts/integration/eventstoredb/**"
+- "tests/integration/eventstoredb/**"

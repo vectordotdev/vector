@@ -15,4 +15,4 @@ matrix:
 paths:
 - "src/sinks/humio/**"
 - "src/sinks/util/**"
-- "scripts/integration/humio/**"
+- "tests/integration/humio/**"

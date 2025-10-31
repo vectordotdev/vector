@@ -16,4 +16,4 @@ matrix:
 paths:
 - "src/sources/http_client/**"
 - "src/sources/util/**"
-- "scripts/integration/http-client/**"
+- "tests/integration/http-client/**"

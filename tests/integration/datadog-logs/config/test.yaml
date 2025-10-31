@@ -17,4 +17,4 @@ paths:
 - "src/internal_events/datadog_*"
 - "src/sinks/datadog/logs/**"
 - "src/sinks/util/**"
-- "scripts/integration/datadog-logs/**"
+- "tests/integration/datadog-logs/**"

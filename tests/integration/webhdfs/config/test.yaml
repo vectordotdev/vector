@@ -14,4 +14,4 @@ matrix:
 paths:
 - "src/sinks/webhdfs/**"
 - "src/sinks/util/**"
-- "scripts/integration/webhdfs/**"
+- "tests/integration/webhdfs/**"

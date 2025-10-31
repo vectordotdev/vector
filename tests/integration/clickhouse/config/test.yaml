@@ -14,4 +14,4 @@ matrix:
 paths:
 - "src/sinks/clickhouse/**"
 - "src/sinks/util/**"
-- "scripts/integration/clickhouse/**"
+- "tests/integration/clickhouse/**"

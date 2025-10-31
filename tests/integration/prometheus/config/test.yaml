@@ -18,4 +18,4 @@ paths:
 - "src/sources/util/**"
 - "src/sinks/prometheus/**"
 - "src/sinks/util/**"
-- "scripts/integration/prometheus/**"
+- "tests/integration/prometheus/**"

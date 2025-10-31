@@ -18,4 +18,4 @@ paths:
 - "src/sources/kafka.rs"
 - "src/sources/util/**"
 - "src/kafka.rs"
-- "scripts/integration/kafka/**"
+- "tests/integration/kafka/**"

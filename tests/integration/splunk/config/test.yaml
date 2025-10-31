@@ -18,4 +18,4 @@ paths:
 - "src/sources/util/**"
 - "src/sinks/splunk_hec/**"
 - "src/sinks/util/**"
-- "scripts/integration/splunk/**"
+- "tests/integration/splunk/**"

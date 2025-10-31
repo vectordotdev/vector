@@ -15,4 +15,4 @@ paths:
 - "src/internal_events/pulsar.rs"
 - "src/sinks/pulsar/**"
 - "src/sinks/util/**"
-- "scripts/integration/pulsar/**"
+- "tests/integration/pulsar/**"

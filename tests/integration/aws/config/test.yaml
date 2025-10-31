@@ -29,4 +29,4 @@ paths:
 - "src/sinks/aws_*/**"
 - "src/sinks/util/**"
 - "src/transforms/aws_*"
-- "scripts/integration/aws/**"
+- "tests/integration/aws/**"

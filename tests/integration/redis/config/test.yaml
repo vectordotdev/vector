@@ -18,4 +18,4 @@ paths:
 - "src/sources/util/**"
 - "src/sinks/redis.rs"
 - "src/sinks/util/**"
-- "scripts/integration/redis/**"
+- "tests/integration/redis/**"

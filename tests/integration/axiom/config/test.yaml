@@ -18,4 +18,4 @@ matrix:
 paths:
 - "src/sinks/axiom.rs"
 - "src/sinks/util/**"
-- "scripts/integration/axiom/**"
+- "tests/integration/axiom/**"

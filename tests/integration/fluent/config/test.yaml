@@ -17,4 +17,4 @@ paths:
 - "src/internal_events/fluent.rs"
 - "src/sources/fluent/**"
 - "src/sources/util/**"
-- "scripts/integration/fluent/**"
+- "tests/integration/fluent/**"

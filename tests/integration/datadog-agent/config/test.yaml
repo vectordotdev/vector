@@ -19,4 +19,4 @@ paths:
 - "src/common/datadog.rs"
 - "src/internal_events/datadog_*"
 - "src/sources/datadog_agent/**"
-- "scripts/integration/datadog-agent/**"
+- "tests/integration/datadog-agent/**"

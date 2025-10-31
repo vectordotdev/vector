@@ -22,4 +22,4 @@ paths:
 - "src/sinks/postgres/**"
 - "src/sources/postgresql_metrics.rs"
 - "src/sources/util/**"
-- "scripts/integration/postgres/**"
+- "tests/integration/postgres/**"

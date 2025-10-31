@@ -18,4 +18,4 @@ matrix:
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
 - "src/sinks/greptimedb/**"
-- "scripts/integration/greptimedb/**"
+- "tests/integration/greptimedb/**"

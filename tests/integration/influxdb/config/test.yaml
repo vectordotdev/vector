@@ -17,4 +17,4 @@ paths:
 - "src/internal_events/influxdb.rs"
 - "src/sinks/influxdb/**"
 - "src/sinks/util/**"
-- "scripts/integration/influxdb/**"
+- "tests/integration/influxdb/**"

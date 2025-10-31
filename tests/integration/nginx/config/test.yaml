@@ -18,4 +18,4 @@ paths:
 - "src/internal_events/nginx_metrics.rs"
 - "src/sources/nginx_metrics/**"
 - "src/sources/util/**"
-- "scripts/integration/nginx/**"
+- "tests/integration/nginx/**"

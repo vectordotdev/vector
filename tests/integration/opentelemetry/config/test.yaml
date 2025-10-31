@@ -16,4 +16,4 @@ matrix:
 paths:
 - "src/sources/opentelemetry/**"
 - "src/sources/util/**"
-- "scripts/integration/opentelemetry/**"
+- "tests/integration/opentelemetry/**"

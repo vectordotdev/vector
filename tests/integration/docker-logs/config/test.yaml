@@ -16,4 +16,4 @@ paths:
 - "src/internal_events/docker_logs.rs"
 - "src/sources/docker_logs/**"
 - "src/sources/util/**"
-- "scripts/integration/docker-logs/**"
+- "tests/integration/docker-logs/**"

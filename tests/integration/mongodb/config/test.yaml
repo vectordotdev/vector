@@ -16,4 +16,4 @@ paths:
 - "src/internal_events/mongodb_metrics.rs"
 - "src/sources/mongodb_metrics/**"
 - "src/sources/util/**"
-- "scripts/integration/mongodb/**"
+- "tests/integration/mongodb/**"

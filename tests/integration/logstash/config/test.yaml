@@ -15,4 +15,4 @@ matrix:
 paths:
 - "src/sources/logstash.rs"
 - "src/sources/util/**"
-- "scripts/integration/logstash/**"
+- "tests/integration/logstash/**"

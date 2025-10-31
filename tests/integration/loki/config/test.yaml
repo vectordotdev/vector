@@ -15,4 +15,4 @@ paths:
 - "src/internal_events/loki.rs"
 - "src/sinks/loki/**"
 - "src/sinks/util/**"
-- "scripts/integration/loki/**"
+- "tests/integration/loki/**"
