@@ -140,10 +140,10 @@ pub struct GlobalOptions {
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     pub expire_metrics_per_metric_set: Option<Vec<PerMetricSetExpiration>>,
 
-    /// The amount of time, in seconds, that internal metrics cache used for VRL will be refreshed.
+    /// The interval, in seconds, at which the internal metrics cache for VRL is refreshed.
     ///
-    /// Higher values will lead to stale metric values from `get_vector_metric`,
-    /// `find_vector_metrics` and `aggregate_vector_metrics` functions.
+    /// Higher values lead to stale metric values from `get_vector_metric`,
+    /// `find_vector_metrics`, and `aggregate_vector_metrics` functions.
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub metrics_storage_refresh_period: Option<f64>,
 }
