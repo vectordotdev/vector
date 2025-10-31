@@ -218,14 +218,10 @@ impl ComposeTest {
             &self.config.runner.env,
             Some(&self.config.features),
             &args,
-            self.local_config.directory,
             self.reuse_image,
+            self.local_config.kind == ComposeTestKind::E2E,
         )?;
 
-        if self.is_running()? {
-            self.runner.remove()?;
-            self.stop()?;
-        }
         Ok(())
     }
 
@@ -239,9 +235,9 @@ impl ComposeTest {
         if self.local_config.kind == ComposeTestKind::E2E {
             self.runner.build(
                 Some(&self.config.features),
-                self.local_config.directory,
                 &self.env_config,
                 false, // Always rebuild for E2E tests
+                true,  // E2E tests build Vector in the image
             )?;
         }
 
@@ -266,10 +262,11 @@ impl ComposeTest {
                 bail!("No environment for {} is up.", self.test_name);
             }
 
-            self.runner.remove()?;
             let project_name = self.project_name();
             compose.stop(&self.env_config, &project_name)?;
         }
+
+        self.runner.remove()?;
 
         Ok(())
     }

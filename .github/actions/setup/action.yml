@@ -58,6 +58,10 @@ inputs:
     required: false
     default: false
     description: "Install wasm-pack for Rust to WASM bridge."
+  vdev:
+    required: false
+    default: false
+    description: "Install vdev CLI tool (cached by vdev/ directory changes)."
 
   # prepare.sh - npm
   markdownlint:
@@ -87,7 +91,8 @@ runs:
                    "${{ inputs.cargo-deny }}" \
                    "${{ inputs.cargo-msrv }}" \
                    "${{ inputs.dd-rust-license-tool }}" \
-                   "${{ inputs.wasm-pack }}"; do
+                   "${{ inputs.wasm-pack }}" \
+                   "${{ inputs.vdev }}"; do
           if [[ "$val" == "true" ]]; then
             rust="true"
             break
@@ -200,6 +205,10 @@ runs:
           -C "${TEMP}"
         sudo cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
+
+    - name: Install vdev
+      if: ${{ inputs.vdev == 'true' }}
+      uses: ./.github/actions/install-vdev
 
     - name: Run prepare.sh
       shell: bash

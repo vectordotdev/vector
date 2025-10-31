@@ -133,6 +133,11 @@ jobs:
       - build-test-runner
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
+    strategy:
+      matrix:
+        service: [
+          "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"
+        ]
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
@@ -147,31 +152,16 @@ jobs:
 
       - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
-      - name: e2e-datadog-logs
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-logs')
-          || startsWith(github.event.review.body, '/ci-run-e2e-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
+      - name: E2E Tests - ${{ matrix.service }}
+        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-all')
+          || startsWith(github.event.review.body, '/ci-run-all')
+          || startsWith(github.event.review.body, format('/ci-run-e2e-{0}', matrix.service)) }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/run-integration-test.sh e2e datadog-logs
+          command: bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
 
-      - name: datadog-e2e-metrics
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-metrics')
-          || startsWith(github.event.review.body, '/ci-run-e2e-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
-        with:
-          timeout_minutes: 35
-          max_attempts: 3
-          command: bash scripts/run-integration-test.sh e2e datadog-metrics
-
-      - name: e2e-opentelemetry-logs
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-logs')
-          || startsWith(github.event.review.body, '/ci-run-e2e-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        run: bash scripts/run-integration-test.sh e2e opentelemetry-logs
 
   update-pr-status:
     name: Signal result to PR

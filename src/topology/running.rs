@@ -22,7 +22,7 @@ use vector_lib::{
 
 use super::{
     BuiltBuffer, TaskHandle,
-    builder::{self, TopologyPieces, reload_enrichment_tables},
+    builder::{self, TopologyPieces, TopologyPiecesBuilder, reload_enrichment_tables},
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
     task::{Task, TaskOutput},
@@ -35,6 +35,7 @@ use crate::{
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
+    utilization::UtilizationRegistry,
 };
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
@@ -54,6 +55,7 @@ pub struct RunningTopology {
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
+    utilization_registry: Option<UtilizationRegistry>,
     utilization_task: Option<TaskHandle>,
     utilization_task_shutdown_trigger: Option<Trigger>,
     metrics_task: Option<TaskHandle>,
@@ -77,6 +79,7 @@ impl RunningTopology {
             running: Arc::new(AtomicBool::new(true)),
             graceful_shutdown_duration: config.graceful_shutdown_duration,
             config,
+            utilization_registry: None,
             utilization_task: None,
             utilization_task_shutdown_trigger: None,
             metrics_task: None,
@@ -314,13 +317,12 @@ impl RunningTopology {
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
-        if let Some(mut new_pieces) = TopologyPieces::build_or_log_errors(
-            &new_config,
-            &diff,
-            buffers.clone(),
-            extra_context.clone(),
-        )
-        .await
+        if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&new_config, &diff)
+            .with_buffers(buffers.clone())
+            .with_extra_context(extra_context.clone())
+            .with_utilization_registry(self.utilization_registry.clone())
+            .build_or_log_errors()
+            .await
         {
             // If healthchecks are configured for any of the changing/new components, try running
             // them before moving forward with connecting and spawning.  In some cases, healthchecks
@@ -345,9 +347,12 @@ impl RunningTopology {
         warn!("Failed to completely load new configuration. Restoring old configuration.");
 
         let diff = diff.flip();
-        if let Some(mut new_pieces) =
-            TopologyPieces::build_or_log_errors(&self.config, &diff, buffers, extra_context.clone())
-                .await
+        if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&self.config, &diff)
+            .with_buffers(buffers)
+            .with_extra_context(extra_context.clone())
+            .with_utilization_registry(self.utilization_registry.clone())
+            .build_or_log_errors()
+            .await
             && self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
@@ -471,6 +476,10 @@ impl RunningTopology {
 
             self.remove_inputs(key, diff, new_config).await;
             self.remove_outputs(key);
+
+            if let Some(registry) = self.utilization_registry.as_ref() {
+                registry.remove_component(key);
+            }
         }
 
         for key in &diff.transforms.to_change {
@@ -597,6 +606,10 @@ impl RunningTopology {
         for key in &removed_sinks {
             debug!(component_id = %key, "Removing sink.");
             self.remove_inputs(key, diff, new_config).await;
+
+            if let Some(registry) = self.utilization_registry.as_ref() {
+                registry.remove_component(key);
+            }
         }
 
         // After that, for any changed sinks, we temporarily detach their inputs (not remove) so
@@ -1249,9 +1262,10 @@ impl RunningTopology {
         extra_context: ExtraContext,
     ) -> Option<(Self, ShutdownErrorReceiver)> {
         let diff = ConfigDiff::initial(&config);
-        let pieces =
-            TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new(), extra_context)
-                .await?;
+        let pieces = TopologyPiecesBuilder::new(&config, &diff)
+            .with_extra_context(extra_context)
+            .build_or_log_errors()
+            .await?;
         Self::start_validated(config, diff, pieces).await
     }
 
@@ -1308,8 +1322,8 @@ impl RunningTopology {
             return None;
         }
 
-        let mut utilization_emitter = pieces
-            .utilization_emitter
+        let (utilization_emitter, utilization_registry) = pieces
+            .utilization
             .take()
             .expect("Topology is missing the utilization metric emitter!");
         let metrics_storage = pieces.metrics_storage.clone();
@@ -1334,6 +1348,7 @@ impl RunningTopology {
 
         let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
             ShutdownSignal::new_wired();
+        running_topology.utilization_registry = Some(utilization_registry.clone());
         running_topology.utilization_task_shutdown_trigger =
             Some(utilization_task_shutdown_trigger);
         running_topology.utilization_task = Some(tokio::spawn(Task::new(
