@@ -647,6 +647,10 @@ release-push: ## Push new Vector version
 release-s3: ## Release artifacts to S3
 	@cargo vdev release s3
 
+.PHONY: release-vdev
+release-vdev: ## Release a new vdev version (VDEV_RELEASE_TYPE: major, minor, or patch; default: minor)
+	@cargo vdev release vdev $${VDEV_RELEASE_TYPE:-minor} --yes
+
 .PHONY: sha256sum
 sha256sum: ## Generate SHA256 checksums of CI artifacts
 	scripts/checksum.sh

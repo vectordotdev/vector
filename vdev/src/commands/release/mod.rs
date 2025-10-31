@@ -9,6 +9,7 @@ crate::cli_subcommands! {
     mod prepare,
     mod push,
     s3,
+    mod vdev,
 }
 
 crate::script_wrapper! {
