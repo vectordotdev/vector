@@ -216,7 +216,7 @@ jobs:
             vector:${{ needs.resolve-inputs.outputs.baseline-tag }}
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: baseline-image
           path: "${{ runner.temp }}/baseline-image.tar"
@@ -255,7 +255,7 @@ jobs:
             vector:${{ needs.resolve-inputs.outputs.comparison-tag }}
 
       - name: Upload image as artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: comparison-image
           path: "${{ runner.temp }}/comparison-image.tar"
@@ -294,7 +294,7 @@ jobs:
       - build-baseline
     steps:
       - name: 'Download baseline image'
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: baseline-image
 
@@ -334,7 +334,7 @@ jobs:
       - build-comparison
     steps:
       - name: 'Download comparison image'
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: comparison-image
 
@@ -408,7 +408,7 @@ jobs:
             --submission-metadata ${{ runner.temp }}/submission-metadata \
             --replicas ${{ env.SMP_REPLICAS }}
 
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/submission-metadata
@@ -462,7 +462,7 @@ jobs:
           aws s3 cp s3://smp-cli-releases/v${{ needs.resolve-inputs.outputs.smp-version }}/x86_64-unknown-linux-musl/smp ${{ runner.temp }}/bin/smp
 
       - name: Download submission metadata
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/
@@ -501,7 +501,7 @@ jobs:
           aws s3 cp s3://smp-cli-releases/v${{ needs.resolve-inputs.outputs.smp-version }}/x86_64-unknown-linux-musl/smp ${{ runner.temp }}/bin/smp
 
       - name: Download submission metadata
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: vector-submission-metadata
           path: ${{ runner.temp }}/
@@ -523,7 +523,7 @@ jobs:
           path: ${{ runner.temp }}/outputs/report.md
 
       - name: Upload regression report to artifacts
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: capture-artifacts
           path: ${{ runner.temp }}/outputs/*
@@ -547,7 +547,7 @@ jobs:
     steps:
       - name: Download capture-artifacts
         continue-on-error: true
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         with:
           name: capture-artifacts
 
