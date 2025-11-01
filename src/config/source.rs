@@ -15,6 +15,7 @@ use vector_lib::{
     },
     source::Source,
 };
+use vector_vrl_metrics::MetricsStorage;
 
 use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
 use crate::{SourceSender, extra_context::ExtraContext, shutdown::ShutdownSignal};
@@ -128,6 +129,7 @@ pub struct SourceContext {
     pub key: ComponentKey,
     pub globals: GlobalOptions,
     pub enrichment_tables: vector_lib::enrichment::TableRegistry,
+    pub metrics_storage: MetricsStorage,
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
@@ -158,6 +160,7 @@ impl SourceContext {
                 key: key.clone(),
                 globals: GlobalOptions::default(),
                 enrichment_tables: Default::default(),
+                metrics_storage: Default::default(),
                 shutdown: shutdown_signal,
                 out,
                 proxy: Default::default(),
@@ -179,6 +182,7 @@ impl SourceContext {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
             enrichment_tables: Default::default(),
+            metrics_storage: Default::default(),
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: Default::default(),
