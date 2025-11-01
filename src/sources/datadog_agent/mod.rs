@@ -57,10 +57,10 @@ use crate::{
     },
     event::Event,
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
-    internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
+    internal_events::{HttpBytesReceived, StreamClosedError},
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::{self},
+    sources::{self, util::http::emit_decompress_error},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -119,6 +119,14 @@ pub struct DatadogAgentConfig {
     #[serde(default = "crate::serde::default_false")]
     parse_ddtags: bool,
 
+    /// If this is set to `true`, metric names are split at the first '.' into a namespace and name.
+    /// For example, `system.cpu.usage` would be split into namespace `system` and name `cpu.usage`.
+    /// If `false`, the full metric name is used without splitting. This may be useful if you are using a
+    /// default namespace for metrics in sinks connected to this source.
+    #[configurable(metadata(docs::advanced))]
+    #[serde(default = "crate::serde::default_true")]
+    split_metric_namespace: bool,
+
     /// The namespace to use for logs. This overrides the global setting.
     #[serde(default)]
     #[configurable(metadata(docs::hidden))]
@@ -158,6 +166,7 @@ impl GenerateConfig for DatadogAgentConfig {
             disable_traces: false,
             multiple_outputs: false,
             parse_ddtags: false,
+            split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
         })
@@ -189,6 +198,7 @@ impl SourceConfig for DatadogAgentConfig {
             logs_schema_definition,
             log_namespace,
             self.parse_ddtags,
+            self.split_metric_namespace,
         );
         let listener = tls.bind(&self.address).await?;
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
@@ -345,6 +355,7 @@ pub(crate) struct DatadogAgentSource {
     logs_schema_definition: Option<Arc<schema::Definition>>,
     events_received: Registered<EventsReceived>,
     parse_ddtags: bool,
+    split_metric_namespace: bool,
 }
 
 #[derive(Clone)]
@@ -382,6 +393,7 @@ impl DatadogAgentSource {
         logs_schema_definition: Option<schema::Definition>,
         log_namespace: LogNamespace,
         parse_ddtags: bool,
+        split_metric_namespace: bool,
     ) -> Self {
         Self {
             api_key_extractor: ApiKeyExtractor {
@@ -403,6 +415,7 @@ impl DatadogAgentSource {
             log_namespace,
             events_received: register!(EventsReceived),
             parse_ddtags,
+            split_metric_namespace,
         }
     }
 
@@ -462,20 +475,20 @@ impl DatadogAgentSource {
                         let mut decoded = Vec::new();
                         MultiGzDecoder::new(body.reader())
                             .read_to_end(&mut decoded)
-                            .map_err(|error| handle_decode_error(encoding, error))?;
+                            .map_err(|error| emit_decompress_error(encoding, error))?;
                         decoded.into()
                     }
                     "zstd" => {
                         let mut decoded = Vec::new();
                         zstd::stream::copy_decode(body.reader(), &mut decoded)
-                            .map_err(|error| handle_decode_error(encoding, error))?;
+                            .map_err(|error| emit_decompress_error(encoding, error))?;
                         decoded.into()
                     }
                     "deflate" | "x-deflate" => {
                         let mut decoded = Vec::new();
                         ZlibDecoder::new(body.reader())
                             .read_to_end(&mut decoded)
-                            .map_err(|error| handle_decode_error(encoding, error))?;
+                            .map_err(|error| emit_decompress_error(encoding, error))?;
                         decoded.into()
                     }
                     encoding => {
@@ -533,17 +546,6 @@ pub(crate) async fn handle_request(
         }
         Err(err) => Err(warp::reject::custom(err)),
     }
-}
-
-fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(HttpDecompressError {
-        encoding,
-        error: &error
-    });
-    ErrorMessage::new(
-        StatusCode::UNPROCESSABLE_ENTITY,
-        format!("Failed decompressing payload with {encoding} decoder."),
-    )
 }
 
 // https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49

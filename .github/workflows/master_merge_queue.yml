@@ -36,9 +36,6 @@ env:
   VERBOSE: true
   CI: true
   PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   # This is the entry job which is required for all the actual tests in this workflow.
@@ -50,19 +47,40 @@ jobs:
     secrets: inherit
 
   test-cli:
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cli-yml == 'true' }}
     uses: ./.github/workflows/cli.yml
     needs: changes
     secrets: inherit
 
-  test-misc:
-    if: needs.changes.outputs.source == 'true'
-    uses: ./.github/workflows/misc.yml
+  make-test-behavior:
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-behavior
+      job_name: make test-behavior
+    needs: changes
+    secrets: inherit
+
+  make-check-examples:
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: check-examples
+      job_name: make check-examples
+    needs: changes
+    secrets: inherit
+
+  make-test-docs:
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-docs
+      job_name: make test-docs
     needs: changes
     secrets: inherit
 
   check-msrv:
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.msrv-yml == 'true' }}
     uses: ./.github/workflows/msrv.yml
     needs: changes
     secrets: inherit
@@ -70,19 +88,19 @@ jobs:
   cross-linux:
     # We run cross checks when dependencies change to ensure they still build.
     # This helps us avoid adopting dependencies that aren't compatible with other architectures.
-    if: needs.changes.outputs.dependencies == 'true'
+    if: ${{ needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.cross-yml == 'true' }}
     uses: ./.github/workflows/cross.yml
     needs: changes
     secrets: inherit
 
   unit-mac:
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.unit_mac-yml == 'true' }}
     uses: ./.github/workflows/unit_mac.yml
     needs: changes
     secrets: inherit
 
   unit-windows:
-    if: needs.changes.outputs.source == 'true'
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.unit_windows-yml == 'true' }}
     uses: ./.github/workflows/unit_windows.yml
     needs: changes
     secrets: inherit
@@ -102,7 +120,9 @@ jobs:
     needs:
       - changes
       - test-cli
-      - test-misc
+      - make-test-behavior
+      - make-check-examples
+      - make-test-docs
       - check-msrv
       - cross-linux
       - unit-mac

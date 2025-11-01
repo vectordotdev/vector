@@ -209,7 +209,7 @@ pub struct CefSerializerOptions {
     /// The value length must be less than or equal to 63.
     pub device_product: String,
 
-    /// Identifies the version of the problem. The combination of the device product, vendor and this value make up the unique id of the device that sends messages.
+    /// Identifies the version of the problem. The combination of the device product, vendor, and this value make up the unique id of the device that sends messages.
     /// The value length must be less than or equal to 31.
     pub device_version: String,
 
@@ -218,7 +218,6 @@ pub struct CefSerializerOptions {
     pub device_event_class_id: String,
 
     /// This is a path that points to the field of a log event that reflects importance of the event.
-    /// Reflects importance of the event.
     ///
     /// It must point to a number from 0 to 10.
     /// 0 = lowest_importance, 10 = highest_importance.

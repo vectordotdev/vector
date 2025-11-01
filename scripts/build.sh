@@ -13,7 +13,7 @@ set -euo pipefail
 #   $CHANNEL        the release channel for the build, "nightly" or "stable" (default `cargo vdev release channel`)
 #   $FEATURES       a list of Vector features to include when building (default "default")
 #   $NATIVE_BUILD   whether to pass the --target flag when building via cargo (default "true")
-#   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
+#   $TARGET         a target triple. ex: arm64-apple-darwin (no default)
 
 #
 # Env Vars
@@ -22,7 +22,7 @@ set -euo pipefail
 OVERWRITE=${OVERWRITE:-"true"}
 FEATURES="${FEATURES:-"default"}"
 NATIVE_BUILD="${NATIVE_BUILD:-"true"}"
-TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
+TARGET="${TARGET:?"You must specify a target triple, ex: arm64-apple-darwin"}"
 
 CHANNEL=${CHANNEL:-"$(cargo vdev release channel)"}
 if [ "$CHANNEL" == "nightly" ]; then
