@@ -312,15 +312,14 @@ impl SinkConfig for HttpSinkConfig {
                     .region()
                     .or(default_region)
                     .expect("Region must be specified");
-                let shared_credentials_provider = auth
-                    .credentials_provider(region.clone(), &ProxyConfig::default(), None)
-                    .await?;
 
                 HttpService::new_with_sig_v4(
                     client,
                     http_sink_request_builder,
                     SigV4Config {
-                        shared_credentials_provider,
+                        shared_credentials_provider: auth
+                            .credentials_provider(region.clone(), &ProxyConfig::default(), None)
+                            .await?,
                         region: region.clone(),
                         service: service.clone(),
                     },
