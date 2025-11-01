@@ -30,3 +30,8 @@ services:
       interval: 5s
       timeout: 5s
       retries: 3
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

@@ -206,7 +206,7 @@ mod test {
                     // was outside the max_size range _or_ the current chunk is empty.
                     let has_valid_delimiter = facts
                         .iter()
-                        .any(|details| ((details.chunk_index == idx) && details.within_max_size));
+                        .any(|details| (details.chunk_index == idx) && details.within_max_size);
                     assert!(chunk.is_empty() || !has_valid_delimiter)
                 }
                 ReadResult {

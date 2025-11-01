@@ -240,7 +240,7 @@ impl CloudWatchMetricsSvc {
 
         let sink = request_settings
             .partition_sink(CloudWatchMetricsRetryLogic, service, buffer, batch.timeout)
-            .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
+            .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error, internal_log_rate_limit = false))
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.allocated_bytes();

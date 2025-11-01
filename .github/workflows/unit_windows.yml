@@ -30,7 +30,7 @@ jobs:
         if: ${{ github.event_name != 'pull_request_review' }}
         uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.10"
       - run: .\scripts\environment\bootstrap-windows-2025.ps1

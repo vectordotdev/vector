@@ -1,7 +1,8 @@
 ---
+date: "2021-08-12"
 title: Troubleshooting
 description: A guide to debugging and troubleshooting Vector
-author_github: binarylogic
+authors: ["binarylogic"]
 domain: operations
 weight: 4
 tags: ["troubleshooting", "level up", "guides", "guide"]

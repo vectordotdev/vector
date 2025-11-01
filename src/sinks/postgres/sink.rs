@@ -26,8 +26,7 @@ impl PostgresSink {
                     Err(e) => {
                         warn!(
                             message = "Error creating postgres sink's request.",
-                            error = %e,
-                            internal_log_rate_limit=true
+                            error = %e
                         );
                         None
                     }

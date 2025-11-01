@@ -167,7 +167,7 @@ impl Lua {
         });
 
         self.invocations_after_gc += 1;
-        if self.invocations_after_gc % GC_INTERVAL == 0 {
+        if self.invocations_after_gc.is_multiple_of(GC_INTERVAL) {
             emit!(LuaGcTriggered {
                 used_memory: self.lua.used_memory()
             });
@@ -252,8 +252,7 @@ impl mlua::UserData for LuaEvent {
                         info!(
                             message =
                                 "Could not set field to Lua value of invalid type, dropping field.",
-                            field = key.as_str(),
-                            internal_log_rate_limit = true
+                            field = key.as_str()
                         );
                         this.inner.as_mut_log().remove(&key_path);
                     }

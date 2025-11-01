@@ -79,7 +79,6 @@ impl InternalEvent for KafkaOffsetUpdateError {
             error_code = "kafka_offset_update",
             error_type = error_type::READER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -104,7 +103,6 @@ impl InternalEvent for KafkaReadError {
             error_code = "reading_message",
             error_type = error_type::READER_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -164,7 +162,6 @@ impl InternalEvent for KafkaHeaderExtractionError<'_> {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::RECEIVING,
             header_field = self.header_field.to_string(),
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

@@ -151,7 +151,7 @@ pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequest
 
     /// The amount of time to wait before attempting the first retry for a failed request.
     ///
-    /// After the first retry has failed, the fibonacci sequence is used to select future backoffs.
+    /// After the first retry has failed, the Fibonacci sequence is used to select future backoffs.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::human_name = "Retry Initial Backoff"))]
     #[serde(default = "default_retry_initial_backoff_secs::<D>")]

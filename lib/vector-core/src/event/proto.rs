@@ -678,8 +678,7 @@ impl From<Metadata> for EventMetadata {
                 Err(error) => {
                     error!(
                         message = "Failed to parse source_event_id: {}",
-                        %error,
-                        internal_log_rate_limit = true
+                        %error
                     );
                     None
                 }

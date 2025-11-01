@@ -6,3 +6,8 @@ services:
     command: --insecure --stats-period-sec=1
     volumes:
     - ../../../tests/data:/etc/vector:ro
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
