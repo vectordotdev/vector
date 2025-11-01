@@ -191,6 +191,24 @@ mod tests {
         );
     }
 
+    #[test]
+    fn test_connection_ttl_config() {
+        // Test that connection_ttl_secs is parsed correctly
+        let config = r#"
+            address = "http://127.0.0.1:9000"
+            connection_ttl_secs = 300
+        "#;
+        let config: VectorConfig = toml::from_str(config).unwrap();
+        assert_eq!(config.connection_ttl_secs, Some(300));
+
+        // Test default (no TTL)
+        let config = r#"
+            address = "http://127.0.0.1:9000"
+        "#;
+        let config: VectorConfig = toml::from_str(config).unwrap();
+        assert_eq!(config.connection_ttl_secs, None);
+    }
+
     async fn get_received(
         rx: mpsc::Receiver<(Parts, Bytes)>,
         assert_parts: impl Fn(Parts),
