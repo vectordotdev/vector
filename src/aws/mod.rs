@@ -277,8 +277,7 @@ pub async fn sign_request(
 ) -> crate::Result<()> {
     let method = request.method().clone();
     let uri = request.uri().clone();
-    let headers = request.headers().clone();
-    let headers = get_headers(&headers)?.into_iter();
+    let headers = get_headers(request.headers())?.into_iter();
     let signable_request = SignableRequest::new(
         method.as_str(),
         uri.to_string(),
