@@ -2,7 +2,7 @@
 #![allow(clippy::print_stderr)]
 
 use crate::git;
-use crate::util::run_command;
+use crate::util::{get_repo_root, run_command};
 use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use semver::Version;
@@ -57,7 +57,6 @@ struct Prepare {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-
         let repo_root = get_repo_root();
         env::set_current_dir(repo_root.clone())?;
 
@@ -388,10 +387,6 @@ impl Prepare {
 }
 
 // FREE FUNCTIONS AFTER THIS LINE
-
-fn get_repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf()
-}
 
 fn get_latest_version_from_vector_tags() -> Result<Version> {
     let tags = run_command("git tag --list --sort=-v:refname");
