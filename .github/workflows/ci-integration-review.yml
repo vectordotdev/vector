@@ -136,7 +136,7 @@ jobs:
     strategy:
       matrix:
         service: [
-          "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"
+          "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics", "opentelemetry-traces"
         ]
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
@@ -161,13 +161,6 @@ jobs:
           timeout_minutes: 35
           max_attempts: 3
           command: bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
-
-      - name: e2e-opentelemetry-traces
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-opentelemetry-traces')
-          || startsWith(github.event.review.body, '/ci-run-e2e-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        run: bash scripts/run-integration-test.sh e2e opentelemetry-traces
-
 
   update-pr-status:
     name: Signal result to PR
