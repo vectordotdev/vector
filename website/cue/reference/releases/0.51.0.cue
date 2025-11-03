@@ -17,14 +17,14 @@ releases: "0.51.0": {
 		{
 			type: "feat"
 			description: """
-				Disable ANSI color for `vector test` when running non-interactively. Honor `--color {auto|always|never}` and `VECTOR_COLOR`; VRL diagnostics no longer include ANSI sequences when color is disabled.
+				Disabled ANSI color for `vector test` when running non-interactively. Honor `--color {auto|always|never}` and `VECTOR_COLOR`; VRL diagnostics no longer include ANSI sequences when color is disabled.
 				"""
 			contributors: ["VanjaRo"]
 		},
 		{
 			type: "feat"
 			description: """
-				Adds proper support for compression of HEC indexer ack queries, using the sink's configured `compression` setting.
+				Added proper support for compression of HEC indexer ack queries, using the sink's configured `compression` setting.
 				"""
 			contributors: ["sbalmos"]
 		},
@@ -281,13 +281,13 @@ releases: "0.51.0": {
 		
 		- Introduced the `basename` function to get the last component of a path.
 		
-		author: titaneric (https://github.com/vectordotdev/vrl/pull/1531)
+		authors: titaneric (https://github.com/vectordotdev/vrl/pull/1531)
 		- Introduced the `dirname` function to get the directory component of a path.
 		
-		author: titaneric (https://github.com/vectordotdev/vrl/pull/1532)
+		authors: titaneric (https://github.com/vectordotdev/vrl/pull/1532)
 		- Introduced the `split_path` function to split a path into its components.
 		
-		author: titaneric (https://github.com/vectordotdev/vrl/pull/1533)
+		authors: titaneric (https://github.com/vectordotdev/vrl/pull/1533)
 		
 		#### Enhancements
 		
