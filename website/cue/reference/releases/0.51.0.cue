@@ -29,7 +29,7 @@ releases: "0.51.0": {
 		  configuration blocks, use a config pre-processing tool like `envsubst` instead
 		  or update your configuration files so that they don't rely on block injections.
 
-		- Vector's internal topology debug and trace logs now use the `component_id` field name instead of `component` or `key`.
+		- Vector's internal topology `debug!` and `trace!` logs now use the `component_id` field name instead of `component` or `key`.
 		  If you are monitoring or filtering Vector's internal logs based on these field names, update your queries to use `component_id`.
 
 		- The `utilization` metric is now capped at 4 decimal digit precision.
@@ -235,7 +235,7 @@ releases: "0.51.0": {
 		{
 			type: "chore"
 			description: """
-				Vector's internal topology debug and trace logs now use the `component_id` field name instead of `component` or `key`.
+				Vector's internal topology `debug!` and `trace!` logs now use the `component_id` field name instead of `component` or `key`.
 				If you are monitoring or filtering Vector's internal logs based on these field names, update your queries to use `component_id`.
 				"""
 			contributors: ["pront"]
