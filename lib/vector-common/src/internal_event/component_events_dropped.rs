@@ -1,10 +1,12 @@
 use metrics::{Counter, counter};
+use vector_config::internal_event;
 
 use super::{Count, InternalEvent, InternalEventHandle, RegisterInternalEvent};
 
 pub const INTENTIONAL: bool = true;
 pub const UNINTENTIONAL: bool = false;
 
+#[internal_event]
 #[derive(Debug)]
 pub struct ComponentEventsDropped<'a, const INTENTIONAL: bool> {
     pub count: usize,
@@ -15,10 +17,6 @@ impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'_, INTEN
     fn emit(self) {
         let count = self.count;
         self.register().emit(Count(count));
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("ComponentEventsDropped")
     }
 }
 

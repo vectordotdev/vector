@@ -1,4 +1,5 @@
 use metrics::counter;
+use vector_config::internal_event;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
@@ -7,6 +8,7 @@ use crate::internal_events::SocketOutgoingConnectionError;
 
 // TODO: Get rid of this. UDP is connectionless, so there's no "successful" connect event, only
 // successfully binding a socket that can be used for receiving.
+#[internal_event]
 #[derive(Debug)]
 pub struct UdpSocketConnectionEstablished;
 
@@ -19,6 +21,7 @@ impl InternalEvent for UdpSocketConnectionEstablished {
 
 // TODO: Get rid of this. UDP is connectionless, so there's no "unsuccessful" connect event, only
 // unsuccessfully binding a socket that can be used for receiving.
+#[internal_event]
 pub struct UdpSocketOutgoingConnectionError<E> {
     pub error: E,
 }
@@ -31,6 +34,7 @@ impl<E: std::error::Error> InternalEvent for UdpSocketOutgoingConnectionError<E>
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct UdpSendIncompleteError {
     pub data_size: usize,
@@ -61,6 +65,7 @@ impl InternalEvent for UdpSendIncompleteError {
     }
 }
 
+#[internal_event]
 #[derive(Debug)]
 pub struct UdpChunkingError {
     pub error: vector_common::Error,
