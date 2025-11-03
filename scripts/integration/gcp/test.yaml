@@ -2,7 +2,7 @@ features:
 - gcp-integration-tests
 - chronicle-integration-tests
 
-test_filter: '::gcp::'
+test_filter: '::gcp'
 
 env:
   EMULATOR_ADDRESS: http://gcloud-pubsub:8681
