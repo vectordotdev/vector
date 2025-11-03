@@ -41,6 +41,9 @@ updates:
         patterns:
         - "futures"
         - "futures-util"
+      graphql:
+        patterns:
+        - "async-graphql*"
       metrics:
         patterns:
         - "metrics"
@@ -49,9 +52,6 @@ updates:
       netlink:
         patterns:
         - "netlink-*"
-      graphql:
-        patterns:
-        - "async-graphql*"
       phf:
         patterns:
         - "phf*"
@@ -59,6 +59,14 @@ updates:
         patterns:
         - "prost"
         - "prost-*"
+      serde:
+        patterns:
+          - "serde"
+          - "serde_*"
+      tokio:
+        patterns:
+          - "tokio"
+          - "tokio-*"
       tonic:
         patterns:
         - "tonic"
@@ -67,6 +75,10 @@ updates:
         patterns:
         - "tower"
         - "tower-*"
+      tracing:
+        patterns:
+          - "tracing"
+          - "tracing-*"
       wasm-bindgen:
         patterns:
         - "wasm-bindgen-*"
