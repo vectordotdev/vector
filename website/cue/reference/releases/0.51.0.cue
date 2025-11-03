@@ -6,6 +6,39 @@ releases: "0.51.0": {
 
 	whats_next: []
 
+	description: """
+		The Vector team is excited to announce version `0.51.0`!
+
+		## Release highlights
+
+		- Enhanced OpenTelemetry Protocol (OTLP) support with the introduction of the `otlp` codec, enabling
+		  bidirectional conversion between Vector events and OTLP format for seamless integration with
+		  OpenTelemetry collectors and instrumentation.
+		- Added `use_json_names` option to protobuf encoding and decoding.
+		  When enabled, the codec uses JSON field names (camelCase) instead of protobuf field names (snake_case).
+		- Added `expired` output to the memory enrichment table source, to export items as they expire in the cache.
+		- Memory enrichment tables' outputs are now visible to the `vector tap` command.
+		- Vector now emits `config_reload_rejected` and `config_reloaded` counters.
+
+		## Breaking Changes
+
+		- Environment variable interpolation in configuration files now rejects values containing newline characters. This prevents configuration
+		  injection attacks where environment variables could inject malicious multi-line configurations. If you need to inject multi-line
+		  configuration blocks, use a config pre-processing tool like `envsubst` instead.
+
+		- Vector's internal topology logs now use the `component_id` field name instead of `component` or `key`.
+		  If you are monitoring or filtering Vector's internal logs based on these field names, update your queries to use `component_id`.
+
+		- The `utilization` metric is now capped at 4 decimal digit precision.
+
+		- Support for legacy fingerprints in the `file` source was dropped. Affected users may be ones that have been running Vector since version 0.14.
+		  Consult the upgrade guide for more details.
+
+		- Following [this announcement](https://blog.rust-lang.org/2025/09/18/Rust-1.90.0/#demoting-x86-64-apple-darwin-to-tier-2-with-host-tools), we will no longer publish `x86_64-apple-darwin` builds.
+		  this means we will not be validating if Vector builds and works correctly on that platform.
+		"""
+
+
 	changelog: [
 		{
 			type: "feat"
