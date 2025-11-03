@@ -52,14 +52,14 @@ releases: "0.51.0": {
 		{
 			type: "fix"
 			description: """
-				Enable unused TLS settings for perform client authentication by SSL certificate in `mqtt` sink.
+				Enabled unused TLS settings to perform client authentication by SSL certificate in `mqtt` sink.
 				"""
 			contributors: ["ValentinChernovNTQ"]
 		},
 		{
 			type: "fix"
 			description: """
-				Memory enrichment table's outputs are now visible to the `vector tap` command.
+				Memory enrichment tables' outputs are now visible to the `vector tap` command.
 				"""
 			contributors: ["esensar", "Quad9DNS"]
 		},
@@ -73,7 +73,7 @@ releases: "0.51.0": {
 		{
 			type: "fix"
 			description: """
-				Fix buffer counter underflowed, caused by the counter has not been updated(increase) timely when new event is coming.
+				Fixed an issue where the buffer counter underflowed. This was caused by the counter not being increased before a new event was observed.
 				"""
 			contributors: ["sialais"]
 		},
@@ -161,7 +161,7 @@ releases: "0.51.0": {
 		{
 			type: "feat"
 			description: """
-				Improve Avro encoding error where schema and value are included in the message
+				Improved Avro encoding error. Schema and value are now included in the message
 				"""
 			contributors: ["titaneric"]
 		},
