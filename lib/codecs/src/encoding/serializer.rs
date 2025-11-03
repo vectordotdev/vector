@@ -138,7 +138,9 @@ impl Default for SerializerConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(tag = "codec", rename_all = "snake_case")]
-#[configurable(metadata(docs::enum_tag_description = "The codec to use for batch encoding events."))]
+#[configurable(metadata(
+    docs::enum_tag_description = "The codec to use for batch encoding events."
+))]
 pub enum BatchSerializerConfig {
     /// Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
     ///
@@ -154,7 +156,9 @@ pub enum BatchSerializerConfig {
 #[cfg(feature = "arrow")]
 impl BatchSerializerConfig {
     /// Build the `ArrowStreamSerializer` from this configuration.
-    pub fn build(&self) -> Result<ArrowStreamSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    pub fn build(
+        &self,
+    ) -> Result<ArrowStreamSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => {
                 ArrowStreamSerializer::new(arrow_config.clone())
