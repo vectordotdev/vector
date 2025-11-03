@@ -9,7 +9,7 @@ releases: "0.51.0": {
 	description: """
 		The Vector team is excited to announce version `0.51.0`!
 
-		Please refer to the [upgrade guide](/highlights/2025-11-03-0-51-0-upgrade-guide) for breaking changes in this release.
+		Please refer to the [upgrade guide](/highlights/2025-11-04-0-51-0-upgrade-guide) for breaking changes in this release.
 
 		## Release highlights
 
