@@ -16,9 +16,8 @@ releases: "0.51.0": {
 		- Enhanced OpenTelemetry Protocol (OTLP) support with the introduction of the `otlp` codec, enabling
 		  bidirectional conversion between Vector events and OTLP format for seamless integration with
 		  OpenTelemetry collectors and instrumentation.
-		- Vector now emits `config_reload_rejected` and `config_reloaded` counters.
-		- Fixed issues with Vector's internal telemetry where utilization would report negative
-		  values and the buffer counter underflowed.
+		- Improved Vector's internal telemetry with new `config_reload_rejected` and `config_reloaded` counters,
+		  and fixed issues where utilization metrics reported negative values and buffer counters underflowed.
 		- Enhanced memory enrichment tables with an `expired` output for exporting expired cache items,
 		  and made enrichment table outputs accessible via `vector tap`.
 
