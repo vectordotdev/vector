@@ -41,7 +41,6 @@ releases: "0.51.0": {
 		  this means we will not be validating if Vector builds and works correctly on that platform.
 		"""
 
-
 	changelog: [
 		{
 			type: "feat"
