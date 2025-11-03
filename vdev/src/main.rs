@@ -14,6 +14,7 @@ mod config;
 mod environment;
 mod features;
 mod git;
+mod path_utils;
 mod platform;
 mod testing;
 mod util;

@@ -199,7 +199,7 @@ def generate_changelog!(new_version)
     # these are handled in the upgrade guide separately.
 
     # NOTE: If the fragment types are altered, update both the 'changelog.d/README.md' and
-    #       'scripts/check_changelog_fragments.sh' accordingly.
+    #       'vdev/src/commands/check/changelog_fragments.rs' accordingly.
     type = ""
     if fragment_type == "breaking"
       type = "chore"

@@ -9,6 +9,9 @@
 name: Changelog
 
 on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
   pull_request_target:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
@@ -47,8 +50,9 @@ jobs:
         with:
           ref: master
           sparse-checkout: |
-            scripts/check_changelog_fragments.sh
             changelog.d/
+            scripts/environment/release-flags.sh
+            scripts/environment/binstall.sh
           sparse-checkout-cone-mode: false
 
       # Checkout PR's changelog.d/ into tmp/
@@ -60,6 +64,10 @@ jobs:
           path: tmp
           sparse-checkout: changelog.d/
 
+      - name: Prepare vdev
+        if: env.SHOULD_RUN == 'true'
+        run: bash tmp/scripts/environment/prepare.sh --modules=vdev
+
       - name: Run changelog fragment checker
         if: env.SHOULD_RUN == 'true'
         run: |
@@ -68,4 +76,4 @@ jobs:
 
           # Add files and then compare with HEAD instead of origin/master
           git add changelog.d/
-          MERGE_BASE=HEAD ./scripts/check_changelog_fragments.sh
+          vdev check changelog-fragments --merge-base HEAD
