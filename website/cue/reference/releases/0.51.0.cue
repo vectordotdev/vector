@@ -17,7 +17,6 @@ releases: "0.51.0": {
 		  bidirectional conversion between Vector events and OTLP format for seamless integration with
 		  OpenTelemetry collectors and instrumentation.
 		- Vector now emits `config_reload_rejected` and `config_reloaded` counters.
-		- The configuration watcher now collects event paths even during the delay period. These were previously ignored and prevented components from reloading.
 		- Fixed issues with Vector's internal telemetry where utilization would report negative
 		  values and the buffer counter underflowed.
 		- Enhanced memory enrichment tables with an `expired` output for exporting expired cache items,
