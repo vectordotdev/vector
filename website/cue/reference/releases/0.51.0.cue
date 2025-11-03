@@ -31,8 +31,8 @@ releases: "0.51.0": {
 
 		- The `utilization` metric is now capped at 4 decimal digit precision.
 
-		- Support for legacy fingerprints in the `file` source was dropped. Affected users may be ones that have been running Vector since version 0.14.
-		  Consult the upgrade guide for more details.
+		- Support for legacy fingerprints in the `file` source was dropped. Affected users may be
+		  ones that have been running Vector since version 0.14 or earlier. Consult the upgrade guide for more details.
 
 		- Following [this announcement](https://blog.rust-lang.org/2025/09/18/Rust-1.90.0/#demoting-x86-64-apple-darwin-to-tier-2-with-host-tools), we will no longer publish `x86_64-apple-darwin` builds.
 		  this means we will not be validating if Vector builds and works correctly on that platform.
