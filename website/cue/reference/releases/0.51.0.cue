@@ -14,11 +14,11 @@ releases: "0.51.0": {
 		- Enhanced OpenTelemetry Protocol (OTLP) support with the introduction of the `otlp` codec, enabling
 		  bidirectional conversion between Vector events and OTLP format for seamless integration with
 		  OpenTelemetry collectors and instrumentation.
-		- Added `use_json_names` option to protobuf encoding and decoding.
-		  When enabled, the codec uses JSON field names (camelCase) instead of protobuf field names (snake_case).
 		- Added `expired` output to the memory enrichment table source, to export items as they expire in the cache.
 		- Memory enrichment tables' outputs are now visible to the `vector tap` command.
 		- Vector now emits `config_reload_rejected` and `config_reloaded` counters.
+		- Fixed issues with Vector's internal telemetry where utilization would report negative
+		  values and the buffer counter underflowed.
 
 		## Breaking Changes
 
