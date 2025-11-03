@@ -23,6 +23,6 @@ paths:
 - "src/internal_events/datadog_*"
 - "src/sinks/datadog/metrics/**"
 - "src/sinks/util/**"
-- "scripts/integration/datadog-e2e/metrics/**"
+- "scripts/e2e/datadog-metrics/**"
 - "tests/e2e/datadog/metrics/**"
 - "tests/data/e2e/datadog/metrics/**"
