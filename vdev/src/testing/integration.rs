@@ -15,7 +15,7 @@ use crate::{
     app::CommandExt as _,
     environment::{Environment, extract_present, rename_environment_keys},
     testing::{
-        build::ALL_INTEGRATIONS_FEATURE_FLAG,
+        build::{ALL_INTEGRATIONS_FEATURE_FLAG, ALL_TESTS_FEATURE_FLAG},
         docker::{CONTAINER_TOOL, DOCKER_SOCKET},
     },
 };
@@ -121,6 +121,17 @@ impl ComposeTest {
         Ok(compose_test)
     }
 
+    /// Returns the appropriate feature flags to use when building the test runner image.
+    /// When reuse_image is true, uses the unified 'all-tests' feature that includes both
+    /// integration and e2e tests. Otherwise, uses test-specific features from test.yaml.
+    fn build_features(&self) -> Vec<String> {
+        if self.reuse_image {
+            vec![ALL_TESTS_FEATURE_FLAG.to_string()]
+        } else {
+            self.config.features.clone()
+        }
+    }
+
     fn project_name(&self) -> String {
         // Docker Compose project names must consist only of lowercase alphanumeric characters,
         // hyphens, and underscores. Replace any dots with hyphens.
@@ -180,9 +191,12 @@ impl ComposeTest {
 
         args.push("--features".to_string());
 
+        // When reuse_image=true: use 'all-tests' (unified feature)
         // When all_features=true: use 'all-integration-tests' or 'all-e2e-tests'
         // When all_features=false: use test-specific features from test.yaml
-        args.push(if self.all_features {
+        args.push(if self.reuse_image {
+            ALL_TESTS_FEATURE_FLAG.to_string()
+        } else if self.all_features {
             self.local_config.feature_flag.to_string()
         } else {
             self.config.features.join(",")
@@ -213,31 +227,33 @@ impl ComposeTest {
             args.push(self.retries.to_string());
         }
 
+        let features = self.build_features();
         self.runner.test(
             &env_vars,
             &self.config.runner.env,
-            Some(&self.config.features),
+            Some(&features),
             &args,
             self.reuse_image,
-            self.local_config.kind == ComposeTestKind::E2E,
+            self.reuse_image || self.local_config.kind == ComposeTestKind::E2E,
         )?;
 
         Ok(())
     }
 
     pub(crate) fn start(&self) -> Result<()> {
-        // For end-to-end tests, we want to run vector as a service, leveraging the
-        // image for the runner. So we must build that image before starting the
-        // compose so that it is available.
+        // When reuse_image is enabled, both Integration and E2E tests use a unified
+        // image that contains Vector and tests built with the 'all-tests' feature flag.
+        // This allows CI to build once and reuse for all tests.
         //
-        // TODO: Enable image reuse for E2E tests by building a unified image in CI
-        // that includes the vector binary compiled with all-e2e-tests feature.
-        if self.local_config.kind == ComposeTestKind::E2E {
+        // When reuse_image is disabled (local development), E2E tests still need to
+        // pre-build the image since they run Vector as a service.
+        if self.reuse_image || self.local_config.kind == ComposeTestKind::E2E {
+            let features = self.build_features();
             self.runner.build(
-                Some(&self.config.features),
+                Some(&features),
                 &self.env_config,
-                false, // Always rebuild for E2E tests
-                true,  // E2E tests build Vector in the image
+                self.reuse_image, // Reuse if flag is set, otherwise rebuild
+                true,             // Build Vector in the image for unified approach
             )?;
         }
 

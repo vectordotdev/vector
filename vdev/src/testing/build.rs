@@ -12,6 +12,7 @@ use crate::{
 };
 
 pub const ALL_INTEGRATIONS_FEATURE_FLAG: &str = "all-integration-tests";
+pub const ALL_TESTS_FEATURE_FLAG: &str = "all-tests";
 
 /// Construct (but do not run) the `docker build` command for a test-runner image.
 /// - `image` is the full tag (e.g. `"vector-test-runner-1.86.0:latest"`).
@@ -59,16 +60,17 @@ pub fn prepare_build_command(
     command
 }
 
-/// Build the integration test‐runner image from `scripts/e2e/Dockerfile`
+/// Build the unified test runner image from `scripts/e2e/Dockerfile`.
+/// This image includes both Integration and E2E tests via the 'all-tests' feature flag.
 pub fn build_integration_image() -> Result<()> {
     let dockerfile = test_runner_dockerfile();
     let image = format!("vector-test-runner-{}", RustToolchainConfig::rust_version());
     let mut cmd = prepare_build_command(
         &image,
         &dockerfile,
-        Some(&[ALL_INTEGRATIONS_FEATURE_FLAG.to_string()]),
+        Some(&[ALL_TESTS_FEATURE_FLAG.to_string()]),
         &Environment::default(),
-        false, // Integration tests don't pre-build Vector tests.
+        true, // Build Vector in the image for unified approach across all test types.
     );
     waiting!("Building {image}");
     cmd.check_run()

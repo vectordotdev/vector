@@ -1007,6 +1007,13 @@ all-e2e-tests = [
   "e2e-tests-opentelemetry"
 ]
 
+# Unified testing feature that includes both Integration and E2E tests
+# This is used when building a single test runner image in CI with --reuse-image
+all-tests = [
+  "all-integration-tests",
+  "all-e2e-tests"
+]
+
 e2e-tests-datadog = [
   "sources-datadog_agent",
   "sinks-datadog_logs",
