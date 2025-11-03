@@ -27,7 +27,8 @@ releases: "0.51.0": {
 
 		- Environment variable interpolation in configuration files now rejects values containing newline characters. This prevents configuration
 		  injection attacks where environment variables could inject malicious multi-line configurations. If you need to inject multi-line
-		  configuration blocks, use a config pre-processing tool like `envsubst` instead.
+		  configuration blocks, use a config pre-processing tool like `envsubst` instead
+		  or update your configuration files so that they don't rely on block injections.
 
 		- Vector's internal topology debug and trace logs now use the `component_id` field name instead of `component` or `key`.
 		  If you are monitoring or filtering Vector's internal logs based on these field names, update your queries to use `component_id`.
