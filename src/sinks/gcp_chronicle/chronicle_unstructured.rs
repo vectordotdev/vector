@@ -718,10 +718,9 @@ mod integration_tests {
         trace_init();
 
         let log_type = random_string(10);
-        let (sink, healthcheck) =
-            config_build(&log_type, "/home/vector/tests/integration/gcp/auth.json")
-                .await
-                .expect("Building sink failed");
+        let (sink, healthcheck) = config_build(&log_type, "tests/integration/gcp/config/auth.json")
+            .await
+            .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
@@ -749,11 +748,7 @@ mod integration_tests {
 
         let log_type = random_string(10);
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
-        let sink = config_build(
-            &log_type,
-            "/home/vector/tests/integration/gcp/invalidauth.json",
-        )
-        .await;
+        let sink = config_build(&log_type, "tests/integration/gcp/config/invalidauth.json").await;
 
         assert!(sink.is_err())
     }
@@ -765,10 +760,9 @@ mod integration_tests {
         // The chronicle-emulator we are testing against is setup so a `log_type` of "INVALID"
         // will return a `400 BAD_REQUEST`.
         let log_type = "INVALID";
-        let (sink, healthcheck) =
-            config_build(log_type, "/home/vector/tests/integration/gcp/auth.json")
-                .await
-                .expect("Building sink failed");
+        let (sink, healthcheck) = config_build(log_type, "tests/integration/gcp/config/auth.json")
+            .await
+            .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
