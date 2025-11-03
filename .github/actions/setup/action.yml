@@ -223,7 +223,7 @@ runs:
           ~/.cargo/bin/wasm-pack
           /usr/local/bin/markdownlint
           /usr/local/bin/datadog-ci
-        key: ${{ runner.os }}-prepare-binaries-${{ hashFiles('scripts/environment/prepare.sh', 'scripts/environment/binstall.sh', 'scripts/environment/release-flags.sh') }}
+        key: ${{ runner.os }}-prepare-binaries-${{ hashFiles('scripts/environment/*') }}
         restore-keys: |
           ${{ runner.os }}-prepare-binaries-
 
