@@ -122,7 +122,7 @@ impl ComposeTest {
     }
 
     /// Returns the appropriate feature flags to use when building the test runner image.
-    /// When reuse_image is true, uses the unified 'all-tests' feature that includes both
+    /// When `reuse_image` is true, uses the unified 'all-tests' feature that includes both
     /// integration and e2e tests. Otherwise, uses test-specific features from test.yaml.
     fn build_features(&self) -> Vec<String> {
         if self.reuse_image {
