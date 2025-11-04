@@ -39,6 +39,10 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Free disk space
+        shell: bash
+        run: sudo -E bash scripts/ci-free-disk-space.sh
+
       - name: Build and push integration test runner image
         run: |
           # Build integration test runner image with all-integration-tests feature
