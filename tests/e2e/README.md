@@ -11,7 +11,7 @@ Each directory contains:
 2. A `data/` subdirectory (optional) containing test data files, configuration files, and other
    resources needed by the test
 
-You can list these tests with `cargo vdev e2e show`[1], which provides a list of all the
+You can list these tests with `cargo vdev e2e show`, which provides a list of all the
 end-to-end test names followed by the extrapolated matrix of environments.
 
 Each test can be run using one of the following:
@@ -32,9 +32,7 @@ If no environment is named for the `test` and `stop` subcommands, all active env
 
 ## E2E vs Integration Tests
 
-The end-to-end (e2e) tests are more of a black box test, in which we spin up a full vector instance
-as one of the compose services that runs alongside the others. This differs from integration tests
-which focus on testing individual components or integrations.
-
-[1] Note that the `vdev` tool accepts abbreviated subcommand names, so this can also be run as
-`cargo vdev e2e show` for brevity.
+The end-to-end (E2E) tests are black box tests that spin up a full Vector instance as one of the
+Docker Compose services, running alongside external systems (e.g., Datadog Agent, Splunk, OTEL
+collectors). This differs from integration tests, which compile and run Vector within a test runner
+container to test individual components or integrations in isolation.
