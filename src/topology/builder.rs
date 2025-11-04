@@ -123,8 +123,12 @@ impl<'a> Builder<'a> {
         }
     }
 
-    /// Create topology metadata from the current configuration
-    fn create_topology_metadata(&mut self) -> Option<SharedTopologyMetadata> {
+    /// Create topology metadata from the current configuration, reusing the existing shared state
+    fn create_topology_metadata(&mut self) -> SharedTopologyMetadata {
+        if let Some(shared) = &self.topology_metadata {
+            return Arc::clone(shared);
+        }
+
         let mut metadata = TopologyMetadata::new();
 
         // Collect inputs for each component
@@ -174,7 +178,7 @@ impl<'a> Builder<'a> {
 
         let shared = Arc::new(RwLock::new(metadata));
         self.topology_metadata = Some(Arc::clone(&shared));
-        Some(shared)
+        shared
     }
 
     /// Builds the new pieces of the topology found in `self.diff`.
@@ -409,7 +413,7 @@ impl<'a> Builder<'a> {
 
             // Create topology metadata for any internal_metrics source
             let topology_metadata = if typetag == "internal_metrics" {
-                self.create_topology_metadata()
+                Some(self.create_topology_metadata())
             } else {
                 None
             };

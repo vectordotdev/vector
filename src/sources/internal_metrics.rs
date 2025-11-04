@@ -156,8 +156,11 @@ impl InternalMetrics<'_> {
         let bytes_received = register!(BytesReceived::from(Protocol::INTERNAL));
         let mut interval =
             IntervalStream::new(time::interval(self.interval)).take_until(self.shutdown);
+        let namespace_override = (self.namespace != "vector").then(|| self.namespace.clone());
+        let host_tag_key = self.host_key.path.as_ref().map(|path| path.to_string());
+        let pid_tag_key = self.pid_key.clone();
         while interval.next().await.is_some() {
-            let hostname = crate::get_hostname();
+            let hostname = crate::get_hostname().ok();
             let pid = std::process::id().to_string();
 
             let metrics = self.controller.capture_metrics();
@@ -170,22 +173,15 @@ impl InternalMetrics<'_> {
 
             let mut batch: Vec<Metric> = metrics
                 .into_iter()
-                .map(|mut metric| {
-                    // A metric starts out with a default "vector" namespace, but will be overridden
-                    // if an explicit namespace is provided to this source.
-                    if self.namespace != "vector" {
-                        metric = metric.with_namespace(Some(self.namespace.clone()));
-                    }
-
-                    if let Some(host_key) = &self.host_key.path
-                        && let Ok(hostname) = &hostname
-                    {
-                        metric.replace_tag(host_key.to_string(), hostname.to_owned());
-                    }
-                    if let Some(pid_key) = &self.pid_key {
-                        metric.replace_tag(pid_key.to_owned(), pid.clone());
-                    }
-                    metric
+                .map(|metric| {
+                    apply_common_tags(
+                        metric,
+                        namespace_override.as_ref(),
+                        host_tag_key.as_ref(),
+                        hostname.as_ref(),
+                        pid_tag_key.as_ref(),
+                        &pid,
+                    )
                 })
                 .collect();
 
@@ -193,7 +189,16 @@ impl InternalMetrics<'_> {
             if let Some(topology_metadata) = &self.topology_metadata {
                 let topology = topology_metadata.read().unwrap();
                 let topology_metrics = generate_topology_metrics(&topology, Utc::now());
-                batch.extend(topology_metrics);
+                batch.extend(topology_metrics.into_iter().map(|metric| {
+                    apply_common_tags(
+                        metric,
+                        namespace_override.as_ref(),
+                        host_tag_key.as_ref(),
+                        hostname.as_ref(),
+                        pid_tag_key.as_ref(),
+                        &pid,
+                    )
+                }));
             }
 
             if (self.out.send_batch(batch.into_iter()).await).is_err() {
@@ -204,6 +209,29 @@ impl InternalMetrics<'_> {
 
         Ok(())
     }
+}
+
+fn apply_common_tags(
+    mut metric: Metric,
+    namespace_override: Option<&String>,
+    host_tag_key: Option<&String>,
+    hostname: Option<&String>,
+    pid_tag_key: Option<&String>,
+    pid: &str,
+) -> Metric {
+    if let Some(namespace) = namespace_override {
+        metric = metric.with_namespace(Some(namespace.clone()));
+    }
+
+    if let (Some(key), Some(host)) = (host_tag_key, hostname) {
+        metric.replace_tag(key.clone(), host.clone());
+    }
+
+    if let Some(pid_key) = pid_tag_key {
+        metric.replace_tag(pid_key.clone(), pid.to_owned());
+    }
+
+    metric
 }
 
 /// Generate metrics for topology connections
