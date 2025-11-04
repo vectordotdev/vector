@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::{app, config};
+use crate::{app, utils::config};
 
 /// Set the target Datadog org
 #[derive(Args, Debug)]

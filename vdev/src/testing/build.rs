@@ -6,9 +6,11 @@ use crate::testing::test_runner_dockerfile;
 use crate::{
     app,
     app::CommandExt,
-    environment::{Environment, extract_present},
     testing::{config::RustToolchainConfig, docker::docker_command},
-    util::IS_A_TTY,
+    utils::{
+        self,
+        environment::{Environment, extract_present},
+    },
 };
 
 pub const ALL_INTEGRATIONS_FEATURE_FLAG: &str = "all-integration-tests";
@@ -32,7 +34,7 @@ pub fn prepare_build_command(
     command.current_dir(app::path());
 
     // If we're attached to a TTY, show fancy progress
-    if *IS_A_TTY {
+    if *utils::IS_A_TTY {
         command.args(["--progress", "tty"]);
     }
 

@@ -1,9 +1,24 @@
+//! Git utilities
+
 use std::{collections::HashSet, process::Command};
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use git2::{BranchType, ErrorCode, Repository};
 
 use crate::app::CommandExt as _;
+
+/// Get the git HEAD tag if it exists
+pub fn git_head() -> Result<std::process::Output> {
+    Command::new("git")
+        .args(["describe", "--exact-match", "--tags", "HEAD"])
+        .output()
+        .context("Could not execute `git`")
+}
+
+/// Get the release channel from environment or default to "custom"
+pub fn get_channel() -> String {
+    std::env::var("CHANNEL").unwrap_or_else(|_| "custom".to_string())
+}
 
 pub fn current_branch() -> Result<String> {
     let output = run_and_check_output(&["rev-parse", "--abbrev-ref", "HEAD"])?;
@@ -160,6 +175,7 @@ pub fn branch_exists(branch: &str) -> Result<bool> {
 
     Ok(exists)
 }
+
 pub fn checkout_branch(branch_name: &str) -> Result<()> {
     let _output = run_and_check_output(&["checkout", branch_name])?;
     Ok(())
