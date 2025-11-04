@@ -20,12 +20,11 @@ pub const E2E_TESTS_DIR: &str = "e2e";
 
 /// Returns the base directory and whether to use config subdirectory for the given test type.
 /// Integration tests are in tests/integration with config/ subdirectories.
-/// E2E tests are in scripts/e2e without config/ subdirectories.
+/// E2E tests are in tests/e2e with config/ subdirectories.
 fn test_dir_config(root_dir: &str) -> (&'static str, bool) {
-    if root_dir == INTEGRATION_TESTS_DIR {
-        ("tests", true)
-    } else {
-        ("scripts", false)
+    match root_dir {
+        INTEGRATION_TESTS_DIR | E2E_TESTS_DIR => ("tests", true),
+        _ => ("scripts", false),
     }
 }
 

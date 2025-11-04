@@ -3,7 +3,7 @@ features:
 
 test: "e2e"
 
-test_filter: "opentelemetry::logs::"
+test_filter: "opentelemetry::metrics::"
 
 runner:
   needs_docker_socket: true
@@ -15,13 +15,11 @@ runner:
 matrix:
   # Determines which `otel/opentelemetry-collector-contrib` version to use
   collector_version: [ 'latest' ]
-  vector_config: [ 'vector_default.yaml', 'vector_otlp.yaml' ]
 
 # Only trigger this integration test if relevant OTEL source/sink files change
 paths:
   - "src/sources/opentelemetry/**"
   - "src/sinks/opentelemetry/**"
   - "src/internal_events/opentelemetry_*"
-  - "tests/e2e/opentelemetry/logs/**"
-  - "scripts/e2e/opentelemetry-logs/**"
+  - "tests/e2e/opentelemetry-metrics/**"
   - "lib/codecs/src/**/otlp.rs"

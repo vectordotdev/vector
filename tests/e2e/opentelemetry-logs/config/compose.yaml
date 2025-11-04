@@ -6,7 +6,7 @@ services:
     init: true
     volumes:
       - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/collector-source.yaml
+        source: ../data/collector-source.yaml
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
     ports:
@@ -18,7 +18,7 @@ services:
     container_name: logs-generator
     build:
       context: ../../../
-      dockerfile: ./scripts/e2e/opentelemetry-common/telemetrygen.Dockerfile
+      dockerfile: ./tests/e2e/opentelemetry-common/telemetrygen.Dockerfile
     init: true
     depends_on:
       otel-collector-source:
@@ -44,7 +44,7 @@ services:
     container_name: otel-collector-sink
     build:
       context: ../../../
-      dockerfile: ./scripts/e2e/opentelemetry-common/collector.Dockerfile
+      dockerfile: ./tests/e2e/opentelemetry-common/collector.Dockerfile
       args:
         CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
     init: true
@@ -52,7 +52,7 @@ services:
     command: [ "--config", "/etc/otelcol-contrib/config.yaml" ]
     volumes:
       - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/collector-sink.yaml
+        source: ../data/collector-sink.yaml
         target: /etc/otelcol-contrib/config.yaml
         read_only: true
       - type: volume
@@ -67,7 +67,7 @@ services:
     init: true
     volumes:
       - type: bind
-        source: ../../../tests/data/e2e/opentelemetry/logs/${CONFIG_VECTOR_CONFIG}
+        source: ../data/${CONFIG_VECTOR_CONFIG}
         target: /etc/vector/vector.yaml
         read_only: true
       - type: volume

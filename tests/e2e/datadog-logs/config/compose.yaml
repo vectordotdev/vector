@@ -36,13 +36,13 @@ services:
     volumes:
       # The Agent config file
       - type: bind
-        source: ../../../tests/data/e2e/datadog/logs/agent_only.yaml
+        source: ../data/agent_only.yaml
         target: /etc/datadog-agent/datadog.yaml
         read_only: true
 
       # The custom logs check
       - type: bind
-        source: ../../../tests/data/e2e/datadog/logs/logs.conf.d
+        source: ../data/logs.conf.d
         target: /conf.d
         read_only: true
 
@@ -66,13 +66,13 @@ services:
     volumes:
       # The Agent config file
       - type: bind
-        source: ../../../tests/data/e2e/datadog/logs/agent_vector.yaml
+        source: ../data/agent_vector.yaml
         target: /etc/datadog-agent/datadog.yaml
         read_only: true
 
       # The custom logs check
       - type: bind
-        source: ../../../tests/data/e2e/datadog/logs/logs.conf.d
+        source: ../data/logs.conf.d
         target: /conf.d
         read_only: true
 
@@ -96,7 +96,7 @@ services:
       - "/usr/bin/vector"
       - "-vvv"
       - "-c"
-      - "/home/vector/tests/data/e2e/datadog/logs/vector.toml"
+      - "/home/vector/tests/e2e/datadog-logs/data/vector.toml"
     volumes:
       - type: bind
         source: ../../..

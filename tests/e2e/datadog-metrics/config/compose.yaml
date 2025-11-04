@@ -4,7 +4,7 @@ services:
 
   # Emits metrics to the Agent only path
   dogstatsd-client-agent:
-    build: ./dogstatsd_client
+    build: ../dogstatsd_client
     environment:
     - STATSD_HOST=datadog-agent
     depends_on:
@@ -12,7 +12,7 @@ services:
 
   # Emits metrics to the Agent-Vector path
   dogstatsd-client-vector:
-    build: ./dogstatsd_client
+    build: ../dogstatsd_client
     environment:
     - STATSD_HOST=datadog-agent-vector
     depends_on:
@@ -28,7 +28,7 @@ services:
     - DD_HOSTNAME=datadog-agent
     volumes:
       # The Agent config file
-      - ../../../tests/data/e2e/datadog/metrics/agent_only.yaml:/etc/datadog-agent/datadog.yaml
+      - ../data/agent_only.yaml:/etc/datadog-agent/datadog.yaml
 
   # Sends metric data received from the Emitter to the `vector` service
   datadog-agent-vector:
@@ -40,7 +40,7 @@ services:
     - DD_HOSTNAME=datadog-agent-vector
     volumes:
       # The Agent config file
-      - ../../../tests/data/e2e/datadog/metrics/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
+      - ../data/agent_vector.yaml:/etc/datadog-agent/datadog.yaml
 
   # Receives metric data from the `datadog-agent-vector` service and sends
   # to the `fakeintake-vector` service.
@@ -57,7 +57,7 @@ services:
       - "/usr/bin/vector"
       - "-vvv"
       - "-c"
-      - "/home/vector/tests/data/e2e/datadog/metrics/vector.toml"
+      - "/home/vector/tests/e2e/datadog-metrics/data/vector.toml"
     volumes:
       - ../../..:/home/vector
 
