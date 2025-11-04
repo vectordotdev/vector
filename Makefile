@@ -456,7 +456,7 @@ check: ## Run prerequisite code checks
 .PHONY: check-all
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-docs
-check-all: check-version check-examples check-component-features
+check-all: check-examples check-component-features
 check-all: check-scripts check-deny check-component-docs check-licenses
 
 .PHONY: check-component-features
@@ -482,10 +482,6 @@ check-licenses: ## Check that the 3rd-party license file is up to date
 .PHONY: check-markdown
 check-markdown: ## Check that markdown is styled properly
 	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check markdown
-
-.PHONY: check-version
-check-version: ## Check that Vector's version is correct accounting for recent changes
-	${MAYBE_ENVIRONMENT_EXEC} cargo vdev check version
 
 .PHONY: check-examples
 check-examples: ## Check that the config/examples files are valid

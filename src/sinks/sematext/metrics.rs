@@ -192,7 +192,7 @@ impl SematextMetricsService {
                         .map(|item| Ok(EncodedEvent::new(item, byte_size, json_byte_size)))
                 })
             })
-            .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
+            .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error, internal_log_rate_limit = false));
 
         #[allow(deprecated)]
         Ok(VectorSink::from_event_sink(sink))

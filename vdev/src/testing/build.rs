@@ -1,10 +1,8 @@
-use std::{
-    path::{Path, PathBuf},
-    process::Command,
-};
+use std::{path::Path, process::Command};
 
 use anyhow::Result;
 
+use crate::testing::test_runner_dockerfile;
 use crate::{
     app,
     app::CommandExt,
@@ -17,13 +15,15 @@ pub const ALL_INTEGRATIONS_FEATURE_FLAG: &str = "all-integration-tests";
 
 /// Construct (but do not run) the `docker build` command for a test-runner image.
 /// - `image` is the full tag (e.g. `"vector-test-runner-1.86.0:latest"`).
-/// - `dockerfile` is the path to the Dockerfile (e.g. `scripts/integration/Dockerfile`).
+/// - `dockerfile` is the path to the Dockerfile (e.g. `scripts/e2e/Dockerfile`).
 /// - `features` controls the `FEATURES` build-arg (pass `None` for an empty list).
+/// - `build` controls whether to build the Vector binary in the image.
 pub fn prepare_build_command(
     image: &str,
     dockerfile: &Path,
     features: Option<&[String]>,
     config_environment_variables: &Environment,
+    build: bool,
 ) -> Command {
     // Start with `docker build`
     let mut command = docker_command(["build"]);
@@ -49,6 +49,8 @@ pub fn prepare_build_command(
         &format!("RUST_VERSION={}", RustToolchainConfig::rust_version()),
         "--build-arg",
         &format!("FEATURES={}", features.unwrap_or(&[]).join(",")),
+        "--build-arg",
+        &format!("BUILD={}", if build { "true" } else { "false" }),
     ]);
 
     command.envs(extract_present(config_environment_variables));
@@ -57,18 +59,16 @@ pub fn prepare_build_command(
     command
 }
 
-#[allow(dead_code)]
-/// Build the integration test‐runner image from `scripts/integration/Dockerfile`
+/// Build the integration test‐runner image from `scripts/e2e/Dockerfile`
 pub fn build_integration_image() -> Result<()> {
-    let dockerfile: PathBuf = [app::path(), "scripts", "integration", "Dockerfile"]
-        .iter()
-        .collect();
+    let dockerfile = test_runner_dockerfile();
     let image = format!("vector-test-runner-{}", RustToolchainConfig::rust_version());
     let mut cmd = prepare_build_command(
         &image,
         &dockerfile,
         Some(&[ALL_INTEGRATIONS_FEATURE_FLAG.to_string()]),
         &Environment::default(),
+        false, // Integration tests don't pre-build Vector tests.
     );
     waiting!("Building {image}");
     cmd.check_run()

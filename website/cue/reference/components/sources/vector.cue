@@ -98,7 +98,7 @@ components: sources: vector: {
 			}
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events received from an upstream Vector instance."
 		}
 	}
 

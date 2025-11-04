@@ -433,6 +433,15 @@ generated: components: sinks: loki: configuration: {
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
+					otlp: """
+						Encodes an event in the [OTLP (OpenTelemetry Protocol)][otlp] format.
+
+						This codec uses protobuf encoding, which is the recommended format for OTLP.
+						The output is suitable for sending to OTLP-compatible endpoints with
+						`content-type: application/x-protobuf`.
+
+						[otlp]: https://opentelemetry.io/docs/specs/otlp/
+						"""
 					protobuf: """
 						Encodes an event as a [Protobuf][protobuf] message.
 
@@ -616,6 +625,19 @@ generated: components: sinks: loki: configuration: {
 						description: "The name of the message type to use for serializing."
 						required:    true
 						type: string: examples: ["package.Message"]
+					}
+					use_json_names: {
+						description: """
+																Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+
+																When enabled, the serializer looks for fields using their JSON names as defined
+																in the `.proto` file (for example `jobDescription` instead of `job_description`).
+
+																This is useful when working with data that has already been converted from JSON or
+																when interfacing with systems that use JSON naming conventions.
+																"""
+						required: false
+						type: bool: default: false
 					}
 				}
 			}

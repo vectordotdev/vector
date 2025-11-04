@@ -27,6 +27,8 @@ pub use vector_core::{
 pub use vector_lookup as lookup;
 pub use vector_stream as stream;
 pub use vector_tap as tap;
+#[cfg(feature = "vector-top")]
+pub use vector_top as top;
 #[cfg(feature = "vrl")]
 pub use vrl;
 
