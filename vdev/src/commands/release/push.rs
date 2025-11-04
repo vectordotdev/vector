@@ -2,7 +2,7 @@ use anyhow::Result;
 use clap::Args;
 
 use crate::app;
-use crate::git;
+use crate::utils::git;
 use itertools::Itertools;
 
 /// Pushes new versions produced by `make release` to the repository

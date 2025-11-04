@@ -57,10 +57,10 @@ use crate::{
     },
     event::Event,
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
-    internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
+    internal_events::{HttpBytesReceived, StreamClosedError},
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::{self},
+    sources::{self, util::http::emit_decompress_error},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -475,20 +475,20 @@ impl DatadogAgentSource {
                         let mut decoded = Vec::new();
                         MultiGzDecoder::new(body.reader())
                             .read_to_end(&mut decoded)
-                            .map_err(|error| handle_decode_error(encoding, error))?;
+                            .map_err(|error| emit_decompress_error(encoding, error))?;
                         decoded.into()
                     }
                     "zstd" => {
                         let mut decoded = Vec::new();
                         zstd::stream::copy_decode(body.reader(), &mut decoded)
-                            .map_err(|error| handle_decode_error(encoding, error))?;
+                            .map_err(|error| emit_decompress_error(encoding, error))?;
                         decoded.into()
                     }
                     "deflate" | "x-deflate" => {
                         let mut decoded = Vec::new();
                         ZlibDecoder::new(body.reader())
                             .read_to_end(&mut decoded)
-                            .map_err(|error| handle_decode_error(encoding, error))?;
+                            .map_err(|error| emit_decompress_error(encoding, error))?;
                         decoded.into()
                     }
                     encoding => {
@@ -546,17 +546,6 @@ pub(crate) async fn handle_request(
         }
         Err(err) => Err(warp::reject::custom(err)),
     }
-}
-
-fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(HttpDecompressError {
-        encoding,
-        error: &error
-    });
-    ErrorMessage::new(
-        StatusCode::UNPROCESSABLE_ENTITY,
-        format!("Failed decompressing payload with {encoding} decoder."),
-    )
 }
 
 // https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49

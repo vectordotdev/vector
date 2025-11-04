@@ -187,8 +187,8 @@ pub struct RootOpts {
     /// shows a suppression warning, and subsequent occurrences are silent until the
     /// window expires.
     ///
-    /// Logs are grouped by their location in the code and contextual fields so different log instances can be rate
-    /// limited independently.
+    /// Logs are grouped by their location in the code and the `component_id` field, so logs
+    /// from different components are rate limited independently.
     ///
     /// Examples:
     /// - 1: Very verbose, logs can repeat every second
@@ -410,7 +410,7 @@ pub enum WatchConfigMethod {
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
     for error in errors {
-        error!(message = "Configuration error.", %error);
+        error!(message = "Configuration error.", %error, internal_log_rate_limit = false);
     }
 
     exitcode::CONFIG

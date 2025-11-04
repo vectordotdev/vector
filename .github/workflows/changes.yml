@@ -134,8 +134,6 @@ on:
         value: ${{ jobs.int_tests.outputs.splunk }}
       webhdfs:
         value: ${{ jobs.int_tests.outputs.webhdfs }}
-      all-changes-json:
-        value: ${{ jobs.int_tests.outputs.all-changes-json }}
       # e2e tests
       e2e-datadog-logs:
         value: ${{ jobs.e2e_tests.outputs.datadog-logs }}
@@ -143,6 +141,12 @@ on:
         value: ${{ jobs.e2e_tests.outputs.datadog-metrics }}
       e2e-opentelemetry-logs:
         value: ${{ jobs.e2e_tests.outputs.opentelemetry-logs }}
+      e2e-opentelemetry-metrics:
+        value: ${{ jobs.e2e_tests.outputs.opentelemetry-metrics }}
+      int-tests-any:
+        value: ${{ jobs.int_tests.outputs.any }}
+      e2e-tests-any:
+        value: ${{ jobs.e2e_tests.outputs.any }}
 env:
   BASE_SHA: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_sha) || github.event.pull_request.base.sha }}
   HEAD_SHA: ${{ inputs.head_ref || (github.event_name == 'merge_group' && github.event.merge_group.head_sha) || github.event.pull_request.head.sha }}
@@ -310,15 +314,19 @@ jobs:
       redis: ${{ steps.filter.outputs.redis }}
       splunk: ${{ steps.filter.outputs.splunk }}
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
-      all-changes-json: ${{ steps.aggregate.outputs.all-changes-json }}
+      any: ${{ steps.detect-changes.outputs.any }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which
-      # sources the paths from the scripts/integration/.../test.yaml files
+      # sources the paths from the tests/integration/.../config/test.yaml files
       - name: Create filter rules for integrations
-        run: cargo vdev int ci-paths > int_test_filters.yaml
+        run: vdev int ci-paths > int_test_filters.yaml
 
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         id: filter
@@ -329,8 +337,8 @@ jobs:
 
       # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
       # `if` section of a job or step. In return, we can reduce a lot of redundant job configuration in integration.yml.
-      - name: Generate JSON for all outputs
-        id: aggregate
+      - name: Detect changes and generate JSON
+        id: detect-changes
         run: |
           json=$(cat <<EOF
           {
@@ -375,6 +383,10 @@ jobs:
 
           echo "$json" > int_tests_changes.json
 
+          # Check if at least one integration test has changes
+          any_changed=$(jq -r 'to_entries | map(select(.value == true)) | length > 0' int_tests_changes.json)
+          echo "any=$any_changed" >> $GITHUB_OUTPUT
+
       - name: Upload JSON artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
@@ -390,14 +402,20 @@ jobs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
       opentelemetry-logs: ${{ steps.filter.outputs.opentelemetry-logs }}
+      opentelemetry-metrics: ${{ steps.filter.outputs.opentelemetry-metrics }}
+      any: ${{ steps.detect-changes.outputs.any }}
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
 
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+
       # creates a yaml file that contains the filters for each test,
       # extracted from the output of the `vdev int ci-paths` command, which
-      # sources the paths from the scripts/e2e/.../test.yaml files
+      # sources the paths from the tests/e2e/.../test.yaml files
       - name: Create filter rules for e2e tests
-        run: cargo vdev e2e ci-paths > int_test_filters.yaml
+        run: vdev e2e ci-paths > int_test_filters.yaml
 
       - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
         id: filter
@@ -408,19 +426,24 @@ jobs:
 
       # This JSON hack was introduced because GitHub Actions does not support dynamic expressions in the
       # `if` section of a job or step. In return, we can reduce a lot of redundant job configuration in integration.yml.
-      - name: Generate JSON for all outputs
-        id: aggregate
+      - name: Detect changes and generate JSON
+        id: detect-changes
         run: |
           json=$(cat <<EOF
           {
             "datadog-logs": ${{ steps.filter.outputs.datadog-logs }},
             "datadog-metrics": ${{ steps.filter.outputs.datadog-metrics }},
-            "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }}
+            "opentelemetry-logs": ${{ steps.filter.outputs.opentelemetry-logs }},
+            "opentelemetry-metrics": ${{ steps.filter.outputs.opentelemetry-metrics }}
           }
           EOF
           )
 
           echo "$json" > e2e_tests_changes.json
+
+          # Check if at least one e2e test has changes
+          any_changed=$(jq -r 'to_entries | map(select(.value == true)) | length > 0' e2e_tests_changes.json)
+          echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
