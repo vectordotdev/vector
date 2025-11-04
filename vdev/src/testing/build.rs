@@ -7,7 +7,10 @@ use crate::{
     app,
     app::CommandExt,
     testing::{config::RustToolchainConfig, docker::docker_command},
-    utils::{self, environment::{Environment, extract_present}},
+    utils::{
+        self,
+        environment::{Environment, extract_present},
+    },
 };
 
 pub const ALL_INTEGRATIONS_FEATURE_FLAG: &str = "all-integration-tests";
