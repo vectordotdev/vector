@@ -13,12 +13,9 @@ mod commands;
 mod config;
 mod environment;
 mod features;
-mod git;
 mod platform;
 mod testing;
-mod util;
-
-use std::env;
+mod utils;
 
 use anyhow::Result;
 use clap::Parser;
@@ -31,10 +28,7 @@ fn main() -> Result<()> {
     app::set_global_config(config::load()?);
 
     let path = if app::config().repo.is_empty() {
-        env::current_dir()
-            .expect("Could not determine current directory")
-            .display()
-            .to_string()
+        utils::paths::find_repo_root()?.display().to_string()
     } else {
         app::config().repo.clone()
     };

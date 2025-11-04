@@ -1,8 +1,7 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
-use crate::git;
-use crate::util::run_command;
+use crate::utils::{command, git};
 use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use semver::Version;
@@ -15,6 +14,7 @@ use std::process::Command;
 use std::{env, fs};
 use toml::map::Map;
 use toml::Value;
+use crate::utils::command::run_command;
 
 const ALPINE_PREFIX: &str = "FROM docker.io/alpine:";
 const ALPINE_DOCKERFILE: &str = "distribution/docker/alpine/Dockerfile";
@@ -152,7 +152,7 @@ impl Prepare {
 
         lines.push(String::new()); // File should end with a newline.
         fs::write(cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
-        run_command("cargo update -p vrl");
+        command::run_command("cargo update -p vrl");
         git::commit(&format!("chore(releasing): Pinned VRL version to {vrl_version}"))?;
         Ok(())
     }
@@ -381,7 +381,7 @@ impl Prepare {
         fs::write(&tmp_path, &updated)?;
         fs::rename(&tmp_path, &cue_path)?;
 
-        run_command(&format!("cue fmt {}", cue_path.display()));
+        command::run_command(&format!("cue fmt {}", cue_path.display()));
         debug!("Successfully added VRL changelog to the release cue file.");
         Ok(())
     }
@@ -394,7 +394,7 @@ fn get_repo_root() -> PathBuf {
 }
 
 fn get_latest_version_from_vector_tags() -> Result<Version> {
-    let tags = run_command("git tag --list --sort=-v:refname");
+    let tags = command::run_command("git tag --list --sort=-v:refname");
     let latest_tag = tags
         .lines()
         .find(|tag| tag.starts_with('v') && !tag.starts_with("vdev-v"))
