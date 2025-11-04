@@ -53,7 +53,7 @@ pub fn prepare_build_command(
         "--build-arg",
         &format!("FEATURES={}", features.unwrap_or(&[]).join(",")),
         "--build-arg",
-        &format!("BUILD={}", if build { "true" } else { "false" }),
+        &format!("PRECOMPILE={}", if build { "true" } else { "false" }),
     ]);
 
     command.envs(extract_present(config_environment_variables));

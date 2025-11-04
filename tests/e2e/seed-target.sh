@@ -1,24 +1,30 @@
 #!/bin/bash
-# Seed the /home/target volume with precompiled test binaries from the image.
-# This script runs as the container entrypoint to populate the persistent volume
-# with test binaries that were compiled during the Docker image build.
+# ============================================================================
+# Volume Seeding Script for Vector Test Runner
+# ============================================================================
+# Docker volumes mask image contents at mount points. This script copies
+# precompiled binaries from /precompiled-target to /home/target volume.
 #
-# Why this is needed:
-# - Test binaries are compiled at /home/target during image build
-# - At runtime, /home/target is mounted as a Docker volume
-# - Docker volumes hide/mask the image contents at the mount point
-# - So we copy binaries from /precompiled-target (not masked) to /home/target (volume)
-# - This only runs once when the volume is empty
+# - DEVELOPMENT MODE: Seeds volume on first run (when source is mounted)
+# - PRECOMPILED MODE: No-op (no volumes mounted)
+# ============================================================================
 
+# Check if precompiled binaries exist in the image
 if [ -d /precompiled-target/debug ]; then
-    # Count files in /home/target/debug (excluding . and ..)
+    # Count how many files exist in the target volume
     file_count=$(find /home/target/debug -type f 2>/dev/null | wc -l || echo "0")
+
+    # Only seed if the volume is empty (first run)
     if [ "$file_count" -eq 0 ]; then
-        echo "Seeding /home/target with precompiled binaries..."
+        echo "==> Seeding /home/target with precompiled test binaries..."
         mkdir -p /home/target/debug
         cp -r /precompiled-target/debug/* /home/target/debug/
-        echo "Seeded successfully"
+        echo "==> Seeding complete! Tests will start from precompiled binaries."
+    else
+        echo "==> /home/target already populated (skipping seed)"
     fi
+else
+    echo "==> No precompiled binaries found (PRECOMPILE=false mode or PRECOMPILED mode)"
 fi
 
 # Execute the command passed to the container (e.g., /bin/sleep infinity)

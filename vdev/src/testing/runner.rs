@@ -198,8 +198,6 @@ pub trait ContainerTestRunner: TestRunner {
     }
 
     fn create(&self, build: bool, reuse_image: bool) -> Result<()> {
-        let network_name = self.network_name().unwrap_or("host");
-
         let docker_socket = format!("{}:/var/run/docker.sock", DOCKER_SOCKET.display());
         let docker_args = if self.needs_docker_socket() {
             vec!["--volume", &docker_socket]
@@ -217,6 +215,7 @@ pub trait ContainerTestRunner: TestRunner {
 
         // Prepare strings that need to outlive the args vec
         let container_name = self.container_name();
+        let network_name = self.network_name().unwrap_or("host");
         let source_mount = format!("{}:{MOUNT_PATH}", app::path());
         let target_mount = format!("{VOLUME_TARGET}:{TARGET_PATH}");
         let cargo_git_mount = format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git");
@@ -234,8 +233,7 @@ pub trait ContainerTestRunner: TestRunner {
             MOUNT_PATH,
         ];
 
-        // When using precompiled binaries (build=true + reuse_image=true),
-        // don't mount source code to avoid triggering recompilation
+        // Skip source mount when using precompiled binaries to avoid recompilation
         if !(build && reuse_image) {
             args.extend(["--volume", source_mount.as_str()]);
         }
@@ -254,7 +252,7 @@ pub trait ContainerTestRunner: TestRunner {
                 .chain_args(docker_args)
                 .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
         )
-        .wait(format!("Creating container {}", self.container_name()))
+        .wait(format!("Creating container {container_name}"))
     }
 }
 
