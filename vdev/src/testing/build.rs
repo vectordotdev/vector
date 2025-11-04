@@ -15,7 +15,7 @@ pub const ALL_INTEGRATIONS_FEATURE_FLAG: &str = "all-integration-tests";
 
 /// Construct (but do not run) the `docker build` command for a test-runner image.
 /// - `image` is the full tag (e.g. `"vector-test-runner-1.86.0:latest"`).
-/// - `dockerfile` is the path to the Dockerfile (e.g. `scripts/e2e/Dockerfile`).
+/// - `dockerfile` is the path to the Dockerfile (e.g. `tests/e2e/Dockerfile`).
 /// - `features` controls the `FEATURES` build-arg (pass `None` for an empty list).
 /// - `build` controls whether to build the Vector binary in the image.
 pub fn prepare_build_command(
@@ -59,7 +59,7 @@ pub fn prepare_build_command(
     command
 }
 
-/// Build the integration test‐runner image from `scripts/e2e/Dockerfile`
+/// Build the integration test‐runner image from `tests/e2e/Dockerfile`
 pub fn build_integration_image() -> Result<()> {
     let dockerfile = test_runner_dockerfile();
     let image = format!("vector-test-runner-{}", RustToolchainConfig::rust_version());
