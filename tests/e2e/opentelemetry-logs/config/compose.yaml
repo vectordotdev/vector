@@ -17,7 +17,7 @@ services:
   logs-generator:
     container_name: logs-generator
     build:
-      context: ../../../
+      context: ../../../..
       dockerfile: ./tests/e2e/opentelemetry-common/telemetrygen.Dockerfile
     init: true
     depends_on:
@@ -43,7 +43,7 @@ services:
   otel-collector-sink:
     container_name: otel-collector-sink
     build:
-      context: ../../../
+      context: ../../../..
       dockerfile: ./tests/e2e/opentelemetry-common/collector.Dockerfile
       args:
         CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
