@@ -13,7 +13,7 @@ use anyhow::{Context as _, Result, bail};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 
-use crate::{config::Config, platform, utils};
+use crate::utils::{self, config::Config, platform};
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.

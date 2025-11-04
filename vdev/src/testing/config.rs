@@ -10,7 +10,10 @@ use itertools::{self, Itertools};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-use crate::{app, environment::Environment, utils::paths};
+use crate::{
+    app,
+    utils::{environment::Environment, paths},
+};
 
 const FILE_NAME: &str = "test.yaml";
 const CONFIG_SUBDIR: &str = "config";

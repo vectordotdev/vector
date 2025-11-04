@@ -1,7 +1,7 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
-use crate::utils::{command, git};
+use crate::utils::{git, paths};
 use anyhow::{anyhow, Result};
 use reqwest::blocking::Client;
 use semver::Version;
@@ -57,9 +57,8 @@ struct Prepare {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-
-        let repo_root = get_repo_root();
-        env::set_current_dir(repo_root.clone())?;
+        let repo_root = paths::find_repo_root()?;
+        env::set_current_dir(&repo_root)?;
 
         let prepare = Prepare {
             new_vector_version: self.version.clone(),
@@ -152,7 +151,7 @@ impl Prepare {
 
         lines.push(String::new()); // File should end with a newline.
         fs::write(cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
-        command::run_command("cargo update -p vrl");
+        run_command("cargo update -p vrl");
         git::commit(&format!("chore(releasing): Pinned VRL version to {vrl_version}"))?;
         Ok(())
     }
@@ -381,7 +380,7 @@ impl Prepare {
         fs::write(&tmp_path, &updated)?;
         fs::rename(&tmp_path, &cue_path)?;
 
-        command::run_command(&format!("cue fmt {}", cue_path.display()));
+        run_command(&format!("cue fmt {}", cue_path.display()));
         debug!("Successfully added VRL changelog to the release cue file.");
         Ok(())
     }
@@ -389,12 +388,8 @@ impl Prepare {
 
 // FREE FUNCTIONS AFTER THIS LINE
 
-fn get_repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf()
-}
-
 fn get_latest_version_from_vector_tags() -> Result<Version> {
-    let tags = command::run_command("git tag --list --sort=-v:refname");
+    let tags = run_command("git tag --list --sort=-v:refname");
     let latest_tag = tags
         .lines()
         .find(|tag| tag.starts_with('v') && !tag.starts_with("vdev-v"))

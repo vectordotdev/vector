@@ -6,12 +6,14 @@ use crate::testing::test_runner_dockerfile;
 use crate::utils::IS_A_TTY;
 use crate::{
     app::{self, CommandExt as _},
-    environment::{Environment, append_environment_variables},
     testing::{
         build::prepare_build_command,
         docker::{DOCKER_SOCKET, docker_command},
     },
-    utils::command::ChainArgs as _,
+    utils::{
+        command::ChainArgs as _,
+        environment::{Environment, append_environment_variables},
+    },
 };
 
 const MOUNT_PATH: &str = "/home/vector";
