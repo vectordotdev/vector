@@ -47,8 +47,8 @@ impl ComposeTestLocalConfig {
         }
     }
 
-    /// E2E tests are located in the `scripts/e2e` dir,
-    /// and are the full feature flag is `all-e2e-tests`.
+    /// E2E tests are located in the `tests/e2e` dir,
+    /// and the full feature flag is `all-e2e-tests`.
     pub(crate) fn e2e() -> Self {
         Self {
             kind: ComposeTestKind::E2E,

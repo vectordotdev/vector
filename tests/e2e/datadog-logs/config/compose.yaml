@@ -99,7 +99,7 @@ services:
       - "/home/vector/tests/e2e/datadog-logs/data/vector.toml"
     volumes:
       - type: bind
-        source: ../../..
+        source: ../../../..
         target: /home/vector
 
   # Receives log data from the `datadog-agent` service. Is queried by the test runner
