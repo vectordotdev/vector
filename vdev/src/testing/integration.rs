@@ -15,7 +15,7 @@ use crate::{
     app::CommandExt as _,
     environment::{Environment, extract_present, rename_environment_keys},
     testing::{
-        build::{ALL_INTEGRATIONS_FEATURE_FLAG, ALL_TESTS_FEATURE_FLAG},
+        build::{ALL_E2E_TESTS_FEATURE_FLAG, ALL_INTEGRATIONS_FEATURE_FLAG},
         docker::{CONTAINER_TOOL, DOCKER_SOCKET},
     },
 };
@@ -122,11 +122,14 @@ impl ComposeTest {
     }
 
     /// Returns the appropriate feature flags to use when building the test runner image.
-    /// When `reuse_image` is true, uses the unified 'all-tests' feature that includes both
-    /// integration and e2e tests. Otherwise, uses test-specific features from test.yaml.
+    /// When `reuse_image` is true, uses both `all-integration-tests` and `all-e2e-tests`
+    /// features. Otherwise, uses test-specific features from test.yaml.
     fn build_features(&self) -> Vec<String> {
         if self.reuse_image {
-            vec![ALL_TESTS_FEATURE_FLAG.to_string()]
+            vec![
+                ALL_INTEGRATIONS_FEATURE_FLAG.to_string(),
+                ALL_E2E_TESTS_FEATURE_FLAG.to_string(),
+            ]
         } else {
             self.config.features.clone()
         }
@@ -191,11 +194,11 @@ impl ComposeTest {
 
         args.push("--features".to_string());
 
-        // When reuse_image=true: use 'all-tests' (unified feature)
+        // When reuse_image=true: use both 'all-integration-tests' and 'all-e2e-tests'
         // When all_features=true: use 'all-integration-tests' or 'all-e2e-tests'
         // When all_features=false: use test-specific features from test.yaml
         args.push(if self.reuse_image {
-            ALL_TESTS_FEATURE_FLAG.to_string()
+            format!("{ALL_INTEGRATIONS_FEATURE_FLAG},{ALL_E2E_TESTS_FEATURE_FLAG}")
         } else if self.all_features {
             self.local_config.feature_flag.to_string()
         } else {
@@ -242,8 +245,8 @@ impl ComposeTest {
 
     pub(crate) fn start(&self) -> Result<()> {
         // When reuse_image is enabled, both Integration and E2E tests use a unified
-        // image that contains Vector and tests built with the 'all-tests' feature flag.
-        // This allows CI to build once and reuse for all tests.
+        // image that contains Vector and tests built with both 'all-integration-tests'
+        // and 'all-e2e-tests' feature flags. This allows CI to build once and reuse for all tests.
         //
         // When reuse_image is disabled (local development), E2E tests still need to
         // pre-build the image since they run Vector as a service.
