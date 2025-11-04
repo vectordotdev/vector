@@ -1,7 +1,7 @@
 use anyhow::Result;
 
 use crate::app;
-use crate::git::git_ls_files;
+use crate::utils::git::git_ls_files;
 
 /// Check that markdown is styled properly
 #[derive(clap::Args, Debug)]

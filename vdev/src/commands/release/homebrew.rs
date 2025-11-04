@@ -1,4 +1,4 @@
-use crate::git;
+use crate::utils::git;
 use anyhow::Result;
 use hex;
 use reqwest;
