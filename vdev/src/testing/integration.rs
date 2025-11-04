@@ -213,13 +213,17 @@ impl ComposeTest {
             args.push(self.retries.to_string());
         }
 
+        // Universal test image precompiles all tests (both integration and e2e)
+        // when all_features=true, so we can use precompiled binaries for both.
+        let use_precompiled = self.all_features;
+
         self.runner.test(
             &env_vars,
             &self.config.runner.env,
             Some(&self.config.features),
             &args,
             self.reuse_image,
-            self.local_config.kind == ComposeTestKind::E2E,
+            use_precompiled,
         )?;
 
         Ok(())

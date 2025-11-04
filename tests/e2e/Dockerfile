@@ -30,16 +30,36 @@ COPY scripts/environment/release-flags.sh /
 RUN bash /prepare.sh --modules=cargo-nextest
 RUN bash /install-protoc.sh
 
-WORKDIR /vector
-COPY . .
 ARG FEATURES
 ARG BUILD
 
-RUN --mount=type=cache,target=/vector/target \
-    --mount=type=cache,target=/usr/local/cargo/registry \
+# Copy source to /home/vector (same location used at runtime)
+WORKDIR /home/vector
+COPY . .
+
+# When BUILD=true, compile and persist test binaries in the image.
+# The universal test image (BUILD=true) contains:
+# - All integration test binaries (all-integration-tests feature)
+# - All e2e test binaries (all-e2e-tests feature)
+# - The vector binary used as a service by tests
+#
+# Build target dir is set to /home/target to match runtime configuration.
+# Binaries are also copied to /precompiled-target so we can seed the volume at container start.
+#
+# When BUILD=false, skip precompilation (tests compile at runtime using cache mounts).
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     if [ "$BUILD" = "true" ]; then \
-        /usr/bin/mold -run cargo build --tests --lib --bin vector \
+        CARGO_BUILD_TARGET_DIR=/home/target /usr/bin/mold -run cargo build --tests --lib --bin vector \
         --no-default-features --features $FEATURES && \
-        cp target/debug/vector /usr/bin/vector; \
+        cp /home/target/debug/vector /usr/bin/vector && \
+        mkdir -p /precompiled-target && \
+        cp -r /home/target/debug /precompiled-target/; \
     fi
+
+# Copy the seed script that populates /home/target volume with precompiled binaries
+COPY tests/e2e/seed-target.sh /seed-target.sh
+RUN chmod +x /seed-target.sh
+
+ENTRYPOINT ["/seed-target.sh"]
+CMD ["/bin/sleep", "infinity"]

@@ -116,12 +116,12 @@ pub trait ContainerTestRunner: TestRunner {
             RunnerState::Paused => self.unpause()?,
             RunnerState::Dead | RunnerState::Unknown => {
                 self.remove()?;
-                self.create()?;
+                self.create(build, reuse_image)?;
                 self.start()?;
             }
             RunnerState::Missing => {
                 self.build(features, config_environment_variables, reuse_image, build)?;
-                self.create()?;
+                self.create(build, reuse_image)?;
                 self.start()?;
             }
         }
@@ -197,7 +197,7 @@ pub trait ContainerTestRunner: TestRunner {
             .wait(format!("Unpausing container {}", self.container_name()))
     }
 
-    fn create(&self) -> Result<()> {
+    fn create(&self, build: bool, reuse_image: bool) -> Result<()> {
         let network_name = self.network_name().unwrap_or("host");
 
         let docker_socket = format!("{}:/var/run/docker.sock", DOCKER_SOCKET.display());
@@ -214,29 +214,45 @@ pub trait ContainerTestRunner: TestRunner {
             .collect();
 
         self.ensure_volumes()?;
+
+        // Prepare strings that need to outlive the args vec
+        let container_name = self.container_name();
+        let source_mount = format!("{}:{MOUNT_PATH}", app::path());
+        let target_mount = format!("{VOLUME_TARGET}:{TARGET_PATH}");
+        let cargo_git_mount = format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git");
+        let cargo_registry_mount = format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry");
+
+        let mut args = vec![
+            "create",
+            "--name",
+            container_name.as_str(),
+            "--network",
+            network_name,
+            "--hostname",
+            RUNNER_HOSTNAME,
+            "--workdir",
+            MOUNT_PATH,
+        ];
+
+        // When using precompiled binaries (build=true + reuse_image=true),
+        // don't mount source code to avoid triggering recompilation
+        if !(build && reuse_image) {
+            args.extend(["--volume", source_mount.as_str()]);
+        }
+
+        args.extend([
+            "--volume",
+            target_mount.as_str(),
+            "--volume",
+            cargo_git_mount.as_str(),
+            "--volume",
+            cargo_registry_mount.as_str(),
+        ]);
+
         docker_command(
-            [
-                "create",
-                "--name",
-                &self.container_name(),
-                "--network",
-                network_name,
-                "--hostname",
-                RUNNER_HOSTNAME,
-                "--workdir",
-                MOUNT_PATH,
-                "--volume",
-                &format!("{}:{MOUNT_PATH}", app::path()),
-                "--volume",
-                &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
-                "--volume",
-                &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
-                "--volume",
-                &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
-            ]
-            .chain_args(volumes)
-            .chain_args(docker_args)
-            .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
+            args.chain_args(volumes)
+                .chain_args(docker_args)
+                .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
         )
         .wait(format!("Creating container {}", self.container_name()))
     }
