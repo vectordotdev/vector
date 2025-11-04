@@ -32,9 +32,6 @@ jobs:
         with:
           vdev: true
 
-      - name: Free disk space
-        run: sudo -E bash scripts/ci-free-disk-space.sh
-
       - name: Login to GitHub Container Registry
         uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
         with:
@@ -44,7 +41,7 @@ jobs:
 
       - name: Build and push integration test runner image
         run: |
-          # Build integration test runner image with all-tests feature (includes both integration and e2e tests)
+          # Build integration test runner image with all-integration-tests feature
           vdev int build
           # Get rust version from rust-toolchain.toml (same as vdev does)
           RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
