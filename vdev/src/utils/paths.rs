@@ -25,9 +25,10 @@ pub fn find_repo_root() -> Result<PathBuf> {
         let cargo_toml = current.join("Cargo.toml");
         if cargo_toml.is_file()
             && let Ok(contents) = fs::read_to_string(&cargo_toml)
-                && contents.contains("[workspace]") {
-                    return Ok(current);
-                }
+            && contents.contains("[workspace]")
+        {
+            return Ok(current);
+        }
 
         // Move up one directory
         if let Some(parent) = current.parent() {
