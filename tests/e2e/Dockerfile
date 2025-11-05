@@ -68,30 +68,14 @@ WORKDIR /home/vector
 COPY . .
 
 # ============================================================================
-# SECTION 4: Compile tests (only in PRECOMPILED MODE)
+# SECTION 4: Precompile tests (only in PRECOMPILED MODE)
 # ============================================================================
-# Compiles tests with FEATURES when PRECOMPILE=true
-# Stores at /precompiled-target/debug for volume seeding
-# ============================================================================
+COPY tests/e2e/precompile.sh /precompile.sh
+RUN chmod +x /precompile.sh
+
 RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
-    if [ "$PRECOMPILE" = "true" ]; then \
-        echo "==> Compiling tests with features: $FEATURES"; \
-        CARGO_BUILD_TARGET_DIR=/home/target \
-        /usr/bin/mold -run cargo build \
-            --tests \
-            --lib \
-            --bin vector \
-            --no-default-features \
-            --features $FEATURES && \
-        echo "==> Installing vector binary to /usr/bin/vector" && \
-        cp /home/target/debug/vector /usr/bin/vector && \
-        echo "==> Copying binaries to /precompiled-target for volume seeding" && \
-        mkdir -p /precompiled-target && \
-        cp -r /home/target/debug /precompiled-target/; \
-    else \
-        echo "==> Skipping test precompilation (PRECOMPILE=false)"; \
-    fi
+    /precompile.sh "$PRECOMPILE" "$FEATURES"
 
 # ============================================================================
 # SECTION 5: Setup entrypoint for volume seeding
