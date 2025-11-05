@@ -16,12 +16,66 @@ pub struct ConfigBuilderLoader {
 }
 
 impl ConfigBuilderLoader {
+    /// Creates a new builder with default settings.
+    /// This is kept for backwards compatibility with the old API.
     pub fn new(interpolate_env: bool, secrets: Option<HashMap<String, String>>) -> Self {
         Self {
             builder: ConfigBuilder::default(),
             secrets,
             interpolate_env,
         }
+    }
+}
+
+/// Builder for ConfigBuilderLoader that allows fluent configuration.
+/// By default, environment variable interpolation is enabled.
+pub struct ConfigBuilderLoaderBuilder {
+    secrets: Option<HashMap<String, String>>,
+    interpolate_env: bool,
+}
+
+impl ConfigBuilderLoaderBuilder {
+    /// Creates a new builder with default settings.
+    /// By default, environment variable interpolation is enabled.
+    pub const fn new() -> Self {
+        Self {
+            secrets: None,
+            interpolate_env: true,
+        }
+    }
+
+    /// Sets whether to interpolate environment variables in the config.
+    pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
+        self.interpolate_env = interpolate;
+        self
+    }
+
+    /// Sets the secrets map for secret interpolation.
+    pub fn secrets(mut self, secrets: HashMap<String, String>) -> Self {
+        self.secrets = Some(secrets);
+        self
+    }
+
+    /// Builds the ConfigBuilderLoader and loads configuration from the specified paths.
+    pub fn load_from_paths(self, config_paths: &[super::ConfigPath]) -> Result<ConfigBuilder, Vec<String>> {
+        let loader = ConfigBuilderLoader::new(self.interpolate_env, self.secrets);
+        super::loader_from_paths(loader, config_paths)
+    }
+
+    /// Builds the ConfigBuilderLoader and loads configuration from an input reader.
+    pub fn load_from_input<R: std::io::Read>(
+        self,
+        input: R,
+        format: super::Format,
+    ) -> Result<ConfigBuilder, Vec<String>> {
+        let loader = ConfigBuilderLoader::new(self.interpolate_env, self.secrets);
+        super::loader_from_input(loader, input, format)
+    }
+}
+
+impl Default for ConfigBuilderLoaderBuilder {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
