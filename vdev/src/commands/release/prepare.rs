@@ -42,7 +42,7 @@ pub struct Cli {
     #[arg(long)]
     debian_version: Option<String>,
 
-    /// Dry run. Enabling this will make it so no PRs or branches will be created or pushed upstream.
+    /// Dry run. Enabling this will make it so no PRs will be created and no branches will be pushed upstream.
     #[arg(long, default_value_t = false)]
     dry_run: bool,
 }
