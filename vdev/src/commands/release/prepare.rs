@@ -3,7 +3,7 @@
 
 use crate::utils::command::run_command;
 use crate::utils::{git, paths};
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow, bail};
 use reqwest::blocking::Client;
 use semver::Version;
 use std::fs::File;
@@ -150,25 +150,38 @@ impl Prepare {
         let mut lines: Vec<String> = contents.lines().map(String::from).collect();
 
         let vrl_version = self.vrl_version.to_string();
+
+        let mut found = false;
+        let prefix = "vrl = { git = ";
         for line in &mut lines {
-            if line.trim().starts_with("vrl = { git = ") {
-                if let Ok(mut vrl_toml) = line.parse::<Value>() {
-                    let vrl_dependency: &mut Value = vrl_toml
-                        .get_mut("vrl")
-                        .expect("line should start with 'vrl'");
+            if line.trim().starts_with(prefix) {
+                let mut vrl_toml = line
+                    .parse::<Value>()
+                    .with_context(|| format!("{line} not parseable as toml"))?;
 
-                    let mut new_dependency_value = Map::new();
-                    new_dependency_value
-                        .insert("version".to_string(), Value::String(vrl_version.clone()));
-                    let features = vrl_dependency
-                        .get("features")
-                        .expect("missing 'features' key");
-                    new_dependency_value.insert("features".to_string(), features.clone());
+                let vrl_dependency: &mut Value = vrl_toml
+                    .get_mut("vrl")
+                    .expect("line should start with 'vrl'");
 
-                    *line = format!("vrl = {}", Value::from(new_dependency_value));
-                }
+                let mut new_dependency_value = Map::new();
+                new_dependency_value
+                    .insert("version".to_string(), Value::String(vrl_version.clone()));
+                let features = vrl_dependency
+                    .get("features")
+                    .expect("missing 'features' key");
+                new_dependency_value.insert("features".to_string(), features.clone());
+
+                *line = format!("vrl = {}", Value::from(new_dependency_value));
+                dbg!(line);
+
+                found = true;
+
                 break;
             }
+        }
+
+        if !found {
+            bail!("`{prefix}` not found in Cargo.toml. Could not pin VRL.");
         }
 
         lines.push(String::new()); // File should end with a newline.
