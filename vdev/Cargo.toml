@@ -42,7 +42,7 @@ serde_json.workspace = true
 serde_yaml.workspace = true
 sha2 = "0.10.9"
 tempfile.workspace = true
-toml.workspace = true
+toml = { workspace = true, features = ["preserve_order"] }
 semver.workspace = true
 indoc.workspace = true
 git2 = { version = "0.20.2" }
