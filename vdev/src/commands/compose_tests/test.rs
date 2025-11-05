@@ -13,7 +13,6 @@ pub fn exec(
     local_config: ComposeTestLocalConfig,
     integration: &str,
     environment: Option<&String>,
-    all_features: bool,
     retries: u8,
     args: &[String],
 ) -> Result<()> {
@@ -34,14 +33,10 @@ pub fn exec(
     };
 
     for environment in environments {
-        ComposeTest::generate(
-            local_config,
-            integration,
-            environment,
-            all_features,
-            retries,
-        )?
-        .test(args.to_owned())?;
+        // Use test-specific features from test.yaml for testing
+        // The image should already exist (built by 'start' or pulled from CI)
+        ComposeTest::generate(local_config, integration, environment, false, retries)?
+            .test(args.to_owned())?;
     }
     Ok(())
 }

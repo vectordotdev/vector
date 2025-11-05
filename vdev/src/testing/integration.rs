@@ -90,12 +90,10 @@ impl ComposeTest {
         let network_name = format!("vector-integration-tests-{test_name}");
         let compose = Compose::new(test_dir, env_config.clone(), network_name.clone())?;
 
-        // When using 'all-*-tests' feature, creates shared image (vector-test-runner-1.90:latest).
-        // When using test.yaml features, creates per-test image (vector-test-runner-clickhouse-1.90:latest).
-        let runner_name = (!all_features).then(|| test_name.clone());
-
+        // Always use shared container name (vector-test-runner-1.90:latest)
+        // The all_features flag only affects which Cargo features are compiled into the image
         let runner = IntegrationTestRunner::new(
-            runner_name,
+            None, // Always use shared container name
             &config.runner,
             compose.is_some().then_some(network_name),
         )?;

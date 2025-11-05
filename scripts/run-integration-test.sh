@@ -127,12 +127,12 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   docker run --rm -v vector_target:/output/"${TEST_NAME}" alpine:3.20 \
     sh -c "rm -rf /output/${TEST_NAME}/*"
 
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start --build-all "${TEST_NAME}" "${TEST_ENV}"
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start --all-features "${TEST_NAME}" "${TEST_ENV}"
   START_RET=$?
   print_compose_logs_on_failure "$START_RET"
 
   if [[ "$START_RET" -eq 0 ]]; then
-    cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" --build-all "${TEST_NAME}" "${TEST_ENV}"
+    cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" "${TEST_NAME}" "${TEST_ENV}"
     RET=$?
     print_compose_logs_on_failure "$RET"
 
@@ -144,7 +144,7 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   fi
 
   # Always stop the environment (best effort cleanup)
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop --build-all "${TEST_NAME}" || true
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop "${TEST_NAME}" || true
 
   # Exit early on first failure
   if [[ "$RET" -ne 0 ]]; then
