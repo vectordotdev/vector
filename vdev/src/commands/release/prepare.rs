@@ -3,7 +3,7 @@
 
 use crate::utils::command::run_command;
 use crate::utils::{git, paths};
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail, ensure};
 use reqwest::blocking::Client;
 use semver::Version;
 use std::fs::File;
@@ -13,7 +13,6 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs};
-use toml::map::Map;
 use toml::{Table, Value};
 
 const ALPINE_PREFIX: &str = "FROM docker.io/alpine:";
@@ -159,19 +158,22 @@ impl Prepare {
                     .parse::<Table>()
                     .with_context(|| format!("{line} not parseable as toml table"))?;
 
-                let vrl_dependency: &mut Value = vrl_toml
+                let vrl_dependency = vrl_toml
                     .get_mut("vrl")
-                    .expect("line should start with 'vrl'");
+                    .expect("line should start with 'vrl'")
+                    .as_table_mut()
+                    .context("`vrl` key in Cargo.toml should be a toml table")?;
 
-                let mut new_dependency_value = Map::new();
-                new_dependency_value
-                    .insert("version".to_string(), Value::String(vrl_version.clone()));
-                let features = vrl_dependency
-                    .get("features")
-                    .expect("missing 'features' key");
-                new_dependency_value.insert("features".to_string(), features.clone());
+                let git_vrl_ctx = "master branch should have been using git vrl";
 
-                *line = format!("vrl = {}", Value::from(new_dependency_value));
+                vrl_dependency.remove("git").context(git_vrl_ctx)?;
+                vrl_dependency.remove("branch").context(git_vrl_ctx)?;
+
+                ensure!(!vrl_dependency.contains_key("version"), git_vrl_ctx);
+
+                vrl_dependency.insert("version".to_string(), Value::String(vrl_version.clone()));
+
+                *line = Value::from(vrl_toml).to_string();
 
                 found = true;
 
