@@ -155,11 +155,15 @@ impl Prepare {
         let prefix = "vrl = { git = ";
         for line in &mut lines {
             if line.trim().starts_with(prefix) {
-                let mut vrl_toml = line
+                // Wrap the line in a temporary document structure to parse it as valid TOML
+                let wrapped_toml = format!("[wrapper]\n{}", line.trim());
+                let mut parsed_toml = wrapped_toml
                     .parse::<Value>()
                     .with_context(|| format!("{line} not parseable as toml"))?;
 
-                let vrl_dependency: &mut Value = vrl_toml
+                let vrl_dependency: &mut Value = parsed_toml
+                    .get_mut("wrapper")
+                    .expect("wrapper table should exist")
                     .get_mut("vrl")
                     .expect("line should start with 'vrl'");
 
@@ -172,7 +176,6 @@ impl Prepare {
                 new_dependency_value.insert("features".to_string(), features.clone());
 
                 *line = format!("vrl = {}", Value::from(new_dependency_value));
-                dbg!(line);
 
                 found = true;
 
