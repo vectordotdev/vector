@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::config;
+use crate::utils::config;
 
 /// Locate the config file
 #[derive(Args, Debug)]

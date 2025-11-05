@@ -3,14 +3,17 @@ use std::{collections::HashSet, env, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::testing::test_runner_dockerfile;
+use crate::utils::IS_A_TTY;
 use crate::{
     app::{self, CommandExt as _},
-    environment::{Environment, append_environment_variables},
     testing::{
         build::prepare_build_command,
         docker::{DOCKER_SOCKET, docker_command},
     },
-    util::{ChainArgs as _, IS_A_TTY},
+    utils::{
+        command::ChainArgs as _,
+        environment::{Environment, append_environment_variables},
+    },
 };
 
 const MOUNT_PATH: &str = "/home/vector";
