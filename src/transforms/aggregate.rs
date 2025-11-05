@@ -1609,7 +1609,7 @@ interval_ms = 999999
         for event in out {
             if let MetricValue::Distribution { samples, statistic } = event.as_metric().value() {
                 assert_eq!(*statistic, StatisticKind::Histogram);
-                assert!(samples.len() >= 1);
+                assert!(!samples.is_empty());
             } else {
                 panic!("Expected Distribution metric value");
             }
