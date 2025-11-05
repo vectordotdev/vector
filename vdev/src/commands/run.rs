@@ -1,6 +1,6 @@
 use std::{path::PathBuf, process::Command};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 
 use crate::{app::CommandExt as _, utils::features};
