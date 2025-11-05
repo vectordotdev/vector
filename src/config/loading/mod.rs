@@ -20,9 +20,10 @@ pub use source::*;
 use vector_lib::configurable::NamedComponent;
 
 use super::{
-    Config, ConfigPath, Format, FormatHint, builder::ConfigBuilder, format, validation, vars,
+    Config, ConfigPath, Format, FormatHint, ProviderConfig, builder::ConfigBuilder, format,
+    validation, vars,
 };
-use crate::{config::ProviderConfig, signal};
+use crate::signal;
 
 pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
 
@@ -148,28 +149,59 @@ pub async fn load_from_paths_with_provider_and_secrets(
     allow_empty: bool,
     interpolate_env: bool,
 ) -> Result<Config, Vec<String>> {
-    // Load secret backends first
-    let mut secrets_backends_loader =
-        load_secret_backends_from_paths_with_opts(config_paths, interpolate_env)?;
-    // And then, if needed, retrieve secrets from configured backends
-    let mut builder = if secrets_backends_loader.has_secrets_to_retrieve() {
-        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
-        let resolved_secrets = secrets_backends_loader
-            .retrieve(&mut signal_handler.subscribe())
-            .await
-            .map_err(|e| vec![e])?;
-        ConfigBuilderLoader::default()
-            .interpolate_env(interpolate_env)
-            .secrets(resolved_secrets)
-            .load_from_paths(config_paths)?
-    } else {
-        debug!(message = "No secret placeholder found, skipping secret resolution.");
-        ConfigBuilderLoader::default()
-            .interpolate_env(interpolate_env)
-            .load_from_paths(config_paths)?
-    };
+    let secrets_backends_loader = loader_from_paths(
+        SecretBackendLoader::default().interpolate_env(interpolate_env),
+        config_paths,
+    )?;
+    let config_builder_loader = ConfigBuilderLoader::default()
+        .interpolate_env(interpolate_env)
+        .allow_empty(allow_empty);
 
-    builder.allow_empty = allow_empty;
+    load_with_secrets_and_provider(
+        secrets_backends_loader,
+        config_builder_loader,
+        signal_handler,
+        |loader| loader.load_from_paths(config_paths),
+    )
+    .await
+}
+
+pub async fn load_from_str_with_secrets(
+    input: &str,
+    format: Format,
+    signal_handler: &mut signal::SignalHandler,
+    allow_empty: bool,
+    interpolate_env: bool,
+) -> Result<Config, Vec<String>> {
+    let secrets_backends_loader = loader_from_input(
+        SecretBackendLoader::default().interpolate_env(interpolate_env),
+        input.as_bytes(),
+        format,
+    )?;
+    let config_builder_loader = ConfigBuilderLoader::default()
+        .interpolate_env(interpolate_env)
+        .allow_empty(allow_empty);
+
+    load_with_secrets(
+        secrets_backends_loader,
+        config_builder_loader,
+        signal_handler,
+        |loader| loader.load_from_input(input.as_bytes(), format),
+    )
+    .await
+}
+
+async fn load_with_secrets_and_provider(
+    secrets_backends_loader: SecretBackendLoader,
+    config_builder_loader: ConfigBuilderLoader,
+    signal_handler: &mut signal::SignalHandler,
+    load_fn: impl FnOnce(ConfigBuilderLoader) -> Result<ConfigBuilder, Vec<String>>,
+) -> Result<Config, Vec<String>> {
+    let config_builder_loader = secrets_backends_loader
+        .retrieve_and_apply_secrets(config_builder_loader, signal_handler)
+        .await?;
+
+    let mut builder = load_fn(config_builder_loader)?;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -180,47 +212,26 @@ pub async fn load_from_paths_with_provider_and_secrets(
         debug!(message = "Provider configured.", provider = ?provider.get_component_name());
     }
 
-    let (new_config, build_warnings) = builder.build_with_warnings()?;
-
-    validation::check_buffer_preconditions(&new_config).await?;
-
-    for warning in build_warnings {
-        warn!("{}", warning);
-    }
-
-    Ok(new_config)
+    finalize_config(builder).await
 }
 
-pub async fn load_from_str_with_secrets(
-    input: &str,
-    format: Format,
+async fn load_with_secrets(
+    secrets_backends_loader: SecretBackendLoader,
+    config_builder_loader: ConfigBuilderLoader,
     signal_handler: &mut signal::SignalHandler,
-    allow_empty: bool,
-    interpolate_env: bool,
+    load_fn: impl FnOnce(ConfigBuilderLoader) -> Result<ConfigBuilder, Vec<String>>,
 ) -> Result<Config, Vec<String>> {
-    // Load secret backends first
-    let mut secrets_backends_loader =
-        load_secret_backends_from_input_with_opts(input.as_bytes(), format, interpolate_env)?;
-    // And then, if needed, retrieve secrets from configured backends
-    let mut builder = if secrets_backends_loader.has_secrets_to_retrieve() {
-        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
-        let resolved_secrets = secrets_backends_loader
-            .retrieve(&mut signal_handler.subscribe())
-            .await
-            .map_err(|e| vec![e])?;
-        ConfigBuilderLoader::default()
-            .interpolate_env(interpolate_env)
-            .secrets(resolved_secrets)
-            .load_from_input(input.as_bytes(), format)?
-    } else {
-        debug!(message = "No secret placeholder found, skipping secret resolution.");
-        ConfigBuilderLoader::default()
-            .interpolate_env(interpolate_env)
-            .load_from_input(input.as_bytes(), format)?
-    };
+    let config_builder_loader = secrets_backends_loader
+        .retrieve_and_apply_secrets(config_builder_loader, signal_handler)
+        .await?;
 
-    builder.allow_empty = allow_empty;
+    let builder = load_fn(config_builder_loader)?;
     signal_handler.clear();
+
+    finalize_config(builder).await
+}
+
+async fn finalize_config(builder: ConfigBuilder) -> Result<Config, Vec<String>> {
     let (new_config, build_warnings) = builder.build_with_warnings()?;
 
     validation::check_buffer_preconditions(&new_config).await?;
@@ -292,28 +303,6 @@ pub fn load_source_from_paths(
     loader_from_paths(SourceLoader::new(), config_paths)
 }
 
-/// Uses `SecretBackendLoader` to process `ConfigPaths`, deserializing to a `SecretBackends`.
-pub fn load_secret_backends_from_paths_with_opts(
-    config_paths: &[ConfigPath],
-    interpolate_env: bool,
-) -> Result<SecretBackendLoader, Vec<String>> {
-    loader_from_paths(
-        SecretBackendLoader::new_with_opts(interpolate_env),
-        config_paths,
-    )
-}
-
-fn load_secret_backends_from_input_with_opts<R: std::io::Read>(
-    input: R,
-    format: Format,
-    interpolate_env: bool,
-) -> Result<SecretBackendLoader, Vec<String>> {
-    loader_from_input(
-        SecretBackendLoader::new_with_opts(interpolate_env),
-        input,
-        format,
-    )
-}
 
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
     let builder = load_from_inputs(std::iter::once((input.as_bytes(), format)))?;

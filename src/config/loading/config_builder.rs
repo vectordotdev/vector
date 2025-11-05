@@ -29,6 +29,12 @@ impl ConfigBuilderLoader {
         self
     }
 
+    /// Sets whether to allow empty configuration.
+    pub const fn allow_empty(mut self, allow_empty: bool) -> Self {
+        self.builder.allow_empty = allow_empty;
+        self
+    }
+
     /// Builds the ConfigBuilderLoader and loads configuration from the specified paths.
     pub fn load_from_paths(
         self,

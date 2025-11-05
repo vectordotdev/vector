@@ -38,20 +38,18 @@ pub(crate) struct SecretBackendOuter {
 }
 
 /// Loader for secrets backends.
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SecretBackendLoader {
     backends: IndexMap<ComponentKey, SecretBackends>,
-    pub(crate) secret_keys: HashMap<String, HashSet<String>>,
+    secret_keys: HashMap<String, HashSet<String>>,
     interpolate_env: bool,
 }
 
 impl SecretBackendLoader {
-    pub(crate) fn new_with_opts(interpolate_env: bool) -> Self {
-        Self {
-            backends: IndexMap::new(),
-            secret_keys: HashMap::new(),
-            interpolate_env,
-        }
+    /// Sets whether to interpolate environment variables in the config.
+    pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
+        self.interpolate_env = interpolate;
+        self
     }
 
     pub(crate) async fn retrieve(
@@ -84,8 +82,40 @@ impl SecretBackendLoader {
         Ok(secrets)
     }
 
+    /// Check if there are any secrets to retrieve.
     pub(crate) fn has_secrets_to_retrieve(&self) -> bool {
         !self.secret_keys.is_empty()
+    }
+
+    /// Retrieve secrets from backends and apply them to the config builder loader.
+    pub(crate) async fn retrieve_and_apply_secrets(
+        mut self,
+        config_builder_loader: super::ConfigBuilderLoader,
+        signal_handler: &mut crate::signal::SignalHandler,
+    ) -> Result<super::ConfigBuilderLoader, Vec<String>> {
+        if self.has_secrets_to_retrieve() {
+            debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
+            let resolved_secrets = self
+                .retrieve(&mut signal_handler.subscribe())
+                .await
+                .map_err(|e| vec![e])?;
+            Ok(config_builder_loader.secrets(resolved_secrets))
+        } else {
+            debug!(message = "No secret placeholder found, skipping secret resolution.");
+            Ok(config_builder_loader)
+        }
+    }
+}
+
+impl Default for SecretBackendLoader {
+    /// Creates a new SecretBackendLoader with default settings.
+    /// By default, environment variable interpolation is enabled.
+    fn default() -> Self {
+        Self {
+            backends: IndexMap::new(),
+            secret_keys: HashMap::new(),
+            interpolate_env: true,
+        }
     }
 }
 
