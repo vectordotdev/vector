@@ -14,7 +14,6 @@ pub fn exec(
     integration: &str,
     environment: Option<&String>,
     all_features: bool,
-    reuse_image: bool,
     retries: u8,
     args: &[String],
 ) -> Result<()> {
@@ -40,7 +39,6 @@ pub fn exec(
             integration,
             environment,
             all_features,
-            reuse_image,
             retries,
         )?
         .test(args.to_owned())?;
