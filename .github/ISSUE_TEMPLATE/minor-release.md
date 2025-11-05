@@ -96,11 +96,10 @@ Automated steps include:
   - Note: the pipeline inputs are the version number `v"${NEW_VECTOR_VERSION}"` and a personal GitHub token.
   - [ ] Manually trigger the `trigger-package-release-pipeline-prod-stable` job.
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts#releasing).
-- [ ] Once Helm chart is released, updated Vector manifests
-    - Run `cargo vdev build manifests` and open a PR with changes
 - [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally. ([Example PR](https://github.com/DataDog/images/pull/7104))
 - [ ] Create a new PR with title starting as `chore(releasing):`
   - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`
+  - [ ] Run `cargo vdev build manifests` and open a PR with changes
   - [ ] Bump the release number in the `Cargo.toml` on master to the next minor release.
   - [ ] Also, update `Cargo.lock` with: `cargo update -p vector`
   - [ ] If there is a VRL version update, revert it and make it track the git `main` branch and then run `cargo update -p vrl`.
