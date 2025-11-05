@@ -11,7 +11,7 @@ use std::{
     sync::Mutex,
 };
 
-use config_builder::ConfigBuilderLoader;
+pub use config_builder::ConfigBuilderLoader;
 use glob::glob;
 use loader::process::Process;
 pub use loader::*;
@@ -127,7 +127,9 @@ pub fn load_from_paths(
     config_paths: &[ConfigPath],
     interpolate_env: bool,
 ) -> Result<Config, Vec<String>> {
-    let builder = load_builder_from_paths_with_opts(config_paths, interpolate_env)?;
+    let builder = ConfigBuilderLoader::default()
+        .interpolate_env(interpolate_env)
+        .load_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in build_warnings {
@@ -156,14 +158,15 @@ pub async fn load_from_paths_with_provider_and_secrets(
             .retrieve(&mut signal_handler.subscribe())
             .await
             .map_err(|e| vec![e])?;
-        load_builder_from_paths_with_opts_with_secrets_and_opts(
-            config_paths,
-            resolved_secrets,
-            interpolate_env,
-        )?
+        ConfigBuilderLoader::default()
+            .interpolate_env(interpolate_env)
+            .secrets(resolved_secrets)
+            .load_from_paths(config_paths)?
     } else {
         debug!(message = "No secret placeholder found, skipping secret resolution.");
-        load_builder_from_paths_with_opts(config_paths, interpolate_env)?
+        ConfigBuilderLoader::default()
+            .interpolate_env(interpolate_env)
+            .load_from_paths(config_paths)?
     };
 
     builder.allow_empty = allow_empty;
@@ -205,15 +208,15 @@ pub async fn load_from_str_with_secrets(
             .retrieve(&mut signal_handler.subscribe())
             .await
             .map_err(|e| vec![e])?;
-        load_builder_from_input_with_secrets_and_opts(
-            input.as_bytes(),
-            format,
-            resolved_secrets,
-            interpolate_env,
-        )?
+        ConfigBuilderLoader::default()
+            .interpolate_env(interpolate_env)
+            .secrets(resolved_secrets)
+            .load_from_input(input.as_bytes(), format)?
     } else {
         debug!(message = "No secret placeholder found, skipping secret resolution.");
-        load_builder_from_input_with_opts(input.as_bytes(), format, interpolate_env)?
+        ConfigBuilderLoader::default()
+            .interpolate_env(interpolate_env)
+            .load_from_input(input.as_bytes(), format)?
     };
 
     builder.allow_empty = allow_empty;
@@ -229,7 +232,11 @@ pub async fn load_from_str_with_secrets(
     Ok(new_config)
 }
 
-fn loader_from_input<T, L, R>(mut loader: L, input: R, format: Format) -> Result<T, Vec<String>>
+pub(super) fn loader_from_input<T, L, R>(
+    mut loader: L,
+    input: R,
+    format: Format,
+) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
     L: Loader<T> + Process,
@@ -239,7 +246,10 @@ where
 }
 
 /// Iterators over `ConfigPaths`, and processes a file/dir according to a provided `Loader`.
-fn loader_from_paths<T, L>(mut loader: L, config_paths: &[ConfigPath]) -> Result<T, Vec<String>>
+pub(super) fn loader_from_paths<T, L>(
+    mut loader: L,
+    config_paths: &[ConfigPath],
+) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
     L: Loader<T> + Process,
@@ -273,54 +283,6 @@ where
     } else {
         Err(errors)
     }
-}
-
-/// Uses `ConfigBuilderLoader` to process `ConfigPaths`, deserializing to a `ConfigBuilder`.
-pub fn load_builder_from_paths_with_opts(
-    config_paths: &[ConfigPath],
-    interpolate_env: bool,
-) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_paths(
-        ConfigBuilderLoader::new(interpolate_env, None),
-        config_paths,
-    )
-}
-
-fn load_builder_from_input_with_opts<R: std::io::Read>(
-    input: R,
-    format: Format,
-    interpolate_env: bool,
-) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_input(
-        ConfigBuilderLoader::new(interpolate_env, None),
-        input,
-        format,
-    )
-}
-
-/// Uses `ConfigBuilderLoader` to process `ConfigPaths`, performing secret replacement and deserializing to a `ConfigBuilder`
-pub fn load_builder_from_paths_with_opts_with_secrets_and_opts(
-    config_paths: &[ConfigPath],
-    secrets: HashMap<String, String>,
-    interpolate_env: bool,
-) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_paths(
-        ConfigBuilderLoader::new(interpolate_env, Some(secrets)),
-        config_paths,
-    )
-}
-
-fn load_builder_from_input_with_secrets_and_opts<R: std::io::Read>(
-    input: R,
-    format: Format,
-    secrets: HashMap<String, String>,
-    interpolate_env: bool,
-) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_input(
-        ConfigBuilderLoader::new(interpolate_env, Some(secrets)),
-        input,
-        format,
-    )
 }
 
 /// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
@@ -441,84 +403,4 @@ fn default_config_paths() -> Vec<ConfigPath> {
     let default_path = default_path();
 
     vec![ConfigPath::File(default_path, Some(Format::Yaml))]
-}
-
-#[cfg(all(
-    test,
-    feature = "sinks-elasticsearch",
-    feature = "transforms-sample",
-    feature = "sources-demo_logs",
-    feature = "sinks-console"
-))]
-mod tests {
-    use std::path::PathBuf;
-
-    use super::load_builder_from_paths_with_opts;
-    use crate::config::{ComponentKey, ConfigPath};
-
-    #[test]
-    fn load_namespacing_folder() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("namespacing")
-            .join("success");
-        let configs = vec![ConfigPath::Dir(path)];
-        let builder = load_builder_from_paths_with_opts(&configs, true).unwrap();
-        assert!(
-            builder
-                .transforms
-                .contains_key(&ComponentKey::from("apache_parser"))
-        );
-        assert!(
-            builder
-                .sources
-                .contains_key(&ComponentKey::from("apache_logs"))
-        );
-        assert!(
-            builder
-                .sinks
-                .contains_key(&ComponentKey::from("es_cluster"))
-        );
-        assert_eq!(builder.tests.len(), 2);
-    }
-
-    #[test]
-    fn load_namespacing_ignore_invalid() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("namespacing")
-            .join("ignore-invalid");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths_with_opts(&configs, true).unwrap();
-    }
-
-    #[test]
-    fn load_directory_ignores_unknown_file_formats() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("config-dir")
-            .join("ignore-unknown");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths_with_opts(&configs, true).unwrap();
-    }
-
-    #[test]
-    fn load_directory_globals() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("config-dir")
-            .join("globals");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths_with_opts(&configs, true).unwrap();
-    }
-
-    #[test]
-    fn load_directory_globals_duplicates() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("config-dir")
-            .join("globals-duplicate");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths_with_opts(&configs, true).unwrap();
-    }
 }

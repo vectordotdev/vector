@@ -7,7 +7,7 @@ use colored::*;
 use exitcode::ExitCode;
 
 use crate::{
-    config::{self, Config, ConfigDiff},
+    config::{self, Config, ConfigDiff, loading::ConfigBuilderLoader},
     topology::{
         self,
         builder::{TopologyPieces, TopologyPiecesBuilder},
@@ -151,10 +151,11 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    let builder =
-        config::load_builder_from_paths_with_opts(&paths, !opts.disable_env_var_interpolation)
-            .map_err(&mut report_error)
-            .ok()?;
+    let builder = ConfigBuilderLoader::default()
+        .interpolate_env(!opts.disable_env_var_interpolation)
+        .load_from_paths(&paths)
+        .map_err(&mut report_error)
+        .ok()?;
     config::init_log_schema(builder.global.log_schema.clone(), true);
 
     // Build
