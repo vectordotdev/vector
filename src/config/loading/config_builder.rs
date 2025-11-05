@@ -40,49 +40,17 @@ impl ConfigBuilderLoader {
     }
 
     /// Builds the ConfigBuilderLoader and loads configuration from the specified paths.
-    pub fn load_from_paths(mut self, config_paths: &[super::ConfigPath]) -> Result<ConfigBuilder, Vec<String>> {
-        use super::{ConfigPath, Format, Loader};
-
-        let mut errors = Vec::new();
-
-        for config_path in config_paths {
-            match config_path {
-                ConfigPath::File(path, format_hint) => {
-                    match self.load_from_file(
-                        path,
-                        format_hint
-                            .or_else(move || Format::from_path(path).ok())
-                            .unwrap_or_default(),
-                    ) {
-                        Ok(()) => {}
-                        Err(errs) => errors.extend(errs),
-                    };
-                }
-                ConfigPath::Dir(path) => {
-                    match self.load_from_dir(path) {
-                        Ok(()) => {}
-                        Err(errs) => errors.extend(errs),
-                    };
-                }
-            }
-        }
-
-        if errors.is_empty() {
-            Ok(self.take())
-        } else {
-            Err(errors)
-        }
+    pub fn load_from_paths(self, config_paths: &[super::ConfigPath]) -> Result<ConfigBuilder, Vec<String>> {
+        super::loader_from_paths(self, config_paths)
     }
 
     /// Builds the ConfigBuilderLoader and loads configuration from an input reader.
     pub fn load_from_input<R: Read>(
-        mut self,
+        self,
         input: R,
         format: super::Format,
     ) -> Result<ConfigBuilder, Vec<String>> {
-        use super::Loader;
-
-        self.load_from_str(input, format).map(|_| self.take())
+        super::loader_from_input(self, input, format)
     }
 }
 

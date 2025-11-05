@@ -232,7 +232,7 @@ pub async fn load_from_str_with_secrets(
     Ok(new_config)
 }
 
-fn loader_from_input<T, L, R>(mut loader: L, input: R, format: Format) -> Result<T, Vec<String>>
+pub(super) fn loader_from_input<T, L, R>(mut loader: L, input: R, format: Format) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
     L: Loader<T> + Process,
@@ -242,7 +242,7 @@ where
 }
 
 /// Iterators over `ConfigPaths`, and processes a file/dir according to a provided `Loader`.
-fn loader_from_paths<T, L>(mut loader: L, config_paths: &[ConfigPath]) -> Result<T, Vec<String>>
+pub(super) fn loader_from_paths<T, L>(mut loader: L, config_paths: &[ConfigPath]) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
     L: Loader<T> + Process,
@@ -398,4 +398,3 @@ fn default_config_paths() -> Vec<ConfigPath> {
 
     vec![ConfigPath::File(default_path, Some(Format::Yaml))]
 }
-
