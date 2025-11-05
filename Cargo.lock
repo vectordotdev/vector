@@ -4804,12 +4804,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "hashbrown"
-version = "0.16.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5419bdc4f6a9207fbeba6d11b604d481addf78ecd10c11ad51e76c2f6482748d"
-
-[[package]]
 name = "hashlink"
 version = "0.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13076,8 +13070,8 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vrl"
-version = "0.27.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#90ea34f09903e3ee85f9b3e4813f44992f6e7c68"
+version = "0.28.0"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#d6cae023d596fdc73bf19501498e2db962fe1d54"
 dependencies = [
  "aes",
  "aes-siv",
