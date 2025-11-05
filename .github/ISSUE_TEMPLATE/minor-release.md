@@ -90,13 +90,10 @@ Automated steps include:
 - [ ] Reset the `website` branch to the `HEAD` of the release branch to update https://vector.dev
   - [ ] `git switch website && git reset --hard origin/"${RELEASE_BRANCH}" && git push`
   - [ ] Confirm that the release changelog was published to https://vector.dev/releases/
-    - The deployment is done by Amplify. You can see
-      the [deployment logs here](https://dd-corpsite.datadoghq.com/logs?query=service%3Awebsites-vector%20branch%3Awebsite&agg_m=count&agg_m_source=base&agg_t=count&cols=host%2Cservice&fromUser=true&messageDisplay=inline&refresh_mode=sliding&storage=hot&stream_sort=time%2Casc&viz=stream).
-- [ ] Release Linux packages. See [`vector-release` usage](https://github.com/DataDog/vector-release#usage).
-  - Note: the pipeline inputs are the version number `v"${NEW_VECTOR_VERSION}"` and a personal GitHub token.
-  - [ ] Manually trigger the `trigger-package-release-pipeline-prod-stable` job.
+    - Refer to the internal releasing doc to monitor the deployment.
+- [ ] Release Linux packages. Refer to the internal releasing doc.
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md).
-- [ ] Add docker images to [https://github.com/DataDog/images](https://github.com/DataDog/images/tree/master/vector) to have them available internally. ([Example PR](https://github.com/DataDog/images/pull/7104))
+- [ ] Create internal Docker images. Refer to the internal releasing doc.
 - [ ] Create a new PR with title starting as `chore(releasing):`
   - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`.
   - [ ] Run `cargo vdev build manifests` and commit changes.
