@@ -114,12 +114,10 @@ pub async fn build_unit_tests_main(
         .await
         .map_err(|e| vec![e])?;
 
-    let mut config_builder_loader = ConfigBuilderLoader::default().interpolate_env(true);
-    if !secrets.is_empty() {
-        config_builder_loader = config_builder_loader.secrets(secrets);
-    }
-
-    let config_builder = config_builder_loader.load_from_paths(paths)?;
+    let config_builder = ConfigBuilderLoader::default()
+        .interpolate_env(true)
+        .secrets(secrets)
+        .load_from_paths(paths)?;
 
     build_unit_tests(config_builder).await
 }

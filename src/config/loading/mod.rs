@@ -158,15 +158,11 @@ pub async fn load_from_paths_with_provider_and_secrets(
         .await
         .map_err(|e| vec![e])?;
 
-    let mut config_builder_loader = ConfigBuilderLoader::default()
+    let mut builder = ConfigBuilderLoader::default()
         .interpolate_env(interpolate_env)
-        .allow_empty(allow_empty);
-
-    if !secrets.is_empty() {
-        config_builder_loader = config_builder_loader.secrets(secrets);
-    }
-
-    let mut builder = config_builder_loader.load_from_paths(config_paths)?;
+        .allow_empty(allow_empty)
+        .secrets(secrets)
+        .load_from_paths(config_paths)?;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -197,15 +193,11 @@ pub async fn load_from_str_with_secrets(
         .await
         .map_err(|e| vec![e])?;
 
-    let mut config_builder_loader = ConfigBuilderLoader::default()
+    let builder = ConfigBuilderLoader::default()
         .interpolate_env(interpolate_env)
-        .allow_empty(allow_empty);
-
-    if !secrets.is_empty() {
-        config_builder_loader = config_builder_loader.secrets(secrets);
-    }
-
-    let builder = config_builder_loader.load_from_input(input.as_bytes(), format)?;
+        .allow_empty(allow_empty)
+        .secrets(secrets)
+        .load_from_input(input.as_bytes(), format)?;
     signal_handler.clear();
 
     finalize_config(builder).await
