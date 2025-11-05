@@ -43,6 +43,7 @@ serde_yaml.workspace = true
 sha2 = "0.10.9"
 tempfile.workspace = true
 toml.workspace = true
+toml_edit = { version = "0.22", default-features = false }
 semver.workspace = true
 indoc.workspace = true
 git2 = { version = "0.20.2" }
