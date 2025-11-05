@@ -151,7 +151,7 @@ pub fn validate_config(opts: &Opts, fmt: &mut Formatter) -> Option<Config> {
         fmt.title(format!("Failed to load {:?}", &paths_list));
         fmt.sub_error(errors);
     };
-    let builder = ConfigBuilderLoader::new()
+    let builder = ConfigBuilderLoader::default()
         .interpolate_env(!opts.disable_env_var_interpolation)
         .load_from_paths(&paths)
         .map_err(&mut report_error)

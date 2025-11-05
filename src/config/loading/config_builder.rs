@@ -17,16 +17,6 @@ pub struct ConfigBuilderLoader {
 }
 
 impl ConfigBuilderLoader {
-    /// Creates a new builder with default settings.
-    /// By default, environment variable interpolation is enabled.
-    pub fn new() -> Self {
-        Self {
-            builder: ConfigBuilder::default(),
-            secrets: None,
-            interpolate_env: true,
-        }
-    }
-
     /// Sets whether to interpolate environment variables in the config.
     pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
         self.interpolate_env = interpolate;
@@ -40,7 +30,10 @@ impl ConfigBuilderLoader {
     }
 
     /// Builds the ConfigBuilderLoader and loads configuration from the specified paths.
-    pub fn load_from_paths(self, config_paths: &[super::ConfigPath]) -> Result<ConfigBuilder, Vec<String>> {
+    pub fn load_from_paths(
+        self,
+        config_paths: &[super::ConfigPath],
+    ) -> Result<ConfigBuilder, Vec<String>> {
         super::loader_from_paths(self, config_paths)
     }
 
@@ -55,8 +48,14 @@ impl ConfigBuilderLoader {
 }
 
 impl Default for ConfigBuilderLoader {
+    /// Creates a new builder with default settings.
+    /// By default, environment variable interpolation is enabled.
     fn default() -> Self {
-        Self::new()
+        Self {
+            builder: ConfigBuilder::default(),
+            secrets: None,
+            interpolate_env: true,
+        }
     }
 }
 
@@ -140,7 +139,7 @@ mod tests {
             .join("namespacing")
             .join("success");
         let configs = vec![ConfigPath::Dir(path)];
-        let builder = ConfigBuilderLoader::new()
+        let builder = ConfigBuilderLoader::default()
             .interpolate_env(true)
             .load_from_paths(&configs)
             .unwrap();
@@ -169,7 +168,7 @@ mod tests {
             .join("namespacing")
             .join("ignore-invalid");
         let configs = vec![ConfigPath::Dir(path)];
-        ConfigBuilderLoader::new()
+        ConfigBuilderLoader::default()
             .interpolate_env(true)
             .load_from_paths(&configs)
             .unwrap();
@@ -182,7 +181,7 @@ mod tests {
             .join("config-dir")
             .join("ignore-unknown");
         let configs = vec![ConfigPath::Dir(path)];
-        ConfigBuilderLoader::new()
+        ConfigBuilderLoader::default()
             .interpolate_env(true)
             .load_from_paths(&configs)
             .unwrap();
@@ -195,7 +194,7 @@ mod tests {
             .join("config-dir")
             .join("globals");
         let configs = vec![ConfigPath::Dir(path)];
-        ConfigBuilderLoader::new()
+        ConfigBuilderLoader::default()
             .interpolate_env(true)
             .load_from_paths(&configs)
             .unwrap();
@@ -208,7 +207,7 @@ mod tests {
             .join("config-dir")
             .join("globals-duplicate");
         let configs = vec![ConfigPath::Dir(path)];
-        ConfigBuilderLoader::new()
+        ConfigBuilderLoader::default()
             .interpolate_env(true)
             .load_from_paths(&configs)
             .unwrap();

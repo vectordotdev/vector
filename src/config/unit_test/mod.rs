@@ -38,8 +38,7 @@ use crate::{
     conditions::Condition,
     config::{
         self, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
-        TestDefinition, TestInput, TestOutput, loading,
-        loading::ConfigBuilderLoader,
+        TestDefinition, TestInput, TestOutput, loading, loading::ConfigBuilderLoader,
     },
     event::{Event, EventMetadata, LogEvent},
     signal,
@@ -94,7 +93,7 @@ fn init_log_schema_from_paths(
     config_paths: &[ConfigPath],
     deny_if_set: bool,
 ) -> Result<(), Vec<String>> {
-    let builder = ConfigBuilderLoader::new()
+    let builder = ConfigBuilderLoader::default()
         .interpolate_env(true)
         .load_from_paths(config_paths)?;
     vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
@@ -113,12 +112,12 @@ pub async fn build_unit_tests_main(
             .retrieve(&mut signal_handler.subscribe())
             .await
             .map_err(|e| vec![e])?;
-        ConfigBuilderLoader::new()
+        ConfigBuilderLoader::default()
             .interpolate_env(true)
             .secrets(resolved_secrets)
             .load_from_paths(paths)?
     } else {
-        ConfigBuilderLoader::new()
+        ConfigBuilderLoader::default()
             .interpolate_env(true)
             .load_from_paths(paths)?
     };

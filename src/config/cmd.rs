@@ -3,9 +3,7 @@ use std::path::PathBuf;
 use clap::Parser;
 use serde_json::Value;
 
-use super::{
-    ConfigBuilder, loading::ConfigBuilderLoader, load_source_from_paths, process_paths,
-};
+use super::{ConfigBuilder, load_source_from_paths, loading::ConfigBuilderLoader, process_paths};
 use crate::{cli::handle_config_errors, config};
 
 #[derive(Parser, Debug, Clone)]
@@ -177,7 +175,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     // builder fields which we'll use to error out if required.
     let (paths, builder) = match process_paths(&paths) {
         Some(paths) => {
-            match ConfigBuilderLoader::new()
+            match ConfigBuilderLoader::default()
                 .interpolate_env(!opts.disable_env_var_interpolation)
                 .load_from_paths(&paths)
             {

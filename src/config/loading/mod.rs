@@ -127,7 +127,7 @@ pub fn load_from_paths(
     config_paths: &[ConfigPath],
     interpolate_env: bool,
 ) -> Result<Config, Vec<String>> {
-    let builder = ConfigBuilderLoader::new()
+    let builder = ConfigBuilderLoader::default()
         .interpolate_env(interpolate_env)
         .load_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
@@ -158,13 +158,13 @@ pub async fn load_from_paths_with_provider_and_secrets(
             .retrieve(&mut signal_handler.subscribe())
             .await
             .map_err(|e| vec![e])?;
-        ConfigBuilderLoader::new()
+        ConfigBuilderLoader::default()
             .interpolate_env(interpolate_env)
             .secrets(resolved_secrets)
             .load_from_paths(config_paths)?
     } else {
         debug!(message = "No secret placeholder found, skipping secret resolution.");
-        ConfigBuilderLoader::new()
+        ConfigBuilderLoader::default()
             .interpolate_env(interpolate_env)
             .load_from_paths(config_paths)?
     };
@@ -208,13 +208,13 @@ pub async fn load_from_str_with_secrets(
             .retrieve(&mut signal_handler.subscribe())
             .await
             .map_err(|e| vec![e])?;
-        ConfigBuilderLoader::new()
+        ConfigBuilderLoader::default()
             .interpolate_env(interpolate_env)
             .secrets(resolved_secrets)
             .load_from_input(input.as_bytes(), format)?
     } else {
         debug!(message = "No secret placeholder found, skipping secret resolution.");
-        ConfigBuilderLoader::new()
+        ConfigBuilderLoader::default()
             .interpolate_env(interpolate_env)
             .load_from_input(input.as_bytes(), format)?
     };
@@ -232,7 +232,11 @@ pub async fn load_from_str_with_secrets(
     Ok(new_config)
 }
 
-pub(super) fn loader_from_input<T, L, R>(mut loader: L, input: R, format: Format) -> Result<T, Vec<String>>
+pub(super) fn loader_from_input<T, L, R>(
+    mut loader: L,
+    input: R,
+    format: Format,
+) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
     L: Loader<T> + Process,
@@ -242,7 +246,10 @@ where
 }
 
 /// Iterators over `ConfigPaths`, and processes a file/dir according to a provided `Loader`.
-pub(super) fn loader_from_paths<T, L>(mut loader: L, config_paths: &[ConfigPath]) -> Result<T, Vec<String>>
+pub(super) fn loader_from_paths<T, L>(
+    mut loader: L,
+    config_paths: &[ConfigPath],
+) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
     L: Loader<T> + Process,
@@ -277,7 +284,6 @@ where
         Err(errors)
     }
 }
-
 
 /// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
 pub fn load_source_from_paths(
