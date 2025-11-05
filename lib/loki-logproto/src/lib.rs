@@ -85,7 +85,7 @@ pub mod util {
         let mut labels: Vec<String> = labels
             .iter()
             .filter(|(k, _)| !RESERVED_LABELS.contains(&k.as_str()))
-            .map(|(k, v)| format!("{k}=\"{v}\""))
+            .map(|(k, v)| format!("{k}=\"{}\"", v.replace('\\', "\\\\").replace('"', "\\\"")))
             .collect();
         labels.sort();
         format!("{{{}}}", labels.join(", "))
@@ -113,6 +113,22 @@ mod tests {
         assert_eq!(
             s,
             r#"{agent="vector", file="/path/to/log", host="localhost", job="file_logs"}"#
+        );
+    }
+
+    #[test]
+    fn encode_labels_with_special_characters() {
+        let mut labels: HashMap<String, String> = HashMap::new();
+        labels.insert("key_with_quote".into(), r#"value"with"quotes"#.into());
+        labels.insert(
+            "key_with_backslash".into(),
+            r#"value\with\backslashes"#.into(),
+        );
+        labels.insert("key_with_both".into(), r#"value\"with\"both"#.into());
+        let s = util::encode_labels_map_to_string(&labels);
+        assert_eq!(
+            s,
+            r#"{key_with_backslash="value\\with\\backslashes", key_with_both="value\\\"with\\\"both", key_with_quote="value\"with\"quotes"}"#
         );
     }
 
