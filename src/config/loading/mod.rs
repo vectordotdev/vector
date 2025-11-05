@@ -143,7 +143,7 @@ pub fn load_from_paths(
 /// Loads a configuration from paths. Handle secret replacement and if a provider is present
 /// in the builder, the config is used as bootstrapping for a remote source. Otherwise,
 /// provider instantiation is skipped.
-pub async fn load_from_paths_withgd_provider_and_secrets(
+pub async fn load_from_paths_with_provider_and_secrets(
     config_paths: &[ConfigPath],
     signal_handler: &mut signal::SignalHandler,
     allow_empty: bool,
