@@ -1,3 +1,4 @@
+mod build;
 mod ci_paths;
 mod show;
 mod start;
@@ -12,6 +13,7 @@ These test setups are organized into a set of integrations, located in subdirect
 `matrix` setting in the `test.yaml` file contained therein."
 
     show,
+    build,
     start,
     stop,
     test,

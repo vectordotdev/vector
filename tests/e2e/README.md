@@ -30,6 +30,44 @@ cargo vdev e2e stop NAME [ENVIRONMENT]
 
 If no environment is named for the `test` and `stop` subcommands, all active environments are used.
 
+## Local Development Workflow
+
+For typical local development, simply run:
+
+```shell
+cargo vdev e2e test NAME [ENVIRONMENT]
+```
+
+This will automatically build the test runner image with only the features needed for that specific
+test, making builds fast thanks to Docker's layer caching.
+
+If you want to keep the environment running between test iterations:
+
+```shell
+cargo vdev e2e start NAME [ENVIRONMENT]  # Build and start services once
+cargo vdev e2e test NAME [ENVIRONMENT]   # Run tests (repeat as needed)
+cargo vdev e2e stop NAME [ENVIRONMENT]   # Clean up when done
+```
+
+### Advanced: Pre-building for Faster Iteration
+
+If you're working on multiple E2E tests, you can pre-build a shared test runner image with all E2E
+test features and a compiled Vector binary once:
+
+```shell
+cargo vdev e2e build
+```
+
+Then use the `--no-build` flag to skip rebuilding:
+
+```shell
+cargo vdev e2e start --no-build NAME [ENVIRONMENT]
+cargo vdev e2e test --no-build NAME [ENVIRONMENT]
+```
+
+**Note:** When using `--no-build`, you're responsible for rebuilding the image when you make code
+changes. Without the flag, Docker's layer cache ensures incremental builds are fast anyway.
+
 ## E2E vs Integration Tests
 
 The end-to-end (E2E) tests are black box tests that spin up a full Vector instance as one of the

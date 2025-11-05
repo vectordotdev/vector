@@ -2,6 +2,7 @@ use std::{path::Path, process::Command};
 
 use anyhow::Result;
 
+use crate::testing::integration::ComposeTestKind;
 use crate::testing::test_runner_dockerfile;
 use crate::{
     app,
@@ -19,13 +20,13 @@ pub const ALL_INTEGRATIONS_FEATURE_FLAG: &str = "all-integration-tests";
 /// - `image` is the full tag (e.g. `"vector-test-runner-1.86.0:latest"`).
 /// - `dockerfile` is the path to the Dockerfile (e.g. `tests/e2e/Dockerfile`).
 /// - `features` controls the `FEATURES` build-arg (pass `None` for an empty list).
-/// - `build` controls whether to build the Vector binary in the image.
+/// - `build_tests` controls the `BUILD_TESTS` build-arg (true to pre-build test binaries and Vector binary in the image).
 pub fn prepare_build_command(
     image: &str,
     dockerfile: &Path,
     features: Option<&[String]>,
     config_environment_variables: &Environment,
-    build: bool,
+    build_tests: bool,
 ) -> Command {
     // Start with `docker build`
     let mut command = docker_command(["build"]);
@@ -52,7 +53,7 @@ pub fn prepare_build_command(
         "--build-arg",
         &format!("FEATURES={}", features.unwrap_or(&[]).join(",")),
         "--build-arg",
-        &format!("BUILD={}", if build { "true" } else { "false" }),
+        &format!("BUILD_TESTS={}", if build_tests { "true" } else { "false" }),
     ]);
 
     command.envs(extract_present(config_environment_variables));
@@ -61,16 +62,22 @@ pub fn prepare_build_command(
     command
 }
 
-/// Build the integration test‐runner image from `tests/e2e/Dockerfile`
-pub fn build_integration_image() -> Result<()> {
+pub const ALL_E2E_FEATURE_FLAG: &str = "all-e2e-tests";
+
+/// Build a test runner image for the given test kind
+pub fn build_test_runner_image(
+    test_kind: ComposeTestKind,
+    feature_flag: &str,
+    build_tests: bool,
+) -> Result<()> {
     let dockerfile = test_runner_dockerfile();
-    let image = format!("vector-test-runner-{}", RustToolchainConfig::rust_version());
+    let image = format!("{}:latest", test_kind.image_name());
     let mut cmd = prepare_build_command(
         &image,
         &dockerfile,
-        Some(&[ALL_INTEGRATIONS_FEATURE_FLAG.to_string()]),
+        Some(&[feature_flag.to_string()]),
         &Environment::default(),
-        false, // Integration tests don't pre-build Vector tests.
+        build_tests,
     );
     waiting!("Building {image}");
     cmd.check_run()

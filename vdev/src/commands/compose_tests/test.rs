@@ -14,6 +14,7 @@ pub fn exec(
     integration: &str,
     environment: Option<&String>,
     retries: u8,
+    no_build: bool,
     args: &[String],
 ) -> Result<()> {
     let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, integration)?;
@@ -35,8 +36,8 @@ pub fn exec(
     for environment in environments {
         // Use test-specific features from test.yaml for testing
         // The image should already exist (built by 'start' or pulled from CI)
-        ComposeTest::generate(local_config, integration, environment, false, retries)?
-            .test(args.to_owned())?;
+        ComposeTest::generate(local_config, integration, environment, retries)?
+            .test(no_build, args.to_owned())?;
     }
     Ok(())
 }

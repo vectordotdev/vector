@@ -2,6 +2,7 @@ use anyhow::Result;
 use std::{collections::HashSet, env, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
+use super::integration::ComposeTestKind;
 use crate::testing::test_runner_dockerfile;
 use crate::utils::IS_A_TTY;
 use crate::{
@@ -150,13 +151,18 @@ pub trait ContainerTestRunner: TestRunner {
         &self,
         features: Option<&[String]>,
         config_env_vars: &Environment,
-        build: bool,
+        build_tests: bool,
     ) -> Result<()> {
         let image_name = self.image_name();
 
         let dockerfile = test_runner_dockerfile();
-        let mut command =
-            prepare_build_command(&image_name, &dockerfile, features, config_env_vars, build);
+        let mut command = prepare_build_command(
+            &image_name,
+            &dockerfile,
+            features,
+            config_env_vars,
+            build_tests,
+        );
         waiting!("Building image {}", image_name);
         command.check_run()
     }
@@ -265,18 +271,20 @@ where
 
 #[derive(Debug)]
 pub(super) struct IntegrationTestRunner {
-    // The integration is None when compiling the runner image with the `all-integration-tests` feature.
-    integration: Option<String>,
+    //If None, the runner image needs to be built with all test features.
+    test_name: Option<String>,
     needs_docker_socket: bool,
     network: Option<String>,
     volumes: Vec<String>,
+    test_kind: ComposeTestKind,
 }
 
 impl IntegrationTestRunner {
     pub(super) fn new(
-        integration: Option<String>,
+        test_name: Option<String>,
         config: &IntegrationRunnerConfig,
         network: Option<String>,
+        test_kind: ComposeTestKind,
     ) -> Result<Self> {
         let mut volumes: Vec<String> = config
             .volumes
@@ -287,10 +295,11 @@ impl IntegrationTestRunner {
         volumes.push(format!("{VOLUME_TARGET}:/output"));
 
         Ok(Self {
-            integration,
+            test_name,
             needs_docker_socket: config.needs_docker_socket,
             network,
             volumes,
+            test_kind,
         })
     }
 
@@ -339,14 +348,10 @@ impl ContainerTestRunner for IntegrationTestRunner {
     }
 
     fn container_name(&self) -> String {
-        if let Some(integration) = self.integration.as_ref() {
-            format!(
-                "vector-test-runner-{}-{}",
-                integration,
-                RustToolchainConfig::rust_version()
-            )
+        if let Some(test_name) = self.test_name.as_ref() {
+            format!("{}-{}", self.test_kind.image_name(), test_name)
         } else {
-            format!("vector-test-runner-{}", RustToolchainConfig::rust_version())
+            self.test_kind.image_name().to_string()
         }
     }
 
