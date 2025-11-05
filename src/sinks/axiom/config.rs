@@ -79,37 +79,37 @@ pub struct AxiomConfig {
     /// Only required when using personal tokens.
     #[configurable(metadata(docs::examples = "${AXIOM_ORG_ID}"))]
     #[configurable(metadata(docs::examples = "123abc"))]
-    org_id: Option<String>,
+    pub org_id: Option<String>,
 
     /// The Axiom API token.
     #[configurable(metadata(docs::examples = "${AXIOM_TOKEN}"))]
     #[configurable(metadata(docs::examples = "123abc"))]
-    token: SensitiveString,
+    pub token: SensitiveString,
 
     /// The Axiom dataset to write to.
     #[configurable(metadata(docs::examples = "${AXIOM_DATASET}"))]
     #[configurable(metadata(docs::examples = "vector_rocks"))]
-    dataset: String,
+    pub dataset: String,
 
     /// Configuration for the URL or regional edge endpoint.
     #[serde(flatten)]
     #[configurable(derived)]
-    endpoint: UrlOrRegion,
+    pub endpoint: UrlOrRegion,
 
     #[configurable(derived)]
     #[serde(default)]
-    request: RequestConfig,
+    pub request: RequestConfig,
 
     /// The compression algorithm to use.
     #[configurable(derived)]
     #[serde(default = "Compression::zstd_default")]
-    compression: Compression,
+    pub compression: Compression,
 
     /// The TLS settings for the connection.
     ///
     /// Optional, constrains TLS settings for this sink.
     #[configurable(derived)]
-    tls: Option<TlsConfig>,
+    pub tls: Option<TlsConfig>,
 
     /// The batch settings for the sink.
     #[configurable(derived)]
@@ -123,7 +123,7 @@ pub struct AxiomConfig {
         deserialize_with = "crate::serde::bool_or_struct",
         skip_serializing_if = "crate::serde::is_default"
     )]
-    acknowledgements: AcknowledgementsConfig,
+    pub acknowledgements: AcknowledgementsConfig,
 }
 
 impl GenerateConfig for AxiomConfig {
