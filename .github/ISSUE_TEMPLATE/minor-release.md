@@ -11,10 +11,11 @@ labels: "domain: releasing"
 Note the preparation steps are now automated. First, alter/create release.env
 
 ```shell
+#!/usr/bin/env bash
 export NEW_VECTOR_VERSION=<new Vector version> # replace this with the actual new version (e.g.: 0.50.0)
 export NEW_VRL_VERSION=<new VRL version> # replace this with the actual new VRL version (e.g.: 0.30.0)
 export MINOR_VERSION=$(echo "$NEW_VECTOR_VERSION" | cut -d. -f2)
-export PREP_BRANCH=prepare-v-0-"${MINOR_VERSION}"-"${NEW_VECTOR_VERSION}"-website
+export PREP_BRANCH=prepare-v-"${NEW_VECTOR_VERSION//./-}"-website
 export RELEASE_BRANCH=v0."${MINOR_VERSION}"
 ```
 
