@@ -151,3 +151,98 @@ impl loader::Loader<ConfigBuilder> for ConfigBuilderLoader {
         self.builder
     }
 }
+
+#[cfg(all(
+    test,
+    feature = "sinks-elasticsearch",
+    feature = "transforms-sample",
+    feature = "sources-demo_logs",
+    feature = "sinks-console"
+))]
+mod tests {
+    use std::path::PathBuf;
+
+    use super::ConfigBuilderLoader;
+    use crate::config::{ComponentKey, ConfigPath};
+
+    #[test]
+    fn load_namespacing_folder() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("namespacing")
+            .join("success");
+        let configs = vec![ConfigPath::Dir(path)];
+        let builder = ConfigBuilderLoader::new()
+            .interpolate_env(true)
+            .load_from_paths(&configs)
+            .unwrap();
+        assert!(
+            builder
+                .transforms
+                .contains_key(&ComponentKey::from("apache_parser"))
+        );
+        assert!(
+            builder
+                .sources
+                .contains_key(&ComponentKey::from("apache_logs"))
+        );
+        assert!(
+            builder
+                .sinks
+                .contains_key(&ComponentKey::from("es_cluster"))
+        );
+        assert_eq!(builder.tests.len(), 2);
+    }
+
+    #[test]
+    fn load_namespacing_ignore_invalid() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("namespacing")
+            .join("ignore-invalid");
+        let configs = vec![ConfigPath::Dir(path)];
+        ConfigBuilderLoader::new()
+            .interpolate_env(true)
+            .load_from_paths(&configs)
+            .unwrap();
+    }
+
+    #[test]
+    fn load_directory_ignores_unknown_file_formats() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("ignore-unknown");
+        let configs = vec![ConfigPath::Dir(path)];
+        ConfigBuilderLoader::new()
+            .interpolate_env(true)
+            .load_from_paths(&configs)
+            .unwrap();
+    }
+
+    #[test]
+    fn load_directory_globals() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("globals");
+        let configs = vec![ConfigPath::Dir(path)];
+        ConfigBuilderLoader::new()
+            .interpolate_env(true)
+            .load_from_paths(&configs)
+            .unwrap();
+    }
+
+    #[test]
+    fn load_directory_globals_duplicates() {
+        let path = PathBuf::from(".")
+            .join("tests")
+            .join("config-dir")
+            .join("globals-duplicate");
+        let configs = vec![ConfigPath::Dir(path)];
+        ConfigBuilderLoader::new()
+            .interpolate_env(true)
+            .load_from_paths(&configs)
+            .unwrap();
+    }
+}
