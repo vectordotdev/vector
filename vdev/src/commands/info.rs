@@ -2,7 +2,10 @@ use anyhow::Result;
 use clap::Args;
 
 use crate::testing::docker::CONTAINER_TOOL;
-use crate::{app, utils::{config, platform}};
+use crate::{
+    app,
+    utils::{config, platform},
+};
 
 /// Show `vdev` command configuration
 #[derive(Args, Debug)]
