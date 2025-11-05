@@ -153,17 +153,31 @@ pub async fn load_from_paths_with_provider_and_secrets(
         SecretBackendLoader::default().interpolate_env(interpolate_env),
         config_paths,
     )?;
-    let config_builder_loader = ConfigBuilderLoader::default()
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
+
+    let mut config_builder_loader = ConfigBuilderLoader::default()
         .interpolate_env(interpolate_env)
         .allow_empty(allow_empty);
 
-    load_with_secrets_and_provider(
-        secrets_backends_loader,
-        config_builder_loader,
-        signal_handler,
-        |loader| loader.load_from_paths(config_paths),
-    )
-    .await
+    if !secrets.is_empty() {
+        config_builder_loader = config_builder_loader.secrets(secrets);
+    }
+
+    let mut builder = config_builder_loader.load_from_paths(config_paths)?;
+
+    validation::check_provider(&builder)?;
+    signal_handler.clear();
+
+    // If there's a provider, overwrite the existing config builder with the remote variant.
+    if let Some(mut provider) = builder.provider {
+        builder = provider.build(signal_handler).await?;
+        debug!(message = "Provider configured.", provider = ?provider.get_component_name());
+    }
+
+    finalize_config(builder).await
 }
 
 pub async fn load_from_str_with_secrets(
@@ -178,54 +192,20 @@ pub async fn load_from_str_with_secrets(
         input.as_bytes(),
         format,
     )?;
-    let config_builder_loader = ConfigBuilderLoader::default()
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
+
+    let mut config_builder_loader = ConfigBuilderLoader::default()
         .interpolate_env(interpolate_env)
         .allow_empty(allow_empty);
 
-    load_with_secrets(
-        secrets_backends_loader,
-        config_builder_loader,
-        signal_handler,
-        |loader| loader.load_from_input(input.as_bytes(), format),
-    )
-    .await
-}
-
-async fn load_with_secrets_and_provider(
-    secrets_backends_loader: SecretBackendLoader,
-    config_builder_loader: ConfigBuilderLoader,
-    signal_handler: &mut signal::SignalHandler,
-    load_fn: impl FnOnce(ConfigBuilderLoader) -> Result<ConfigBuilder, Vec<String>>,
-) -> Result<Config, Vec<String>> {
-    let config_builder_loader = secrets_backends_loader
-        .retrieve_and_apply_secrets(config_builder_loader, signal_handler)
-        .await?;
-
-    let mut builder = load_fn(config_builder_loader)?;
-
-    validation::check_provider(&builder)?;
-    signal_handler.clear();
-
-    // If there's a provider, overwrite the existing config builder with the remote variant.
-    if let Some(mut provider) = builder.provider {
-        builder = provider.build(signal_handler).await?;
-        debug!(message = "Provider configured.", provider = ?provider.get_component_name());
+    if !secrets.is_empty() {
+        config_builder_loader = config_builder_loader.secrets(secrets);
     }
 
-    finalize_config(builder).await
-}
-
-async fn load_with_secrets(
-    secrets_backends_loader: SecretBackendLoader,
-    config_builder_loader: ConfigBuilderLoader,
-    signal_handler: &mut signal::SignalHandler,
-    load_fn: impl FnOnce(ConfigBuilderLoader) -> Result<ConfigBuilder, Vec<String>>,
-) -> Result<Config, Vec<String>> {
-    let config_builder_loader = secrets_backends_loader
-        .retrieve_and_apply_secrets(config_builder_loader, signal_handler)
-        .await?;
-
-    let builder = load_fn(config_builder_loader)?;
+    let builder = config_builder_loader.load_from_input(input.as_bytes(), format)?;
     signal_handler.clear();
 
     finalize_config(builder).await

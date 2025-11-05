@@ -52,24 +52,36 @@ impl SecretBackendLoader {
         self
     }
 
-    pub(crate) async fn retrieve(
-        &mut self,
-        signal_rx: &mut signal::SignalRx,
+    /// Retrieve secrets from backends.
+    /// Returns an empty HashMap if there are no secrets to retrieve.
+    pub(crate) async fn retrieve_secrets(
+        mut self,
+        signal_handler: &mut signal::SignalHandler,
     ) -> Result<HashMap<String, String>, String> {
+        if self.secret_keys.is_empty() {
+            debug!(message = "No secret placeholder found, skipping secret resolution.");
+            return Ok(HashMap::new());
+        }
+
+        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
         let mut secrets: HashMap<String, String> = HashMap::new();
+        let mut signal_rx = signal_handler.subscribe();
 
         for (backend_name, keys) in &self.secret_keys {
-            let backend = self.backends
+            let backend = self
+                .backends
                 .get_mut(&ComponentKey::from(backend_name.clone()))
                 .ok_or_else(|| {
-                    format!("Backend \"{backend_name}\" is required for secret retrieval but was not found in config.")
+                    format!(
+                        "Backend \"{backend_name}\" is required for secret retrieval but was not found in config."
+                    )
                 })?;
 
             debug!(message = "Retrieving secrets from a backend.", backend = ?backend_name, keys = ?keys);
             let backend_secrets = backend
-                .retrieve(keys.clone(), signal_rx)
+                .retrieve(keys.clone(), &mut signal_rx)
                 .map_err(|e| {
-                    format!("Error while retrieving secret from backend \"{backend_name}\": {e}.",)
+                    format!("Error while retrieving secret from backend \"{backend_name}\": {e}.")
                 })
                 .await?;
 
@@ -80,30 +92,6 @@ impl SecretBackendLoader {
         }
 
         Ok(secrets)
-    }
-
-    /// Check if there are any secrets to retrieve.
-    pub(crate) fn has_secrets_to_retrieve(&self) -> bool {
-        !self.secret_keys.is_empty()
-    }
-
-    /// Retrieve secrets from backends and apply them to the config builder loader.
-    pub(crate) async fn retrieve_and_apply_secrets(
-        mut self,
-        config_builder_loader: super::ConfigBuilderLoader,
-        signal_handler: &mut crate::signal::SignalHandler,
-    ) -> Result<super::ConfigBuilderLoader, Vec<String>> {
-        if self.has_secrets_to_retrieve() {
-            debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
-            let resolved_secrets = self
-                .retrieve(&mut signal_handler.subscribe())
-                .await
-                .map_err(|e| vec![e])?;
-            Ok(config_builder_loader.secrets(resolved_secrets))
-        } else {
-            debug!(message = "No secret placeholder found, skipping secret resolution.");
-            Ok(config_builder_loader)
-        }
     }
 }
 
