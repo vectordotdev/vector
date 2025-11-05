@@ -10,3 +10,7 @@
 !rust-toolchain.toml
 !scripts
 !vdev
+
+# Exclude target directories to avoid copying build artifacts
+target
+vdev/target
