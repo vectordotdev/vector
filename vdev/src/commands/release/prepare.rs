@@ -144,29 +144,11 @@ impl Prepare {
     fn pin_vrl_version(&self) -> Result<()> {
         debug!("pin_vrl_version");
         let cargo_toml_path = &self.repo_root.join("Cargo.toml");
-        let contents = fs::read_to_string(cargo_toml_path)
-            .context("Failed to read Cargo.toml")?;
-
-        // Parse the TOML document using toml_edit to preserve formatting
-        let mut doc = contents.parse::<DocumentMut>()
-            .context("Failed to parse Cargo.toml")?;
-
+        let contents = fs::read_to_string(cargo_toml_path).context("Failed to read Cargo.toml")?;
         let vrl_version = self.vrl_version.to_string();
+        let updated_contents = update_vrl_to_version(&contents, &vrl_version)?;
 
-        // Navigate to workspace.dependencies.vrl
-        let vrl_table = doc["workspace"]["dependencies"]["vrl"]
-            .as_inline_table_mut()
-            .context("vrl in workspace.dependencies should be an inline table")?;
-
-        // Remove git and branch, add version
-        vrl_table.remove("git");
-        vrl_table.remove("branch");
-        vrl_table.insert("version", vrl_version.as_str().into());
-
-        // Write back to file
-        fs::write(cargo_toml_path, doc.to_string())
-            .context("Failed to write Cargo.toml")?;
-
+        fs::write(cargo_toml_path, updated_contents).context("Failed to write Cargo.toml")?;
         run_command("cargo update -p vrl");
         git::commit(&format!(
             "chore(releasing): Pinned VRL version to {vrl_version}"
@@ -428,6 +410,26 @@ impl Prepare {
 
 // FREE FUNCTIONS AFTER THIS LINE
 
+/// Transforms a Cargo.toml string by replacing vrl's git dependency with a version dependency.
+/// Updates the vrl entry in [workspace.dependencies] from git + branch to a version.
+fn update_vrl_to_version(cargo_toml_contents: &str, vrl_version: &str) -> Result<String> {
+    let mut doc = cargo_toml_contents
+        .parse::<DocumentMut>()
+        .context("Failed to parse Cargo.toml")?;
+
+    // Navigate to workspace.dependencies.vrl
+    let vrl_table = doc["workspace"]["dependencies"]["vrl"]
+        .as_inline_table_mut()
+        .context("vrl in workspace.dependencies should be an inline table")?;
+
+    // Remove git and branch, add version
+    vrl_table.remove("git");
+    vrl_table.remove("branch");
+    vrl_table.insert("version", vrl_version.into());
+
+    Ok(doc.to_string())
+}
+
 fn get_latest_version_from_vector_tags() -> Result<Version> {
     let tags = run_command("git tag --list --sort=-v:refname");
     let latest_tag = tags
@@ -535,9 +537,48 @@ fn get_latest_vrl_tag_and_changelog() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use crate::commands::release::prepare::{
-        format_vrl_changelog_block, insert_block_after_changelog,
+        format_vrl_changelog_block, insert_block_after_changelog, update_vrl_to_version,
     };
     use indoc::indoc;
+
+    #[test]
+    fn test_update_vrl_to_version() {
+        let input = indoc! {r#"
+            [workspace.dependencies]
+            some-other-dep = "1.0.0"
+            vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+            another-dep = "2.0.0"
+        "#};
+
+        let result = update_vrl_to_version(input, "0.28.0").expect("should succeed");
+
+        // Verify git and branch are removed
+        assert!(!result.contains("git ="), "git should be removed");
+        assert!(!result.contains("branch ="), "branch should be removed");
+
+        // Verify version is added
+        assert!(
+            result.contains(r#"version = "0.28.0""#),
+            "version should be added"
+        );
+
+        // Verify features are preserved
+        assert!(
+            result.contains("features = "),
+            "features should be preserved"
+        );
+        assert!(
+            result.contains(r#""arbitrary""#),
+            "arbitrary feature should be preserved"
+        );
+
+        // Verify vrl line exists with the expected components
+        assert!(result.contains("vrl = {"), "vrl dependency should exist");
+
+        // Verify other dependencies are preserved
+        assert!(result.contains(r#"some-other-dep = "1.0.0""#));
+        assert!(result.contains(r#"another-dep = "2.0.0""#));
+    }
 
     #[test]
     fn test_insert_block_after_changelog() {
