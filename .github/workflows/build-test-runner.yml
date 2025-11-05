@@ -35,14 +35,7 @@ jobs:
       - name: Free disk space
         run: sudo -E bash scripts/ci-free-disk-space.sh
 
-      - name: Login to GitHub Container Registry
-        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push integration test runner image
+      - name: Build integration test runner image
         run: |
           echo "==> Disk space before build:"
           df -h
@@ -53,18 +46,30 @@ jobs:
           echo "==> Disk space after build:"
           df -h
 
+      - name: Push image to GHCR with compression
+        run: |
           # Get rust version from rust-toolchain.toml (same as vdev does)
           RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
           LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
           REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ inputs.commit_sha }}"
 
-          # Tag and push before cleanup
-          docker tag "${LOCAL_IMAGE}" "${REMOTE_IMAGE}"
-          docker push "${REMOTE_IMAGE}"
+          echo "==> Logging in to GHCR..."
+          echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-          # Aggressive cleanup to free disk space
+          echo "==> Tagging image..."
+          docker tag "${LOCAL_IMAGE}" "${REMOTE_IMAGE}"
+
+          echo "==> Pushing with optimized settings..."
+          # Use max compression and parallel uploads
+          DOCKER_BUILDKIT=1 docker push --compression-format gzip --compression-level 9 "${REMOTE_IMAGE}" || \
+            docker push "${REMOTE_IMAGE}"
+
+          echo "==> Push complete!"
+
+      - name: Cleanup Docker resources
+        if: always()
+        run: |
           echo "==> Cleaning up Docker resources..."
           docker system prune -af --volumes
-
           echo "==> Final disk space:"
           df -h

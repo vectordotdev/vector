@@ -78,7 +78,24 @@ RUN --mount=type=cache,target=/usr/local/cargo/registry \
     /precompile.sh "$PRECOMPILE" "$FEATURES"
 
 # ============================================================================
-# SECTION 5: Setup entrypoint for volume seeding
+# SECTION 5: Aggressive cleanup to reduce image size
+# ============================================================================
+RUN if [ "$PRECOMPILE" = "true" ]; then \
+      echo "==> Cleaning up source and build artifacts to reduce image size..."; \
+      rm -rf /home/target; \
+      rm -rf /home/vector/src; \
+      rm -rf /home/vector/.git; \
+      rm -rf /home/vector/benches; \
+      rm -rf /home/vector/distribution; \
+      rm -rf /home/vector/lib; \
+      rm -rf /home/vector/scripts; \
+      rm -rf /home/vector/website; \
+      find /home/vector -name "*.rs" -delete; \
+      echo "==> Cleanup complete"; \
+    fi
+
+# ============================================================================
+# SECTION 6: Setup entrypoint for volume seeding
 # ============================================================================
 COPY tests/e2e/seed-target.sh /seed-target.sh
 RUN chmod +x /seed-target.sh
