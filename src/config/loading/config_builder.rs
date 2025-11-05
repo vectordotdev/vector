@@ -12,7 +12,7 @@ use crate::config::{
 #[derive(Debug)]
 pub struct ConfigBuilderLoader {
     builder: ConfigBuilder,
-    secrets: Option<HashMap<String, String>>,
+    secrets: HashMap<String, String>,
     interpolate_env: bool,
 }
 
@@ -25,7 +25,13 @@ impl ConfigBuilderLoader {
 
     /// Sets the secrets map for secret interpolation.
     pub fn secrets(mut self, secrets: HashMap<String, String>) -> Self {
-        self.secrets = Some(secrets);
+        self.secrets = secrets;
+        self
+    }
+
+    /// Sets whether to allow empty configuration.
+    pub const fn allow_empty(mut self, allow_empty: bool) -> Self {
+        self.builder.allow_empty = allow_empty;
         self
     }
 
@@ -53,7 +59,7 @@ impl Default for ConfigBuilderLoader {
     fn default() -> Self {
         Self {
             builder: ConfigBuilder::default(),
-            secrets: None,
+            secrets: HashMap::new(),
             interpolate_env: true,
         }
     }
@@ -63,12 +69,11 @@ impl Process for ConfigBuilderLoader {
     /// Prepares input for a `ConfigBuilder` by interpolating environment variables.
     fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
         let prepared_input = prepare_input(input, self.interpolate_env)?;
-        let prepared_input = self
-            .secrets
-            .as_ref()
-            .map(|s| secret::interpolate(&prepared_input, s))
-            .unwrap_or(Ok(prepared_input))?;
-        Ok(prepared_input)
+        Ok(if self.secrets.is_empty() {
+            prepared_input
+        } else {
+            secret::interpolate(&prepared_input, &self.secrets)?
+        })
     }
 
     /// Merge a TOML `Table` with a `ConfigBuilder`. Component types extend specific keys.

@@ -105,22 +105,19 @@ pub async fn build_unit_tests_main(
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     init_log_schema_from_paths(paths, false)?;
-    let mut secrets_backends_loader =
-        loading::load_secret_backends_from_paths_with_opts(paths, true)?;
-    let config_builder = if secrets_backends_loader.has_secrets_to_retrieve() {
-        let resolved_secrets = secrets_backends_loader
-            .retrieve(&mut signal_handler.subscribe())
-            .await
-            .map_err(|e| vec![e])?;
-        ConfigBuilderLoader::default()
-            .interpolate_env(true)
-            .secrets(resolved_secrets)
-            .load_from_paths(paths)?
-    } else {
-        ConfigBuilderLoader::default()
-            .interpolate_env(true)
-            .load_from_paths(paths)?
-    };
+    let secrets_backends_loader = loading::loader_from_paths(
+        loading::SecretBackendLoader::default().interpolate_env(true),
+        paths,
+    )?;
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
+
+    let config_builder = ConfigBuilderLoader::default()
+        .interpolate_env(true)
+        .secrets(secrets)
+        .load_from_paths(paths)?;
 
     build_unit_tests(config_builder).await
 }
