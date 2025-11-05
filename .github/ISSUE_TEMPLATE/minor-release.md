@@ -38,7 +38,7 @@ cargo vdev release prepare --version "${NEW_VECTOR_VERSION}" --vrl-version "${NE
 
 Automated steps include:
 - [ ] Create a new release branch from master to freeze commits
-  - `git fetch && git checkout origin/master && git checkout -b "{RELEASE_BRANCH}" && git push -u`
+  - `git fetch && git checkout origin/master && git checkout -b "${RELEASE_BRANCH}" && git push -u`
 - [ ] Create a new release preparation branch from `master`
   - `git checkout -b "${PREP_BRANCH}" && git push -u`
 - [ ] Pin VRL to latest released version rather than `main`
