@@ -13,11 +13,11 @@ use super::{
 };
 use crate::{
     app::CommandExt as _,
-    environment::{Environment, extract_present, rename_environment_keys},
     testing::{
         build::ALL_INTEGRATIONS_FEATURE_FLAG,
         docker::{CONTAINER_TOOL, DOCKER_SOCKET},
     },
+    utils::environment::{Environment, extract_present, rename_environment_keys},
 };
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
@@ -37,7 +37,7 @@ pub(crate) struct ComposeTestLocalConfig {
 }
 
 impl ComposeTestLocalConfig {
-    /// Integration tests are located in the `scripts/integration` dir,
+    /// Integration tests are located in the `tests/integration` dir,
     /// and are the full feature flag is `all-integration-tests`.
     pub(crate) fn integration() -> Self {
         Self {
@@ -47,8 +47,8 @@ impl ComposeTestLocalConfig {
         }
     }
 
-    /// E2E tests are located in the `scripts/e2e` dir,
-    /// and are the full feature flag is `all-e2e-tests`.
+    /// E2E tests are located in the `tests/e2e` dir,
+    /// and the full feature flag is `all-e2e-tests`.
     pub(crate) fn e2e() -> Self {
         Self {
             kind: ComposeTestKind::E2E,
@@ -218,14 +218,10 @@ impl ComposeTest {
             &self.config.runner.env,
             Some(&self.config.features),
             &args,
-            self.local_config.directory,
             self.reuse_image,
+            self.local_config.kind == ComposeTestKind::E2E,
         )?;
 
-        if self.is_running()? {
-            self.runner.remove()?;
-            self.stop()?;
-        }
         Ok(())
     }
 
@@ -239,9 +235,9 @@ impl ComposeTest {
         if self.local_config.kind == ComposeTestKind::E2E {
             self.runner.build(
                 Some(&self.config.features),
-                self.local_config.directory,
                 &self.env_config,
                 false, // Always rebuild for E2E tests
+                true,  // E2E tests build Vector in the image
             )?;
         }
 
@@ -266,10 +262,11 @@ impl ComposeTest {
                 bail!("No environment for {} is up.", self.test_name);
             }
 
-            self.runner.remove()?;
             let project_name = self.project_name();
             compose.stop(&self.env_config, &project_name)?;
         }
+
+        self.runner.remove()?;
 
         Ok(())
     }
@@ -380,8 +377,8 @@ mod unix {
 
     use super::super::config::ComposeConfig;
     use crate::{
-        environment::{Environment, resolve_placeholders},
         testing::config::VolumeMount,
+        utils::environment::{Environment, resolve_placeholders},
     };
 
     /// Unix permissions mask to allow everybody to read a file

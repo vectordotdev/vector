@@ -2,8 +2,8 @@ use anyhow::Result;
 use clap::Args;
 use std::collections::BTreeMap;
 
-use crate::platform;
 use crate::testing::runner::get_agent_test_runner;
+use crate::utils::platform;
 
 /// Execute tests
 #[derive(Args, Debug)]
@@ -57,8 +57,8 @@ impl Cli {
             &BTreeMap::default(),
             None,
             &args,
-            "",
             self.reuse_image,
+            false, // Don't pre-build Vector for direct test runs
         )
     }
 }

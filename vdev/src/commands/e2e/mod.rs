@@ -2,7 +2,7 @@ crate::cli_subcommands! {
     r"Manage end-to-end test environments...
 
 These test setups are organized into a set of integrations, located in subdirectories
-`scripts/e2e`.  For each integration, there is a matrix of environments, described in the
+`tests/e2e`.  For each integration, there is a matrix of environments, described in the
 `matrix` setting in the `test.yaml` file contained therein."
 
     mod show,
