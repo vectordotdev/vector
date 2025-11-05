@@ -5,6 +5,7 @@ mod compose_tests;
 
 /// This macro simplifies the generation of CLI subcommand invocation structures by combining the
 /// creation of the command enum and implementation of the dispatch function into one simple list.
+// Module declaration in here was removed due to https://github.com/rust-lang/rustfmt/issues/3253
 #[macro_export]
 macro_rules! cli_commands {
     ( :: $( $list:ident, )* :: $mod:ident, $( $rest:tt )* ) => {
