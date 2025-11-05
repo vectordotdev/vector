@@ -3,7 +3,7 @@
 
 use crate::utils::command::run_command;
 use crate::utils::{git, paths};
-use anyhow::{Result, anyhow};
+use anyhow::{Context, Result, anyhow};
 use reqwest::blocking::Client;
 use semver::Version;
 use std::fs::File;
@@ -14,7 +14,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs};
 use toml::Value;
-use toml::map::Map;
+use toml_edit::DocumentMut;
 
 const ALPINE_PREFIX: &str = "FROM docker.io/alpine:";
 const ALPINE_DOCKERFILE: &str = "distribution/docker/alpine/Dockerfile";
@@ -42,6 +42,10 @@ pub struct Cli {
     /// You can find the latest version here: <https://www.debian.org/releases/>.
     #[arg(long)]
     debian_version: Option<String>,
+
+    /// Dry run. Enabling this will make it so no PRs will be created and no branches will be pushed upstream.
+    #[arg(long, default_value_t = false)]
+    dry_run: bool,
 }
 
 struct Prepare {
@@ -53,6 +57,7 @@ struct Prepare {
     latest_vector_version: Version,
     release_branch: String,
     release_preparation_branch: String,
+    dry_run: bool,
 }
 
 impl Cli {
@@ -74,6 +79,7 @@ impl Cli {
                 "prepare-v-{}-{}-{}-website",
                 self.version.major, self.version.minor, self.version.patch
             ),
+            dry_run: self.dry_run,
         };
         prepare.run()
     }
@@ -106,7 +112,11 @@ impl Prepare {
 
         self.create_new_release_md()?;
 
-        self.open_release_pr()
+        if !self.dry_run {
+            self.open_release_pr()?;
+        }
+
+        Ok(())
     }
 
     /// Steps 1 & 2
@@ -117,12 +127,16 @@ impl Prepare {
         git::checkout_main_branch()?;
 
         git::checkout_or_create_branch(self.release_branch.as_str())?;
-        git::push_and_set_upstream(self.release_branch.as_str())?;
+        if !self.dry_run {
+            git::push_and_set_upstream(self.release_branch.as_str())?;
+        }
 
         // Step 2: Create a new release preparation branch
         //         The branch website contains 'website' to generate vector.dev preview.
         git::checkout_or_create_branch(self.release_preparation_branch.as_str())?;
-        git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
+        if !self.dry_run {
+            git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
+        }
         Ok(())
     }
 
@@ -130,35 +144,11 @@ impl Prepare {
     fn pin_vrl_version(&self) -> Result<()> {
         debug!("pin_vrl_version");
         let cargo_toml_path = &self.repo_root.join("Cargo.toml");
-        let contents = fs::read_to_string(cargo_toml_path).expect("Failed to read Cargo.toml");
-
-        // Needs this hybrid approach to preserve ordering.
-        let mut lines: Vec<String> = contents.lines().map(String::from).collect();
-
+        let contents = fs::read_to_string(cargo_toml_path).context("Failed to read Cargo.toml")?;
         let vrl_version = self.vrl_version.to_string();
-        for line in &mut lines {
-            if line.trim().starts_with("vrl = { git = ") {
-                if let Ok(mut vrl_toml) = line.parse::<Value>() {
-                    let vrl_dependency: &mut Value = vrl_toml
-                        .get_mut("vrl")
-                        .expect("line should start with 'vrl'");
+        let updated_contents = update_vrl_to_version(&contents, &vrl_version)?;
 
-                    let mut new_dependency_value = Map::new();
-                    new_dependency_value
-                        .insert("version".to_string(), Value::String(vrl_version.clone()));
-                    let features = vrl_dependency
-                        .get("features")
-                        .expect("missing 'features' key");
-                    new_dependency_value.insert("features".to_string(), features.clone());
-
-                    *line = format!("vrl = {}", Value::from(new_dependency_value));
-                }
-                break;
-            }
-        }
-
-        lines.push(String::new()); // File should end with a newline.
-        fs::write(cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
+        fs::write(cargo_toml_path, updated_contents).context("Failed to write Cargo.toml")?;
         run_command("cargo update -p vrl");
         git::commit(&format!(
             "chore(releasing): Pinned VRL version to {vrl_version}"
@@ -420,6 +410,26 @@ impl Prepare {
 
 // FREE FUNCTIONS AFTER THIS LINE
 
+/// Transforms a Cargo.toml string by replacing vrl's git dependency with a version dependency.
+/// Updates the vrl entry in [workspace.dependencies] from git + branch to a version.
+fn update_vrl_to_version(cargo_toml_contents: &str, vrl_version: &str) -> Result<String> {
+    let mut doc = cargo_toml_contents
+        .parse::<DocumentMut>()
+        .context("Failed to parse Cargo.toml")?;
+
+    // Navigate to workspace.dependencies.vrl
+    let vrl_table = doc["workspace"]["dependencies"]["vrl"]
+        .as_inline_table_mut()
+        .context("vrl in workspace.dependencies should be an inline table")?;
+
+    // Remove git and branch, add version
+    vrl_table.remove("git");
+    vrl_table.remove("branch");
+    vrl_table.insert("version", vrl_version.into());
+
+    Ok(doc.to_string())
+}
+
 fn get_latest_version_from_vector_tags() -> Result<Version> {
     let tags = run_command("git tag --list --sort=-v:refname");
     let latest_tag = tags
@@ -527,9 +537,30 @@ fn get_latest_vrl_tag_and_changelog() -> Result<String> {
 #[cfg(test)]
 mod tests {
     use crate::commands::release::prepare::{
-        format_vrl_changelog_block, insert_block_after_changelog,
+        format_vrl_changelog_block, insert_block_after_changelog, update_vrl_to_version,
     };
     use indoc::indoc;
+
+    #[test]
+    fn test_update_vrl_to_version() {
+        let input = indoc! {r#"
+            [workspace.dependencies]
+            some-other-dep = "1.0.0"
+            vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+            another-dep = "2.0.0"
+        "#};
+
+        let result = update_vrl_to_version(input, "0.28.0").expect("should succeed");
+
+        let expected = indoc! {r#"
+            [workspace.dependencies]
+            some-other-dep = "1.0.0"
+            vrl = { features = ["arbitrary", "cli", "test", "test_framework"] , version = "0.28.0" }
+            another-dep = "2.0.0"
+        "#};
+
+        assert_eq!(result, expected);
+    }
 
     #[test]
     fn test_insert_block_after_changelog() {
