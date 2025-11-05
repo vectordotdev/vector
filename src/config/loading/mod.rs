@@ -11,7 +11,7 @@ use std::{
     sync::Mutex,
 };
 
-pub use config_builder::{ConfigBuilderLoader, ConfigBuilderLoaderBuilder};
+pub use config_builder::ConfigBuilderLoader;
 use glob::glob;
 use loader::process::Process;
 pub use loader::*;
@@ -127,7 +127,7 @@ pub fn load_from_paths(
     config_paths: &[ConfigPath],
     interpolate_env: bool,
 ) -> Result<Config, Vec<String>> {
-    let builder = ConfigBuilderLoaderBuilder::new()
+    let builder = ConfigBuilderLoader::new()
         .interpolate_env(interpolate_env)
         .load_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
@@ -158,13 +158,13 @@ pub async fn load_from_paths_with_provider_and_secrets(
             .retrieve(&mut signal_handler.subscribe())
             .await
             .map_err(|e| vec![e])?;
-        ConfigBuilderLoaderBuilder::new()
+        ConfigBuilderLoader::new()
             .interpolate_env(interpolate_env)
             .secrets(resolved_secrets)
             .load_from_paths(config_paths)?
     } else {
         debug!(message = "No secret placeholder found, skipping secret resolution.");
-        ConfigBuilderLoaderBuilder::new()
+        ConfigBuilderLoader::new()
             .interpolate_env(interpolate_env)
             .load_from_paths(config_paths)?
     };
@@ -208,13 +208,13 @@ pub async fn load_from_str_with_secrets(
             .retrieve(&mut signal_handler.subscribe())
             .await
             .map_err(|e| vec![e])?;
-        ConfigBuilderLoaderBuilder::new()
+        ConfigBuilderLoader::new()
             .interpolate_env(interpolate_env)
             .secrets(resolved_secrets)
             .load_from_input(input.as_bytes(), format)?
     } else {
         debug!(message = "No secret placeholder found, skipping secret resolution.");
-        ConfigBuilderLoaderBuilder::new()
+        ConfigBuilderLoader::new()
             .interpolate_env(interpolate_env)
             .load_from_input(input.as_bytes(), format)?
     };
@@ -409,7 +409,7 @@ fn default_config_paths() -> Vec<ConfigPath> {
 mod tests {
     use std::path::PathBuf;
 
-    use super::ConfigBuilderLoaderBuilder;
+    use super::ConfigBuilderLoader;
     use crate::config::{ComponentKey, ConfigPath};
 
     #[test]
@@ -419,7 +419,7 @@ mod tests {
             .join("namespacing")
             .join("success");
         let configs = vec![ConfigPath::Dir(path)];
-        let builder = ConfigBuilderLoaderBuilder::new()
+        let builder = ConfigBuilderLoader::new()
             .interpolate_env(true)
             .load_from_paths(&configs)
             .unwrap();
@@ -448,7 +448,7 @@ mod tests {
             .join("namespacing")
             .join("ignore-invalid");
         let configs = vec![ConfigPath::Dir(path)];
-        ConfigBuilderLoaderBuilder::new()
+        ConfigBuilderLoader::new()
             .interpolate_env(true)
             .load_from_paths(&configs)
             .unwrap();
@@ -461,7 +461,7 @@ mod tests {
             .join("config-dir")
             .join("ignore-unknown");
         let configs = vec![ConfigPath::Dir(path)];
-        ConfigBuilderLoaderBuilder::new()
+        ConfigBuilderLoader::new()
             .interpolate_env(true)
             .load_from_paths(&configs)
             .unwrap();
@@ -474,7 +474,7 @@ mod tests {
             .join("config-dir")
             .join("globals");
         let configs = vec![ConfigPath::Dir(path)];
-        ConfigBuilderLoaderBuilder::new()
+        ConfigBuilderLoader::new()
             .interpolate_env(true)
             .load_from_paths(&configs)
             .unwrap();
@@ -487,7 +487,7 @@ mod tests {
             .join("config-dir")
             .join("globals-duplicate");
         let configs = vec![ConfigPath::Dir(path)];
-        ConfigBuilderLoaderBuilder::new()
+        ConfigBuilderLoader::new()
             .interpolate_env(true)
             .load_from_paths(&configs)
             .unwrap();

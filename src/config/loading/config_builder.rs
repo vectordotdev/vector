@@ -9,6 +9,7 @@ use crate::config::{
     TransformOuter,
 };
 
+#[derive(Debug)]
 pub struct ConfigBuilderLoader {
     builder: ConfigBuilder,
     secrets: Option<HashMap<String, String>>,
@@ -17,28 +18,10 @@ pub struct ConfigBuilderLoader {
 
 impl ConfigBuilderLoader {
     /// Creates a new builder with default settings.
-    /// This is kept for backwards compatibility with the old API.
-    pub fn new(interpolate_env: bool, secrets: Option<HashMap<String, String>>) -> Self {
+    /// By default, environment variable interpolation is enabled.
+    pub fn new() -> Self {
         Self {
             builder: ConfigBuilder::default(),
-            secrets,
-            interpolate_env,
-        }
-    }
-}
-
-/// Builder for ConfigBuilderLoader that allows fluent configuration.
-/// By default, environment variable interpolation is enabled.
-pub struct ConfigBuilderLoaderBuilder {
-    secrets: Option<HashMap<String, String>>,
-    interpolate_env: bool,
-}
-
-impl ConfigBuilderLoaderBuilder {
-    /// Creates a new builder with default settings.
-    /// By default, environment variable interpolation is enabled.
-    pub const fn new() -> Self {
-        Self {
             secrets: None,
             interpolate_env: true,
         }
@@ -57,23 +40,53 @@ impl ConfigBuilderLoaderBuilder {
     }
 
     /// Builds the ConfigBuilderLoader and loads configuration from the specified paths.
-    pub fn load_from_paths(self, config_paths: &[super::ConfigPath]) -> Result<ConfigBuilder, Vec<String>> {
-        let loader = ConfigBuilderLoader::new(self.interpolate_env, self.secrets);
-        super::loader_from_paths(loader, config_paths)
+    pub fn load_from_paths(mut self, config_paths: &[super::ConfigPath]) -> Result<ConfigBuilder, Vec<String>> {
+        use super::{ConfigPath, Format, Loader};
+
+        let mut errors = Vec::new();
+
+        for config_path in config_paths {
+            match config_path {
+                ConfigPath::File(path, format_hint) => {
+                    match self.load_from_file(
+                        path,
+                        format_hint
+                            .or_else(move || Format::from_path(path).ok())
+                            .unwrap_or_default(),
+                    ) {
+                        Ok(()) => {}
+                        Err(errs) => errors.extend(errs),
+                    };
+                }
+                ConfigPath::Dir(path) => {
+                    match self.load_from_dir(path) {
+                        Ok(()) => {}
+                        Err(errs) => errors.extend(errs),
+                    };
+                }
+            }
+        }
+
+        if errors.is_empty() {
+            Ok(self.take())
+        } else {
+            Err(errors)
+        }
     }
 
     /// Builds the ConfigBuilderLoader and loads configuration from an input reader.
-    pub fn load_from_input<R: std::io::Read>(
-        self,
+    pub fn load_from_input<R: Read>(
+        mut self,
         input: R,
         format: super::Format,
     ) -> Result<ConfigBuilder, Vec<String>> {
-        let loader = ConfigBuilderLoader::new(self.interpolate_env, self.secrets);
-        super::loader_from_input(loader, input, format)
+        use super::Loader;
+
+        self.load_from_str(input, format).map(|_| self.take())
     }
 }
 
-impl Default for ConfigBuilderLoaderBuilder {
+impl Default for ConfigBuilderLoader {
     fn default() -> Self {
         Self::new()
     }
