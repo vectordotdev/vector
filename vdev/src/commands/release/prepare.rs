@@ -160,20 +160,22 @@ impl Prepare {
 
                 let vrl_dependency = vrl_toml
                     .get_mut("vrl")
-                    .expect("line should start with 'vrl'")
+                    .expect("line should start with 'vrl'");
+
+                let vrl_table = vrl_dependency
                     .as_table_mut()
                     .context("`vrl` key in Cargo.toml should be a toml table")?;
 
                 let git_vrl_ctx = "master branch should have been using git vrl";
 
-                vrl_dependency.remove("git").context(git_vrl_ctx)?;
-                vrl_dependency.remove("branch").context(git_vrl_ctx)?;
+                vrl_table.remove("git").context(git_vrl_ctx)?;
+                vrl_table.remove("branch").context(git_vrl_ctx)?;
 
-                ensure!(!vrl_dependency.contains_key("version"), git_vrl_ctx);
+                ensure!(!vrl_table.contains_key("version"), git_vrl_ctx);
 
-                vrl_dependency.insert("version".to_string(), Value::String(vrl_version.clone()));
+                vrl_table.insert("version".to_string(), Value::String(vrl_version.clone()));
 
-                *line = Value::from(vrl_toml).to_string();
+                *line = format!("vrl = {vrl_dependency}");
 
                 found = true;
 
