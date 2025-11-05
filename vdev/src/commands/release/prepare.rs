@@ -3,7 +3,7 @@
 
 use crate::utils::command::run_command;
 use crate::utils::{git, paths};
-use anyhow::{Context, Result, anyhow, bail, ensure};
+use anyhow::{Context, Result, anyhow};
 use reqwest::blocking::Client;
 use semver::Version;
 use std::fs::File;
@@ -13,7 +13,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs};
-use toml::{Table, Value};
+use toml::Value;
+use toml_edit::DocumentMut;
 
 const ALPINE_PREFIX: &str = "FROM docker.io/alpine:";
 const ALPINE_DOCKERFILE: &str = "distribution/docker/alpine/Dockerfile";
@@ -143,52 +144,29 @@ impl Prepare {
     fn pin_vrl_version(&self) -> Result<()> {
         debug!("pin_vrl_version");
         let cargo_toml_path = &self.repo_root.join("Cargo.toml");
-        let contents = fs::read_to_string(cargo_toml_path).expect("Failed to read Cargo.toml");
+        let contents = fs::read_to_string(cargo_toml_path)
+            .context("Failed to read Cargo.toml")?;
 
-        // Needs this hybrid approach to preserve ordering.
-        let mut lines: Vec<String> = contents.lines().map(String::from).collect();
+        // Parse the TOML document using toml_edit to preserve formatting
+        let mut doc = contents.parse::<DocumentMut>()
+            .context("Failed to parse Cargo.toml")?;
 
         let vrl_version = self.vrl_version.to_string();
 
-        let mut found = false;
-        let prefix = "vrl = { git = ";
-        for line in &mut lines {
-            if line.trim().starts_with(prefix) {
-                let mut vrl_toml = line
-                    .parse::<Table>()
-                    .with_context(|| format!("{line} not parseable as toml table"))?;
+        // Navigate to workspace.dependencies.vrl
+        let vrl_table = doc["workspace"]["dependencies"]["vrl"]
+            .as_inline_table_mut()
+            .context("vrl in workspace.dependencies should be an inline table")?;
 
-                let vrl_dependency = vrl_toml
-                    .get_mut("vrl")
-                    .expect("line should start with 'vrl'");
+        // Remove git and branch, add version
+        vrl_table.remove("git");
+        vrl_table.remove("branch");
+        vrl_table.insert("version", vrl_version.as_str().into());
 
-                let vrl_table = vrl_dependency
-                    .as_table_mut()
-                    .context("`vrl` key in Cargo.toml should be a toml table")?;
+        // Write back to file
+        fs::write(cargo_toml_path, doc.to_string())
+            .context("Failed to write Cargo.toml")?;
 
-                let git_vrl_ctx = "master branch should have been using git vrl";
-
-                vrl_table.remove("git").context(git_vrl_ctx)?;
-                vrl_table.remove("branch").context(git_vrl_ctx)?;
-
-                ensure!(!vrl_table.contains_key("version"), git_vrl_ctx);
-
-                vrl_table.insert("version".to_string(), Value::String(vrl_version.clone()));
-
-                *line = format!("vrl = {vrl_dependency}");
-
-                found = true;
-
-                break;
-            }
-        }
-
-        if !found {
-            bail!("`{prefix}` not found in Cargo.toml. Could not pin VRL.");
-        }
-
-        lines.push(String::new()); // File should end with a newline.
-        fs::write(cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
         run_command("cargo update -p vrl");
         git::commit(&format!(
             "chore(releasing): Pinned VRL version to {vrl_version}"
