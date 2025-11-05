@@ -1,7 +1,5 @@
 use crate::utils::git;
 use anyhow::Result;
-use hex;
-use reqwest;
 use sha2::Digest;
 use std::path::Path;
 use std::{env, fs};
