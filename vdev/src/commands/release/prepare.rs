@@ -42,7 +42,7 @@ pub struct Cli {
     #[arg(long)]
     debian_version: Option<String>,
 
-    /// The new VRL version.
+    /// Dry run. Enabling this will make it so no PRs or branches will be created or pushed upstream.
     #[arg(long, default_value_t = false)]
     dry_run: bool,
 }
