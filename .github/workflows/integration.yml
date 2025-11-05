@@ -44,7 +44,7 @@ jobs:
       e2e_tests: true
     secrets: inherit
 
-  build-test-runner:
+  build-test-runner-int:
     needs: changes
     if: |
       ${{
@@ -52,18 +52,33 @@ jobs:
         (github.event_name == 'merge_group' &&
          (needs.changes.outputs.dependencies == 'true' ||
           needs.changes.outputs.integration-yml == 'true' ||
-          needs.changes.outputs.int-tests-any == 'true' ||
+          needs.changes.outputs.int-tests-any == 'true'))
+      }}
+    uses: ./.github/workflows/build-test-runner.yml
+    with:
+      commit_sha: ${{ github.sha }}
+      test_type: int
+
+  build-test-runner-e2e:
+    needs: changes
+    if: |
+      ${{
+        github.event_name == 'workflow_dispatch' ||
+        (github.event_name == 'merge_group' &&
+         (needs.changes.outputs.dependencies == 'true' ||
+          needs.changes.outputs.integration-yml == 'true' ||
           needs.changes.outputs.e2e-tests-any == 'true'))
       }}
     uses: ./.github/workflows/build-test-runner.yml
     with:
       commit_sha: ${{ github.sha }}
+      test_type: e2e
 
   integration-tests:
     runs-on: ubuntu-24.04-8core
     needs:
       - changes
-      - build-test-runner
+      - build-test-runner-int
 
     if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
@@ -94,6 +109,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.sha }}
+          test_type: int
 
       - name: Run Integration Tests for ${{ matrix.service }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
@@ -132,7 +148,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     needs:
       - changes
-      - build-test-runner
+      - build-test-runner-e2e
     if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
@@ -155,6 +171,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.sha }}
+          test_type: e2e
 
       - name: Run E2E Tests for ${{ matrix.service }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
@@ -193,7 +210,8 @@ jobs:
     runs-on: ubuntu-24.04
     if: always()
     needs:
-      - build-test-runner
+      - build-test-runner-int
+      - build-test-runner-e2e
       - integration-tests
       - e2e-tests
     steps:

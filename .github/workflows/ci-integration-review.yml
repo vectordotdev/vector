@@ -81,17 +81,26 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-  build-test-runner:
+  build-test-runner-int:
     needs: prep-pr
     uses: ./.github/workflows/build-test-runner.yml
     with:
       commit_sha: ${{ github.event.review.commit_id }}
       checkout_ref: ${{ github.event.review.commit_id }}
+      test_type: int
+
+  build-test-runner-e2e:
+    needs: prep-pr
+    uses: ./.github/workflows/build-test-runner.yml
+    with:
+      commit_sha: ${{ github.event.review.commit_id }}
+      checkout_ref: ${{ github.event.review.commit_id }}
+      test_type: e2e
 
   integration-tests:
     needs:
       - prep-pr
-      - build-test-runner
+      - build-test-runner-int
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
@@ -115,6 +124,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.event.review.commit_id }}
+          test_type: int
 
       - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
@@ -131,7 +141,7 @@ jobs:
   e2e-tests:
     needs:
       - prep-pr
-      - build-test-runner
+      - build-test-runner-e2e
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
     strategy:
@@ -151,6 +161,7 @@ jobs:
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.event.review.commit_id }}
+          test_type: e2e
 
       - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 

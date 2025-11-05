@@ -8,6 +8,9 @@ inputs:
   commit_sha:
     description: 'Commit SHA used to tag the test runner image'
     required: true
+  test_type:
+    description: 'Test type: "int" for integration or "e2e" for end-to-end tests'
+    required: true
 
 runs:
   using: composite
@@ -22,9 +25,12 @@ runs:
     - name: Pull and tag test runner image
       shell: bash
       run: |
-        RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
-        REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ inputs.commit_sha }}"
-        LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
+        REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner-${{ inputs.test_type }}:${{ inputs.commit_sha }}"
+        if [ "${{ inputs.test_type }}" = "int" ]; then
+          LOCAL_IMAGE="vector-integration-tests-runner:latest"
+        else
+          LOCAL_IMAGE="vector-e2e-tests-runner:latest"
+        fi
 
         docker pull "${REMOTE_IMAGE}"
         docker tag "${REMOTE_IMAGE}" "${LOCAL_IMAGE}"

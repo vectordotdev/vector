@@ -8,7 +8,7 @@ Each directory contains two files:
 2. A `test.yaml` file that describes how to run the integration tests, including a matrix of
    software versions or other parameters over which the tests will be run.
 
-You can list these tests with `cargo vdev integration show`[1], which provides a list of all the
+You can list these tests with `cargo vdev integration show`, which provides a list of all the
 integration test names followed by the extrapolated matrix of environments.
 
 Each test can be run using one of the following:
@@ -27,5 +27,31 @@ cargo vdev integration stop NAME [ENVIRONMENT]
 
 If no environment is named for the `test` and `stop` subcommands, all active environments are used.
 
-[1] Note that the `vdev` tool accepts abbreviated subcommand names, so this can also be run as
-`cargo vdev int show` for brevity.
+## Local Development Workflow
+
+For typical local development, simply run:
+
+```shell
+cargo vdev integration test NAME [ENVIRONMENT]
+```
+
+This will automatically build the test runner image with only the features needed for that specific
+test, making builds fast thanks to Docker's layer caching.
+
+### Advanced: Pre-building for Faster Iteration
+
+If you're working on multiple integration tests, you can pre-build a shared test runner image with
+all integration test features compiled once:
+
+```shell
+cargo vdev int build
+```
+
+Then use the `--no-build` flag to skip rebuilding for each test:
+
+```shell
+cargo vdev integration test --no-build NAME [ENVIRONMENT]
+```
+
+**Note:** When using `--no-build`, you're responsible for rebuilding the image when you make code
+changes. Without the flag, Docker's layer cache ensures incremental builds are fast anyway.

@@ -16,6 +16,10 @@ on:
         description: 'Git ref to checkout (defaults to commit_sha)'
         required: false
         type: string
+      test_type:
+        description: 'Test type: "int" for integration or "e2e" for end-to-end tests'
+        required: true
+        type: string
 
 permissions:
   packages: write
@@ -39,14 +43,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push integration test runner image
+      - name: Build and push test runner image
         run: |
-          # Build integration test runner image with all-integration-tests feature
-          vdev int build
-          # Get rust version from rust-toolchain.toml (same as vdev does)
-          RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
-          LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
-          REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ inputs.commit_sha }}"
+          # Build test runner image based on test_type
+          if [[ "${{ inputs.test_type }}" == "int" ]]; then
+            vdev int build
+            LOCAL_IMAGE="vector-integration-tests-runner:latest"
+          elif [[ "${{ inputs.test_type }}" == "e2e" ]]; then
+            vdev e2e build
+            LOCAL_IMAGE="vector-e2e-tests-runner:latest"
+          else
+            echo "Invalid test_type: ${{ inputs.test_type }}"
+            exit 1
+          fi
+
+          REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner-${{ inputs.test_type }}:${{ inputs.commit_sha }}"
 
           docker tag "${LOCAL_IMAGE}" "${REMOTE_IMAGE}"
           docker push "${REMOTE_IMAGE}"

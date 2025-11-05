@@ -1,18 +1,15 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::integration::ComposeTestLocalConfig;
-
 /// Start an environment
+///
+/// Note: Integration tests build the test runner image lazily when tests run,
+/// not during start. Use `vdev int build` to pre-build the image with all features.
 #[derive(Args, Debug)]
 #[command()]
 pub struct Cli {
     /// The integration name
     integration: String,
-
-    /// Compile the test runner with all integration test features (instead of just this test's features)
-    #[arg(long)]
-    all_features: bool,
 
     /// The desired environment name to start. If omitted, the first environment name is used.
     environment: Option<String>,
@@ -20,11 +17,9 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::start::exec(
-            ComposeTestLocalConfig::integration(),
+        crate::commands::compose_tests::start::exec_integration(
             &self.integration,
             self.environment.as_ref(),
-            self.all_features,
         )
     }
 }

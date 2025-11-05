@@ -13,8 +13,7 @@ pub(crate) fn exec(local_config: ComposeTestLocalConfig, test_name: &str) -> Res
         find_active_environment_for_integration(local_config.directory, test_name, &config)?;
 
     if let Some(environment) = active_environment {
-        // all_features doesn't matter for stop since we always use the same container name now
-        ComposeTest::generate(local_config, test_name, environment, false, 0)?.stop()
+        ComposeTest::generate(local_config, test_name, environment, 0)?.stop()
     } else {
         println!("No environment for {test_name} is active.");
         Ok(())
