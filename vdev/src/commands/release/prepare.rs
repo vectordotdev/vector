@@ -552,32 +552,14 @@ mod tests {
 
         let result = update_vrl_to_version(input, "0.28.0").expect("should succeed");
 
-        // Verify git and branch are removed
-        assert!(!result.contains("git ="), "git should be removed");
-        assert!(!result.contains("branch ="), "branch should be removed");
+        let expected = indoc! {r#"
+            [workspace.dependencies]
+            some-other-dep = "1.0.0"
+            vrl = { features = ["arbitrary", "cli", "test", "test_framework"] , version = "0.28.0" }
+            another-dep = "2.0.0"
+        "#};
 
-        // Verify version is added
-        assert!(
-            result.contains(r#"version = "0.28.0""#),
-            "version should be added"
-        );
-
-        // Verify features are preserved
-        assert!(
-            result.contains("features = "),
-            "features should be preserved"
-        );
-        assert!(
-            result.contains(r#""arbitrary""#),
-            "arbitrary feature should be preserved"
-        );
-
-        // Verify vrl line exists with the expected components
-        assert!(result.contains("vrl = {"), "vrl dependency should exist");
-
-        // Verify other dependencies are preserved
-        assert!(result.contains(r#"some-other-dep = "1.0.0""#));
-        assert!(result.contains(r#"another-dep = "2.0.0""#));
+        assert_eq!(result, expected);
     }
 
     #[test]
