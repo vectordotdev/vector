@@ -340,16 +340,15 @@ impl SourceConfig for HttpClientConfig {
         let endpoints = [self.endpoint.clone()];
         let urls: Vec<Uri> = endpoints
             .iter()
-            .map(|s| s.parse::<Uri>().context(sources::UriParseSnafu))
-            .map(|r| {
-                if query.has_vrl {
-                    // For URLs with VRL expressions, don't add query parameters here
-                    // They'll be added dynamically during the HTTP request
-                    r
+            .map(|s| {
+                let uri = s.parse::<Uri>().context(sources::UriParseSnafu)?;
+                // For URLs with VRL expressions, add query parameters dynamically during request
+                // For URLs without VRL expressions, add query parameters now
+                Ok(if query.has_vrl {
+                    uri
                 } else {
-                    // For URLs without VRL expressions, add query parameters now
-                    r.map(|uri| build_url(&uri, &query.original))
-                }
+                    build_url(&uri, &query.original)
+                })
             })
             .collect::<std::result::Result<Vec<Uri>, sources::BuildError>>()?;
 
