@@ -66,7 +66,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
 #[derive(Debug, Clone)]
 pub enum EncoderKind {
     /// Uses framing to encode individual events
-    Framed(Encoder<Framer>),
+    Framed(Box<Encoder<Framer>>),
     /// Encodes events in batches without framing
     #[cfg(feature = "codecs-arrow")]
     Batch(BatchEncoder),
