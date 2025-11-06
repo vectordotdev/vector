@@ -259,6 +259,17 @@ pub enum CompiledQueryParameterValue {
     MultiParams(Vec<CompiledParam>),
 }
 
+impl CompiledQueryParameterValue {
+    fn has_vrl(&self) -> bool {
+        match self {
+            CompiledQueryParameterValue::SingleParam(param) => param.program.is_some(),
+            CompiledQueryParameterValue::MultiParams(params) => {
+                params.iter().any(|p| p.program.is_some())
+            }
+        }
+    }
+}
+
 #[derive(Clone)]
 pub struct Query {
     original: HashMap<String, QueryParameterValue>,
@@ -275,12 +286,7 @@ impl Query {
             .map(|(k, v)| (k.clone(), Self::compile_param(v, &functions)))
             .collect();
 
-        let has_vrl = compiled.values().any(|compiled| match compiled {
-            CompiledQueryParameterValue::SingleParam(param) => param.program.is_some(),
-            CompiledQueryParameterValue::MultiParams(params) => {
-                params.iter().any(|p| p.program.is_some())
-            }
-        });
+        let has_vrl = compiled.values().any(|v| v.has_vrl());
 
         Query {
             original: params.clone(),
