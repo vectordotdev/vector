@@ -17,6 +17,10 @@ use crate::{
 };
 
 /// Configuration for the `trace_to_log` transform.
+///
+/// This is a naive implementation that simply converts a `TraceEvent` to a `LogEvent`.
+/// The conversion preserves all trace attributes (span IDs, trace IDs, etc.) as log fields without modification.
+/// This will need to be updated when Vector's trace data model is finalized to properly handle trace-specific semantics and field mappings.
 #[configurable_component(transform("trace_to_log", "Convert trace events to log events."))]
 #[derive(Clone, Debug, Default)]
 #[serde(deny_unknown_fields)]
@@ -66,6 +70,7 @@ impl TransformConfig for TraceToLogConfig {
     }
 }
 
+/// Defines the output schema for log events converted from traces.
 fn schema_definition(log_namespace: LogNamespace) -> Definition {
     let mut schema_definition = Definition::default_for_namespace(&BTreeSet::from([log_namespace]));
     
@@ -98,11 +103,9 @@ pub struct TraceToLog;
 
 impl FunctionTransform for TraceToLog {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
-        let log = match event {
-            Event::Trace(trace) => LogEvent::from(trace),
-            _ => return,
-        };
-        output.push(Event::Log(log));
+        if let Event::Trace(trace) = event {
+            output.push(Event::Log(LogEvent::from(trace)));
+        }
     }
 }
 
@@ -146,13 +149,27 @@ mod tests {
 
     #[tokio::test]
     async fn transform_trace() {
-        let trace = TraceEvent::default();
-        let mut metadata = trace.metadata().clone();
-        metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-        metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
+        use vrl::btreemap;
+        
+        let trace = TraceEvent::from(btreemap! {
+            "span_id" => "abc123",
+            "trace_id" => "xyz789",
+            "span_name" => "test-span",
+            "service" => "my-service",
+        });
+        
+        let (expected_map, _) = trace.clone().into_parts();
+        
+        let mut expected_metadata = trace.metadata().clone();
+        expected_metadata.set_source_id(Arc::new(ComponentKey::from("in")));
+        expected_metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
+        expected_metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
 
         let log = do_transform(trace).await.unwrap();
-        assert_eq!(log.metadata(), &metadata);
+        let (actual_value, actual_metadata) = log.into_parts();
+        let actual_map = actual_value.into_object().expect("log value should be an object");
+        
+        assert_eq!(actual_map, expected_map, "Trace data fields should be preserved");
+        assert_eq!(&actual_metadata, &expected_metadata, "Trace metadata should be preserved");
     }
 }

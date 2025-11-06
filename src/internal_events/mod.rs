@@ -85,8 +85,6 @@ mod loki;
 mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
 mod metric_to_log;
-#[cfg(feature = "transforms-trace_to_log")]
-mod trace_to_log;
 #[cfg(feature = "sources-mongodb_metrics")]
 mod mongodb_metrics;
 #[cfg(feature = "sinks-mqtt")]
