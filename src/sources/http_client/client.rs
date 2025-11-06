@@ -183,10 +183,14 @@ fn headers_examples() -> HashMap<String, Vec<String>> {
 }
 
 fn body_examples() -> Option<ParameterValue> {
-    Some(ParameterValue::String(
-        r#"{"searchStatements":[{"column":"status","operator":"=","value":"active"}],"page":0}"#
-            .to_owned(),
-    ))
+    Some(ParameterValue::Typed {
+        value: r#"encode_json({
+  "searchStatements": [{"column": "auditAction", "operator": "=", "value": "DELETE"}],
+  "timestamp": now()
+})"#
+        .to_owned(),
+        r#type: ParamType::Vrl,
+    })
 }
 
 /// Helper function to get all VRL functions for compilation
