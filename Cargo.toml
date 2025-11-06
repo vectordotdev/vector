@@ -740,7 +740,6 @@ transforms-metrics = [
   "transforms-remap",
   "transforms-tag_cardinality_limit",
   "transforms-throttle",
-  "transforms-trace_to_log"
 ]
 
 transforms-aggregate = []
