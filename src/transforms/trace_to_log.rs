@@ -1,7 +1,7 @@
 use std::collections::BTreeSet;
 use vector_lib::config::LogNamespace;
-use vector_lib::lookup::owned_value_path;
 use vector_lib::configurable::configurable_component;
+use vector_lib::lookup::owned_value_path;
 use vrl::value::kind::Collection;
 use vrl::value::Kind;
 
@@ -45,6 +45,10 @@ impl GenerateConfig for TraceToLogConfig {
 impl TransformConfig for TraceToLogConfig {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::function(TraceToLog))
+    }
+
+    fn enable_concurrency(&self) -> bool {
+        true
     }
 
     fn input(&self) -> Input {
@@ -113,11 +117,11 @@ impl FunctionTransform for TraceToLog {
 mod tests {
     use super::*;
     use crate::test_util::components::assert_transform_compliance;
+    use crate::transforms::test::create_topology;
     use std::sync::Arc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
     use vector_lib::config::ComponentKey;
-    use crate::transforms::test::create_topology;
     use vector_lib::event::TraceEvent;
 
     #[test]
@@ -168,7 +172,6 @@ mod tests {
         let log = do_transform(trace).await.unwrap();
         let (actual_value, actual_metadata) = log.into_parts();
         let actual_map = actual_value.into_object().expect("log value should be an object");
-        
         assert_eq!(actual_map, expected_map, "Trace data fields should be preserved");
         assert_eq!(&actual_metadata, &expected_metadata, "Trace metadata should be preserved");
     }
