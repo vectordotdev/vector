@@ -58,6 +58,9 @@ fn clone_and_setup_git(username: &str) -> Result<()> {
     // Set the remote URL with credentials to ensure push works
     git::set_remote_url("origin", &homebrew_repo)?;
 
+    // Disable credential helper to ensure we use the PAT from the URL
+    git::set_config_value("credential.helper", "")?;
+
     git::set_config_value("user.name", "vic")?;
     git::set_config_value("user.email", "vector@datadoghq.com")?;
 
