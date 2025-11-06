@@ -83,6 +83,7 @@ jobs:
 
   build-test-runner-int:
     needs: prep-pr
+    if: startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all')
     uses: ./.github/workflows/build-test-runner.yml
     with:
       commit_sha: ${{ github.event.review.commit_id }}
@@ -91,6 +92,7 @@ jobs:
 
   build-test-runner-e2e:
     needs: prep-pr
+    if: startsWith(github.event.review.body, '/ci-run-e2e') || contains(github.event.review.body, '/ci-run-all')
     uses: ./.github/workflows/build-test-runner.yml
     with:
       commit_sha: ${{ github.event.review.commit_id }}
