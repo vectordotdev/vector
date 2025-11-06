@@ -23,6 +23,7 @@ impl Cli {
         // Create temporary directory for cloning the homebrew-brew repository
         let td = TempDir::new()?;
         env::set_current_dir(td.path())?;
+        trace!("Cloned at {td:?}");
 
         debug!(
             "Cloning the homebrew repository for username: {}",
@@ -37,6 +38,7 @@ impl Cli {
         debug!("Committing and pushing changes (if any).");
         commit_and_push_changes(&vector_version)?;
 
+        std::thread::sleep(std::time::Duration::from_secs(60));
         td.close()?;
         Ok(())
     }
@@ -56,6 +58,8 @@ fn clone_and_setup_git(username: &str) -> Result<()> {
 
     git::set_config_value("user.name", "vic")?;
     git::set_config_value("user.email", "vector@datadoghq.com")?;
+
+    git::checkout_or_create_branch("test")?;
     Ok(())
 }
 
@@ -102,7 +106,7 @@ fn commit_and_push_changes(vector_version: &str) -> Result<()> {
         debug!("Modified lines {:?}", git::get_modified_files());
         let commit_message = format!("Release Vector {vector_version}");
         git::commit(&commit_message)?;
-        git::push()?;
+        // git::push()?;
     } else {
         debug!("No changes to push.");
     }
