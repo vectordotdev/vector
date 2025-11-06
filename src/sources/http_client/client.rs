@@ -116,8 +116,7 @@ pub struct HttpClientConfig {
 
     /// Raw data to send as the HTTP request body.
     ///
-    /// This is typically used with POST, PUT, or PATCH methods to send JSON or other raw data.
-    /// Can be a static string or a VRL expression for dynamic content generation.
+    /// Can be a static string or a VRL expression.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "body_examples()"))]
     pub body: Option<ParameterValue>,

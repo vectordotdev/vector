@@ -173,6 +173,54 @@ generated: components: sources: http_client: configuration: {
 			}
 		}
 	}
+	body: {
+		description: """
+			Raw data to send as the HTTP request body.
+
+			Can be a static string or a VRL expression.
+			"""
+		required: false
+		type: {
+			object: {
+				examples: [{
+					type: "vrl"
+					value: """
+						encode_json({
+						  "searchStatements": [{"column": "auditAction", "operator": "=", "value": "DELETE"}],
+						  "timestamp": now()
+						})
+						"""
+				}]
+				options: {
+					type: {
+						description: "The type of the parameter, indicating how the `value` should be treated."
+						required:    false
+						type: string: {
+							default: "string"
+							enum: {
+								string: "The parameter value is a plain string."
+								vrl:    "The parameter value is a VRL expression that will be evaluated before each request."
+							}
+						}
+					}
+					value: {
+						description: "The raw value of the parameter."
+						required:    true
+						type: string: {}
+					}
+				}
+			}
+			string: examples: [{
+				type: "vrl"
+				value: """
+					encode_json({
+					  "searchStatements": [{"column": "auditAction", "operator": "=", "value": "DELETE"}],
+					  "timestamp": now()
+					})
+					"""
+			}]
+		}
+	}
 	decoding: {
 		description: """
 			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
