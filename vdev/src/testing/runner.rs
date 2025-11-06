@@ -11,10 +11,7 @@ use crate::{
         build::prepare_build_command,
         docker::{DOCKER_SOCKET, docker_command},
     },
-    utils::{
-        command::ChainArgs as _,
-        environment::{Environment, append_environment_variables},
-    },
+    utils::environment::{Environment, append_environment_variables},
 };
 
 const MOUNT_PATH: &str = "/home/vector";
@@ -103,6 +100,12 @@ pub trait ContainerTestRunner: TestRunner {
         Ok(RunnerState::Missing)
     }
 
+    fn image_exists(&self) -> Result<bool> {
+        let mut command = docker_command(["images", "-q", &self.image_name()]);
+        let output = command.check_output()?;
+        Ok(!output.trim().is_empty())
+    }
+
     fn ensure_running(
         &self,
         features: Option<&[String]>,
@@ -115,13 +118,27 @@ pub trait ContainerTestRunner: TestRunner {
             RunnerState::Paused => self.unpause()?,
             RunnerState::Dead | RunnerState::Unknown => {
                 self.remove()?;
-                self.create()?;
+                self.create(build)?; // Mount source when building
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, config_environment_variables, build)?;
-                self.create()?;
-                self.start()?;
+                if !build {
+                    // Check if the image exists
+                    if !self.image_exists()? {
+                        anyhow::bail!(
+                            "Test runner image '{}' does not exist. Build it first with 'vdev e2e build' or 'vdev int build'.",
+                            self.image_name()
+                        );
+                    }
+                    // Image exists but container doesn't - create it without mounting source
+                    self.create(false)?;
+                    self.start()?;
+                } else {
+                    // Build mode: build the image, then create and start the container with source mounted
+                    self.build(features, config_environment_variables, true)?;
+                    self.create(true)?;
+                    self.start()?;
+                }
             }
         }
 
@@ -132,7 +149,7 @@ pub trait ContainerTestRunner: TestRunner {
         let mut command = docker_command(["volume", "ls", "--format", "{{.Name}}"]);
 
         let mut volumes = HashSet::new();
-        volumes.insert(VOLUME_TARGET);
+        // Don't pre-create VOLUME_TARGET - let Docker initialize it from the image
         volumes.insert(VOLUME_CARGO_GIT);
         volumes.insert(VOLUME_CARGO_REGISTRY);
         for volume in command.check_output()?.lines() {
@@ -187,7 +204,7 @@ pub trait ContainerTestRunner: TestRunner {
             .wait(format!("Unpausing container {}", self.container_name()))
     }
 
-    fn create(&self) -> Result<()> {
+    fn create(&self, mount_source: bool) -> Result<()> {
         let network_name = self.network_name().unwrap_or("host");
 
         let docker_socket = format!("{}:/var/run/docker.sock", DOCKER_SOCKET.display());
@@ -204,31 +221,54 @@ pub trait ContainerTestRunner: TestRunner {
             .collect();
 
         self.ensure_volumes()?;
-        docker_command(
-            [
-                "create",
-                "--name",
-                &self.container_name(),
-                "--network",
-                network_name,
-                "--hostname",
-                RUNNER_HOSTNAME,
-                "--workdir",
-                MOUNT_PATH,
-                "--volume",
-                &format!("{}:{MOUNT_PATH}", app::path()),
-                "--volume",
-                &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
+
+        // Use /vector (image's source location) when not mounting, /home/vector when mounting
+        let workdir = if mount_source { MOUNT_PATH } else { "/vector" };
+
+        // Build docker command conditionally based on whether source should be mounted
+        let mut command = docker_command([
+            "create",
+            "--name",
+            &self.container_name(),
+            "--network",
+            network_name,
+            "--hostname",
+            RUNNER_HOSTNAME,
+            "--workdir",
+            workdir,
+        ]);
+
+        // Conditionally add source volume mount
+        if mount_source {
+            command.args(["--volume", &format!("{}:{MOUNT_PATH}", app::path())]);
+        }
+
+        // Always mount target volume (initialized from image if empty)
+        command.args(["--volume", &format!("{VOLUME_TARGET}:{TARGET_PATH}")]);
+
+        // Only mount cargo volumes when building (to cache downloads across builds)
+        // When using pre-built artifacts, use cargo registry/git from the image
+        if mount_source {
+            command.args([
                 "--volume",
                 &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
                 "--volume",
                 &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
-            ]
-            .chain_args(volumes)
-            .chain_args(docker_args)
-            .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
-        )
-        .wait(format!("Creating container {}", self.container_name()))
+            ]);
+        }
+
+        // Add additional volumes
+        for volume_arg in volumes {
+            command.arg(volume_arg);
+        }
+
+        // Add docker socket if needed
+        for docker_arg in docker_args {
+            command.arg(docker_arg);
+        }
+
+        command.args([&self.image_name(), "/bin/sleep", "infinity"]);
+        command.wait(format!("Creating container {}", self.container_name()))
     }
 }
 
