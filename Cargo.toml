@@ -98,6 +98,9 @@ depends = "libc6 (>= 2.18)"
 [package.metadata.deb.variants.aarch64-unknown-linux-musl]
 depends = ""
 
+[package.metadata.deb.variants.s390x-unknown-linux-gnu]
+depends = "libc6 (>= 2.15)"
+
 [workspace]
 members = [
   ".",
@@ -522,6 +525,7 @@ target-arm-unknown-linux-gnueabi = ["api", "api-client", "enrichment-tables", "r
 target-arm-unknown-linux-musleabi = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "secrets"]
 target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
+target-s390x-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]

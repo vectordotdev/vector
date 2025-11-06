@@ -264,6 +264,34 @@ jobs:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts/vector*
 
+  build-s390x-unknown-linux-gnu-packages:
+    name: Build Vector for s390x-unknown-linux-gnu (.tar.gz, DEB, RPM)
+    runs-on: release-builder-linux
+    timeout-minutes: 60
+    needs: generate-publish-metadata
+    env:
+      VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
+      VECTOR_BUILD_DESC: ${{ needs.generate-publish-metadata.outputs.vector_build_desc }}
+      CHANNEL: ${{ needs.generate-publish-metadata.outputs.vector_release_channel }}
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+        with:
+          ref: ${{ inputs.git_ref }}
+      - name: Bootstrap runner environment (Ubuntu-specific)
+        run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - name: Bootstrap runner environment (generic)
+        run: bash scripts/environment/prepare.sh --modules=rustup,cross
+      - name: Build Vector
+        env:
+          DOCKER_PRIVILEGED: "true"
+        run: make package-s390x-unknown-linux-gnu-all
+      - name: Stage package artifacts for publish
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-s390x-unknown-linux-gnu
+          path: target/artifacts/vector*
+
   build-apple-darwin-packages:
     name: Build Vector for ${{ matrix.architecture }}-apple-darwin (.tar.gz)
     runs-on: ${{ matrix.runner }}
@@ -501,6 +529,7 @@ jobs:
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-arm-unknown-linux-gnueabi-packages
       - build-arm-unknown-linux-musleabi-packages
+      - build-s390x-unknown-linux-gnu-packages
       - deb-verify
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
@@ -572,9 +601,14 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts
+      - name: Download staged package artifacts (s390x-unknown-linux-gnu)
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-s390x-unknown-linux-gnu
+          path: target/artifacts
       - name: Build and publish Docker images
         env:
-          PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
+          PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6,linux/s390x"
           REPOS: "timberio/vector,ghcr.io/vectordotdev/vector"
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
@@ -599,6 +633,7 @@ jobs:
       - build-armv7-unknown-linux-gnueabihf-packages
       - build-arm-unknown-linux-gnueabi-packages
       - build-arm-unknown-linux-musleabi-packages
+      - build-s390x-unknown-linux-gnu-packages
       - deb-verify
       - rpm-verify
       - macos-verify
@@ -660,6 +695,11 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts
+      - name: Download staged package artifacts (s390x-unknown-linux-gnu)
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-s390x-unknown-linux-gnu
+          path: target/artifacts
       - name: Publish artifacts to S3
         env:
           AWS_ACCESS_KEY_ID: ${{ secrets.CI_AWS_ACCESS_KEY_ID }}
@@ -684,6 +724,7 @@ jobs:
       - build-armv7-unknown-linux-musleabihf-packages
       - build-arm-unknown-linux-gnueabi-packages
       - build-arm-unknown-linux-musleabi-packages
+      - build-s390x-unknown-linux-gnu-packages
       - deb-verify
       - rpm-verify
       - macos-verify
@@ -750,6 +791,11 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
           path: target/artifacts
+      - name: Download staged package artifacts (s390x-unknown-linux-gnu)
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-s390x-unknown-linux-gnu
+          path: target/artifacts
       - name: Publish release to GitHub
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -771,6 +817,7 @@ jobs:
       - build-armv7-unknown-linux-musleabihf-packages
       - build-arm-unknown-linux-gnueabi-packages
       - build-arm-unknown-linux-musleabi-packages
+      - build-s390x-unknown-linux-gnu-packages
     env:
       VECTOR_VERSION: ${{ needs.generate-publish-metadata.outputs.vector_version }}
     steps:
@@ -827,6 +874,11 @@ jobs:
         uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
         with:
           name: vector-${{ env.VECTOR_VERSION }}-arm-unknown-linux-musleabi
+          path: target/artifacts
+      - name: Download staged package artifacts (s390x-unknown-linux-gnu)
+        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        with:
+          name: vector-${{ env.VECTOR_VERSION }}-s390x-unknown-linux-gnu
           path: target/artifacts
       - name: Generate SHA256 checksums for artifacts
         run: make sha256sum
