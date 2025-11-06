@@ -33,6 +33,14 @@ impl ComposeTestKind {
             ComposeTestKind::Integration => "vector-integration-tests-runner",
         }
     }
+
+    /// Returns the feature flag that includes all tests for this kind
+    pub(crate) fn all_features_flag(self) -> &'static str {
+        match self {
+            ComposeTestKind::E2E => crate::testing::build::ALL_E2E_FEATURE_FLAG,
+            ComposeTestKind::Integration => crate::testing::build::ALL_INTEGRATIONS_FEATURE_FLAG,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -170,9 +178,13 @@ impl ComposeTest {
         let mut args = self.config.args.clone().unwrap_or_default();
 
         args.push("--features".to_string());
-        // Always use test-specific features from test.yaml
-        // Use `vdev int build` or `vdev e2e build` to pre-build with all features
-        args.push(self.config.features.join(","));
+        // When using a pre-built image (no_build=true), use all features to match what was built
+        // When building on-the-fly (no_build=false), use test-specific features for faster builds
+        if no_build {
+            args.push(self.local_config.kind.all_features_flag().to_string());
+        } else {
+            args.push(self.config.features.join(","));
+        }
 
         // If the test field is not present then use the --lib flag
         match self.config.test {

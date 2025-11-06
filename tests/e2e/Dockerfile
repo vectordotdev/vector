@@ -37,11 +37,11 @@ COPY . .
 ARG FEATURES
 ARG BUILD_TESTS
 
-RUN --mount=type=cache,target=/vector/target \
-    --mount=type=cache,target=/usr/local/cargo/registry \
+RUN --mount=type=cache,target=/usr/local/cargo/registry \
     --mount=type=cache,target=/usr/local/cargo/git \
     if [ "$BUILD_TESTS" = "true" ]; then \
-        /usr/bin/mold -run cargo build --tests --lib --bin vector \
+        mkdir -p /home/target/debug && \
+        CARGO_BUILD_TARGET_DIR=/home/target /usr/bin/mold -run cargo build --tests --lib --bin vector \
         --no-default-features --features $FEATURES && \
-        cp target/debug/vector /usr/bin/vector; \
+        cp /home/target/debug/vector /usr/bin/vector; \
     fi
