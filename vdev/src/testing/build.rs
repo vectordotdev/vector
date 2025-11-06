@@ -70,8 +70,32 @@ pub fn build_test_runner_image(
     feature_flag: &str,
     build_tests: bool,
 ) -> Result<()> {
+    use crate::testing::docker::docker_command;
+
+    // Clean up any existing containers using this image
+    let image_name = test_kind.image_name();
+    info!("Cleaning up existing test runner containers for {image_name}");
+
+    // Find and remove containers using this image
+    if let Ok(output) = docker_command(["ps", "-a", "--filter", &format!("ancestor={image_name}"), "--format", "{{.ID}}"]).output() {
+        if output.status.success() {
+            let container_ids = String::from_utf8_lossy(&output.stdout);
+            for container_id in container_ids.lines().filter(|s| !s.is_empty()) {
+                let _ = docker_command(["rm", "--force", container_id]).output();
+            }
+        }
+    }
+
+    // Clean up the shared target volume
+    info!("Cleaning up vector_target volume");
+    let _ = docker_command(["volume", "rm", "vector_target"]).output();
+
+    // Remove the old image to force a fresh build
+    info!("Removing old image {image_name}:latest");
+    let _ = docker_command(["rmi", &format!("{image_name}:latest")]).output();
+
     let dockerfile = test_runner_dockerfile();
-    let image = format!("{}:latest", test_kind.image_name());
+    let image = format!("{image_name}:latest");
     let mut cmd = prepare_build_command(
         &image,
         &dockerfile,
