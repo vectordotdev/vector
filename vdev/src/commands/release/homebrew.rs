@@ -50,6 +50,10 @@ fn clone_and_setup_git(username: &str) -> Result<()> {
 
     git::clone(&homebrew_repo)?;
     env::set_current_dir("homebrew-brew")?;
+
+    // Set the remote URL with credentials to ensure push works
+    git::set_remote_url("origin", &homebrew_repo)?;
+
     git::set_config_value("user.name", "vic")?;
     git::set_config_value("user.email", "vector@datadoghq.com")?;
     Ok(())
