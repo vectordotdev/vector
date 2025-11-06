@@ -507,19 +507,7 @@ impl http_client::HttpClientContext for HttpClientContext {
 
     /// Get the request body to send with the HTTP request
     fn get_request_body(&self) -> Option<String> {
-        self.body.as_ref().map(|compiled_body| {
-            match &compiled_body.program {
-                Some(program) => {
-                    // If VRL compilation succeeded, resolve it
-                    resolve_vrl(&compiled_body.value, program)
-                        .unwrap_or_else(|| compiled_body.value.clone())
-                }
-                None => {
-                    // No VRL, use the value as-is
-                    compiled_body.value.clone()
-                }
-            }
-        })
+        self.body.as_ref().and_then(resolve_compiled_param)
     }
 
     /// Process the URL dynamically before each request

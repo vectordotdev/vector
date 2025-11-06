@@ -197,20 +197,16 @@ pub(crate) async fn call<
             }
 
             // Get the request body from the context (if any)
-            let body_string = context.get_request_body();
-            let body = body_string
-                .as_ref()
-                .map(|s| Body::from(s.clone()))
-                .unwrap_or_else(Body::empty);
-
-            // Set Content-Type header if body is present and not already set
-            if body_string.is_some()
-                && !inputs
-                    .headers
-                    .contains_key(http::header::CONTENT_TYPE.as_str())
-            {
-                builder = builder.header(http::header::CONTENT_TYPE, "application/json");
-            }
+            let body = match context.get_request_body() {
+                Some(body_str) => {
+                    // Set Content-Type header if not already set
+                    if !inputs.headers.contains_key(http::header::CONTENT_TYPE.as_str()) {
+                        builder = builder.header(http::header::CONTENT_TYPE, "application/json");
+                    }
+                    Body::from(body_str)
+                }
+                None => Body::empty(),
+            };
 
             // building the request should be infallible
             let mut request = builder.body(body).expect("error creating request");
