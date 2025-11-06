@@ -1,4 +1,4 @@
-use crate::utils::git;
+use crate::{app, utils::git};
 use anyhow::Result;
 use sha2::Digest;
 use std::path::Path;
@@ -51,6 +51,9 @@ fn clone_and_setup_git(username: &str) -> Result<()> {
 
     git::clone(&homebrew_repo)?;
     env::set_current_dir("homebrew-brew")?;
+
+    // Update the global path to the homebrew-brew repo so git operations work correctly
+    app::set_global_path(env::current_dir()?.to_string_lossy().to_string());
 
     // Set the remote URL with credentials to ensure push works
     git::set_remote_url("origin", &homebrew_repo)?;
