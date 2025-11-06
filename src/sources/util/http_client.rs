@@ -200,7 +200,10 @@ pub(crate) async fn call<
             let body = match context.get_request_body() {
                 Some(body_str) => {
                     // Set Content-Type header if not already set
-                    if !inputs.headers.contains_key(http::header::CONTENT_TYPE.as_str()) {
+                    if !inputs
+                        .headers
+                        .contains_key(http::header::CONTENT_TYPE.as_str())
+                    {
                         builder = builder.header(http::header::CONTENT_TYPE, "application/json");
                     }
                     Body::from(body_str)
