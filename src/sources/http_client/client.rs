@@ -114,6 +114,14 @@ pub struct HttpClientConfig {
     #[serde(default = "default_http_method")]
     pub method: HttpMethod,
 
+    /// Raw data to send as the HTTP request body.
+    ///
+    /// This is typically used with POST, PUT, or PATCH methods to send JSON or other raw data.
+    /// Can be a static string or a VRL expression for dynamic content generation.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "body_examples()"))]
+    pub body: Option<ParameterValue>,
+
     /// TLS configuration.
     #[configurable(derived)]
     pub tls: Option<TlsConfig>,
@@ -174,6 +182,50 @@ fn headers_examples() -> HashMap<String, Vec<String>> {
     ])
 }
 
+fn body_examples() -> Option<ParameterValue> {
+    Some(ParameterValue::String(
+        r#"{"searchStatements":[{"column":"status","operator":"=","value":"active"}],"page":0}"#
+            .to_owned(),
+    ))
+}
+
+/// Helper function to get all VRL functions for compilation
+fn get_vrl_functions() -> Vec<Box<dyn Function>> {
+    vrl::stdlib::all()
+        .into_iter()
+        .chain(vector_lib::enrichment::vrl_functions())
+        .chain(vector_vrl_functions::all())
+        .collect()
+}
+
+/// Helper function to compile a VRL parameter value into a Program
+fn compile_parameter_vrl(
+    param: &ParameterValue,
+    functions: &[Box<dyn Function>],
+) -> Option<Program> {
+    if !param.is_vrl() {
+        return None;
+    }
+
+    let state = TypeState::default();
+    let config = CompileConfig::default();
+
+    match compile_vrl(param.value(), functions, &state, config) {
+        Ok(compilation_result) => {
+            if !compilation_result.warnings.is_empty() {
+                let warnings = format_vrl_diagnostics(param.value(), compilation_result.warnings);
+                warn!(message = "VRL compilation warnings.", %warnings);
+            }
+            Some(compilation_result.program)
+        }
+        Err(diagnostics) => {
+            let error = format_vrl_diagnostics(param.value(), diagnostics);
+            warn!(message = "VRL compilation failed.", %error);
+            None
+        }
+    }
+}
+
 impl Default for HttpClientConfig {
     fn default() -> Self {
         Self {
@@ -185,6 +237,7 @@ impl Default for HttpClientConfig {
             framing: default_framing_message_based(),
             headers: HashMap::new(),
             method: default_http_method(),
+            body: None,
             tls: None,
             auth: None,
             log_namespace: None,
@@ -215,11 +268,7 @@ pub struct Query {
 
 impl Query {
     pub fn new(params: &HashMap<String, QueryParameterValue>) -> Self {
-        let functions = vrl::stdlib::all()
-            .into_iter()
-            .chain(vector_lib::enrichment::vrl_functions())
-            .chain(vector_vrl_functions::all())
-            .collect::<Vec<_>>();
+        let functions = get_vrl_functions();
 
         let compiled: HashMap<String, CompiledQueryParameterValue> = params
             .iter()
@@ -241,32 +290,9 @@ impl Query {
     }
 
     fn compile_value(param: &ParameterValue, functions: &[Box<dyn Function>]) -> CompiledParam {
-        let program = if param.is_vrl() {
-            let state = TypeState::default();
-            let config = CompileConfig::default();
-
-            match compile_vrl(param.value(), functions, &state, config) {
-                Ok(compilation_result) => {
-                    if !compilation_result.warnings.is_empty() {
-                        let warnings =
-                            format_vrl_diagnostics(param.value(), compilation_result.warnings);
-                        warn!(message = "VRL compilation warnings.", %warnings);
-                    }
-                    Some(compilation_result.program)
-                }
-                Err(diagnostics) => {
-                    let error = format_vrl_diagnostics(param.value(), diagnostics);
-                    warn!(message = "VRL compilation failed.", %error);
-                    None
-                }
-            }
-        } else {
-            None
-        };
-
         CompiledParam {
             value: param.value().to_string(),
-            program,
+            program: compile_parameter_vrl(param, functions),
         }
     }
 
@@ -295,6 +321,15 @@ impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let query = Query::new(&self.query.clone());
 
+        // Compile body if present
+        let body = self.body.as_ref().map(|body_param| {
+            let functions = get_vrl_functions();
+            CompiledParam {
+                value: body_param.value().to_string(),
+                program: compile_parameter_vrl(body_param, &functions),
+            }
+        });
+
         // Build the base URLs
         let endpoints = [self.endpoint.clone()];
         let urls: Vec<Uri> = endpoints
@@ -321,11 +356,12 @@ impl SourceConfig for HttpClientConfig {
 
         let content_type = self.decoding.content_type(&self.framing).to_string();
 
-        // Create context with the config for dynamic query parameter evaluation
+        // Create context with the config for dynamic query parameter and body evaluation
         let context = HttpClientContext {
             decoder,
             log_namespace,
             query,
+            body,
         };
 
         warn_if_interval_too_low(self.timeout, self.interval);
@@ -383,6 +419,7 @@ pub struct HttpClientContext {
     pub decoder: Decoder,
     pub log_namespace: LogNamespace,
     query: Query,
+    body: Option<CompiledParam>,
 }
 
 impl HttpClientContext {
@@ -453,6 +490,23 @@ impl http_client::HttpClientContext for HttpClientContext {
         let events = self.decode_events(&mut buf);
 
         Some(events)
+    }
+
+    /// Get the request body to send with the HTTP request
+    fn get_request_body(&self) -> Option<String> {
+        self.body.as_ref().map(|compiled_body| {
+            match &compiled_body.program {
+                Some(program) => {
+                    // If VRL compilation succeeded, resolve it
+                    resolve_vrl(&compiled_body.value, program)
+                        .unwrap_or_else(|| compiled_body.value.clone())
+                }
+                None => {
+                    // No VRL, use the value as-is
+                    compiled_body.value.clone()
+                }
+            }
+        })
     }
 
     /// Process the URL dynamically before each request

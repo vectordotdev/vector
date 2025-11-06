@@ -98,6 +98,7 @@ async fn bytes_decoding() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -127,6 +128,7 @@ async fn json_decoding_newline_delimited() {
         framing: FramingConfig::NewlineDelimited(Default::default()),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -161,6 +163,7 @@ async fn json_decoding_character_delimited() {
         }),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -201,6 +204,7 @@ async fn request_query_applied() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -312,6 +316,7 @@ async fn request_query_vrl_applied() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -393,6 +398,7 @@ async fn request_query_vrl_dynamic_updates() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: None,
         log_namespace: None,
@@ -460,6 +466,7 @@ async fn headers_applied() {
             vec!["bazz".to_string(), "bizz".to_string()],
         )]),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -489,9 +496,167 @@ async fn accept_header_override() {
         framing: default_framing_message_based(),
         headers: HashMap::from([("ACCEPT".to_string(), vec!["application/json".to_string()])]),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
     })
     .await;
+}
+
+/// POST request with JSON body data should send the body correctly
+#[tokio::test]
+async fn post_with_body() {
+    let in_addr = next_addr();
+
+    // Endpoint that echoes back the request body
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::post())
+        .and(warp::header::exact("Content-Type", "application/json"))
+        .and(warp::body::bytes())
+        .map(|body: bytes::Bytes| {
+            // Echo the body back as a string
+            String::from_utf8_lossy(&body).to_string()
+        });
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    let test_json = r#"{"key":"value","number":42}"#;
+
+    let events = run_compliance(HttpClientConfig {
+        endpoint: format!("http://{in_addr}/endpoint"),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        method: HttpMethod::Post,
+        body: Some(ParameterValue::String(test_json.to_string())),
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    })
+    .await;
+
+    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+
+    // Verify the body was echoed back correctly
+    for log in logs {
+        assert_eq!(log.get("key").unwrap().as_str().unwrap(), "value");
+        let number = log.get("number").unwrap();
+        match number {
+            vector_lib::event::Value::Integer(n) => assert_eq!(*n, 42),
+            _ => panic!("Expected integer value"),
+        }
+    }
+}
+
+/// POST request without body should work as before
+#[tokio::test]
+async fn post_without_body() {
+    let in_addr = next_addr();
+
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::post())
+        .map(|| r#"{"data": "success"}"#);
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    run_compliance(HttpClientConfig {
+        endpoint: format!("http://{in_addr}/endpoint"),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        method: HttpMethod::Post,
+        body: None,
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    })
+    .await;
+}
+
+/// Custom Content-Type header should override the default
+#[tokio::test]
+async fn post_with_custom_content_type() {
+    let in_addr = next_addr();
+
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::post())
+        .and(warp::header::exact("Content-Type", "text/plain"))
+        .map(|| r#"{"data": "success"}"#);
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    run_compliance(HttpClientConfig {
+        endpoint: format!("http://{in_addr}/endpoint"),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: default_framing_message_based(),
+        headers: HashMap::from([("Content-Type".to_string(), vec!["text/plain".to_string()])]),
+        method: HttpMethod::Post,
+        body: Some(ParameterValue::String("plain text body".to_string())),
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    })
+    .await;
+}
+
+/// POST request with VRL body should resolve correctly
+#[tokio::test]
+async fn post_with_vrl_body() {
+    let in_addr = next_addr();
+
+    let dummy_endpoint = warp::path!("endpoint")
+        .and(warp::post())
+        .and(warp::header::exact("Content-Type", "application/json"))
+        .and(warp::body::bytes())
+        .map(|body: bytes::Bytes| {
+            // Echo back the body as a string
+            String::from_utf8_lossy(&body).to_string()
+        });
+
+    tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+    wait_for_tcp(in_addr).await;
+
+    let events = run_compliance(HttpClientConfig {
+        endpoint: format!("http://{in_addr}/endpoint"),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        method: HttpMethod::Post,
+        body: Some(ParameterValue::Typed {
+            value: r#"encode_json({"message": upcase("hello"), "value": 42})"#.to_string(),
+            r#type: ParamType::Vrl,
+        }),
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    })
+    .await;
+
+    let logs: Vec<_> = events.into_iter().map(|event| event.into_log()).collect();
+
+    // Verify VRL was evaluated correctly
+    for log in logs {
+        assert_eq!(log.get("message").unwrap().as_str().unwrap(), "HELLO");
+        let value = log.get("value").unwrap();
+        match value {
+            vector_lib::event::Value::Integer(n) => assert_eq!(*n, 42),
+            _ => panic!("Expected integer value"),
+        }
+    }
 }
