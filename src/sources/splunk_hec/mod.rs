@@ -12,30 +12,39 @@ use chrono::{DateTime, TimeZone, Utc};
 use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
-use hyper::{service::make_service_fn, Server};
-use serde::Serialize;
+use hyper::{Server, service::make_service_fn};
+use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{
-    de::{Read as JsonRead, StrRead},
     Deserializer, Value as JsonValue,
+    de::{Read as JsonRead, StrRead},
 };
 use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::lookup::{self, event_path, owned_value_path};
-use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
-    event::BatchNotifier,
-    schema::meaning,
     EstimatedJsonEncodedSizeOf,
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    event::BatchNotifier,
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    lookup::{self, event_path, lookup_v2::OptionalValuePath, owned_value_path},
+    schema::meaning,
+    sensitive_string::SensitiveString,
+    tls::MaybeTlsIncomingStream,
 };
-use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStream};
-use vrl::path::OwnedTargetPath;
-use vrl::value::{kind::Collection, Kind};
-use warp::{filters::BoxedFilter, path, reject::Rejection, reply::Response, Filter, Reply};
+use vrl::{
+    path::OwnedTargetPath,
+    value::{Kind, kind::Collection},
+};
+use warp::{
+    Filter, Reply,
+    filters::BoxedFilter,
+    http::header::{CONTENT_TYPE, HeaderValue},
+    path,
+    reject::Rejection,
+    reply::Response,
+};
 
 use self::{
     acknowledgements::{
@@ -45,16 +54,16 @@ use self::{
     splunk_response::{HecResponse, HecResponseMetadata, HecStatusCode},
 };
 use crate::{
-    config::{log_schema, DataType, Resource, SourceConfig, SourceContext, SourceOutput},
+    SourceSender,
+    config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::{Event, LogEvent, Value},
-    http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
     serde::bool_or_struct,
     source_sender::ClosedError,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
-    SourceSender,
 };
 
 mod acknowledgements;
@@ -424,10 +433,10 @@ impl SplunkSource {
                             }
                         }
 
-                        if !events.is_empty() {
-                            if let Err(ClosedError) = out.send_batch(events).await {
-                                return Err(Rejection::from(ApiError::ServerShutdown));
-                            }
+                        if !events.is_empty()
+                            && let Err(ClosedError) = out.send_batch(events).await
+                        {
+                            return Err(Rejection::from(ApiError::ServerShutdown));
                         }
 
                         if let Some(error) = error {
@@ -529,26 +538,50 @@ impl SplunkSource {
             .boxed()
     }
 
+    fn lenient_json_content_type_check<T>() -> impl Filter<Extract = (T,), Error = Rejection> + Clone
+    where
+        T: Send + DeserializeOwned + 'static,
+    {
+        warp::header::optional::<HeaderValue>(CONTENT_TYPE.as_str())
+            .and(warp::body::bytes())
+            .and_then(
+                |ctype: Option<HeaderValue>, body: bytes::Bytes| async move {
+                    let ok = ctype
+                        .as_ref()
+                        .and_then(|v| v.to_str().ok())
+                        .map(|h| h.to_ascii_lowercase().contains("application/json"))
+                        .unwrap_or(true);
+
+                    if !ok {
+                        return Err(warp::reject::custom(ApiError::UnsupportedContentType));
+                    }
+
+                    let value = serde_json::from_slice::<T>(&body)
+                        .map_err(|_| warp::reject::custom(ApiError::BadRequest))?;
+
+                    Ok(value)
+                },
+            )
+    }
+
     fn ack_service(&self) -> BoxedFilter<(Response,)> {
         let idx_ack = self.idx_ack.clone();
+
         warp::post()
-            .and(path!("ack"))
+            .and(warp::path!("ack"))
             .and(self.authorization())
             .and(SplunkSource::required_channel())
-            .and(warp::body::json())
-            .and_then(move |_, channel_id: String, body: HecAckStatusRequest| {
+            .and(Self::lenient_json_content_type_check::<HecAckStatusRequest>())
+            .and_then(move |_, channel: String, req: HecAckStatusRequest| {
                 let idx_ack = idx_ack.clone();
                 async move {
                     if let Some(idx_ack) = idx_ack {
-                        let ack_statuses = idx_ack
-                            .get_acks_status_from_channel(channel_id, &body.acks)
+                        let acks = idx_ack
+                            .get_acks_status_from_channel(channel, &req.acks)
                             .await?;
-                        Ok(
-                            warp::reply::json(&HecAckStatusResponse { acks: ack_statuses })
-                                .into_response(),
-                        )
+                        Ok(warp::reply::json(&HecAckStatusResponse { acks }).into_response())
                     } else {
-                        Err(Rejection::from(ApiError::AckIsDisabled))
+                        Err(warp::reject::custom(ApiError::AckIsDisabled))
                     }
                 }
             })
@@ -990,16 +1023,16 @@ impl DefaultExtractor {
         }
 
         // Add data field
-        if let Some(index) = self.value.as_ref() {
-            if let Some(metadata_key) = self.to_field.path.as_ref() {
-                self.log_namespace.insert_source_metadata(
-                    SplunkConfig::NAME,
-                    log,
-                    Some(LegacyKey::Overwrite(metadata_key)),
-                    &self.to_field.path.clone().unwrap_or(owned_value_path!("")),
-                    index.clone(),
-                )
-            }
+        if let Some(index) = self.value.as_ref()
+            && let Some(metadata_key) = self.to_field.path.as_ref()
+        {
+            self.log_namespace.insert_source_metadata(
+                SplunkConfig::NAME,
+                log,
+                Some(LegacyKey::Overwrite(metadata_key)),
+                &self.to_field.path.clone().unwrap_or(owned_value_path!("")),
+                index.clone(),
+            )
         }
     }
 }
@@ -1094,6 +1127,7 @@ pub(crate) enum ApiError {
     MissingAuthorization,
     InvalidAuthorization,
     UnsupportedEncoding,
+    UnsupportedContentType,
     MissingChannel,
     NoData,
     InvalidDataFormat { event: usize },
@@ -1188,6 +1222,14 @@ fn finish_ok(maybe_ack_id: Option<u64>) -> Response {
     response_json(StatusCode::OK, body)
 }
 
+fn response_plain(code: StatusCode, msg: &'static str) -> Response {
+    warp::reply::with_status(
+        warp::reply::with_header(msg, http::header::CONTENT_TYPE, "text/plain; charset=utf-8"),
+        code,
+    )
+    .into_response()
+}
+
 async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
     if let Some(&error) = rejection.find::<ApiError>() {
         emit!(SplunkHecRequestError { error });
@@ -1200,6 +1242,10 @@ async fn finish_err(rejection: Rejection) -> Result<(Response,), Rejection> {
                 splunk_response::INVALID_AUTHORIZATION,
             ),
             ApiError::UnsupportedEncoding => empty_response(StatusCode::UNSUPPORTED_MEDIA_TYPE),
+            ApiError::UnsupportedContentType => response_plain(
+                StatusCode::UNSUPPORTED_MEDIA_TYPE,
+                "The request's content-type is not supported",
+            ),
             ApiError::MissingChannel => {
                 response_json(StatusCode::BAD_REQUEST, splunk_response::NO_CHANNEL)
             }
@@ -1256,35 +1302,38 @@ mod tests {
     use http::Uri;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
-    use vector_lib::codecs::{
-        decoding::DeserializerConfig, BytesDecoderConfig, JsonSerializerConfig,
-        TextSerializerConfig,
+    use vector_lib::{
+        codecs::{
+            BytesDecoderConfig, JsonSerializerConfig, TextSerializerConfig,
+            decoding::DeserializerConfig,
+        },
+        event::EventStatus,
+        schema::Definition,
+        sensitive_string::SensitiveString,
     };
-    use vector_lib::sensitive_string::SensitiveString;
-    use vector_lib::{event::EventStatus, schema::Definition};
     use vrl::path::PathPrefix;
 
     use super::*;
     use crate::{
+        SourceSender,
         codecs::{DecodingConfig, EncodingConfig},
         components::validation::prelude::*,
-        config::{log_schema, SinkConfig, SinkContext, SourceConfig, SourceContext},
+        config::{SinkConfig, SinkContext, SourceConfig, SourceContext, log_schema},
         event::{Event, LogEvent},
         sinks::{
+            Healthcheck, VectorSink,
             splunk_hec::logs::config::HecLogsSinkConfig,
             util::{BatchConfig, Compression, TowerRequestConfig},
-            Healthcheck, VectorSink,
         },
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
             collect_n,
             components::{
-                assert_source_compliance, assert_source_error, COMPONENT_ERROR_TAGS,
-                HTTP_PUSH_SOURCE_TAGS,
+                COMPONENT_ERROR_TAGS, HTTP_PUSH_SOURCE_TAGS, assert_source_compliance,
+                assert_source_error,
             },
             next_addr, wait_for_tcp,
         },
-        SourceSender,
     };
 
     #[test]
@@ -1307,7 +1356,7 @@ mod tests {
         valid_tokens: Option<&[&str]>,
         acknowledgements: Option<HecAcknowledgementsConfig>,
         store_hec_token: bool,
-    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin + use<>, SocketAddr) {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let address = next_addr();
         let valid_tokens =
@@ -1341,7 +1390,7 @@ mod tests {
     ) -> (VectorSink, Healthcheck) {
         HecLogsSinkConfig {
             default_token: TOKEN.to_owned().into(),
-            endpoint: format!("http://{}", address),
+            endpoint: format!("http://{address}"),
             host_key: None,
             indexed_fields: vec![],
             index: None,
@@ -1426,8 +1475,8 @@ mod tests {
         opts: &SendWithOpts<'_>,
     ) -> RequestBuilder {
         let mut b = reqwest::Client::new()
-            .post(format!("http://{}/{}", address, api))
-            .header("Authorization", format!("Splunk {}", token));
+            .post(format!("http://{address}/{api}"))
+            .header("Authorization", format!("Splunk {token}"));
 
         b = match opts.channel {
             Some(c) => match c {
@@ -1445,7 +1494,7 @@ mod tests {
         b.body(message.to_owned())
     }
 
-    async fn send_with<'a>(
+    async fn send_with(
         address: SocketAddr,
         api: &str,
         message: &str,
@@ -1456,7 +1505,7 @@ mod tests {
         b.send().await.unwrap().status().as_u16()
     }
 
-    async fn send_with_response<'a>(
+    async fn send_with_response(
         address: SocketAddr,
         api: &str,
         message: &str,
@@ -1526,7 +1575,7 @@ mod tests {
         .await;
 
         let messages = (0..n)
-            .map(|i| format!("multiple_simple_text_event_{}", i))
+            .map(|i| format!("multiple_simple_text_event_{i}"))
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source).await;
 
@@ -1579,7 +1628,7 @@ mod tests {
         .await;
 
         let messages = (0..n)
-            .map(|i| format!("multiple_simple_json_event{}", i))
+            .map(|i| format!("multiple_simple_json_event{i}"))
             .collect::<Vec<_>>();
         let events = channel_n(messages.clone(), sink, source).await;
 
@@ -1863,7 +1912,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(format!("http://{}/services/collector/health", address))
+            .get(format!("http://{address}/services/collector/health"))
             .header("Authorization", format!("Splunk {}", "invalid token"))
             .send()
             .await
@@ -1877,7 +1926,7 @@ mod tests {
         let (_source, address) = source(None).await;
 
         let res = reqwest::Client::new()
-            .get(format!("http://{}/services/collector/health", address))
+            .get(format!("http://{address}/services/collector/health"))
             .send()
             .await
             .unwrap();
@@ -2103,7 +2152,7 @@ mod tests {
                 "http://{}/{}",
                 address, "services/collector/event"
             ))
-            .header("Authorization", format!("Splunk {}", TOKEN))
+            .header("Authorization", format!("Splunk {TOKEN}"))
             .body::<&[u8]>(message);
 
         assert_eq!(200, b.send().await.unwrap().status().as_u16());
@@ -2213,10 +2262,12 @@ mod tests {
                 event.as_log()[log_schema().message_key().unwrap().to_string()],
                 message.into()
             );
-            assert!(event
-                .as_log()
-                .get((PathPrefix::Event, log_schema().host_key().unwrap()))
-                .is_none());
+            assert!(
+                event
+                    .as_log()
+                    .get((PathPrefix::Event, log_schema().host_key().unwrap()))
+                    .is_none()
+            );
         })
         .await;
     }
@@ -2483,6 +2534,51 @@ mod tests {
         .await
         .unwrap();
         assert!(ack_res.acks.get(&event_res.ack_id).unwrap());
+    }
+
+    #[tokio::test]
+    async fn ack_service_accepts_parameterized_content_type() {
+        let ack_config = HecAcknowledgementsConfig {
+            enabled: Some(true),
+            ..Default::default()
+        };
+        let (source, address) = source(Some(ack_config)).await;
+        let opts = SendWithOpts {
+            channel: Some(Channel::Header("guid")),
+            forwarded_for: None,
+        };
+
+        let event_res = send_with_response(
+            address,
+            "services/collector/event",
+            r#"{"event":"param-test"}"#,
+            TOKEN,
+            &opts,
+        )
+        .await
+        .json::<HecAckEventResponse>()
+        .await
+        .unwrap();
+        let _ = collect_n(source, 1).await;
+
+        let body = serde_json::to_string(&HecAckStatusRequest {
+            acks: vec![event_res.ack_id],
+        })
+        .unwrap();
+
+        let res = reqwest::Client::new()
+            .post(format!("http://{address}/services/collector/ack"))
+            .header("Authorization", format!("Splunk {TOKEN}"))
+            .header("x-splunk-request-channel", "guid")
+            .header("Content-Type", "application/json; some-random-text; hello")
+            .body(body)
+            .send()
+            .await
+            .unwrap();
+
+        assert_eq!(200, res.status().as_u16());
+
+        let _parsed: HecAckStatusResponse = res.json().await.unwrap();
     }
 
     #[tokio::test]

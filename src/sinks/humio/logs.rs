@@ -1,23 +1,25 @@
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath};
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
+    codecs::JsonSerializerConfig,
+    configurable::configurable_component,
+    lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath},
+    sensitive_string::SensitiveString,
+};
 
 use super::config_host_key_target_path;
-use crate::sinks::splunk_hec::common::config_timestamp_key_target_path;
 use crate::{
     codecs::EncodingConfig,
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     sinks::{
+        Healthcheck, VectorSink,
         splunk_hec::{
             common::{
-                acknowledgements::HecClientAcknowledgementsConfig, EndpointTarget,
-                SplunkHecDefaultBatchSettings,
+                EndpointTarget, SplunkHecDefaultBatchSettings,
+                acknowledgements::HecClientAcknowledgementsConfig,
+                config_timestamp_key_target_path,
             },
             logs::config::HecLogsSinkConfig,
         },
         util::{BatchConfig, Compression, TowerRequestConfig},
-        Healthcheck, VectorSink,
     },
     template::Template,
     tls::TlsConfig,
@@ -35,7 +37,7 @@ pub struct HumioLogsConfig {
         docs::examples = "${HUMIO_TOKEN}",
         docs::examples = "A94A8FE5CCB19BA61C4C08"
     ))]
-    pub(super) token: SensitiveString,
+    pub token: SensitiveString,
 
     /// The base URL of the Humio instance.
     ///
@@ -49,15 +51,15 @@ pub struct HumioLogsConfig {
         docs::examples = "http://127.0.0.1",
         docs::examples = "https://example.com",
     ))]
-    pub(super) endpoint: String,
+    pub endpoint: String,
 
     /// The source of events sent to this sink.
     ///
     /// Typically the filename the logs originated from. Maps to `@source` in Humio.
-    pub(super) source: Option<Template>,
+    pub source: Option<Template>,
 
     #[configurable(derived)]
-    pub(super) encoding: EncodingConfig,
+    pub encoding: EncodingConfig,
 
     /// The type of events sent to this sink. Humio uses this as the name of the parser to use to ingest the data.
     ///
@@ -67,7 +69,7 @@ pub struct HumioLogsConfig {
         docs::examples = "none",
         docs::examples = "{{ event_type }}"
     ))]
-    pub(super) event_type: Option<Template>,
+    pub event_type: Option<Template>,
 
     /// Overrides the name of the log field used to retrieve the hostname to send to Humio.
     ///
@@ -76,7 +78,7 @@ pub struct HumioLogsConfig {
     ///
     /// [global_host_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.host_key
     #[serde(default = "config_host_key_target_path")]
-    pub(super) host_key: OptionalTargetPath,
+    pub host_key: OptionalTargetPath,
 
     /// Event fields to be added to Humio’s extra fields.
     ///
@@ -86,7 +88,7 @@ pub struct HumioLogsConfig {
     ///
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
-    pub(super) indexed_fields: Vec<ConfigValuePath>,
+    pub indexed_fields: Vec<ConfigValuePath>,
 
     /// Optional name of the repository to ingest into.
     ///
@@ -99,26 +101,26 @@ pub struct HumioLogsConfig {
     /// [humio_data_format]: https://docs.humio.com/integrations/data-shippers/hec/#format-of-data
     #[serde(default)]
     #[configurable(metadata(docs::examples = "{{ host }}", docs::examples = "custom_index"))]
-    pub(super) index: Option<Template>,
+    pub index: Option<Template>,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) compression: Compression,
+    pub compression: Compression,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) request: TowerRequestConfig,
+    pub request: TowerRequestConfig,
 
     #[configurable(derived)]
     #[serde(default)]
-    pub(super) batch: BatchConfig<SplunkHecDefaultBatchSettings>,
+    pub batch: BatchConfig<SplunkHecDefaultBatchSettings>,
 
     #[configurable(derived)]
-    pub(super) tls: Option<TlsConfig>,
+    pub tls: Option<TlsConfig>,
 
     /// Overrides the name of the log field used to retrieve the nanosecond-enabled timestamp to send to Humio.
     #[serde(default = "timestamp_nanos_key")]
-    pub(super) timestamp_nanos_key: Option<String>,
+    pub timestamp_nanos_key: Option<String>,
 
     #[configurable(derived)]
     #[serde(
@@ -136,7 +138,7 @@ pub struct HumioLogsConfig {
     ///
     /// [global_timestamp_key]: https://vector.dev/docs/reference/configuration/global-options/#log_schema.timestamp_key
     #[serde(default = "config_timestamp_key_target_path")]
-    pub(super) timestamp_key: OptionalTargetPath,
+    pub timestamp_key: OptionalTargetPath,
 }
 
 fn default_endpoint() -> String {
@@ -226,21 +228,22 @@ mod tests {
 #[cfg(test)]
 #[cfg(feature = "humio-integration-tests")]
 mod integration_tests {
+    use std::{collections::HashMap, convert::TryFrom};
+
     use chrono::{TimeZone, Utc};
     use futures::{future::ready, stream};
     use indoc::indoc;
     use serde::Deserialize;
-    use serde_json::{json, Value as JsonValue};
-    use std::{collections::HashMap, convert::TryFrom};
+    use serde_json::{Value as JsonValue, json};
     use tokio::time::Duration;
 
     use super::*;
     use crate::{
-        config::{log_schema, SinkConfig, SinkContext},
+        config::{SinkConfig, SinkContext, log_schema},
         event::LogEvent,
         sinks::util::Compression,
         test_util::{
-            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
             random_string,
         },
     };
@@ -478,7 +481,7 @@ mod integration_tests {
             humio_address(),
             repository_name
         );
-        let search_query = format!(r#"message="{}""#, message);
+        let search_query = format!(r#"message="{message}""#);
 
         // events are not available to search API immediately
         // poll up 200 times for event to show up
@@ -499,10 +502,7 @@ mod integration_tests {
                 return logs[0].clone();
             }
         }
-        panic!(
-            "did not find event in Humio repository {} with message {}",
-            repository_name, message
-        );
+        panic!("did not find event in Humio repository {repository_name} with message {message}");
     }
 
     #[derive(Debug)]

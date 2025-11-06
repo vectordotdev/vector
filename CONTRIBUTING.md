@@ -116,6 +116,49 @@ Please ensure your commits are small and focused; they should tell a story of
 your change. This helps reviewers to follow your changes, especially for more
 complex changes.
 
+#### Pre-push
+
+To reduce iterations you can create do the following:
+
+```shell
+touch .git/hooks/pre-push
+chmod +x .git/hooks/pre-push
+```
+
+You can use the following as a starting point:
+
+```shell
+#!/bin/sh
+set -e
+
+echo "Format code"
+
+make fmt
+
+echo "Running pre-push checks..."
+
+# We recommend always running all the following checks.
+make check-licenses
+make check-fmt
+make check-clippy
+make check-component-docs
+
+# Some other checks that in our experience rarely fail on PRs.
+make check-deny
+make check-docs
+make check-examples
+make check-scripts
+
+./scripts/check_changelog_fragments.sh
+
+# The following check is very slow.
+# make check-component-features
+```
+
+Please note that `make check-all` covers all checks, but it is slow and may runs checks not
+relevant to your PR. This command is defined
+[here](https://github.com/vectordotdev/vector/blob/1ef01aeeef592c21d32ba4d663e199f0608f615b/Makefile#L450-L454).
+
 ### GitHub Pull Requests
 
 Once your changes are ready you must submit your branch as a [pull request](https://github.com/vectordotdev/vector/pulls).
@@ -131,7 +174,7 @@ format. Vector performs a pull request check to verify the pull request title
 in case you forget.
 
 A list of allowed sub-categories is defined
-[here](https://github.com/vectordotdev/vector/blob/master/.github/semantic.yml#L21).
+[here](https://github.com/vectordotdev/vector/blob/master/.github/workflows/semantic.yml#L21).
 
 The following are all good examples of pull request titles:
 
@@ -240,7 +283,7 @@ first to ensure they pass.
 
 ```sh
 # Run the Clippy linter to catch common mistakes.
-cargo vdev check rust --clippy
+cargo vdev check rust --fix
 # Ensure all code is properly formatted. Code can be run through `rustfmt` using `cargo fmt` to ensure it is properly formatted.
 cargo vdev check fmt
 # Ensure the internal metrics that Vector emits conform to standards.
@@ -259,8 +302,8 @@ cd rust-doc && make docs
 
 ```sh
 cargo install dd-rust-license-tool --locked
-dd-rust-license-tool write
-git commit -am "dd-rust-license-tool write"
+make build-licenses
+git commit -am "updated LICENSE-3rdparty.csv"
 git push
 ```
 
@@ -273,7 +316,7 @@ When deprecating functionality in Vector, see [DEPRECATION.md](docs/DEPRECATION.
 When adding, modifying, or removing a dependency in Vector you may find that you need to update the
 inventory of third-party licenses maintained in `LICENSE-3rdparty.csv`. This file is generated using
 [dd-rust-license-tool](https://github.com/DataDog/rust-license-tool.git) and can be updated using
-`cargo vdev build licenses`.
+`make build-licenses`.
 
 ## Next steps
 

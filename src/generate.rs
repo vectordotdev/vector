@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 use std::{
-    fs::{create_dir_all, File},
+    fs::{File, create_dir_all},
     io::Write,
     path::{Path, PathBuf},
 };
@@ -9,13 +9,15 @@ use clap::Parser;
 use colored::*;
 use indexmap::IndexMap;
 use serde::Serialize;
-use toml::{map::Map, Value};
-use vector_lib::configurable::component::{
-    SinkDescription, SourceDescription, TransformDescription,
+use toml::{Value, map::Map};
+use vector_lib::{
+    buffers::BufferConfig,
+    config::GlobalOptions,
+    configurable::component::{SinkDescription, SourceDescription, TransformDescription},
+    default_data_dir,
 };
-use vector_lib::{buffers::BufferConfig, config::GlobalOptions, default_data_dir};
 
-use crate::config::{format, Format, SinkHealthcheckOptions};
+use crate::config::{Format, SinkHealthcheckOptions, format};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -140,8 +142,7 @@ pub(crate) fn generate_example(
             let (name, source_type) = if let Some(c_index) = source_expr.find(':') {
                 if c_index == 0 {
                     errs.push(format!(
-                        "failed to generate source '{}': empty name is not allowed",
-                        source_expr
+                        "failed to generate source '{source_expr}': empty name is not allowed"
                     ));
                     continue;
                 }
@@ -151,17 +152,14 @@ pub(crate) fn generate_example(
                     chopped_expr.drain(1..).collect(),
                 )
             } else {
-                (format!("source{}", i), source_expr.clone())
+                (format!("source{i}"), source_expr.clone())
             };
             source_names.push(name.clone());
 
             let mut example = match SourceDescription::example(&source_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    errs.push(format!(
-                        "failed to generate source '{}': {}",
-                        source_type, err
-                    ));
+                    errs.push(format!("failed to generate source '{source_type}': {err}"));
                     Value::Table(Map::new())
                 }
             };
@@ -186,8 +184,7 @@ pub(crate) fn generate_example(
             let (name, transform_type) = if let Some(c_index) = transform_expr.find(':') {
                 if c_index == 0 {
                     errs.push(format!(
-                        "failed to generate transform '{}': empty name is not allowed",
-                        transform_expr
+                        "failed to generate transform '{transform_expr}': empty name is not allowed"
                     ));
                     continue;
                 }
@@ -197,7 +194,7 @@ pub(crate) fn generate_example(
                     chopped_expr.drain(1..).collect(),
                 )
             } else {
-                (format!("transform{}", i), transform_expr.clone())
+                (format!("transform{i}"), transform_expr.clone())
             };
             transform_names.push(name.clone());
 
@@ -206,10 +203,12 @@ pub(crate) fn generate_example(
                     if i == 0 {
                         source_names.clone()
                     } else {
-                        vec![transform_names
-                            .get(i - 1)
-                            .unwrap_or(&"component-id".to_owned())
-                            .to_owned()]
+                        vec![
+                            transform_names
+                                .get(i - 1)
+                                .unwrap_or(&"component-id".to_owned())
+                                .to_owned(),
+                        ]
                     }
                 }
                 #[cfg(test)]
@@ -220,8 +219,7 @@ pub(crate) fn generate_example(
                 Ok(example) => example,
                 Err(err) => {
                     errs.push(format!(
-                        "failed to generate transform '{}': {}",
-                        transform_type, err
+                        "failed to generate transform '{transform_type}': {err}"
                     ));
                     Value::Table(Map::new())
                 }
@@ -252,8 +250,7 @@ pub(crate) fn generate_example(
             let (name, sink_type) = if let Some(c_index) = sink_expr.find(':') {
                 if c_index == 0 {
                     errs.push(format!(
-                        "failed to generate sink '{}': empty name is not allowed",
-                        sink_expr
+                        "failed to generate sink '{sink_expr}': empty name is not allowed"
                     ));
                     continue;
                 }
@@ -263,13 +260,13 @@ pub(crate) fn generate_example(
                     chopped_expr.drain(1..).collect(),
                 )
             } else {
-                (format!("sink{}", i), sink_expr.clone())
+                (format!("sink{i}"), sink_expr.clone())
             };
 
             let mut example = match SinkDescription::example(&sink_type) {
                 Ok(example) => example,
                 Err(err) => {
-                    errs.push(format!("failed to generate sink '{}': {}", sink_type, err));
+                    errs.push(format!("failed to generate sink '{sink_type}': {err}"));
                     Value::Table(Map::new())
                 }
             };
@@ -329,9 +326,9 @@ pub(crate) fn generate_example(
     };
 
     let file = opts.file.as_ref();
-    if file.is_some() {
-        #[allow(clippy::print_stdout)]
-        match write_config(file.as_ref().unwrap(), &builder) {
+    if let Some(path) = file {
+        match write_config(path, &builder) {
+            #[allow(clippy::print_stdout)]
             Ok(_) => {
                 println!(
                     "Config file written to {:?}",
@@ -354,7 +351,7 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
         Ok(s) => {
             #[allow(clippy::print_stdout)]
             {
-                println!("{}", s);
+                println!("{s}");
             }
             exitcode::OK
         }
@@ -384,9 +381,10 @@ fn write_config(filepath: &Path, body: &str) -> Result<(), crate::Error> {
 
 #[cfg(test)]
 mod tests {
+    use rstest::rstest;
+
     use super::*;
     use crate::config::ConfigBuilder;
-    use rstest::rstest;
 
     fn generate_and_deserialize(expression: String, format: Format) {
         let opts = Opts {
@@ -411,15 +409,15 @@ mod tests {
     #[test]
     fn generate_all(#[case] format: Format) {
         for name in SourceDescription::types() {
-            generate_and_deserialize(format!("{}//", name), format);
+            generate_and_deserialize(format!("{name}//"), format);
         }
 
         for name in TransformDescription::types() {
-            generate_and_deserialize(format!("/{}/", name), format);
+            generate_and_deserialize(format!("/{name}/"), format);
         }
 
         for name in SinkDescription::types() {
-            generate_and_deserialize(format!("//{}", name), format);
+            generate_and_deserialize(format!("//{name}"), format);
         }
     }
 
@@ -672,13 +670,13 @@ mod tests {
             sources:
               source0:
                 count: 9223372036854775807
-                format: json
-                interval: 1.0
-                type: demo_logs
                 decoding:
                   codec: bytes
+                format: json
                 framing:
                   method: bytes
+                interval: 1.0
+                type: demo_logs
             transforms:
               transform0:
                 inputs:
@@ -693,12 +691,12 @@ mod tests {
               sink0:
                 inputs:
                 - transform0
-                target: stdout
-                type: console
                 encoding:
                   codec: json
                   json:
                     pretty: false
+                target: stdout
+                type: console
                 healthcheck:
                   enabled: true
                   uri: null
@@ -732,15 +730,15 @@ mod tests {
               "sources": {
                 "source0": {
                   "count": 9223372036854775807,
-                  "format": "json",
-                  "interval": 1.0,
-                  "type": "demo_logs",
                   "decoding": {
                     "codec": "bytes"
                   },
+                  "format": "json",
                   "framing": {
                     "method": "bytes"
-                  }
+                  },
+                  "interval": 1.0,
+                  "type": "demo_logs"
                 }
               },
               "transforms": {
@@ -761,14 +759,14 @@ mod tests {
                   "inputs": [
                     "transform0"
                   ],
-                  "target": "stdout",
-                  "type": "console",
                   "encoding": {
                     "codec": "json",
                     "json": {
                       "pretty": false
                     }
                   },
+                  "target": "stdout",
+                  "type": "console",
                   "healthcheck": {
                     "enabled": true,
                     "uri": null

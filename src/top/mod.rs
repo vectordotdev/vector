@@ -1,14 +1,10 @@
 //! Top subcommand
 mod cmd;
-mod dashboard;
-mod events;
-mod metrics;
-mod state;
 
 use clap::Parser;
-pub use cmd::cmd;
-pub use cmd::top;
-pub use dashboard::is_tty;
+use glob::Pattern;
+
+pub use cmd::{cmd, top};
 use url::Url;
 
 use crate::config::api::default_graphql_url;
@@ -34,6 +30,10 @@ pub struct Opts {
     /// By default, top will attempt to reconnect if the connection drops.
     #[arg(short, long)]
     no_reconnect: bool,
+
+    /// Components IDs to observe (comma-separated; accepts glob patterns)
+    #[arg(default_value = "*", value_delimiter(','), short = 'c', long)]
+    components: Vec<Pattern>,
 }
 
 impl Opts {

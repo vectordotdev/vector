@@ -2,6 +2,7 @@ use std::{fs::remove_file, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, StreamExt};
+use smallvec::SmallVec;
 use tokio::{
     io::AsyncWriteExt,
     net::{UnixListener, UnixStream},
@@ -9,39 +10,46 @@ use tokio::{
 };
 use tokio_stream::wrappers::UnixListenerStream;
 use tokio_util::codec::FramedRead;
-use tracing::{field, Instrument};
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_lib::EstimatedJsonEncodedSizeOf;
+use tracing::{Instrument, field};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::StreamDecodingError,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+};
 
 use super::AfterReadExt;
 use crate::{
+    SourceSender,
     async_read::VecAsyncReadExt,
-    codecs::Decoder,
     event::Event,
     internal_events::{
         ConnectionOpen, OpenGauge, SocketEventsReceived, SocketMode, StreamClosedError,
         UnixSocketError, UnixSocketFileDeleteError,
     },
     shutdown::ShutdownSignal,
-    sources::util::change_socket_permissions,
-    sources::util::unix::UNNAMED_SOCKET_HOST,
-    sources::Source,
-    SourceSender,
+    sources::{
+        Source,
+        util::{change_socket_permissions, unix::UNNAMED_SOCKET_HOST},
+    },
 };
 
 /// Returns a `Source` object corresponding to a Unix domain stream socket.
 /// Passing in different functions for `decoder` and `handle_events` can allow
 /// for different source-specific logic (such as decoding syslog messages in the
 /// syslog source).
-pub fn build_unix_stream_source(
+pub fn build_unix_stream_source<D, F, E>(
     listen_path: PathBuf,
     socket_file_mode: Option<u32>,
-    decoder: Decoder,
+    decoder: D,
     handle_events: impl Fn(&mut [Event], Option<Bytes>) + Clone + Send + Sync + 'static,
     shutdown: ShutdownSignal,
     out: SourceSender,
-) -> crate::Result<Source> {
+) -> crate::Result<Source>
+where
+    D: tokio_util::codec::Decoder<Item = (F, usize), Error = E> + Clone + Send + 'static,
+    E: StreamDecodingError + std::fmt::Display + Send,
+    F: Into<SmallVec<[Event; 1]>> + Send,
+{
     Ok(Box::pin(async move {
         let listener = UnixListener::bind(&listen_path).unwrap_or_else(|e| {
             panic!(
@@ -108,7 +116,9 @@ pub fn build_unix_stream_source(
 
                     while let Some(result) = stream.next().await {
                         match result {
-                            Ok((mut events, _byte_size)) => {
+                            Ok((frame, _byte_size)) => {
+                                let mut events = frame.into();
+
                                 emit!(SocketEventsReceived {
                                     mode: SocketMode::Unix,
                                     byte_size: events.estimated_json_encoded_size_of(),

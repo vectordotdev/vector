@@ -1,9 +1,17 @@
 #![allow(missing_docs)]
+use std::{
+    collections::HashMap,
+    fmt,
+    net::SocketAddr,
+    task::{Context, Poll},
+    time::Duration,
+};
+
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
-    header::HeaderValue, request::Builder, uri::InvalidUri, HeaderMap, Request, Response, Uri,
-    Version,
+    HeaderMap, Request, Response, Uri, Version, header::HeaderValue, request::Builder,
+    uri::InvalidUri,
 };
 use hyper::{
     body::{Body, HttpBody},
@@ -15,12 +23,6 @@ use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use std::{
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
-};
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -28,13 +30,14 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
+#[cfg(feature = "aws-core")]
+use crate::aws::AwsAuthentication;
 use crate::{
     config::ProxyConfig,
-    internal_events::{http_client, HttpServerRequestReceived, HttpServerResponseSent},
-    tls::{tls_connector_builder, MaybeTlsSettings, TlsError},
+    internal_events::{HttpServerRequestReceived, HttpServerResponseSent, http_client},
+    tls::{MaybeTlsSettings, TlsError, tls_connector_builder},
 };
 
 pub mod status {
@@ -101,7 +104,7 @@ where
 
         let app_name = crate::get_app_name();
         let version = crate::get_version();
-        let user_agent = HeaderValue::from_str(&format!("{}/{}", app_name, version))
+        let user_agent = HeaderValue::from_str(&format!("{app_name}/{version}"))
             .expect("Invalid header value for user-agent!");
 
         Ok(HttpClient {
@@ -273,7 +276,7 @@ impl<B> fmt::Debug for HttpClient<B> {
 pub enum Auth {
     /// Basic authentication.
     ///
-    /// The username and password are concatenated and encoded via [base64][base64].
+    /// The username and password are concatenated and encoded using [base64][base64].
     ///
     /// [base64]: https://en.wikipedia.org/wiki/Base64
     Basic {
@@ -294,6 +297,16 @@ pub enum Auth {
     Bearer {
         /// The bearer authentication token.
         token: SensitiveString,
+    },
+
+    #[cfg(feature = "aws-core")]
+    /// AWS authentication.
+    Aws {
+        /// The AWS authentication configuration.
+        auth: AwsAuthentication,
+
+        /// The AWS service name to use for signing.
+        service: String,
     },
 }
 
@@ -333,6 +346,8 @@ impl Auth {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
+            #[cfg(feature = "aws-core")]
+            _ => {}
         }
     }
 }
@@ -347,7 +362,7 @@ pub fn get_http_scheme_from_uri(uri: &Uri) -> &'static str {
         // it also supports arbitrary schemes, which is where we bomb out down here, since we can't generate a static
         // string for an arbitrary input string... and anything other than "http" and "https" makes no sense for an HTTP
         // client anyways.
-        s => panic!("invalid URI scheme for HTTP client: {}", s),
+        s => panic!("invalid URI scheme for HTTP client: {s}"),
     })
 }
 
@@ -461,8 +476,8 @@ impl MaxConnectionAgeLayer {
         // Ensure the jitter_factor is between 0.0 and 1.0
         let jitter_factor = jitter_factor.clamp(0.0, 1.0);
         // Generate a random jitter factor between `1 - jitter_factor`` and `1 + jitter_factor`.
-        let mut rng = rand::thread_rng();
-        let random_jitter_factor = rng.gen_range(-jitter_factor..=jitter_factor) + 1.;
+        let mut rng = rand::rng();
+        let random_jitter_factor = rng.random_range(-jitter_factor..=jitter_factor) + 1.;
         duration.mul_f64(random_jitter_factor)
     }
 }
@@ -553,17 +568,125 @@ where
     }
 }
 
+/// The type of a query parameter's value, determines if it's treated as a plain string or a VRL expression.
+#[configurable_component]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[serde(rename_all = "snake_case")]
+pub enum ParamType {
+    /// The parameter value is a plain string.
+    #[default]
+    String,
+    /// The parameter value is a VRL expression that will be evaluated before each request.
+    Vrl,
+}
+
+impl ParamType {
+    fn is_default(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
+/// Represents a query parameter value, which can be a simple string or a typed object
+/// indicating whether the value is a string or a VRL expression.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(untagged)]
+pub enum ParameterValue {
+    /// A simple string value. For backwards compatibility.
+    String(String),
+    /// A value with an explicit type.
+    Typed {
+        /// The raw value of the parameter.
+        value: String,
+        /// The type of the parameter, indicating how the `value` should be treated.
+        #[serde(
+            default,
+            skip_serializing_if = "ParamType::is_default",
+            rename = "type"
+        )]
+        r#type: ParamType,
+    },
+}
+
+impl ParameterValue {
+    /// Returns true if the parameter is a VRL expression.
+    pub const fn is_vrl(&self) -> bool {
+        match self {
+            ParameterValue::String(_) => false,
+            ParameterValue::Typed { r#type, .. } => matches!(r#type, ParamType::Vrl),
+        }
+    }
+
+    /// Returns the raw string value of the parameter.
+    #[allow(clippy::missing_const_for_fn)]
+    pub fn value(&self) -> &str {
+        match self {
+            ParameterValue::String(s) => s,
+            ParameterValue::Typed { value, .. } => value,
+        }
+    }
+
+    /// Consumes the `ParameterValue` and returns the owned raw string value.
+    pub fn into_value(self) -> String {
+        match self {
+            ParameterValue::String(s) => s,
+            ParameterValue::Typed { value, .. } => value,
+        }
+    }
+}
+
+/// Configuration of the query parameter value for HTTP requests.
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(untagged)]
+#[configurable(metadata(docs::enum_tag_description = "Query parameter value"))]
+pub enum QueryParameterValue {
+    /// Query parameter with single value
+    SingleParam(ParameterValue),
+    /// Query parameter with multiple values
+    MultiParams(Vec<ParameterValue>),
+}
+
+impl QueryParameterValue {
+    /// Returns an iterator over the contained `ParameterValue`s.
+    pub fn iter(&self) -> impl Iterator<Item = &ParameterValue> {
+        match self {
+            QueryParameterValue::SingleParam(param) => std::slice::from_ref(param).iter(),
+            QueryParameterValue::MultiParams(params) => params.iter(),
+        }
+    }
+
+    /// Convert to `Vec<ParameterValue>` for owned iteration.
+    fn into_vec(self) -> Vec<ParameterValue> {
+        match self {
+            QueryParameterValue::SingleParam(param) => vec![param],
+            QueryParameterValue::MultiParams(params) => params,
+        }
+    }
+}
+
+// Implement IntoIterator for owned QueryParameterValue
+impl IntoIterator for QueryParameterValue {
+    type Item = ParameterValue;
+    type IntoIter = std::vec::IntoIter<ParameterValue>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.into_vec().into_iter()
+    }
+}
+
+pub type QueryParameters = HashMap<String, QueryParameterValue>;
+
 #[cfg(test)]
 mod tests {
     use std::convert::Infallible;
 
-    use hyper::{server::conn::AddrStream, service::make_service_fn, Server};
+    use hyper::{Server, server::conn::AddrStream, service::make_service_fn};
     use proptest::prelude::*;
     use tower::ServiceBuilder;
 
-    use crate::test_util::next_addr;
-
     use super::*;
+    use crate::test_util::next_addr;
 
     #[test]
     fn test_default_request_headers_defaults() {
@@ -777,13 +900,13 @@ mod tests {
 
         // Responses generated before the client's max connection age has elapsed do not
         // include a `Connection: close` header in the response.
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();
         assert_eq!(response.headers().get("Connection"), None);
 
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();
@@ -792,7 +915,7 @@ mod tests {
         // The first response generated after the client's max connection age has elapsed should
         // include the `Connection: close` header.
         tokio::time::sleep(Duration::from_secs(1)).await;
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();
@@ -804,7 +927,7 @@ mod tests {
         // The next request should establish a new connection.
         // Importantly, this also confirms that each connection has its own independent
         // connection age timer.
-        let req = Request::get(format!("http://{}/", addr))
+        let req = Request::get(format!("http://{addr}/"))
             .body(Body::empty())
             .unwrap();
         let response = client.send(req).await.unwrap();

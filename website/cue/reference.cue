@@ -31,9 +31,10 @@ _values: {
 //
 // * `at_least_once` - The event will be delivered at least once and
 // could be delivered more than once.
+// * `exactly_once` - The event will be delivered exactly once.
 // * `best_effort` - We will make a best effort to deliver the event,
 // but the event is not guaranteed to be delivered.
-#DeliveryStatus: "at_least_once" | "best_effort"
+#DeliveryStatus: "at_least_once" | "exactly_once" | "best_effort"
 
 // `#DeploymentRoles` clarify when a component should be used under
 // certain deployment contexts.
@@ -357,7 +358,6 @@ _values: {
 	"aarch64-unknown-linux-musl":     bool | *true
 	"armv7-unknown-linux-gnueabihf":  bool | *true
 	"armv7-unknown-linux-musleabihf": bool | *true
-	"x86_64-apple-darwin":            bool | *true
 	"x86_64-pc-windows-msv":          bool | *true
 	"x86_64-unknown-linux-gnu":       bool | *true
 	"x86_64-unknown-linux-musl":      bool | *true

@@ -3,9 +3,9 @@ use std::time::Duration;
 use chrono::Local;
 use futures_util::future::join_all;
 use tokio::sync::{mpsc, oneshot};
-use vector_lib::api_client::{connect_subscription_client, Client};
+use vector_lib::api_client::{Client, connect_subscription_client};
 
-use super::{
+use vector_lib::top::{
     dashboard::{init_dashboard, is_tty},
     metrics,
     state::{self, ConnectionStatus, EventType},
@@ -63,7 +63,8 @@ pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> e
     match init_dashboard(
         dashboard_title,
         opts.url().as_str(),
-        opts,
+        opts.interval,
+        opts.human_metrics,
         state_rx,
         shutdown_rx,
     )
@@ -76,7 +77,7 @@ pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> e
         Err(err) => {
             #[allow(clippy::print_stderr)]
             {
-                eprintln!("[top] Encountered shutdown error: {}", err);
+                eprintln!("[top] Encountered shutdown error: {err}");
             }
             connection.abort();
             exitcode::IOERR
@@ -98,7 +99,7 @@ async fn subscription(
         // Initialize state. On future reconnects, we re-initialize state in
         // order to accurately capture added, removed, and edited
         // components.
-        let state = match metrics::init_components(&client).await {
+        let state = match metrics::init_components(&client, &opts.components).await {
             Ok(state) => state,
             Err(_) => {
                 tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
@@ -116,7 +117,12 @@ async fn subscription(
         };
 
         // Subscribe to updated metrics
-        let finished = metrics::subscribe(subscription_client, tx.clone(), opts.interval as i64);
+        let finished = metrics::subscribe(
+            subscription_client,
+            tx.clone(),
+            opts.interval as i64,
+            opts.components.clone(),
+        );
 
         _ = tx
             .send(EventType::ConnectionUpdated(ConnectionStatus::Connected(

@@ -3,35 +3,33 @@ use std::num::NonZeroU32;
 use bytes::Bytes;
 use chrono::{SubsecRound, Utc};
 use flate2::read::ZlibDecoder;
-use futures::{channel::mpsc::Receiver, stream, StreamExt};
+use futures::{StreamExt, channel::mpsc::Receiver, stream};
 use http::request::Parts;
 use hyper::StatusCode;
 use indoc::indoc;
 use prost::Message;
-use rand::{thread_rng, Rng};
-
+use rand::{Rng, rng};
 use vector_lib::{
-    config::{init_telemetry, Tags, Telemetry},
+    config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue},
     metric_tags,
 };
 
+use super::{
+    DatadogMetricsConfig,
+    config::{SERIES_V1_PATH, SERIES_V2_PATH},
+    encoder::{ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE},
+};
 use crate::{
     config::SinkConfig,
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
         components::{
-            assert_data_volume_sink_compliance, assert_sink_compliance, DATA_VOLUME_SINK_TAGS,
-            SINK_TAGS,
+            DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
+            assert_sink_compliance,
         },
         map_event_batch_stream, next_addr,
     },
-};
-
-use super::{
-    config::{SERIES_V1_PATH, SERIES_V2_PATH},
-    encoder::{ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE},
-    DatadogMetricsConfig,
 };
 
 #[allow(warnings, clippy::pedantic, clippy::nursery)]
@@ -46,7 +44,7 @@ fn generate_counters() -> Vec<Event> {
             let ts = timestamp + (std::time::Duration::from_secs(2) * index);
             Event::Metric(
                 Metric::new(
-                    format!("counter_{}", thread_rng().gen::<u32>()),
+                    format!("counter_{}", rng().random::<u32>()),
                     MetricKind::Incremental,
                     MetricValue::Counter {
                         value: index as f64,
@@ -123,7 +121,7 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
     let addr = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -380,12 +378,14 @@ fn validate_json_counters(request: &(Parts, Bytes)) {
     assert_eq!(metric_names, sorted_names);
 
     let entry = series.first().unwrap().as_object().unwrap();
-    assert!(entry
-        .get("metric")
-        .unwrap()
-        .as_str()
-        .unwrap()
-        .starts_with("foo.counter_"),);
+    assert!(
+        entry
+            .get("metric")
+            .unwrap()
+            .as_str()
+            .unwrap()
+            .starts_with("foo.counter_"),
+    );
     assert_eq!(entry.get("type").unwrap().as_str().unwrap(), "count");
     let points = entry
         .get("points")

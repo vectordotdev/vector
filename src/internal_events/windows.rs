@@ -1,6 +1,5 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 #[derive(Debug)]
 pub struct WindowsServiceStart<'a> {
@@ -102,7 +101,6 @@ impl InternalEvent for WindowsServiceDoesNotExistError<'_> {
             error_code = "service_missing",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

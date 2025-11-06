@@ -54,6 +54,14 @@ struct InstallOpts {
         value_delimiter(',')
     )]
     config_dirs: Vec<PathBuf>,
+
+    /// Disable interpolation of environment variables in configuration files.
+    #[arg(
+        long,
+        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub disable_env_var_interpolation: bool,
 }
 
 impl InstallOpts {
@@ -64,7 +72,8 @@ impl InstallOpts {
 
         let current_exe = ::std::env::current_exe().unwrap();
         let config_paths = self.config_paths_with_formats();
-        let arguments = create_service_arguments(&config_paths).unwrap();
+        let arguments =
+            create_service_arguments(&config_paths, self.disable_env_var_interpolation).unwrap();
 
         ServiceInfo {
             name: OsString::from(service_name),
@@ -200,7 +209,9 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
             }
         },
         None => {
-            error!("You must specify a sub command. Valid sub commands are [start, stop, restart, install, uninstall].");
+            error!(
+                "You must specify a sub command. Valid sub commands are [start, stop, restart, install, uninstall]."
+            );
             exitcode::USAGE
         }
     }
@@ -249,9 +260,12 @@ fn control_service(service: &ServiceInfo, action: ControlAction) -> exitcode::Ex
     }
 }
 
-fn create_service_arguments(config_paths: &[config::ConfigPath]) -> Option<Vec<OsString>> {
+fn create_service_arguments(
+    config_paths: &[config::ConfigPath],
+    disable_env_var_interpolation: bool,
+) -> Option<Vec<OsString>> {
     let config_paths = config::process_paths(config_paths)?;
-    match config::load_from_paths(&config_paths) {
+    match config::load_from_paths(&config_paths, !disable_env_var_interpolation) {
         Ok(_) => Some(
             config_paths
                 .iter()

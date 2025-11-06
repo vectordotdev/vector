@@ -1,6 +1,7 @@
 use metrics::counter;
-use vector_lib::internal_event::{error_stage, error_type};
-use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, INTENTIONAL};
+use vector_lib::internal_event::{
+    ComponentEventsDropped, INTENTIONAL, InternalEvent, error_stage, error_type,
+};
 
 #[derive(Debug)]
 pub struct LokiEventUnlabeledError;
@@ -12,7 +13,6 @@ impl InternalEvent for LokiEventUnlabeledError {
             error_code = "unlabeled_event",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
 
         counter!(
@@ -39,7 +39,6 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
             error_code = "out_of_order",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {
@@ -68,7 +67,6 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
             message = "Timestamps rewritten.",
             count = self.count,
             reason = "out_of_order",
-            internal_log_rate_limit = true,
         );
         counter!("rewritten_timestamp_events_total").increment(self.count as u64);
     }
@@ -86,7 +84,6 @@ impl InternalEvent for LokiTimestampNonParsableEventsDropped {
             error_code = "non-parsable_timestamp",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
 
         emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });

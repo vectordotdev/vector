@@ -1,14 +1,19 @@
-use std::ffi::{OsStr, OsString};
 use std::{
-    borrow::Cow, env, io::Read, path::PathBuf, process::Command, process::ExitStatus,
-    process::Stdio, sync::LazyLock, sync::OnceLock, time::Duration,
+    borrow::Cow,
+    env,
+    ffi::{OsStr, OsString},
+    fmt::Write as _,
+    path::PathBuf,
+    process::{Command, ExitStatus},
+    sync::{LazyLock, OnceLock},
+    time::Duration,
 };
 
-use anyhow::{bail, Context as _, Result};
+use anyhow::{Context as _, Result, bail};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 
-use crate::{config::Config, git, platform, util};
+use crate::utils::{self, config::Config, platform};
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.
@@ -22,7 +27,7 @@ const DEFAULT_SHELL: &str = "/bin/sh";
 // Extract the shell from the environment variable `$SHELL` and substitute the above default value
 // if it isn't set.
 pub static SHELL: LazyLock<OsString> =
-    LazyLock::new(|| (env::var_os("SHELL").unwrap_or_else(|| DEFAULT_SHELL.into())));
+    LazyLock::new(|| env::var_os("SHELL").unwrap_or_else(|| DEFAULT_SHELL.into()));
 
 static VERBOSITY: OnceLock<LevelFilter> = OnceLock::new();
 static CONFIG: OnceLock<Config> = OnceLock::new();
@@ -45,24 +50,26 @@ pub fn set_repo_dir() -> Result<()> {
 }
 
 pub fn version() -> Result<String> {
-    let mut version = util::get_version()?;
+    let mut version = utils::cargo::get_version()?;
 
-    let channel = util::get_channel();
+    let channel = utils::git::get_channel();
 
     if channel == "release" {
-        let head = util::git_head()?;
+        let head = utils::git::git_head()?;
         if !head.status.success() {
             let error = String::from_utf8_lossy(&head.stderr);
             bail!("Error running `git describe`:\n{error}");
         }
         let tag = String::from_utf8_lossy(&head.stdout).trim().to_string();
         if tag != format!("v{version}") {
-            bail!("On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting");
+            bail!(
+                "On latest release channel and tag {tag:?} is different from Cargo.toml {version:?}. Aborting"
+            );
         }
 
     // extend version for custom builds if not already
     } else if channel == "custom" && !version.contains("custom") {
-        let sha = git::get_git_sha()?;
+        let sha = utils::git::get_git_sha()?;
 
         // use '.' instead of '-' or '_' to avoid issues with rpm and deb package naming
         // format requirements.
@@ -106,34 +113,19 @@ impl CommandExt for Command {
 
     /// Run the command and capture its output.
     fn check_output(&mut self) -> Result<String> {
-        // Set up the command's stdout to be piped, so we can capture it
         self.pre_exec();
-        self.stdout(Stdio::piped());
 
-        // Spawn the process
-        let mut child = self.spawn()?;
+        let output = self.output()?;
 
-        // Read the output from child.stdout into a buffer
-        let mut buffer = Vec::new();
-        child.stdout.take().unwrap().read_to_end(&mut buffer)?;
-
-        // Catch the exit code
-        let status = child.wait()?;
-        // There are commands that might fail with stdout, but we probably do not
-        // want to capture
-        // If the exit code is non-zero, return an error with the command, exit code, and stderr output
-        if !status.success() {
-            let stdout = String::from_utf8_lossy(&buffer);
+        if output.status.success() {
+            // If the command exits successfully, return stdout as a string
+            Ok(String::from_utf8(output.stdout)?)
+        } else {
             bail!(
-                "Command: {:?}\nfailed with exit code: {}\n\noutput:\n{}",
-                self,
-                status.code().unwrap(),
-                stdout
-            );
+                "{}",
+                format_command_error(&output, Some(&format!("Command: {self:?}")))
+            )
         }
-
-        // If the command exits successfully, return the output as a string
-        Ok(String::from_utf8(buffer)?)
     }
 
     /// Run the command and catch its exit code.
@@ -170,11 +162,7 @@ impl CommandExt for Command {
         if output.status.success() {
             Ok(())
         } else {
-            bail!(
-                "{}\nfailed with exit code: {}",
-                String::from_utf8(output.stdout)?,
-                output.status.code().unwrap()
-            )
+            bail!("{}", format_command_error(&output, None))
         }
     }
 
@@ -204,6 +192,36 @@ impl CommandExt for Command {
         }
         self
     }
+}
+
+/// Helper function to build an error message from command output
+fn format_command_error(
+    output: &std::process::Output,
+    command_description: Option<&str>,
+) -> String {
+    let mut error_msg = String::new();
+
+    if !output.stdout.is_empty() {
+        error_msg.push_str(&String::from_utf8_lossy(&output.stdout));
+        error_msg.push('\n');
+    }
+
+    if !output.stderr.is_empty() {
+        error_msg.push_str(&String::from_utf8_lossy(&output.stderr));
+        error_msg.push('\n');
+    }
+
+    if let Some(description) = command_description {
+        let _ = writeln!(error_msg, "{description}");
+    }
+
+    let _ = write!(
+        error_msg,
+        "failed with exit code: {}",
+        output.status.code().unwrap()
+    );
+
+    error_msg
 }
 
 /// Short-cut wrapper to create a new command, feed in the args, set the working directory, and then

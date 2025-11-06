@@ -1,10 +1,12 @@
 use std::{
+    collections::HashMap,
     future::Future,
     pin::Pin,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use aws_sdk_cloudwatchlogs::{
+    Client as CloudwatchLogsClient,
     operation::{
         create_log_group::CreateLogGroupError,
         create_log_stream::CreateLogStreamError,
@@ -13,16 +15,14 @@ use aws_sdk_cloudwatchlogs::{
         put_retention_policy::PutRetentionPolicyError,
     },
     types::InputLogEvent,
-    Client as CloudwatchLogsClient,
 };
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
-use futures::{future::BoxFuture, FutureExt};
-use http::{header::HeaderName, HeaderValue};
+use futures::{FutureExt, future::BoxFuture};
+use http::{HeaderValue, header::HeaderName};
 use indexmap::IndexMap;
 use tokio::sync::oneshot;
 
-use crate::sinks::aws_cloudwatch_logs::config::Retention;
-use crate::sinks::aws_cloudwatch_logs::service::CloudwatchError;
+use crate::sinks::aws_cloudwatch_logs::{config::Retention, service::CloudwatchError};
 
 pub struct CloudwatchFuture {
     client: Client,
@@ -40,6 +40,8 @@ struct Client {
     group_name: String,
     headers: IndexMap<HeaderName, HeaderValue>,
     retention_days: u32,
+    kms_key: Option<String>,
+    tags: Option<HashMap<String, String>>,
 }
 
 type ClientResult<T, E> = BoxFuture<'static, Result<T, SdkError<E, HttpResponse>>>;
@@ -63,6 +65,8 @@ impl CloudwatchFuture {
         create_missing_group: bool,
         create_missing_stream: bool,
         retention: Retention,
+        kms_key: Option<String>,
+        tags: Option<HashMap<String, String>>,
         mut events: Vec<Vec<InputLogEvent>>,
         token: Option<String>,
         token_tx: oneshot::Sender<Option<String>>,
@@ -74,6 +78,8 @@ impl CloudwatchFuture {
             group_name,
             headers,
             retention_days,
+            kms_key,
+            tags,
         };
 
         let state = if let Some(token) = token {
@@ -106,17 +112,17 @@ impl Future for CloudwatchFuture {
                     let response = match ready!(fut.poll_unpin(cx)) {
                         Ok(response) => response,
                         Err(err) => {
-                            if let SdkError::ServiceError(inner) = &err {
-                                if matches!(
+                            if let SdkError::ServiceError(inner) = &err
+                                && matches!(
                                     inner.err(),
                                     DescribeLogStreamsError::ResourceNotFoundException(_)
-                                ) && self.create_missing_group
-                                {
-                                    info!("Log group provided does not exist; creating a new one.");
+                                )
+                                && self.create_missing_group
+                            {
+                                info!("Log group provided does not exist; creating a new one.");
 
-                                    self.state = State::CreateGroup(self.client.create_log_group());
-                                    continue;
-                                }
+                                self.state = State::CreateGroup(self.client.create_log_group());
+                                continue;
                             }
                             return Poll::Ready(Err(CloudwatchError::DescribeLogStreams(err)));
                         }
@@ -227,7 +233,7 @@ impl Future for CloudwatchFuture {
                     match ready!(fut.poll_unpin(cx)) {
                         Ok(_) => {}
                         Err(error) => {
-                            return Poll::Ready(Err(CloudwatchError::PutRetentionPolicy(error)))
+                            return Poll::Ready(Err(CloudwatchError::PutRetentionPolicy(error)));
                         }
                     }
 
@@ -288,10 +294,14 @@ impl Client {
     pub fn create_log_group(&self) -> ClientResult<(), CreateLogGroupError> {
         let client = self.client.clone();
         let group_name = self.group_name.clone();
+        let kms_key = self.kms_key.clone();
+        let tags = self.tags.clone();
         Box::pin(async move {
             client
                 .create_log_group()
                 .log_group_name(group_name)
+                .set_kms_key_id(kms_key)
+                .set_tags(tags)
                 .send()
                 .await?;
             Ok(())

@@ -30,14 +30,13 @@ name: CI Integration Review Trigger
 
 on:
   pull_request_review:
-    types: [submitted]
+    types: [ submitted ]
 
 permissions:
   statuses: write
+  packages: write
 
 env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
   TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
   TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
@@ -45,7 +44,7 @@ env:
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
   PROFILE: debug
@@ -55,7 +54,7 @@ jobs:
     name: (PR review) Signal pending to PR
     runs-on: ubuntu-24.04
     timeout-minutes: 5
-    if: startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all')
+    if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-e2e') || contains(github.event.review.body, '/ci-run-all')
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -65,7 +64,7 @@ jobs:
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Get PR review author
         id: comment
-        uses: tspascoal/get-user-teams-membership@v3
+        uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
         with:
           username: ${{ github.actor }}
           team: 'Vector'
@@ -76,423 +75,95 @@ jobs:
         run: exit 1
 
       - name: (PR review) Set latest commit status as pending
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-  integration-tests:
+  build-test-runner:
     needs: prep-pr
-    runs-on: ubuntu-20.04
+    uses: ./.github/workflows/build-test-runner.yml
+    with:
+      commit_sha: ${{ github.event.review.commit_id }}
+      checkout_ref: ${{ github.event.review.commit_id }}
+
+  integration-tests:
+    needs:
+      - prep-pr
+      - build-test-runner
+    runs-on: ubuntu-24.04
     timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [
+          "amqp", "appsignal", "aws", "axiom", "azure", "clickhouse", "databend", "datadog-agent",
+          "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "elasticsearch",
+          "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
+          "loki", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
+          "redis", "splunk", "webhdfs"
+        ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
-      - run: sudo npm -g install @datadog/datadog-ci
-
-      - run: docker image prune -af ; docker container prune -f
-
-      - name: amqp
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-amqp')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
         with:
-          # First one requires more time, as we need to build the image from scratch
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int amqp
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.event.review.commit_id }}
 
-      - name: appsignal
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-appsignal')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
+      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
+
+      - name: Integration Tests - ${{ matrix.service }}
+        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-all')
+          || startsWith(github.event.review.body, '/ci-run-all')
+          || startsWith(github.event.review.body, format('/ci-run-integration-{0}', matrix.service)) }}
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int appsignal
-
-      - name: aws
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-aws')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int aws
-
-      - name: axiom
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-axiom')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int axiom
-
-      - name: azure
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-azure')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int azure
-
-      - name: clickhouse
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-clickhouse')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int clickhouse
-
-      - name: databend
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-databend')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int databend
-
-      - name: datadog-agent
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-datadog-agent')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int datadog-agent
-
-      - name: datadog-logs
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-datadog-logs')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int datadog-logs
-
-      - name: datadog-metrics
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-datadog-metrics')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int datadog-metrics
-
-      - name: datadog-traces
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-datadog-traces')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int datadog-traces
-
-      - name: dnstap
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-dnstap')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int dnstap
-
-      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
-
-      - name: docker-logs
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-docker-logs')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int docker-logs
-
-      - name: elasticsearch
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-elasticsearch')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int elasticsearch
-
-      - name: eventstoredb
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-eventstoredb')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int eventstoredb
-
-      - name: fluent
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-fluent')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int fluent
-
-      - name: gcp
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-gcp')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int gcp
-
-      - name: greptimedb
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-greptimedb')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int greptimedb
-
-      - name: humio
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-humio')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int humio
-
-      - name: http-client
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-http-client')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int http-client
-
-      - name: influxdb
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-influxdb')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int influxdb
-
-      - name: kafka
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-kafka')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int kafka
-
-      - name: logstash
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-logstash')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int logstash
-
-      - name: loki
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-loki')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int loki
-
-      - name: mongodb
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-mongodb')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int mongodb
-
-      - name: mqtt
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-mqtt')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int mqtt
-
-      - run: docker image prune -af --filter=label!=vector-test-runner=true ; docker container prune -f
-
-      - name: nats
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-nats')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int nats
-
-      - name: nginx
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-nginx')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int nginx
-
-      - name: opentelemetry
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-opentelemetry')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int opentelemetry
-
-      - name: postgres
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-postgres')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int postgres
-
-      - name: prometheus
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-prometheus')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int prometheus
-
-      - name: pulsar
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-pulsar')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int pulsar
-
-      - name: redis
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-redis')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int redis
-
-      - name: shutdown
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-shutdown')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int shutdown
-
-      - name: splunk
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-splunk')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int splunk
-
-      - name: webhdfs
-        if: ${{ startsWith(github.event.review.body, '/ci-run-integration-webhdfs')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 30
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh int webhdfs
+          command: bash scripts/run-integration-test.sh int ${{ matrix.service }}
 
   e2e-tests:
-    needs: prep-pr
-    runs-on: ubuntu-20.04-8core
+    needs:
+      - prep-pr
+      - build-test-runner
+    runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [
+          "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"
+        ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
-      - run: sudo npm -g install @datadog/datadog-ci
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.event.review.commit_id }}
 
-      - run: docker image prune -af ; docker container prune -f
-      - name: e2e-datadog-logs
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-logs')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
+      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
+
+      - name: E2E Tests - ${{ matrix.service }}
+        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-all')
+          || startsWith(github.event.review.body, '/ci-run-all')
+          || startsWith(github.event.review.body, format('/ci-run-e2e-{0}', matrix.service)) }}
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh e2e datadog-logs
+          command: bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
 
-      - name: datadog-e2e-metrics
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-metrics')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 35
-          max_attempts: 3
-          command: bash scripts/ci-int-e2e-test.sh e2e datadog-metrics
 
   update-pr-status:
     name: Signal result to PR
@@ -501,9 +172,9 @@ jobs:
     needs:
       - integration-tests
       - e2e-tests
-    if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all'))
+    if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-e2e'))
     env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
+      FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -514,7 +185,7 @@ jobs:
 
       - name: Validate issue comment
         if: github.event_name == 'pull_request_review'
-        uses: tspascoal/get-user-teams-membership@v3
+        uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
         with:
           username: ${{ github.actor }}
           team: 'Vector'
@@ -522,16 +193,17 @@ jobs:
 
       - name: (PR review) Submit PR result as success
         if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
 
-      - run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ env.FAILED }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi

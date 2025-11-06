@@ -3,22 +3,24 @@
 use std::{collections::HashMap, io};
 
 use bytes::BytesMut;
-use serde_json::{json, to_vec, Map};
+use serde_json::{Map, json, to_vec};
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
-use vrl::path::PathPrefix;
+use vrl::{event_path, path::PathPrefix};
 
+use super::config::{
+    StackdriverLabelConfig, StackdriverLogName, StackdriverResource, default_labels_key,
+};
 use crate::{
     sinks::{prelude::*, util::encoding::Encoder as SinkEncoder},
     template::TemplateRenderingError,
 };
-
-use super::config::{StackdriverLogName, StackdriverResource};
 
 #[derive(Clone, Debug)]
 pub(super) struct StackdriverLogsEncoder {
     transformer: Transformer,
     log_id: Template,
     log_name: StackdriverLogName,
+    label_config: StackdriverLabelConfig,
     resource: StackdriverResource,
     severity_key: Option<ConfigValuePath>,
 }
@@ -29,6 +31,7 @@ impl StackdriverLogsEncoder {
         transformer: Transformer,
         log_id: Template,
         log_name: StackdriverLogName,
+        label_config: StackdriverLabelConfig,
         resource: StackdriverResource,
         severity_key: Option<ConfigValuePath>,
     ) -> Self {
@@ -36,13 +39,28 @@ impl StackdriverLogsEncoder {
             transformer,
             log_id,
             log_name,
+            label_config,
             resource,
             severity_key,
         }
     }
 
     pub(super) fn encode_event(&self, event: Event) -> Option<serde_json::Value> {
-        let mut labels = HashMap::with_capacity(self.resource.labels.len());
+        let mut labels = HashMap::with_capacity(self.label_config.labels.len());
+        for (key, template) in &self.label_config.labels {
+            let value = template
+                .render_string(&event)
+                .map_err(|error| {
+                    emit!(crate::internal_events::TemplateRenderingError {
+                        error,
+                        field: Some("labels"),
+                        drop_event: true,
+                    });
+                })
+                .ok()?;
+            labels.insert(key.clone(), value);
+        }
+        let mut resource_labels = HashMap::with_capacity(self.resource.labels.len());
         for (key, template) in &self.resource.labels {
             let value = template
                 .render_string(&event)
@@ -54,7 +72,7 @@ impl StackdriverLogsEncoder {
                     });
                 })
                 .ok()?;
-            labels.insert(key.clone(), value);
+            resource_labels.insert(key.clone(), value);
         }
         let log_name = self
             .log_name(&event)
@@ -75,6 +93,23 @@ impl StackdriverLogsEncoder {
             .map(remap_severity)
             .unwrap_or_else(|| 0.into());
 
+        let default_labels_key = default_labels_key();
+        let labels_key = self
+            .label_config
+            .labels_key
+            .as_deref()
+            .or(default_labels_key.as_deref())
+            .unwrap();
+
+        // merge log_labels in the specified labels_key into the labels map.
+        if let Some(Value::Object(log_labels)) = log.remove(event_path!(labels_key)) {
+            labels.extend(
+                log_labels
+                    .into_iter()
+                    .map(|(k, v)| (k.to_string(), v.to_string_lossy().into_owned())),
+            );
+        }
+
         let mut event = Event::Log(log);
         self.transformer.transform(&mut event);
 
@@ -84,11 +119,12 @@ impl StackdriverLogsEncoder {
         entry.insert("logName".into(), json!(log_name));
         entry.insert("jsonPayload".into(), json!(log));
         entry.insert("severity".into(), json!(severity));
+        entry.insert("labels".into(), json!(labels));
         entry.insert(
             "resource".into(),
             json!({
                 "type": self.resource.type_,
-                "labels": labels,
+                "labels": resource_labels,
             }),
         );
 
@@ -106,10 +142,10 @@ impl StackdriverLogsEncoder {
         let log_id = self.log_id.render_string(event)?;
 
         Ok(match &self.log_name {
-            BillingAccount(acct) => format!("billingAccounts/{}/logs/{}", acct, log_id),
-            Folder(folder) => format!("folders/{}/logs/{}", folder, log_id),
-            Organization(org) => format!("organizations/{}/logs/{}", org, log_id),
-            Project(project) => format!("projects/{}/logs/{}", project, log_id),
+            BillingAccount(acct) => format!("billingAccounts/{acct}/logs/{log_id}"),
+            Folder(folder) => format!("folders/{folder}/logs/{log_id}"),
+            Organization(org) => format!("organizations/{org}/logs/{log_id}"),
+            Project(project) => format!("projects/{project}/logs/{log_id}"),
         })
     }
 }
@@ -134,8 +170,7 @@ pub(super) fn remap_severity(severity: Value) -> Value {
                     _ => {
                         warn!(
                             message = "Unknown severity value string, using DEFAULT.",
-                            value = %s,
-                            internal_log_rate_limit = true
+                            value = %s
                         );
                         0
                     }
@@ -145,8 +180,7 @@ pub(super) fn remap_severity(severity: Value) -> Value {
         value => {
             warn!(
                 message = "Unknown severity value type, using DEFAULT.",
-                ?value,
-                internal_log_rate_limit = true
+                ?value
             );
             0
         }

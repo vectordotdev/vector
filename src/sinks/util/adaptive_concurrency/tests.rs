@@ -15,32 +15,31 @@ use std::{
 };
 
 use futures::{
+    FutureExt, SinkExt,
     channel::oneshot,
     future::{self, BoxFuture},
-    stream, FutureExt, SinkExt,
+    stream,
 };
-use rand::{thread_rng, Rng};
+use rand::{Rng, rng};
 use rand_distr::Exp1;
 use rstest::*;
 use serde::Deserialize;
 use snafu::Snafu;
-use tokio::time::{self, sleep, Duration, Instant};
+use tokio::time::{self, Duration, Instant, sleep};
 use tower::Service;
-use vector_lib::configurable::configurable_component;
-use vector_lib::json_size::JsonSize;
+use vector_lib::{configurable::configurable_component, json_size::JsonSize};
 
-use super::controller::ControllerStatistics;
-use super::AdaptiveConcurrencySettings;
+use super::{AdaptiveConcurrencySettings, controller::ControllerStatistics};
 use crate::{
     config::{self, AcknowledgementsConfig, Input, SinkConfig, SinkContext},
-    event::{metric::MetricValue, Event},
+    event::{Event, metric::MetricValue},
     metrics,
     sinks::{
-        util::{
-            retries::{JitterMode, RetryLogic},
-            BatchSettings, Concurrency, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
-        },
         Healthcheck, VectorSink,
+        util::{
+            BatchSettings, Concurrency, EncodedEvent, EncodedLength, TowerRequestConfig, VecBuffer,
+            retries::{JitterMode, RetryLogic},
+        },
     },
     sources::demo_logs::DemoLogsConfig,
     test_util::{
@@ -195,7 +194,7 @@ impl SinkConfig for TestConfig {
             .with_flat_map(|event| {
                 stream::iter(Some(Ok(EncodedEvent::new(event, 0, JsonSize::zero()))))
             })
-            .sink_map_err(|error| panic!("Fatal test sink error: {}", error));
+            .sink_map_err(|error| panic!("Fatal test sink error: {error}"));
         let healthcheck = future::ok(()).boxed();
 
         // Dig deep to get at the internal controller statistics
@@ -236,7 +235,7 @@ impl TestSink {
 
     fn delay_at(&self, in_flight: usize, rate: usize) -> f64 {
         self.params.delay
-            * thread_rng().sample::<f64, _>(Exp1).mul_add(
+            * rng().sample::<f64, _>(Exp1).mul_add(
                 self.params.jitter,
                 1.0 + self.params.concurrency_limit_params.scale(in_flight)
                     + self.params.rate.scale(rate),
@@ -321,6 +320,7 @@ enum Error {
 struct TestRetryLogic;
 
 impl RetryLogic for TestRetryLogic {
+    type Request = Vec<Event>;
     type Response = Response;
     type Error = Error;
 
@@ -366,10 +366,10 @@ impl TestController {
 
     fn end_request(&mut self, now: Instant, completed: bool) {
         self.stats.end_request(now, completed);
-        if self.stats.completed >= self.todo {
-            if let Some(done) = self.send_done.take() {
-                done.send(()).expect("Could not send done signal");
-            }
+        if self.stats.completed >= self.todo
+            && let Some(done) = self.send_done.take()
+        {
+            done.send(()).expect("Could not send done signal");
         }
     }
 }
@@ -525,14 +525,14 @@ impl Range {
     fn assert_usize(&self, value: usize, name1: &str, name2: &str) -> Option<Failure> {
         if value < self.0 as usize {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMinimum,
                 value: value as f64,
                 reference: self.0,
             })
         } else if value > self.1 as usize {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMaximum,
                 value: value as f64,
                 reference: self.1,
@@ -545,14 +545,14 @@ impl Range {
     fn assert_f64(&self, value: f64, name1: &str, name2: &str) -> Option<Failure> {
         if value < self.0 {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMinimum,
                 value,
                 reference: self.0,
             })
         } else if value > self.1 {
             Some(Failure {
-                stat_name: format!("{} {}", name1, name2),
+                stat_name: format!("{name1} {name2}"),
                 mode: FailureMode::ExceededMaximum,
                 value,
                 reference: self.1,
@@ -669,7 +669,7 @@ async fn run_compare(input: TestInput) {
             failure.stat_name, failure.value, mode, failure.reference
         );
     }
-    assert!(failures.is_empty(), "{:#?}", results);
+    assert!(failures.is_empty(), "{results:#?}");
 }
 
 #[rstest]
@@ -681,7 +681,7 @@ async fn all_tests(#[files("tests/data/adaptive-concurrency/*.toml")] file_path:
         .read_to_string(&mut data)
         .unwrap();
     let input: TestInput = toml::from_str(&data)
-        .unwrap_or_else(|error| panic!("Invalid TOML in {:?}: {:?}", file_path, error));
+        .unwrap_or_else(|error| panic!("Invalid TOML in {file_path:?}: {error:?}"));
 
     time::pause();
 

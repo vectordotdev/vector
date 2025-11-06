@@ -14,6 +14,7 @@
   - [Minimum Supported Rust Version](#minimum-supported-rust-version)
 - [Guidelines](#guidelines)
   - [Sink healthchecks](#sink-healthchecks)
+  - [Disabling internal log rate limiting](#disabling-internal-log-rate-limiting)
 - [Testing](#testing)
   - [Unit tests](#unit-tests)
   - [Integration tests](#integration-tests)
@@ -125,8 +126,8 @@ Loosely, you'll need the following:
 - **To run `make test`:** Install [`cargo-nextest`](https://nexte.st/)
 - **To run integration tests:** Have `docker` available, or a real live version of that service. (Use `AUTOSPAWN=false`)
 - **To run `make check-component-features`:** Have `remarshal` installed.
-- **To run `make check-licenses` or `cargo vdev build licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
-- **To run `cargo vdev build component-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
+- **To run `make check-licenses` or `make build-licenses`:** Have `dd-rust-license-tool` [installed](https://github.com/DataDog/rust-license-tool).
+- **To run `make generate-component-docs`:** Have `cue` [installed](https://cuelang.org/docs/install/).
 
 If you find yourself needing to run something inside the Docker environment described above, that's totally fine, they won't collide or hurt each other. In this case, you'd just run `make environment-generate`.
 
@@ -161,7 +162,7 @@ cargo bench transforms::example
 make fmt
 cargo fmt
 # Build component documentation for the website
-cargo vdev build component-docs
+make generate-component-docs
 ```
 
 If you run `make` you'll see a full list of all our tasks. Some of these will start Docker containers, sign commits, or even make releases. These are not common development commands and your mileage may vary.
@@ -327,6 +328,28 @@ option to disable individual health checks, there's an escape hatch for users
 that fall into a false negative circumstance. Our goal should be to minimize the
 likelihood of users needing to pull that lever while still making a good effort
 to detect common problems.
+
+### Disabling internal log rate limiting
+
+Vector rate limits its own internal logs by default (10-second windows). During development, you may want to see all log occurrences.
+
+**Globally** (CLI flag or environment variable):
+
+```bash
+vector --config vector.yaml -r 1
+# or
+VECTOR_INTERNAL_LOG_RATE_LIMIT=1 vector --config vector.yaml
+```
+
+**Per log statement**:
+
+```rust
+// Disable rate limiting for this log
+warn!(message = "Error occurred.", %error, internal_log_rate_limit = false);
+
+// Override rate limit window to 1 second
+info!(message = "Processing batch.", batch_size, internal_log_rate_secs = 1);
+```
 
 ## Testing
 

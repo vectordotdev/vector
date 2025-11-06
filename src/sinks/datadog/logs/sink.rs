@@ -3,6 +3,7 @@ use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 use itertools::Itertools;
 use snafu::Snafu;
 use vector_lib::{
+    event::{ObjectMap, Value},
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
@@ -10,10 +11,10 @@ use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
 
 use super::{config::MAX_PAYLOAD_BYTES, service::LogApiRequest};
 use crate::{
-    common::datadog::{DDTAGS, DD_RESERVED_SEMANTIC_ATTRS},
+    common::datadog::{DD_RESERVED_SEMANTIC_ATTRS, DDTAGS, MESSAGE, is_reserved_attribute},
     sinks::{
         prelude::*,
-        util::{http::HttpJsonBatchSizer, Compressor},
+        util::{Compressor, http::HttpJsonBatchSizer},
     },
 };
 #[derive(Default)]
@@ -36,6 +37,7 @@ pub struct LogSinkBuilder<S> {
     compression: Option<Compression>,
     default_api_key: Arc<str>,
     protocol: String,
+    conforms_as_agent: bool,
 }
 
 impl<S> LogSinkBuilder<S> {
@@ -45,6 +47,7 @@ impl<S> LogSinkBuilder<S> {
         default_api_key: Arc<str>,
         batch_settings: BatcherSettings,
         protocol: String,
+        conforms_as_agent: bool,
     ) -> Self {
         Self {
             transformer,
@@ -53,6 +56,7 @@ impl<S> LogSinkBuilder<S> {
             batch_settings,
             compression: None,
             protocol,
+            conforms_as_agent,
         }
     }
 
@@ -69,6 +73,7 @@ impl<S> LogSinkBuilder<S> {
             batch_settings: self.batch_settings,
             compression: self.compression.unwrap_or_default(),
             protocol: self.protocol,
+            conforms_as_agent: self.conforms_as_agent,
         }
     }
 }
@@ -91,6 +96,8 @@ pub struct LogSink<S> {
     batch_settings: BatcherSettings,
     /// The protocol name
     protocol: String,
+    /// Normalize events to agent standard and attach associated HTTP header to request
+    conforms_as_agent: bool,
 }
 
 // The Datadog logs intake does not require the fields that are set in this
@@ -98,6 +105,11 @@ pub struct LogSink<S> {
 // (and value in the case of timestamp) to something that intake understands.
 pub fn normalize_event(event: &mut Event) {
     let log = event.as_mut_log();
+
+    // Will cast the internal value to an object if it already isn't
+    if !log.value().is_object() {
+        log.insert(MESSAGE, log.value().clone());
+    }
 
     // Upstream Sources may have semantically defined Datadog reserved attributes outside of their
     // expected location by DD logs intake (root of the event). Move them if needed.
@@ -113,19 +125,19 @@ pub fn normalize_event(event: &mut Event) {
     // NOTE: we don't access by semantic meaning here because in the prior step
     // we ensured reserved attributes are in expected locations.
     let ddtags_path = event_path!(DDTAGS);
-    if let Some(Value::Array(tags_arr)) = log.get(ddtags_path) {
-        if !tags_arr.is_empty() {
-            let all_tags: String = tags_arr
-                .iter()
-                .filter_map(|tag_kv| {
-                    tag_kv
-                        .as_bytes()
-                        .map(|bytes| String::from_utf8_lossy(bytes))
-                })
-                .join(",");
+    if let Some(Value::Array(tags_arr)) = log.get(ddtags_path)
+        && !tags_arr.is_empty()
+    {
+        let all_tags: String = tags_arr
+            .iter()
+            .filter_map(|tag_kv| {
+                tag_kv
+                    .as_bytes()
+                    .map(|bytes| String::from_utf8_lossy(bytes))
+            })
+            .join(",");
 
-            log.insert(ddtags_path, all_tags);
-        }
+        log.insert(ddtags_path, all_tags);
     }
 
     // ensure the timestamp is in expected format
@@ -135,6 +147,34 @@ pub fn normalize_event(event: &mut Event) {
     if let Some(Value::Timestamp(ts)) = log.remove(ts_path) {
         log.insert(ts_path, Value::Integer(ts.timestamp_millis()));
     }
+}
+
+// Optionally for all other non-reserved fields, nest these under the `message` key. This is the
+// final step in having the event conform to the standard that the logs intake expects when an
+// event originates from an agent. Normalizing the events to the format prepared by the datadog
+// agent resolves any inconsistencies that would be observed when data flows through vector
+// before being ingested by the logs intake. This is because the logs intake interprets the
+// request with slight differences when this header and format are observed.
+pub fn normalize_as_agent_event(event: &mut Event) {
+    let log = event.as_mut_log();
+    // Should never occur since normalize_event forces a conversion of the log value to an Object type
+    let Some(object_map) = log.as_map_mut() else {
+        return;
+    };
+    // Move all non reserved fields into a new object
+    let mut local_root = ObjectMap::default();
+    let keys_to_move = object_map
+        .keys()
+        .filter(|ks| !is_reserved_attribute(ks.as_str()))
+        .cloned()
+        .collect::<Vec<_>>();
+    for key in keys_to_move {
+        if let Some((entry_k, entry_v)) = object_map.remove_entry(key.as_str()) {
+            local_root.insert(entry_k, entry_v);
+        }
+    }
+    // .. nest this object at the root under the reserved key named 'message'
+    log.insert(MESSAGE, local_root);
 }
 
 // If an expected reserved attribute is not located in the event root, rename it and handle
@@ -153,13 +193,12 @@ pub fn position_reserved_attr_event_root(
         // if an existing attribute exists here already, move it so to not overwrite it.
         // yes, technically the rename path could exist, but technically that could always be the case.
         if log.contains(desired_path) {
-            let rename_attr = format!("_RESERVED_{}", meaning);
+            let rename_attr = format!("_RESERVED_{meaning}");
             let rename_path = event_path!(rename_attr.as_str());
             warn!(
                 message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
                 meaning = meaning,
                 renamed = &rename_attr,
-                internal_log_rate_limit = true,
             );
             log.rename_key(desired_path, rename_path);
         }
@@ -200,10 +239,11 @@ impl From<serde_json::Error> for RequestBuildError {
     }
 }
 
-pub struct LogRequestBuilder {
+struct LogRequestBuilder {
     pub default_api_key: Arc<str>,
     pub transformer: Transformer,
     pub compression: Compression,
+    pub conforms_as_agent: bool,
 }
 
 impl LogRequestBuilder {
@@ -217,6 +257,9 @@ impl LogRequestBuilder {
             .into_iter()
             .map(|mut event| {
                 normalize_event(&mut event);
+                if self.conforms_as_agent {
+                    normalize_as_agent_event(&mut event);
+                }
                 self.transformer.transform(&mut event);
                 let estimated_json_size = event.estimated_json_encoded_size_of();
                 (event, estimated_json_size)
@@ -340,6 +383,7 @@ where
             default_api_key,
             transformer: self.transformer,
             compression: self.compression,
+            conforms_as_agent: self.conforms_as_agent,
         });
 
         let input = input.batched_partitioned(partitioner, || {
@@ -395,21 +439,23 @@ mod tests {
     use vector_lib::{
         config::{LegacyKey, LogNamespace},
         event::{Event, EventMetadata, LogEvent},
-        schema::{meaning, Definition},
+        schema::{Definition, meaning},
     };
     use vrl::{
         core::Value,
-        event_path, metadata_path, owned_value_path,
-        value::{kind::Collection, Kind},
+        event_path, metadata_path, owned_value_path, value,
+        value::{Kind, kind::Collection},
     };
 
-    use super::normalize_event;
+    use super::{normalize_as_agent_event, normalize_event};
+    use crate::common::datadog::DD_RESERVED_SEMANTIC_ATTRS;
 
     fn assert_normalized_log_has_expected_attrs(log: &LogEvent) {
-        assert!(log
-            .get(event_path!("timestamp"))
-            .expect("should have timestamp")
-            .is_integer());
+        assert!(
+            log.get(event_path!("timestamp"))
+                .expect("should have timestamp")
+                .is_integer()
+        );
 
         for attr in [
             "message",
@@ -419,7 +465,7 @@ mod tests {
             "service",
             "status",
         ] {
-            assert!(log.contains(event_path!(attr)), "missing {}", attr);
+            assert!(log.contains(event_path!(attr)), "missing {attr}");
         }
 
         assert_eq!(
@@ -428,101 +474,9 @@ mod tests {
         );
     }
 
-    #[test]
-    fn normalize_event_doesnt_require() {
-        let mut log = LogEvent::default();
-        log.insert(event_path!("foo"), "bar");
-
-        let mut event = Event::Log(log);
-        normalize_event(&mut event);
-
-        let log = event.as_log();
-
-        assert!(!log.contains(event_path!("message")));
-        assert!(!log.contains(event_path!("timestamp")));
-        assert!(!log.contains(event_path!("hostname")));
-    }
-
-    #[test]
-    fn normalize_event_normalizes_legacy_namespace() {
-        let metadata = EventMetadata::default().with_schema_definition(&Arc::new(
-            Definition::new_with_default_metadata(
-                Kind::object(Collection::empty()),
-                [LogNamespace::Legacy],
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
-                &owned_value_path!("ddtags"),
-                Kind::bytes(),
-                Some(meaning::TAGS),
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("hostname"))),
-                &owned_value_path!("hostname"),
-                Kind::bytes(),
-                Some(meaning::HOST),
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("timestamp"))),
-                &owned_value_path!("timestamp"),
-                Kind::timestamp(),
-                Some(meaning::TIMESTAMP),
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("severity"))),
-                &owned_value_path!("severity"),
-                Kind::bytes(),
-                Some(meaning::SEVERITY),
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("service"))),
-                &owned_value_path!("service"),
-                Kind::bytes(),
-                Some(meaning::SERVICE),
-            )
-            .with_source_metadata(
-                "datadog_agent",
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("source"))),
-                &owned_value_path!("source"),
-                Kind::bytes(),
-                Some(meaning::SOURCE),
-            ),
-        ));
-
-        let mut log = LogEvent::new_with_metadata(metadata);
-        log.insert(event_path!("message"), "the_message");
-        let namespace = log.namespace();
-
-        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent", Utc::now());
-
-        let tags = vec![
-            Value::Bytes("key1:value1".into()),
-            Value::Bytes("key2:value2".into()),
-        ];
-
-        log.insert(event_path!("ddtags"), tags);
-        log.insert(event_path!("hostname"), "the_host");
-        log.insert(event_path!("service"), "the_service");
-        log.insert(event_path!("source"), "the_source");
-        log.insert(event_path!("severity"), "the_severity");
-
-        assert!(log.namespace() == LogNamespace::Legacy);
-
-        let mut event = Event::Log(log);
-        normalize_event(&mut event);
-
-        assert_normalized_log_has_expected_attrs(event.as_log());
-    }
-
-    #[test]
-    fn normalize_event_normalizes_vector_namespace() {
-        let metadata = EventMetadata::default().with_schema_definition(&Arc::new(
-            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector])
+    fn agent_event_metadata(definition: Definition) -> EventMetadata {
+        EventMetadata::default().with_schema_definition(&Arc::new(
+            definition
                 .with_source_metadata(
                     "datadog_agent",
                     Some(LegacyKey::InsertIfEmpty(owned_value_path!("ddtags"))),
@@ -565,10 +519,76 @@ mod tests {
                     Kind::bytes(),
                     Some(meaning::SOURCE),
                 ),
-        ));
+        ))
+    }
 
-        let mut log = LogEvent::new_with_metadata(metadata);
+    #[test]
+    fn normalize_event_doesnt_require() {
+        let mut log = LogEvent::default();
+        log.insert(event_path!("foo"), "bar");
+
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+
+        let log = event.as_log();
+
+        assert!(!log.contains(event_path!("message")));
+        assert!(!log.contains(event_path!("timestamp")));
+        assert!(!log.contains(event_path!("hostname")));
+    }
+
+    #[test]
+    fn normalize_event_normalizes_legacy_namespace() {
+        let definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        );
+        let mut log = LogEvent::new_with_metadata(agent_event_metadata(definition));
         log.insert(event_path!("message"), "the_message");
+        let namespace = log.namespace();
+
+        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent", Utc::now());
+
+        let tags = vec![
+            Value::Bytes("key1:value1".into()),
+            Value::Bytes("key2:value2".into()),
+        ];
+
+        log.insert(event_path!("ddtags"), tags);
+        log.insert(event_path!("hostname"), "the_host");
+        log.insert(event_path!("service"), "the_service");
+        log.insert(event_path!("source"), "the_source");
+        log.insert(event_path!("severity"), "the_severity");
+
+        assert!(log.namespace() == LogNamespace::Legacy);
+
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+
+        assert_normalized_log_has_expected_attrs(event.as_log());
+    }
+
+    #[test]
+    fn normalize_event_normalizes_vector_namespace_raw_field() {
+        let mut event = prepare_event_vector_namespace(|definition| {
+            LogEvent::from_parts(value!("the_message"), agent_event_metadata(definition))
+        });
+
+        normalize_event(&mut event);
+        normalize_as_agent_event(&mut event);
+
+        assert_normalized_log_has_expected_attrs(event.as_log());
+        assert_only_reserved_fields_at_root(event.as_log());
+        assert_eq!(
+            event.as_log().get("message"),
+            Some(&value!({"message": "the_message"}))
+        );
+    }
+
+    fn prepare_event_vector_namespace(log_generator: fn(Definition) -> LogEvent) -> Event {
+        let definition =
+            Definition::new_with_default_metadata(Kind::bytes(), [LogNamespace::Vector]);
+        let mut log = log_generator(definition);
 
         // insert an arbitrary metadata field such that the log becomes Vector namespaced
         log.insert(metadata_path!("vector", "foo"), "bar");
@@ -589,10 +609,133 @@ mod tests {
         log.insert(metadata_path!("datadog_agent", "severity"), "the_severity");
 
         assert!(log.namespace() == LogNamespace::Vector);
+        Event::Log(log)
+    }
 
-        let mut event = Event::Log(log);
+    #[test]
+    fn normalize_event_normalizes_vector_namespace() {
+        let mut event = prepare_event_vector_namespace(|definition| {
+            let mut log = LogEvent::new_with_metadata(agent_event_metadata(definition));
+            log.insert(event_path!("message"), "the_message");
+            log
+        });
+
         normalize_event(&mut event);
+        normalize_as_agent_event(&mut event);
 
         assert_normalized_log_has_expected_attrs(event.as_log());
+        assert_only_reserved_fields_at_root(event.as_log());
+    }
+
+    fn prepare_agent_event() -> LogEvent {
+        let definition = Definition::new_with_default_metadata(
+            Kind::object(Collection::empty()),
+            [LogNamespace::Legacy],
+        );
+        let mut log = LogEvent::new_with_metadata(agent_event_metadata(definition));
+        let namespace = log.namespace();
+        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent", Utc::now());
+
+        let tags = vec![
+            Value::Bytes("key1:value1".into()),
+            Value::Bytes("key2:value2".into()),
+        ];
+
+        // insert mandatory fields
+        log.insert(event_path!("ddtags"), tags);
+        log.insert(event_path!("hostname"), "the_host");
+        log.insert(event_path!("service"), "the_service");
+        log.insert(event_path!("timestamp"), Utc::now());
+        log.insert(event_path!("source"), "the_source");
+        log.insert(event_path!("severity"), "the_severity");
+
+        let sample_message = value!({
+            "message": "hello world",
+            "field_a": "field_a_value",
+            "field_b": "field_b_value",
+            "field_c": { "field_c_nested" : "field_c_value" },
+        });
+        log.insert(event_path!("message"), sample_message.to_string());
+        log
+    }
+
+    fn assert_only_reserved_fields_at_root(log: &LogEvent) {
+        let objmap = log.as_map().unwrap();
+        let reserved_fields = DD_RESERVED_SEMANTIC_ATTRS
+            .into_iter()
+            .chain([("message", "message")])
+            .collect::<Vec<(&str, &str)>>();
+        for key in objmap.keys() {
+            assert!(reserved_fields.iter().any(|(_, msg)| *msg == key.as_str()));
+        }
+    }
+
+    #[test]
+    fn normalize_conforming_agent_with_collisions() {
+        let mut log = prepare_agent_event();
+
+        // insert random fields at root which will collide with sample data at 'message'
+        log.insert(event_path!("field_a"), "replaced_field_a_value");
+        log.insert(event_path!("field_c"), "replaced_field_c_value");
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+        normalize_as_agent_event(&mut event);
+
+        let log = event.as_log();
+        assert_normalized_log_has_expected_attrs(log);
+        assert_only_reserved_fields_at_root(log);
+        assert_eq!(
+            log.get(event_path!("message")),
+            Some(&value!({
+                "source_type": "datadog_agent",
+                "field_a": "replaced_field_a_value",
+                "field_c": "replaced_field_c_value",
+                "message": (value!({
+                    "message": "hello world",
+                    "field_a": "field_a_value",
+                    "field_b": "field_b_value",
+                    "field_c": { "field_c_nested" : "field_c_value" },
+                }).to_string()),
+            }))
+        );
+    }
+
+    #[test]
+    fn normalize_conforming_agent() {
+        let mut log = prepare_agent_event();
+
+        // insert random fields at root
+        log.insert(event_path!("field_1"), "value_1");
+        log.insert(event_path!("field_2"), "value_2");
+        log.insert(event_path!("field_3", "field_3_nested"), "value_3");
+
+        // normalize and validate...
+        let mut event = Event::Log(log);
+        normalize_event(&mut event);
+        normalize_as_agent_event(&mut event);
+
+        // that all fields placed at the root no longer exist there
+        let log = event.as_log();
+        assert_normalized_log_has_expected_attrs(log);
+        assert_only_reserved_fields_at_root(log);
+
+        // .. and that they were nested properly underneath message
+        assert_eq!(
+            log.get(event_path!("message")),
+            Some(&value!({
+                "source_type": "datadog_agent",
+                "message": (value!({
+                    "message": "hello world",
+                    "field_a": "field_a_value",
+                    "field_b": "field_b_value",
+                    "field_c": { "field_c_nested" : "field_c_value" },
+                }).to_string()),
+                "field_1": "value_1",
+                "field_2": "value_2",
+                "field_3": {
+                    "field_3_nested": "value_3"
+                }
+            }))
+        );
     }
 }

@@ -1,10 +1,12 @@
 use std::{collections::BTreeMap, sync::LazyLock};
 
-use vector_lib::lookup::{owned_value_path, OwnedValuePath};
-use vrl::btreemap;
-use vrl::value::{
-    kind::{Collection, Field},
-    Kind,
+use vector_lib::lookup::{OwnedValuePath, owned_value_path};
+use vrl::{
+    btreemap,
+    value::{
+        Kind,
+        kind::{Collection, Field},
+    },
 };
 
 #[derive(Debug, Default, Clone)]

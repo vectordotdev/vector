@@ -1,16 +1,23 @@
-use std::collections::HashMap;
-use std::{future::ready, num::NonZeroUsize, panic, sync::Arc, sync::LazyLock};
-
-use aws_sdk_s3::operation::get_object::GetObjectError;
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_sqs::operation::delete_message_batch::{
-    DeleteMessageBatchError, DeleteMessageBatchOutput,
+use std::{
+    collections::HashMap,
+    future::ready,
+    num::NonZeroUsize,
+    panic,
+    sync::{Arc, LazyLock},
+    time::Duration,
 };
-use aws_sdk_sqs::operation::receive_message::ReceiveMessageError;
-use aws_sdk_sqs::types::{DeleteMessageBatchRequestEntry, Message};
-use aws_sdk_sqs::Client as SqsClient;
-use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
-use aws_smithy_runtime_api::client::result::SdkError;
+
+use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
+use aws_sdk_sqs::{
+    Client as SqsClient,
+    operation::{
+        delete_message_batch::{DeleteMessageBatchError, DeleteMessageBatchOutput},
+        receive_message::ReceiveMessageError,
+        send_message_batch::{SendMessageBatchError, SendMessageBatchOutput},
+    },
+    types::{DeleteMessageBatchRequestEntry, Message, SendMessageBatchRequestEntry},
+};
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use aws_types::region::Region;
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
@@ -22,36 +29,60 @@ use snafu::{ResultExt, Snafu};
 use tokio::{pin, select};
 use tokio_util::codec::FramedRead;
 use tracing::Instrument;
-use vector_lib::codecs::decoding::FramingError;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+use vector_lib::{
+    codecs::decoding::FramingError,
+    config::{LegacyKey, LogNamespace, log_schema},
+    configurable::configurable_component,
+    event::MaybeAsLogMut,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    },
+    lookup::{PathPrefix, metadata_path, path},
 };
 
-use crate::codecs::Decoder;
-use crate::event::{Event, LogEvent};
 use crate::{
+    SourceSender,
     aws::AwsTimeout,
+    codecs::Decoder,
+    common::backoff::ExponentialBackoff,
     config::{SourceAcknowledgementsConfig, SourceContext},
-    event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf},
+    event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
         EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
         SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
-        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsS3EventRecordInvalidEventIgnored,
+        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsMessageSendBatchError,
+        SqsMessageSentPartialError, SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored,
         StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
     sources::aws_s3::AwsS3Config,
     tls::TlsConfig,
-    SourceSender,
 };
-use vector_lib::config::{log_schema, LegacyKey, LogNamespace};
-use vector_lib::event::MaybeAsLogMut;
-use vector_lib::lookup::{metadata_path, path, PathPrefix};
 
 static SUPPORTED_S3_EVENT_VERSION: LazyLock<semver::VersionReq> =
     LazyLock::new(|| semver::VersionReq::parse("~2").unwrap());
+
+/// Configuration for deferring events based on their age.
+#[serde_as]
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub(super) struct DeferredConfig {
+    /// The URL of the queue to forward events to when they are older than `max_age_secs`.
+    #[configurable(metadata(
+        docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
+    ))]
+    #[configurable(validation(format = "uri"))]
+    pub(super) queue_url: String,
+
+    /// Event must have been emitted within the last `max_age_secs` seconds to be processed.
+    ///
+    /// If the event is older, it is forwarded to the `queue_url` for later processing.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::examples = 3600))]
+    pub(super) max_age_secs: u64,
+}
 
 /// SQS configuration options.
 //
@@ -147,6 +178,10 @@ pub(super) struct Config {
     #[serde(default)]
     #[serde(flatten)]
     pub(super) timeout: Option<AwsTimeout>,
+
+    /// Configuration for deferring events to another queue based on their age.
+    #[configurable(derived)]
+    pub(super) deferred: Option<DeferredConfig>,
 }
 
 const fn default_poll_secs() -> u32 {
@@ -225,6 +260,17 @@ pub enum ProcessingError {
         bucket: String,
         key: String,
     },
+    #[snafu(display(
+        "File s3://{}/{} too old.  Forwarded to deferred queue {}",
+        bucket,
+        key,
+        deferred_queue
+    ))]
+    FileTooOld {
+        bucket: String,
+        key: String,
+        deferred_queue: String,
+    },
 }
 
 pub struct State {
@@ -244,6 +290,8 @@ pub struct State {
     delete_message: bool,
     delete_failed_message: bool,
     decoder: Decoder,
+
+    deferred: Option<DeferredConfig>,
 }
 
 pub(super) struct Ingestor {
@@ -285,6 +333,8 @@ impl Ingestor {
             delete_message: config.delete_message,
             delete_failed_message: config.delete_failed_message,
             decoder,
+
+            deferred: config.deferred,
         });
 
         Ok(Ingestor { state })
@@ -314,10 +364,10 @@ impl Ingestor {
         // Wait for all of the processes to finish.  If any one of them panics, we resume
         // that panic here to properly shutdown Vector.
         for handle in handles.drain(..) {
-            if let Err(e) = handle.await {
-                if e.is_panic() {
-                    panic::resume_unwind(e.into_panic());
-                }
+            if let Err(e) = handle.await
+                && e.is_panic()
+            {
+                panic::resume_unwind(e.into_panic());
             }
         }
 
@@ -333,6 +383,7 @@ pub struct IngestorProcess {
     log_namespace: LogNamespace,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    backoff: ExponentialBackoff,
 }
 
 impl IngestorProcess {
@@ -351,6 +402,9 @@ impl IngestorProcess {
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
             events_received: register!(EventsReceived),
+            backoff: ExponentialBackoff::from_millis(2)
+                .factor(250)
+                .max_delay(Duration::from_secs(30)),
         }
     }
 
@@ -361,25 +415,42 @@ impl IngestorProcess {
         loop {
             select! {
                 _ = &mut shutdown => break,
-                _ = self.run_once() => {},
+                result = self.run_once() => {
+                    match result {
+                        Ok(()) => {
+                            // Reset backoff on successful receive
+                            self.backoff.reset();
+                        }
+                        Err(_) => {
+                            let delay = self.backoff.next().expect("backoff never ends");
+                            trace!(
+                                delay_ms = delay.as_millis(),
+                                "`run_once` failed, will retry after delay.",
+                            );
+                            tokio::time::sleep(delay).await;
+                        }
+                    }
+                },
             }
         }
     }
 
-    async fn run_once(&mut self) {
-        let messages = self.receive_messages().await;
-        let messages = messages
-            .inspect(|messages| {
+    async fn run_once(&mut self) -> Result<(), ()> {
+        let messages = match self.receive_messages().await {
+            Ok(messages) => {
                 emit!(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
-            })
-            .inspect_err(|err| {
-                emit!(SqsMessageReceiveError { error: err });
-            })
-            .unwrap_or_default();
+                messages
+            }
+            Err(err) => {
+                emit!(SqsMessageReceiveError { error: &err });
+                return Err(());
+            }
+        };
 
         let mut delete_entries = Vec::new();
+        let mut deferred_entries = Vec::new();
         for message in messages {
             let receipt_handle = match message.receipt_handle {
                 None => {
@@ -396,7 +467,7 @@ impl IngestorProcess {
                 .message_id
                 .clone()
                 .unwrap_or_else(|| "<unknown>".to_owned());
-            match self.handle_sqs_message(message).await {
+            match self.handle_sqs_message(message.clone()).await {
                 Ok(()) => {
                     emit!(SqsMessageProcessingSucceeded {
                         message_id: &message_id
@@ -409,7 +480,7 @@ impl IngestorProcess {
                         );
                         delete_entries.push(
                             DeleteMessageBatchRequestEntry::builder()
-                                .id(message_id)
+                                .id(message_id.clone())
                                 .receipt_handle(receipt_handle)
                                 .build()
                                 .expect("all required builder params specified"),
@@ -417,14 +488,86 @@ impl IngestorProcess {
                     }
                 }
                 Err(err) => {
-                    emit!(SqsMessageProcessingError {
-                        message_id: &message_id,
-                        error: &err,
-                    });
+                    match err {
+                        ProcessingError::FileTooOld { .. } => {
+                            emit!(SqsMessageProcessingSucceeded {
+                                message_id: &message_id
+                            });
+                            if let Some(deferred) = &self.state.deferred {
+                                trace!(
+                                    message = "Forwarding message to deferred queue.",
+                                    id = message_id,
+                                    receipt_handle = receipt_handle,
+                                    deferred_queue = deferred.queue_url,
+                                );
+
+                                deferred_entries.push(
+                                    SendMessageBatchRequestEntry::builder()
+                                        .id(message_id.clone())
+                                        .message_body(message.body.unwrap_or_default())
+                                        .build()
+                                        .expect("all required builder params specified"),
+                                );
+                            }
+                            //  maybe delete the message from current queue since we have processed it
+                            if self.state.delete_message {
+                                trace!(
+                                    message = "Queued SQS message for deletion.",
+                                    id = message_id,
+                                    receipt_handle = receipt_handle,
+                                );
+                                delete_entries.push(
+                                    DeleteMessageBatchRequestEntry::builder()
+                                        .id(message_id)
+                                        .receipt_handle(receipt_handle)
+                                        .build()
+                                        .expect("all required builder params specified"),
+                                );
+                            }
+                        }
+                        _ => {
+                            emit!(SqsMessageProcessingError {
+                                message_id: &message_id,
+                                error: &err,
+                            });
+                        }
+                    }
                 }
             }
         }
 
+        // Should consider removing failed deferrals from the delete_entries
+        if !deferred_entries.is_empty() {
+            let Some(deferred) = &self.state.deferred else {
+                warn!("Deferred queue not configured, but received deferred entries.");
+                return Ok(());
+            };
+            let cloned_entries = deferred_entries.clone();
+            match self
+                .send_messages(deferred_entries, deferred.queue_url.clone())
+                .await
+            {
+                Ok(result) => {
+                    if !result.successful.is_empty() {
+                        emit!(SqsMessageSentSucceeded {
+                            message_ids: result.successful,
+                        })
+                    }
+
+                    if !result.failed.is_empty() {
+                        emit!(SqsMessageSentPartialError {
+                            entries: result.failed
+                        })
+                    }
+                }
+                Err(err) => {
+                    emit!(SqsMessageSendBatchError {
+                        entries: cloned_entries,
+                        error: err,
+                    });
+                }
+            }
+        }
         if !delete_entries.is_empty() {
             // We need these for a correct error message if the batch fails overall.
             let cloned_entries = delete_entries.clone();
@@ -452,6 +595,7 @@ impl IngestorProcess {
                 }
             }
         }
+        Ok(())
     }
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
@@ -514,6 +658,17 @@ impl IngestorProcess {
                 key: s3_event.s3.object.key.clone(),
                 region: s3_event.aws_region,
             });
+        }
+
+        if let Some(deferred) = &self.state.deferred {
+            let delta = Utc::now() - s3_event.event_time;
+            if delta.num_seconds() > deferred.max_age_secs as i64 {
+                return Err(ProcessingError::FileTooOld {
+                    bucket: s3_event.s3.bucket.name.clone(),
+                    key: s3_event.s3.object.key.clone(),
+                    deferred_queue: deferred.queue_url.clone(),
+                });
+            }
         }
 
         let object_result = self
@@ -724,6 +879,20 @@ impl IngestorProcess {
             .send()
             .await
     }
+
+    async fn send_messages(
+        &mut self,
+        entries: Vec<SendMessageBatchRequestEntry>,
+        queue_url: String,
+    ) -> Result<SendMessageBatchOutput, SdkError<SendMessageBatchError, HttpResponse>> {
+        self.state
+            .sqs_client
+            .send_message_batch()
+            .queue_url(queue_url.clone())
+            .set_entries(Some(entries))
+            .send()
+            .await
+    }
 }
 
 fn handle_single_log(
@@ -802,6 +971,7 @@ fn handle_single_log(
 #[serde(rename_all = "PascalCase")]
 pub struct SnsNotification {
     pub message: String,
+    pub timestamp: DateTime<Utc>,
 }
 
 // https://docs.aws.amazon.com/AmazonS3/latest/userguide/how-to-enable-disable-notification-intro.html
@@ -834,6 +1004,7 @@ pub struct S3EventRecord {
     pub event_source: String,
     pub aws_region: String,
     pub event_name: S3EventName,
+    pub event_time: DateTime<Utc>,
 
     pub s3: S3Message,
 }
@@ -966,7 +1137,7 @@ mod urlencoded_string {
         use serde::de::Error;
 
         serde::de::Deserialize::deserialize(deserializer).and_then(|s: &[u8]| {
-            let decoded = if s.iter().any(|c| *c == b'+') {
+            let decoded = if s.contains(&b'+') {
                 // AWS encodes spaces as `+` rather than `%20`, so we first need to handle this.
                 let s = s
                     .iter()
@@ -977,9 +1148,8 @@ mod urlencoded_string {
                 percent_decode(s).decode_utf8().map(Into::into)
             };
 
-            decoded.map_err(|err| {
-                D::Error::custom(format!("error url decoding S3 object key: {}", err))
-            })
+            decoded
+                .map_err(|err| D::Error::custom(format!("error url decoding S3 object key: {err}")))
         })
     }
 
@@ -1049,10 +1219,72 @@ fn test_s3_sns_testevent() {
      }"#,
     ).unwrap();
 
+    assert_eq!(
+        sns_value.timestamp,
+        DateTime::parse_from_rfc3339("2012-03-29T05:12:16.901Z")
+            .unwrap()
+            .to_utc()
+    );
+
     let value: S3TestEvent = serde_json::from_str(sns_value.message.as_ref()).unwrap();
 
     assert_eq!(value.service, "Amazon S3".to_string());
     assert_eq!(value.bucket, "bucketname".to_string());
     assert_eq!(value.event.kind, "s3".to_string());
     assert_eq!(value.event.name, "TestEvent".to_string());
+}
+
+#[test]
+fn parse_sqs_config() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    assert!(config.deferred.is_none());
+
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [deferred]
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+            max_age_secs = 3600
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    let Some(deferred) = config.deferred else {
+        panic!("Expected deferred config");
+    };
+    assert_eq!(
+        deferred.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+    );
+    assert_eq!(deferred.max_age_secs, 3600);
+
+    let test: Result<Config, toml::de::Error> = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [deferred]
+            max_age_secs = 3600
+        "#,
+    );
+    assert!(test.is_err());
+
+    let test: Result<Config, toml::de::Error> = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [deferred]
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+        "#,
+    );
+    assert!(test.is_err());
 }

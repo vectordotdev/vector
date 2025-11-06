@@ -1,6 +1,7 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::internal_event::{
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+};
 
 #[derive(Debug)]
 pub struct DecoderFramingError<E> {
@@ -15,7 +16,6 @@ impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
             error_code = "decoder_frame",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -40,7 +40,6 @@ impl InternalEvent for DecoderDeserializeError<'_> {
             error_code = "decoder_deserialize",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -66,7 +65,6 @@ impl InternalEvent for EncoderFramingError<'_> {
             error_code = "encoder_frame",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -93,7 +91,6 @@ impl InternalEvent for EncoderSerializeError<'_> {
             error_code = "encoder_serialize",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -120,7 +117,6 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
             error = %self.error,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

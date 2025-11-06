@@ -31,12 +31,12 @@ components: sinks: opentelemetry: {
 	}
 
 	support: {
-		requirements: ["This sink excepts events conforming to the [OTEL proto format](\(urls.opentelemetry_proto)). You can use [Remap](\(urls.vector_remap_transform)) to prepare events for ingestion."]
+		requirements: ["This sink accepts events conforming to the [OTEL proto format](\(urls.opentelemetry_proto)). You can use [Remap](\(urls.vector_remap_transform)) to prepare events for ingestion."]
 		warnings: []
 		notices: []
 	}
 
-	configuration: base.components.sinks.opentelemetry.configuration
+	configuration: generated.components.sinks.opentelemetry.configuration
 	how_it_works: {
 		quickstart: {
 			title: "Quickstart"

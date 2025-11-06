@@ -3,7 +3,7 @@ use std::{
     fmt,
 };
 
-use vector_config::{configurable_component, ConfigurableString};
+use vector_config::{ConfigurableString, configurable_component};
 
 /// Component identifier.
 #[configurable_component(no_deser, no_ser)]
@@ -36,6 +36,12 @@ impl ComponentKey {
     #[must_use]
     pub fn into_id(self) -> String {
         self.id
+    }
+}
+
+impl AsRef<ComponentKey> for ComponentKey {
+    fn as_ref(&self) -> &ComponentKey {
+        self
     }
 }
 

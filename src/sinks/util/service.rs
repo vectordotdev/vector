@@ -3,14 +3,14 @@ use std::{hash::Hash, marker::PhantomData, num::NonZeroU64, pin::Pin, sync::Arc,
 use futures_util::stream::{self, BoxStream};
 use serde_with::serde_as;
 use tower::{
+    Service, ServiceBuilder,
     balance::p2c::Balance,
     buffer::{Buffer, BufferLayer},
     discover::Change,
-    layer::{util::Stack, Layer},
+    layer::{Layer, util::Stack},
     limit::RateLimit,
     retry::Retry,
     timeout::Timeout,
-    Service, ServiceBuilder,
 };
 use vector_lib::configurable::configurable_component;
 
@@ -22,13 +22,13 @@ pub use crate::sinks::util::service::{
 use crate::{
     internal_events::OpenGauge,
     sinks::util::{
+        Batch, BatchSink, Partition, PartitionBatchSink,
         adaptive_concurrency::{
             AdaptiveConcurrencyLimit, AdaptiveConcurrencyLimitLayer, AdaptiveConcurrencySettings,
         },
         retries::{FibonacciRetryPolicy, JitterMode, RetryLogic},
         service::map::MapLayer,
         sink::Response,
-        Batch, BatchSink, Partition, PartitionBatchSink,
     },
 };
 
@@ -44,7 +44,10 @@ pub type TowerPartitionSink<S, B, RL, K> = PartitionBatchSink<Svc<S, RL>, B, K>;
 
 // Distributed service types
 pub type DistributedService<S, RL, HL, K, Req> = RateLimit<
-    Retry<FibonacciRetryPolicy<RL>, Buffer<Balance<DiscoveryService<S, RL, HL, K>, Req>, Req>>,
+    Retry<
+        FibonacciRetryPolicy<RL>,
+        Buffer<Req, <Balance<DiscoveryService<S, RL, HL, K>, Req> as Service<Req>>::Future>,
+    >,
 >;
 pub type DiscoveryService<S, RL, HL, K> =
     BoxStream<'static, Result<Change<K, SingleDistributedService<S, RL, HL>>, crate::Error>>;
@@ -90,8 +93,8 @@ pub trait TowerRequestConfigDefaults {
     const RATE_LIMIT_DURATION_SECS: u64 = 1;
     const RATE_LIMIT_NUM: u64 = i64::MAX as u64; // i64 avoids TOML deserialize issue
     const RETRY_ATTEMPTS: usize = isize::MAX as usize; // isize avoids TOML deserialize issue
-    const RETRY_MAX_DURATION_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(30) };
-    const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(1) };
+    const RETRY_MAX_DURATION_SECS: NonZeroU64 = NonZeroU64::new(30).unwrap();
+    const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = NonZeroU64::new(1).unwrap();
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -148,7 +151,7 @@ pub struct TowerRequestConfig<D: TowerRequestConfigDefaults = GlobalTowerRequest
 
     /// The amount of time to wait before attempting the first retry for a failed request.
     ///
-    /// After the first retry has failed, the fibonacci sequence is used to select future backoffs.
+    /// After the first retry has failed, the Fibonacci sequence is used to select future backoffs.
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::human_name = "Retry Initial Backoff"))]
     #[serde(default = "default_retry_initial_backoff_secs::<D>")]
@@ -266,7 +269,7 @@ impl TowerRequestSettings {
         batch_timeout: Duration,
     ) -> TowerPartitionSink<S, B, RL, K>
     where
-        RL: RetryLogic<Response = S::Response>,
+        RL: RetryLogic<Request = <B as Batch>::Output, Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -291,7 +294,7 @@ impl TowerRequestSettings {
         batch_timeout: Duration,
     ) -> TowerBatchedSink<S, B, RL>
     where
-        RL: RetryLogic<Response = S::Response>,
+        RL: RetryLogic<Request = <B as Batch>::Output, Response = S::Response>,
         S: Service<B::Output> + Clone + Send + 'static,
         S::Error: Into<crate::Error> + Send + Sync + 'static,
         S::Response: Send + Response,
@@ -352,7 +355,7 @@ impl TowerRequestSettings {
                     )
             })
             .enumerate()
-            .map(|(i, service)| Ok(Change::Insert(i, service)))
+            .map(|(i, service)| Ok::<_, S::Error>(Change::Insert(i, service)))
             .collect::<Vec<_>>();
 
         // Build sink service
@@ -404,18 +407,18 @@ where
 #[cfg(test)]
 mod tests {
     use std::sync::{
-        atomic::{AtomicBool, Ordering::AcqRel},
         Arc, Mutex,
+        atomic::{AtomicBool, Ordering::AcqRel},
     };
 
-    use futures::{future, stream, FutureExt, SinkExt, StreamExt};
+    use futures::{FutureExt, SinkExt, StreamExt, future, stream};
     use tokio::time::Duration;
     use vector_lib::json_size::JsonSize;
 
     use super::*;
     use crate::sinks::util::{
-        retries::{RetryAction, RetryLogic},
         BatchSettings, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, VecBuffer,
+        retries::{RetryAction, RetryLogic},
     };
 
     const TIMEOUT: Duration = Duration::from_secs(10);
@@ -474,8 +477,8 @@ mod tests {
         const RATE_LIMIT_DURATION_SECS: u64 = 2;
         const RATE_LIMIT_NUM: u64 = 3;
         const RETRY_ATTEMPTS: usize = 4;
-        const RETRY_MAX_DURATION_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(5) };
-        const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = unsafe { NonZeroU64::new_unchecked(6) };
+        const RETRY_MAX_DURATION_SECS: NonZeroU64 = NonZeroU64::new(5).unwrap();
+        const RETRY_INITIAL_BACKOFF_SECS: NonZeroU64 = NonZeroU64::new(6).unwrap();
     }
 
     #[test]
@@ -534,11 +537,11 @@ mod tests {
         let svc = {
             let sent_requests = Arc::clone(&sent_requests);
             let delay = Arc::new(AtomicBool::new(true));
-            tower::service_fn(move |req: PartitionInnerBuffer<_, _>| {
+            tower::service_fn(move |req: PartitionInnerBuffer<Vec<usize>, Vec<usize>>| {
                 let (req, _) = req.into_parts();
                 if delay.swap(false, AcqRel) {
                     // Error on first request
-                    future::err::<(), _>(std::io::Error::new(std::io::ErrorKind::Other, "")).boxed()
+                    future::err::<(), _>(std::io::Error::other("")).boxed()
                 } else {
                     sent_requests.lock().unwrap().push(req);
                     future::ok::<_, std::io::Error>(()).boxed()
@@ -558,7 +561,7 @@ mod tests {
         );
         sink.ordered();
 
-        let input = (0..20).map(|i| PartitionInnerBuffer::new(i, 0));
+        let input = (0..20).map(|i| PartitionInnerBuffer::new(i, vec![0]));
         sink.sink_map_err(drop)
             .send_all(
                 &mut stream::iter(input)
@@ -579,13 +582,14 @@ mod tests {
 
     impl RetryLogic for RetryAlways {
         type Error = std::io::Error;
+        type Request = PartitionInnerBuffer<Vec<usize>, Vec<usize>>;
         type Response = ();
 
         fn is_retriable_error(&self, _: &Self::Error) -> bool {
             true
         }
 
-        fn should_retry_response(&self, _response: &Self::Response) -> RetryAction {
+        fn should_retry_response(&self, _response: &Self::Response) -> RetryAction<Self::Request> {
             // Treat the default as the request is successful
             RetryAction::Successful
         }

@@ -8,10 +8,13 @@ use clap::{ArgAction, CommandFactory, FromArgMatches, Parser};
 use crate::service;
 #[cfg(feature = "api-client")]
 use crate::tap;
-#[cfg(feature = "api-client")]
+#[cfg(feature = "top")]
 use crate::top;
-use crate::{config, convert_config, generate, get_version, graph, list, unit_test, validate};
-use crate::{generate_schema, signal};
+
+use crate::{
+    config, convert_config, generate, generate_schema, get_version, graph, list, signal, unit_test,
+    validate,
+};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -134,6 +137,14 @@ pub struct RootOpts {
     #[arg(short, long, action = ArgAction::Count)]
     pub quiet: u8,
 
+    /// Disable interpolation of environment variables in configuration files.
+    #[arg(
+        long,
+        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub disable_env_var_interpolation: bool,
+
     /// Set the logging format
     #[arg(long, default_value = "text", env = "VECTOR_LOG_FORMAT")]
     pub log_format: LogFormat,
@@ -177,7 +188,20 @@ pub struct RootOpts {
     )]
     pub watch_config_poll_interval_seconds: NonZeroU64,
 
-    /// Set the internal log rate limit
+    /// Set the internal log rate limit in seconds.
+    ///
+    /// This controls the time window for rate limiting Vector's own internal logs.
+    /// Within each time window, the first occurrence of a log is emitted, the second
+    /// shows a suppression warning, and subsequent occurrences are silent until the
+    /// window expires.
+    ///
+    /// Logs are grouped by their location in the code and the `component_id` field, so logs
+    /// from different components are rate limited independently.
+    ///
+    /// Examples:
+    /// - 1: Very verbose, logs can repeat every second
+    /// - 10 (default): Logs can repeat every 10 seconds
+    /// - 60: Less verbose, logs can repeat every minute
     #[arg(
         short,
         long,
@@ -258,7 +282,9 @@ impl RootOpts {
 
     pub fn init_global(&self) {
         if !self.openssl_no_probe {
-            openssl_probe::init_ssl_cert_env_vars();
+            unsafe {
+                openssl_probe::init_openssl_env_vars();
+            }
         }
 
         crate::metrics::init_global().expect("metrics initialization failed");
@@ -284,11 +310,13 @@ pub enum SubCommand {
 
     /// Generate the configuration schema for this version of Vector. (experimental)
     ///
-    /// A JSON Schema document will be written to stdout that represents the valid schema for a
+    /// A JSON Schema document will be generated that represents the valid schema for a
     /// Vector configuration. This schema is based on the "full" configuration, such that for usages
     /// where a configuration is split into multiple files, the schema would apply to those files
     /// only when concatenated together.
-    GenerateSchema,
+    ///
+    /// By default all output is writen to stdout. The `output_path` option can be used to redirect to a file.
+    GenerateSchema(generate_schema::Opts),
 
     /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
     #[command(hide = true)]
@@ -305,7 +333,7 @@ pub enum SubCommand {
     Graph(graph::Opts),
 
     /// Display topology and metrics in the console, for a local or remote Vector instance
-    #[cfg(feature = "api-client")]
+    #[cfg(feature = "top")]
     Top(top::Opts),
 
     /// Observe output log events from source or transform components. Logs are sampled at a specified interval.
@@ -330,7 +358,7 @@ impl SubCommand {
             Self::Config(c) => config::cmd(c),
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
-            Self::GenerateSchema => generate_schema::cmd(),
+            Self::GenerateSchema(opts) => generate_schema::cmd(opts),
             Self::Graph(g) => graph::cmd(g),
             Self::List(l) => list::cmd(l),
             #[cfg(windows)]
@@ -338,7 +366,7 @@ impl SubCommand {
             #[cfg(feature = "api-client")]
             Self::Tap(t) => tap::cmd(t, signals.receiver).await,
             Self::Test(t) => unit_test::cmd(t, &mut signals.handler).await,
-            #[cfg(feature = "api-client")]
+            #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
             Self::Validate(v) => validate::validate(v, color).await,
             Self::Vrl(s) => {
@@ -390,7 +418,7 @@ pub enum WatchConfigMethod {
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
     for error in errors {
-        error!(message = "Configuration error.", %error);
+        error!(message = "Configuration error.", %error, internal_log_rate_limit = false);
     }
 
     exitcode::CONFIG

@@ -5,13 +5,14 @@ use std::{
     path::{Path, PathBuf},
 };
 
+use cfg_if::cfg_if;
 use lookup::lookup_v2::OptionalValuePath;
 use openssl::{
     pkcs12::{ParsedPkcs12_2, Pkcs12},
     pkey::{PKey, Private},
-    ssl::{select_next_proto, AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode},
+    ssl::{AlpnError, ConnectConfiguration, SslContextBuilder, SslVerifyMode, select_next_proto},
     stack::Stack,
-    x509::{store::X509StoreBuilder, X509},
+    x509::{X509, store::X509StoreBuilder},
 };
 use snafu::ResultExt;
 use vector_config::configurable_component;
@@ -41,8 +42,9 @@ pub const TEST_PEM_CLIENT_KEY_PATH: &str =
 #[configurable_component]
 #[configurable(metadata(docs::advanced))]
 #[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
 pub struct TlsEnableableConfig {
-    /// Whether or not to require TLS for incoming or outgoing connections.
+    /// Whether to require TLS for incoming or outgoing connections.
     ///
     /// When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
     /// more information.
@@ -68,7 +70,7 @@ impl TlsEnableableConfig {
     }
 }
 
-/// TlsEnableableConfig for `sources`, adding metadata from the client certificate.
+/// `TlsEnableableConfig` for `sources`, adding metadata from the client certificate.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct TlsSourceConfig {
@@ -92,7 +94,7 @@ pub struct TlsConfig {
     /// If enabled, certificates must not be expired and must be issued by a trusted
     /// issuer. This verification operates in a hierarchical manner, checking that the leaf certificate (the
     /// certificate presented by the client/server) is not only valid, but that the issuer of that certificate is also valid, and
-    /// so on until the verification process reaches a root certificate.
+    /// so on, until the verification process reaches a root certificate.
     ///
     /// Do NOT set this to `false` unless you understand the risks of not verifying the validity of certificates.
     pub verify_certificate: Option<bool>,
@@ -109,7 +111,7 @@ pub struct TlsConfig {
 
     /// Sets the list of supported ALPN protocols.
     ///
-    /// Declare the supported ALPN protocols, which are used during negotiation with peer. They are prioritized in the order
+    /// Declare the supported ALPN protocols, which are used during negotiation with a peer. They are prioritized in the order
     /// that they are defined.
     #[configurable(metadata(docs::examples = "h2"))]
     pub alpn_protocols: Option<Vec<String>>,
@@ -127,7 +129,7 @@ pub struct TlsConfig {
     /// The certificate must be in DER, PEM (X.509), or PKCS#12 format. Additionally, the certificate can be provided as
     /// an inline string in PEM format.
     ///
-    /// If this is set, and is not a PKCS#12 archive, `key_file` must also be set.
+    /// If this is set _and_ is not a PKCS#12 archive, `key_file` must also be set.
     #[serde(alias = "crt_path")]
     #[configurable(metadata(docs::examples = "/path/to/host_certificate.crt"))]
     #[configurable(metadata(docs::human_name = "Certificate File Path"))]
@@ -202,7 +204,9 @@ impl TlsSettings {
                 );
             }
             if options.verify_hostname == Some(false) {
-                warn!("The `verify_hostname` option is DISABLED, this may lead to security vulnerabilities.");
+                warn!(
+                    "The `verify_hostname` option is DISABLED, this may lead to security vulnerabilities."
+                );
             }
         }
 
@@ -310,11 +314,21 @@ impl TlsSettings {
         if self.authorities.is_empty() {
             debug!("Fetching system root certs.");
 
-            #[cfg(windows)]
-            load_windows_certs(context).unwrap();
-
-            #[cfg(target_os = "macos")]
-            load_mac_certs(context).unwrap();
+            cfg_if! {
+                if #[cfg(windows)] {
+                    load_windows_certs(context).unwrap();
+                } else if #[cfg(target_os = "macos")] {
+                    cfg_if! { // Panic in release builds, warn in debug builds.
+                        if #[cfg(debug_assertions)] {
+                            if let Err(error) = load_mac_certs(context) {
+                                warn!("Failed to load macOS certs: {error}");
+                            }
+                        } else {
+                            load_mac_certs(context).unwrap();
+                        }
+                    }
+                }
+            }
         } else {
             let mut store = X509StoreBuilder::new().context(NewStoreBuilderSnafu)?;
             for authority in &self.authorities {
@@ -330,8 +344,10 @@ impl TlsSettings {
         if let Some(alpn) = &self.alpn_protocols {
             if for_server {
                 let server_proto = alpn.clone();
+                // See https://github.com/sfackler/rust-openssl/pull/2360.
+                let server_proto_ref: &'static [u8] = Box::leak(server_proto.into_boxed_slice());
                 context.set_alpn_select_callback(move |_, client_proto| {
-                    select_next_proto(server_proto.as_slice(), client_proto).ok_or(AlpnError::NOACK)
+                    select_next_proto(server_proto_ref, client_proto).ok_or(AlpnError::NOACK)
                 });
             } else {
                 context
@@ -368,7 +384,7 @@ impl TlsConfig {
                     |der| X509::from_der(&der).map(|x509| vec![x509]),
                     |pem| {
                         pem.match_indices(PEM_START_MARKER)
-                            .map(|(start, _)| X509::from_pem(pem[start..].as_bytes()))
+                            .map(|(start, _)| X509::from_pem(&pem.as_bytes()[start..]))
                             .collect()
                     },
                 )
@@ -639,10 +655,10 @@ fn der_or_pem<T>(data: Vec<u8>, der_fn: impl Fn(Vec<u8>) -> T, pem_fn: impl Fn(S
 /// file "name" contains a PEM start marker, it is assumed to contain
 /// inline data and is used directly instead of opening a file.
 fn open_read(filename: &Path, note: &'static str) -> Result<(Vec<u8>, PathBuf)> {
-    if let Some(filename) = filename.to_str() {
-        if filename.contains(PEM_START_MARKER) {
-            return Ok((Vec::from(filename), "inline text".into()));
-        }
+    if let Some(filename) = filename.to_str()
+        && filename.contains(PEM_START_MARKER)
+    {
+        return Ok((Vec::from(filename), "inline text".into()));
     }
 
     let mut text = Vec::<u8>::new();

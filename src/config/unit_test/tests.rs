@@ -33,10 +33,12 @@ async fn parse_no_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               inputs[0]: unable to locate target transform 'foo'"}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
@@ -69,10 +71,12 @@ async fn parse_no_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               inputs[1]: unable to locate target transform 'foo'"}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 }
 
@@ -102,10 +106,12 @@ async fn parse_no_test_input() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               must specify at least one input."}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 }
 
@@ -133,10 +139,12 @@ async fn parse_no_outputs() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               unit test must contain at least one of `outputs` or `no_outputs_from`."}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 }
 
@@ -170,10 +178,12 @@ async fn parse_invalid_output_targets() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               Invalid extract_from target in test 'broken test': 'nonexistent' does not exist"}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 
     let config: ConfigBuilder = toml::from_str(indoc! {r#"
@@ -197,10 +207,12 @@ async fn parse_invalid_output_targets() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               Invalid no_outputs_from target in test 'broken test': 'nonexistent' does not exist"}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 }
 
@@ -338,10 +350,12 @@ async fn parse_bad_input_event() {
     let errs = build_unit_tests(config).await.err().unwrap();
     assert_eq!(
         errs,
-        vec![indoc! {r"
+        vec![
+            indoc! {r"
             Failed to build test 'broken test':
               unrecognized input type 'nah', expected one of: 'raw', 'log' or 'metric'"}
-        .to_owned(),]
+            .to_owned(),
+        ]
     );
 }
 
@@ -805,6 +819,9 @@ async fn test_log_input() {
                 message = "this is the message"
                 int_val = 5
                 bool_val = true
+                arr_val = [1, 2, "hi", false]
+                obj_val = { a =  true, b = "b", c = 5 }
+
 
             [[tests.outputs]]
               extract_from = "foo"
@@ -816,6 +833,10 @@ async fn test_log_input() {
                     assert_eq!(.message, "this is the message")
                     assert!(.bool_val)
                     assert_eq!(.int_val, 5)
+                    assert_eq!(.arr_val, [1, 2, "hi", false])
+                    assert!(.obj_val.a)
+                    assert_eq!(.obj_val.b, "b")
+                    assert_eq!(.obj_val.c, 5)
                 """
       "#})
     .unwrap();

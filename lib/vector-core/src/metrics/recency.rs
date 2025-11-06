@@ -47,15 +47,19 @@
 //! observed, to build a complete picture that allows deciding if a given metric has gone "idle" or
 //! not, and thus whether it should actually be deleted.
 
-use std::collections::HashMap;
-use std::sync::atomic::{AtomicUsize, Ordering};
-use std::sync::Arc;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
 
-use metrics::{atomics::AtomicU64, Counter, CounterFn, Gauge, GaugeFn, HistogramFn};
+use metrics::{Counter, CounterFn, Gauge, GaugeFn, HistogramFn, atomics::AtomicU64};
 use metrics_util::{
-    registry::{Registry, Storage},
     Hashable, MetricKind, MetricKindMask,
+    registry::{Registry, Storage},
 };
 use parking_lot::Mutex;
 use quanta::{Clock, Instant};
@@ -82,7 +86,7 @@ pub(super) struct Generation(usize);
 #[derive(Clone)]
 pub(super) struct Generational<T> {
     inner: T,
-    gen: Arc<AtomicUsize>,
+    generation: Arc<AtomicUsize>,
 }
 
 impl<T> Generational<T> {
@@ -90,7 +94,7 @@ impl<T> Generational<T> {
     fn new(inner: T) -> Generational<T> {
         Generational {
             inner,
-            gen: Arc::new(AtomicUsize::new(0)),
+            generation: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -101,7 +105,7 @@ impl<T> Generational<T> {
 
     /// Gets the current generation.
     pub(super) fn get_generation(&self) -> Generation {
-        Generation(self.gen.load(Ordering::Acquire))
+        Generation(self.generation.load(Ordering::Acquire))
     }
 
     /// Acquires a reference to the inner value, and increments the generation.
@@ -110,7 +114,7 @@ impl<T> Generational<T> {
         F: Fn(&T) -> V,
     {
         let result = f(&self.inner);
-        _ = self.gen.fetch_add(1, Ordering::AcqRel);
+        _ = self.generation.fetch_add(1, Ordering::AcqRel);
         result
     }
 }
@@ -216,6 +220,39 @@ impl<K, S: Storage<K>> Storage<K> for GenerationalStorage<S> {
     }
 }
 
+pub(super) trait KeyMatcher<K> {
+    fn matches(&self, key: &K) -> bool;
+}
+
+struct PerSetTimeout<K, M: KeyMatcher<K>> {
+    configuration: Vec<(M, Duration)>,
+    per_key_timeouts: HashMap<K, Option<Duration>>,
+}
+
+impl<K, M> PerSetTimeout<K, M>
+where
+    K: Clone + Eq + Hashable,
+    M: KeyMatcher<K>,
+{
+    fn new(configuration: Vec<(M, Duration)>) -> Self {
+        Self {
+            configuration,
+            per_key_timeouts: HashMap::new(),
+        }
+    }
+
+    fn get_timeout_for_key(&mut self, key: &K, default: Option<Duration>) -> Option<Duration> {
+        *self.per_key_timeouts.entry(key.clone()).or_insert_with(|| {
+            for (matcher, duration) in &self.configuration {
+                if matcher.matches(key) {
+                    return Some(*duration);
+                }
+            }
+            default
+        })
+    }
+}
+
 /// Tracks recency of metric updates by their registry generation and time.
 ///
 /// In many cases, a user may have a long-running process where metrics are stored over time using
@@ -229,20 +266,22 @@ impl<K, S: Storage<K>> Storage<K> for GenerationalStorage<S> {
 ///
 /// [`Recency`] is separate from [`Registry`] specifically to avoid imposing any slowdowns when
 /// tracking recency does not matter, despite their otherwise tight coupling.
-pub(super) struct Recency<K> {
+pub(super) struct Recency<K, M: KeyMatcher<K>> {
     mask: MetricKindMask,
     inner: Mutex<(Clock, HashMap<K, (Generation, Instant)>)>,
-    idle_timeout: Option<Duration>,
+    global_idle_timeout: Option<Duration>,
+    per_set_timeouts: Mutex<PerSetTimeout<K, M>>,
 }
 
-impl<K> Recency<K>
+impl<K, M> Recency<K, M>
 where
-    K: Clone + Eq + Hashable,
+    K: Clone + Eq + Hashable + std::fmt::Debug,
+    M: KeyMatcher<K>,
 {
     /// Creates a new [`Recency`].
     ///
-    /// If `idle_timeout` is `None`, no recency checking will occur.  Otherwise, any metric that has
-    /// not been updated for longer than `idle_timeout` will be subject for deletion the next time
+    /// If `global_idle_timeout` is `None`, no recency checking will occur.  Otherwise, any metric that has
+    /// not been updated for longer than `global_idle_timeout` will be subject for deletion the next time
     /// the metric is checked.
     ///
     /// The provided `clock` is used for tracking time, while `mask` controls which metrics
@@ -251,11 +290,17 @@ where
     ///
     /// Refer to the documentation for [`MetricKindMask`](crate::MetricKindMask) for more
     /// information on defining a metric kind mask.
-    pub(super) fn new(clock: Clock, mask: MetricKindMask, idle_timeout: Option<Duration>) -> Self {
+    pub(super) fn new(
+        clock: Clock,
+        mask: MetricKindMask,
+        global_idle_timeout: Option<Duration>,
+        per_set_timeouts: Vec<(M, Duration)>,
+    ) -> Self {
         Recency {
             mask,
             inner: Mutex::new((clock, HashMap::new())),
-            idle_timeout,
+            global_idle_timeout,
+            per_set_timeouts: Mutex::new(PerSetTimeout::new(per_set_timeouts)),
         }
     }
 
@@ -343,47 +388,50 @@ where
         F: Fn(&Registry<K, S>, &K) -> bool,
         S: Storage<K>,
     {
-        let gen = value.get_generation();
-        if let Some(idle_timeout) = self.idle_timeout {
-            if self.mask.matches(kind) {
-                let mut guard = self.inner.lock();
-                let (clock, entries) = &mut *guard;
+        let key_timeout = self
+            .per_set_timeouts
+            .lock()
+            .get_timeout_for_key(key, self.global_idle_timeout);
 
-                let now = clock.now();
-                let deleted = if let Some((last_gen, last_update)) = entries.get_mut(key) {
-                    // If the value is the same as the latest value we have internally, and
-                    // we're over the idle timeout period, then remove it and continue.
-                    if *last_gen == gen {
-                        // We don't want to delete the metric if there is an outstanding handle that
-                        // could later update the shared value. So, here we look up the count of
-                        // references to the inner value to see if there are more than expected.
-                        //
-                        // The magic value for `strong_count` below comes from:
-                        // 1. The reference in the registry
-                        // 2. The reference held by the value passed in here
-                        // If there is another reference, then there is handle elsewhere.
-                        let referenced = Arc::strong_count(&value.inner) > 2;
-                        // If the delete returns false, that means that our generation counter is
-                        // out-of-date, and that the metric has been updated since, so we don't
-                        // actually want to delete it yet.
-                        !referenced
-                            && (now - *last_update) > idle_timeout
-                            && delete_op(registry, key)
-                    } else {
-                        // Value has changed, so mark it such.
-                        *last_update = now;
-                        *last_gen = gen;
-                        false
-                    }
+        let generation = value.get_generation();
+        if let Some(timeout) = key_timeout
+            && self.mask.matches(kind)
+        {
+            let mut guard = self.inner.lock();
+            let (clock, entries) = &mut *guard;
+
+            let now = clock.now();
+            let deleted = if let Some((last_gen, last_update)) = entries.get_mut(key) {
+                // If the value is the same as the latest value we have internally, and
+                // we're over the idle timeout period, then remove it and continue.
+                if *last_gen == generation {
+                    // We don't want to delete the metric if there is an outstanding handle that
+                    // could later update the shared value. So, here we look up the count of
+                    // references to the inner value to see if there are more than expected.
+                    //
+                    // The magic value for `strong_count` below comes from:
+                    // 1. The reference in the registry
+                    // 2. The reference held by the value passed in here
+                    // If there is another reference, then there is handle elsewhere.
+                    let referenced = Arc::strong_count(&value.inner) > 2;
+                    // If the delete returns false, that means that our generation counter is
+                    // out-of-date, and that the metric has been updated since, so we don't
+                    // actually want to delete it yet.
+                    !referenced && (now - *last_update) > timeout && delete_op(registry, key)
                 } else {
-                    entries.insert(key.clone(), (gen, now));
+                    // Value has changed, so mark it such.
+                    *last_update = now;
+                    *last_gen = generation;
                     false
-                };
-
-                if deleted {
-                    entries.remove(key);
-                    return false;
                 }
+            } else {
+                entries.insert(key.clone(), (generation, now));
+                false
+            };
+
+            if deleted {
+                entries.remove(key);
+                return false;
             }
         }
 

@@ -1,7 +1,8 @@
 ---
+date: "2021-08-12"
 title: Building and Managing Complex Configs
 description: Strategies for building and managing complex Vector configs
-author_github: https://github.com/Jeffail
+authors: ["Jeffail"]
 domain: config
 weight: 3
 tags: ["configuration", "config", "level up", "guides", "guide"]
@@ -14,7 +15,7 @@ Before you begin, this guide assumes the following:
 * You understand the [basic Vector concepts][docs.about.concepts]
 * You understand [how to set up a basic pipeline][docs.setup.quickstart].
 
-[docs.about.concepts]: /docs/about/concepts
+[docs.about.concepts]: /docs/introduction/concepts
 [docs.setup.quickstart]: /docs/setup/quickstart
 {{< /requirement >}}
 
@@ -257,6 +258,6 @@ If you're running Vector in environments where it's not possible to issue
 `SIGHUP` signals you can instead run it with the `--watch-config` flag and it'll
 automatically gobble up changes whenever the file is written to.
 
-[docs.about.concepts]: /docs/about/concepts/
+[docs.about.concepts]: /docs/introduction/concepts/
 [docs.setup.quickstart]: /docs/setup/quickstart/
 [guides.unit-testing]: /guides/level-up/unit-testing/

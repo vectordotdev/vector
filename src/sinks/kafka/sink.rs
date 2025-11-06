@@ -1,18 +1,23 @@
+use std::time::Duration;
+
 use rdkafka::{
+    ClientConfig,
     error::KafkaError,
     producer::{BaseProducer, FutureProducer, Producer},
-    ClientConfig,
 };
 use snafu::{ResultExt, Snafu};
-use tokio::time::Duration;
+use tower::limit::RateLimit;
 use tracing::Span;
 use vrl::path::OwnedTargetPath;
 
 use super::config::KafkaSinkConfig;
 use crate::{
+    config::SinkHealthcheckOptions,
     kafka::KafkaStatisticsContext,
-    sinks::kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
-    sinks::prelude::*,
+    sinks::{
+        kafka::{request_builder::KafkaRequestBuilder, service::KafkaService},
+        prelude::*,
+    },
 };
 
 #[derive(Debug, Snafu)]
@@ -25,7 +30,7 @@ pub(super) enum BuildError {
 pub struct KafkaSink {
     transformer: Transformer,
     encoder: Encoder<()>,
-    service: KafkaService,
+    service: RateLimit<KafkaService>,
     topic: Template,
     key_field: Option<OwnedTargetPath>,
     headers_key: Option<OwnedTargetPath>,
@@ -55,7 +60,12 @@ impl KafkaSink {
             headers_key: config.headers_key.map(|key| key.0),
             transformer,
             encoder,
-            service: KafkaService::new(producer),
+            service: ServiceBuilder::new()
+                .rate_limit(
+                    config.rate_limit_num,
+                    Duration::from_secs(config.rate_limit_duration_secs),
+                )
+                .service(KafkaService::new(producer)),
             topic: config.topic,
             key_field: config.key_field.map(|key| key.0),
         })
@@ -102,7 +112,10 @@ impl KafkaSink {
     }
 }
 
-pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
+pub(crate) async fn healthcheck(
+    config: KafkaSinkConfig,
+    healthcheck_options: SinkHealthcheckOptions,
+) -> crate::Result<()> {
     trace!("Healthcheck started.");
     let client_config = config.to_rdkafka().unwrap();
     let topic: Option<String> = match config.healthcheck_topic {
@@ -125,7 +138,7 @@ pub(crate) async fn healthcheck(config: KafkaSinkConfig) -> crate::Result<()> {
 
         producer
             .client()
-            .fetch_metadata(topic, Duration::from_secs(3))
+            .fetch_metadata(topic, healthcheck_options.timeout)
             .map(|_| ())
     })
     .await??;

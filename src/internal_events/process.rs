@@ -1,6 +1,5 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 use crate::{built_info, config};
 
@@ -73,7 +72,6 @@ impl InternalEvent for VectorReloadError {
             error_code = "reload",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -95,7 +93,6 @@ impl InternalEvent for VectorConfigLoadError {
             error_code = "config_load",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -117,7 +114,6 @@ impl InternalEvent for VectorRecoveryError {
             error_code = "recovery",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

@@ -11,71 +11,60 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
   CONTAINER_TOOL: "docker"
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
-  RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
   PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 jobs:
   changes:
     uses: ./.github/workflows/changes.yml
     secrets: inherit
-    with:
-      base_ref: ${{ github.event.merge_group.base_ref || github.event.pull_request.base.ref }}
-      head_ref: ${{ github.event.merge_group.head_ref || github.event.pull_request.head.ref }}
 
-  checks:
-    name: Checks
-    runs-on: ubuntu-20.04-8core
-    timeout-minutes: 60
+  check-fmt:
+    name: Check code format
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
-    env:
-      CARGO_INCREMENTAL: 0
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: ./.github/actions/setup
         with:
-          # check-version needs tags
-          fetch-depth: 0 # fetch everything
+          rust: true
+      - run: make check-fmt
 
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
+  check-clippy:
+    name: Check clippy
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: ./.github/actions/setup
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          rust: true
+          protoc: true
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+      - run: make check-clippy
 
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-20.04.sh
-
-      - uses: ruby/setup-ruby@v1
-
-      - run: bash scripts/environment/prepare.sh
-
-      - name: Enable Rust matcher
-        run: echo "::add-matcher::.github/matchers/rust.json"
-
-      - name: Check code format
-        run: make check-fmt
-
-      - name: Check clippy
-        if: needs.changes.outputs.source == 'true'
-        run: make check-clippy
-
-      - name: Unit - x86_64-unknown-linux-gnu
-        if: needs.changes.outputs.source == 'true'
+  test:
+    name: Unit and Component Validation tests - x86_64-unknown-linux-gnu
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-nextest: true
+          datadog-ci: true
+          protoc: true
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+      - name: Unit Test
         run: make test
         env:
           CARGO_BUILD_JOBS: 5
@@ -88,60 +77,148 @@ jobs:
         run: scripts/upload-test-results.sh
         if: always()
 
-      - name: Check version
-        run: make check-version
+  check-scripts:
+    name: Check scripts
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.scripts == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - run: make check-scripts
 
-      - name: Check scripts
-        run: make check-scripts
+  check-events:
+    name: Check events
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+      - run: make check-events
 
-      - name: Check events
-        if: needs.changes.outputs.source == 'true'
-        run: make check-events
+  check-licenses:
+    name: Check that the 3rd-party license file is up to date
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: ./.github/actions/setup
+        with:
+          cargo-cache: false
+          mold: false
+          dd-rust-license-tool: true
+      - run: make check-licenses
 
-      - name: Check that the 3rd-party license file is up to date
-        if: needs.changes.outputs.dependencies == 'true'
-        run: make check-licenses
+  check-docs:
+    name: Check Cue docs
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cue: true
+      - run: make check-docs
 
-      - name: Check Cue docs
-        if: needs.changes.outputs.cue == 'true'
-        run: make check-docs
+  check-markdown:
+    name: Check Markdown
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.markdown == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          markdownlint: true
+      - run: make check-markdown
 
-      - name: Check Markdown
-        if: needs.changes.outputs.markdown == 'true'
-        run: make check-markdown
+  check-component-docs:
+    name: Check Component Docs
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          cue: true
+      - run: make check-component-docs
 
-      - name: Check Component Docs
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true'
-        run: make check-component-docs
+  check-rust-docs:
+    name: Check Rust Docs
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+      - run: cd rust-doc && make docs
 
-      - name: Check Rust Docs
-        if: needs.changes.outputs.source == 'true'
-        run: cd rust-doc && make docs
+  test-vrl:
+    name: VRL - Linux
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          wasm-pack: true
+      - run: make test-vrl
 
-      - name: VRL - Linux
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true'
-        run: cargo vdev test-vrl
-
-      - name: Build VRL Playground
-        if: needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true'
-        run: |
+  build-vrl-playground:
+    name: Build VRL Playground
+    runs-on: ubuntu-24.04-8core
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          wasm-pack: true
+      - run: |
           cd lib/vector-vrl/web-playground/
+          rustup target add wasm32-unknown-unknown
           wasm-pack build --target web --out-dir public/pkg
 
-  # This is a required status check, so it always needs to run if prior jobs failed, in order to mark the status correctly.
   all-checks:
     name: Test Suite
-    runs-on: ubuntu-20.04
-    timeout-minutes: 5
+    runs-on: ubuntu-24.04
     if: always()
-    needs: [changes, checks]
-    env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
+    needs:
+      - changes
+      - check-fmt
+      - check-clippy
+      - test
+      - check-scripts
+      - check-events
+      - check-licenses
+      - check-docs
+      - check-markdown
+      - check-component-docs
+      - check-rust-docs
+      - test-vrl
+      - build-vrl-playground
     steps:
-      - run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi

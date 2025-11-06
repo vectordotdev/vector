@@ -5,9 +5,8 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     sync::LazyLock,
 };
-use vector_lib::emit;
 
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use dnsmsg_parser::{dns_message_parser::DnsParserOptions, ede::EDE};
@@ -17,26 +16,16 @@ use hickory_proto::{
 };
 use prost::Message;
 use snafu::Snafu;
-use vrl::{owned_value_path, path};
-
 use vector_lib::{
+    Error, Result, emit,
     event::{LogEvent, Value},
-    Error, Result,
 };
+use vrl::{owned_value_path, path};
 
 #[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 mod dnstap_proto {
     include!(concat!(env!("OUT_DIR"), "/dnstap.rs"));
 }
-
-use crate::{internal_events::DnstapParseWarning, schema::DNSTAP_VALUE_PATHS};
-use dnstap_proto::{
-    message::Type as DnstapMessageType, Dnstap, Message as DnstapMessage, SocketFamily,
-    SocketProtocol,
-};
-use vector_lib::config::log_schema;
-use vector_lib::lookup::lookup_v2::ValuePath;
-use vector_lib::lookup::PathPrefix;
 
 use dnsmsg_parser::{
     dns_message::{
@@ -45,6 +34,16 @@ use dnsmsg_parser::{
     },
     dns_message_parser::DnsMessageParser,
 };
+use dnstap_proto::{
+    Dnstap, Message as DnstapMessage, SocketFamily, SocketProtocol,
+    message::Type as DnstapMessageType,
+};
+use vector_lib::{
+    config::log_schema,
+    lookup::{PathPrefix, lookup_v2::ValuePath},
+};
+
+use crate::{internal_events::DnstapParseWarning, schema::DNSTAP_VALUE_PATHS};
 
 #[derive(Debug, Snafu)]
 enum DnstapParserError {
@@ -147,25 +146,18 @@ impl DnstapParser {
                 dnstap_data_type.clone(),
             );
 
-            if dnstap_data_type == "Message" {
-                if let Some(message) = proto_msg.message {
-                    if let Err(err) =
-                        DnstapParser::parse_dnstap_message(event, &root, message, parsing_options)
-                    {
-                        emit!(DnstapParseWarning { error: &err });
-                        need_raw_data = true;
-                        DnstapParser::insert(
-                            event,
-                            &root,
-                            &DNSTAP_VALUE_PATHS.error,
-                            err.to_string(),
-                        );
-                    }
-                }
+            if dnstap_data_type == "Message"
+                && let Some(message) = proto_msg.message
+                && let Err(err) =
+                    DnstapParser::parse_dnstap_message(event, &root, message, parsing_options)
+            {
+                emit!(DnstapParseWarning { error: &err });
+                need_raw_data = true;
+                DnstapParser::insert(event, &root, &DNSTAP_VALUE_PATHS.error, err.to_string());
             }
         } else {
             emit!(DnstapParseWarning {
-                error: format!("Unknown dnstap data type: {}", dnstap_data_type_id)
+                error: format!("Unknown dnstap data type: {dnstap_data_type_id}")
             });
             need_raw_data = true;
         }
@@ -236,7 +228,7 @@ impl DnstapParser {
                 dnstap_message_type_id,
                 dnstap_message.query_message.as_ref(),
                 &DNSTAP_MESSAGE_REQUEST_TYPE_IDS,
-            );
+            )?;
         }
 
         if let Some(response_time_sec) = dnstap_message.response_time_sec {
@@ -248,7 +240,7 @@ impl DnstapParser {
                 dnstap_message_type_id,
                 dnstap_message.response_message.as_ref(),
                 &DNSTAP_MESSAGE_RESPONSE_TYPE_IDS,
-            );
+            )?;
         }
 
         DnstapParser::parse_dnstap_message_type(
@@ -366,19 +358,37 @@ impl DnstapParser {
         dnstap_message_type_id: i32,
         message: Option<&Vec<u8>>,
         type_ids: &HashSet<i32>,
-    ) {
+    ) -> Result<()> {
+        if time_sec > i64::MAX as u64 {
+            return Err(Error::from("Cannot parse timestamp"));
+        }
+
         let (time_in_nanosec, query_time_nsec) = match time_nsec {
-            Some(nsec) => (time_sec as i64 * 1_000_000_000_i64 + nsec as i64, nsec),
-            None => (time_sec as i64 * 1_000_000_000_i64, 0),
+            Some(nsec) => {
+                if let Some(time_in_ns) = (time_sec as i64)
+                    .checked_mul(1_000_000_000)
+                    .and_then(|v| v.checked_add(nsec as i64))
+                {
+                    (time_in_ns, nsec)
+                } else {
+                    return Err(Error::from("Cannot parse timestamp"));
+                }
+            }
+            None => {
+                if let Some(time_in_ns) = (time_sec as i64).checked_mul(1_000_000_000) {
+                    (time_in_ns, 0)
+                } else {
+                    return Err(Error::from("Cannot parse timestamp"));
+                }
+            }
         };
 
         if type_ids.contains(&dnstap_message_type_id) {
             DnstapParser::log_time(event, prefix.clone(), time_in_nanosec, "ns");
-
             let timestamp = Utc
                 .timestamp_opt(time_sec.try_into().unwrap(), query_time_nsec)
                 .single()
-                .expect("invalid timestamp");
+                .ok_or("Invalid timestamp")?;
             if let Some(timestamp_key) = log_schema().timestamp_key() {
                 DnstapParser::insert(event, prefix.clone(), timestamp_key, timestamp);
             }
@@ -392,6 +402,7 @@ impl DnstapParser {
                 "ns",
             );
         }
+        Ok(())
     }
 
     fn parse_dnstap_message_socket_family<'a>(
@@ -418,9 +429,15 @@ impl DnstapParser {
 
         if let Some(query_address) = dnstap_message.query_address.as_ref() {
             let source_address = if socket_family == 1 {
+                if query_address.len() < 4 {
+                    return Err(Error::from("Cannot parse query_address"));
+                }
                 let address_buffer: [u8; 4] = query_address[0..4].try_into()?;
                 IpAddr::V4(Ipv4Addr::from(address_buffer))
             } else {
+                if query_address.len() < 16 {
+                    return Err(Error::from("Cannot parse query_address"));
+                }
                 let address_buffer: [u8; 16] = query_address[0..16].try_into()?;
                 IpAddr::V6(Ipv6Addr::from(address_buffer))
             };
@@ -444,9 +461,15 @@ impl DnstapParser {
 
         if let Some(response_address) = dnstap_message.response_address.as_ref() {
             let response_addr = if socket_family == 1 {
+                if response_address.len() < 4 {
+                    return Err(Error::from("Cannot parse response_address"));
+                }
                 let address_buffer: [u8; 4] = response_address[0..4].try_into()?;
                 IpAddr::V4(Ipv4Addr::from(address_buffer))
             } else {
+                if response_address.len() < 16 {
+                    return Err(Error::from("Cannot parse response_address"));
+                }
                 let address_buffer: [u8; 16] = response_address[0..16].try_into()?;
                 IpAddr::V6(Ipv6Addr::from(address_buffer))
             };
@@ -959,8 +982,7 @@ fn to_socket_family_name(socket_family: i32) -> Result<&'static str> {
         Ok("INET6")
     } else {
         Err(Error::from(format!(
-            "Unknown socket family: {}",
-            socket_family
+            "Unknown socket family: {socket_family}"
         )))
     }
 }
@@ -980,8 +1002,7 @@ fn to_socket_protocol_name(socket_protocol: i32) -> Result<&'static str> {
         Ok("DNSCryptTCP")
     } else {
         Err(Error::from(format!(
-            "Unknown socket protocol: {}",
-            socket_protocol
+            "Unknown socket protocol: {socket_protocol}"
         )))
     }
 }
@@ -1009,16 +1030,18 @@ fn to_dnstap_message_type(type_id: i32) -> String {
         12 => String::from("ToolResponse"),
         13 => String::from("UpdateQuery"),
         14 => String::from("UpdateResponse"),
-        _ => format!("Unknown dnstap message type: {}", type_id),
+        _ => format!("Unknown dnstap message type: {type_id}"),
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{collections::BTreeMap, vec};
+
     use chrono::DateTime;
     use dnsmsg_parser::dns_message_parser::DnsParserOptions;
-    use std::collections::BTreeMap;
+
+    use super::*;
 
     #[test]
     fn test_parse_dnstap_data_with_query_message() {
@@ -1319,6 +1342,72 @@ mod tests {
         )
         .expect_err("Expected TrustDnsError.");
         assert!(e.to_string().contains("Protobuf message"));
+    }
+
+    #[test]
+    fn test_parse_dnstap_data_with_invalid_timestamp() {
+        fn test_one_timestamp_parse(time_sec: u64, time_nsec: Option<u32>) -> Result<()> {
+            let mut event = LogEvent::default();
+            let root = owned_value_path!();
+            let type_ids = HashSet::from([1]);
+            DnstapParser::parse_dnstap_message_time(
+                &mut event, &root, time_sec, time_nsec, 1, None, &type_ids,
+            )
+        }
+        // okay case
+        assert!(test_one_timestamp_parse(1337, Some(42)).is_ok());
+        // overflow in cast (u64 -> i64)
+        assert!(test_one_timestamp_parse(u64::MAX, Some(42)).is_err());
+        assert!(test_one_timestamp_parse(u64::MAX, None).is_err());
+        // overflow in multiplication
+        assert!(test_one_timestamp_parse(i64::MAX as u64, Some(42)).is_err());
+        assert!(test_one_timestamp_parse(i64::MAX as u64, None).is_err());
+        // overflow in add
+        assert!(
+            test_one_timestamp_parse((i64::MAX / 1_000_000_000) as u64, Some(u32::MAX)).is_err()
+        );
+        // cannot be parsed by timestamp_opt
+        assert!(test_one_timestamp_parse(96, Some(1616928816)).is_err());
+    }
+
+    #[test]
+    fn test_parse_dnstap_message_socket_family_bad_addr() {
+        // while parsing address is optional, but in this function assume otherwise
+        fn test_one_input(socket_family: i32, msg: DnstapMessage) -> Result<()> {
+            let mut event = LogEvent::default();
+            let root = owned_value_path!();
+            DnstapParser::parse_dnstap_message_socket_family(&mut event, &root, socket_family, &msg)
+        }
+        // all bad cases which can panic
+        {
+            let message = DnstapMessage {
+                query_address: Some(vec![]),
+                ..Default::default()
+            };
+            assert!(test_one_input(1, message).is_err());
+        }
+        {
+            let message = DnstapMessage {
+                query_address: Some(vec![]),
+                ..Default::default()
+            };
+            assert!(test_one_input(2, message).is_err());
+        }
+
+        {
+            let message = DnstapMessage {
+                response_address: Some(vec![]),
+                ..Default::default()
+            };
+            assert!(test_one_input(1, message).is_err());
+        }
+        {
+            let message = DnstapMessage {
+                response_address: Some(vec![]),
+                ..Default::default()
+            };
+            assert!(test_one_input(2, message).is_err());
+        }
     }
 
     #[test]

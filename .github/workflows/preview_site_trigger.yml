@@ -1,29 +1,52 @@
 name: Call Build Preview
-
 on:
   pull_request:
     types: [opened, reopened, synchronize]
-
 jobs:
   approval_check:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    # Only run for PRs with 'website' in the branch name
     if: ${{ contains(github.head_ref, 'website') }}
     steps:
-      - name: Echo approval
+      # Validate branch name
+      - name: Validate branch name and set output
+        id: validate
         run: |
-          echo "Workflow has been allowed to run for PR ${{ github.event.number }}. Setting artifacts and then continuing workflow runs"
+          BRANCH="${{ github.head_ref }}"
+          if [[ ! "$BRANCH" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+            echo "valid=false" >> $GITHUB_OUTPUT
+          else
+            echo "valid=true" >> $GITHUB_OUTPUT
+          fi
 
-      # Save the PR number and branch name to an artifact for use in subsequent jobs
-      - name: Save PR number and Branch name
-        run: |
-          mkdir -p ./pr
-          echo "${{ github.event.number }}" > ./pr/number
-          echo "${{ github.head_ref }}" >> ./pr/branch
+      # Save PR information (only if branch is valid)
+      - name: Validate and save PR information
+        if: steps.validate.outputs.valid == 'true'
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd # v8.0.0
+        with:
+          script: |
+            const fs = require('fs').promises;
+            const path = require('path');
+            const crypto = require('crypto');
+            const prNumber = context.payload.number;
+            const branchName = context.payload.pull_request.head.ref;
 
-      # Upload the artifact
+            await fs.mkdir('./pr', { recursive: true });
+            await fs.writeFile('./pr/number', prNumber.toString());
+            await fs.writeFile('./pr/branch', branchName);
+
+            const numberHash = crypto.createHash('sha256').update(prNumber.toString()).digest('hex');
+            const branchHash = crypto.createHash('sha256').update(branchName).digest('hex');
+            await fs.writeFile('./pr/integrity', `${numberHash}:${branchHash}`);
+
+            core.info(`Saved PR #${prNumber} and branch ${branchName}`);
+
+      # Upload the artifact using latest version (only if branch is valid)
       - name: Upload PR information artifact
-        uses: actions/upload-artifact@v4
+        if: steps.validate.outputs.valid == 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: pr
           path: pr/
+          retention-days: 1

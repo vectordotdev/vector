@@ -1,11 +1,14 @@
+use std::time::Duration;
+
 use serde_json::Value;
 use tracing::info;
-
 use vector::test_util::trace_init;
 
 use super::*;
 
 const LOGS_ENDPOINT: &str = "/api/v2/logs";
+const MAX_RETRIES: usize = 10;
+const WAIT_INTERVAL: Duration = Duration::from_secs(1);
 
 fn expected_log_events() -> usize {
     std::env::var("EXPECTED_LOG_EVENTS")
@@ -70,25 +73,36 @@ fn reduce_to_data(payloads: Vec<FakeIntakePayload<Value>>) -> Vec<Value> {
 async fn validate() {
     trace_init();
 
-    // Even with configuring docker service dependencies, we need a small buffer of time
-    // to ensure events flow through to fakeintake before asking for them
-    std::thread::sleep(std::time::Duration::from_secs(2));
-
+    // Retry until we have log payloads or hit max retries.
+    // This is to ensure events flow through to fakeintake before asking for them.
     info!("getting log payloads from agent-only pipeline");
-    let mut agent_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
-        &fake_intake_agent_address(),
-        LOGS_ENDPOINT,
-    )
-    .await
-    .payloads;
+    let mut agent_payloads = Vec::new();
+    for _ in 0..MAX_RETRIES {
+        agent_payloads = get_fakeintake_payloads::<FakeIntakeResponseJson>(
+            &fake_intake_agent_address(),
+            LOGS_ENDPOINT,
+        )
+        .await
+        .payloads;
 
-    // the logs endpoint receives an empty healthcheck payload in the beginning
-    if !agent_payloads.is_empty() {
-        agent_payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty())
+        if !agent_payloads.is_empty() {
+            break;
+        }
+
+        info!("No valid payloads yet, retrying...");
+        tokio::time::sleep(WAIT_INTERVAL).await;
     }
 
-    let mut agent_payloads = reduce_to_data(agent_payloads);
+    // If we still don't have valid payloads after retries, fail the test
+    assert!(
+        !agent_payloads.is_empty(),
+        "Failed to get valid log payloads from agent pipeline after {MAX_RETRIES} retries"
+    );
 
+    // The logs endpoint receives an empty healthcheck payload in the beginning
+    agent_payloads.retain(|raw_payload| !raw_payload.data.as_array().unwrap().is_empty());
+
+    let mut agent_payloads = reduce_to_data(agent_payloads);
     common_assertions(&mut agent_payloads);
 
     info!("getting log payloads from agent-vector pipeline");

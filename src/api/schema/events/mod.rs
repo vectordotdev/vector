@@ -4,11 +4,13 @@ pub mod metric;
 pub mod output;
 pub mod trace;
 
+use std::time::{SystemTime, UNIX_EPOCH};
+
 use async_graphql::{Context, Subscription};
 use encoding::EventEncodingType;
-use futures::{stream, Stream, StreamExt};
-use output::{from_tap_payload_to_output_events, OutputEventsPayload};
-use rand::{rngs::SmallRng, Rng, SeedableRng};
+use futures::{Stream, StreamExt, stream};
+use output::{OutputEventsPayload, from_tap_payload_to_output_events};
+use rand::{Rng, SeedableRng, rngs::SmallRng};
 use tokio::{select, sync::mpsc, time};
 use tokio_stream::wrappers::ReceiverStream;
 use vector_lib::tap::{
@@ -81,7 +83,11 @@ pub(crate) fn create_events_stream(
 
         // Random number generator to allow for sampling. Speed trumps cryptographic security here.
         // The RNG must be Send + Sync to use with the `select!` loop below, hence `SmallRng`.
-        let mut rng = SmallRng::from_entropy();
+        let seed = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap()
+            .as_nanos() as u64;
+        let mut rng = SmallRng::seed_from_u64(seed);
 
         // Keep a count of the batch size, which will be used as a seed for random eviction
         // per the sampling strategy used below.
@@ -113,7 +119,7 @@ pub(crate) fn create_events_stream(
                         if limit > results.len() {
                             results.push(payload);
                         } else {
-                            let random_number = rng.gen_range(0..batch);
+                            let random_number = rng.random_range(0..batch);
                             if random_number < results.len() {
                                 results[random_number] = payload;
                             }

@@ -1,18 +1,18 @@
 #![deny(missing_docs)]
 
-use chrono::{DateTime, Utc};
 use core::fmt::Debug;
 use std::collections::BTreeMap;
 
+use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Deserializer};
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::{LogEvent, MaybeAsLogMut};
-use vector_lib::lookup::lookup_v2::ConfigValuePath;
-use vector_lib::lookup::{event_path, PathPrefix};
-use vector_lib::schema::meaning;
-use vrl::path::OwnedValuePath;
-use vrl::value::Value;
+use vector_lib::{
+    configurable::configurable_component,
+    event::{LogEvent, MaybeAsLogMut},
+    lookup::{PathPrefix, event_path, lookup_v2::ConfigValuePath},
+    schema::meaning,
+};
+use vrl::{path::OwnedValuePath, value::Value};
 
 use crate::{event::Event, serde::is_default};
 
@@ -105,15 +105,12 @@ impl Transformer {
         only_fields: Option<&Vec<ConfigValuePath>>,
         except_fields: Option<&Vec<ConfigValuePath>>,
     ) -> crate::Result<()> {
-        if let (Some(only_fields), Some(except_fields)) = (only_fields, except_fields) {
-            if except_fields
+        if let (Some(only_fields), Some(except_fields)) = (only_fields, except_fields)
+            && except_fields
                 .iter()
                 .any(|f| only_fields.iter().any(|v| v == f))
-            {
-                return Err(
-                    "`except_fields` and `only_fields` should be mutually exclusive.".into(),
-                );
-            }
+        {
+            return Err("`except_fields` and `only_fields` should be mutually exclusive.".into());
         }
         Ok(())
     }
@@ -168,11 +165,11 @@ impl Transformer {
                     .meaning_path(meaning::SERVICE);
                 // If we are removing the service field we need to store this in a `dropped_fields` list as we may need to
                 // refer to this later when emitting metrics.
-                if let (Some(v), Some(service_path)) = (value, service_path) {
-                    if service_path.path == *value_path {
-                        log.metadata_mut()
-                            .add_dropped_field(meaning::SERVICE.into(), v);
-                    }
+                if let (Some(v), Some(service_path)) = (value, service_path)
+                    && service_path.path == *value_path
+                {
+                    log.metadata_mut()
+                        .add_dropped_field(meaning::SERVICE.into(), v);
                 }
             }
         }
@@ -253,7 +250,7 @@ pub enum TimestampFormat {
     /// Represent the timestamp as a Unix timestamp in milliseconds.
     UnixMs,
 
-    /// Represent the timestamp as a Unix timestamp in microseconds
+    /// Represent the timestamp as a Unix timestamp in microseconds.
     UnixUs,
 
     /// Represent the timestamp as a Unix timestamp in nanoseconds.
@@ -265,16 +262,18 @@ pub enum TimestampFormat {
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::BTreeMap, sync::Arc};
+
     use indoc::indoc;
-    use vector_lib::btreemap;
-    use vector_lib::config::{log_schema, LogNamespace};
-    use vector_lib::lookup::path::parse_target_path;
+    use vector_lib::{
+        btreemap,
+        config::{LogNamespace, log_schema},
+        lookup::path::parse_target_path,
+    };
     use vrl::value::Kind;
 
-    use crate::config::schema;
-
     use super::*;
-    use std::{collections::BTreeMap, sync::Arc};
+    use crate::config::schema;
 
     #[test]
     fn serialize() {
@@ -396,7 +395,7 @@ mod tests {
             ),
         ];
         for (fmt, expected) in cases {
-            let config: String = format!(r#"timestamp_format = "{}""#, fmt);
+            let config: String = format!(r#"timestamp_format = "{fmt}""#);
             let transformer: Transformer = toml::from_str(&config).unwrap();
             let mut event = base.clone();
             transformer.transform(&mut event);

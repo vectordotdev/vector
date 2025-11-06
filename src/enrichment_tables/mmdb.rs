@@ -2,11 +2,13 @@
 //! Enrichment data is loaded from any database in [MaxMind][maxmind] format.
 //!
 //! [maxmind]: https://maxmind.com
-use std::{fs, net::IpAddr, sync::Arc, time::SystemTime};
+use std::{fs, net::IpAddr, path::PathBuf, sync::Arc, time::SystemTime};
 
-use maxminddb::{MaxMindDBError, Reader};
-use vector_lib::configurable::configurable_component;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use maxminddb::Reader;
+use vector_lib::{
+    configurable::configurable_component,
+    enrichment::{Case, Condition, IndexHandle, Table},
+};
 use vrl::value::{ObjectMap, Value};
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
@@ -18,13 +20,13 @@ pub struct MmdbConfig {
     /// Path to the [MaxMind][maxmind] database
     ///
     /// [maxmind]: https://maxmind.com
-    pub path: String,
+    pub path: PathBuf,
 }
 
 impl GenerateConfig for MmdbConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            path: "/path/to/GeoLite2-City.mmdb".to_string(),
+            path: "/path/to/GeoLite2-City.mmdb".into(),
         })
         .unwrap()
     }
@@ -50,14 +52,14 @@ pub struct Mmdb {
 impl Mmdb {
     /// Creates a new Mmdb struct from the provided config.
     pub fn new(config: MmdbConfig) -> crate::Result<Self> {
-        let dbreader = Arc::new(Reader::open_readfile(config.path.clone())?);
+        let dbreader = Arc::new(Reader::open_readfile(&config.path)?);
 
         // Check if we can read database with dummy Ip.
         let ip = IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
         let result = dbreader.lookup::<ObjectMap>(ip).map(|_| ());
 
         match result {
-            Ok(_) | Err(MaxMindDBError::AddressNotFoundError(_)) => Ok(Mmdb {
+            Ok(_) => Ok(Mmdb {
                 last_modified: fs::metadata(&config.path)?.modified()?,
                 dbreader,
                 config,
@@ -67,7 +69,7 @@ impl Mmdb {
     }
 
     fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<ObjectMap> {
-        let data = self.dbreader.lookup::<ObjectMap>(ip).ok()?;
+        let data = self.dbreader.lookup::<ObjectMap>(ip).ok()??;
 
         if let Some(fields) = select {
             let mut filtered = Value::from(ObjectMap::new());
@@ -98,9 +100,10 @@ impl Table for Mmdb {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
-        let mut rows = self.find_table_rows(case, condition, select, index)?;
+        let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
@@ -117,6 +120,7 @@ impl Table for Mmdb {
         _: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        _wildcard: Option<&Value>,
         _: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         match condition.first() {
@@ -164,14 +168,15 @@ impl Table for Mmdb {
 
 impl std::fmt::Debug for Mmdb {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Maxmind database {})", self.config.path)
+        write!(f, "Maxmind database {})", self.config.path.display())
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vrl::value::Value;
+
+    use super::*;
 
     #[test]
     fn city_partial_lookup() {
@@ -259,7 +264,7 @@ mod tests {
 
     fn find_select(ip: &str, database: &str, select: Option<&[String]>) -> Option<ObjectMap> {
         Mmdb::new(MmdbConfig {
-            path: database.to_string(),
+            path: database.into(),
         })
         .unwrap()
         .find_table_rows(
@@ -269,6 +274,7 @@ mod tests {
                 value: ip.into(),
             }],
             select,
+            None,
             None,
         )
         .unwrap()

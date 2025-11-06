@@ -11,7 +11,7 @@ use super::{
 use crate::{
     assert_buffer_is_empty, assert_buffer_records, assert_buffer_size, assert_enough_bytes_written,
     assert_reader_writer_v2_file_positions,
-    test::{acknowledge, install_tracing_helpers, with_temp_dir, SizedRecord},
+    test::{SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{
         common::align16,
         tests::{get_corrected_max_record_size, get_minimum_data_file_size_for_record_payload},
@@ -66,7 +66,7 @@ async fn writer_error_when_record_is_over_the_limit() {
 }
 
 #[tokio::test]
-#[ignore]
+#[ignore = "Needs investigation"]
 async fn writer_waits_when_buffer_is_full() {
     let assertion_registry = install_tracing_helpers();
     let fut = with_temp_dir(|dir| {

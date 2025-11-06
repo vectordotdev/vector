@@ -1,25 +1,31 @@
-use std::collections::hash_map::Entry;
-use std::collections::{hash_map, HashMap};
-use std::pin::Pin;
-use std::time::{Duration, Instant};
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    pin::Pin,
+    time::{Duration, Instant},
+};
 
-use crate::internal_events::ReduceAddEventError;
-use crate::transforms::reduce::merge_strategy::{
-    get_value_merger, MergeStrategy, ReduceValueMerger,
-};
-use crate::{
-    conditions::Condition,
-    event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
-    internal_events::ReduceStaleEventFlushed,
-    transforms::{reduce::config::ReduceConfig, TaskTransform},
-};
 use futures::Stream;
 use indexmap::IndexMap;
-use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
-use vrl::path::{parse_target_path, OwnedTargetPath};
-use vrl::prelude::KeyString;
+use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
+use vrl::{
+    path::{OwnedTargetPath, parse_target_path},
+    prelude::KeyString,
+};
 
-#[derive(Debug)]
+use crate::{
+    conditions::Condition,
+    event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
+    internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
+    transforms::{
+        TaskTransform,
+        reduce::{
+            config::ReduceConfig,
+            merge_strategy::{MergeStrategy, ReduceValueMerger, get_value_merger},
+        },
+    },
+};
+
+#[derive(Clone, Debug)]
 struct ReduceState {
     events: usize,
     fields: HashMap<OwnedTargetPath, Box<dyn ReduceValueMerger>>,
@@ -132,7 +138,7 @@ impl ReduceState {
     }
 }
 
-#[derive(Debug)]
+#[derive(Clone, Debug)]
 pub struct Reduce {
     expire_after: Duration,
     flush_period: Duration,
@@ -218,10 +224,10 @@ impl Reduce {
         let mut flush_discriminants = Vec::new();
         let now = Instant::now();
         for (k, t) in &self.reduce_merge_states {
-            if let Some(period) = self.end_every_period {
-                if (now - t.creation) >= period {
-                    flush_discriminants.push(k.clone());
-                }
+            if let Some(period) = self.end_every_period
+                && (now - t.creation) >= period
+            {
+                flush_discriminants.push(k.clone());
             }
 
             if (now - t.stale_since) >= self.expire_after {
@@ -244,18 +250,18 @@ impl Reduce {
 
     fn push_or_new_reduce_state(&mut self, event: LogEvent, discriminant: Discriminant) {
         match self.reduce_merge_states.entry(discriminant) {
-            hash_map::Entry::Vacant(entry) => {
+            Entry::Vacant(entry) => {
                 let mut state = ReduceState::new();
                 state.add_event(event, &self.merge_strategies);
                 entry.insert(state);
             }
-            hash_map::Entry::Occupied(mut entry) => {
+            Entry::Occupied(mut entry) => {
                 entry.get_mut().add_event(event, &self.merge_strategies);
             }
         };
     }
 
-    pub(crate) fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
+    pub fn transform_one(&mut self, emitter: &mut Emitter<Event>, event: Event) {
         let (starts_here, event) = match &self.starts_when {
             Some(condition) => condition.check(event),
             None => (false, event),
@@ -312,47 +318,57 @@ impl TaskTransform<Event> for Reduce {
     where
         Self: 'static,
     {
-        let flush_period = self.flush_period;
+        let transform_fn = move |me: &mut Box<Reduce>, event, emitter: &mut Emitter<Event>| {
+            me.transform_one(emitter, event);
+        };
 
-        Box::pin(map_with_expiration(
-            self,
-            input_rx,
-            flush_period,
-            |me: &mut Box<Reduce>, event, emitter: &mut Emitter<Event>| {
-                // called for each event
-                me.transform_one(emitter, event);
-            },
-            |me: &mut Box<Reduce>, emitter: &mut Emitter<Event>| {
-                // called periodically to check for expired events
-                me.flush_into(emitter);
-            },
-            |me: &mut Box<Reduce>, emitter: &mut Emitter<Event>| {
-                // called when the input stream ends
-                me.flush_all_into(emitter);
-            },
-        ))
+        construct_output_stream(self, input_rx, transform_fn)
     }
+}
+
+pub fn construct_output_stream(
+    reduce: Box<Reduce>,
+    input_rx: Pin<Box<dyn Stream<Item = Event> + Send>>,
+    mut transform_fn: impl FnMut(&mut Box<Reduce>, Event, &mut Emitter<Event>) + Send + Sync + 'static,
+) -> Pin<Box<dyn Stream<Item = Event> + Send>>
+where
+    Reduce: 'static,
+{
+    let flush_period = reduce.flush_period;
+    Box::pin(map_with_expiration(
+        reduce,
+        input_rx,
+        flush_period,
+        move |me, event, emitter| {
+            transform_fn(me, event, emitter);
+        },
+        |me, emitter| {
+            me.flush_into(emitter);
+        },
+        |me, emitter| {
+            me.flush_all_into(emitter);
+        },
+    ))
 }
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use indoc::indoc;
     use serde_json::json;
-    use std::sync::Arc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::{enrichment::TableRegistry, lookup::owned_value_path};
     use vrl::value::Kind;
 
-    use vector_lib::enrichment::TableRegistry;
-    use vector_lib::lookup::owned_value_path;
-
-    use crate::config::schema::Definition;
-    use crate::config::{schema, LogNamespace, OutputId, TransformConfig};
-    use crate::event::{LogEvent, Value};
-    use crate::test_util::components::assert_transform_compliance;
-    use crate::transforms::test::create_topology;
-
     use super::*;
+    use crate::{
+        config::{LogNamespace, OutputId, TransformConfig, schema, schema::Definition},
+        event::{LogEvent, Value},
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
+    };
 
     #[tokio::test]
     async fn reduce_from_condition() {
@@ -629,9 +645,10 @@ max_events = 0
 
         match reduce_config {
             Ok(_conf) => unreachable!("max_events=0 should be rejected."),
-            Err(err) => assert!(err
-                .to_string()
-                .contains("invalid value: integer `0`, expected a nonzero usize")),
+            Err(err) => assert!(
+                err.to_string()
+                    .contains("invalid value: integer `0`, expected a nonzero usize")
+            ),
         }
     }
 

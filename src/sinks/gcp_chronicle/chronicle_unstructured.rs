@@ -1,32 +1,32 @@
 //! This sink sends data to Google Chronicles unstructured log entries endpoint.
 //! See <https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries>
 //! for more information.
-use bytes::{Bytes, BytesMut};
+use std::{collections::HashMap, io};
 
+use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
-use http::header::{self, HeaderName, HeaderValue};
-use http::{Request, StatusCode, Uri};
+use http::{
+    Request, StatusCode, Uri,
+    header::{self, HeaderName, HeaderValue},
+};
 use hyper::Body;
 use indoc::indoc;
 use serde::Serialize;
 use serde_json::json;
 use snafu::Snafu;
-use std::collections::HashMap;
-use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_lib::configurable::configurable_component;
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::{
-    config::{telemetry, AcknowledgementsConfig, Input},
-    event::{Event, EventFinalizers, Finalizable},
-    sink::VectorSink,
     EstimatedJsonEncodedSizeOf,
+    config::{AcknowledgementsConfig, Input, telemetry},
+    configurable::configurable_component,
+    event::{Event, EventFinalizers, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    sink::VectorSink,
 };
 use vrl::value::Kind;
 
-use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{self, EncodingConfig},
     config::{GenerateConfig, SinkConfig, SinkContext},
@@ -34,22 +34,23 @@ use crate::{
     http::HttpClient,
     schema,
     sinks::{
+        Healthcheck,
         gcp_chronicle::{
             compression::ChronicleCompression,
             partitioner::{ChroniclePartitionKey, ChroniclePartitioner},
             sink::ChronicleSink,
         },
         gcs_common::{
-            config::{healthcheck_response, GcsRetryLogic},
+            config::{GcsRetryLogic, healthcheck_response},
             service::GcsResponse,
         },
         util::{
-            encoding::{as_tracked_write, Encoder},
+            BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
+            encoding::{Encoder, as_tracked_write},
             metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
-            BatchConfig, Compression, RequestBuilder, SinkBatchSettings, TowerRequestConfig,
+            service::TowerRequestConfigDefaults,
         },
-        Healthcheck,
     },
     template::{Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
@@ -237,6 +238,10 @@ pub struct ChronicleUnstructuredConfig {
     #[configurable(metadata(docs::examples = "WINDOWS_DNS", docs::examples = "{{ log_type }}"))]
     pub log_type: Template,
 
+    /// The default `log_type` to attach to events if the template in `log_type` cannot be resolved.
+    #[configurable(metadata(docs::examples = "VECTOR_DEV"))]
+    pub fallback_log_type: Option<String>,
+
     #[configurable(derived)]
     #[serde(
         default,
@@ -261,6 +266,7 @@ impl GenerateConfig for ChronicleUnstructuredConfig {
             namespace = "namespace"
             compression = "gzip"
             log_type = "log_type"
+            fallback_log_type = "VECTOR_DEV"
             encoding.codec = "text"
         "#})
         .unwrap()
@@ -342,7 +348,7 @@ impl ChronicleUnstructuredConfig {
         let partitioner = self.partitioner()?;
 
         let svc = ServiceBuilder::new()
-            .settings(request, GcsRetryLogic)
+            .settings(request, GcsRetryLogic::default())
             .service(ChronicleService::new(client, base_url, creds));
 
         let request_settings = ChronicleRequestBuilder::new(self)?;
@@ -355,6 +361,7 @@ impl ChronicleUnstructuredConfig {
     fn partitioner(&self) -> crate::Result<ChroniclePartitioner> {
         Ok(ChroniclePartitioner::new(
             self.log_type.clone(),
+            self.fallback_log_type.clone(),
             self.namespace.clone(),
         ))
     }
@@ -672,8 +679,8 @@ mod integration_tests {
     use super::*;
     use crate::test_util::{
         components::{
-            run_and_assert_sink_compliance, run_and_assert_sink_error, COMPONENT_ERROR_TAGS,
-            SINK_TAGS,
+            COMPONENT_ERROR_TAGS, SINK_TAGS, run_and_assert_sink_compliance,
+            run_and_assert_sink_error,
         },
         random_events_with_stream, random_string, trace_init,
     };
@@ -706,15 +713,15 @@ mod integration_tests {
         config(log_type, auth_path).build(cx).await
     }
 
+    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn publish_events() {
         trace_init();
 
         let log_type = random_string(10);
-        let (sink, healthcheck) =
-            config_build(&log_type, "/home/vector/scripts/integration/gcp/auth.json")
-                .await
-                .expect("Building sink failed");
+        let (sink, healthcheck) = config_build(&log_type, "tests/integration/gcp/config/auth.json")
+            .await
+            .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
@@ -742,15 +749,12 @@ mod integration_tests {
 
         let log_type = random_string(10);
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
-        let sink = config_build(
-            &log_type,
-            "/home/vector/scripts/integration/gcp/invalidauth.json",
-        )
-        .await;
+        let sink = config_build(&log_type, "tests/integration/gcp/config/invalidauth.json").await;
 
         assert!(sink.is_err())
     }
 
+    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn publish_invalid_events() {
         trace_init();
@@ -758,10 +762,9 @@ mod integration_tests {
         // The chronicle-emulator we are testing against is setup so a `log_type` of "INVALID"
         // will return a `400 BAD_REQUEST`.
         let log_type = "INVALID";
-        let (sink, healthcheck) =
-            config_build(log_type, "/home/vector/scripts/integration/gcp/auth.json")
-                .await
-                .expect("Building sink failed");
+        let (sink, healthcheck) = config_build(log_type, "tests/integration/gcp/config/auth.json")
+            .await
+            .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
@@ -782,13 +785,13 @@ mod integration_tests {
 
     async fn request(method: Method, path: &str, log_type: &str) -> Response {
         let address = std::env::var(ADDRESS_ENV_VAR).unwrap();
-        let url = format!("{}/{}", address, path);
+        let url = format!("{address}/{path}");
         Client::new()
             .request(method.clone(), &url)
             .query(&[("log_type", log_type)])
             .send()
             .await
-            .unwrap_or_else(|_| panic!("Sending {} request to {} failed", method, url))
+            .unwrap_or_else(|_| panic!("Sending {method} request to {url} failed"))
     }
 
     async fn pull_messages(log_type: &str) -> Vec<Log> {

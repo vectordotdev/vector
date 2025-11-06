@@ -25,9 +25,9 @@ impl NoProxyInterceptor {
                 if scheme.is_some() && scheme != Some(expected_scheme) {
                     return false;
                 }
-                let matches = host.map_or(false, |host| {
+                let matches = host.is_some_and(|host| {
                     self.0.matches(host)
-                        || port.map_or(false, |port| {
+                        || port.is_some_and(|port| {
                             let url = format!("{host}:{port}");
                             self.0.matches(&url)
                         })
@@ -161,17 +161,14 @@ impl ProxyConfig {
             .map(|url| {
                 url.parse().map(|parsed| {
                     let mut proxy = Proxy::new(self.interceptor().intercept(proxy_scheme), parsed);
-                    if let Ok(authority) = Url::parse(url) {
-                        if let Some(password) = authority.password() {
-                            let decoded_user = urlencoding::decode(authority.username())
-                                .expect("username must be valid UTF-8.");
-                            let decoded_pw = urlencoding::decode(password)
-                                .expect("Password must be valid UTF-8.");
-                            proxy.set_authorization(Authorization::basic(
-                                &decoded_user,
-                                &decoded_pw,
-                            ));
-                        }
+                    if let Ok(authority) = Url::parse(url)
+                        && let Some(password) = authority.password()
+                    {
+                        let decoded_user = urlencoding::decode(authority.username())
+                            .expect("username must be valid UTF-8.");
+                        let decoded_pw =
+                            urlencoding::decode(password).expect("Password must be valid UTF-8.");
+                        proxy.set_authorization(Authorization::basic(&decoded_user, &decoded_pw));
                     }
                     proxy
                 })
@@ -207,11 +204,11 @@ impl ProxyConfig {
 
 #[cfg(test)]
 mod tests {
-    use base64::prelude::{Engine as _, BASE64_STANDARD};
+    use base64::prelude::{BASE64_STANDARD, Engine as _};
     use env_test_util::TempEnvVar;
     use http::{
-        header::{AUTHORIZATION, PROXY_AUTHORIZATION},
         HeaderName, HeaderValue, Uri,
+        header::{AUTHORIZATION, PROXY_AUTHORIZATION},
     };
     use proptest::prelude::*;
 

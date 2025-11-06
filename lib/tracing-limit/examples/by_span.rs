@@ -1,4 +1,4 @@
-use tracing::{info, info_span, trace, Dispatch};
+use tracing::{Dispatch, info, info_span, trace};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::SubscriberExt;
 
@@ -28,7 +28,6 @@ fn main() {
                         message =
                             "This message is rate limited by its component and vrl_line_number",
                         count = &i,
-                        internal_log_rate_limit = true,
                     );
                 }
             }

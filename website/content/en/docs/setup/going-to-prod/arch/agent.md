@@ -46,7 +46,7 @@ See the [architecting document](/docs/setup/going-to-prod/architecting/) for mor
 ### High Availability
 
 - If the [failure of a single Vector agent](/docs/setup/going-to-prod/high-availability/#vector-process-failure) is unacceptable, consider the [aggregator architecture](/docs/setup/going-to-prod/arch/aggregator/), which deploys Vector across multiple nodes in a [highly available manner](/docs/setup/going-to-prod/high-availability/).
-- Enable [end-to-end acknowledgements](/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/) to mitigate [data receive failures](/docs/setup/going-to-prod/high-availability/#data-receive-failure).
+- Enable [end-to-end acknowledgements](/docs/architecture/end-to-end-acknowledgements/) to mitigate [data receive failures](/docs/setup/going-to-prod/high-availability/#data-receive-failure).
 - Route dropped events to mitigate [data processing failures](/docs/setup/going-to-prod/high-availability/#data-processing-failure).
 
 {{< info >}}

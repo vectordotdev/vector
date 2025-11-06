@@ -10,21 +10,24 @@ use glob::{Pattern, PatternError};
 use heim::units::ratio::ratio;
 use heim::units::time::second;
 use serde_with::serde_as;
+use sysinfo::System;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    configurable::configurable_component,
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
+    },
 };
-use vector_lib::EstimatedJsonEncodedSizeOf;
 
 use crate::{
+    SourceSender,
     config::{SourceConfig, SourceContext, SourceOutput},
     event::metric::{Metric, MetricKind, MetricTags, MetricValue},
     internal_events::{EventsReceived, HostMetricsScrapeDetailError, StreamClosedError},
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 #[cfg(target_os = "linux")]
@@ -322,7 +325,7 @@ impl HostMetricsConfig {
         let duration = self.scrape_interval_secs;
         let mut interval = IntervalStream::new(time::interval(duration)).take_until(shutdown);
 
-        let generator = HostMetrics::new(self);
+        let mut generator = HostMetrics::new(self);
 
         let bytes_received = register!(BytesReceived::from(Protocol::NONE));
 
@@ -342,13 +345,14 @@ impl HostMetricsConfig {
     fn has_collector(&self, collector: Collector) -> bool {
         match &self.collectors {
             None => true,
-            Some(collectors) => collectors.iter().any(|&c| c == collector),
+            Some(collectors) => collectors.contains(&collector),
         }
     }
 }
 
 pub struct HostMetrics {
     config: HostMetricsConfig,
+    system: System,
     #[cfg(target_os = "linux")]
     root_cgroup: Option<cgroups::CGroupRoot>,
     events_received: Registered<EventsReceived>,
@@ -359,6 +363,7 @@ impl HostMetrics {
     pub fn new(config: HostMetricsConfig) -> Self {
         Self {
             config,
+            system: System::new(),
             events_received: register!(EventsReceived),
         }
     }
@@ -369,6 +374,7 @@ impl HostMetrics {
         let root_cgroup = cgroups::CGroupRoot::new(&cgroups);
         Self {
             config,
+            system: System::new(),
             root_cgroup,
             events_received: register!(EventsReceived),
         }
@@ -378,7 +384,7 @@ impl HostMetrics {
         MetricsBuffer::new(self.config.namespace.clone())
     }
 
-    async fn capture_metrics(&self) -> Vec<Metric> {
+    async fn capture_metrics(&mut self) -> Vec<Metric> {
         let mut buffer = self.buffer();
 
         #[cfg(target_os = "linux")]
@@ -669,10 +675,10 @@ impl From<PatternWrapper> for String {
 
 #[cfg(test)]
 mod tests {
-    use crate::test_util::components::{run_and_assert_source_compliance, SOURCE_TAGS};
     use std::{collections::HashSet, future::Future, time::Duration};
 
     use super::*;
+    use crate::test_util::components::{SOURCE_TAGS, run_and_assert_source_compliance};
 
     #[test]
     fn filterlist_default_includes_everything() {
@@ -766,8 +772,7 @@ mod tests {
 
             assert!(
                 all_metrics_count > some_metrics.len(),
-                "collector={:?}",
-                collector
+                "collector={collector:?}"
             );
         }
     }
@@ -778,12 +783,14 @@ mod tests {
             .capture_metrics()
             .await;
         let hostname = crate::get_hostname().expect("Broken hostname");
-        assert!(!metrics.into_iter().any(|event| event
-            .tags()
-            .expect("Missing tags")
-            .get("host")
-            .expect("Missing \"host\" tag")
-            != hostname));
+        assert!(!metrics.into_iter().any(|event| {
+            event
+                .tags()
+                .expect("Missing tags")
+                .get("host")
+                .expect("Missing \"host\" tag")
+                != hostname
+        }));
     }
 
     #[tokio::test]
@@ -795,9 +802,11 @@ mod tests {
         .capture_metrics()
         .await;
 
-        assert!(metrics
-            .into_iter()
-            .all(|event| event.namespace() == Some("other")));
+        assert!(
+            metrics
+                .into_iter()
+                .all(|event| event.namespace() == Some("other"))
+        );
     }
 
     #[tokio::test]
@@ -806,9 +815,11 @@ mod tests {
             .capture_metrics()
             .await;
 
-        assert!(metrics
-            .iter()
-            .all(|event| event.namespace() == Some("host")));
+        assert!(
+            metrics
+                .iter()
+                .all(|event| event.namespace() == Some("host"))
+        );
     }
 
     // Windows does not produce load average metrics.
@@ -824,9 +835,11 @@ mod tests {
         assert!(all_gauges(&metrics));
 
         // All metrics are named load*
-        assert!(!metrics
-            .iter()
-            .any(|metric| !metric.name().starts_with("load")));
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| !metric.name().starts_with("load"))
+        );
     }
 
     #[tokio::test]
@@ -901,7 +914,7 @@ mod tests {
         // Pick an arbitrary key value
         if let Some(key) = keys.into_iter().next() {
             let key_prefix = &key[..key.len() - 1].to_string();
-            let key_prefix_pattern = PatternWrapper::try_from(format!("{}*", key_prefix)).unwrap();
+            let key_prefix_pattern = PatternWrapper::try_from(format!("{key_prefix}*")).unwrap();
             let key_pattern = PatternWrapper::try_from(key.clone()).unwrap();
 
             let filter = FilterList {

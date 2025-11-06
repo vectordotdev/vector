@@ -2,15 +2,16 @@ use bytes::Bytes;
 use chrono::{DateTime, Utc};
 use serde_json::Value as JsonValue;
 use snafu::{OptionExt, ResultExt, Snafu};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::lookup::{self, path, OwnedTargetPath};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    lookup::{self, OwnedTargetPath, path},
+};
 
-use crate::sources::kubernetes_logs::transform_utils::get_message_path;
 use crate::{
     config::log_schema,
     event::{self, Event, LogEvent, Value},
     internal_events::KubernetesLogsDockerFormatParseError,
-    sources::kubernetes_logs::Config,
+    sources::kubernetes_logs::{Config, transform_utils::get_message_path},
     transforms::{FunctionTransform, OutputBuffer},
 };
 
@@ -114,13 +115,10 @@ fn normalize_event(
 
     if let Some(timestamp_key) = timestamp_key {
         let time = log.remove(&timestamp_key).context(TimeFieldMissingSnafu)?;
-
-        let time = match time {
-            Value::Bytes(val) => val,
-            _ => return Err(NormalizationError::TimeValueUnexpectedType),
-        };
-        let time = DateTime::parse_from_rfc3339(String::from_utf8_lossy(time.as_ref()).as_ref())
-            .context(TimeParsingSnafu)?;
+        let time = time
+            .as_str()
+            .ok_or(NormalizationError::TimeValueUnexpectedType)?;
+        let time = DateTime::parse_from_rfc3339(time.as_ref()).context(TimeParsingSnafu)?;
         log_namespace.insert_source_metadata(
             Config::NAME,
             log,
@@ -199,9 +197,10 @@ enum NormalizationError {
 
 #[cfg(test)]
 pub mod tests {
+    use vrl::value;
+
     use super::{super::test_util, *};
     use crate::test_util::trace_init;
-    use vrl::value;
 
     fn make_long_string(base: &str, len: usize) -> String {
         base.chars().cycle().take(len).collect()
@@ -342,7 +341,7 @@ pub mod tests {
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 
-            assert!(output.is_empty(), "Expected no events: {:?}", output);
+            assert!(output.is_empty(), "Expected no events: {output:?}");
         }
     }
 
@@ -358,7 +357,7 @@ pub mod tests {
             let mut output = OutputBuffer::default();
             parser.transform(&mut output, input.into());
 
-            assert!(output.is_empty(), "Expected no events: {:?}", output);
+            assert!(output.is_empty(), "Expected no events: {output:?}");
         }
     }
 }

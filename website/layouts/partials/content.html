@@ -18,9 +18,55 @@
   {{ partial "guides/badges.html" . }}
   {{ end }}
 
-  <div class="mt-8">
-    {{ partial "page-actions.html" . }}
-  </div>
+  {{ if or (eq .Section "guides") (eq .Section "highlights") }}
+    {{ if or .Date .Params.authors }}
+    <div class="mt-3 flex items-center space-x-3 text-gray-500 dark:text-gray-300">
+      {{ if .Date }}
+      {{ $date := .Date | dateFormat "January 2, 2006" }}
+      <time datetime="{{ $date }}" class="text-sm">
+        {{ $date }}
+      </time>
+      {{ end }}
+      {{ if and .Date .Params.authors }}
+      <span class="text-sm">by</span>
+      {{ end }}
+      {{ if .Params.authors }}
+      <div class="flex items-center space-x-2">
+        {{ range $index, $author := .Params.authors }}
+          {{ $handle := $author }}
+          {{ $img := printf "https://github.com/%s.png" $handle }}
+          {{ $link := printf "https://github.com/%s" $handle }}
+          {{ $apiUrl := printf "https://api.github.com/users/%s" $handle }}
+          {{ $name := $handle }}
+          {{ $displayName := $handle }}
+          {{ with resources.GetRemote $apiUrl }}
+            {{ with .Err }}
+              {{/* Silently fall back to GitHub handle on error */}}
+            {{ else }}
+              {{ $data := . | transform.Unmarshal }}
+              {{ if $data.name }}
+                {{ $name = $data.name }}
+                {{ $displayName = $data.name }}
+              {{ end }}
+            {{ end }}
+          {{ end }}
+          {{ if gt $index 0 }}<span class="text-sm">,</span>{{ end }}
+          <a href="{{ $link }}" class="flex items-center space-x-2 group" rel="noopener" target="_blank">
+            <img
+              class="h-8 w-8 rounded-full ring-1 ring-white dark:ring-dark"
+              src="{{ $img }}"
+              alt="Author avatar for {{ $handle }}"
+            />
+            <span class="text-sm font-medium text-gray-700 group-hover:text-secondary dark:text-gray-200">
+              {{ $displayName }}
+            </span>
+          </a>
+        {{ end }}
+      </div>
+      {{ end }}
+    </div>
+    {{ end }}
+  {{ end }}
 
   <div class="mt-12">
     {{ partial "inner-content.html" . }}

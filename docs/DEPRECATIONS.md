@@ -14,6 +14,8 @@ For example:
 
 ## To be deprecated
 
+- `v0.50.0` | `http-server-encoding` | The `encoding` field will be removed. Use `decoding` and `framing` instead.
+
 ## To be migrated
 
 ## To be removed

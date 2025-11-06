@@ -14,7 +14,7 @@
     <div class="mb-4 md:mb-6">
       {{ partial "breadcrumb.html" . }}
     </div>
-    <div class="pb-8 md:pb-10 lg:pb-12">
+    <div class="pb-1 md:pb-2 lg:pb-3">
       {{ partial "hero.html" . }}
     </div>
 
@@ -101,7 +101,7 @@
       {{ if gt (len $release.changelog) 0 }}
       <div class="mt-8">
         <div class="prose dark:prose-dark max-w-none">
-          {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
+          {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
         </div>
 
         <div class="mt-6 flex flex-col space-y-8">
@@ -124,13 +124,15 @@
                     {{ .description | markdownify }}
                   </span>
                 {{ if gt (len .contributors) 0 }}
-                <span class="prose dark:prose-dark">
-                    Thanks to
-                    {{ range .contributors}}
-                    <a href="https://github.com/{{ replace . "@" "" }}" rel="noopener" target="_blank">{{ . }}</a>
+                <br>
+                <span class="prose dark:prose-dark italic">
+                  Thanks to
+                  {{ $len := len .contributors }}
+                  {{ range $i, $contributor := .contributors }}
+                    <a href="https://github.com/{{ replace $contributor "@" "" }}" rel="noopener" target="_blank">{{ $contributor }}</a>{{ if lt (add $i 1) $len }}, {{ end }}
                   {{ end }}
-                    for contributing this change!
-                  </span>
+                  for contributing this change!
+                </span>
                 {{ end }}
               </li>
               {{ end }}
@@ -168,6 +170,20 @@
           </div>
           {{ end }}
           {{ end }}
+        </div>
+      </div>
+      {{ end }}
+      {{ end }}
+
+      {{ with $release.vrl_changelog }}
+      {{ if ne . "" }}
+      <div class="mt-8">
+        <div class="prose dark:prose-dark max-w-none">
+          {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
+        </div>
+
+        <div class="mt-6 prose dark:prose-dark max-w-none">
+          {{ . | markdownify }}
         </div>
       </div>
       {{ end }}

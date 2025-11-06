@@ -1,5 +1,5 @@
 use hickory_proto::{
-    error::ProtoResult,
+    ProtoError,
     serialize::binary::{BinDecodable, BinDecoder, BinEncodable, BinEncoder},
 };
 
@@ -67,7 +67,7 @@ impl EDE {
 }
 
 impl BinEncodable for EDE {
-    fn emit(&self, encoder: &mut BinEncoder<'_>) -> ProtoResult<()> {
+    fn emit(&self, encoder: &mut BinEncoder<'_>) -> Result<(), ProtoError> {
         encoder.emit_u16(self.info_code)?;
         if let Some(extra_text) = &self.extra_text {
             encoder.emit_vec(extra_text.as_bytes())?;
@@ -77,7 +77,7 @@ impl BinEncodable for EDE {
 }
 
 impl<'a> BinDecodable<'a> for EDE {
-    fn read(decoder: &mut BinDecoder<'a>) -> ProtoResult<Self> {
+    fn read(decoder: &mut BinDecoder<'a>) -> Result<Self, ProtoError> {
         let info_code = decoder.read_u16()?.unverified();
         let extra_text = if decoder.is_empty() {
             None

@@ -2,8 +2,8 @@ use std::{
     cmp, error, fmt,
     path::PathBuf,
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     time::{Duration, Instant},
 };
@@ -13,19 +13,21 @@ use clap::{Arg, Command};
 use hdrhistogram::Histogram;
 use rand::Rng;
 use tokio::{select, sync::oneshot, task, time};
-use tracing::{debug, info, Span};
+use tracing::{Span, debug, info};
 use tracing_subscriber::EnvFilter;
 use vector_buffers::{
+    BufferType, Bufferable, EventCount, MemoryBufferSize, WhenFull,
     encoding::FixedEncodable,
     topology::{
         builder::TopologyBuilder,
         channel::{BufferReceiver, BufferSender},
     },
-    BufferType, Bufferable, EventCount, WhenFull,
 };
-use vector_common::byte_size_of::ByteSizeOf;
-use vector_common::finalization::{
-    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalization::{
+        AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+    },
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -113,7 +115,7 @@ pub struct EncodeError;
 
 impl fmt::Display for EncodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -124,7 +126,7 @@ pub struct DecodeError;
 
 impl fmt::Display for DecodeError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{:?}", self)
+        write!(f, "{self:?}")
     }
 }
 
@@ -231,11 +233,11 @@ impl Configuration {
 }
 
 fn generate_record_cache(min: usize, max: usize) -> Vec<VariableMessage> {
-    let mut rng = rand::thread_rng();
+    let mut rng = rand::rng();
     let mut records = Vec::new();
     for i in 1..=200_000 {
-        let payload_size = rng.gen_range(min..max);
-        let payload = (0..payload_size).map(|_| rng.gen::<u8>()).collect();
+        let payload_size = rng.random_range(min..max);
+        let payload = (0..payload_size).map(|_| rng.random::<u8>()).collect();
         let message = VariableMessage::new(i, payload);
         records.push(message);
     }
@@ -247,7 +249,7 @@ where
     T: Bufferable + Clone + Finalizable,
 {
     let data_dir = PathBuf::from("/tmp/vector");
-    let id = format!("{}-buffer-perf-testing", buffer_type);
+    let id = format!("{buffer_type}-buffer-perf-testing");
     let max_size_events = std::num::NonZeroUsize::new(500).unwrap();
     let max_size_bytes = std::num::NonZeroU64::new(32 * 1024 * 1024 * 1024).unwrap();
     let when_full = WhenFull::Block;
@@ -261,7 +263,7 @@ where
                 max_size_events
             );
             BufferType::Memory {
-                max_events: max_size_events,
+                size: MemoryBufferSize::MaxEvents(max_size_events),
                 when_full,
             }
         }
@@ -276,8 +278,7 @@ where
             }
         }
         s => panic!(
-            "unknown buffer type '{}' requested; valid types are in-memory, disk-v1, and disk-v2",
-            s
+            "unknown buffer type '{s}' requested; valid types are in-memory, disk-v1, and disk-v2"
         ),
     };
 

@@ -1,13 +1,14 @@
-use vector_lib::config::proxy::ProxyConfig;
+use vector_lib::config::{log_schema, proxy::ProxyConfig};
 
 use super::{config::LokiConfig, healthcheck::healthcheck, sink::LokiSink};
 use crate::{
     http::HttpClient,
-    sinks::prelude::*,
-    sinks::util::test::{build_test_server, load_sink},
+    sinks::{
+        prelude::*,
+        util::test::{build_test_server, load_sink},
+    },
     test_util,
 };
-use vector_lib::config::log_schema;
 
 #[test]
 fn generate_config() {
@@ -100,7 +101,7 @@ async fn healthcheck_includes_auth() {
     .unwrap();
 
     let addr = test_util::next_addr();
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.endpoint = endpoint
         .clone()
         .parse::<http::Uri>()

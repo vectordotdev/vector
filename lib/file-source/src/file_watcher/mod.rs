@@ -1,19 +1,24 @@
-use std::{
-    fs::{self, File},
-    io::{self, BufRead, Seek},
-    path::PathBuf,
-    time::{Duration, Instant},
-};
-
+use async_compression::tokio::bufread::GzipDecoder;
 use bytes::{Bytes, BytesMut};
 use chrono::{DateTime, Utc};
-use flate2::bufread::MultiGzDecoder;
+use std::{
+    io::{self, SeekFrom},
+    path::PathBuf,
+    time::Duration,
+};
+use tokio::{
+    fs::File,
+    io::{AsyncBufRead, AsyncBufReadExt, AsyncSeekExt, BufReader},
+    time::Instant,
+};
 use tracing::debug;
 use vector_common::constants::GZIP_MAGIC;
 
-use crate::{
-    buffer::read_until_with_max_size, metadata_ext::PortableFileExt, FilePosition, ReadFrom,
+use file_source_common::{
+    AsyncFileInfo, FilePosition, PortableFileExt, ReadFrom,
+    buffer::{ReadResult, read_until_with_max_size},
 };
+
 #[cfg(test)]
 mod tests;
 
@@ -23,9 +28,15 @@ mod tests;
 /// The offset field contains the byte offset of the beginning of the line within
 /// the file that it was read from.
 #[derive(Debug)]
-pub(super) struct RawLine {
+pub struct RawLine {
     pub offset: u64,
     pub bytes: Bytes,
+}
+
+#[derive(Debug)]
+pub struct RawLineResult {
+    pub raw_line: Option<RawLine>,
+    pub discarded_for_size_and_truncated: Vec<BytesMut>,
 }
 
 /// The `FileWatcher` struct defines the polling based state machine which reads
@@ -38,7 +49,7 @@ pub(super) struct RawLine {
 pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
-    reader: Box<dyn BufRead>,
+    reader: Box<dyn AsyncBufRead + Send + Unpin>,
     file_position: FilePosition,
     devno: u64,
     inode: u64,
@@ -58,17 +69,23 @@ impl FileWatcher {
     /// The input path will be used by `FileWatcher` to prime its state
     /// machine. A `FileWatcher` tracks _only one_ file. This function returns
     /// None if the path does not exist or is not readable by the current process.
-    pub fn new(
+    pub async fn new(
         path: PathBuf,
         read_from: ReadFrom,
         ignore_before: Option<DateTime<Utc>>,
         max_line_bytes: usize,
         line_delimiter: Bytes,
-    ) -> Result<FileWatcher, io::Error> {
-        let f = fs::File::open(&path)?;
-        let (devno, ino) = (f.portable_dev()?, f.portable_ino()?);
-        let metadata = f.metadata()?;
-        let mut reader = io::BufReader::new(f);
+    ) -> Result<FileWatcher, std::io::Error> {
+        let f = File::open(&path).await?;
+        let file_info = f.file_info().await?;
+        let (devno, ino) = (file_info.portable_dev(), file_info.portable_ino());
+
+        #[cfg(unix)]
+        let metadata = file_info;
+        #[cfg(windows)]
+        let metadata = f.metadata().await?;
+
+        let mut reader = BufReader::new(f);
 
         let too_old = if let (Some(ignore_before), Ok(modified_time)) = (
             ignore_before,
@@ -79,10 +96,10 @@ impl FileWatcher {
             false
         };
 
-        let gzipped = is_gzipped(&mut reader)?;
+        let gzipped = is_gzipped(&mut reader).await?;
 
         // Determine the actual position at which we should start reading
-        let (reader, file_position): (Box<dyn BufRead>, FilePosition) =
+        let (reader, file_position): (Box<dyn AsyncBufRead + Send + Unpin>, FilePosition) =
             match (gzipped, too_old, read_from) {
                 (true, true, _) => {
                     debug!(
@@ -111,22 +128,22 @@ impl FileWatcher {
                     (Box::new(null_reader()), 0)
                 }
                 (true, false, ReadFrom::Beginning) => {
-                    (Box::new(io::BufReader::new(MultiGzDecoder::new(reader))), 0)
+                    (Box::new(BufReader::new(GzipDecoder::new(reader))), 0)
                 }
                 (false, true, _) => {
-                    let pos = reader.seek(io::SeekFrom::End(0)).unwrap();
+                    let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
                     (Box::new(reader), pos)
                 }
                 (false, false, ReadFrom::Checkpoint(file_position)) => {
-                    let pos = reader.seek(io::SeekFrom::Start(file_position)).unwrap();
+                    let pos = reader.seek(SeekFrom::Start(file_position)).await.unwrap();
                     (Box::new(reader), pos)
                 }
                 (false, false, ReadFrom::Beginning) => {
-                    let pos = reader.seek(io::SeekFrom::Start(0)).unwrap();
+                    let pos = reader.seek(SeekFrom::Start(0)).await.unwrap();
                     (Box::new(reader), pos)
                 }
                 (false, false, ReadFrom::End) => {
-                    let pos = reader.seek(io::SeekFrom::End(0)).unwrap();
+                    let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
                     (Box::new(reader), pos)
                 }
             };
@@ -156,24 +173,28 @@ impl FileWatcher {
         })
     }
 
-    pub fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
-        let file_handle = File::open(&path)?;
-        if (file_handle.portable_dev()?, file_handle.portable_ino()?) != (self.devno, self.inode) {
-            let mut reader = io::BufReader::new(fs::File::open(&path)?);
-            let gzipped = is_gzipped(&mut reader)?;
-            let new_reader: Box<dyn BufRead> = if gzipped {
+    pub async fn update_path(&mut self, path: PathBuf) -> io::Result<()> {
+        let file_handle = File::open(&path).await?;
+
+        let file_info = file_handle.file_info().await?;
+        if (file_info.portable_dev(), file_info.portable_ino()) != (self.devno, self.inode) {
+            let mut reader = BufReader::new(File::open(&path).await?);
+            let gzipped = is_gzipped(&mut reader).await?;
+            let new_reader: Box<dyn AsyncBufRead + Send + Unpin> = if gzipped {
                 if self.file_position != 0 {
                     Box::new(null_reader())
                 } else {
-                    Box::new(io::BufReader::new(MultiGzDecoder::new(reader)))
+                    Box::new(BufReader::new(GzipDecoder::new(reader)))
                 }
             } else {
-                reader.seek(io::SeekFrom::Start(self.file_position))?;
+                reader.seek(io::SeekFrom::Start(self.file_position)).await?;
                 Box::new(reader)
             };
             self.reader = new_reader;
-            self.devno = file_handle.portable_dev()?;
-            self.inode = file_handle.portable_ino()?;
+
+            let file_info = file_handle.file_info().await?;
+            self.devno = file_info.portable_dev();
+            self.inode = file_info.portable_ino();
         }
         self.path = path;
         Ok(())
@@ -207,27 +228,38 @@ impl FileWatcher {
     /// This function will attempt to read a new line from its file, blocking,
     /// up to some maximum but unspecified amount of time. `read_line` will open
     /// a new file handler as needed, transparently to the caller.
-    pub(super) fn read_line(&mut self) -> io::Result<Option<RawLine>> {
+    pub(super) async fn read_line(&mut self) -> io::Result<RawLineResult> {
         self.track_read_attempt();
 
         let reader = &mut self.reader;
         let file_position = &mut self.file_position;
         let initial_position = *file_position;
         match read_until_with_max_size(
-            reader,
+            Box::pin(reader),
             file_position,
             self.line_delimiter.as_ref(),
             &mut self.buf,
             self.max_line_bytes,
-        ) {
-            Ok(Some(_)) => {
+        )
+        .await
+        {
+            Ok(ReadResult {
+                successfully_read: Some(_),
+                discarded_for_size_and_truncated,
+            }) => {
                 self.track_read_success();
-                Ok(Some(RawLine {
-                    offset: initial_position,
-                    bytes: self.buf.split().freeze(),
-                }))
+                Ok(RawLineResult {
+                    raw_line: Some(RawLine {
+                        offset: initial_position,
+                        bytes: self.buf.split().freeze(),
+                    }),
+                    discarded_for_size_and_truncated,
+                })
             }
-            Ok(None) => {
+            Ok(ReadResult {
+                successfully_read: None,
+                discarded_for_size_and_truncated,
+            }) => {
                 if !self.file_findable() {
                     self.set_dead();
                     // File has been deleted, so return what we have in the buffer, even though it
@@ -237,16 +269,25 @@ impl FileWatcher {
                     if buf.is_empty() {
                         // EOF
                         self.reached_eof = true;
-                        Ok(None)
+                        Ok(RawLineResult {
+                            raw_line: None,
+                            discarded_for_size_and_truncated,
+                        })
                     } else {
-                        Ok(Some(RawLine {
-                            offset: initial_position,
-                            bytes: buf,
-                        }))
+                        Ok(RawLineResult {
+                            raw_line: Some(RawLine {
+                                offset: initial_position,
+                                bytes: buf,
+                            }),
+                            discarded_for_size_and_truncated,
+                        })
                     }
                 } else {
                     self.reached_eof = true;
-                    Ok(None)
+                    Ok(RawLineResult {
+                        raw_line: None,
+                        discarded_for_size_and_truncated,
+                    })
                 }
             }
             Err(e) => {
@@ -290,13 +331,13 @@ impl FileWatcher {
     }
 }
 
-fn is_gzipped(r: &mut io::BufReader<fs::File>) -> io::Result<bool> {
-    let header_bytes = r.fill_buf()?;
+async fn is_gzipped(r: &mut BufReader<File>) -> io::Result<bool> {
+    let header_bytes = r.fill_buf().await?;
     // WARN: The paired `BufReader::consume` is not called intentionally. If we
     // do we'll chop a decent part of the potential gzip stream off.
     Ok(header_bytes.starts_with(GZIP_MAGIC))
 }
 
-fn null_reader() -> impl BufRead {
+fn null_reader() -> impl AsyncBufRead {
     io::Cursor::new(Vec::new())
 }

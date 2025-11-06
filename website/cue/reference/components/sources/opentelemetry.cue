@@ -39,11 +39,7 @@ components: sources: opentelemetry: {
 
 	support: {
 		requirements: []
-		warnings: [
-			"""
-				The `opentelemetry` source only supports log and trace events at this time.
-				""",
-		]
+		warnings: []
 		notices: []
 	}
 
@@ -51,7 +47,7 @@ components: sources: opentelemetry: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.opentelemetry.configuration
+	configuration: generated.components.sources.opentelemetry.configuration
 
 	outputs: [
 		{
@@ -66,11 +62,17 @@ components: sources: opentelemetry: {
 				Received trace events will go to this output stream. Use `<component_id>.traces` as an input to downstream transforms and sinks.
 				"""
 		},
+		{
+			name: "metrics"
+			description: """
+				Received metric events will go to this output stream. Use `<component_id>.metrics` as an input to downstream transforms and sinks.
+				"""
+		},
 	]
 
 	output: {
 		logs: event: {
-			description: "An individual log event from a batch of events received through an OTLP request"
+			description: "An individual log event from a batch of events received through an OTLP request. The following applies only when the `use_otlp_decoding` option is `false`."
 			fields: {
 				attributes: {
 					description: "Attributes that describe the specific event occurrence."
@@ -238,9 +240,40 @@ components: sources: opentelemetry: {
 				}
 			}
 		}
+		metrics: "": {
+			description: "Metric events that may be emitted by this source."
+		}
+		traces: "": {
+			description: "Trace events that may be emitted by this source."
+		}
 	}
 
 	how_it_works: {
+		otlp_decoding: {
+			title: "OTLP Decoding Usage"
+			body: """
+				This section is a usage example for the `use_otlp_decoding` option.
+				This setup allows shipping OTLP formatted logs to an OTEL collector without the use of a `remap` transform.
+				The same can be done for metrics and traces.
+
+				However, OTLP formatted metrics cannot be converted to Vector's metrics format. As a workaround, the OTLP
+				metrics are converted to Vector log events while preserving the OTLP format. This prohibits the use of metric
+				transforms like `aggregate` but it enables easy shipping to OTEL collectors.
+
+				The recommended `opentelemetry` sink configuration is the following:
+				```yaml
+					otel_sink:
+						inputs:
+							- otel.logs
+						type: opentelemetry
+						protocol:
+							type: http
+							uri: http://localhost:5318/v1/logs
+						encoding:
+							codec: otlp
+				```
+				"""
+		}
 		tls: {
 			title: "Transport Layer Security (TLS)"
 			body:  """
@@ -254,6 +287,19 @@ components: sources: opentelemetry: {
 			title: "Ingest OTLP traces"
 			body: """
 				Trace support is experimental and subject to change as Vector has no strongly-typed structure for traces internally. Instead traces are stored as a key/value map similar to logs. This may change in the future to be a structured format.
+				"""
+		}
+		metrics: {
+			title: "Ingest metrics"
+			body: """
+				Metrics support is experimental and subject to change due to structural differences between the internal Vector metric data model and OpenTelemetry.
+				If aggregation temporality is supported for an OpenTelemetry metric type, it influences the corresponding Vector metric kind as follows: If temporality is set to Delta, the metric kind is Incremental; otherwise, it is Absolute.
+				Metric type mappings:
+				Gauge is mapped to a Vector Gauge;
+				Sum is mapped to a Vector Counter if `is_monotonic` is true, to Vector Gauge if `is_monotonic` is false;
+				Histogram is mapped to a Vector AggregatedHistogram;
+				Exponential Histogram is also mapped to a Vector AggregatedHistogram, bucket boundaries are reconstructed from the exponential scale;
+				Summary is mapped to a Vector Aggregated Summary.
 				"""
 		}
 	}

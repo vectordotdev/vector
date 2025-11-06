@@ -1,10 +1,10 @@
-use super::{
-    builder::ConfigBuilder, graph::Graph, transform::get_transform_output_ids, validation, Config,
-    OutputId,
-};
-
 use indexmap::{IndexMap, IndexSet};
 use vector_lib::id::Inputs;
+
+use super::{
+    Config, OutputId, builder::ConfigBuilder, graph::Graph, transform::get_transform_output_ids,
+    validation,
+};
 
 pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<String>> {
     let mut errors = Vec::new();
@@ -58,11 +58,26 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         .chain(
             enrichment_tables
                 .iter()
-                .filter_map(|(key, table)| table.as_sink().map(|s| (key.clone(), s))),
+                .filter_map(|(key, table)| table.as_sink(key)),
+        )
+        .collect::<IndexMap<_, _>>();
+    let sources_and_table_sources = sources
+        .clone()
+        .into_iter()
+        .chain(
+            enrichment_tables
+                .iter()
+                .filter_map(|(key, table)| table.as_source(key)),
         )
         .collect::<IndexMap<_, _>>();
 
-    let graph = match Graph::new(&sources, &transforms, &all_sinks, schema) {
+    let graph = match Graph::new(
+        &sources_and_table_sources,
+        &transforms,
+        &all_sinks,
+        schema,
+        global.wildcard_matching.unwrap_or_default(),
+    ) {
         Ok(graph) => graph,
         Err(graph_errors) => {
             errors.extend(graph_errors);
@@ -203,9 +218,10 @@ fn expand_globs_inner(inputs: &mut Inputs<String>, id: &str, candidates: &IndexS
 
 #[cfg(test)]
 mod test {
+    use vector_lib::config::ComponentKey;
+
     use super::*;
     use crate::test_util::mock::{basic_sink, basic_source, basic_transform};
-    use vector_lib::config::ComponentKey;
 
     #[test]
     fn glob_expansion() {

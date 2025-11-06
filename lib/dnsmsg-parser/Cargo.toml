@@ -2,17 +2,17 @@
 name = "dnsmsg-parser"
 version = "0.1.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
-edition = "2021"
+edition = "2024"
 publish = false
 license = "MIT"
 
 [dependencies]
-data-encoding = "2.7"
+data-encoding = "2.9"
 hickory-proto.workspace = true
 snafu.workspace = true
 
 [dev-dependencies]
-criterion = "0.5"
+criterion = "0.7"
 
 [lib]
 bench = false

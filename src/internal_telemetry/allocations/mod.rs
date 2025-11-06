@@ -3,8 +3,8 @@
 mod allocator;
 use std::{
     sync::{
-        atomic::{AtomicBool, AtomicU64, Ordering},
         Mutex,
+        atomic::{AtomicBool, AtomicU64, Ordering},
     },
     thread,
     time::Duration,
@@ -15,12 +15,11 @@ use metrics::{counter, gauge};
 use rand_distr::num_traits::ToPrimitive;
 
 use self::allocator::Tracer;
-
 pub(crate) use self::allocator::{
-    without_allocation_tracing, AllocationGroupId, AllocationLayer, GroupedTraceableAllocator,
+    AllocationGroupId, AllocationLayer, GroupedTraceableAllocator, without_allocation_tracing,
 };
 
-const NUM_GROUPS: usize = 128;
+const NUM_GROUPS: usize = 256;
 
 // Allocations are not tracked during startup.
 // We use the Relaxed ordering for both stores and loads of this atomic as no other threads exist when
@@ -55,8 +54,8 @@ impl GroupMemStats {
     pub fn new() -> Self {
         let mut mutex = THREAD_LOCAL_REFS.lock().unwrap();
         let stats_ref: &'static GroupMemStatsStorage = Box::leak(Box::new(GroupMemStatsStorage {
-            allocations: arr![AtomicU64::new(0) ; 128],
-            deallocations: arr![AtomicU64::new(0) ; 128],
+            allocations: arr![AtomicU64::new(0) ; 256],
+            deallocations: arr![AtomicU64::new(0) ; 256],
         }));
         let group_mem_stats = GroupMemStats { stats: stats_ref };
         mutex.push(stats_ref);
@@ -84,7 +83,7 @@ impl GroupInfo {
     }
 }
 
-static GROUP_INFO: [Mutex<GroupInfo>; NUM_GROUPS] = arr![Mutex::new(GroupInfo::new()); 128];
+static GROUP_INFO: [Mutex<GroupInfo>; NUM_GROUPS] = arr![Mutex::new(GroupInfo::new()); 256];
 
 pub type Allocator<A> = GroupedTraceableAllocator<A, MainTracer>;
 
@@ -190,22 +189,22 @@ pub fn acquire_allocation_group_id(
     component_type: String,
     component_kind: String,
 ) -> AllocationGroupId {
-    if let Some(group_id) = AllocationGroupId::register() {
-        if let Some(group_lock) = GROUP_INFO.get(group_id.as_raw() as usize) {
-            let mut writer = group_lock.lock().unwrap();
-            *writer = GroupInfo {
-                component_id,
-                component_kind,
-                component_type,
-            };
+    if let Some(group_id) = AllocationGroupId::register()
+        && let Some(group_lock) = GROUP_INFO.get(group_id.as_raw() as usize)
+    {
+        let mut writer = group_lock.lock().unwrap();
+        *writer = GroupInfo {
+            component_id,
+            component_kind,
+            component_type,
+        };
 
-            return group_id;
-        }
+        return group_id;
     }
 
-    // TODO: Technically, `NUM_GROUPS` is lower (128) than the upper bound for the
-    // `AllocationGroupId::register` call itself (253), so we can hardcode `NUM_GROUPS` here knowing
-    // it's the lower of the two values and will trigger first.. but this may not always be true.
-    warn!("Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.", NUM_GROUPS, component_id);
+    warn!(
+        "Maximum number of registrable allocation group IDs reached ({}). Allocations for component '{}' will be attributed to the root allocation group.",
+        NUM_GROUPS, component_id
+    );
     AllocationGroupId::ROOT
 }

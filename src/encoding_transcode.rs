@@ -84,10 +84,7 @@ impl Decoder {
         // processing, we handle it centrally here. Also, the BOM does not serve
         // any more use for us, since the source encoding is already pre-identified
         // as part of decoder initialization.
-        if output
-            .get(..BOM_UTF8_LEN)
-            .map_or(false, |start| start == BOM_UTF8)
-        {
+        if output.get(..BOM_UTF8_LEN) == Some(BOM_UTF8) {
             emit!(DecoderBomRemoval {
                 from_encoding: self.inner.encoding().name()
             });
@@ -189,9 +186,9 @@ mod tests {
     use std::char::REPLACEMENT_CHARACTER;
 
     use bytes::Bytes;
-    use encoding_rs::{SHIFT_JIS, UTF_16BE, UTF_16LE, UTF_8};
+    use encoding_rs::{SHIFT_JIS, UTF_8, UTF_16BE, UTF_16LE};
 
-    use super::{Decoder, Encoder, BOM_UTF8};
+    use super::{BOM_UTF8, Decoder, Encoder};
 
     // BOM unicode character (U+FEFF) expressed in utf-16
     // http://unicode.org/faq/utf_bom.html#bom4
@@ -293,10 +290,7 @@ mod tests {
 
         assert_eq!(
             d.decode_to_utf8(Bytes::from(problematic_input)),
-            Bytes::from(format!(
-                "{}{}123",
-                REPLACEMENT_CHARACTER, REPLACEMENT_CHARACTER
-            ))
+            Bytes::from(format!("{REPLACEMENT_CHARACTER}{REPLACEMENT_CHARACTER}123"))
         );
     }
 

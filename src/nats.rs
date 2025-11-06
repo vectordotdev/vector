@@ -1,10 +1,13 @@
+//! Shared helper functions for NATS source and sink.
+#![allow(missing_docs)]
+
 use nkeys::error::Error as NKeysError;
 use snafu::{ResultExt, Snafu};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 use crate::tls::TlsEnableableConfig;
 
+/// Errors that can occur during NATS configuration.
 #[derive(Debug, Snafu)]
 pub enum NatsConfigError {
     #[snafu(display("NATS Auth Config Error: {}", source))]
@@ -30,7 +33,7 @@ NATS [documentation][nats_auth_docs]. For TLS client certificate authentication 
 
 [nats_auth_docs]: https://docs.nats.io/running-a-nats-service/configuration/securing_nats/auth_intro"
 ))]
-pub(crate) enum NatsAuthConfig {
+pub enum NatsAuthConfig {
     /// Username/password authentication.
     UserPassword {
         #[configurable(derived)]
@@ -65,7 +68,7 @@ impl std::fmt::Display for NatsAuthConfig {
             CredentialsFile { .. } => "credentials_file",
             Nkey { .. } => "nkey",
         };
-        write!(f, "{}", word)
+        write!(f, "{word}")
     }
 }
 
@@ -73,7 +76,7 @@ impl std::fmt::Display for NatsAuthConfig {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct NatsAuthUserPassword {
+pub struct NatsAuthUserPassword {
     /// Username.
     pub(crate) user: String,
 
@@ -85,7 +88,7 @@ pub(crate) struct NatsAuthUserPassword {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct NatsAuthToken {
+pub struct NatsAuthToken {
     /// Token.
     pub(crate) value: SensitiveString,
 }
@@ -94,7 +97,7 @@ pub(crate) struct NatsAuthToken {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct NatsAuthCredentialsFile {
+pub struct NatsAuthCredentialsFile {
     /// Path to credentials file.
     #[configurable(metadata(docs::examples = "/etc/nats/nats.creds"))]
     pub(crate) path: String,
@@ -104,7 +107,7 @@ pub(crate) struct NatsAuthCredentialsFile {
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
-pub(crate) struct NatsAuthNKey {
+pub struct NatsAuthNKey {
     /// User.
     ///
     /// Conceptually, this is equivalent to a public key.
@@ -263,7 +266,7 @@ mod tests {
         parse_auth(
             r#"
             strategy = "credentials_file"
-            credentials_file.path = "tests/data/nats/nats.creds"
+            credentials_file.path = "tests/integration/nats/data/nats.creds"
         "#,
         )
         .unwrap();

@@ -1,8 +1,6 @@
 use metrics::counter;
-
-use vector_lib::internal_event::InternalEvent;
 use vector_lib::{
-    internal_event::{error_stage, error_type},
+    internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
@@ -46,7 +44,6 @@ impl InternalEvent for ApacheMetricsParseError<'_> {
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
             endpoint = %self.endpoint,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

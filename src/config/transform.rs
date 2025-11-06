@@ -1,26 +1,26 @@
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
-use vector_lib::configurable::attributes::CustomAttribute;
-use vector_lib::configurable::{
-    configurable_component,
-    schema::{SchemaGenerator, SchemaObject},
-    Configurable, GenerateError, Metadata, NamedComponent,
-};
 use vector_lib::{
     config::{GlobalOptions, Input, LogNamespace, TransformOutput},
+    configurable::{
+        Configurable, GenerateError, Metadata, NamedComponent,
+        attributes::CustomAttribute,
+        configurable_component,
+        schema::{SchemaGenerator, SchemaObject},
+    },
     id::Inputs,
     schema,
     transform::Transform,
 };
 
-use super::dot_graph::GraphConfig;
-use super::schema::Options as SchemaOptions;
-use super::ComponentKey;
-use super::OutputId;
+use super::{ComponentKey, OutputId, dot_graph::GraphConfig, schema::Options as SchemaOptions};
 use crate::extra_context::ExtraContext;
 
 pub type BoxedTransform = Box<dyn TransformConfig>;
@@ -38,8 +38,10 @@ impl Configurable for BoxedTransform {
         metadata
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_lib::configurable::component::TransformDescription::generate_schemas(gen)
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
+        vector_lib::configurable::component::TransformDescription::generate_schemas(generator)
     }
 }
 
@@ -252,6 +254,11 @@ pub trait TransformConfig: DynClone + NamedComponent + core::fmt::Debug + Send +
     /// nested under transforms of a specific type, or if such nesting is fundamentally disallowed.
     fn nestable(&self, _parents: &HashSet<&'static str>) -> bool {
         true
+    }
+
+    /// Gets the files to watch to trigger reload
+    fn files_to_watch(&self) -> Vec<&PathBuf> {
+        Vec::new()
     }
 }
 

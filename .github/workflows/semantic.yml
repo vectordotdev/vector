@@ -4,18 +4,17 @@
 name: "PR Title Semantic Check"
 
 on:
+  pull_request_target:
+    types: [opened, edited, synchronize]
   pull_request:
-    types:
-      - opened
-      - edited
-      - synchronize
+    types: [opened, edited, synchronize]
 
 jobs:
   main:
     name: Check Semantic PR
     runs-on: ubuntu-24.04
     steps:
-      - uses: amannn/action-semantic-pull-request@v5
+      - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
@@ -29,12 +28,9 @@ jobs:
             revert
 
           scopes: |
-            new source
-            new transform
-            new sink
-            ARC
             administration
             api
+            ARC
             architecture
             auth
             buffers
@@ -43,14 +39,17 @@ jobs:
             codecs
             compression
             config
+            config provider
             core
             data model
             delivery
             deployment
+            deprecations
             deps
             dev
             durability
             enriching
+            enrichment tables
             enterprise
             exceptions
             external
@@ -62,6 +61,9 @@ jobs:
             logs
             metrics
             networking
+            new sink
+            new source
+            new transform
             observability
             parsing
             performance
@@ -86,7 +88,9 @@ jobs:
             traces
             transforms
             unit tests
+            vdev
             vrl
+
             amazon-linux platform
             apt platform
             arm platform
@@ -111,7 +115,6 @@ jobs:
             x86_64 platform
             yum platform
 
-            service providers
             aws service
             azure service
             confluent service
@@ -127,8 +130,10 @@ jobs:
             new relic service
             papertrail service
             sematext service
+            service providers
             splunk service
             yandex service
+
             apache_metrics source
             aws_ecs_metrics source
             aws_kinesis_firehose source
@@ -145,7 +150,7 @@ jobs:
             gcp_pubsub source
             heroku_logs source
             host_metrics source
-            http source
+            http_client source
             http_scrape source
             internal_logs source
             internal_metrics source
@@ -154,8 +159,10 @@ jobs:
             kubernetes_logs source
             logstash source
             mongodb_metrics source
+            nats source
             new source
             nginx_metrics source
+            okta source
             opentelemetry source
             postgresql_metrics source
             prometheus_remote_write source
@@ -168,8 +175,11 @@ jobs:
             stdin source
             syslog source
             vector source
+            websocket source
+
             aws_ec2_metadata transform
             dedupe transform
+            exclusive_route transform
             filter transform
             geoip transform
             log_to_metric transform
@@ -180,10 +190,10 @@ jobs:
             reduce transform
             remap transform
             route transform
-            exclusive_route transform
             sample transform
             tag_cardinality_limit transform
             throttle transform
+
             amqp sink
             apex sink
             aws_cloudwatch_logs sink
@@ -192,12 +202,14 @@ jobs:
             aws_kinesis_streams sink
             aws_s3 sink
             aws_sqs sink
+            axiom sink
             azure_blob sink
             azure_monitor_logs sink
             blackhole sink
             clickhouse sink
             console sink
             datadog_archives sink
+            datadog_common sink
             datadog_events sink
             datadog_logs sink
             datadog_metrics sink
@@ -208,8 +220,8 @@ jobs:
             gcp_pubsub sink
             gcp_stackdriver_logs sink
             gcp_stackdriver_metrics sink
-            greptimedb_metrics sink
             greptimedb_logs sink
+            greptimedb_metrics sink
             honeycomb sink
             http sink
             humio_logs sink
@@ -219,12 +231,14 @@ jobs:
             kafka sink
             logdna sink
             loki sink
+            mqtt sink
             nats sink
             new sink
             new_relic sink
             new_relic_logs sink
             opentelemetry sink
             papertrail sink
+            postgres sink
             prometheus_exporter sink
             prometheus_remote_write sink
             pulsar sink
@@ -236,6 +250,8 @@ jobs:
             statsd sink
             vector sink
             websocket sink
+            websocket_server sink
+
             blog website
             css website
             guides website
@@ -244,3 +260,8 @@ jobs:
             search website
             template website
             website
+            website deps
+
+            vrl playground
+
+            opentelemetry lib

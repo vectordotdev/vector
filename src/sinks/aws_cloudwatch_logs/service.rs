@@ -1,60 +1,66 @@
 use std::{
     collections::HashMap,
     fmt,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use aws_sdk_cloudwatchlogs::{
+    Client as CloudwatchLogsClient,
     operation::{
         create_log_group::CreateLogGroupError, create_log_stream::CreateLogStreamError,
         describe_log_streams::DescribeLogStreamsError, put_log_events::PutLogEventsError,
         put_retention_policy::PutRetentionPolicyError,
     },
     types::InputLogEvent,
-    Client as CloudwatchLogsClient,
 };
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use chrono::Duration;
-use futures::{future::BoxFuture, FutureExt};
+use futures::{FutureExt, future::BoxFuture};
 use futures_util::TryFutureExt;
 use http::{
-    header::{HeaderName, InvalidHeaderName, InvalidHeaderValue},
     HeaderValue,
+    header::{HeaderName, InvalidHeaderName, InvalidHeaderValue},
 };
 use indexmap::IndexMap;
 use snafu::{ResultExt, Snafu};
 use tokio::sync::oneshot;
 use tower::{
+    Service, ServiceBuilder, ServiceExt,
     buffer::Buffer,
     limit::{ConcurrencyLimit, RateLimit},
     retry::Retry,
     timeout::Timeout,
-    Service, ServiceBuilder, ServiceExt,
 };
-use vector_lib::stream::DriverResponse;
 use vector_lib::{
     finalization::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
+    stream::DriverResponse,
 };
 
 use crate::sinks::{
     aws_cloudwatch_logs::{
-        config::CloudwatchLogsSinkConfig, config::Retention, request, retry::CloudwatchRetryLogic,
-        sink::BatchCloudwatchRequest, CloudwatchKey,
+        CloudwatchKey,
+        config::{CloudwatchLogsSinkConfig, Retention},
+        request,
+        retry::CloudwatchRetryLogic,
+        sink::BatchCloudwatchRequest,
     },
-    util::{retries::FibonacciRetryPolicy, EncodedLength, TowerRequestSettings},
+    util::{EncodedLength, TowerRequestSettings, retries::FibonacciRetryPolicy},
 };
 
 type Svc = Buffer<
-    ConcurrencyLimit<
+    Vec<InputLogEvent>,
+    <ConcurrencyLimit<
         RateLimit<
             Retry<
-                FibonacciRetryPolicy<CloudwatchRetryLogic<()>>,
-                Buffer<Timeout<CloudwatchLogsSvc>, Vec<InputLogEvent>>,
+                FibonacciRetryPolicy<CloudwatchRetryLogic<Vec<InputLogEvent>, ()>>,
+                Buffer<
+                    Vec<InputLogEvent>,
+                    <Timeout<CloudwatchLogsSvc> as Service<Vec<InputLogEvent>>>::Future,
+                >,
             >,
         >,
-    >,
-    Vec<InputLogEvent>,
+    > as Service<Vec<InputLogEvent>>>::Future,
 >;
 
 #[derive(Debug)]
@@ -70,19 +76,19 @@ pub enum CloudwatchError {
 impl fmt::Display for CloudwatchError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            CloudwatchError::Put(error) => write!(f, "CloudwatchError::Put: {}", error),
+            CloudwatchError::Put(error) => write!(f, "CloudwatchError::Put: {error}"),
             CloudwatchError::DescribeLogStreams(error) => {
-                write!(f, "CloudwatchError::DescribeLogStreams: {}", error)
+                write!(f, "CloudwatchError::DescribeLogStreams: {error}")
             }
             CloudwatchError::CreateStream(error) => {
-                write!(f, "CloudwatchError::CreateStream: {}", error)
+                write!(f, "CloudwatchError::CreateStream: {error}")
             }
             CloudwatchError::CreateGroup(error) => {
-                write!(f, "CloudwatchError::CreateGroup: {}", error)
+                write!(f, "CloudwatchError::CreateGroup: {error}")
             }
             CloudwatchError::NoStreamsFound => write!(f, "CloudwatchError: No Streams Found"),
             CloudwatchError::PutRetentionPolicy(error) => {
-                write!(f, "CloudwatchError::PutRetentionPolicy: {}", error)
+                write!(f, "CloudwatchError::PutRetentionPolicy: {error}")
             }
         }
     }
@@ -240,6 +246,9 @@ impl CloudwatchLogsSvc {
 
         let retention = config.retention.clone();
 
+        let kms_key = config.kms_key.clone();
+        let tags = config.tags.clone();
+
         CloudwatchLogsSvc {
             headers,
             client,
@@ -248,6 +257,8 @@ impl CloudwatchLogsSvc {
             create_missing_group,
             create_missing_stream,
             retention,
+            kms_key,
+            tags,
             token: None,
             token_rx: None,
         }
@@ -322,6 +333,8 @@ impl Service<Vec<InputLogEvent>> for CloudwatchLogsSvc {
                 self.create_missing_group,
                 self.create_missing_stream,
                 self.retention.clone(),
+                self.kms_key.clone(),
+                self.tags.clone(),
                 event_batches,
                 self.token.take(),
                 tx,
@@ -340,6 +353,8 @@ pub struct CloudwatchLogsSvc {
     create_missing_group: bool,
     create_missing_stream: bool,
     retention: Retention,
+    kms_key: Option<String>,
+    tags: Option<HashMap<String, String>>,
     token: Option<String>,
     token_rx: Option<oneshot::Receiver<Option<String>>>,
 }

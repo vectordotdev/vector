@@ -10,8 +10,10 @@ mod vrl_util;
 
 use dyn_clone::DynClone;
 pub use tables::{TableRegistry, TableSearch};
-use vrl::compiler::Function;
-use vrl::value::{ObjectMap, Value};
+use vrl::{
+    compiler::Function,
+    value::{ObjectMap, Value},
+};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
 pub struct IndexHandle(pub usize);
@@ -24,6 +26,16 @@ pub enum Condition<'a> {
     BetweenDates {
         field: &'a str,
         from: chrono::DateTime<chrono::Utc>,
+        to: chrono::DateTime<chrono::Utc>,
+    },
+    /// The date in the field is greater than or equal to `from`.
+    FromDate {
+        field: &'a str,
+        from: chrono::DateTime<chrono::Utc>,
+    },
+    /// The date in the field is less than or equal to `to`.
+    ToDate {
+        field: &'a str,
         to: chrono::DateTime<chrono::Utc>,
     },
 }
@@ -47,6 +59,7 @@ pub trait Table: DynClone {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String>;
 
@@ -58,6 +71,7 @@ pub trait Table: DynClone {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String>;
 

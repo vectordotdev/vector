@@ -6,19 +6,20 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    internal_event::{CountByteSize, InternalEventHandle as _},
+};
 use vrl::event_path;
-use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
-
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_lib::EstimatedJsonEncodedSizeOf;
+use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
 use crate::{
-    event::{Event, ObjectMap, TraceEvent, Value},
-    sources::{
-        datadog_agent::{ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource},
-        util::ErrorMessage,
-    },
     SourceSender,
+    common::http::ErrorMessage,
+    event::{Event, ObjectMap, TraceEvent, Value},
+    sources::datadog_agent::{
+        ApiKeyQueryParams, DatadogAgentSource, ddtrace_proto, handle_request,
+    },
 };
 
 pub(crate) fn build_warp_filter(
@@ -72,7 +73,7 @@ fn build_trace_filter(
                         .map_err(|error| {
                             ErrorMessage::new(
                                 StatusCode::UNPROCESSABLE_ENTITY,
-                                format!("Error decoding Datadog traces: {:?}", error),
+                                format!("Error decoding Datadog traces: {error:?}"),
                             )
                         })
                     });

@@ -4,7 +4,7 @@
 
 use darling::FromMeta;
 use proc_macro2::TokenStream;
-use quote::{quote, ToTokens};
+use quote::{ToTokens, quote};
 use syn::{Expr, Lit, Meta};
 
 use crate::{
@@ -187,9 +187,9 @@ pub enum Validation {
     ///
     /// Can only be used for numbers.
     Range {
-        #[darling(default, rename = "min", with = "maybe_float_or_int")]
+        #[darling(default, rename = "min", with = maybe_float_or_int)]
         minimum: Option<f64>,
-        #[darling(default, rename = "max", with = "maybe_float_or_int")]
+        #[darling(default, rename = "max", with = maybe_float_or_int)]
         maximum: Option<f64>,
     },
 
@@ -221,20 +221,20 @@ impl Validation {
             let min_bound = NUMERIC_ENFORCED_LOWER_BOUND;
             let max_bound = NUMERIC_ENFORCED_UPPER_BOUND;
 
-            if let Some(minimum) = *minimum {
-                if minimum < min_bound {
-                    return Err(darling::Error::custom(
-                        "number ranges cannot exceed 2^53 (absolute) for either the minimum or maximum",
-                    ));
-                }
+            if let Some(minimum) = *minimum
+                && minimum < min_bound
+            {
+                return Err(darling::Error::custom(
+                    "number ranges cannot exceed 2^53 (absolute) for either the minimum or maximum",
+                ));
             }
 
-            if let Some(maximum) = *maximum {
-                if maximum < max_bound {
-                    return Err(darling::Error::custom(
-                        "number ranges cannot exceed 2^53 (absolute) for either the minimum or maximum",
-                    ));
-                }
+            if let Some(maximum) = *maximum
+                && maximum < max_bound
+            {
+                return Err(darling::Error::custom(
+                    "number ranges cannot exceed 2^53 (absolute) for either the minimum or maximum",
+                ));
             }
 
             if *minimum > *maximum {
@@ -249,7 +249,7 @@ impl Validation {
                 (Some(min), Some(max)) if min > max => {
                     return Err(darling::Error::custom(
                         "minimum cannot be greater than maximum",
-                    ))
+                    ));
                 }
                 _ => {}
             }

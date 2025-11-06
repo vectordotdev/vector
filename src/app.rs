@@ -1,4 +1,8 @@
 #![allow(missing_docs)]
+#[cfg(unix)]
+use std::os::unix::process::ExitStatusExt;
+#[cfg(windows)]
+use std::os::windows::process::ExitStatusExt;
 use std::{
     num::{NonZeroU64, NonZeroUsize},
     path::PathBuf,
@@ -9,16 +13,18 @@ use std::{
 
 use exitcode::ExitCode;
 use futures::StreamExt;
-use tokio::runtime::{self, Runtime};
-use tokio::sync::{broadcast::error::RecvError, MutexGuard};
+use tokio::{
+    runtime::{self, Handle, Runtime},
+    sync::{MutexGuard, broadcast::error::RecvError},
+};
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
-use crate::extra_context::ExtraContext;
 #[cfg(feature = "api")]
 use crate::{api, internal_events::ApiStarted};
 use crate::{
-    cli::{handle_config_errors, LogFormat, Opts, RootOpts, WatchConfigMethod},
-    config::{self, Config, ConfigPath},
+    cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
+    config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
+    extra_context::ExtraContext,
     heartbeat,
     internal_events::{VectorConfigLoadError, VectorQuit, VectorStarted, VectorStopped},
     signal::{SignalHandler, SignalPair, SignalRx, SignalTo},
@@ -28,12 +34,6 @@ use crate::{
     },
     trace,
 };
-
-#[cfg(unix)]
-use std::os::unix::process::ExitStatusExt;
-#[cfg(windows)]
-use std::os::windows::process::ExitStatusExt;
-use tokio::runtime::Handle;
 
 static WORKER_THREADS: AtomicUsize = AtomicUsize::new(0);
 
@@ -82,6 +82,7 @@ impl ApplicationConfig {
             watcher_conf,
             opts.require_healthy,
             opts.allow_empty_config,
+            !opts.disable_env_var_interpolation,
             graceful_shutdown_duration,
             signal_handler,
         )
@@ -149,7 +150,7 @@ impl ApplicationConfig {
                 }
                 Err(error) => {
                     let error = error.to_string();
-                    error!("An error occurred that Vector couldn't handle: {}.", error);
+                    error!(message = "An error occurred that Vector couldn't handle.", %error, internal_log_rate_limit = false);
                     _ = self
                         .topology
                         .abort_tx
@@ -158,7 +159,9 @@ impl ApplicationConfig {
                 }
             }
         } else {
-            info!(message="API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`.");
+            info!(
+                message = "API is disabled, enable by setting `api.enabled` to `true` and use commands like `vector top`."
+            );
             None
         }
     }
@@ -204,9 +207,14 @@ impl Application {
             opts.root.internal_log_rate_limit,
         );
 
+        // Set global color preference for downstream modules
+        crate::set_global_color(color);
+
         // Can only log this after initializing the logging subsystem
         if opts.root.openssl_no_probe {
-            debug!(message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL.");
+            debug!(
+                message = "Disabled probing and configuration of root certificate locations on the system for OpenSSL."
+            );
         }
 
         let runtime = build_runtime(opts.root.threads, "vector-worker")?;
@@ -264,6 +272,7 @@ impl Application {
             signals,
             topology_controller,
             allow_empty_config: root_opts.allow_empty_config,
+            interpolate_env: !root_opts.disable_env_var_interpolation,
         })
     }
 }
@@ -275,6 +284,7 @@ pub struct StartedApplication {
     pub signals: SignalPair,
     pub topology_controller: SharedTopologyController,
     pub allow_empty_config: bool,
+    pub interpolate_env: bool,
 }
 
 impl StartedApplication {
@@ -290,6 +300,7 @@ impl StartedApplication {
             topology_controller,
             internal_topologies,
             allow_empty_config,
+            interpolate_env,
         } = self;
 
         let mut graceful_crash = UnboundedReceiverStream::new(graceful_crash_receiver);
@@ -306,6 +317,7 @@ impl StartedApplication {
                     &config_paths,
                     &mut signal_handler,
                     allow_empty_config,
+                    interpolate_env,
                 ).await {
                     break signal;
                 },
@@ -334,8 +346,31 @@ async fn handle_signal(
     config_paths: &[ConfigPath],
     signal_handler: &mut SignalHandler,
     allow_empty_config: bool,
+    interpolate_env: bool,
 ) -> Option<SignalTo> {
     match signal {
+        Ok(SignalTo::ReloadComponents(components_to_reload)) => {
+            let mut topology_controller = topology_controller.lock().await;
+            topology_controller
+                .topology
+                .extend_reload_set(components_to_reload);
+
+            // Reload paths
+            if let Some(paths) = config::process_paths(config_paths) {
+                topology_controller.config_paths = paths;
+            }
+
+            // Reload config
+            let new_config = config::load_from_paths_with_provider_and_secrets(
+                &topology_controller.config_paths,
+                signal_handler,
+                allow_empty_config,
+                interpolate_env,
+            )
+            .await;
+
+            reload_config_from_result(topology_controller, new_config).await
+        }
         Ok(SignalTo::ReloadFromConfigBuilder(config_builder)) => {
             let topology_controller = topology_controller.lock().await;
             reload_config_from_result(topology_controller, config_builder.build()).await
@@ -353,10 +388,36 @@ async fn handle_signal(
                 &topology_controller.config_paths,
                 signal_handler,
                 allow_empty_config,
+                interpolate_env,
             )
             .await;
 
+            if let Ok(ref config) = new_config {
+                // Find all transforms that have external files to watch
+                let transform_keys_to_reload = config.transform_keys_with_external_files();
+
+                // Add these transforms to reload set
+                if !transform_keys_to_reload.is_empty() {
+                    info!(
+                        message = "Reloading transforms with external files.",
+                        count = transform_keys_to_reload.len()
+                    );
+                    topology_controller
+                        .topology
+                        .extend_reload_set(transform_keys_to_reload);
+                }
+            }
+
             reload_config_from_result(topology_controller, new_config).await
+        }
+        Ok(SignalTo::ReloadEnrichmentTables) => {
+            let topology_controller = topology_controller.lock().await;
+
+            topology_controller
+                .topology
+                .reload_enrichment_tables()
+                .await;
+            None
         }
         Err(RecvError::Lagged(amt)) => {
             warn!("Overflow, dropped {} signals.", amt);
@@ -477,7 +538,7 @@ pub fn build_runtime(threads: Option<usize>, thread_name: &str) -> Result<Runtim
         .unwrap_or_else(|_| panic!("double thread initialization"));
     rt_builder.worker_threads(threads);
 
-    debug!(messaged = "Building runtime.", worker_threads = threads);
+    debug!(message = "Building runtime.", worker_threads = threads);
     Ok(rt_builder.build().expect("Unable to create async runtime"))
 }
 
@@ -486,17 +547,79 @@ pub async fn load_configs(
     watcher_conf: Option<config::watcher::WatcherConfig>,
     require_healthy: Option<bool>,
     allow_empty_config: bool,
+    interpolate_env: bool,
     graceful_shutdown_duration: Option<Duration>,
     signal_handler: &mut SignalHandler,
 ) -> Result<Config, ExitCode> {
     let config_paths = config::process_paths(config_paths).ok_or(exitcode::CONFIG)?;
 
+    let watched_paths = config_paths
+        .iter()
+        .map(<&PathBuf>::from)
+        .collect::<Vec<_>>();
+
+    info!(
+        message = "Loading configs.",
+        paths = ?watched_paths
+    );
+
+    let mut config = config::load_from_paths_with_provider_and_secrets(
+        &config_paths,
+        signal_handler,
+        allow_empty_config,
+        interpolate_env,
+    )
+    .await
+    .map_err(handle_config_errors)?;
+
+    let mut watched_component_paths = Vec::new();
+
     if let Some(watcher_conf) = watcher_conf {
-        // Start listening for config changes immediately.
+        for (name, transform) in config.transforms() {
+            let files = transform.inner.files_to_watch();
+            let component_config = ComponentConfig::new(
+                files.into_iter().cloned().collect(),
+                name.clone(),
+                ComponentType::Transform,
+            );
+            watched_component_paths.push(component_config);
+        }
+
+        for (name, sink) in config.sinks() {
+            let files = sink.inner.files_to_watch();
+            let component_config = ComponentConfig::new(
+                files.into_iter().cloned().collect(),
+                name.clone(),
+                ComponentType::Sink,
+            );
+            watched_component_paths.push(component_config);
+        }
+
+        for (name, table) in config.enrichment_tables() {
+            let files = table.inner.files_to_watch();
+            let component_config = ComponentConfig::new(
+                files.into_iter().cloned().collect(),
+                name.clone(),
+                ComponentType::EnrichmentTable,
+            );
+            watched_component_paths.push(component_config);
+        }
+
+        info!(
+            message = "Starting watcher.",
+            paths = ?watched_paths
+        );
+        info!(
+            message = "Components to watch.",
+            paths = ?watched_component_paths
+        );
+
+        // Start listening for config changes.
         config::watcher::spawn_thread(
             watcher_conf,
             signal_handler.clone_tx(),
-            config_paths.iter().map(Into::into),
+            watched_paths,
+            watched_component_paths,
             None,
         )
         .map_err(|error| {
@@ -504,19 +627,6 @@ pub async fn load_configs(
             exitcode::CONFIG
         })?;
     }
-
-    info!(
-        message = "Loading configs.",
-        paths = ?config_paths.iter().map(<&PathBuf>::from).collect::<Vec<_>>()
-    );
-
-    let mut config = config::load_from_paths_with_provider_and_secrets(
-        &config_paths,
-        signal_handler,
-        allow_empty_config,
-    )
-    .await
-    .map_err(handle_config_errors)?;
 
     config::init_log_schema(config.global.log_schema.clone(), true);
     config::init_telemetry(config.global.telemetry.clone(), true);

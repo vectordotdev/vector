@@ -27,14 +27,18 @@ Kubernetes, SystemD, or however you are running Vector.
 You can access Vector's logs by adding an [`internal_logs`][internal_logs] source to your [topology]. Here's an example
 configuration that takes Vector's logs and pipes them to the console as plain text:
 
-```toml
-[sources.vector_logs]
-type = "internal_logs"
+```yaml
+sources:
+  vector_logs:
+    type: internal_logs
 
-[sinks.console]
-type = "console"
-inputs = ["vector_logs"]
-encoding.codec = "text"
+sinks:
+  console:
+    type: console
+    inputs:
+      - vector_logs
+    encoding:
+      codec: text
 ```
 
 ### Using Vector logs
@@ -44,24 +48,26 @@ system, i.e. you can [transform] them and send them off to any number of [sinks]
 transforms Vector's logs using the [`remap` transform][remap] and [Vector Remap Language][VRL] and then stores those
 logs in [ClickHouse]:
 
-```toml
-[sources.vector_logs]
-type = "internal_logs"
+```yaml
+sources:
+  vector_logs:
+    type: internal_logs
 
-[transforms.modify]
-type = "remap"
-inputs = ["vector_logs"]
+transforms:
+  modify:
+    type: remap
+    inputs:
+      - vector_logs
+    source: |
+      .timestamp = to_unix_timestamp!(.timestamp)
 
-# Reformat the timestamp to Unix time
-source = '''
-  .timestamp = to_unix_timestamp!(to_timestamp!(.timestamp))
-'''
-
-[sinks.database]
-type = "clickhouse"
-inputs = ["modify"]
-host = "http://localhost:8123"
-table = "vector-log-data"
+sinks:
+  database:
+    type: clickhouse
+    inputs:
+      - modify
+    host: http://localhost:8123
+    table: vector-log-data
 ```
 
 ### Configuring logs
@@ -91,22 +97,23 @@ You can monitor metrics produced by Vector using the [`internal_metrics`][intern
 [internal logs](#using-vector-logs), you can configure an `internal_metrics` source and use the piped-in metrics
 however you wish. Here's an example configuration that delivers Vector's metrics to a Prometheus remote write endpoint.
 
-```toml
-[sources.vector_metrics]
-type = "internal_metrics"
+```yaml
+sources:
+  vector_metrics:
+    type: internal_metrics
 
-[sinks.prometheus]
-type = ["prometheus_remote_write"]
-endpoint = ["https://localhost:8087/"]
-inputs = ["vector_metrics"]
+sinks:
+  prometheus:
+    type: prometheus_remote_write
+    endpoint: https://localhost:8087/
+    inputs:
+      - vector_metrics
 ```
 
 ### Metrics catalogue
 
 The table below provides a list of internal metrics provided by Vector. See the docs for the [`internal_metrics`
-source][output] for more detailed information about the available metrics.
-
-{{< internal-metrics-list >}}
+source][output] for more detailed information about the available metrics and the [debugging guide][debugging_guide] on how to use them.
 
 ## Troubleshooting
 
@@ -131,14 +138,15 @@ IO and disrupting the service. The trade-off is that repetitive logs aren't logg
 [internal_metrics]: /docs/reference/configuration/sources/internal_metrics
 [journald]: https://www.freedesktop.org/software/systemd/man/systemd-journald.service.html
 [journald_source]: /docs/reference/configuration/sources/journald
-[output]: /docs/reference/configuration/sources/internal_metrics/#output-data
+[output]: /docs/reference/configuration/sources/internal_metrics/#output-types
 [remap]: /docs/reference/configuration/transforms/remap
 [rfc_2064]: https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 [sinks]: /sinks
 [sources]: /sources
 [starting]: /docs/administration/management
 [stderr]: https://en.wikipedia.org/wiki/Standard_streams#Standard_error_(stderr)
-[topology]: /docs/about/concepts/#topology
+[topology]: /docs/introduction/concepts/#topology
 [transform]: /transforms
 [troubleshooting]: /guides/level-up/troubleshooting
 [vrl]: /docs/reference/vrl
+[debugging_guide]: /guides/developer/debugging#visualizing-and-querying-internal-metrics

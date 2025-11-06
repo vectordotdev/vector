@@ -10,9 +10,9 @@ use std::{
 
 use bytes::Bytes;
 use chrono::{TimeZone, Utc};
-use futures::{poll, stream::BoxStream, task::Poll, StreamExt};
+use futures::{StreamExt, poll, stream::BoxStream, task::Poll};
 use nix::{
-    sys::signal::{kill, Signal},
+    sys::signal::{Signal, kill},
     unistd::Pid,
 };
 use serde_json::{Error as JsonError, Value as JsonValue};
@@ -25,27 +25,28 @@ use tokio::{
     time::sleep,
 };
 use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{decoding::BoxedFramingError, CharacterDelimitedDecoder};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{metadata_path, owned_value_path, path};
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
-    schema::Definition,
     EstimatedJsonEncodedSizeOf,
-};
-use vector_lib::{
+    codecs::{CharacterDelimitedDecoder, decoding::BoxedFramingError},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
     finalizer::OrderedFinalizer,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
+    lookup::{metadata_path, owned_value_path, path},
+    schema::Definition,
 };
-use vrl::event_path;
-use vrl::value::{kind::Collection, Kind, Value};
+use vrl::{
+    event_path,
+    value::{Kind, Value, kind::Collection},
+};
 
 use crate::{
+    SourceSender,
     config::{
-        log_schema, DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
-        SourceOutput,
+        DataType, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
+        log_schema,
     },
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, LogEvent},
     internal_events::{
@@ -55,7 +56,6 @@ use crate::{
     },
     serde::bool_or_struct,
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 const BATCH_TIMEOUT: Duration = Duration::from_millis(10);
@@ -330,7 +330,9 @@ type Record = HashMap<String, String>;
 impl SourceConfig for JournaldConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         if self.remap_priority {
-            warn!("DEPRECATION, option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead.");
+            warn!(
+                "DEPRECATION, option `remap_priority` has been deprecated. Please use the `remap` transform and function `to_syslog_level` instead."
+            );
         }
 
         let data_dir = cx
@@ -461,8 +463,11 @@ impl JournaldSource {
             info!("Starting journalctl.");
             let cursor = checkpointer.lock().await.cursor.clone();
             match self.starter.start(cursor.as_deref()) {
-                Ok((stream, running)) => {
-                    if !self.run_stream(stream, &finalizer, shutdown.clone()).await {
+                Ok((stdout_stream, stderr_stream, running)) => {
+                    if !self
+                        .run_stream(stdout_stream, stderr_stream, &finalizer, shutdown.clone())
+                        .await
+                    {
                         return;
                     }
                     // Explicit drop to ensure it isn't dropped earlier.
@@ -486,25 +491,33 @@ impl JournaldSource {
     /// Return `true` if should restart `journalctl`.
     async fn run_stream<'a>(
         &'a mut self,
-        mut stream: JournalStream,
+        mut stdout_stream: JournalStream,
+        stderr_stream: JournalStream,
         finalizer: &'a Finalizer,
         mut shutdown: ShutdownSignal,
     ) -> bool {
         let bytes_received = register!(BytesReceived::from(Protocol::from("journald")));
         let events_received = register!(EventsReceived);
 
+        // Spawn stderr handler task
+        let stderr_handler = tokio::spawn(Self::handle_stderr(stderr_stream));
+
         let batch_size = self.batch_size;
-        loop {
+        let result = loop {
             let mut batch = Batch::new(self);
 
             // Start the timeout counter only once we have received a
             // valid and non-filtered event.
             while batch.events.is_empty() {
                 let item = tokio::select! {
-                    _ = &mut shutdown => return false,
-                    item = stream.next() => item,
+                    _ = &mut shutdown => {
+                        stderr_handler.abort();
+                        return false;
+                    },
+                    item = stdout_stream.next() => item,
                 };
                 if !batch.handle_next(item) {
+                    stderr_handler.abort();
                     return true;
                 }
             }
@@ -515,7 +528,7 @@ impl JournaldSource {
             for _ in 1..batch_size {
                 tokio::select! {
                     _ = &mut timeout => break,
-                    result = stream.next() => if !batch.handle_next(result) {
+                    result = stdout_stream.next() => if !batch.handle_next(result) {
                         break;
                     }
                 }
@@ -525,6 +538,28 @@ impl JournaldSource {
                 .await
             {
                 break x;
+            }
+        };
+
+        stderr_handler.abort();
+        result
+    }
+
+    /// Handle stderr stream from journalctl process
+    async fn handle_stderr(mut stderr_stream: JournalStream) {
+        while let Some(result) = stderr_stream.next().await {
+            match result {
+                Ok(line) => {
+                    let line_str = String::from_utf8_lossy(&line);
+                    let trimmed = line_str.trim();
+                    if !trimmed.is_empty() {
+                        warn!("Warning journalctl stderr: {trimmed}");
+                    }
+                }
+                Err(err) => {
+                    error!("Error reading journalctl stderr: {err}");
+                    break;
+                }
             }
         }
     }
@@ -673,6 +708,7 @@ impl StartJournalctl {
     fn make_command(&self, checkpoint: Option<&str>) -> Command {
         let mut command = Command::new(&self.path);
         command.stdout(Stdio::piped());
+        command.stderr(Stdio::piped());
         command.arg("--follow");
         command.arg("--all");
         command.arg("--show-cursor");
@@ -683,7 +719,7 @@ impl StartJournalctl {
         }
 
         if let Some(namespace) = &self.journal_namespace {
-            command.arg(format!("--namespace={}", namespace));
+            command.arg(format!("--namespace={namespace}"));
         }
 
         if self.current_boot_only {
@@ -691,7 +727,7 @@ impl StartJournalctl {
         }
 
         if let Some(cursor) = checkpoint {
-            command.arg(format!("--after-cursor={}", cursor));
+            command.arg(format!("--after-cursor={cursor}"));
         } else if self.since_now {
             command.arg("--since=now");
         } else {
@@ -709,18 +745,24 @@ impl StartJournalctl {
     fn start(
         &mut self,
         checkpoint: Option<&str>,
-    ) -> crate::Result<(JournalStream, RunningJournalctl)> {
+    ) -> crate::Result<(JournalStream, JournalStream, RunningJournalctl)> {
         let mut command = self.make_command(checkpoint);
 
         let mut child = command.spawn().context(JournalctlSpawnSnafu)?;
 
-        let stream = FramedRead::new(
+        let stdout_stream = FramedRead::new(
             child.stdout.take().unwrap(),
             CharacterDelimitedDecoder::new(b'\n'),
-        )
-        .boxed();
+        );
 
-        Ok((stream, RunningJournalctl(child)))
+        let stderr = child.stderr.take().unwrap();
+        let stderr_stream = FramedRead::new(stderr, CharacterDelimitedDecoder::new(b'\n'));
+
+        Ok((
+            stdout_stream.boxed(),
+            stderr_stream.boxed(),
+            RunningJournalctl(child),
+        ))
     }
 }
 
@@ -772,11 +814,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
 
     let timestamp = timestamp_value
         .filter(|&ts| ts.is_bytes())
-        .and_then(|ts| {
-            String::from_utf8_lossy(ts.as_bytes().unwrap())
-                .parse::<u64>()
-                .ok()
-        })
+        .and_then(|ts| ts.as_str().unwrap().parse::<u64>().ok())
         .map(|ts| {
             chrono::Utc
                 .timestamp_opt((ts / 1_000_000) as i64, (ts % 1_000_000) as u32 * 1_000)
@@ -850,7 +888,7 @@ fn fixup_unit(unit: &str) -> String {
     if unit.contains('.') {
         unit.into()
     } else {
-        format!("{}.service", unit)
+        format!("{unit}.service")
     }
 }
 
@@ -1000,7 +1038,7 @@ impl Checkpointer {
 
     async fn set(&mut self, token: &str) -> Result<(), io::Error> {
         self.file.seek(SeekFrom::Start(0)).await?;
-        self.file.write_all(format!("{}\n", token).as_bytes()).await
+        self.file.write_all(format!("{token}\n").as_bytes()).await
     }
 
     async fn get(&mut self) -> Result<Option<String>, io::Error> {
@@ -1095,7 +1133,7 @@ mod checkpointer_tests {
         assert_eq!(checkpointer.get().await.unwrap().unwrap(), "first test");
         let contents = read_to_string(filename.clone())
             .await
-            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+            .unwrap_or_else(|_| panic!("Failed to read: {filename:?}"));
         assert!(contents.starts_with("first test\n"));
 
         checkpointer
@@ -1105,7 +1143,7 @@ mod checkpointer_tests {
         assert_eq!(checkpointer.get().await.unwrap().unwrap(), "second");
         let contents = read_to_string(filename.clone())
             .await
-            .unwrap_or_else(|_| panic!("Failed to read: {:?}", filename));
+            .unwrap_or_else(|_| panic!("Failed to read: {filename:?}"));
         assert!(contents.starts_with("second\n"));
     }
 }
@@ -1115,12 +1153,13 @@ mod tests {
     use std::{fs, path::Path};
 
     use tempfile::tempdir;
-    use tokio::time::{sleep, timeout, Duration, Instant};
-    use vrl::value::{kind::Collection, Value};
+    use tokio::time::{Duration, Instant, sleep, timeout};
+    use vrl::value::{Value, kind::Collection};
 
     use super::*;
     use crate::{
-        config::ComponentKey, event::Event, event::EventStatus,
+        config::ComponentKey,
+        event::{Event, EventStatus},
         test_util::components::assert_source_compliance,
     };
 
@@ -1176,7 +1215,8 @@ mod tests {
             let source = config.build(cx).await.unwrap();
             tokio::spawn(async move { source.await.unwrap() });
 
-            sleep(Duration::from_millis(100)).await;
+            // Hack: Sleep to ensure journalctl process starts and emits events before shutdown.
+            sleep(Duration::from_secs(1)).await;
             shutdown
                 .shutdown_all(Some(Instant::now() + Duration::from_secs(1)))
                 .await;
@@ -1368,7 +1408,8 @@ mod tests {
         // Make sure the checkpointer cursor is empty
         assert_eq!(checkpointer.get().await.unwrap(), None);
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Hack: Sleep to ensure journalctl process starts and emits events.
+        sleep(Duration::from_secs(1)).await;
 
         // Acknowledge all the received events.
         let mut count = 0;
@@ -1380,7 +1421,7 @@ mod tests {
         }
         assert_eq!(count, 8);
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
         assert_eq!(checkpointer.get().await.unwrap().as_deref(), Some("8"));
     }
 
@@ -1492,7 +1533,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--namespace="));
         assert!(!cmd_line.contains("--boot"));
@@ -1512,7 +1553,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(cmd_line.contains("--since=now"));
 
         let journal_dir = Some(PathBuf::from("/tmp/journal-dir"));
@@ -1530,7 +1571,7 @@ mod tests {
             cursor,
             extra_args,
         );
-        let cmd_line = format!("{:?}", command);
+        let cmd_line = format!("{command:?}");
         assert!(cmd_line.contains("--directory=/tmp/journal-dir"));
         assert!(cmd_line.contains("--namespace=my_namespace"));
         assert!(cmd_line.contains("--boot"));

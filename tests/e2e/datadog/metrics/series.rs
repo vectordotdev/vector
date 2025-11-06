@@ -6,14 +6,13 @@ mod ddmetric_proto {
 }
 
 use ddmetric_proto::{
-    metric_payload::{MetricSeries, MetricType},
     MetricPayload,
+    metric_payload::{MetricSeries, MetricType},
 };
 use tracing::info;
 use vector::common::datadog::DatadogSeriesMetric;
 
 use self::ddmetric_proto::metric_payload::{MetricPoint, Resource};
-
 use super::*;
 
 const SERIES_ENDPOINT_V1: &str = "/api/v1/series";
@@ -205,7 +204,9 @@ async fn get_v2_series_from_pipeline(address: String) -> SeriesIntake {
         get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SERIES_ENDPOINT_V2).await;
 
     info!("unpacking payloads");
-    let payloads = unpack_proto_payloads::<MetricPayload>(&payloads);
+    let payloads = unpack_proto_payloads::<MetricPayload>(&payloads)
+        .await
+        .expect("Failed to unpack v2 series payloads");
 
     info!("generating series intake");
     let intake = generate_series_intake(&payloads);
@@ -287,14 +288,14 @@ pub(super) async fn validate() {
             if metric_type == 2 {
                 let agent_sum: f64 = agent_ts
                     .1
-                    .iter()
-                    .map(|(_tb, points)| points.iter().sum::<f64>())
+                    .values()
+                    .map(|points| points.iter().sum::<f64>())
                     .sum();
 
                 let vector_sum: f64 = vector_ts
                     .1
-                    .iter()
-                    .map(|(_tb, points)| points.iter().sum::<f64>())
+                    .values()
+                    .map(|points| points.iter().sum::<f64>())
                     .sum();
 
                 assert_eq!(agent_sum, vector_sum, "Mismatch of rate data");

@@ -1,7 +1,7 @@
 use std::{
     fmt,
     sync::Arc,
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use bytes::Bytes;
@@ -9,24 +9,23 @@ use futures_util::future::BoxFuture;
 use http::Request;
 use serde::{Deserialize, Serialize};
 use snafu::ResultExt;
-use tokio::sync::{mpsc, oneshot, OwnedSemaphorePermit, Semaphore};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
-use vector_lib::event::EventStatus;
-use vector_lib::request_metadata::MetaDescriptive;
+use vector_lib::{event::EventStatus, request_metadata::MetaDescriptive};
 
 use super::{
-    acknowledgements::{run_acknowledgements, HecClientAcknowledgementsConfig},
     EndpointTarget,
+    acknowledgements::{HecClientAcknowledgementsConfig, run_acknowledgements},
 };
 use crate::{
     http::HttpClient,
     internal_events::{SplunkIndexerAcknowledgementUnavailableError, SplunkResponseParseError},
     sinks::{
-        splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
-        util::{sink::Response, Compression},
         UriParseSnafu,
+        splunk_hec::common::{build_uri, request::HecRequest, response::HecResponse},
+        util::{Compression, sink::Response},
     },
 };
 
@@ -178,6 +177,7 @@ impl ResponseExt for http::Response<Bytes> {
     }
 }
 
+#[derive(Clone)]
 pub struct HttpRequestBuilder {
     pub endpoint_target: EndpointTarget,
     pub endpoint: String,
@@ -271,40 +271,40 @@ mod tests {
     use std::{
         collections::HashMap,
         future::poll_fn,
-        num::{NonZeroU64, NonZeroU8, NonZeroUsize},
+        num::{NonZeroU8, NonZeroU64, NonZeroUsize},
         sync::{
-            atomic::{AtomicU64, Ordering},
             Arc,
+            atomic::{AtomicU64, Ordering},
         },
         task::Poll,
     };
 
     use bytes::Bytes;
-    use futures_util::{poll, stream::FuturesUnordered, StreamExt};
-    use tower::{util::BoxService, Service, ServiceExt};
-    use vector_lib::internal_event::CountByteSize;
+    use futures_util::{StreamExt, poll, stream::FuturesUnordered};
+    use tower::{Service, ServiceExt, util::BoxService};
     use vector_lib::{
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
+        internal_event::CountByteSize,
     };
     use wiremock::{
-        matchers::{header, header_exists, method, path},
         Mock, MockServer, Request, Respond, ResponseTemplate,
+        matchers::{header, header_exists, method, path},
     };
 
     use crate::{
         http::HttpClient,
         sinks::{
             splunk_hec::common::{
+                EndpointTarget,
                 acknowledgements::{
                     HecAckStatusRequest, HecAckStatusResponse, HecClientAcknowledgementsConfig,
                 },
                 build_http_batch_service,
                 request::HecRequest,
                 service::{HecAckResponseBody, HecService, HttpRequestBuilder},
-                EndpointTarget,
             },
-            util::{metadata::RequestMetadataBuilder, Compression},
+            util::{Compression, metadata::RequestMetadataBuilder},
         },
     };
 
@@ -370,10 +370,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/services/collector/event"))
-            .and(header(
-                "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
-            ))
+            .and(header("Authorization", format!("Splunk {TOKEN}").as_str()))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(move |_: &Request| {
                 let ack_id =
@@ -385,10 +382,7 @@ mod tests {
 
         Mock::given(method("POST"))
             .and(path("/services/collector/ack"))
-            .and(header(
-                "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
-            ))
+            .and(header("Authorization", format!("Splunk {TOKEN}").as_str()))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(ack_response)
             .mount(&mock_server)
@@ -528,10 +522,7 @@ mod tests {
         // Override the usual event endpoint
         Mock::given(method("POST"))
             .and(path("/services/collector/event"))
-            .and(header(
-                "Authorization",
-                format!("Splunk {}", TOKEN).as_str(),
-            ))
+            .and(header("Authorization", format!("Splunk {TOKEN}").as_str()))
             .and(header_exists("X-Splunk-Request-Channel"))
             .respond_with(move |_: &Request| {
                 ResponseTemplate::new(200).set_body_json(r#"{ "new": "a new response body" }"#)
