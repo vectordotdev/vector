@@ -5,7 +5,7 @@ use std::{
     fmt::Write as _,
     path::PathBuf,
     process::{Command, ExitStatus},
-    sync::{LazyLock, OnceLock},
+    sync::{LazyLock, OnceLock, RwLock},
     time::Duration,
 };
 
@@ -31,7 +31,7 @@ pub static SHELL: LazyLock<OsString> =
 
 static VERBOSITY: OnceLock<LevelFilter> = OnceLock::new();
 static CONFIG: OnceLock<Config> = OnceLock::new();
-static PATH: OnceLock<String> = OnceLock::new();
+static PATH: RwLock<Option<String>> = RwLock::new(None);
 
 pub fn verbosity() -> &'static LevelFilter {
     VERBOSITY.get().expect("verbosity is not initialized")
@@ -41,8 +41,12 @@ pub fn config() -> &'static Config {
     CONFIG.get().expect("config is not initialized")
 }
 
-pub fn path() -> &'static String {
-    PATH.get().expect("path is not initialized")
+pub fn path() -> String {
+    PATH.read()
+        .expect("could not read path lock")
+        .as_ref()
+        .expect("path is not initialized")
+        .clone()
 }
 
 pub fn set_repo_dir() -> Result<()> {
@@ -94,7 +98,7 @@ pub trait CommandExt {
 impl CommandExt for Command {
     /// Create a new command to execute the named script in the repository `scripts` directory.
     fn script(script: &str) -> Self {
-        let path: PathBuf = [path(), "scripts", script].into_iter().collect();
+        let path: PathBuf = [&path(), "scripts", script].into_iter().collect();
         if cfg!(windows) {
             // On Windows, all scripts must be run through an explicit interpreter.
             let mut command = Command::new(&*SHELL);
@@ -263,5 +267,5 @@ pub fn set_global_config(config: Config) {
 }
 
 pub fn set_global_path(path: String) {
-    PATH.set(path).expect("could not set path");
+    *PATH.write().expect("could not write path lock") = Some(path);
 }

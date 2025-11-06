@@ -47,7 +47,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let hook_dir = Path::new(app::path()).join(".git").join("hooks");
+        let hook_dir = Path::new(&app::path()).join(".git").join("hooks");
 
         // Create a new directory named hooks in the .git directory if it
         // doesn't already exist.

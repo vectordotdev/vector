@@ -40,7 +40,7 @@ pub struct RustToolchainConfig {
 impl RustToolchainConfig {
     fn parse() -> Result<Self> {
         let repo_path = app::path();
-        let config_file: PathBuf = [repo_path, "rust-toolchain.toml"].iter().collect();
+        let config_file: PathBuf = [&repo_path, "rust-toolchain.toml"].iter().collect();
         let contents = fs::read_to_string(&config_file)
             .with_context(|| format!("failed to read {}", config_file.display()))?;
         let config: RustToolchainRootConfig = toml::from_str(&contents)
@@ -217,7 +217,7 @@ impl ComposeTestConfig {
     pub fn load(root_dir: &str, integration: &str) -> Result<(PathBuf, Self)> {
         let (base_dir, use_config_subdir) = test_dir_config(root_dir);
 
-        let test_dir: PathBuf = [app::path(), base_dir, root_dir, integration]
+        let test_dir: PathBuf = [&app::path(), base_dir, root_dir, integration]
             .iter()
             .collect();
 
@@ -262,7 +262,7 @@ impl ComposeTestConfig {
         let mut configs = BTreeMap::new();
 
         let (base_dir, use_config_subdir) = test_dir_config(root_dir);
-        let tests_dir: PathBuf = [app::path(), base_dir, root_dir].iter().collect();
+        let tests_dir: PathBuf = [&app::path(), base_dir, root_dir].iter().collect();
 
         Self::collect_all_dir(&tests_dir, &mut configs, use_config_subdir)?;
 

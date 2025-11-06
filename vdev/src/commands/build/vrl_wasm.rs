@@ -11,7 +11,7 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let vrl_path = Path::new(app::path()).join("lib").join("vrl");
+        let vrl_path = Path::new(&app::path()).join("lib").join("vrl");
         let args = &["build", "--release", "--target", "wasm32-unknown-unknown"];
 
         for crate_name in ["compiler", "core", "diagnostic", "parser"] {
