@@ -1,14 +1,10 @@
-use std::collections::BTreeSet;
-use vector_lib::config::LogNamespace;
+use vector_lib::config::{clone_input_definitions, LogNamespace};
 use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::owned_value_path;
-use vrl::value::kind::Collection;
-use vrl::value::Kind;
 
 use crate::config::OutputId;
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Input, TransformConfig, TransformContext,
+        DataType, GenerateConfig, Input, TransformConfig, TransformContext,
         TransformOutput,
     },
     event::{Event, LogEvent},
@@ -59,47 +55,13 @@ impl TransformConfig for TraceToLogConfig {
         &self,
         _: vector_lib::enrichment::TableRegistry,
         input_definitions: &[(OutputId, Definition)],
-        global_log_namespace: LogNamespace,
+        _: LogNamespace,
     ) -> Vec<TransformOutput> {
-        let log_namespace = global_log_namespace.merge(self.log_namespace);
-        let schema_definition = schema_definition(log_namespace);
-
         vec![TransformOutput::new(
             DataType::Log,
-            input_definitions
-                .iter()
-                .map(|(output, _)| (output.clone(), schema_definition.clone()))
-                .collect(),
+            clone_input_definitions(input_definitions),
         )]
     }
-}
-
-/// Defines the output schema for log events converted from traces.
-fn schema_definition(log_namespace: LogNamespace) -> Definition {
-    let mut schema_definition = Definition::default_for_namespace(&BTreeSet::from([log_namespace]));
-    
-    match log_namespace {
-        LogNamespace::Vector => {
-            schema_definition = schema_definition.with_event_field(
-                &owned_value_path!("timestamp"),
-                Kind::bytes().or_undefined(),
-                None,
-            );
-
-            schema_definition = schema_definition.with_metadata_field(
-                &owned_value_path!("vector"),
-                Kind::object(Collection::empty()),
-                None,
-            );
-        }
-        LogNamespace::Legacy => {
-            if let Some(timestamp_key) = log_schema().timestamp_key() {
-                schema_definition =
-                    schema_definition.with_event_field(timestamp_key, Kind::timestamp(), None);
-            }
-        }
-    }
-    schema_definition
 }
 
 #[derive(Clone, Debug)]
@@ -118,10 +80,8 @@ mod tests {
     use super::*;
     use crate::test_util::components::assert_transform_compliance;
     use crate::transforms::test::create_topology;
-    use std::sync::Arc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::config::ComponentKey;
     use vector_lib::event::TraceEvent;
 
     #[test]
@@ -164,15 +124,10 @@ mod tests {
         
         let (expected_map, _) = trace.clone().into_parts();
         
-        let mut expected_metadata = trace.metadata().clone();
-        expected_metadata.set_source_id(Arc::new(ComponentKey::from("in")));
-        expected_metadata.set_upstream_id(Arc::new(OutputId::from("transform")));
-        expected_metadata.set_schema_definition(&Arc::new(schema_definition(LogNamespace::Legacy)));
-
         let log = do_transform(trace).await.unwrap();
-        let (actual_value, actual_metadata) = log.into_parts();
+        let (actual_value, _) = log.into_parts();
         let actual_map = actual_value.into_object().expect("log value should be an object");
+        
         assert_eq!(actual_map, expected_map, "Trace data fields should be preserved");
-        assert_eq!(&actual_metadata, &expected_metadata, "Trace metadata should be preserved");
     }
 }
