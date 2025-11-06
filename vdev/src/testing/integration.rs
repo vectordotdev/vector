@@ -204,7 +204,7 @@ impl ComposeTest {
             &self.config.runner.env,
             Some(&self.config.features),
             &args,
-            self.local_config.kind == ComposeTestKind::E2E,
+            !no_build,
         )?;
 
         Ok(())
