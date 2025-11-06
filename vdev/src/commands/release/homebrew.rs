@@ -38,7 +38,6 @@ impl Cli {
         debug!("Committing and pushing changes (if any).");
         commit_and_push_changes(&vector_version)?;
 
-        std::thread::sleep(std::time::Duration::from_secs(60));
         td.close()?;
         Ok(())
     }
@@ -106,7 +105,7 @@ fn commit_and_push_changes(vector_version: &str) -> Result<()> {
         debug!("Modified lines {:?}", git::get_modified_files());
         let commit_message = format!("Release Vector {vector_version}");
         git::commit(&commit_message)?;
-        // git::push()?;
+        git::push_branch("test")?;
     } else {
         debug!("No changes to push.");
     }
