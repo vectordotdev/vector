@@ -480,6 +480,14 @@ fn resolve_vrl(value: &str, program: &Program) -> Option<String> {
         })
 }
 
+/// Resolve a compiled parameter, handling VRL evaluation if present
+fn resolve_compiled_param(compiled: &CompiledParam) -> Option<String> {
+    match &compiled.program {
+        Some(program) => resolve_vrl(&compiled.value, program),
+        None => Some(compiled.value.clone()),
+    }
+}
+
 impl http_client::HttpClientContext for HttpClientContext {
     /// Decodes the HTTP response body into events per the decoder configured.
     fn on_response(&mut self, _url: &Uri, _header: &Parts, body: &Bytes) -> Option<Vec<Event>> {
@@ -511,63 +519,42 @@ impl http_client::HttpClientContext for HttpClientContext {
 
     /// Process the URL dynamically before each request
     fn process_url(&self, url: &Uri) -> Option<Uri> {
-        // Early exit if there is no VRL to process
-        let query: &Query = &self.query;
-        if !query.has_vrl {
+        if !self.query.has_vrl {
             return None;
         }
 
-        let mut processed_query = HashMap::new();
-
-        for (param_name, compiled_value) in &query.compiled {
-            match compiled_value {
-                CompiledQueryParameterValue::SingleParam(compiled_param) => {
-                    let result = match &compiled_param.program {
-                        Some(prog) => resolve_vrl(&compiled_param.value, prog)?,
-                        None => compiled_param.value.clone(),
-                    };
-
-                    processed_query.insert(
-                        param_name.clone(),
-                        QueryParameterValue::SingleParam(ParameterValue::String(result)),
-                    );
-                }
-                CompiledQueryParameterValue::MultiParams(compiled_params) => {
-                    let mut results = Vec::new();
-
-                    for param in compiled_params {
-                        let result = match &param.program {
-                            Some(p) => resolve_vrl(&param.value, p)?,
-                            None => param.value.clone(),
-                        };
-                        results.push(ParameterValue::String(result));
+        // Resolve all query parameters with VRL expressions
+        let processed_query: Option<HashMap<_, _>> = self
+            .query
+            .compiled
+            .iter()
+            .map(|(name, value)| {
+                let resolved = match value {
+                    CompiledQueryParameterValue::SingleParam(param) => {
+                        let result = resolve_compiled_param(param)?;
+                        QueryParameterValue::SingleParam(ParameterValue::String(result))
                     }
+                    CompiledQueryParameterValue::MultiParams(params) => {
+                        let results: Option<Vec<_>> = params
+                            .iter()
+                            .map(|p| resolve_compiled_param(p).map(ParameterValue::String))
+                            .collect();
+                        QueryParameterValue::MultiParams(results?)
+                    }
+                };
+                Some((name.clone(), resolved))
+            })
+            .collect();
 
-                    processed_query.insert(
-                        param_name.clone(),
-                        QueryParameterValue::MultiParams(results),
-                    );
-                }
-            };
-        }
-
-        // Extract the base URI without query parameters to avoid parameter duplication
+        // Build base URI and add query parameters
         let base_uri = Uri::builder()
-            .scheme(
-                url.scheme()
-                    .cloned()
-                    .unwrap_or_else(|| http::uri::Scheme::try_from("http").unwrap()),
-            )
-            .authority(
-                url.authority()
-                    .cloned()
-                    .unwrap_or_else(|| http::uri::Authority::try_from("localhost").unwrap()),
-            )
-            .path_and_query(url.path().to_string())
+            .scheme(url.scheme().cloned()?)
+            .authority(url.authority().cloned()?)
+            .path_and_query(url.path())
             .build()
             .ok()?;
 
-        Some(build_url(&base_uri, &processed_query))
+        Some(build_url(&base_uri, &processed_query?))
     }
 
     /// Enriches events with source_type, timestamp
