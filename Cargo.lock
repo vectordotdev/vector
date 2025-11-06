@@ -2509,18 +2509,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "confy"
-version = "1.0.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f29222b549d4e3ded127989d523da9e928918d0d0d7f7c1690b439d0d538bae9"
-dependencies = [
- "directories",
- "serde",
- "thiserror 2.0.17",
- "toml 0.8.23",
-]
-
-[[package]]
 name = "console"
 version = "0.15.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3450,12 +3438,6 @@ dependencies = [
  "os_pipe",
  "shared_child",
 ]
-
-[[package]]
-name = "dunce"
-version = "1.0.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "92773504d58c093f6de2459af4af33faa518c13451eb8f2b5698ed3d36e7c813"
 
 [[package]]
 name = "dyn-clone"
@@ -12160,9 +12142,7 @@ dependencies = [
  "clap",
  "clap-verbosity-flag",
  "clap_complete",
- "confy",
  "directories",
- "dunce",
  "git2",
  "glob",
  "hex",

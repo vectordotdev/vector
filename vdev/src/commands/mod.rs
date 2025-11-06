@@ -70,7 +70,6 @@ pub struct Cli {
 mod build;
 mod check;
 mod complete;
-mod config;
 mod crate_versions;
 mod e2e;
 mod exec;
@@ -91,7 +90,6 @@ cli_commands! {
     build,
     check,
     complete,
-    config,
     crate_versions,
     e2e,
     exec,
