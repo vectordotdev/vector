@@ -232,7 +232,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to flush all of s3://{}/{}: {}", bucket, key, source))]
     PipelineSend {
-        source: crate::source_sender::ClosedError,
+        source: vector_lib::source_sender::ClosedError,
         bucket: String,
         key: String,
     },
@@ -786,7 +786,7 @@ impl IngestorProcess {
             Err(_) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
-                Some(crate::source_sender::ClosedError)
+                Some(vector_lib::source_sender::ClosedError)
             }
         };
 

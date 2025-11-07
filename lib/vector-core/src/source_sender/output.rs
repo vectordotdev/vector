@@ -4,21 +4,26 @@ use chrono::Utc;
 use futures::{Stream, StreamExt as _};
 use metrics::Histogram;
 use tracing::Span;
-use vector_lib::{
-    ByteSizeOf, EstimatedJsonEncodedSizeOf as _,
-    buffers::config::MemoryBufferSize,
-    buffers::topology::channel::{self, LimitedReceiver, LimitedSender},
-    config::{OutputId, log_schema},
-    event::{Event, EventArray, EventContainer as _, EventRef, array},
+use vector_buffers::{
+    config::MemoryBufferSize,
+    topology::channel::{self, LimitedReceiver, LimitedSender},
+};
+use vector_common::{
+    byte_size_of::ByteSizeOf,
     internal_event::{
         self, ComponentEventsDropped, CountByteSize, EventsSent, InternalEventHandle as _,
         Registered, UNINTENTIONAL,
     },
-    schema::Definition,
 };
 use vrl::value::Value;
 
 use super::{CHUNK_SIZE, ClosedError, SourceSenderItem};
+use crate::{
+    EstimatedJsonEncodedSizeOf,
+    config::{OutputId, log_schema},
+    event::{Event, EventArray, EventContainer as _, EventRef, array},
+    schema::Definition,
+};
 
 /// UnsentEvents tracks the number of events yet to be sent in the buffer. This is used to
 /// increment the appropriate counters when a future is not polled to completion. Particularly,
@@ -53,9 +58,9 @@ impl Drop for UnsentEventCount {
     fn drop(&mut self) {
         if self.count > 0 {
             let _enter = self.span.enter();
-            emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            internal_event::emit(ComponentEventsDropped::<UNINTENTIONAL> {
                 count: self.count,
-                reason: "Source send cancelled."
+                reason: "Source send cancelled.",
             });
         }
     }
@@ -70,14 +75,15 @@ pub(super) struct Output {
     log_definition: Option<Arc<Definition>>,
     /// The OutputId related to this source sender. This is set as the `upstream_id` in
     /// `EventMetadata` for all event sent through here.
-    output_id: Arc<OutputId>,
+    id: Arc<OutputId>,
 }
 
+#[expect(clippy::missing_fields_in_debug)]
 impl fmt::Debug for Output {
     fn fmt(&self, fmt: &mut fmt::Formatter<'_>) -> fmt::Result {
         fmt.debug_struct("Output")
             .field("sender", &self.sender)
-            .field("output_id", &self.output_id)
+            .field("output_id", &self.id)
             // `metrics::Histogram` is missing `impl Debug`
             .finish()
     }
@@ -96,11 +102,11 @@ impl Output {
             Self {
                 sender: tx,
                 lag_time,
-                events_sent: register!(EventsSent::from(internal_event::Output(Some(
-                    output.into()
-                )))),
+                events_sent: internal_event::register(EventsSent::from(internal_event::Output(
+                    Some(output.into()),
+                ))),
                 log_definition,
-                output_id: Arc::new(output_id),
+                id: Arc::new(output_id),
             },
             rx,
         )
@@ -122,9 +128,7 @@ impl Output {
             if let Some(log_definition) = &self.log_definition {
                 event.metadata_mut().set_schema_definition(log_definition);
             }
-            event
-                .metadata_mut()
-                .set_upstream_id(Arc::clone(&self.output_id));
+            event.metadata_mut().set_upstream_id(Arc::clone(&self.id));
         });
 
         let byte_size = events.estimated_json_encoded_size_of();
@@ -215,6 +219,7 @@ impl Output {
             if let Some(timestamp) = timestamp {
                 // This will truncate precision for values larger than 2**52, but at that point the user
                 // probably has much larger problems than precision.
+                #[expect(clippy::cast_precision_loss)]
                 let lag_time = (reference - timestamp) as f64 / 1000.0;
                 lag_time_metric.record(lag_time);
             }
