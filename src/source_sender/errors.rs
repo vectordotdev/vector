@@ -2,8 +2,7 @@ use std::fmt;
 
 use tokio::sync::mpsc;
 use vector_lib::buffers::topology::channel::SendError;
-
-use crate::event::{Event, EventArray};
+use vector_lib::event::{Event, EventArray};
 
 #[derive(Clone, Debug)]
 pub struct ClosedError;
