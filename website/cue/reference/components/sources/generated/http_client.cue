@@ -193,13 +193,13 @@ generated: components: sources: http_client: configuration: {
 				}]
 				options: {
 					type: {
-						description: "The type of the parameter, indicating how the `value` should be treated."
+						description: "The parameter type, indicating how the `value` should be treated."
 						required:    false
 						type: string: {
 							default: "string"
 							enum: {
 								string: "The parameter value is a plain string."
-								vrl:    "The parameter value is a VRL expression that will be evaluated before each request."
+								vrl:    "The parameter value is a VRL expression that is evaluated before each request."
 							}
 						}
 					}
@@ -773,13 +773,13 @@ generated: components: sources: http_client: configuration: {
 				type: {
 					object: options: {
 						type: {
-							description: "The type of the parameter, indicating how the `value` should be treated."
+							description: "The parameter type, indicating how the `value` should be treated."
 							required:    false
 							type: string: {
 								default: "string"
 								enum: {
 									string: "The parameter value is a plain string."
-									vrl:    "The parameter value is a VRL expression that will be evaluated before each request."
+									vrl:    "The parameter value is a VRL expression that is evaluated before each request."
 								}
 							}
 						}

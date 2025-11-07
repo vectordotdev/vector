@@ -576,7 +576,7 @@ pub enum ParamType {
     /// The parameter value is a plain string.
     #[default]
     String,
-    /// The parameter value is a VRL expression that will be evaluated before each request.
+    /// The parameter value is a VRL expression that is evaluated before each request.
     Vrl,
 }
 
@@ -598,7 +598,7 @@ pub enum ParameterValue {
     Typed {
         /// The raw value of the parameter.
         value: String,
-        /// The type of the parameter, indicating how the `value` should be treated.
+        /// The parameter type, indicating how the `value` should be treated.
         #[serde(
             default,
             skip_serializing_if = "ParamType::is_default",
