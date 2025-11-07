@@ -33,6 +33,17 @@ arr_macro,https://github.com/JoshMcguigan/arr_macro,MIT OR Apache-2.0,Josh Mcgui
 arr_macro_impl,https://github.com/JoshMcguigan/arr_macro,MIT OR Apache-2.0,Josh Mcguigan
 arrayvec,https://github.com/bluss/arrayvec,MIT OR Apache-2.0,bluss
 arrow,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-arith,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-array,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-buffer,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-cast,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-data,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-ipc,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-ord,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-row,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-schema,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-select,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
+arrow-string,https://github.com/apache/arrow-rs,Apache-2.0,Apache Arrow <dev@arrow.apache.org>
 ascii,https://github.com/tomprogrammer/rust-ascii,Apache-2.0  OR  MIT,"Thomas Bahn <thomas@thomas-bahn.net>, Torbjørn Birch Moltu <t.b.moltu@lyse.net>, Simon Sapin <simon.sapin@exyr.org>"
 async-broadcast,https://github.com/smol-rs/async-broadcast,MIT OR Apache-2.0,"Stjepan Glavina <stjepang@gmail.com>, Yoshua Wuyts <yoshuawuyts@gmail.com>, Zeeshan Ali Khan <zeeshanak@gnome.org>"
 async-channel,https://github.com/smol-rs/async-channel,Apache-2.0 OR MIT,Stjepan Glavina <stjepang@gmail.com>
@@ -755,9 +766,9 @@ thread_local,https://github.com/Amanieu/thread_local-rs,MIT OR Apache-2.0,Amanie
 tikv-jemalloc-sys,https://github.com/tikv/jemallocator,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Gonzalo Brito Gadeschi <gonzalobg88@gmail.com>, The TiKV Project Developers"
 tikv-jemallocator,https://github.com/tikv/jemallocator,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Gonzalo Brito Gadeschi <gonzalobg88@gmail.com>, Simon Sapin <simon.sapin@exyr.org>, Steven Fackler <sfackler@gmail.com>, The TiKV Project Developers"
 time,https://github.com/time-rs/time,MIT OR Apache-2.0,"Jacob Pratt <open-source@jhpratt.dev>, Time contributors"
-tiny-keccak,https://github.com/debris/tiny-keccak,CC0-1.0,debris <marek.kotewicz@gmail.com>
 time-core,https://github.com/time-rs/time,MIT OR Apache-2.0,"Jacob Pratt <open-source@jhpratt.dev>, Time contributors"
 time-macros,https://github.com/time-rs/time,MIT OR Apache-2.0,"Jacob Pratt <open-source@jhpratt.dev>, Time contributors"
+tiny-keccak,https://github.com/debris/tiny-keccak,CC0-1.0,debris <marek.kotewicz@gmail.com>
 tinystr,https://github.com/unicode-org/icu4x,Unicode-3.0,The ICU4X Project Developers
 tinyvec,https://github.com/Lokathor/tinyvec,Zlib OR Apache-2.0 OR MIT,Lokathor <zefria@gmail.com>
 tinyvec_macros,https://github.com/Soveu/tinyvec_macros,MIT OR Apache-2.0 OR Zlib,Soveu <marx.tomasz@gmail.com>
