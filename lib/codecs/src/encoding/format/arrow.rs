@@ -8,9 +8,9 @@ use arrow::{
     array::{
         ArrayRef, BinaryBuilder, BooleanBuilder, Decimal128Builder, Decimal256Builder,
         Float32Builder, Float64Builder, Int8Builder, Int16Builder, Int32Builder, Int64Builder,
-        StringBuilder, TimestampMicrosecondBuilder,
-        TimestampMillisecondBuilder, TimestampNanosecondBuilder, TimestampSecondBuilder,
-        UInt8Builder, UInt16Builder, UInt32Builder, UInt64Builder,
+        StringBuilder, TimestampMicrosecondBuilder, TimestampMillisecondBuilder,
+        TimestampNanosecondBuilder, TimestampSecondBuilder, UInt8Builder, UInt16Builder,
+        UInt32Builder, UInt64Builder,
     },
     datatypes::{DataType, Schema, TimeUnit, i256},
     ipc::writer::StreamWriter,
