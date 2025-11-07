@@ -184,7 +184,7 @@ fi
 
 if contains_module dd-rust-license-tool; then
   if ! dd-rust-license-tool --help &>/dev/null; then
-    cargo install dd-rust-license-tool --version 1.0.2 --force --locked
+    cargo install dd-rust-license-tool --version 1.0.4 --force --locked
   fi
 fi
 

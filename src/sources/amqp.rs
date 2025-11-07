@@ -432,7 +432,7 @@ async fn run_amqp_source(
         )
         .await
         .map_err(|error| {
-            error!(message = "Failed to consume.", error = ?error, internal_log_rate_limit = true);
+            error!(message = "Failed to consume.", ?error);
         })?
         .fuse();
     let mut shutdown = shutdown.fuse();
@@ -599,7 +599,7 @@ pub mod test {
     }
 }
 
-/// Integration tests use the docker compose files in `scripts/integration/docker-compose.amqp.yml`.
+/// Integration tests use the docker compose files in `tests/integration/docker-compose.amqp.yml`.
 #[cfg(feature = "amqp-integration-tests")]
 #[cfg(test)]
 mod integration_test {

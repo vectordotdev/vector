@@ -12,7 +12,7 @@ pub struct Cli {
 
     /// If true, remove the runner container compiled with all integration test features
     #[arg(short = 'a', long)]
-    all_features: bool,
+    build_all: bool,
 }
 
 impl Cli {
@@ -20,7 +20,7 @@ impl Cli {
         crate::commands::compose_tests::stop::exec(
             ComposeTestLocalConfig::integration(),
             &self.integration,
-            self.all_features,
+            self.build_all,
         )
     }
 }

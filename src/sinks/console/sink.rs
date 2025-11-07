@@ -46,7 +46,7 @@ where
                 Err(error) => {
                     // Error when writing to stdout/stderr is likely irrecoverable,
                     // so stop the sink.
-                    error!(message = "Error writing to output. Stopping sink.", %error);
+                    error!(message = "Error writing to output. Stopping sink.", %error, internal_log_rate_limit = false);
                     finalizers.update_status(EventStatus::Errored);
                     return Err(());
                 }

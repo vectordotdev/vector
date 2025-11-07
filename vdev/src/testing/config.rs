@@ -10,12 +10,22 @@ use itertools::{self, Itertools};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-use crate::{app, environment::Environment, util};
+use crate::{
+    app,
+    utils::{environment::Environment, paths},
+};
 
 const FILE_NAME: &str = "test.yaml";
+const CONFIG_SUBDIR: &str = "config";
 
 pub const INTEGRATION_TESTS_DIR: &str = "integration";
 pub const E2E_TESTS_DIR: &str = "e2e";
+
+/// Returns the base directory and whether to use config subdirectory for the given test type.
+/// All tests (integration and E2E) are now in tests/ with config/ subdirectories.
+fn test_dir_config(_root_dir: &str) -> (&'static str, bool) {
+    ("tests", true)
+}
 
 #[derive(Deserialize, Debug)]
 pub struct RustToolchainRootConfig {
@@ -78,6 +88,20 @@ pub struct ComposeConfig {
 }
 
 #[derive(Debug, Deserialize, Serialize)]
+#[serde(untagged)]
+pub enum DependsOn {
+    Simple(Vec<String>),
+    Conditional(BTreeMap<String, DependencyCondition>),
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct DependencyCondition {
+    pub condition: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub required: Option<bool>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
 pub struct ComposeService {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image: Option<String>,
@@ -98,7 +122,7 @@ pub struct ComposeService {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub environment: Option<Vec<String>>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub depends_on: Option<Vec<String>>,
+    pub depends_on: Option<DependsOn>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub healthcheck: Option<Value>,
 }
@@ -191,7 +215,9 @@ impl ComposeTestConfig {
     }
 
     pub fn load(root_dir: &str, integration: &str) -> Result<(PathBuf, Self)> {
-        let test_dir: PathBuf = [app::path(), "scripts", root_dir, integration]
+        let (base_dir, use_config_subdir) = test_dir_config(root_dir);
+
+        let test_dir: PathBuf = [app::path(), base_dir, root_dir, integration]
             .iter()
             .collect();
 
@@ -199,17 +225,31 @@ impl ComposeTestConfig {
             bail!("unknown integration: {}", integration);
         }
 
-        let config = Self::parse_file(&test_dir.join(FILE_NAME))?;
-        Ok((test_dir, config))
+        let config_dir = if use_config_subdir {
+            test_dir.join(CONFIG_SUBDIR)
+        } else {
+            test_dir.clone()
+        };
+        let config = Self::parse_file(&config_dir.join(FILE_NAME))?;
+        Ok((config_dir, config))
     }
 
-    fn collect_all_dir(tests_dir: &Path, configs: &mut BTreeMap<String, Self>) -> Result<()> {
+    fn collect_all_dir(
+        tests_dir: &Path,
+        configs: &mut BTreeMap<String, Self>,
+        use_config_subdir: bool,
+    ) -> Result<()> {
         for entry in tests_dir.read_dir()? {
             let entry = entry?;
             if entry.path().is_dir() {
-                let config_file: PathBuf =
-                    [entry.path().to_str().unwrap(), FILE_NAME].iter().collect();
-                if util::exists(&config_file)? {
+                let config_file: PathBuf = if use_config_subdir {
+                    [entry.path().to_str().unwrap(), CONFIG_SUBDIR, FILE_NAME]
+                        .iter()
+                        .collect()
+                } else {
+                    [entry.path().to_str().unwrap(), FILE_NAME].iter().collect()
+                };
+                if paths::exists(&config_file)? {
                     let config = Self::parse_file(&config_file)?;
                     configs.insert(entry.file_name().into_string().unwrap(), config);
                 }
@@ -221,9 +261,10 @@ impl ComposeTestConfig {
     pub fn collect_all(root_dir: &str) -> Result<BTreeMap<String, Self>> {
         let mut configs = BTreeMap::new();
 
-        let tests_dir: PathBuf = [app::path(), "scripts", root_dir].iter().collect();
+        let (base_dir, use_config_subdir) = test_dir_config(root_dir);
+        let tests_dir: PathBuf = [app::path(), base_dir, root_dir].iter().collect();
 
-        Self::collect_all_dir(&tests_dir, &mut configs)?;
+        Self::collect_all_dir(&tests_dir, &mut configs, use_config_subdir)?;
 
         Ok(configs)
     }

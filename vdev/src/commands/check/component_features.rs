@@ -1,6 +1,6 @@
 use anyhow::Result;
 
-use crate::{app, util::CargoToml};
+use crate::{app, utils::cargo::CargoToml};
 
 /// Check that all component features are set up properly
 #[derive(clap::Args, Debug)]
