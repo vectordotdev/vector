@@ -45,6 +45,7 @@ semver.workspace = true
 indoc.workspace = true
 git2 = { version = "0.20.2" }
 cfg-if.workspace = true
+vrl.workspace = true
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/vdev-v{ version }/{ name }-{ target }-v{ version }.tgz"

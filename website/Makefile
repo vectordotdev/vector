@@ -22,7 +22,10 @@ cue-%:
 config-examples:
 	yarn config-examples
 
-structured-data: cue-build config-examples
+vrl-examples:
+	cargo vdev generate-vrl-examples
+
+structured-data: cue-build config-examples vrl-examples
 
 serve: clean setup cargo-data structured-data
 	hugo server \
