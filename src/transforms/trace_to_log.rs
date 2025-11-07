@@ -1,12 +1,9 @@
-use vector_lib::config::{clone_input_definitions, LogNamespace};
+use vector_lib::config::{LogNamespace, clone_input_definitions};
 use vector_lib::configurable::configurable_component;
 
 use crate::config::OutputId;
 use crate::{
-    config::{
-        DataType, GenerateConfig, Input, TransformConfig, TransformContext,
-        TransformOutput,
-    },
+    config::{DataType, GenerateConfig, Input, TransformConfig, TransformContext, TransformOutput},
     event::{Event, LogEvent},
     schema::Definition,
     transforms::{FunctionTransform, OutputBuffer, Transform},
@@ -114,20 +111,25 @@ mod tests {
     #[tokio::test]
     async fn transform_trace() {
         use vrl::btreemap;
-        
+
         let trace = TraceEvent::from(btreemap! {
             "span_id" => "abc123",
             "trace_id" => "xyz789",
             "span_name" => "test-span",
             "service" => "my-service",
         });
-        
+
         let (expected_map, _) = trace.clone().into_parts();
-        
+
         let log = do_transform(trace).await.unwrap();
         let (actual_value, _) = log.into_parts();
-        let actual_map = actual_value.into_object().expect("log value should be an object");
-        
-        assert_eq!(actual_map, expected_map, "Trace data fields should be preserved");
+        let actual_map = actual_value
+            .into_object()
+            .expect("log value should be an object");
+
+        assert_eq!(
+            actual_map, expected_map,
+            "Trace data fields should be preserved"
+        );
     }
 }

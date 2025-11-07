@@ -23,8 +23,6 @@ pub mod log_to_metric;
 pub mod lua;
 #[cfg(feature = "transforms-metric_to_log")]
 pub mod metric_to_log;
-#[cfg(feature = "transforms-trace_to_log")]
-pub mod trace_to_log;
 #[cfg(feature = "transforms-remap")]
 pub mod remap;
 #[cfg(feature = "transforms-route")]
@@ -33,6 +31,8 @@ pub mod route;
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
 pub mod throttle;
+#[cfg(feature = "transforms-trace_to_log")]
+pub mod trace_to_log;
 #[cfg(feature = "transforms-window")]
 pub mod window;
 
