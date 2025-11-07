@@ -8,10 +8,11 @@ use super::chunking::Chunker;
 use super::format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
-    JsonSerializer, JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig,
-    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
-    ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig,
-    TextSerializer, TextSerializerConfig,
+    InfluxLineProtocolSerializer, InfluxLineProtocolSerializerConfig, JsonSerializer,
+    JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer,
+    NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig, ProtobufSerializer,
+    ProtobufSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
+    TextSerializerConfig,
 };
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
@@ -124,6 +125,9 @@ pub enum SerializerConfig {
     /// transform) and removing the message field while doing additional parsing on it, as this
     /// could lead to the encoding emitting empty strings for the given event.
     Text(TextSerializerConfig),
+
+    /// Encodes metric events using the InfluxDB line protocol.
+    Influxdb(InfluxLineProtocolSerializerConfig),
 }
 
 impl Default for SerializerConfig {
@@ -199,6 +203,12 @@ impl From<RawMessageSerializerConfig> for SerializerConfig {
     }
 }
 
+impl From<InfluxLineProtocolSerializerConfig> for SerializerConfig {
+    fn from(config: InfluxLineProtocolSerializerConfig) -> Self {
+        Self::Influxdb(config)
+    }
+}
+
 impl From<TextSerializerConfig> for SerializerConfig {
     fn from(config: TextSerializerConfig) -> Self {
         Self::Text(config)
@@ -230,6 +240,7 @@ impl SerializerConfig {
                 Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
             }
             SerializerConfig::Text(config) => Ok(Serializer::Text(config.build())),
+            SerializerConfig::Influxdb(config) => Ok(Serializer::Influxdb(config.build())),
         }
     }
 
@@ -261,7 +272,8 @@ impl SerializerConfig {
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
-            | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
+            | SerializerConfig::Text(_)
+            | SerializerConfig::Influxdb(_) => FramingConfig::NewlineDelimited,
             SerializerConfig::Gelf(_) => {
                 FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
             }
@@ -286,6 +298,7 @@ impl SerializerConfig {
             SerializerConfig::Protobuf(config) => config.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
             SerializerConfig::Text(config) => config.input_type(),
+            SerializerConfig::Influxdb(config) => config.input_type(),
         }
     }
 
@@ -307,6 +320,7 @@ impl SerializerConfig {
             SerializerConfig::Protobuf(config) => config.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
             SerializerConfig::Text(config) => config.schema_requirement(),
+            SerializerConfig::Influxdb(config) => config.schema_requirement(),
         }
     }
 }
@@ -335,6 +349,8 @@ pub enum Serializer {
     Otlp(OtlpSerializer),
     /// Uses a `ProtobufSerializer` for serialization.
     Protobuf(ProtobufSerializer),
+    /// Uses an `InfluxLineProtocolSerializer` for serialization.
+    Influxdb(InfluxLineProtocolSerializer),
     /// Uses a `RawMessageSerializer` for serialization.
     RawMessage(RawMessageSerializer),
     /// Uses a `TextSerializer` for serialization.
@@ -352,6 +368,7 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
+            | Serializer::Influxdb(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => false,
             #[cfg(feature = "opentelemetry")]
@@ -376,6 +393,7 @@ impl Serializer {
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
+            | Serializer::Influxdb(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => {
                 panic!("Serializer does not support JSON")
@@ -413,7 +431,8 @@ impl Serializer {
             | Serializer::Gelf(_)
             | Serializer::Json(_)
             | Serializer::Text(_)
-            | Serializer::NativeJson(_) => false,
+            | Serializer::NativeJson(_)
+            | Serializer::Influxdb(_) => false,
         }
     }
 }
@@ -479,6 +498,12 @@ impl From<ProtobufSerializer> for Serializer {
     }
 }
 
+impl From<InfluxLineProtocolSerializer> for Serializer {
+    fn from(serializer: InfluxLineProtocolSerializer) -> Self {
+        Self::Influxdb(serializer)
+    }
+}
+
 impl From<RawMessageSerializer> for Serializer {
     fn from(serializer: RawMessageSerializer) -> Self {
         Self::RawMessage(serializer)
@@ -507,6 +532,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             #[cfg(feature = "opentelemetry")]
             Serializer::Otlp(serializer) => serializer.encode(event, buffer),
             Serializer::Protobuf(serializer) => serializer.encode(event, buffer),
+            Serializer::Influxdb(serializer) => serializer.encode(event, buffer),
             Serializer::RawMessage(serializer) => serializer.encode(event, buffer),
             Serializer::Text(serializer) => serializer.encode(event, buffer),
         }
