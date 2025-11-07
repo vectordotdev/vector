@@ -377,15 +377,17 @@ where
             let valueset = fields.value_set(&values);
             let event = Event::new(metadata, &valueset);
             self.inner.on_event(&event, ctx.clone());
-        } else {
-            let values = [(
-                &fields.field(RATE_LIMIT_FIELD).unwrap(),
-                Some(&rate_limit as &dyn Value),
-            )];
+        } else if let Some(rate_limit_field) = fields.field(RATE_LIMIT_FIELD) {
+            let values = [(&rate_limit_field, Some(&rate_limit as &dyn Value))];
 
             let valueset = fields.value_set(&values);
             let event = Event::new(metadata, &valueset);
             self.inner.on_event(&event, ctx.clone());
+        } else {
+            // If the event metadata has neither a "message" nor "internal_log_rate_limit" field,
+            // we cannot create a proper synthetic event. This can happen with custom debug events
+            // that have their own field structure. In this case, we simply skip emitting the
+            // rate limit notification rather than panicking.
         }
     }
 }
@@ -1010,6 +1012,36 @@ mod test {
                 event!("Internal log [Hello!] is being suppressed to avoid flooding."),
                 event!("Hello!", component_id: "bar"),
             ]
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn events_with_custom_fields_no_message_dont_panic() {
+        // This test ensures that events without a "message" field or "internal_log_rate_limit"
+        // field don't panic when rate limiting tries to emit suppression notifications.
+        // This can happen with custom debug events like utilization metrics.
+        let (events, sub) = setup_test(1);
+        tracing::subscriber::with_default(sub, || {
+            // Emit events with custom fields but no "message" field
+            // This simulates what happens with utilization debug events
+            for _ in 0..5 {
+                debug!(component_id = "test_component", utilization = 0.85);
+                MockClock::advance(Duration::from_millis(100));
+            }
+        });
+
+        let events = events.lock().unwrap();
+
+        // The first event should be emitted normally
+        // The second event would normally trigger a suppression notification,
+        // but since the metadata has no "message" or "internal_log_rate_limit" field,
+        // the notification is skipped gracefully instead of panicking
+        // Subsequent events within the rate limit window are suppressed
+        // After the window, the summary notification is also skipped gracefully
+        assert_eq!(
+            *events,
+            vec![event!("", component_id: "test_component", utilization: "0.85"),]
         );
     }
 }
