@@ -21,13 +21,8 @@ fn main() -> Result<()> {
     let cli = Cli::parse();
 
     app::set_global_verbosity(cli.verbose.log_level_filter());
-    app::set_global_config(utils::config::load()?);
 
-    let path = if app::config().repo.is_empty() {
-        utils::paths::find_repo_root()?.display().to_string()
-    } else {
-        app::config().repo.clone()
-    };
+    let path = utils::paths::find_repo_root()?.display().to_string();
     app::set_global_path(path);
 
     cli.exec()
