@@ -1,31 +1,35 @@
-use std::collections::HashMap;
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 use futures::Stream;
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(any(test, feature = "test"))]
 use futures::StreamExt as _;
-#[cfg(any(test, feature = "test-utils"))]
+#[cfg(any(test, feature = "test"))]
 use metrics::histogram;
+use vector_buffers::EventCount;
+#[cfg(any(test, feature = "test"))]
+use vector_buffers::topology::channel::LimitedReceiver;
+#[cfg(any(test, feature = "test"))]
+use vector_common::internal_event::DEFAULT_OUTPUT;
 #[cfg(doc)]
-use vector_lib::internal_event::{ComponentEventsDropped, EventsSent};
-use vector_lib::{
-    ByteSizeOf, EstimatedJsonEncodedSizeOf,
-    buffers::EventCount,
-    event::{Event, EventArray, EventContainer, array::EventArrayIntoIter},
+use vector_common::internal_event::{ComponentEventsDropped, EventsSent};
+use vector_common::{
+    byte_size_of::ByteSizeOf,
     finalization::{AddBatchNotifier, BatchNotifier},
     json_size::JsonSize,
 };
-#[cfg(any(test, feature = "test-utils"))]
-use vector_lib::{buffers::topology::channel::LimitedReceiver, internal_event::DEFAULT_OUTPUT};
-#[cfg(any(test, feature = "test-utils"))]
-use vector_lib::{
+
+use super::{Builder, ClosedError, Output};
+#[cfg(any(test, feature = "test"))]
+use super::{LAG_TIME_NAME, TEST_BUFFER_SIZE};
+use crate::{
+    EstimatedJsonEncodedSizeOf,
+    event::{Event, EventArray, EventContainer, array::EventArrayIntoIter},
+};
+#[cfg(any(test, feature = "test"))]
+use crate::{
     config::OutputId,
     event::{EventStatus, into_event_stream},
 };
-
-use super::{Builder, ClosedError, Output};
-#[cfg(any(test, feature = "test-utils"))]
-use super::{LAG_TIME_NAME, TEST_BUFFER_SIZE};
 
 /// SourceSenderItem is a thin wrapper around [EventArray] used to track the send duration of a batch.
 ///
@@ -43,7 +47,7 @@ pub struct SourceSenderItem {
 
 impl AddBatchNotifier for SourceSenderItem {
     fn add_batch_notifier(&mut self, notifier: BatchNotifier) {
-        self.events.add_batch_notifier(notifier)
+        self.events.add_batch_notifier(notifier);
     }
 }
 
@@ -96,7 +100,7 @@ impl SourceSender {
         Builder::default()
     }
 
-    #[cfg(any(test, feature = "test-utils"))]
+    #[cfg(any(test, feature = "test"))]
     pub fn new_test_sender_with_buffer(n: usize) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let lag_time = Some(histogram!(LAG_TIME_NAME));
         let output_id = OutputId {
@@ -114,14 +118,14 @@ impl SourceSender {
         )
     }
 
-    #[cfg(any(test, feature = "test-utils"))]
+    #[cfg(any(test, feature = "test"))]
     pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
         let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
         let recv = recv.into_stream().flat_map(into_event_stream);
         (pipe, recv)
     }
 
-    #[cfg(any(test, feature = "test-utils"))]
+    #[cfg(any(test, feature = "test"))]
     pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
         let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
         // In a source test pipeline, there is no sink to acknowledge
@@ -138,7 +142,7 @@ impl SourceSender {
         (pipe, recv)
     }
 
-    #[cfg(any(test, feature = "test-utils"))]
+    #[cfg(any(test, feature = "test"))]
     pub fn new_test_errors(
         error_at: impl Fn(usize) -> bool,
     ) -> (Self, impl Stream<Item = Event> + Unpin) {
@@ -164,7 +168,7 @@ impl SourceSender {
         (pipe, recv)
     }
 
-    #[cfg(any(test, feature = "test-utils"))]
+    #[cfg(any(test, feature = "test"))]
     pub fn add_outputs(
         &mut self,
         status: EventStatus,

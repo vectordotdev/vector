@@ -37,6 +37,7 @@ pub mod schema;
 pub mod serde;
 pub mod sink;
 pub mod source;
+pub mod source_sender;
 pub mod tcp;
 #[cfg(test)]
 mod test_util;
