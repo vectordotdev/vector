@@ -589,6 +589,7 @@ urls: {
 	vector_installer:                           "https://sh.vector.dev"
 	vector_issues:                              "\(vector_repo)/issues"
 	vector_journald_source:                     "/docs/reference/configuration/sources/journald/"
+	vector_kubernetes_events_source:            "/docs/reference/configuration/sources/kubernetes_events/"
 	vector_kubernetes_logs_source:              "/docs/reference/configuration/sources/kubernetes_logs/"
 	vector_level_up:                            "/guides/level-up/"
 	vector_log:                                 "/docs/architecture/data-model/log"
