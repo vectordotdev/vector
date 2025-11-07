@@ -7,7 +7,8 @@
 use arrow::{
     array::{
         ArrayRef, BinaryBuilder, BooleanBuilder, Decimal128Builder, Decimal256Builder,
-        Float64Builder, Int64Builder, StringBuilder, TimestampMicrosecondBuilder,
+        Float32Builder, Float64Builder, Int8Builder, Int16Builder, Int32Builder, Int64Builder,
+        StringBuilder, TimestampMicrosecondBuilder,
         TimestampMillisecondBuilder, TimestampNanosecondBuilder, TimestampSecondBuilder,
         UInt8Builder, UInt16Builder, UInt32Builder, UInt64Builder,
     },
@@ -271,11 +272,15 @@ fn build_record_batch(
                 build_timestamp_array(events, field_name, *time_unit)?
             }
             DataType::Utf8 => build_string_array(events, field_name)?,
+            DataType::Int8 => build_int8_array(events, field_name)?,
+            DataType::Int16 => build_int16_array(events, field_name)?,
+            DataType::Int32 => build_int32_array(events, field_name)?,
             DataType::Int64 => build_int64_array(events, field_name)?,
             DataType::UInt8 => build_uint8_array(events, field_name)?,
             DataType::UInt16 => build_uint16_array(events, field_name)?,
             DataType::UInt32 => build_uint32_array(events, field_name)?,
             DataType::UInt64 => build_uint64_array(events, field_name)?,
+            DataType::Float32 => build_float32_array(events, field_name)?,
             DataType::Float64 => build_float64_array(events, field_name)?,
             DataType::Boolean => build_boolean_array(events, field_name)?,
             DataType::Binary => build_binary_array(events, field_name)?,
@@ -400,6 +405,57 @@ fn build_string_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
     Ok(Arc::new(builder.finish()))
 }
 
+fn build_int8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = Int8Builder::new();
+
+    for event in events {
+        if let Event::Log(log) = event {
+            match log.get(field_name) {
+                Some(Value::Integer(i)) if *i >= i8::MIN as i64 && *i <= i8::MAX as i64 => {
+                    builder.append_value(*i as i8)
+                }
+                _ => builder.append_null(),
+            }
+        }
+    }
+
+    Ok(Arc::new(builder.finish()))
+}
+
+fn build_int16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = Int16Builder::new();
+
+    for event in events {
+        if let Event::Log(log) = event {
+            match log.get(field_name) {
+                Some(Value::Integer(i)) if *i >= i16::MIN as i64 && *i <= i16::MAX as i64 => {
+                    builder.append_value(*i as i16)
+                }
+                _ => builder.append_null(),
+            }
+        }
+    }
+
+    Ok(Arc::new(builder.finish()))
+}
+
+fn build_int32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = Int32Builder::new();
+
+    for event in events {
+        if let Event::Log(log) = event {
+            match log.get(field_name) {
+                Some(Value::Integer(i)) if *i >= i32::MIN as i64 && *i <= i32::MAX as i64 => {
+                    builder.append_value(*i as i32)
+                }
+                _ => builder.append_null(),
+            }
+        }
+    }
+
+    Ok(Arc::new(builder.finish()))
+}
+
 fn build_int64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = Int64Builder::new();
 
@@ -473,6 +529,22 @@ fn build_uint64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
         if let Event::Log(log) = event {
             match log.get(field_name) {
                 Some(Value::Integer(i)) if *i >= 0 => builder.append_value(*i as u64),
+                _ => builder.append_null(),
+            }
+        }
+    }
+
+    Ok(Arc::new(builder.finish()))
+}
+
+fn build_float32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = Float32Builder::new();
+
+    for event in events {
+        if let Event::Log(log) = event {
+            match log.get(field_name) {
+                Some(Value::Float(f)) => builder.append_value(f.into_inner() as f32),
+                Some(Value::Integer(i)) => builder.append_value(*i as f32),
                 _ => builder.append_null(),
             }
         }
@@ -630,8 +702,12 @@ mod tests {
     fn test_encode_all_types() {
         let mut log = LogEvent::default();
         log.insert("string_field", "test");
-        log.insert("int_field", 42);
-        log.insert("float_field", 3.15);
+        log.insert("int8_field", 127);
+        log.insert("int16_field", 32000);
+        log.insert("int32_field", 1000000);
+        log.insert("int64_field", 42);
+        log.insert("float32_field", 3.14);
+        log.insert("float64_field", 3.15);
         log.insert("bool_field", true);
         log.insert("bytes_field", bytes::Bytes::from("binary"));
         log.insert("timestamp_field", Utc::now());
@@ -640,8 +716,12 @@ mod tests {
 
         let schema = Arc::new(Schema::new(vec![
             Field::new("string_field", DataType::Utf8, true),
-            Field::new("int_field", DataType::Int64, true),
-            Field::new("float_field", DataType::Float64, true),
+            Field::new("int8_field", DataType::Int8, true),
+            Field::new("int16_field", DataType::Int16, true),
+            Field::new("int32_field", DataType::Int32, true),
+            Field::new("int64_field", DataType::Int64, true),
+            Field::new("float32_field", DataType::Float32, true),
+            Field::new("float64_field", DataType::Float64, true),
             Field::new("bool_field", DataType::Boolean, true),
             Field::new("bytes_field", DataType::Binary, true),
             Field::new(
@@ -660,9 +740,9 @@ mod tests {
         let batch = reader.next().unwrap().unwrap();
 
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 6);
+        assert_eq!(batch.num_columns(), 10);
 
-        // Verify each column has data
+        // Verify string field
         assert_eq!(
             batch
                 .column(0)
@@ -672,18 +752,68 @@ mod tests {
                 .value(0),
             "test"
         );
+
+        // Verify int8 field
         assert_eq!(
             batch
                 .column(1)
+                .as_any()
+                .downcast_ref::<arrow::array::Int8Array>()
+                .unwrap()
+                .value(0),
+            127
+        );
+
+        // Verify int16 field
+        assert_eq!(
+            batch
+                .column(2)
+                .as_any()
+                .downcast_ref::<arrow::array::Int16Array>()
+                .unwrap()
+                .value(0),
+            32000
+        );
+
+        // Verify int32 field
+        assert_eq!(
+            batch
+                .column(3)
+                .as_any()
+                .downcast_ref::<arrow::array::Int32Array>()
+                .unwrap()
+                .value(0),
+            1000000
+        );
+
+        // Verify int64 field
+        assert_eq!(
+            batch
+                .column(4)
                 .as_any()
                 .downcast_ref::<Int64Array>()
                 .unwrap()
                 .value(0),
             42
         );
+
+        // Verify float32 field
         assert!(
             (batch
-                .column(2)
+                .column(5)
+                .as_any()
+                .downcast_ref::<arrow::array::Float32Array>()
+                .unwrap()
+                .value(0)
+                - 3.14)
+                .abs()
+                < 0.001
+        );
+
+        // Verify float64 field
+        assert!(
+            (batch
+                .column(6)
                 .as_any()
                 .downcast_ref::<Float64Array>()
                 .unwrap()
@@ -692,9 +822,11 @@ mod tests {
                 .abs()
                 < 0.001
         );
+
+        // Verify boolean field
         assert!(
             batch
-                .column(3)
+                .column(7)
                 .as_any()
                 .downcast_ref::<BooleanArray>()
                 .unwrap()
@@ -702,18 +834,22 @@ mod tests {
             "{}",
             true
         );
+
+        // Verify binary field
         assert_eq!(
             batch
-                .column(4)
+                .column(8)
                 .as_any()
                 .downcast_ref::<BinaryArray>()
                 .unwrap()
                 .value(0),
             b"binary"
         );
+
+        // Verify timestamp field
         assert!(
             !batch
-                .column(5)
+                .column(9)
                 .as_any()
                 .downcast_ref::<TimestampMillisecondArray>()
                 .unwrap()
