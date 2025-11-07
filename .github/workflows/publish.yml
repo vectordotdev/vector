@@ -835,15 +835,3 @@ jobs:
         with:
           name: vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
           path: target/artifacts/vector-${{ env.VECTOR_VERSION }}-SHA256SUMS
-
-  publish-homebrew:
-    name: Publish to Homebrew
-    # We only publish versioned releases to Homebrew.
-    if: ${{ inputs.channel == 'release' }}
-    uses: ./.github/workflows/publish-homebrew.yml
-    needs:
-      - generate-publish-metadata
-      - publish-s3
-    with:
-      git_ref: ${{ inputs.git_ref }}
-      vector_version: ${{ needs.generate-publish-metadata.outputs.vector_version }}
