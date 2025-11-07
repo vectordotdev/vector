@@ -150,7 +150,6 @@ pub fn spawn_thread<'a>(
                                 _ = signal_tx
                                     .send(crate::signal::SignalTo::ReloadEnrichmentTables)
                                     .map_err(|error| {
-                                        true;
                                         error!(
                                             message = "Unable to reload enrichment tables.",
                                             cause = %error,
