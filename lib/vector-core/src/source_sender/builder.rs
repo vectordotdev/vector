@@ -1,13 +1,11 @@
 use std::collections::HashMap;
 
 use metrics::{Histogram, histogram};
-use vector_lib::{
-    buffers::topology::channel::LimitedReceiver,
-    config::{ComponentKey, OutputId, SourceOutput},
-    internal_event::DEFAULT_OUTPUT,
-};
+use vector_buffers::topology::channel::LimitedReceiver;
+use vector_common::internal_event::DEFAULT_OUTPUT;
 
 use super::{CHUNK_SIZE, LAG_TIME_NAME, Output, SourceSender, SourceSenderItem};
+use crate::config::{ComponentKey, OutputId, SourceOutput};
 
 pub struct Builder {
     buf_size: usize,
@@ -28,7 +26,8 @@ impl Default for Builder {
 }
 
 impl Builder {
-    pub const fn with_buffer(mut self, n: usize) -> Self {
+    #[must_use]
+    pub fn with_buffer(mut self, n: usize) -> Self {
         self.buf_size = n;
         self
     }

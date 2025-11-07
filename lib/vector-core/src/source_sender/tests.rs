@@ -1,11 +1,13 @@
 use chrono::{DateTime, Duration, Utc};
 use rand::{Rng, rng};
 use tokio::time::timeout;
-use vector_lib::event::{Event, LogEvent, Metric, MetricKind, MetricValue, TraceEvent};
-use vector_lib::metrics::{self, Controller};
 use vrl::event_path;
 
 use super::*;
+use crate::{
+    event::{Event, LogEvent, Metric, MetricKind, MetricValue, TraceEvent},
+    metrics::{self, Controller},
+};
 
 #[tokio::test]
 async fn emits_lag_time_for_log() {
@@ -47,6 +49,7 @@ async fn emit_and_test(make_event: impl FnOnce(DateTime<Utc>) -> Event) {
     let (mut sender, _stream) = SourceSender::new_test();
     let millis = rng().random_range(10..10000);
     let timestamp = Utc::now() - Duration::milliseconds(millis);
+    #[expect(clippy::cast_precision_loss)]
     let expected = millis as f64 / 1000.0;
 
     let event = make_event(timestamp);
@@ -132,6 +135,7 @@ async fn emits_component_discarded_events_total_for_send_event() {
 }
 
 #[tokio::test]
+#[expect(clippy::cast_precision_loss)]
 async fn emits_component_discarded_events_total_for_send_batch() {
     metrics::init_test();
     let (mut sender, _recv) = SourceSender::new_test_sender_with_buffer(1);
@@ -167,5 +171,6 @@ async fn emits_component_discarded_events_total_for_send_batch() {
     let MetricValue::Counter { value } = component_discarded_events_total.value() else {
         panic!("component_discarded_events_total has invalid type")
     };
-    assert_eq!(*value, expected_drop as f64);
+
+    assert_eq!(*value, expected_drop as f64,);
 }
