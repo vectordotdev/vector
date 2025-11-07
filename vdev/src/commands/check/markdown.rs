@@ -20,11 +20,11 @@ impl Cli {
             "scripts/.markdownlintrc",
             // We should fix these as well. Previously these files were not linted.
             "--ignore",
-            ".github"
+            ".github",
         ]
-            .into_iter()
-            .chain(files.iter().map(String::as_str))
-            .collect();
+        .into_iter()
+        .chain(files.iter().map(String::as_str))
+        .collect();
 
         app::exec("markdownlint", &args, true)
     }
