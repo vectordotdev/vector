@@ -2,19 +2,30 @@ use std::collections::BTreeMap;
 use std::fs;
 use std::path::Path;
 
-use anyhow::{Context, Result, bail};
+use anyhow::{Context, Result, ensure};
+use clap::Args;
 use serde_json::{Value, json};
 
 use crate::app;
 
 /// Generate VRL function examples from VRL stdlib and inject into docs.json
-#[derive(clap::Args, Debug)]
+#[derive(Args, Debug)]
 #[command()]
 pub struct Cli {
     /// Dry run - don't write files, just print what would be done
     #[arg(long)]
     dry_run: bool,
 }
+
+// FIXME this shouldn't exist, all functions should be documented
+static UNDOCUMENTED_FNS: [&str; 6] = [
+    "dns_lookup",
+    "http_request",
+    "reverse_dns",
+    "tally",
+    "tally_value",
+    "type_def",
+];
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
@@ -24,9 +35,10 @@ impl Cli {
 
         let docs_json_path = Path::new("website/data/docs.json");
 
-        if !docs_json_path.exists() {
-            bail!("docs.json not found. Please run 'make -C website cue-build' first.");
-        }
+        ensure!(
+            docs_json_path.exists(),
+            "docs.json not found. Please run 'make -C website cue-build' first."
+        );
 
         // Read docs.json
         let docs_content = fs::read_to_string(docs_json_path)?;
@@ -58,16 +70,7 @@ impl Cli {
 
         // Inject examples into docs.json
         for (function_name, examples) in &functions_with_examples {
-            if [
-                "dns_lookup",
-                "http_request",
-                "reverse_dns",
-                "tally",
-                "tally_value",
-                "type_def",
-            ]
-            .contains(&function_name.as_str())
-            {
+            if UNDOCUMENTED_FNS.contains(&function_name.as_str()) {
                 continue;
             }
 
@@ -123,16 +126,11 @@ impl Cli {
 
             if self.dry_run {
                 println!(
-                    "[DRY RUN] Would append {} examples to {}",
-                    examples.len(),
-                    function_name
+                    "[DRY RUN] Would append {} examples to {function_name}",
+                    examples.len()
                 );
             } else {
-                println!(
-                    "✓ Appended {} examples to {}",
-                    examples.len(),
-                    function_name
-                );
+                println!("✓ Appended {} examples to {function_name}", examples.len());
             }
         }
 
