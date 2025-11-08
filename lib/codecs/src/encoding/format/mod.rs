@@ -23,9 +23,7 @@ mod text;
 use std::fmt::Debug;
 
 #[cfg(feature = "arrow")]
-pub use arrow::{
-    ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
-};
+pub use arrow::{ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig};
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};
 use dyn_clone::DynClone;

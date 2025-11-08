@@ -7,9 +7,7 @@ pub mod framing;
 pub mod serializer;
 pub use chunking::{Chunker, Chunking, GelfChunker};
 #[cfg(feature = "arrow")]
-pub use format::{
-    ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
-};
+pub use format::{ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig};
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,

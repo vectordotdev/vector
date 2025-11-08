@@ -16,7 +16,6 @@ use arrow::{
     ipc::writer::StreamWriter,
     record_batch::RecordBatch,
 };
-use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
@@ -27,33 +26,14 @@ use vector_config::configurable_component;
 
 use vector_core::event::{Event, Value};
 
-/// Provides Arrow schema for encoding.
-///
-/// Sinks can implement this trait to provide custom schema fetching logic,
-/// such as fetching from a database, inferring from data, or loading from configuration.
-#[async_trait]
-pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
-    /// Get the Arrow schema for encoding events.
-    ///
-    /// This method will be called once before encoding begins, and the result
-    /// will be cached for the lifetime of the encoder.
-    async fn get_schema(&self) -> Result<Arc<Schema>, ArrowEncodingError>;
-}
-
 /// Configuration for Arrow IPC stream serialization
-///
-/// Supports both immediate schema provision and lazy schema loading via providers.
 #[configurable_component]
 #[derive(Clone, Default)]
 pub struct ArrowStreamSerializerConfig {
-    /// The Arrow schema to use for encoding (if known immediately)
+    /// The Arrow schema to use for encoding
     #[serde(skip)]
     #[configurable(derived)]
     pub schema: Option<Arc<arrow::datatypes::Schema>>,
-
-    /// Schema provider for lazy schema loading (not serializable)
-    #[serde(skip)]
-    schema_provider: Option<Arc<dyn SchemaProvider>>,
 }
 
 impl std::fmt::Debug for ArrowStreamSerializerConfig {
@@ -66,53 +46,15 @@ impl std::fmt::Debug for ArrowStreamSerializerConfig {
                     .as_ref()
                     .map(|s| format!("{} fields", s.fields().len())),
             )
-            .field(
-                "schema_provider",
-                &self.schema_provider.as_ref().map(|_| "<provider>"),
-            )
             .finish()
     }
 }
 
 impl ArrowStreamSerializerConfig {
-    /// Create a new ArrowStreamSerializerConfig with an immediate schema
+    /// Create a new ArrowStreamSerializerConfig with a schema
     pub fn new(schema: Arc<arrow::datatypes::Schema>) -> Self {
         Self {
             schema: Some(schema),
-            schema_provider: None,
-        }
-    }
-
-    /// Create a new ArrowStreamSerializerConfig with a schema provider
-    ///
-    /// The provider will be called to fetch the schema lazily, typically during
-    /// sink initialization before any events are encoded.
-    pub fn with_provider(provider: Arc<dyn SchemaProvider>) -> Self {
-        Self {
-            schema: None,
-            schema_provider: Some(provider),
-        }
-    }
-
-    /// Get the schema provider if one was configured
-    pub fn provider(&self) -> Option<&Arc<dyn SchemaProvider>> {
-        self.schema_provider.as_ref()
-    }
-
-    /// Resolve the schema from the provider if present.
-    pub async fn resolve(&mut self) -> Result<(), ArrowEncodingError> {
-        // If schema already exists, nothing to do
-        if self.schema.is_some() {
-            return Ok(());
-        }
-
-        // Fetch from provider if available
-        if let Some(provider) = &self.schema_provider {
-            let schema = provider.get_schema().await?;
-            self.schema = Some(schema);
-            Ok(())
-        } else {
-            Err(ArrowEncodingError::NoSchemaProvided)
         }
     }
 
@@ -185,16 +127,9 @@ pub enum ArrowEncodingError {
     #[snafu(display("No events provided for encoding"))]
     NoEvents,
 
-    /// Schema must be provided before runtime
-    #[snafu(display("Schema must be provided before runtime"))]
+    /// Schema must be provided before encoding
+    #[snafu(display("Schema must be provided before encoding"))]
     NoSchemaProvided,
-
-    /// Failed to fetch schema from provider
-    #[snafu(display("Failed to fetch schema from provider: {}", message))]
-    SchemaFetchError {
-        /// Error message from the provider
-        message: String,
-    },
 
     /// Unsupported Arrow data type for field
     #[snafu(display(
