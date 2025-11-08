@@ -89,17 +89,14 @@ impl ArrowStreamSerializer {
 }
 
 impl tokio_util::codec::Encoder<Vec<Event>> for ArrowStreamSerializer {
-    type Error = vector_common::Error;
+    type Error = ArrowEncodingError;
 
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         if events.is_empty() {
-            return Err(vector_common::Error::from(
-                "No events provided for encoding",
-            ));
+            return Err(ArrowEncodingError::NoEvents);
         }
 
-        let bytes = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&self.schema)))
-            .map_err(|e| vector_common::Error::from(e.to_string()))?;
+        let bytes = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&self.schema)))?;
 
         buffer.extend_from_slice(&bytes);
         Ok(())
@@ -143,6 +140,26 @@ pub enum ArrowEncodingError {
         /// The unsupported data type
         data_type: DataType,
     },
+
+    /// Null value encountered for non-nullable field
+    #[snafu(display("Null value for non-nullable field '{}'", field_name))]
+    NullConstraint {
+        /// The field name
+        field_name: String,
+    },
+
+    /// IO error during encoding
+    #[snafu(display("IO error: {}", source))]
+    Io {
+        /// The underlying IO error
+        source: std::io::Error,
+    },
+}
+
+impl From<std::io::Error> for ArrowEncodingError {
+    fn from(error: std::io::Error) -> Self {
+        Self::Io { source: error }
+    }
 }
 
 /// Encodes a batch of events into Arrow IPC streaming format
@@ -202,32 +219,33 @@ fn build_record_batch(
 
     for field in schema.fields() {
         let field_name = field.name();
+        let nullable = field.is_nullable();
         let array: ArrayRef = match field.data_type() {
             DataType::Timestamp(time_unit, _) => {
-                build_timestamp_array(events, field_name, *time_unit)?
+                build_timestamp_array(events, field_name, *time_unit, nullable)?
             }
-            DataType::Utf8 => build_string_array(events, field_name)?,
-            DataType::Int8 => build_int8_array(events, field_name)?,
-            DataType::Int16 => build_int16_array(events, field_name)?,
-            DataType::Int32 => build_int32_array(events, field_name)?,
-            DataType::Int64 => build_int64_array(events, field_name)?,
-            DataType::UInt8 => build_uint8_array(events, field_name)?,
-            DataType::UInt16 => build_uint16_array(events, field_name)?,
-            DataType::UInt32 => build_uint32_array(events, field_name)?,
-            DataType::UInt64 => build_uint64_array(events, field_name)?,
-            DataType::Float32 => build_float32_array(events, field_name)?,
-            DataType::Float64 => build_float64_array(events, field_name)?,
-            DataType::Boolean => build_boolean_array(events, field_name)?,
-            DataType::Binary => build_binary_array(events, field_name)?,
+            DataType::Utf8 => build_string_array(events, field_name, nullable)?,
+            DataType::Int8 => build_int8_array(events, field_name, nullable)?,
+            DataType::Int16 => build_int16_array(events, field_name, nullable)?,
+            DataType::Int32 => build_int32_array(events, field_name, nullable)?,
+            DataType::Int64 => build_int64_array(events, field_name, nullable)?,
+            DataType::UInt8 => build_uint8_array(events, field_name, nullable)?,
+            DataType::UInt16 => build_uint16_array(events, field_name, nullable)?,
+            DataType::UInt32 => build_uint32_array(events, field_name, nullable)?,
+            DataType::UInt64 => build_uint64_array(events, field_name, nullable)?,
+            DataType::Float32 => build_float32_array(events, field_name, nullable)?,
+            DataType::Float64 => build_float64_array(events, field_name, nullable)?,
+            DataType::Boolean => build_boolean_array(events, field_name, nullable)?,
+            DataType::Binary => build_binary_array(events, field_name, nullable)?,
             DataType::Decimal128(precision, scale) => {
-                build_decimal128_array(events, field_name, *precision, *scale)?
+                build_decimal128_array(events, field_name, *precision, *scale, nullable)?
             }
             DataType::Decimal256(precision, scale) => {
-                build_decimal256_array(events, field_name, *precision, *scale)?
+                build_decimal256_array(events, field_name, *precision, *scale, nullable)?
             }
             other_type => {
                 return Err(ArrowEncodingError::UnsupportedType {
-                    field_name: field_name.to_string(),
+                    field_name: field_name.into(),
                     data_type: other_type.clone(),
                 });
             }
@@ -255,6 +273,7 @@ fn build_timestamp_array(
     events: &[Event],
     field_name: &str,
     time_unit: TimeUnit,
+    nullable: bool,
 ) -> Result<ArrayRef, ArrowEncodingError> {
     macro_rules! build_array {
         ($builder:ty, $converter:expr) => {{
@@ -275,6 +294,13 @@ fn build_timestamp_array(
                             None
                         }
                     });
+
+                    if value_to_append.is_none() && !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+
                     builder.append_option(value_to_append);
                 }
             }
@@ -305,11 +331,16 @@ fn build_timestamp_array(
     }
 }
 
-fn build_string_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_string_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = StringBuilder::with_capacity(events.len(), 0);
 
     for event in events {
         if let Event::Log(log) = event {
+            let mut appended = false;
             if let Some(value) = log.get(field_name) {
                 match value {
                     Value::Bytes(bytes) => {
@@ -318,20 +349,35 @@ fn build_string_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
                             Ok(s) => builder.append_value(s),
                             Err(_) => builder.append_value(&String::from_utf8_lossy(bytes)),
                         }
+                        appended = true;
                     }
                     Value::Object(obj) => match serde_json::to_string(&obj) {
-                        Ok(s) => builder.append_value(s),
-                        Err(_) => builder.append_null(),
+                        Ok(s) => {
+                            builder.append_value(s);
+                            appended = true;
+                        }
+                        Err(_) => {}
                     },
                     Value::Array(arr) => match serde_json::to_string(&arr) {
-                        Ok(s) => builder.append_value(s),
-                        Err(_) => builder.append_null(),
+                        Ok(s) => {
+                            builder.append_value(s);
+                            appended = true;
+                        }
+                        Err(_) => {}
                     },
                     _ => {
                         builder.append_value(&value.to_string_lossy());
+                        appended = true;
                     }
                 }
-            } else {
+            }
+
+            if !appended {
+                if !nullable {
+                    return Err(ArrowEncodingError::NullConstraint {
+                        field_name: field_name.into(),
+                    });
+                }
                 builder.append_null();
             }
         }
@@ -340,7 +386,11 @@ fn build_string_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_int8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_int8_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = Int8Builder::with_capacity(events.len());
 
     for event in events {
@@ -349,7 +399,14 @@ fn build_int8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arro
                 Some(Value::Integer(i)) if *i >= i8::MIN as i64 && *i <= i8::MAX as i64 => {
                     builder.append_value(*i as i8)
                 }
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -357,7 +414,11 @@ fn build_int8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arro
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_int16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_int16_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = Int16Builder::with_capacity(events.len());
 
     for event in events {
@@ -366,7 +427,14 @@ fn build_int16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
                 Some(Value::Integer(i)) if *i >= i16::MIN as i64 && *i <= i16::MAX as i64 => {
                     builder.append_value(*i as i16)
                 }
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -374,7 +442,11 @@ fn build_int16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_int32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_int32_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = Int32Builder::with_capacity(events.len());
 
     for event in events {
@@ -383,7 +455,14 @@ fn build_int32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
                 Some(Value::Integer(i)) if *i >= i32::MIN as i64 && *i <= i32::MAX as i64 => {
                     builder.append_value(*i as i32)
                 }
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -391,14 +470,25 @@ fn build_int32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_int64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_int64_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = Int64Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
             match log.get(field_name) {
                 Some(Value::Integer(i)) => builder.append_value(*i),
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -406,7 +496,11 @@ fn build_int64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_uint8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_uint8_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = UInt8Builder::with_capacity(events.len());
 
     for event in events {
@@ -415,7 +509,14 @@ fn build_uint8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
                 Some(Value::Integer(i)) if *i >= 0 && *i <= u8::MAX as i64 => {
                     builder.append_value(*i as u8)
                 }
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -423,7 +524,11 @@ fn build_uint8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_uint16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_uint16_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = UInt16Builder::with_capacity(events.len());
 
     for event in events {
@@ -432,7 +537,14 @@ fn build_uint16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
                 Some(Value::Integer(i)) if *i >= 0 && *i <= u16::MAX as i64 => {
                     builder.append_value(*i as u16)
                 }
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -440,7 +552,11 @@ fn build_uint16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_uint32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_uint32_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = UInt32Builder::with_capacity(events.len());
 
     for event in events {
@@ -449,7 +565,14 @@ fn build_uint32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
                 Some(Value::Integer(i)) if *i >= 0 && *i <= u32::MAX as i64 => {
                     builder.append_value(*i as u32)
                 }
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -457,14 +580,25 @@ fn build_uint32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_uint64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_uint64_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = UInt64Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
             match log.get(field_name) {
                 Some(Value::Integer(i)) if *i >= 0 => builder.append_value(*i as u64),
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -472,7 +606,11 @@ fn build_uint64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_float32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_float32_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = Float32Builder::with_capacity(events.len());
 
     for event in events {
@@ -480,7 +618,14 @@ fn build_float32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
             match log.get(field_name) {
                 Some(Value::Float(f)) => builder.append_value(f.into_inner() as f32),
                 Some(Value::Integer(i)) => builder.append_value(*i as f32),
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -488,7 +633,11 @@ fn build_float32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_float64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_float64_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = Float64Builder::with_capacity(events.len());
 
     for event in events {
@@ -496,7 +645,14 @@ fn build_float64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
             match log.get(field_name) {
                 Some(Value::Float(f)) => builder.append_value(f.into_inner()),
                 Some(Value::Integer(i)) => builder.append_value(*i as f64),
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -504,14 +660,25 @@ fn build_float64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_boolean_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_boolean_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = BooleanBuilder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
             match log.get(field_name) {
                 Some(Value::Boolean(b)) => builder.append_value(*b),
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -519,14 +686,25 @@ fn build_boolean_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_binary_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
+fn build_binary_array(
+    events: &[Event],
+    field_name: &str,
+    nullable: bool,
+) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = BinaryBuilder::with_capacity(events.len(), 0);
 
     for event in events {
         if let Event::Log(log) = event {
             match log.get(field_name) {
                 Some(Value::Bytes(bytes)) => builder.append_value(bytes),
-                _ => builder.append_null(),
+                _ => {
+                    if !nullable {
+                        return Err(ArrowEncodingError::NullConstraint {
+                            field_name: field_name.into(),
+                        });
+                    }
+                    builder.append_null()
+                }
             }
         }
     }
@@ -539,11 +717,12 @@ fn build_decimal128_array(
     field_name: &str,
     precision: u8,
     scale: i8,
+    nullable: bool,
 ) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = Decimal128Builder::with_capacity(events.len())
         .with_precision_and_scale(precision, scale)
         .map_err(|_| ArrowEncodingError::UnsupportedType {
-            field_name: field_name.to_string(),
+            field_name: field_name.into(),
             data_type: DataType::Decimal128(precision, scale),
         })?;
 
@@ -551,14 +730,14 @@ fn build_decimal128_array(
 
     for event in events {
         if let Event::Log(log) = event {
+            let mut appended = false;
             match log.get(field_name) {
                 Some(Value::Float(f)) => {
                     if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
                         decimal.rescale(target_scale);
                         let mantissa = decimal.mantissa();
                         builder.append_value(mantissa);
-                    } else {
-                        builder.append_null();
+                        appended = true;
                     }
                 }
                 Some(Value::Integer(i)) => {
@@ -566,8 +745,18 @@ fn build_decimal128_array(
                     decimal.rescale(target_scale);
                     let mantissa = decimal.mantissa();
                     builder.append_value(mantissa);
+                    appended = true;
                 }
-                _ => builder.append_null(),
+                _ => {}
+            }
+
+            if !appended {
+                if !nullable {
+                    return Err(ArrowEncodingError::NullConstraint {
+                        field_name: field_name.into(),
+                    });
+                }
+                builder.append_null();
             }
         }
     }
@@ -580,11 +769,12 @@ fn build_decimal256_array(
     field_name: &str,
     precision: u8,
     scale: i8,
+    nullable: bool,
 ) -> Result<ArrayRef, ArrowEncodingError> {
     let mut builder = Decimal256Builder::with_capacity(events.len())
         .with_precision_and_scale(precision, scale)
         .map_err(|_| ArrowEncodingError::UnsupportedType {
-            field_name: field_name.to_string(),
+            field_name: field_name.into(),
             data_type: DataType::Decimal256(precision, scale),
         })?;
 
@@ -592,6 +782,7 @@ fn build_decimal256_array(
 
     for event in events {
         if let Event::Log(log) = event {
+            let mut appended = false;
             match log.get(field_name) {
                 Some(Value::Float(f)) => {
                     if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
@@ -599,8 +790,7 @@ fn build_decimal256_array(
                         let mantissa = decimal.mantissa();
                         // rust_decimal does not support i256 natively so we upcast here
                         builder.append_value(i256::from_i128(mantissa));
-                    } else {
-                        builder.append_null();
+                        appended = true;
                     }
                 }
                 Some(Value::Integer(i)) => {
@@ -608,8 +798,18 @@ fn build_decimal256_array(
                     decimal.rescale(target_scale);
                     let mantissa = decimal.mantissa();
                     builder.append_value(i256::from_i128(mantissa));
+                    appended = true;
                 }
-                _ => builder.append_null(),
+                _ => {}
+            }
+
+            if !appended {
+                if !nullable {
+                    return Err(ArrowEncodingError::NullConstraint {
+                        field_name: field_name.into(),
+                    });
+                }
+                builder.append_null();
             }
         }
     }
@@ -1375,5 +1575,109 @@ mod tests {
         assert_eq!(uint32_array.value(0), 1000_u32); // Valid
         assert!(uint32_array.is_null(1)); // Negative
         assert!(uint32_array.is_null(2)); // Missing
+    }
+
+    #[test]
+    fn test_encode_non_nullable_field_with_null_value() {
+        // Test that encoding fails when a non-nullable field encounters a null value
+        let mut log1 = LogEvent::default();
+        log1.insert("required_field", 42);
+
+        let log2 = LogEvent::default();
+        // log2 is missing required_field - should cause an error
+
+        let events = vec![Event::Log(log1), Event::Log(log2)];
+
+        // Create schema with non-nullable field
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "required_field",
+            DataType::Int64,
+            false, // Not nullable
+        )]));
+
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(schema));
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            ArrowEncodingError::NullConstraint { field_name } => {
+                assert_eq!(field_name, "required_field");
+            }
+            other => panic!("Expected NullConstraint error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_encode_non_nullable_string_field_with_missing_value() {
+        // Test that encoding fails for non-nullable string field
+        let mut log1 = LogEvent::default();
+        log1.insert("name", "Alice");
+
+        let mut log2 = LogEvent::default();
+        log2.insert("name", "Bob");
+
+        let log3 = LogEvent::default();
+        // log3 is missing name field
+
+        let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "name",
+            DataType::Utf8,
+            false, // Not nullable
+        )]));
+
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(schema));
+        assert!(result.is_err());
+
+        match result.unwrap_err() {
+            ArrowEncodingError::NullConstraint { field_name } => {
+                assert_eq!(field_name, "name");
+            }
+            other => panic!("Expected NullConstraint error, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_encode_non_nullable_field_all_values_present() {
+        // Test that encoding succeeds when all values are present for non-nullable field
+        let mut log1 = LogEvent::default();
+        log1.insert("id", 1);
+
+        let mut log2 = LogEvent::default();
+        log2.insert("id", 2);
+
+        let mut log3 = LogEvent::default();
+        log3.insert("id", 3);
+
+        let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
+
+        let schema = Arc::new(Schema::new(vec![Field::new(
+            "id",
+            DataType::Int64,
+            false, // Not nullable
+        )]));
+
+        let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
+        assert!(result.is_ok());
+
+        let bytes = result.unwrap();
+        let cursor = Cursor::new(bytes);
+        let mut reader = StreamReader::try_new(cursor, None).unwrap();
+        let batch = reader.next().unwrap().unwrap();
+
+        assert_eq!(batch.num_rows(), 3);
+
+        let id_array = batch
+            .column(0)
+            .as_any()
+            .downcast_ref::<Int64Array>()
+            .unwrap();
+
+        assert_eq!(id_array.value(0), 1);
+        assert_eq!(id_array.value(1), 2);
+        assert_eq!(id_array.value(2), 3);
+        assert!(!id_array.is_null(0));
+        assert!(!id_array.is_null(1));
+        assert!(!id_array.is_null(2));
     }
 }

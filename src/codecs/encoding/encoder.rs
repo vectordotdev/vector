@@ -38,9 +38,9 @@ impl BatchEncoder {
     }
 
     /// Get the HTTP content type.
-    pub const fn content_type(&self) -> &'static str {
+    #[cfg(feature = "codecs-arrow")]
+    pub fn content_type(&self) -> &'static str {
         match &self.serializer {
-            #[cfg(feature = "codecs-arrow")]
             BatchSerializer::Arrow(_) => "application/vnd.apache.arrow.stream",
         }
     }
@@ -54,9 +54,17 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
         #[allow(unreachable_patterns)]
         match &mut self.serializer {
             #[cfg(feature = "codecs-arrow")]
-            BatchSerializer::Arrow(serializer) => serializer
-                .encode(events, buffer)
-                .map_err(Error::SerializingError),
+            BatchSerializer::Arrow(serializer) => {
+                serializer.encode(events, buffer).map_err(|err| {
+                    use vector_lib::codecs::encoding::ArrowEncodingError;
+                    match err {
+                        ArrowEncodingError::NullConstraint { .. } => {
+                            Error::SchemaConstraintViolation(Box::new(err))
+                        }
+                        _ => Error::SerializingError(Box::new(err)),
+                    }
+                })
+            }
             _ => unreachable!("BatchSerializer cannot be constructed without encode()"),
         }
     }

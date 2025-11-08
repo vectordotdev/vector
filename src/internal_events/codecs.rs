@@ -132,3 +132,31 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
         }
     }
 }
+
+#[cfg(feature = "codecs-arrow")]
+#[derive(Debug)]
+pub struct EncoderNullConstraintError<'a> {
+    pub error: &'a crate::Error,
+}
+
+#[cfg(feature = "codecs-arrow")]
+impl InternalEvent for EncoderNullConstraintError<'_> {
+    fn emit(self) {
+        let reason = "Schema constraint violation.";
+        error!(
+            message = reason,
+            error = %self.error,
+            error_code = "encoding_null_constraint",
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "encoding_null_constraint",
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+    }
+}
