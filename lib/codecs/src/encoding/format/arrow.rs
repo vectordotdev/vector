@@ -21,7 +21,6 @@ use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
 use snafu::Snafu;
 use std::sync::Arc;
-use tracing::debug;
 use vector_config::configurable_component;
 
 use vector_core::event::{Event, Value};
@@ -234,6 +233,49 @@ fn build_record_batch(
         .map_err(|source| ArrowEncodingError::RecordBatchCreation { source })
 }
 
+/// Macro to handle appending null or returning an error for non-nullable fields.
+macro_rules! handle_null_constraints {
+    ($builder:expr, $nullable:expr, $field_name:expr) => {{
+        if !$nullable {
+            return Err(ArrowEncodingError::NullConstraint {
+                field_name: $field_name.into(),
+            });
+        }
+        $builder.append_null();
+    }};
+}
+
+/// Macro to generate a `build_*_array` function for primitive types.
+macro_rules! define_build_primitive_array_fn {
+    (
+        $fn_name:ident, // The function name (e.g., build_int8_array)
+        $builder_ty:ty, // The builder type (e.g., Int8Builder)
+        // One or more match arms for valid Value types
+        $( $value_pat:pat $(if $guard:expr)? => $append_expr:expr ),+
+    ) => {
+        fn $fn_name(
+            events: &[Event],
+            field_name: &str,
+            nullable: bool,
+        ) -> Result<ArrayRef, ArrowEncodingError> {
+            let mut builder = <$builder_ty>::with_capacity(events.len());
+
+            for event in events {
+                if let Event::Log(log) = event {
+                    match log.get(field_name) {
+                        $(
+                            $value_pat $(if $guard)? => builder.append_value($append_expr),
+                        )+
+                        // All other patterns are treated as null/invalid
+                        _ => handle_null_constraints!(builder, nullable, field_name),
+                    }
+                }
+            }
+            Ok(Arc::new(builder.finish()))
+        }
+    };
+}
+
 fn extract_timestamp(value: &Value) -> Option<DateTime<Utc>> {
     match value {
         Value::Timestamp(ts) => Some(*ts),
@@ -349,12 +391,7 @@ fn build_string_array(
             }
 
             if !appended {
-                if !nullable {
-                    return Err(ArrowEncodingError::NullConstraint {
-                        field_name: field_name.into(),
-                    });
-                }
-                builder.append_null();
+                handle_null_constraints!(builder, nullable, field_name);
             }
         }
     }
@@ -362,305 +399,73 @@ fn build_string_array(
     Ok(Arc::new(builder.finish()))
 }
 
-fn build_int8_array(
-    events: &[Event],
-    field_name: &str,
-    nullable: bool,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Int8Builder::with_capacity(events.len());
+define_build_primitive_array_fn!(
+    build_int8_array,
+    Int8Builder,
+    Some(Value::Integer(i)) if *i >= i8::MIN as i64 && *i <= i8::MAX as i64 => *i as i8
+);
 
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Integer(i)) if *i >= i8::MIN as i64 && *i <= i8::MAX as i64 => {
-                    builder.append_value(*i as i8)
-                }
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
-            }
-        }
-    }
+define_build_primitive_array_fn!(
+    build_int16_array,
+    Int16Builder,
+    Some(Value::Integer(i)) if *i >= i16::MIN as i64 && *i <= i16::MAX as i64 => *i as i16
+);
 
-    Ok(Arc::new(builder.finish()))
-}
+define_build_primitive_array_fn!(
+    build_int32_array,
+    Int32Builder,
+    Some(Value::Integer(i)) if *i >= i32::MIN as i64 && *i <= i32::MAX as i64 => *i as i32
+);
 
-fn build_int16_array(
-    events: &[Event],
-    field_name: &str,
-    nullable: bool,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Int16Builder::with_capacity(events.len());
+define_build_primitive_array_fn!(
+    build_int64_array,
+    Int64Builder,
+    Some(Value::Integer(i)) => *i
+);
 
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Integer(i)) if *i >= i16::MIN as i64 && *i <= i16::MAX as i64 => {
-                    builder.append_value(*i as i16)
-                }
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
-            }
-        }
-    }
+define_build_primitive_array_fn!(
+    build_uint8_array,
+    UInt8Builder,
+    Some(Value::Integer(i)) if *i >= 0 && *i <= u8::MAX as i64 => *i as u8
+);
 
-    Ok(Arc::new(builder.finish()))
-}
+define_build_primitive_array_fn!(
+    build_uint16_array,
+    UInt16Builder,
+    Some(Value::Integer(i)) if *i >= 0 && *i <= u16::MAX as i64 => *i as u16
+);
 
-fn build_int32_array(
-    events: &[Event],
-    field_name: &str,
-    nullable: bool,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Int32Builder::with_capacity(events.len());
+define_build_primitive_array_fn!(
+    build_uint32_array,
+    UInt32Builder,
+    Some(Value::Integer(i)) if *i >= 0 && *i <= u32::MAX as i64 => *i as u32
+);
 
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Integer(i)) if *i >= i32::MIN as i64 && *i <= i32::MAX as i64 => {
-                    builder.append_value(*i as i32)
-                }
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
-            }
-        }
-    }
+define_build_primitive_array_fn!(
+    build_uint64_array,
+    UInt64Builder,
+    Some(Value::Integer(i)) if *i >= 0 => *i as u64
+);
 
-    Ok(Arc::new(builder.finish()))
-}
+define_build_primitive_array_fn!(
+    build_float32_array,
+    Float32Builder,
+    Some(Value::Float(f)) => f.into_inner() as f32,
+    Some(Value::Integer(i)) => *i as f32
+);
 
-fn build_int64_array(
-    events: &[Event],
-    field_name: &str,
-    nullable: bool,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Int64Builder::with_capacity(events.len());
+define_build_primitive_array_fn!(
+    build_float64_array,
+    Float64Builder,
+    Some(Value::Float(f)) => f.into_inner(),
+    Some(Value::Integer(i)) => *i as f64
+);
 
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Integer(i)) => builder.append_value(*i),
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
-            }
-        }
-    }
-
-    Ok(Arc::new(builder.finish()))
-}
-
-fn build_uint8_array(
-    events: &[Event],
-    field_name: &str,
-    nullable: bool,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt8Builder::with_capacity(events.len());
-
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Integer(i)) if *i >= 0 && *i <= u8::MAX as i64 => {
-                    builder.append_value(*i as u8)
-                }
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
-            }
-        }
-    }
-
-    Ok(Arc::new(builder.finish()))
-}
-
-fn build_uint16_array(
-    events: &[Event],
-    field_name: &str,
-    nullable: bool,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt16Builder::with_capacity(events.len());
-
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Integer(i)) if *i >= 0 && *i <= u16::MAX as i64 => {
-                    builder.append_value(*i as u16)
-                }
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
-            }
-        }
-    }
-
-    Ok(Arc::new(builder.finish()))
-}
-
-fn build_uint32_array(
-    events: &[Event],
-    field_name: &str,
-    nullable: bool,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt32Builder::with_capacity(events.len());
-
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Integer(i)) if *i >= 0 && *i <= u32::MAX as i64 => {
-                    builder.append_value(*i as u32)
-                }
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
-            }
-        }
-    }
-
-    Ok(Arc::new(builder.finish()))
-}
-
-fn build_uint64_array(
-    events: &[Event],
-    field_name: &str,
-    nullable: bool,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt64Builder::with_capacity(events.len());
-
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Integer(i)) if *i >= 0 => builder.append_value(*i as u64),
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
-            }
-        }
-    }
-
-    Ok(Arc::new(builder.finish()))
-}
-
-fn build_float32_array(
-    events: &[Event],
-    field_name: &str,
-    nullable: bool,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Float32Builder::with_capacity(events.len());
-
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Float(f)) => builder.append_value(f.into_inner() as f32),
-                Some(Value::Integer(i)) => builder.append_value(*i as f32),
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
-            }
-        }
-    }
-
-    Ok(Arc::new(builder.finish()))
-}
-
-fn build_float64_array(
-    events: &[Event],
-    field_name: &str,
-    nullable: bool,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Float64Builder::with_capacity(events.len());
-
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Float(f)) => builder.append_value(f.into_inner()),
-                Some(Value::Integer(i)) => builder.append_value(*i as f64),
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
-            }
-        }
-    }
-
-    Ok(Arc::new(builder.finish()))
-}
-
-fn build_boolean_array(
-    events: &[Event],
-    field_name: &str,
-    nullable: bool,
-) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = BooleanBuilder::with_capacity(events.len());
-
-    for event in events {
-        if let Event::Log(log) = event {
-            match log.get(field_name) {
-                Some(Value::Boolean(b)) => builder.append_value(*b),
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
-            }
-        }
-    }
-
-    Ok(Arc::new(builder.finish()))
-}
+define_build_primitive_array_fn!(
+    build_boolean_array,
+    BooleanBuilder,
+    Some(Value::Boolean(b)) => *b
+);
 
 fn build_binary_array(
     events: &[Event],
@@ -673,14 +478,7 @@ fn build_binary_array(
         if let Event::Log(log) = event {
             match log.get(field_name) {
                 Some(Value::Bytes(bytes)) => builder.append_value(bytes),
-                _ => {
-                    if !nullable {
-                        return Err(ArrowEncodingError::NullConstraint {
-                            field_name: field_name.into(),
-                        });
-                    }
-                    builder.append_null()
-                }
+                _ => handle_null_constraints!(builder, nullable, field_name),
             }
         }
     }
@@ -727,12 +525,7 @@ fn build_decimal128_array(
             }
 
             if !appended {
-                if !nullable {
-                    return Err(ArrowEncodingError::NullConstraint {
-                        field_name: field_name.into(),
-                    });
-                }
-                builder.append_null();
+                handle_null_constraints!(builder, nullable, field_name);
             }
         }
     }
@@ -780,12 +573,7 @@ fn build_decimal256_array(
             }
 
             if !appended {
-                if !nullable {
-                    return Err(ArrowEncodingError::NullConstraint {
-                        field_name: field_name.into(),
-                    });
-                }
-                builder.append_null();
+                handle_null_constraints!(builder, nullable, field_name);
             }
         }
     }
