@@ -40,94 +40,113 @@ impl Cli {
             let function_name = function.identifier();
             let examples = function.examples();
 
-            if !examples.is_empty() {
-                let examples_vec: Vec<VrlExample> = examples
-                    .iter()
-                    .map(|ex| VrlExample {
-                        title: ex.title.to_string(),
-                        source: ex.source.to_string(),
-                        result: match ex.result {
-                            Ok(s) => Ok(s.to_string()),
-                            Err(s) => Err(s.to_string()),
-                        },
-                    })
-                    .collect();
-
-                functions_with_examples.insert(function_name.to_string(), examples_vec);
+            if examples.is_empty() {
+                continue;
             }
+
+            let examples_vec: Vec<VrlExample> = examples
+                .iter()
+                .map(|ex| VrlExample {
+                    title: ex.title.to_string(),
+                    source: ex.source.to_string(),
+                    result: match ex.result {
+                        Ok(s) => Ok(s.to_string()),
+                        Err(s) => Err(s.to_string()),
+                    },
+                })
+                .collect();
+
+            functions_with_examples.insert(function_name.to_string(), examples_vec);
         }
 
         println!(
             "Found {} VRL functions with {} total examples",
             functions_with_examples.len(),
-            functions_with_examples.values().map(|v| v.len()).sum::<usize>()
+            functions_with_examples
+                .values()
+                .map(|v| v.len())
+                .sum::<usize>()
         );
 
         // Inject examples into docs.json
-        let mut updated_count = 0;
-        let mut skipped_count = 0;
-
         for (function_name, examples) in &functions_with_examples {
+            if [
+                "dns_lookup",
+                "http_request",
+                "reverse_dns",
+                "tally",
+                "tally_value",
+                "type_def",
+            ]
+            .contains(&function_name.as_str())
+            {
+                continue;
+            }
+
             // Navigate to remap.functions.<function_name>
-            if let Some(function_obj) = docs
+            let function_obj = docs
                 .get_mut("remap")
                 .and_then(|r| r.get_mut("functions"))
                 .and_then(|f| f.get_mut(function_name))
-            {
-                // Get existing examples array
-                if let Some(existing_examples) = function_obj.get_mut("examples") {
-                    if let Some(examples_array) = existing_examples.as_array_mut() {
-                        // Append new examples
-                        for example in examples {
-                            let mut example_json = json!({
-                                "title": example.title,
-                                "source": example.source,
-                            });
+                .with_context(|| {
+                    format!("⚠ VRL function not found in docs.json: {function_name}")
+                })?;
 
-                            match &example.result {
-                                Ok(value) => {
-                                    // Remove VRL string literal syntax if present
-                                    let clean_value = if value.starts_with("s'") && value.ends_with('\'') {
-                                        &value[2..value.len() - 1]
-                                    } else {
-                                        value
-                                    };
-                                    example_json["return"] = json!(clean_value);
-                                }
-                                Err(error) => {
-                                    example_json["error"] = json!(error);
-                                }
-                            }
+            let examples_array = {
+                if function_obj.get("examples").is_none() {
+                    function_obj
+                        .as_object_mut()
+                        .with_context(|| {
+                            format!("{function_name} remap.functions is not an object")
+                        })?
+                        .insert("examples".to_string(), Value::Array(vec![]));
+                }
 
-                            examples_array.push(example_json);
-                        }
+                let existing_examples = function_obj.get_mut("examples").unwrap();
+                existing_examples
+                    .as_array_mut()
+                    .with_context(|| format!("{function_name} examples is not an array"))?
+            };
 
-                        if self.dry_run {
-                            println!(
-                                "[DRY RUN] Would append {} examples to {}",
-                                examples.len(),
-                                function_name
-                            );
+            // Append new examples
+            for example in examples {
+                let mut example_json = json!({
+                    "title": example.title,
+                    "source": example.source,
+                });
+
+                match &example.result {
+                    Ok(value) => {
+                        // Remove VRL string literal syntax if present
+                        let clean_value = if value.starts_with("s'") && value.ends_with('\'') {
+                            &value[2..value.len() - 1]
                         } else {
-                            println!("✓ Appended {} examples to {}", examples.len(), function_name);
-                        }
-                        updated_count += 1;
+                            value
+                        };
+                        example_json["return"] = json!(clean_value);
+                    }
+                    Err(error) => {
+                        example_json["error"] = json!(error);
                     }
                 }
+
+                examples_array.push(example_json);
+            }
+
+            if self.dry_run {
+                println!(
+                    "[DRY RUN] Would append {} examples to {}",
+                    examples.len(),
+                    function_name
+                );
             } else {
-                if !self.dry_run {
-                    println!(
-                        "⚠ Function not found in docs.json: {} (skipping)",
-                        function_name
-                    );
-                }
-                skipped_count += 1;
+                println!(
+                    "✓ Appended {} examples to {}",
+                    examples.len(),
+                    function_name
+                );
             }
         }
-
-        println!("\nSummary:");
-        println!("  Updated: {}", updated_count);
-        println!("  Skipped: {}", skipped_count);
 
         if self.dry_run {
             println!("\n(This was a dry run - no files were modified)");
