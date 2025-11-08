@@ -9,10 +9,6 @@ use crate::testing::integration::ComposeTestLocalConfig;
 pub struct Cli {
     /// The e2e test name to stop
     test: String,
-
-    /// If true, remove the runner container compiled with all integration test features
-    #[arg(short = 'a', long)]
-    build_all: bool,
 }
 
 impl Cli {
@@ -20,7 +16,6 @@ impl Cli {
         crate::commands::compose_tests::stop::exec(
             ComposeTestLocalConfig::e2e(),
             &self.test,
-            self.build_all,
         )
     }
 }
