@@ -23,7 +23,7 @@ config-examples:
 	yarn config-examples
 
 vrl-examples:
-	cargo vdev build vrl-examples
+	cargo vdev build vrl-examples 2>&1
 
 structured-data: cue-build config-examples vrl-examples
 
