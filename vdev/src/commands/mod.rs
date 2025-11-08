@@ -75,7 +75,6 @@ mod e2e;
 mod exec;
 mod features;
 mod fmt;
-mod generate_vrl_examples;
 mod info;
 mod integration;
 mod meta;
@@ -96,7 +95,6 @@ cli_commands! {
     exec,
     features,
     fmt,
-    generate_vrl_examples,
     info,
     integration,
     meta,
