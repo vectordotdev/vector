@@ -44,19 +44,7 @@ impl Cli {
                 continue;
             }
 
-            let examples_vec: Vec<VrlExample> = examples
-                .iter()
-                .map(|ex| VrlExample {
-                    title: ex.title.to_string(),
-                    source: ex.source.to_string(),
-                    result: match ex.result {
-                        Ok(s) => Ok(s.to_string()),
-                        Err(s) => Err(s.to_string()),
-                    },
-                })
-                .collect();
-
-            functions_with_examples.insert(function_name.to_string(), examples_vec);
+            functions_with_examples.insert(function_name.to_string(), examples);
         }
 
         println!(
@@ -109,7 +97,7 @@ impl Cli {
             };
 
             // Append new examples
-            for example in examples {
+            for example in *examples {
                 let mut example_json = json!({
                     "title": example.title,
                     "source": example.source,
@@ -159,11 +147,4 @@ impl Cli {
 
         Ok(())
     }
-}
-
-#[derive(Debug, Clone)]
-struct VrlExample {
-    title: String,
-    source: String,
-    result: Result<String, String>,
 }
