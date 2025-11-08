@@ -544,9 +544,17 @@ impl http_client::HttpClientContext for HttpClientContext {
 
         // Build base URI and add query parameters
         let base_uri = Uri::builder()
-            .scheme(url.scheme().cloned()?)
-            .authority(url.authority().cloned()?)
-            .path_and_query(url.path())
+            .scheme(
+                url.scheme()
+                    .cloned()
+                    .unwrap_or_else(|| http::uri::Scheme::try_from("http").unwrap()),
+            )
+            .authority(
+                url.authority()
+                    .cloned()
+                    .unwrap_or_else(|| http::uri::Authority::try_from("localhost").unwrap()),
+            )
+            .path_and_query(url.path().to_string())
             .build()
             .ok()?;
 
