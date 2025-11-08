@@ -258,7 +258,7 @@ fn build_timestamp_array(
 ) -> Result<ArrayRef, ArrowEncodingError> {
     macro_rules! build_array {
         ($builder:ty, $converter:expr) => {{
-            let mut builder = <$builder>::new();
+            let mut builder = <$builder>::with_capacity(events.len());
             for event in events {
                 if let Event::Log(log) = event {
                     let value_to_append = log.get(field_name).and_then(|value| {
@@ -306,7 +306,7 @@ fn build_timestamp_array(
 }
 
 fn build_string_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = StringBuilder::new();
+    let mut builder = StringBuilder::with_capacity(events.len(), 0);
 
     for event in events {
         if let Event::Log(log) = event {
@@ -341,7 +341,7 @@ fn build_string_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
 }
 
 fn build_int8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Int8Builder::new();
+    let mut builder = Int8Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
@@ -358,7 +358,7 @@ fn build_int8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arro
 }
 
 fn build_int16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Int16Builder::new();
+    let mut builder = Int16Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
@@ -375,7 +375,7 @@ fn build_int16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
 }
 
 fn build_int32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Int32Builder::new();
+    let mut builder = Int32Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
@@ -392,7 +392,7 @@ fn build_int32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
 }
 
 fn build_int64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Int64Builder::new();
+    let mut builder = Int64Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
@@ -407,7 +407,7 @@ fn build_int64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
 }
 
 fn build_uint8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt8Builder::new();
+    let mut builder = UInt8Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
@@ -424,7 +424,7 @@ fn build_uint8_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Arr
 }
 
 fn build_uint16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt16Builder::new();
+    let mut builder = UInt16Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
@@ -441,7 +441,7 @@ fn build_uint16_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
 }
 
 fn build_uint32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt32Builder::new();
+    let mut builder = UInt32Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
@@ -458,7 +458,7 @@ fn build_uint32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
 }
 
 fn build_uint64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = UInt64Builder::new();
+    let mut builder = UInt64Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
@@ -473,7 +473,7 @@ fn build_uint64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, Ar
 }
 
 fn build_float32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Float32Builder::new();
+    let mut builder = Float32Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
@@ -489,7 +489,7 @@ fn build_float32_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
 }
 
 fn build_float64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Float64Builder::new();
+    let mut builder = Float64Builder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
@@ -505,7 +505,7 @@ fn build_float64_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
 }
 
 fn build_boolean_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = BooleanBuilder::new();
+    let mut builder = BooleanBuilder::with_capacity(events.len());
 
     for event in events {
         if let Event::Log(log) = event {
@@ -520,7 +520,7 @@ fn build_boolean_array(events: &[Event], field_name: &str) -> Result<ArrayRef, A
 }
 
 fn build_binary_array(events: &[Event], field_name: &str) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = BinaryBuilder::new();
+    let mut builder = BinaryBuilder::with_capacity(events.len(), 0);
 
     for event in events {
         if let Event::Log(log) = event {
@@ -540,7 +540,7 @@ fn build_decimal128_array(
     precision: u8,
     scale: i8,
 ) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Decimal128Builder::new()
+    let mut builder = Decimal128Builder::with_capacity(events.len())
         .with_precision_and_scale(precision, scale)
         .map_err(|_| ArrowEncodingError::UnsupportedType {
             field_name: field_name.to_string(),
@@ -581,7 +581,7 @@ fn build_decimal256_array(
     precision: u8,
     scale: i8,
 ) -> Result<ArrayRef, ArrowEncodingError> {
-    let mut builder = Decimal256Builder::new()
+    let mut builder = Decimal256Builder::with_capacity(events.len())
         .with_precision_and_scale(precision, scale)
         .map_err(|_| ArrowEncodingError::UnsupportedType {
             field_name: field_name.to_string(),
