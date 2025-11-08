@@ -7,10 +7,7 @@ use crate::testing::{
 
 use super::active_projects::find_active_environment_for_integration;
 
-pub(crate) fn exec(
-    local_config: ComposeTestLocalConfig,
-    test_name: &str,
-) -> Result<()> {
+pub(crate) fn exec(local_config: ComposeTestLocalConfig, test_name: &str) -> Result<()> {
     let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, test_name)?;
     let active_environment =
         find_active_environment_for_integration(local_config.directory, test_name, &config)?;

@@ -13,9 +13,6 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::stop::exec(
-            ComposeTestLocalConfig::e2e(),
-            &self.test,
-        )
+        crate::commands::compose_tests::stop::exec(ComposeTestLocalConfig::e2e(), &self.test)
     }
 }
