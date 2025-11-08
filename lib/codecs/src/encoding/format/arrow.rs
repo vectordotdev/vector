@@ -171,42 +171,18 @@ pub fn encode_events_to_arrow_ipc_stream(
         return Err(ArrowEncodingError::NoEvents);
     }
 
-    let schema_ref = if let Some(provided_schema) = schema {
-        provided_schema
-    } else {
-        return Err(ArrowEncodingError::NoSchemaProvided);
-    };
+    let schema_ref = schema.ok_or(ArrowEncodingError::NoSchemaProvided)?;
 
-    let record_batch = build_record_batch(Arc::<Schema>::clone(&schema_ref), events)?;
+    let record_batch = build_record_batch(schema_ref.clone(), events)?;
 
-    debug!(
-        "Built RecordBatch with {} rows and {} columns",
-        record_batch.num_rows(),
-        record_batch.num_columns()
-    );
+    let ipc_err = |source| ArrowEncodingError::IpcWrite { source };
 
-    // Encode to Arrow IPC format
     let mut buffer = BytesMut::new().writer();
-    {
-        let mut writer = StreamWriter::try_new(&mut buffer, &schema_ref)
-            .map_err(|source| ArrowEncodingError::IpcWrite { source })?;
+    let mut writer = StreamWriter::try_new(&mut buffer, &schema_ref).map_err(ipc_err)?;
+    writer.write(&record_batch).map_err(ipc_err)?;
+    writer.finish().map_err(ipc_err)?;
 
-        writer
-            .write(&record_batch)
-            .map_err(|source| ArrowEncodingError::IpcWrite { source })?;
-
-        writer
-            .finish()
-            .map_err(|source| ArrowEncodingError::IpcWrite { source })?;
-    }
-
-    let encoded_bytes = buffer.into_inner().freeze();
-    debug!(
-        "Encoded to {} bytes of Arrow IPC stream data",
-        encoded_bytes.len()
-    );
-
-    Ok(encoded_bytes)
+    Ok(buffer.into_inner().freeze())
 }
 
 /// Builds an Arrow RecordBatch from events
