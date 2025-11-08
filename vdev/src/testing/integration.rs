@@ -170,7 +170,7 @@ impl ComposeTest {
         Ok(!output.stdout.is_empty() && output.stdout != b"[]\n" && output.stdout != b"[]")
     }
 
-    pub(crate) fn test(&self, extra_args: Vec<String>) -> Result<()> {
+    pub(crate) fn test(&self, extra_args: Vec<String>, prebuilt: bool) -> Result<()> {
         let was_running = self.is_running()?;
         self.config.check_required()?;
 
@@ -228,6 +228,7 @@ impl ComposeTest {
             Some(&self.config.features),
             &args,
             self.local_config.kind == ComposeTestKind::E2E,
+            prebuilt,
         )?;
 
         Ok(())

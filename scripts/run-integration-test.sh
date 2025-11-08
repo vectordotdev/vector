@@ -132,7 +132,7 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   print_compose_logs_on_failure "$START_RET"
 
   if [[ "$START_RET" -eq 0 ]]; then
-    cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" "${TEST_NAME}" "${TEST_ENV}"
+    cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --prebuilt --retries "$RETRIES" "${TEST_NAME}" "${TEST_ENV}"
     RET=$?
     print_compose_logs_on_failure "$RET"
 

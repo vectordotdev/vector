@@ -10,10 +10,7 @@ use crate::{
         build::prepare_build_command,
         docker::{DOCKER_SOCKET, docker_command},
     },
-    utils::{
-        command::ChainArgs as _,
-        environment::{Environment, append_environment_variables},
-    },
+    utils::environment::{Environment, append_environment_variables},
 };
 
 const MOUNT_PATH: &str = "/home/vector";
@@ -59,6 +56,7 @@ pub trait TestRunner {
         features: Option<&[String]>,
         args: &[String],
         build: bool,
+        prebuilt: bool,
     ) -> Result<()>;
 }
 
@@ -72,6 +70,13 @@ pub trait ContainerTestRunner: TestRunner {
     fn needs_docker_socket(&self) -> bool;
 
     fn volumes(&self) -> Vec<String>;
+
+    /// Check if a Docker image exists locally
+    fn image_exists(&self, image_name: &str) -> Result<bool> {
+        let output =
+            docker_command(["images", "--format", "{{.Repository}}:{{.Tag}}"]).check_output()?;
+        Ok(output.lines().any(|line| line == image_name))
+    }
 
     fn state(&self) -> Result<RunnerState> {
         let mut command = docker_command(["ps", "-a", "--format", "{{.Names}} {{.State}}"]);
@@ -107,6 +112,7 @@ pub trait ContainerTestRunner: TestRunner {
         features: Option<&[String]>,
         config_environment_variables: &Environment,
         build: bool,
+        prebuilt: bool,
     ) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
@@ -114,12 +120,25 @@ pub trait ContainerTestRunner: TestRunner {
             RunnerState::Paused => self.unpause()?,
             RunnerState::Dead | RunnerState::Unknown => {
                 self.remove()?;
-                self.create()?;
+                self.create(prebuilt)?;
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, config_environment_variables, build)?;
-                self.create()?;
+                let image_name = self.image_name();
+                if !self.image_exists(&image_name)? {
+                    if build {
+                        // Only build if explicitly allowed
+                        self.build(features, config_environment_variables, build)?;
+                    } else {
+                        anyhow::bail!(
+                            "Test runner image '{}' does not exist. Please run 'cargo vdev int build' first.",
+                            image_name
+                        );
+                    }
+                } else {
+                    info!("Using existing test runner image: {}", image_name);
+                }
+                self.create(prebuilt)?;
                 self.start()?;
             }
         }
@@ -181,7 +200,7 @@ pub trait ContainerTestRunner: TestRunner {
             .wait(format!("Unpausing container {}", self.container_name()))
     }
 
-    fn create(&self) -> Result<()> {
+    fn create(&self, prebuilt: bool) -> Result<()> {
         let network_name = self.network_name().unwrap_or("host");
 
         let docker_socket = format!("{}:/var/run/docker.sock", DOCKER_SOCKET.display());
@@ -198,31 +217,39 @@ pub trait ContainerTestRunner: TestRunner {
             .collect();
 
         self.ensure_volumes()?;
-        docker_command(
-            [
-                "create",
-                "--name",
-                &self.container_name(),
-                "--network",
-                network_name,
-                "--hostname",
-                RUNNER_HOSTNAME,
-                "--workdir",
-                MOUNT_PATH,
-                "--volume",
-                &format!("{}:{MOUNT_PATH}", app::path()),
-                "--volume",
-                &format!("{VOLUME_TARGET}:{TARGET_PATH}"),
-                "--volume",
-                &format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git"),
-                "--volume",
-                &format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry"),
-            ]
-            .chain_args(volumes)
-            .chain_args(docker_args)
-            .chain_args([&self.image_name(), "/bin/sleep", "infinity"]),
-        )
-        .wait(format!("Creating container {}", self.container_name()))
+
+        let container_name = self.container_name();
+        let image_name = self.image_name();
+        let source_mount = format!("{}:{MOUNT_PATH}", app::path());
+        let target_mount = format!("{VOLUME_TARGET}:{TARGET_PATH}");
+        let cargo_git_mount = format!("{VOLUME_CARGO_GIT}:/usr/local/cargo/git");
+        let cargo_registry_mount = format!("{VOLUME_CARGO_REGISTRY}:/usr/local/cargo/registry");
+
+        let mut cmd = docker_command(["create", "--name", &container_name]);
+        cmd.args(["--network", network_name]);
+        cmd.args(["--hostname", RUNNER_HOSTNAME]);
+        cmd.args(["--workdir", MOUNT_PATH]);
+
+        // Only mount source code in dev mode (not prebuilt)
+        if !prebuilt {
+            cmd.args(["--volume", &source_mount]);
+        }
+
+        cmd.args(["--volume", &target_mount]);
+        cmd.args(["--volume", &cargo_git_mount]);
+        cmd.args(["--volume", &cargo_registry_mount]);
+
+        for volume in &volumes {
+            cmd.arg(volume);
+        }
+
+        for arg in &docker_args {
+            cmd.arg(arg);
+        }
+
+        cmd.args([&image_name, "/bin/sleep", "infinity"]);
+
+        cmd.wait(format!("Creating container {container_name}"))
     }
 }
 
@@ -237,8 +264,36 @@ where
         features: Option<&[String]>,
         args: &[String],
         build: bool,
+        prebuilt: bool,
     ) -> Result<()> {
-        self.ensure_running(features, config_environment_variables, build)?;
+        self.ensure_running(features, config_environment_variables, build, prebuilt)?;
+
+        // If in prebuilt mode and pre-built artifacts exist in the image, copy them to the target volume
+        // This only happens if the target volume is empty (first run after build)
+        if prebuilt {
+            let check_result = docker_command([
+                "exec",
+                &self.container_name(),
+                "sh",
+                "-c",
+                "[ -d /opt/vector-build/debug ] && [ ! -f /home/target/debug/.cargo-lock ]",
+            ])
+            .status();
+
+            if let Ok(status) = check_result {
+                if status.success() {
+                    info!("Copying pre-built artifacts to target volume...");
+                    docker_command([
+                        "exec",
+                        &self.container_name(),
+                        "sh",
+                        "-c",
+                        "cp -r /opt/vector-build/debug/* /home/target/debug/",
+                    ])
+                    .check_run()?;
+                }
+            }
+        }
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
@@ -402,6 +457,7 @@ impl TestRunner for LocalTestRunner {
         _features: Option<&[String]>,
         args: &[String],
         _build: bool,
+        _prebuilt: bool,
     ) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);

@@ -4,8 +4,7 @@ use anyhow::Result;
 
 use crate::testing::test_runner_dockerfile;
 use crate::{
-    app,
-    app::CommandExt,
+    app::{self, CommandExt as _},
     testing::{config::RustToolchainConfig, docker::docker_command},
     utils::{
         self,
@@ -64,14 +63,17 @@ pub fn prepare_build_command(
 /// Build the integration test‐runner image from `tests/e2e/Dockerfile`
 pub fn build_integration_image() -> Result<()> {
     let dockerfile = test_runner_dockerfile();
-    let image = format!("vector-test-runner-{}", RustToolchainConfig::rust_version());
+    let image_tag = format!(
+        "vector-test-runner-{}:latest",
+        RustToolchainConfig::rust_version()
+    );
     let mut cmd = prepare_build_command(
-        &image,
+        &image_tag,
         &dockerfile,
         Some(&[ALL_INTEGRATIONS_FEATURE_FLAG.to_string()]),
         &Environment::default(),
-        false, // Integration tests don't pre-build Vector tests.
+        true, // Pre-compile tests in the image so they can be copied to the volume
     );
-    waiting!("Building {image}");
+    waiting!("Building {} (with pre-compiled tests)", image_tag);
     cmd.check_run()
 }

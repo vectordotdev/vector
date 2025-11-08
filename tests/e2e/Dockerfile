@@ -43,5 +43,7 @@ RUN --mount=type=cache,target=/vector/target \
     if [ "$BUILD" = "true" ]; then \
         /usr/bin/mold -run cargo build --tests --lib --bin vector \
         --no-default-features --features $FEATURES && \
-        cp target/debug/vector /usr/bin/vector; \
+        cp target/debug/vector /usr/bin/vector && \
+        mkdir -p /opt/vector-build && \
+        cp -r target/debug /opt/vector-build/; \
     fi

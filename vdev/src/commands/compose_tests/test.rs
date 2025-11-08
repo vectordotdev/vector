@@ -14,6 +14,7 @@ pub fn exec(
     integration: &str,
     environment: Option<&String>,
     retries: u8,
+    prebuilt: bool,
     args: &[String],
 ) -> Result<()> {
     let (_test_dir, config) = ComposeTestConfig::load(local_config.directory, integration)?;
@@ -34,7 +35,7 @@ pub fn exec(
 
     for environment in environments {
         ComposeTest::generate(local_config, integration, environment, retries)?
-            .test(args.to_owned())?;
+            .test(args.to_owned(), prebuilt)?;
     }
     Ok(())
 }

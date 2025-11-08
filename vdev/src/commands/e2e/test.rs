@@ -24,6 +24,10 @@ pub struct Cli {
     #[arg(short = 'r', long)]
     retries: Option<u8>,
 
+    /// Use pre-built test binaries from the image (no source mounting)
+    #[arg(long)]
+    prebuilt: bool,
+
     /// Extra test command arguments
     args: Vec<String>,
 }
@@ -35,6 +39,7 @@ impl Cli {
             &self.e2e_test,
             self.environment.as_ref(),
             self.retries.unwrap_or_default(),
+            self.prebuilt,
             &self.args,
         )
     }
