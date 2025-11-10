@@ -45,8 +45,6 @@ Read more in our [OTLP Support highlight]({{< ref "/highlights/2025-09-23-otlp-s
 
 We've made Vector more robust in production:
 
-- **Automatic TLS certificate rotation**: Your HTTP sinks now reload certificates automatically—no more manual
-  restarts when certs expire
 - **Smarter configuration reloads**: The `--watch-config` flag now watches external VRL files and enrichment tables
   in addition to config files, automatically reloading when they change. We've also fixed crashes during enrichment
   table reloads and improved file event handling to properly track file changes even during editor save operations
