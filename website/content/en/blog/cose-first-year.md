@@ -32,9 +32,9 @@ Over the past year:
 ### Native OpenTelemetry Support
 
 If you're using OpenTelemetry, Vector now speaks your language natively. You can send OTLP data directly to Vector
-and get OTLP data out—no more custom transforms or format conversions. Whether you're collecting logs, metrics, or
-traces, Vector now integrates seamlessly into your OpenTelemetry stack as a collector, aggregator, or transformation
-layer.
+and get OTLP data out, without needing custom transforms or format conversions. Whether you're collecting logs,
+metrics, or traces, Vector now integrates seamlessly into your OpenTelemetry stack as a collector, aggregator, or
+transformation layer.
 
 **What this means for you:** Simpler configurations, faster setup, and native compatibility with the OpenTelemetry
 ecosystem you're already using.
