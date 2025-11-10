@@ -1018,30 +1018,38 @@ mod test {
     #[test]
     #[serial]
     fn events_with_custom_fields_no_message_dont_panic() {
-        // This test ensures that events without a "message" field or "internal_log_rate_limit"
-        // field don't panic when rate limiting tries to emit suppression notifications.
-        // This can happen with custom debug events like utilization metrics.
+        // Verify events without "message" or "internal_log_rate_limit" fields don't panic
+        // when rate limiting skips suppression notifications.
         let (events, sub) = setup_test(1);
         tracing::subscriber::with_default(sub, || {
-            // Emit events with custom fields but no "message" field
-            // This simulates what happens with utilization debug events
-            for _ in 0..5 {
+            // Use closure to ensure all events share the same callsite
+            let emit_event = || {
                 debug!(component_id = "test_component", utilization = 0.85);
+            };
+
+            // First window: emit 5 events, only the first one should be logged
+            for _ in 0..5 {
+                emit_event();
                 MockClock::advance(Duration::from_millis(100));
             }
+
+            // Advance to the next window
+            MockClock::advance(Duration::from_millis(1000));
+
+            // Second window: this event should be logged
+            emit_event();
         });
 
         let events = events.lock().unwrap();
 
-        // The first event should be emitted normally
-        // The second event would normally trigger a suppression notification,
-        // but since the metadata has no "message" or "internal_log_rate_limit" field,
-        // the notification is skipped gracefully instead of panicking
-        // Subsequent events within the rate limit window are suppressed
-        // After the window, the summary notification is also skipped gracefully
+        // First event from window 1, first event from window 2
+        // Suppression notifications are skipped (no message field)
         assert_eq!(
             *events,
-            vec![event!("", component_id: "test_component", utilization: "0.85"),]
+            vec![
+                event!("", component_id: "test_component", utilization: "0.85"),
+                event!("", component_id: "test_component", utilization: "0.85"),
+            ]
         );
     }
 }
