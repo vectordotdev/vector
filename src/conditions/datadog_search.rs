@@ -3,7 +3,7 @@ use std::{borrow::Cow, str::FromStr};
 use bytes::Bytes;
 use vector_lib::{
     configurable::configurable_component,
-    event::{Event, LogEvent, Value},
+    event::{Event, EventRef, LogEvent, Value},
 };
 use vrl::{
     datadog_filter::{
@@ -33,8 +33,8 @@ impl Default for DatadogSearchConfig {
 }
 
 impl DatadogSearchConfig {
-    pub fn build_matcher(&self) -> crate::Result<Box<dyn Matcher<Event>>> {
-        Ok(as_log(build_matcher(&self.source, &EventFilter)?))
+    pub fn build_matcher(&self) -> crate::Result<Box<dyn Matcher<LogEvent>>> {
+        Ok(build_matcher(&self.source, &EventFilter)?)
     }
 }
 
@@ -57,7 +57,7 @@ impl_generate_config_from_default!(DatadogSearchConfig);
 /// a [Datadog Search Syntax query](https://docs.datadoghq.com/logs/explorer/search_syntax/).
 #[derive(Debug, Clone)]
 pub struct DatadogSearchRunner {
-    matcher: Box<dyn Matcher<Event>>,
+    matcher: Box<dyn Matcher<LogEvent>>,
 }
 
 impl TryFrom<&DatadogSearchConfig> for DatadogSearchRunner {
@@ -68,8 +68,11 @@ impl TryFrom<&DatadogSearchConfig> for DatadogSearchRunner {
 }
 
 impl DatadogSearchRunner {
-    pub fn matches(&self, event: &Event) -> bool {
-        self.matcher.run(event)
+    pub fn matches<'a>(&self, event: impl Into<EventRef<'a>>) -> bool {
+        match event.into() {
+            EventRef::Log(log) => self.matcher.run(log),
+            _ => false,
+        }
     }
 }
 
@@ -86,14 +89,6 @@ impl ConditionalConfig for DatadogSearchConfig {
     ) -> crate::Result<Condition> {
         Ok(Condition::DatadogSearch(self.try_into()?))
     }
-}
-
-/// Run the provided `Matcher` when we're dealing with `LogEvent`s. Otherwise, return false.
-fn as_log(matcher: Box<dyn Matcher<LogEvent>>) -> Box<dyn Matcher<Event>> {
-    Run::boxed(move |ev| match ev {
-        Event::Log(log) => matcher.run(log),
-        _ => false,
-    })
 }
 
 #[derive(Default, Clone)]

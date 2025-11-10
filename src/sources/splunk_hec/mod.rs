@@ -31,6 +31,7 @@ use vector_lib::{
     lookup::{self, event_path, lookup_v2::OptionalValuePath, owned_value_path},
     schema::meaning,
     sensitive_string::SensitiveString,
+    source_sender::ClosedError,
     tls::MaybeTlsIncomingStream,
 };
 use vrl::{
@@ -62,7 +63,6 @@ use crate::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
     serde::bool_or_struct,
-    source_sender::ClosedError,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 

@@ -3,7 +3,10 @@ use std::sync::{Arc, atomic::AtomicUsize};
 use futures_util::Stream;
 use stream_cancel::Trigger;
 use tokio::sync::oneshot::Sender;
-use vector_lib::event::EventArray;
+use vector_lib::{
+    event::EventArray,
+    source_sender::{SourceSender, SourceSenderItem},
+};
 
 use self::{
     sinks::{
@@ -16,7 +19,6 @@ use self::{
     },
     transforms::{BasicTransformConfig, ErrorDefinitionTransformConfig},
 };
-use crate::{SourceSender, source_sender::SourceSenderItem};
 
 pub mod sinks;
 pub mod sources;
