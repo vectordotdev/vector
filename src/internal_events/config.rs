@@ -14,6 +14,7 @@ impl InternalEvent for ConfigReloadRejected {
                     message = "Config reload rejected due to non-reloadable global options.",
                     reason = %self.reason.as_str(),
                     changed_fields = %fields.join(", "),
+                    internal_log_rate_limit = false,
                 );
 
                 counter!(
@@ -27,6 +28,7 @@ impl InternalEvent for ConfigReloadRejected {
                     message = "Config reload rejected due to failed to compute global diff.",
                     reason = %self.reason.as_str(),
                     error = %err,
+                    internal_log_rate_limit = false,
                 );
 
                 counter!(
