@@ -966,8 +966,12 @@ mod integration_tests {
                 Some(TlsEnableableConfig {
                     enabled: Some(true),
                     options: TlsConfig {
-                        crt_file: Some("tests/data/host.docker.internal.crt".into()),
-                        key_file: Some("tests/data/host.docker.internal.key".into()),
+                        crt_file: Some(
+                            "tests/integration/shared/data/host.docker.internal.crt".into(),
+                        ),
+                        key_file: Some(
+                            "tests/integration/shared/data/host.docker.internal.key".into(),
+                        ),
                         ..Default::default()
                     },
                 }),

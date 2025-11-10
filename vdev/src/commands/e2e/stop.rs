@@ -13,10 +13,6 @@ pub struct Cli {
     /// If true, remove the runner container compiled with all integration test features
     #[arg(short = 'a', long)]
     build_all: bool,
-
-    /// Reuse existing test runner image instead of rebuilding (useful in CI)
-    #[arg(long)]
-    reuse_image: bool,
 }
 
 impl Cli {
@@ -25,7 +21,6 @@ impl Cli {
             ComposeTestLocalConfig::e2e(),
             &self.test,
             self.build_all,
-            self.reuse_image,
         )
     }
 }

@@ -599,7 +599,7 @@ pub mod test {
     }
 }
 
-/// Integration tests use the docker compose files in `scripts/integration/docker-compose.amqp.yml`.
+/// Integration tests use the docker compose files in `tests/integration/docker-compose.amqp.yml`.
 #[cfg(feature = "amqp-integration-tests")]
 #[cfg(test)]
 mod integration_test {

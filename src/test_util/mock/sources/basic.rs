@@ -17,12 +17,10 @@ use vector_lib::{
     event::EventContainer,
     schema::Definition,
     source::Source,
-};
-
-use crate::{
-    config::{SourceConfig, SourceContext},
     source_sender::SourceSenderItem,
 };
+
+use crate::config::{SourceConfig, SourceContext};
 
 /// Configuration for the `test_basic` source.
 #[configurable_component(source("test_basic", "Test (basic)."))]

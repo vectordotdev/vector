@@ -47,6 +47,8 @@ sinks:
         codec: otlp
 ```
 
+The above configuration will only work with Vector versions >= `0.51`.
+
 ## Example Configuration 2
 
 Here is another pipeline configuration that can achieve the same as the above:

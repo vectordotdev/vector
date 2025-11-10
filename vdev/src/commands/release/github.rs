@@ -1,6 +1,6 @@
 use crate::app::CommandExt as _;
-use crate::util;
-use anyhow::{anyhow, Ok, Result};
+use crate::utils::cargo;
+use anyhow::{Ok, Result, anyhow};
 use glob::glob;
 use std::process::Command;
 
@@ -20,7 +20,7 @@ impl Cli {
             .collect::<Result<Vec<_>, _>>()
             .map_err(|e| anyhow!("failed to turn path into string: {:?}", e))?;
 
-        let version = util::get_version()?;
+        let version = cargo::get_version()?;
         let mut command = Command::new("gh");
         command.in_repo();
         command.args(

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use chrono::prelude::*;
 
-use crate::{git, util};
+use crate::utils::{cargo, git};
 use std::env;
 use std::fs::OpenOptions;
 use std::io::{self, Write};
@@ -19,14 +19,14 @@ pub struct Cli {}
 impl Cli {
     pub fn exec(self) -> Result<()> {
         // Generate the Vector version and build description.
-        let version = util::get_version()?;
+        let version = cargo::get_version()?;
 
         let git_sha = git::get_git_sha()?;
         let current_date = Local::now().naive_local().to_string();
         let build_desc = format!("{git_sha} {current_date}");
 
         // Figure out what our release channel is.
-        let channel = util::get_channel();
+        let channel = git::get_channel();
 
         let mut output_file: Box<dyn Write> = match env::var("GITHUB_OUTPUT") {
             Ok(file_name) if !file_name.is_empty() => {

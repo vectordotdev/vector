@@ -24,10 +24,6 @@ pub struct Cli {
     #[arg(short = 'a', long)]
     build_all: bool,
 
-    /// Reuse existing test runner image instead of rebuilding (useful in CI)
-    #[arg(long)]
-    reuse_image: bool,
-
     /// Number of retries to allow on each integration test case.
     #[arg(short = 'r', long)]
     retries: Option<u8>,
@@ -43,7 +39,6 @@ impl Cli {
             &self.e2e_test,
             self.environment.as_ref(),
             self.build_all,
-            self.reuse_image,
             self.retries.unwrap_or_default(),
             &self.args,
         )

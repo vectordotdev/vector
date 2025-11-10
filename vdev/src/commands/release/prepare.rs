@@ -1,9 +1,9 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
-use crate::git;
-use crate::util::run_command;
-use anyhow::{anyhow, Result};
+use crate::utils::command::run_command;
+use crate::utils::{git, paths};
+use anyhow::{Context, Result, anyhow};
 use reqwest::blocking::Client;
 use semver::Version;
 use std::fs::File;
@@ -13,8 +13,8 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::{env, fs};
-use toml::map::Map;
 use toml::Value;
+use toml_edit::DocumentMut;
 
 const ALPINE_PREFIX: &str = "FROM docker.io/alpine:";
 const ALPINE_DOCKERFILE: &str = "distribution/docker/alpine/Dockerfile";
@@ -42,6 +42,10 @@ pub struct Cli {
     /// You can find the latest version here: <https://www.debian.org/releases/>.
     #[arg(long)]
     debian_version: Option<String>,
+
+    /// Dry run. Enabling this will make it so no PRs will be created and no branches will be pushed upstream.
+    #[arg(long, default_value_t = false)]
+    dry_run: bool,
 }
 
 struct Prepare {
@@ -53,13 +57,13 @@ struct Prepare {
     latest_vector_version: Version,
     release_branch: String,
     release_preparation_branch: String,
+    dry_run: bool,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-
-        let repo_root = get_repo_root();
-        env::set_current_dir(repo_root.clone())?;
+        let repo_root = paths::find_repo_root()?;
+        env::set_current_dir(&repo_root)?;
 
         let prepare = Prepare {
             new_vector_version: self.version.clone(),
@@ -71,7 +75,11 @@ impl Cli {
             release_branch: format!("v{}.{}", self.version.major, self.version.minor),
             // Websites containing `website` will also generate website previews.
             // Caveat is these branches can only contain alphanumeric chars and dashes.
-            release_preparation_branch: format!("prepare-v-{}-{}-{}-website", self.version.major, self.version.minor, self.version.patch),
+            release_preparation_branch: format!(
+                "prepare-v-{}-{}-{}-website",
+                self.version.major, self.version.minor, self.version.patch
+            ),
+            dry_run: self.dry_run,
         };
         prepare.run()
     }
@@ -104,7 +112,11 @@ impl Prepare {
 
         self.create_new_release_md()?;
 
-        self.open_release_pr()
+        if !self.dry_run {
+            self.open_release_pr()?;
+        }
+
+        Ok(())
     }
 
     /// Steps 1 & 2
@@ -115,12 +127,16 @@ impl Prepare {
         git::checkout_main_branch()?;
 
         git::checkout_or_create_branch(self.release_branch.as_str())?;
-        git::push_and_set_upstream(self.release_branch.as_str())?;
+        if !self.dry_run {
+            git::push_and_set_upstream(self.release_branch.as_str())?;
+        }
 
         // Step 2: Create a new release preparation branch
         //         The branch website contains 'website' to generate vector.dev preview.
         git::checkout_or_create_branch(self.release_preparation_branch.as_str())?;
-        git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
+        if !self.dry_run {
+            git::push_and_set_upstream(self.release_preparation_branch.as_str())?;
+        }
         Ok(())
     }
 
@@ -128,32 +144,15 @@ impl Prepare {
     fn pin_vrl_version(&self) -> Result<()> {
         debug!("pin_vrl_version");
         let cargo_toml_path = &self.repo_root.join("Cargo.toml");
-        let contents = fs::read_to_string(cargo_toml_path).expect("Failed to read Cargo.toml");
-
-        // Needs this hybrid approach to preserve ordering.
-        let mut lines: Vec<String> = contents.lines().map(String::from).collect();
-
+        let contents = fs::read_to_string(cargo_toml_path).context("Failed to read Cargo.toml")?;
         let vrl_version = self.vrl_version.to_string();
-        for line in &mut lines {
-            if line.trim().starts_with("vrl = { git = ") {
-                if let Ok(mut vrl_toml) = line.parse::<Value>() {
-                    let vrl_dependency: &mut Value = vrl_toml.get_mut("vrl").expect("line should start with 'vrl'");
+        let updated_contents = update_vrl_to_version(&contents, &vrl_version)?;
 
-                    let mut new_dependency_value = Map::new();
-                    new_dependency_value.insert("version".to_string(), Value::String(vrl_version.clone()));
-                    let features = vrl_dependency.get("features").expect("missing 'features' key");
-                    new_dependency_value.insert("features".to_string(), features.clone());
-
-                    *line = format!("vrl = {}", Value::from(new_dependency_value));
-                }
-                break;
-            }
-        }
-
-        lines.push(String::new()); // File should end with a newline.
-        fs::write(cargo_toml_path, lines.join("\n")).expect("Failed to write Cargo.toml");
+        fs::write(cargo_toml_path, updated_contents).context("Failed to write Cargo.toml")?;
         run_command("cargo update -p vrl");
-        git::commit(&format!("chore(releasing): Pinned VRL version to {vrl_version}"))?;
+        git::commit(&format!(
+            "chore(releasing): Pinned VRL version to {vrl_version}"
+        ))?;
         Ok(())
     }
 
@@ -165,7 +164,10 @@ impl Prepare {
         new_version: Option<&str>,
         prefix: &str,
     ) -> Result<()> {
-        debug!("update_dockerfile_base_version for {}", dockerfile_path.display());
+        debug!(
+            "update_dockerfile_base_version for {}",
+            dockerfile_path.display()
+        );
         if let Some(version) = new_version {
             let contents = fs::read_to_string(dockerfile_path)?;
 
@@ -182,9 +184,9 @@ impl Prepare {
 
             // Split into prefix, version, and suffix
             // E.g. "FROM docker.io/alpine:", "3.21", " AS builder"
-            let after_prefix = first_line
-                .strip_prefix(prefix)
-                .ok_or_else(|| anyhow!("Failed to strip prefix in {}", dockerfile_path.display()))?;
+            let after_prefix = first_line.strip_prefix(prefix).ok_or_else(|| {
+                anyhow!("Failed to strip prefix in {}", dockerfile_path.display())
+            })?;
             let parts: Vec<&str> = after_prefix.splitn(2, ' ').collect();
             let suffix = parts.get(1).unwrap_or(&"");
 
@@ -195,11 +197,13 @@ impl Prepare {
             fs::write(dockerfile_path, &new_contents)?;
             git::commit(&format!(
                 "chore(releasing): Bump {} version to {version}",
-                dockerfile_path.strip_prefix(&self.repo_root).unwrap().display(),
+                dockerfile_path
+                    .strip_prefix(&self.repo_root)
+                    .unwrap()
+                    .display(),
             ))?;
         } else {
-            debug!(
-                "No version specified for {dockerfile_path:?}; skipping update");
+            debug!("No version specified for {dockerfile_path:?}; skipping update");
         }
         Ok(())
     }
@@ -210,7 +214,10 @@ impl Prepare {
         let script = self.repo_root.join(RELEASE_CUE_SCRIPT);
         let new_vector_version = &self.new_vector_version;
         if script.is_file() {
-            run_command(&format!("{} --new-version {new_vector_version} --no-interactive", script.to_string_lossy().as_ref()));
+            run_command(&format!(
+                "{} --new-version {new_vector_version} --no-interactive",
+                script.to_string_lossy().as_ref()
+            ));
         } else {
             return Err(anyhow!("Script not found: {}", script.display()));
         }
@@ -234,11 +241,15 @@ impl Prepare {
         let new_version_str = format!("{}.{}", new_version.major, new_version.minor);
 
         if !contents.contains(&old_version_str) {
-            return Err(anyhow!("Could not find version {} to update in {}",
-                latest_version, file_path.display()));
+            return Err(anyhow!(
+                "Could not find version {} to update in {}",
+                latest_version,
+                file_path.display()
+            ));
         }
 
-        let updated_contents = contents.replace(&latest_version.to_string(), &new_version.to_string());
+        let updated_contents =
+            contents.replace(&latest_version.to_string(), &new_version.to_string());
         let updated_contents = updated_contents.replace(&old_version_str, &new_version_str);
 
         fs::write(file_path, updated_contents)
@@ -276,14 +287,17 @@ impl Prepare {
 
         fs::rename(&temp_file_path, &versions_cue_path)?;
 
-        git::commit(&format!("chore(releasing): Add {vector_version} to versions.cue"))?;
+        git::commit(&format!(
+            "chore(releasing): Add {vector_version} to versions.cue"
+        ))?;
         Ok(())
     }
 
     /// Step 10: Create a new release md file
     fn create_new_release_md(&self) -> Result<()> {
         debug!("create_new_release_md");
-        let releases_dir = self.repo_root
+        let releases_dir = self
+            .repo_root
             .join("website")
             .join("content")
             .join("en")
@@ -293,7 +307,10 @@ impl Prepare {
         let new_version = &self.new_vector_version;
         let old_file_path = releases_dir.join(format!("{old_version}.md"));
         if !old_file_path.exists() {
-            return Err(anyhow!("Source file not found: {}", old_file_path.display()));
+            return Err(anyhow!(
+                "Source file not found: {}",
+                old_file_path.display()
+            ));
         }
 
         let content = fs::read_to_string(&old_file_path)?;
@@ -305,8 +322,13 @@ impl Prepare {
         for line in lines {
             if line.trim().starts_with("weight: ") && !weight_updated {
                 // Extract the current weight value
-                let weight_str = line.trim().strip_prefix("weight: ").ok_or_else(|| anyhow!("Invalid weight format"))?;
-                let weight: i32 = weight_str.parse().map_err(|e| anyhow!("Failed to parse weight: {}", e))?;
+                let weight_str = line
+                    .trim()
+                    .strip_prefix("weight: ")
+                    .ok_or_else(|| anyhow!("Invalid weight format"))?;
+                let weight: i32 = weight_str
+                    .parse()
+                    .map_err(|e| anyhow!("Failed to parse weight: {}", e))?;
                 // Increase by 1
                 let new_weight = weight + 1;
                 updated_lines.push(format!("weight: {new_weight}"));
@@ -319,7 +341,6 @@ impl Prepare {
         if !weight_updated {
             error!("Couldn't update 'weight' line from {old_file_path:?}");
         }
-
 
         let new_file_path = releases_dir.join(format!("{new_version}.md"));
         updated_lines.push(String::new()); // File should end with a newline.
@@ -389,8 +410,24 @@ impl Prepare {
 
 // FREE FUNCTIONS AFTER THIS LINE
 
-fn get_repo_root() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).parent().unwrap().to_path_buf()
+/// Transforms a Cargo.toml string by replacing vrl's git dependency with a version dependency.
+/// Updates the vrl entry in [workspace.dependencies] from git + branch to a version.
+fn update_vrl_to_version(cargo_toml_contents: &str, vrl_version: &str) -> Result<String> {
+    let mut doc = cargo_toml_contents
+        .parse::<DocumentMut>()
+        .context("Failed to parse Cargo.toml")?;
+
+    // Navigate to workspace.dependencies.vrl
+    let vrl_table = doc["workspace"]["dependencies"]["vrl"]
+        .as_inline_table_mut()
+        .context("vrl in workspace.dependencies should be an inline table")?;
+
+    // Remove git and branch, add version
+    vrl_table.remove("git");
+    vrl_table.remove("branch");
+    vrl_table.insert("version", vrl_version.into());
+
+    Ok(doc.to_string())
 }
 
 fn get_latest_version_from_vector_tags() -> Result<Version> {
@@ -451,21 +488,21 @@ fn get_latest_vrl_tag_and_changelog() -> Result<String> {
     let tags_url = "https://api.github.com/repos/vectordotdev/vrl/tags";
     let tags_response = client
         .get(tags_url)
-        .header("User-Agent", "rust-reqwest")  // GitHub API requires User-Agent
+        .header("User-Agent", "rust-reqwest") // GitHub API requires User-Agent
         .send()?
         .text()?;
 
     let tags: Vec<Value> = serde_json::from_str(&tags_response)?;
-    let latest_tag = tags.first()
+    let latest_tag = tags
+        .first()
         .and_then(|tag| tag.get("name"))
         .and_then(|name| name.as_str())
         .ok_or_else(|| anyhow!("Failed to extract latest tag"))?
         .to_string();
 
     // Step 2: Download CHANGELOG.md for the specific tag
-    let changelog_url = format!(
-        "https://raw.githubusercontent.com/vectordotdev/vrl/{latest_tag}/CHANGELOG.md",
-    );
+    let changelog_url =
+        format!("https://raw.githubusercontent.com/vectordotdev/vrl/{latest_tag}/CHANGELOG.md",);
     let changelog = client
         .get(&changelog_url)
         .header("User-Agent", "rust-reqwest")
@@ -499,8 +536,31 @@ fn get_latest_vrl_tag_and_changelog() -> Result<String> {
 
 #[cfg(test)]
 mod tests {
-    use crate::commands::release::prepare::{format_vrl_changelog_block, insert_block_after_changelog};
+    use crate::commands::release::prepare::{
+        format_vrl_changelog_block, insert_block_after_changelog, update_vrl_to_version,
+    };
     use indoc::indoc;
+
+    #[test]
+    fn test_update_vrl_to_version() {
+        let input = indoc! {r#"
+            [workspace.dependencies]
+            some-other-dep = "1.0.0"
+            vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+            another-dep = "2.0.0"
+        "#};
+
+        let result = update_vrl_to_version(input, "0.28.0").expect("should succeed");
+
+        let expected = indoc! {r#"
+            [workspace.dependencies]
+            some-other-dep = "1.0.0"
+            vrl = { features = ["arbitrary", "cli", "test", "test_framework"] , version = "0.28.0" }
+            another-dep = "2.0.0"
+        "#};
+
+        assert_eq!(result, expected);
+    }
 
     #[test]
     fn test_insert_block_after_changelog() {
@@ -508,11 +568,11 @@ mod tests {
         let vrl_changelog_block = format_vrl_changelog_block(vrl_changelog);
 
         let expected = concat!(
-        "\tvrl_changelog: \"\"\"\n",
-        "\t\t#### [0.2.0]\n",
-        "\t\t- Feature\n",
-        "\t\t- Fix\n",
-        "\t\t\"\"\""
+            "\tvrl_changelog: \"\"\"\n",
+            "\t\t#### [0.2.0]\n",
+            "\t\t- Feature\n",
+            "\t\t- Fix\n",
+            "\t\t\"\"\""
         );
 
         assert_eq!(vrl_changelog_block, expected);
@@ -530,7 +590,14 @@ mod tests {
 
         // Assert the last 5 lines match the VRL changelog block
         let expected_lines_len = 5;
-        let updated_tail: Vec<&str> = updated.lines().rev().take(expected_lines_len).collect::<Vec<_>>().into_iter().rev().collect();
+        let updated_tail: Vec<&str> = updated
+            .lines()
+            .rev()
+            .take(expected_lines_len)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
         let expected_lines: Vec<&str> = vrl_changelog_block.lines().collect();
         assert_eq!(updated_tail, expected_lines);
     }

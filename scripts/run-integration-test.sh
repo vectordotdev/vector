@@ -32,7 +32,6 @@ Options:
   -v         Increase verbosity; repeat for more (e.g. -vv or -vvv)
   -e <ENV>   One or more environments to run (repeatable or comma-separated).
              If provided, these are used as TEST_ENVIRONMENTS instead of auto-discovery.
-  -b         Always build images (disables --reuse-image which is enabled by default)
 
 Notes:
   - All existing two-argument invocations remain compatible:
@@ -44,8 +43,7 @@ USAGE
 # Parse options
 # Note: options must come before positional args (standard getopts behavior)
 TEST_ENV=""
-REUSE_IMAGE="--reuse-image"
-while getopts ":hr:v:e:b" opt; do
+while getopts ":hr:v:e:" opt; do
   case "$opt" in
     h)
       usage
@@ -63,9 +61,6 @@ while getopts ":hr:v:e:b" opt; do
       ;;
     e)
       TEST_ENV="$OPTARG"
-      ;;
-    b)
-      REUSE_IMAGE=""
       ;;
     \?)
       echo "ERROR: unknown option: -$OPTARG" >&2
@@ -132,12 +127,12 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   docker run --rm -v vector_target:/output/"${TEST_NAME}" alpine:3.20 \
     sh -c "rm -rf /output/${TEST_NAME}/*"
 
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start --build-all ${REUSE_IMAGE} "${TEST_NAME}" "${TEST_ENV}"
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start --build-all "${TEST_NAME}" "${TEST_ENV}"
   START_RET=$?
   print_compose_logs_on_failure "$START_RET"
 
   if [[ "$START_RET" -eq 0 ]]; then
-    cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" --build-all ${REUSE_IMAGE} "${TEST_NAME}" "${TEST_ENV}"
+    cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" --build-all "${TEST_NAME}" "${TEST_ENV}"
     RET=$?
     print_compose_logs_on_failure "$RET"
 
@@ -149,7 +144,7 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   fi
 
   # Always stop the environment (best effort cleanup)
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop --build-all ${REUSE_IMAGE} "${TEST_NAME}" || true
+  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop --build-all "${TEST_NAME}" || true
 
   # Exit early on first failure
   if [[ "$RET" -ne 0 ]]; then

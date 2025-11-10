@@ -1,0 +1,88 @@
+name: opentelemetry-vector-e2e
+services:
+  otel-collector-source:
+    container_name: otel-collector-source
+    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}
+    init: true
+    volumes:
+      - type: bind
+        source: ../data/collector-source.yaml
+        target: /etc/otelcol-contrib/config.yaml
+        read_only: true
+    ports:
+      - "${OTEL_COLLECTOR_SOURCE_GRPC_PORT:-4317}:4317"
+      - "${OTEL_COLLECTOR_SOURCE_HTTP_PORT:-4318}:4318"
+    command: [ "--config=/etc/otelcol-contrib/config.yaml" ]
+
+  logs-generator:
+    container_name: logs-generator
+    build:
+      context: ../../../..
+      dockerfile: ./tests/e2e/opentelemetry-common/telemetrygen.Dockerfile
+    init: true
+    depends_on:
+      otel-collector-source:
+        condition: service_started
+      vector:
+        condition: service_started
+      otel-collector-sink:
+        condition: service_started
+    command:
+      - "-c"
+      - |
+        until nc -z otel-collector-source 4318; do
+          sleep 0.5
+        done
+        telemetrygen logs \
+          --otlp-endpoint=otel-collector-source:4318 \
+          --otlp-insecure \
+          --otlp-http \
+          --logs=100 \
+          --rate=0
+
+  otel-collector-sink:
+    container_name: otel-collector-sink
+    build:
+      context: ../../../..
+      dockerfile: ./tests/e2e/opentelemetry-common/collector.Dockerfile
+      args:
+        CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
+    init: true
+    user: "0:0" # test only, override special user with root
+    command: [ "--config", "/etc/otelcol-contrib/config.yaml" ]
+    volumes:
+      - type: bind
+        source: ../data/collector-sink.yaml
+        target: /etc/otelcol-contrib/config.yaml
+        read_only: true
+      - type: volume
+        source: vector_target
+        target: /output
+    ports:
+      - "${OTEL_COLLECTOR_SINK_HTTP_PORT:-5318}:5318"
+
+  vector:
+    container_name: vector-otel-logs-e2e
+    image: ${CONFIG_VECTOR_IMAGE}
+    init: true
+    volumes:
+      - type: bind
+        source: ../data/${CONFIG_VECTOR_CONFIG}
+        target: /etc/vector/vector.yaml
+        read_only: true
+      - type: volume
+        source: vector_target
+        target: /output
+    environment:
+      - VECTOR_LOG=${VECTOR_LOG:-info}
+      - FEATURES=e2e-tests-opentelemetry
+    command: [ "vector", "-c", "/etc/vector/vector.yaml" ]
+
+volumes:
+  vector_target:
+    external: true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

@@ -244,7 +244,7 @@ async fn tls_invalid_ca() {
         headers: HashMap::new(),
         method: HttpMethod::Get,
         tls: Some(TlsConfig {
-            ca_file: Some("tests/data/http-client/certs/invalid-ca-cert.pem".into()),
+            ca_file: Some("tests/integration/http-client/data/certs/invalid-ca-cert.pem".into()),
             ..Default::default()
         }),
         auth: None,

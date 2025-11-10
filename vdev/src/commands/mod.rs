@@ -5,13 +5,9 @@ mod compose_tests;
 
 /// This macro simplifies the generation of CLI subcommand invocation structures by combining the
 /// creation of the command enum and implementation of the dispatch function into one simple list.
+// Module declaration in here was removed due to https://github.com/rust-lang/rustfmt/issues/3253
 #[macro_export]
 macro_rules! cli_commands {
-    // Peel off the list of module identifiers one-by-one
-    ( :: $( $list:ident, )* :: mod $mod:ident, $( $rest:tt )* ) => {
-        mod $mod;
-        $crate::cli_commands! { :: $( $list, )* $mod, :: $( $rest )* }
-    };
     ( :: $( $list:ident, )* :: $mod:ident, $( $rest:tt )* ) => {
         $crate::cli_commands! { :: $( $list, )* $mod, :: $( $rest )* }
     };
@@ -71,26 +67,44 @@ pub struct Cli {
     command: Commands,
 }
 
+mod build;
+mod check;
+mod complete;
+mod crate_versions;
+mod e2e;
+mod exec;
+mod features;
+mod fmt;
+mod info;
+mod integration;
+mod meta;
+mod package;
+mod release;
+mod run;
+mod status;
+mod test;
+mod test_vrl;
+mod version;
+
 cli_commands! {
-    mod build,
-    mod check,
-    mod complete,
-    mod config,
-    mod crate_versions,
-    mod e2e,
-    mod exec,
-    mod features,
-    mod fmt,
-    mod info,
-    mod integration,
-    mod meta,
-    mod package,
-    mod release,
-    mod run,
-    mod status,
-    mod test,
-    mod test_vrl,
-    mod version,
+    build,
+    check,
+    complete,
+    crate_versions,
+    e2e,
+    exec,
+    features,
+    fmt,
+    info,
+    integration,
+    meta,
+    package,
+    release,
+    run,
+    status,
+    test,
+    test_vrl,
+    version,
 }
 
 /// This macro creates a wrapper for an existing script.

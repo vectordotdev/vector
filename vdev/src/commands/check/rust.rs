@@ -1,7 +1,7 @@
 use anyhow::Result;
 use std::ffi::OsString;
 
-use crate::{app, git, util::ChainArgs as _};
+use crate::{app, utils::command::ChainArgs as _, utils::git};
 
 /// Check the Rust code for errors
 #[derive(clap::Args, Debug)]
