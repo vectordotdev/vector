@@ -16,14 +16,14 @@ One year ago, in October 2024, the
 [COSE (Community Open Source Engineering)](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team)
 team was formed with a mission to strengthen Vector's open source foundation and improve the developer experience.
 Today, we're celebrating our first year by highlighting the contributions we've made to the Vector community. The
-COSE team has committed over **550 changes** to Vector across **7 major releases** (0.43.0 through 0.50.0).
+COSE team has committed over **550 changes** to Vector across **8 major releases** (0.43.0 through 0.51.0).
 
 ## By the Numbers
 
 Over the past year:
 
 - **550+** commits to Vector
-- **7** major releases (0.43.0 through 0.50.0)
+- **8** major releases (0.43.0 through 0.51.0)
 - **100+** pull requests merged
 - **159** unique community contributors
 
@@ -162,10 +162,11 @@ For those interested in the technical details:
 - [v0.44.0 Release Notes]({{< ref "/releases/0.44.0" >}}) - January 2025
 - [v0.45.0 Release Notes]({{< ref "/releases/0.45.0" >}}) - February 2025
 - [v0.46.0 Release Notes]({{< ref "/releases/0.46.0" >}}) - April 2025
-- [v0.47.0 Release Notes]({{< ref "/releases/0.47.0" >}}) - April 2025
+- [v0.47.0 Release Notes]({{< ref "/releases/0.47.0" >}}) - May 2025
 - [v0.48.0 Release Notes]({{< ref "/releases/0.48.0" >}}) - June 2025
 - [v0.49.0 Release Notes]({{< ref "/releases/0.49.0" >}}) - August 2025
 - [v0.50.0 Release Notes]({{< ref "/releases/0.50.0" >}}) - September 2025
+- [v0.51.0 Release Notes]({{< ref "/releases/0.51.0" >}}) - November 2025
 
 ### VRL Functions Added
 
