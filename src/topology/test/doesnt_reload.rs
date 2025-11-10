@@ -22,10 +22,10 @@ async fn topology_doesnt_reload_new_data_dir() {
 
     new_config.global.data_dir = Some(Path::new("/qwerty").to_path_buf());
 
-    topology
+    assert!(topology
         .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
         .await
-        .unwrap();
+        .is_err());
 
     assert_eq!(
         topology.config.global.data_dir,
