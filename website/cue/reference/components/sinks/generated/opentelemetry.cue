@@ -210,7 +210,7 @@ generated: components: sinks: opentelemetry: configuration: protocol: {
 					description:   "Custom string value of the Authorization header"
 					relevant_when: "strategy = \"custom_authorization\""
 					required:      true
-					type: string: examples: ["${AUTH_HEADER_VALUE}", "SSWS ${TOKEN}"]
+					type: string: examples: ["${AUTH_HEADER_VALUE}", "CUSTOM_PREFIX ${TOKEN}"]
 				}
 			}
 		}

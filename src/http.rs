@@ -313,7 +313,7 @@ pub enum Auth {
     CustomAuthorization {
         /// Custom string value of the Authorization header
         #[configurable(metadata(docs::examples = "${AUTH_HEADER_VALUE}"))]
-        #[configurable(metadata(docs::examples = "SSWS ${TOKEN}"))]
+        #[configurable(metadata(docs::examples = "CUSTOM_PREFIX ${TOKEN}"))]
         value: String,
     },
 }
