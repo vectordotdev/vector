@@ -30,7 +30,8 @@ impl InternalEvent for VectorReloaded<'_> {
         info!(
             target: "vector",
             message = "Vector has reloaded.",
-            path = ?self.config_paths
+            path = ?self.config_paths,
+            internal_log_rate_limit = false,
         );
         counter!("reloaded_total").increment(1);
     }
@@ -43,7 +44,7 @@ impl InternalEvent for VectorStopped {
     fn emit(self) {
         info!(
             target: "vector",
-            message = "Vector has stopped."
+            message = "Vector has stopped.",
         );
         counter!("stopped_total").increment(1);
     }
@@ -56,7 +57,7 @@ impl InternalEvent for VectorQuit {
     fn emit(self) {
         info!(
             target: "vector",
-            message = "Vector has quit."
+            message = "Vector has quit.",
         );
         counter!("quit_total").increment(1);
     }
@@ -72,6 +73,7 @@ impl InternalEvent for VectorReloadError {
             error_code = "reload",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = false,
         );
         counter!(
             "component_errors_total",
@@ -93,6 +95,7 @@ impl InternalEvent for VectorConfigLoadError {
             error_code = "config_load",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = false,
         );
         counter!(
             "component_errors_total",
@@ -114,6 +117,7 @@ impl InternalEvent for VectorRecoveryError {
             error_code = "recovery",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
+            internal_log_rate_limit = false,
         );
         counter!(
             "component_errors_total",
