@@ -64,7 +64,6 @@ impl OpenSearchServiceType {
     }
 }
 
-
 /// Configuration for the `elasticsearch` sink.
 #[configurable_component(sink("elasticsearch", "Index observability events in Elasticsearch."))]
 #[derive(Clone, Debug)]

@@ -94,8 +94,7 @@ type TagValueRef<'a> = Option<&'a str>;
 
 /// Tag values for a metric series.  This may be empty, a single value, or a set of values. This is
 /// used to provide the storage for `TagValueSet`.
-#[derive(Clone, Configurable, Debug, Eq, PartialEq)]
-#[derive(Default)]
+#[derive(Clone, Configurable, Debug, Eq, PartialEq, Default)]
 pub enum TagValueSet {
     /// This represents a set containing no value.
     #[default]
@@ -112,7 +111,6 @@ pub enum TagValueSet {
     /// emulate the set having a single value.
     Set(IndexSet<TagValue>),
 }
-
 
 impl Display for TagValueSet {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

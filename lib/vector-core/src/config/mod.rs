@@ -393,8 +393,7 @@ impl From<bool> for AcknowledgementsConfig {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq)]
-#[derive(Default)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq, Default)]
 pub enum LogNamespace {
     /// Vector native namespacing
     ///
@@ -421,7 +420,6 @@ impl From<bool> for LogNamespace {
         }
     }
 }
-
 
 /// A shortcut to specify no `LegacyKey` should be used (since otherwise a turbofish would be required)
 pub const NO_LEGACY_KEY: Option<LegacyKey<&'static str>> = None;

@@ -293,7 +293,6 @@ pub enum BatchStatus {
     Rejected,
 }
 
-
 impl BatchStatus {
     /// Updates the delivery status based on another batch's delivery status, returning the result.
     ///
@@ -333,7 +332,6 @@ pub enum EventStatus {
     /// This status has been recorded and should not be updated.
     Recorded,
 }
-
 
 impl EventStatus {
     /// Updates the status based on another event's status, returning the result.

@@ -18,4 +18,3 @@ pub enum DatabendCompression {
     /// [gzip]: https://www.gzip.org/
     Gzip,
 }
-

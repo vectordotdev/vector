@@ -77,7 +77,6 @@ pub enum ElasticsearchMode {
     DataStream,
 }
 
-
 /// Bulk API actions.
 #[configurable_component]
 #[derive(Clone, Copy, Debug, Derivative, Eq, Hash, PartialEq)]
@@ -312,7 +311,6 @@ pub enum ElasticsearchApiVersion {
     /// Use the Elasticsearch 8.x API.
     V8,
 }
-
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
