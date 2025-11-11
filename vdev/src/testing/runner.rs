@@ -294,6 +294,11 @@ impl IntegrationTestRunner {
         })
     }
 
+    /// Returns true if this runner uses the shared image (with all features)
+    pub(super) fn is_shared_runner(&self) -> bool {
+        self.integration.is_none()
+    }
+
     pub(super) fn ensure_network(&self) -> Result<()> {
         if let Some(network_name) = &self.network {
             let mut command = docker_command(["network", "ls", "--format", "{{.Name}}"]);
