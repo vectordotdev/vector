@@ -44,6 +44,20 @@ releases: "0.51.1": {
 		},
 	]
 
+	vrl_changelog: """
+		### [0.28.1 (2025-11-07)]
+
+		#### Fixes
+
+		- Fixed an issue where `split_path`, `basename`, `dirname` had not been added to VRL's standard
+		library and, therefore, appeared to be missing and were inaccessible in the `0.28.0` release.
+
+		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1553)
+
+
+		### [0.28.0 (2025-11-03)]
+		"""
+
 	commits: [
 		{sha: "0aedea9561a4834f6abebaa2a0bc5580b9143a9e", date: "2025-11-04 02:03:46 UTC", description: "reorganize integration test files", pr_number: 24108, scopes: ["ci"], type: "chore", breaking_change: false, author: "Pavlos Rontidis", files_count: 125, insertions_count: 149, deletions_count: 122},
 		{sha: "2d3793e96d7047408d6ce24d378d2396ca6830f4", date: "2025-11-05 01:13:53 UTC", description: "move all utils in a new utils folder", pr_number: 24143, scopes: ["vdev"], type: "chore", breaking_change: false, author: "Pavlos Rontidis", files_count: 40, insertions_count: 242, deletions_count: 174},
