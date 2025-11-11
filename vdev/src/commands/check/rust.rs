@@ -40,7 +40,7 @@ impl Cli {
             vec![
                 "--no-default-features".to_string(),
                 "--features".to_string(),
-                self.features.join(",").to_string(),
+                self.features.join(",").clone(),
             ]
         };
 

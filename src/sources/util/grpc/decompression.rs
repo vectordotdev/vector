@@ -66,16 +66,16 @@ impl CompressionScheme {
     }
 }
 
+#[derive(Default)]
 enum State {
+    #[default]
     WaitingForHeader,
-    Forward { overall_len: usize },
-    Decompress { remaining: usize },
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self::WaitingForHeader
-    }
+    Forward {
+        overall_len: usize,
+    },
+    Decompress {
+        remaining: usize,
+    },
 }
 
 fn new_decompressor() -> GzDecoder<Vec<u8>> {
