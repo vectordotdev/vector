@@ -33,13 +33,8 @@ pub fn exec(
     };
 
     for environment in environments {
-        ComposeTest::generate(
-            local_config,
-            integration,
-            environment,
-            retries,
-        )?
-        .test(args.to_owned())?;
+        ComposeTest::generate(local_config, integration, environment, retries)?
+            .test(args.to_owned())?;
     }
     Ok(())
 }

@@ -26,8 +26,8 @@ const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
 /// Check if a Docker image exists locally
 fn docker_image_exists(image_name: &str) -> Result<bool> {
     use crate::testing::docker::docker_command;
-    let output = docker_command(["images", "--format", "{{.Repository}}:{{.Tag}}"])
-        .check_output()?;
+    let output =
+        docker_command(["images", "--format", "{{.Repository}}:{{.Tag}}"]).check_output()?;
     Ok(output.lines().any(|line| line == image_name))
 }
 
