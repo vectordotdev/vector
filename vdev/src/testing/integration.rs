@@ -13,15 +13,23 @@ use super::{
 };
 use crate::{
     app::CommandExt as _,
-    environment::{Environment, extract_present, rename_environment_keys},
     testing::{
         build::ALL_INTEGRATIONS_FEATURE_FLAG,
         docker::{CONTAINER_TOOL, DOCKER_SOCKET},
     },
+    utils::environment::{Environment, extract_present, rename_environment_keys},
 };
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
 const E2E_FEATURE_FLAG: &str = "all-e2e-tests";
+
+/// Check if a Docker image exists locally
+fn docker_image_exists(image_name: &str) -> Result<bool> {
+    use crate::testing::docker::docker_command;
+    let output =
+        docker_command(["images", "--format", "{{.Repository}}:{{.Tag}}"]).check_output()?;
+    Ok(output.lines().any(|line| line == image_name))
+}
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ComposeTestKind {
@@ -37,7 +45,7 @@ pub(crate) struct ComposeTestLocalConfig {
 }
 
 impl ComposeTestLocalConfig {
-    /// Integration tests are located in the `scripts/integration` dir,
+    /// Integration tests are located in the `tests/integration` dir,
     /// and are the full feature flag is `all-integration-tests`.
     pub(crate) fn integration() -> Self {
         Self {
@@ -47,8 +55,8 @@ impl ComposeTestLocalConfig {
         }
     }
 
-    /// E2E tests are located in the `scripts/e2e` dir,
-    /// and are the full feature flag is `all-e2e-tests`.
+    /// E2E tests are located in the `tests/e2e` dir,
+    /// and the full feature flag is `all-e2e-tests`.
     pub(crate) fn e2e() -> Self {
         Self {
             kind: ComposeTestKind::E2E,
@@ -67,10 +75,6 @@ pub(crate) struct ComposeTest {
     runner: IntegrationTestRunner,
     compose: Option<Compose>,
     env_config: Environment,
-    /// When true, uses 'all-integration-tests' or 'all-e2e-tests' feature. When false, uses features from test.yaml.
-    all_features: bool,
-    /// When true, reuse existing image instead of rebuilding (useful in CI).
-    reuse_image: bool,
     retries: u8,
 }
 
@@ -79,8 +83,6 @@ impl ComposeTest {
         local_config: ComposeTestLocalConfig,
         test_name: impl Into<String>,
         environment: impl Into<String>,
-        all_features: bool,
-        reuse_image: bool,
         retries: u8,
     ) -> Result<ComposeTest> {
         let test_name: String = test_name.into();
@@ -93,9 +95,20 @@ impl ComposeTest {
         let network_name = format!("vector-integration-tests-{test_name}");
         let compose = Compose::new(test_dir, env_config.clone(), network_name.clone())?;
 
-        // When using 'all-*-tests' feature, creates shared image (vector-test-runner-1.90:latest).
-        // When using test.yaml features, creates per-test image (vector-test-runner-clickhouse-1.90:latest).
-        let runner_name = (!all_features).then(|| test_name.clone());
+        // Auto-detect: If shared image exists, use it. Otherwise use per-test image.
+        // Shared image: vector-test-runner-1.90:latest (compiled with all-integration-tests)
+        // Per-test image: vector-test-runner-clickhouse-1.90:latest (compiled with specific features)
+        let shared_image_name = format!(
+            "vector-test-runner-{}:latest",
+            RustToolchainConfig::rust_version()
+        );
+        let runner_name = if docker_image_exists(&shared_image_name).unwrap_or(false) {
+            info!("Using shared runner image: {shared_image_name}");
+            None
+        } else {
+            info!("Shared runner image not found, will build image for: {test_name}");
+            Some(test_name.clone())
+        };
 
         let runner = IntegrationTestRunner::new(
             runner_name,
@@ -113,8 +126,6 @@ impl ComposeTest {
             runner,
             compose,
             env_config: rename_environment_keys(&env_config),
-            all_features,
-            reuse_image,
             retries,
         };
         trace!("Generated {compose_test:#?}");
@@ -180,9 +191,9 @@ impl ComposeTest {
 
         args.push("--features".to_string());
 
-        // When all_features=true: use 'all-integration-tests' or 'all-e2e-tests'
-        // When all_features=false: use test-specific features from test.yaml
-        args.push(if self.all_features {
+        // If using shared runner: use 'all-integration-tests' or 'all-e2e-tests'
+        // If using per-test runner: use test-specific features from test.yaml
+        args.push(if self.runner.is_shared_runner() {
             self.local_config.feature_flag.to_string()
         } else {
             self.config.features.join(",")
@@ -218,7 +229,6 @@ impl ComposeTest {
             &self.config.runner.env,
             Some(&self.config.features),
             &args,
-            self.reuse_image,
             self.local_config.kind == ComposeTestKind::E2E,
         )?;
 
@@ -229,15 +239,11 @@ impl ComposeTest {
         // For end-to-end tests, we want to run vector as a service, leveraging the
         // image for the runner. So we must build that image before starting the
         // compose so that it is available.
-        //
-        // TODO: Enable image reuse for E2E tests by building a unified image in CI
-        // that includes the vector binary compiled with all-e2e-tests feature.
         if self.local_config.kind == ComposeTestKind::E2E {
             self.runner.build(
                 Some(&self.config.features),
                 &self.env_config,
-                false, // Always rebuild for E2E tests
-                true,  // E2E tests build Vector in the image
+                true, // E2E tests build Vector in the image
             )?;
         }
 
@@ -377,8 +383,8 @@ mod unix {
 
     use super::super::config::ComposeConfig;
     use crate::{
-        environment::{Environment, resolve_placeholders},
         testing::config::VolumeMount,
+        utils::environment::{Environment, resolve_placeholders},
     };
 
     /// Unix permissions mask to allow everybody to read a file
