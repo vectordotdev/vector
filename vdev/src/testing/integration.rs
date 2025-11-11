@@ -13,11 +13,11 @@ use super::{
 };
 use crate::{
     app::CommandExt as _,
-    environment::{Environment, extract_present, rename_environment_keys},
     testing::{
         build::ALL_INTEGRATIONS_FEATURE_FLAG,
         docker::{CONTAINER_TOOL, DOCKER_SOCKET},
     },
+    utils::environment::{Environment, extract_present, rename_environment_keys},
 };
 
 const NETWORK_ENV_VAR: &str = "VECTOR_NETWORK";
@@ -37,7 +37,7 @@ pub(crate) struct ComposeTestLocalConfig {
 }
 
 impl ComposeTestLocalConfig {
-    /// Integration tests are located in the `scripts/integration` dir,
+    /// Integration tests are located in the `tests/integration` dir,
     /// and are the full feature flag is `all-integration-tests`.
     pub(crate) fn integration() -> Self {
         Self {
@@ -377,8 +377,8 @@ mod unix {
 
     use super::super::config::ComposeConfig;
     use crate::{
-        environment::{Environment, resolve_placeholders},
         testing::config::VolumeMount,
+        utils::environment::{Environment, resolve_placeholders},
     };
 
     /// Unix permissions mask to allow everybody to read a file
