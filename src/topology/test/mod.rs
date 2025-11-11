@@ -29,7 +29,7 @@ use crate::{
         },
         start_topology, trace_init,
     },
-    topology::{RunningTopology, builder::TopologyPiecesBuilder},
+    topology::{ReloadError::*, RunningTopology, builder::TopologyPiecesBuilder},
 };
 
 mod backpressure;
@@ -847,12 +847,12 @@ async fn topology_healthcheck_run_for_changes_on_reload() {
 
     let mut config = config.build().unwrap();
     config.healthchecks.require_healthy = true;
-    assert!(
-        topology
-            .reload_config_and_respawn(config, Default::default())
-            .await
-            .is_err()
-    );
+    let result = topology
+        .reload_config_and_respawn(config, Default::default())
+        .await;
+
+    // Should fail with TopologyBuildFailed error due to healthcheck failure
+    assert!(matches!(result, Err(TopologyBuildFailed)));
 }
 
 #[tokio::test]

@@ -21,6 +21,7 @@ use crate::{
         splunk_hec::SplunkConfig,
     },
     test_util::{self, mock::basic_sink, next_addr, start_topology, temp_dir, wait_for_tcp},
+    topology::ReloadError::*,
 };
 
 fn internal_metrics_source() -> InternalMetricsConfig {
@@ -92,12 +93,12 @@ async fn topology_rebuild_old() {
     let _bind = TcpListener::bind(address_1).unwrap();
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .is_err()
-    );
+    let result = topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await;
+
+    // Should fail with TopologyBuildFailed error due to port conflict
+    assert!(matches!(result, Err(TopologyBuildFailed)));
 }
 
 #[tokio::test]
