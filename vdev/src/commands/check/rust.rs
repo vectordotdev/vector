@@ -57,6 +57,7 @@ impl Cli {
         if self.fix {
             let has_changes = !git::get_modified_files()?.is_empty();
             if has_changes {
+                app::exec("cargo", ["fmt", "--all"], true)?;
                 git::commit("chore(vdev): apply vdev rust check fixes")?;
             }
         }
