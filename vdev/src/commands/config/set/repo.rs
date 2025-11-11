@@ -1,7 +1,10 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::{app, config, platform};
+use crate::{
+    app,
+    utils::{config, platform},
+};
 
 /// Set the path to the Vector repository
 #[derive(Args, Debug)]
