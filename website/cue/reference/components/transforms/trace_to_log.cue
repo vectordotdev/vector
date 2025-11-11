@@ -6,6 +6,8 @@ components: transforms: trace_to_log: {
     description: """
         Converts a trace event into a log event. This preserves all trace
         attributes (span IDs, trace IDs, etc.) as log fields without modification.
+        This transformation does not add any new fields, nor does it validate the
+        output events are valid traces.
         """
 
     classes: {
