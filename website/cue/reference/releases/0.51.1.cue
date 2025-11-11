@@ -7,18 +7,18 @@ releases: "0.51.1": {
 	whats_next: []
 
 	description: """
-			When Vector is running with debug logs enabled (`VECTOR_LOG=debug`), threads no
-			longer panic when logging utilization or other debug messages.
+		* When Vector is running with debug logs enabled (`VECTOR_LOG=debug`), threads no
+		longer panic when logging utilization or other debug messages.
 
-			The `config_reload_rejected` and `config_reloaded` counters added in `0.51.0` were
-			not being emitted and have been replaced. `component_errors_total` with
-			`error_code="reload"` now replaces `config_reload_rejected` and `reloaded_total`
-			replaces `config_reloaded`.
+		* The `config_reload_rejected` and `config_reloaded` counters added in `0.51.0` were
+		not being emitted and have been replaced. `component_errors_total` with
+		`error_code="reload"` now replaces `config_reload_rejected` and `reloaded_total`
+		replaces `config_reloaded`.
 
-			The `basename`, `dirname` and `split_path` VRL functions added in `0.51.0` are now
-			properly exposed.
+		* The `basename`, `dirname` and `split_path` VRL functions added in `0.51.0` are now
+		properly exposed.
 
-			`blackhole` sink's periodic statistics messages are no longer rate limited.
+		* `blackhole` sink's periodic statistics messages are no longer rate limited.
 		"""
 
 	changelog: [
