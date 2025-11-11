@@ -19,6 +19,7 @@ use vector_lib::configurable::{
 /// This can be set either to one of the below enum values or to a positive integer, which denotes
 /// a fixed concurrency limit.
 #[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
+#[derive(Default)]
 pub enum Concurrency {
     /// A fixed concurrency of 1.
     ///
@@ -28,6 +29,7 @@ pub enum Concurrency {
     /// Concurrency is managed by the [Adaptive Request Concurrency][arc] feature.
     ///
     /// [arc]: https://vector.dev/docs/architecture/arc/
+    #[default]
     Adaptive,
 
     /// A fixed amount of concurrency is allowed.
@@ -47,11 +49,6 @@ impl Serialize for Concurrency {
     }
 }
 
-impl Default for Concurrency {
-    fn default() -> Self {
-        Self::Adaptive
-    }
-}
 
 impl Concurrency {
     pub const fn parse_concurrency(&self) -> Option<usize> {

@@ -280,10 +280,12 @@ impl Drop for OwnedBatchNotifier {
 /// The status of an individual batch.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum BatchStatus {
     /// All events in the batch were accepted.
     ///
     /// This is the default.
+    #[default]
     Delivered,
     /// At least one event in the batch had a transient error in delivery.
     Errored,
@@ -291,11 +293,6 @@ pub enum BatchStatus {
     Rejected,
 }
 
-impl Default for BatchStatus {
-    fn default() -> Self {
-        Self::Delivered
-    }
-}
 
 impl BatchStatus {
     /// Updates the delivery status based on another batch's delivery status, returning the result.
@@ -320,10 +317,12 @@ impl BatchStatus {
 /// The status of an individual event.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum EventStatus {
     /// All copies of this event were dropped without being finalized.
     ///
     /// This is the default.
+    #[default]
     Dropped,
     /// All copies of this event were delivered successfully.
     Delivered,
@@ -335,11 +334,6 @@ pub enum EventStatus {
     Recorded,
 }
 
-impl Default for EventStatus {
-    fn default() -> Self {
-        Self::Dropped
-    }
-}
 
 impl EventStatus {
     /// Updates the status based on another event's status, returning the result.

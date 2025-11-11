@@ -926,11 +926,9 @@ mod tests {
             250, 129, 167, 109, 101, 115, 115, 97, 103, 101, 163, 98, 97, 122,
         ];
 
-        let expected = vec![
-            mock_event("foo", "2015-09-07T01:23:04Z"),
+        let expected = [mock_event("foo", "2015-09-07T01:23:04Z"),
             mock_event("bar", "2015-09-07T01:23:05Z"),
-            mock_event("baz", "2015-09-07T01:23:06Z"),
-        ];
+            mock_event("baz", "2015-09-07T01:23:06Z")];
         let got = decode_all(message.clone()).unwrap();
 
         assert_eq!(got.1, message.len());
@@ -958,11 +956,9 @@ mod tests {
             122, 101, 3,
         ];
 
-        let expected = vec![
-            mock_event("foo", "2015-09-07T01:23:04Z"),
+        let expected = [mock_event("foo", "2015-09-07T01:23:04Z"),
             mock_event("bar", "2015-09-07T01:23:05Z"),
-            mock_event("baz", "2015-09-07T01:23:06Z"),
-        ];
+            mock_event("baz", "2015-09-07T01:23:06Z")];
 
         let got = decode_all(message.clone()).unwrap();
 
@@ -992,11 +988,9 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 102, 111, 111,
         ];
 
-        let expected = vec![
-            mock_event("foo", "2015-09-07T01:23:04Z"),
+        let expected = [mock_event("foo", "2015-09-07T01:23:04Z"),
             mock_event("bar", "2015-09-07T01:23:05Z"),
-            mock_event("baz", "2015-09-07T01:23:06Z"),
-        ];
+            mock_event("baz", "2015-09-07T01:23:06Z")];
 
         let got = decode_all(message.clone()).unwrap();
 
@@ -1027,11 +1021,9 @@ mod tests {
             164, 103, 122, 105, 112,
         ];
 
-        let expected = vec![
-            mock_event("foo", "2015-09-07T01:23:04Z"),
+        let expected = [mock_event("foo", "2015-09-07T01:23:04Z"),
             mock_event("bar", "2015-09-07T01:23:05Z"),
-            mock_event("baz", "2015-09-07T01:23:06Z"),
-        ];
+            mock_event("baz", "2015-09-07T01:23:06Z")];
 
         let got = decode_all(message.clone()).unwrap();
 

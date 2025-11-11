@@ -451,7 +451,7 @@ group_by = [ "request_id" ]
             e_5.insert("extra_field", "value1");
             e_5.insert("test_end", "yep");
 
-            for event in vec![e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into()] {
+            for event in [e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into()] {
                 tx.send(event).await.unwrap();
             }
 
@@ -676,7 +676,7 @@ max_events = 1
             let mut e_3 = LogEvent::from("test 3");
             e_3.insert("id", "1");
 
-            for event in vec![e_1.into(), e_2.into(), e_3.into()] {
+            for event in [e_1.into(), e_2.into(), e_3.into()] {
                 tx.send(event).await.unwrap();
             }
 
@@ -729,14 +729,12 @@ max_events = 3
             let mut e_6 = LogEvent::from("test 6");
             e_6.insert("id", "1");
 
-            for event in vec![
-                e_1.into(),
+            for event in [e_1.into(),
                 e_2.into(),
                 e_3.into(),
                 e_4.into(),
                 e_5.into(),
-                e_6.into(),
-            ] {
+                e_6.into()] {
                 tx.send(event).await.unwrap();
             }
 

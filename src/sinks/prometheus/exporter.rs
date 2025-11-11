@@ -1186,8 +1186,7 @@ mod tests {
             },
         );
 
-        let metrics = vec![
-            base_summary_metric.clone(),
+        let metrics = [base_summary_metric.clone(),
             base_summary_metric
                 .clone()
                 .with_value(MetricValue::Distribution {
@@ -1212,8 +1211,7 @@ mod tests {
                 .with_value(MetricValue::Distribution {
                     statistic: StatisticKind::Histogram,
                     samples: samples!(7.0 => 4, 10.2 => 1),
-                }),
-        ];
+                })];
 
         // Figure out what the merged distributions should add up to.
         let mut merged_summary = base_summary_metric.clone();
@@ -1305,8 +1303,7 @@ mod tests {
             },
         );
 
-        let metrics = vec![
-            base_summary_metric.clone(),
+        let metrics = [base_summary_metric.clone(),
             base_summary_metric
                 .clone()
                 .with_value(MetricValue::Distribution {
@@ -1331,8 +1328,7 @@ mod tests {
                 .with_value(MetricValue::Distribution {
                     statistic: StatisticKind::Histogram,
                     samples: samples!(7.0 => 4, 10.2 => 1),
-                }),
-        ];
+                })];
 
         // Figure out what the merged distributions should add up to.
         let mut merged_summary = base_summary_metric.clone();
@@ -1406,16 +1402,14 @@ mod tests {
             MetricValue::Gauge { value: -10.0 },
         );
 
-        let metrics = vec![
-            base_absolute_gauge_metric.clone(),
+        let metrics = [base_absolute_gauge_metric.clone(),
             base_absolute_gauge_metric
                 .clone()
                 .with_value(MetricValue::Gauge { value: 333.0 }),
             base_incremental_gauge_metric.clone(),
             base_incremental_gauge_metric
                 .clone()
-                .with_value(MetricValue::Gauge { value: 4.0 }),
-        ];
+                .with_value(MetricValue::Gauge { value: 4.0 })];
 
         // Now run the events through the sink and see what ends up in the internal metric map.
         let metrics_handle = Arc::clone(&sink.metrics);

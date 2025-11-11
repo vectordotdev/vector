@@ -46,8 +46,10 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
+#[derive(Default)]
 pub enum OpenSearchServiceType {
     /// Elasticsearch or OpenSearch Managed domain
+    #[default]
     Managed,
     /// OpenSearch Serverless collection
     Serverless,
@@ -62,11 +64,6 @@ impl OpenSearchServiceType {
     }
 }
 
-impl Default for OpenSearchServiceType {
-    fn default() -> Self {
-        Self::Managed
-    }
-}
 
 /// Configuration for the `elasticsearch` sink.
 #[configurable_component(sink("elasticsearch", "Index observability events in Elasticsearch."))]

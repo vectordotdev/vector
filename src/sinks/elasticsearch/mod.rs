@@ -61,9 +61,11 @@ pub enum ElasticsearchAuthConfig {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ElasticsearchMode {
     /// Ingests documents in bulk, using the bulk API `index` action.
     #[serde(alias = "normal")]
+    #[default]
     Bulk,
 
     /// Ingests documents in bulk, using the bulk API `create` action.
@@ -75,11 +77,6 @@ pub enum ElasticsearchMode {
     DataStream,
 }
 
-impl Default for ElasticsearchMode {
-    fn default() -> Self {
-        Self::Bulk
-    }
-}
 
 /// Bulk API actions.
 #[configurable_component]
@@ -295,6 +292,7 @@ impl ElasticsearchCommonMode {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ElasticsearchApiVersion {
     /// Auto-detect the API version.
     ///
@@ -305,6 +303,7 @@ pub enum ElasticsearchApiVersion {
     /// incorrect API calls.
     ///
     /// [es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
+    #[default]
     Auto,
     /// Use the Elasticsearch 6.x API.
     V6,
@@ -314,11 +313,6 @@ pub enum ElasticsearchApiVersion {
     V8,
 }
 
-impl Default for ElasticsearchApiVersion {
-    fn default() -> Self {
-        Self::Auto
-    }
-}
 
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub))]
