@@ -9,7 +9,7 @@ releases: "0.51.0": {
 	known_issues: [
 		"""
 			The newly added `basename`, `dirname` and `split_path` VRL functions are not accessible
-			because they weren't included in VRLs stdlib
+			because they weren't included in VRLs stdlib.
 		""",
 		"""
 			The newly added `config_reload_rejected` and `config_reloaded` counters are not
@@ -18,7 +18,7 @@ releases: "0.51.0": {
 			respectively.
 		""",
 		"""
-			Blackhole sink periodic statistics messages are incorrectly rate limited
+			Blackhole sink periodic statistics messages are incorrectly rate limited.
 		""",
 		"""
 			Threads panic when log messages are missing both a message and a rate limit tag. This is
