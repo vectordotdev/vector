@@ -21,9 +21,10 @@ releases: "0.51.0": {
 			Blackhole sink periodic statistics messages are incorrectly rate limited.
 		""",
 		"""
-			Threads panic when log messages are missing both a message and a rate limit tag. This is
-			known to affect the file server (affecting the `file` and `kubernetes_logs` sources) when
-			Vector is running with debug logs enabled.
+			When running Vector with debug logs enabled (`VECTOR_LOG=debug`), threads panic when log
+			messages are missing both a message and a rate limit tag. This is known to happen when
+			the utilization debug log was emitted and in the file server (affecting the `file` and
+			`kubernetes_logs` sources).
 		"""
 	]
 
