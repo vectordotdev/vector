@@ -9,7 +9,7 @@ releases: "0.51.0": {
 	known_issues: [
 		"""
 			The newly added `basename`, `dirname` and `split_path` VRL functions are not accessible
-			because they weren't included in VRLs stdlib.
+			because they weren't properly exposed in the latest VRL release (0.28.0).
 		""",
 		"""
 			The newly added `config_reload_rejected` and `config_reloaded` counters are not
