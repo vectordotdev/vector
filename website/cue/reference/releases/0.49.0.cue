@@ -13,7 +13,7 @@ releases: "0.49.0": {
 			- Encoder: supports logs and traces.
 
 			Metrics are not supported. Any future updates will be noted in changelogs.
-		""",
+			""",
 		"""
 			In this version, the `aws_s3` default `retry_strategy` is to never retry. A workaround to restore the correct default behavior is to set:
 
@@ -28,7 +28,7 @@ releases: "0.49.0": {
 			retry_strategy:
 			  type: all
 			```
-		""",
+			""",
 	]
 
 	description: """
@@ -170,7 +170,7 @@ releases: "0.49.0": {
 			type: "enhancement"
 			description: """
 				The `nats` sink now supports message headers when publishing to JetStream.
-				
+
 				It introduces a configurable, templated Nats-Msg-Id header that ensures a unique ID for each message. This enables broker-level deduplication, resulting in stronger delivery guarantees and exactly-once semantics when combined with idempotent consumers.
 				"""
 			contributors: ["benjamin-awd"]
@@ -286,9 +286,9 @@ releases: "0.49.0": {
 
 	vrl_changelog: """
 		### 0.26.0
-		
+
 		#### Breaking Changes & Upgrade Guide
-		
+
 		- The `parse_cef` now trims unnecessary whitespace around escaped values in both headers and extension fields, improving accuracy and reliability when dealing with messy input strings.
 			authors: yjagdale (https://github.com/vectordotdev/vrl/pull/1430)
 
@@ -298,9 +298,9 @@ releases: "0.49.0": {
 
 		- `encode_lz4`  no longer prepends the uncompressed size by default, improving compatibility with standard LZ4 tools. A new `prepend_size` flag restores the old behavior if needed. Also, `decode_lz4` now also accepts `prepend_size` and a `buf_size` option (default: 1MB).
 			authors: jlambatl (https://github.com/vectordotdev/vrl/pull/1447)
-		
+
 		#### New Features
-		
+
 		- Added `haversine` function for calculating [haversine](https://en.wikipedia.org/wiki/Haversine_formula) distance and bearing.
 			authors: esensar Quad9DNS (https://github.com/vectordotdev/vrl/pull/1442)
 
