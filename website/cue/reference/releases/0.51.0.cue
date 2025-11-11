@@ -6,6 +6,27 @@ releases: "0.51.0": {
 
 	whats_next: []
 
+	known_issues: [
+		"""
+			The newly added `basename`, `dirname` and `split_path` VRL functions are not accessible
+			because they weren't included in VRLs stdlib
+		""",
+		"""
+			The newly added `config_reload_rejected` and `config_reloaded` counters are not
+			emitted. These counters will be replaced in the next patch release (0.51.1) in favor of
+			`component_errors_total` with `error_code="reload"` and `reloaded_total` metrics,
+			respectively.
+		""",
+		"""
+			Blackhole sink periodic statistics messages are incorrectly rate limited
+		""",
+		"""
+			Threads panic when log messages are missing both a message and a rate limit tag. This is
+			known to affect the file server (affecting the `file` and `kubernetes_logs` sources) when
+			Vector is running with debug logs enabled.
+		"""
+	]
+
 	description: """
 		The Vector team is excited to announce version `0.51.0`!
 
