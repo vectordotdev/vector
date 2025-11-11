@@ -112,7 +112,7 @@ We helped bring these community contributions to production (listed alphabetical
 **What this means for you:** More integration options, new data sources, and flexible routing capabilities to fit
 Vector into your existing infrastructure.
 
-## Making Vector Development Better
+## Improving Vector development
 
 While our primary focus is making Vector better for you, we've also invested in making it easier for you to
 contribute to Vector. Despite being a small team, we've worked hard to review pull requests quickly and provide
@@ -141,7 +141,7 @@ As we enter our second year, our focus remains on the themes that have guided us
 - **Better learning resources**: Expanding documentation and guides to help both new and experienced users
 - **Supporting contributors**: Helping community ideas and contributions make their way into Vector
 
-## Thank You
+## Thank you
 
 Thank you to the Vector community for your support, feedback, and contributions. The open source community is what
 makes Vector great, and we're honored to be part of it.
@@ -166,7 +166,7 @@ For those interested in the technical details:
 - [v0.50.0 Release Notes]({{< ref "/releases/0.50.0" >}}) - September 2025
 - [v0.51.0 Release Notes]({{< ref "/releases/0.51.0" >}}) - November 2025
 
-### VRL Functions Added
+### VRL functions added
 
 For a complete list of VRL functions added during this period, see
 the [VRL Changelog](https://github.com/vectordotdev/vrl/blob/main/CHANGELOG.md).
