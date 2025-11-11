@@ -310,7 +310,7 @@ pub enum Auth {
     },
 
     /// Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`
-    CustomAuthorization {
+    Custom {
         /// Custom string value of the Authorization header
         #[configurable(metadata(docs::examples = "${AUTH_HEADER_VALUE}"))]
         #[configurable(metadata(docs::examples = "CUSTOM_PREFIX ${TOKEN}"))]
@@ -354,7 +354,7 @@ impl Auth {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
-            Auth::CustomAuthorization { value } => {
+            Auth::Custom { value } => {
                 // The value contains just the value for the Authorization header
                 // Expected format: "SSWS token123" or "Bearer token123", etc.
                 match HeaderValue::from_str(value) {
