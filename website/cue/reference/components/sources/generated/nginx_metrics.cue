@@ -162,7 +162,7 @@ generated: components: sources: nginx_metrics: configuration: {
 
 						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
 						"""
-					custom_authorization: "Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`"
+					custom: "Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`"
 				}
 			}
 			token: {
@@ -179,7 +179,7 @@ generated: components: sources: nginx_metrics: configuration: {
 			}
 			value: {
 				description:   "Custom string value of the Authorization header"
-				relevant_when: "strategy = \"custom_authorization\""
+				relevant_when: "strategy = \"custom\""
 				required:      true
 				type: string: examples: ["${AUTH_HEADER_VALUE}", "CUSTOM_PREFIX ${TOKEN}"]
 			}
