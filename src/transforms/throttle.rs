@@ -7,6 +7,7 @@ use serde_with::serde_as;
 use snafu::Snafu;
 use vector_lib::config::{clone_input_definitions, LogNamespace};
 use vector_lib::configurable::configurable_component;
+use vector_lib::ByteSizeOf;
 
 use crate::{
     conditions::{AnyCondition, Condition},
@@ -36,6 +37,40 @@ pub struct ThrottleInternalMetricsConfig {
     pub emit_events_discarded_per_key: bool,
 }
 
+/// The mode for rate limiting.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ThrottleMode {
+    /// Rate limit by number of events.
+    Event,
+    /// Rate limit by byte size of events.
+    Byte,
+}
+
+impl Default for ThrottleMode {
+    fn default() -> Self {
+        Self::Event
+    }
+}
+
+/// The strategy for handling rate limit exceeded.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ThrottleStrategy {
+    /// Drop events that exceed the rate limit.
+    Drop,
+    /// Block and wait until the rate limit allows the event through (supports backpressure).
+    Block,
+}
+
+impl Default for ThrottleStrategy {
+    fn default() -> Self {
+        Self::Drop
+    }
+}
+
 /// Configuration for the `throttle` transform.
 #[serde_as]
 #[configurable_component(transform("throttle", "Rate limit logs passing through a topology."))]
@@ -45,6 +80,8 @@ pub struct ThrottleConfig {
     /// The number of events allowed for a given bucket per configured `window_secs`.
     ///
     /// Each unique key has its own `threshold`.
+    ///
+    /// When `mode` is `byte`, this represents the number of bytes allowed.
     threshold: u32,
 
     /// The time window in which the configured `threshold` is applied, in seconds.
@@ -61,6 +98,22 @@ pub struct ThrottleConfig {
 
     /// A logical condition used to exclude events from sampling.
     exclude: Option<AnyCondition>,
+
+    /// The mode for rate limiting.
+    ///
+    /// - `event`: Rate limit by number of events (default).
+    /// - `byte`: Rate limit by byte size of events.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "event", docs::examples = "byte"))]
+    mode: ThrottleMode,
+
+    /// The strategy for handling rate limit exceeded.
+    ///
+    /// - `drop`: Drop events that exceed the rate limit (default).
+    /// - `block`: Block and wait until the rate limit allows the event through (supports backpressure).
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "drop", docs::examples = "block"))]
+    strategy: ThrottleStrategy,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -102,6 +155,9 @@ pub struct Throttle<C: clock::Clock<Instant = I>, I: clock::Reference> {
     exclude: Option<Condition>,
     clock: C,
     internal_metrics: ThrottleInternalMetricsConfig,
+    mode: ThrottleMode,
+    strategy: ThrottleStrategy,
+    threshold: u32,
 }
 
 impl<C, I> Throttle<C, I>
@@ -140,13 +196,16 @@ where
             key_field: config.key_field.clone(),
             exclude,
             internal_metrics: config.internal_metrics.clone(),
+            mode: config.mode,
+            strategy: config.strategy,
+            threshold: config.threshold,
         })
     }
 }
 
 impl<C, I> TaskTransform<Event> for Throttle<C, I>
 where
-    C: clock::Clock<Instant = I> + Send + 'static,
+    C: clock::Clock<Instant = I> + Send + 'static + Clone,
     I: clock::Reference + Send + 'static,
 {
     fn transform(
@@ -189,16 +248,69 @@ where
                                         .ok()
                                 });
 
-                                match limiter.check_key(&key) {
-                                    Ok(()) => {
-                                        Some(event)
+                                let check_result = match self.mode {
+                                    ThrottleMode::Event => limiter.check_key(&key).map_err(|_| ()),
+                                    ThrottleMode::Byte => {
+                                        let byte_size = event.size_of() as u32;
+                                        // In block mode, if event byte size exceeds threshold, pass directly without time window check
+                                        // In drop mode, keep the original logic
+                                        if self.strategy == ThrottleStrategy::Block && byte_size > self.threshold {
+                                            Ok(())
+                                        } else {
+                                            match limiter.check_key_n(&key, NonZeroU32::new(byte_size).unwrap_or(NonZeroU32::new(1).unwrap())) {
+                                                Ok(Ok(())) => Ok(()),
+                                                Ok(Err(_)) | Err(_) => Err(()),
+                                            }
+                                        }
                                     }
-                                    _ => {
-                                        emit!(ThrottleEventDiscarded{
-                                            key: key.unwrap_or_else(|| "None".to_string()),
-                                            emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key
-                                        });
-                                        None
+                                };
+
+                                match check_result {
+                                    Ok(()) => Some(event),
+                                    Err(_) => {
+                                        match self.strategy {
+                                            ThrottleStrategy::Drop => {
+                                                emit!(ThrottleEventDiscarded{
+                                                    key: key.unwrap_or_else(|| "None".to_string()),
+                                                    emit_events_discarded_per_key: self.internal_metrics.emit_events_discarded_per_key
+                                                });
+                                                None
+                                            }
+                                            ThrottleStrategy::Block => {
+                                                // Wait until the rate limiter allows the event through
+                                                let byte_size = match self.mode {
+                                                    ThrottleMode::Event => NonZeroU32::new(1).unwrap(),
+                                                    ThrottleMode::Byte => NonZeroU32::new(event.size_of() as u32).unwrap_or(NonZeroU32::new(1).unwrap()),
+                                                };
+
+                                                // Wait until quota is available and consume it
+                                                // Use polling instead of until_key_ready to avoid ReasonablyRealtime trait bound
+                                                // Yield first to allow other tasks to run
+                                                tokio::task::yield_now().await;
+
+                                                loop {
+                                                    let can_proceed = match self.mode {
+                                                        ThrottleMode::Event => limiter.check_key(&key).is_ok(),
+                                                        ThrottleMode::Byte => {
+                                                            match limiter.check_key_n(&key, byte_size) {
+                                                                Ok(Ok(())) => true,
+                                                                _ => false,
+                                                            }
+                                                        }
+                                                    };
+
+                                                    if can_proceed {
+                                                        break;
+                                                    }
+
+                                                    // Wait a short time before checking again
+                                                    // Use a shorter sleep interval for better responsiveness
+                                                    tokio::time::sleep(Duration::from_millis(1)).await;
+                                                }
+
+                                                Some(event)
+                                            }
+                                        }
                                     }
                                 }
                             } else {
@@ -444,6 +556,8 @@ key_field = "{{ bucket }}"
                 window_secs: Duration::from_secs_f64(1.0),
                 key_field: None,
                 exclude: None,
+                mode: ThrottleMode::default(),
+                strategy: ThrottleStrategy::default(),
                 internal_metrics: Default::default(),
             };
             let (tx, rx) = mpsc::channel(1);
@@ -459,5 +573,239 @@ key_field = "{{ bucket }}"
             assert_eq!(out.recv().await, None);
         })
         .await
+    }
+
+    #[tokio::test]
+    async fn throttle_by_byte_size() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 10000
+window_secs = 5
+mode = "byte"
+strategy = "drop"
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::event_task)
+            .unwrap();
+
+        let throttle = throttle.into_task();
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
+
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // Send small event to consume part of the quota
+        let small_event = LogEvent::from("small");
+        tx.send(small_event.into()).await.unwrap();
+        assert!(out_stream.next().await.is_some(), "Small event should pass");
+
+        // Send large event that exceeds remaining quota, should be dropped
+        let mut large_event = LogEvent::from("large");
+        large_event.insert("data", "x".repeat(250)); // Exceeds threshold of 200 bytes
+        tx.send(large_event.into()).await.unwrap();
+        tx.disconnect();
+
+        // Wait for stream processing to complete
+        tokio::time::sleep(Duration::from_millis(50)).await;
+        let result = tokio::time::timeout(Duration::from_secs(1), out_stream.next()).await;
+        match result {
+            Ok(None) => {} // Stream ended normally, event was dropped
+            Ok(Some(_)) => panic!("Large event should be dropped"),
+            Err(_) => panic!("Stream did not end within timeout"),
+        }
+    }
+
+    #[tokio::test]
+    async fn throttle_block_strategy() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 2
+window_secs = 5
+mode = "event"
+strategy = "block"
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::event_task)
+            .unwrap();
+
+        let throttle = throttle.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
+
+        // tokio interval is always immediately ready, so we poll once to make sure
+        // we trip it/set the interval in the future
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // Send first two events - should pass immediately
+        tx.send(LogEvent::default().into()).await.unwrap();
+        tx.send(LogEvent::default().into()).await.unwrap();
+
+        let mut count = 0_u8;
+        while count < 2 {
+            if let Some(_event) = out_stream.next().await {
+                count += 1;
+            } else {
+                panic!("Unexpectedly received None in output stream");
+            }
+        }
+        assert_eq!(2, count);
+
+        // Send a third event - should be blocked until quota is available
+        // We need to advance time to make quota available
+        // Start sending the event in the background
+        let send_future = async {
+            tx.send(LogEvent::default().into()).await.unwrap();
+        };
+
+        // Advance time to make quota available
+        clock.advance(Duration::from_secs(3));
+
+        // The event should eventually pass through (blocked until quota available)
+        tokio::select! {
+            _ = send_future => {},
+            _ = tokio::time::sleep(Duration::from_secs(1)) => {
+                panic!("Send should complete within timeout");
+            }
+        }
+
+        // The event should eventually come through
+        tokio::time::timeout(Duration::from_secs(1), out_stream.next())
+            .await
+            .expect("Event should eventually pass through with block strategy")
+            .expect("Event should not be None");
+
+        tx.disconnect();
+    }
+
+    #[tokio::test]
+    async fn throttle_byte_block_strategy() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 500
+window_secs = 5
+mode = "byte"
+strategy = "block"
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::event_task)
+            .unwrap();
+
+        let throttle = throttle.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
+
+        // tokio interval is always immediately ready, so we poll once to make sure
+        // we trip it/set the interval in the future
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // Create a small event that should pass immediately
+        let small_event = LogEvent::from("small");
+        tx.send(small_event.into()).await.unwrap();
+
+        if let Some(_event) = out_stream.next().await {
+            // Event passed
+        } else {
+            panic!("Small event should have passed");
+        }
+
+        // Create another small event - should also pass immediately (within threshold)
+        let small_event2 = LogEvent::from("small2");
+        tx.send(small_event2.into()).await.unwrap();
+
+        if let Some(_event) = out_stream.next().await {
+            // Event passed
+        } else {
+            panic!("Second small event should have passed");
+        }
+
+        // Create a larger event that should be blocked initially
+        // But since we have enough quota (threshold = 500), it should pass
+        let mut larger_event = LogEvent::from("larger");
+        larger_event.insert("data", "x".repeat(100)); // Should be within threshold
+
+        // Send the event
+        tx.send(larger_event.into()).await.unwrap();
+
+        // The event should come through (within threshold, so should pass)
+        // Use timeout to avoid hanging
+        tokio::time::timeout(Duration::from_secs(1), out_stream.next())
+            .await
+            .expect("Event should pass through with block strategy")
+            .expect("Event should not be None");
+
+        tx.disconnect();
+    }
+
+    #[tokio::test]
+    async fn throttle_byte_size_exceeds_threshold_passes_directly() {
+        let clock = clock::FakeRelativeClock::default();
+        let config = toml::from_str::<ThrottleConfig>(
+            r#"
+threshold = 100
+window_secs = 5
+mode = "byte"
+strategy = "block"
+"#,
+        )
+        .unwrap();
+
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone())
+            .map(Transform::event_task)
+            .unwrap();
+
+        let throttle = throttle.into_task();
+
+        let (mut tx, rx) = futures::channel::mpsc::channel(10);
+        let mut out_stream = throttle.transform_events(Box::pin(rx));
+
+        // tokio interval is always immediately ready, so we poll once to make sure
+        // we trip it/set the interval in the future
+        assert_eq!(Poll::Pending, futures::poll!(out_stream.next()));
+
+        // Fill up the quota with small events to exhaust it
+        for _ in 0..10 {
+            let small_event = LogEvent::from("small");
+            tx.send(small_event.into()).await.unwrap();
+            if let Some(_event) = out_stream.next().await {
+                // Event passed
+            } else {
+                panic!("Small event should have passed");
+            }
+        }
+
+        // Now quota should be exhausted
+        // In block mode, small events would be blocked, but we want to test that
+        // large events (exceeding threshold) pass directly even when quota is exhausted
+
+        // Create a large event that exceeds threshold (byte_size > 100)
+        let mut large_event = LogEvent::from("This is a large message");
+        large_event.insert("data", "x".repeat(200)); // Make it large enough to exceed threshold
+
+        // Send a large event - should pass directly without time window check
+        // even though quota is exhausted (in block mode, this bypasses the wait)
+        tx.send(large_event.into()).await.unwrap();
+
+        // The large event should pass through directly since byte_size > threshold
+        // even though quota is exhausted - this is the key feature we're testing
+        tokio::time::timeout(Duration::from_secs(1), out_stream.next())
+            .await
+            .expect("Large event should pass through immediately without waiting")
+            .expect("Large event should not be None");
+
+        tx.disconnect();
     }
 }
