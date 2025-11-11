@@ -622,8 +622,9 @@ mod tests {
         http::HttpClient,
         sinks::prometheus::{distribution_to_agg_histogram, distribution_to_ddsketch},
         test_util::{
+            addr::next_addr,
             components::{SINK_TAGS, run_and_assert_sink_compliance},
-            next_addr, random_string, trace_init,
+            random_string, trace_init, wait_for_tcp,
         },
         tls::MaybeTlsSettings,
     };
@@ -902,7 +903,7 @@ mod tests {
         let client_settings = MaybeTlsSettings::from_config(tls_config.as_ref(), false).unwrap();
         let proto = client_settings.http_protocol_name();
 
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let config = PrometheusExporterConfig {
             address,
             tls: tls_config,
@@ -926,7 +927,9 @@ mod tests {
             &SINK_TAGS,
         ));
 
-        time::sleep(time::Duration::from_millis(100)).await;
+        // Wait for sink to bind to the port before releasing the guard
+        wait_for_tcp(address).await;
+        drop(_guard);
 
         // Events are marked as delivered as soon as they are aggregated.
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
@@ -989,7 +992,7 @@ mod tests {
         let client_settings = MaybeTlsSettings::from_config(None, false).unwrap();
         let proto = client_settings.http_protocol_name();
 
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let config = PrometheusExporterConfig {
             address,
             auth: server_auth_config,
@@ -1014,7 +1017,9 @@ mod tests {
             &SINK_TAGS,
         ));
 
-        time::sleep(time::Duration::from_millis(100)).await;
+        // Wait for sink to bind to the port before releasing the guard
+        wait_for_tcp(address).await;
+        drop(_guard);
 
         // Events are marked as delivered as soon as they are aggregated.
         assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
@@ -1106,7 +1111,10 @@ mod tests {
     #[tokio::test]
     async fn sink_absolute() {
         let config = PrometheusExporterConfig {
-            address: next_addr(), // Not actually bound, just needed to fill config
+            address: {
+                let (_guard1, addr) = next_addr();
+                addr
+            }, // Not actually bound, just needed to fill config
             tls: None,
             ..Default::default()
         };
@@ -1159,7 +1167,10 @@ mod tests {
 
         // This expects that the default for the sink is to render distributions as aggregated histograms.
         let config = PrometheusExporterConfig {
-            address: next_addr(), // Not actually bound, just needed to fill config
+            address: {
+                let (_guard2, addr) = next_addr();
+                addr
+            }, // Not actually bound, just needed to fill config
             tls: None,
             ..Default::default()
         };
@@ -1278,7 +1289,10 @@ mod tests {
         // The render code is actually what will end up rendering those sketches as aggregated
         // summaries in the scrape output.
         let config = PrometheusExporterConfig {
-            address: next_addr(), // Not actually bound, just needed to fill config
+            address: {
+                let (_guard3, addr) = next_addr();
+                addr
+            }, // Not actually bound, just needed to fill config
             tls: None,
             distributions_as_summaries: true,
             ..Default::default()
@@ -1387,7 +1401,10 @@ mod tests {
         // This test ensures that this normalization works correctly when applied to a mix of both
         // Incremental and Absolute inputs.
         let config = PrometheusExporterConfig {
-            address: next_addr(), // Not actually bound, just needed to fill config
+            address: {
+                let (_guard4, addr) = next_addr();
+                addr
+            }, // Not actually bound, just needed to fill config
             tls: None,
             ..Default::default()
         };

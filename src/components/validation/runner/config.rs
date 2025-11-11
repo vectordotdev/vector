@@ -14,7 +14,7 @@ use crate::{
     config::{BoxedSink, BoxedSource, BoxedTransform, ConfigBuilder},
     sinks::vector::VectorConfig as VectorSinkConfig,
     sources::vector::VectorConfig as VectorSourceConfig,
-    test_util::next_addr,
+    test_util::addr::next_addr,
 };
 
 pub struct TopologyBuilder {
@@ -125,7 +125,10 @@ impl TopologyBuilder {
 }
 
 fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedSource>) {
-    let input_listen_addr = GrpcAddress::from(next_addr());
+    let input_listen_addr = GrpcAddress::from({
+        let (_guard2, addr) = next_addr();
+        addr
+    });
     debug!(listen_addr = %input_listen_addr, "Creating controlled input edge.");
 
     let mut input_source = VectorSourceConfig::from_address(input_listen_addr.as_socket_addr());
@@ -138,7 +141,10 @@ fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedS
 }
 
 fn build_output_edge() -> (OutputEdge, impl Into<BoxedSink>) {
-    let output_listen_addr = GrpcAddress::from(next_addr());
+    let output_listen_addr = GrpcAddress::from({
+        let (_guard3, addr) = next_addr();
+        addr
+    });
     debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");
 
     let mut output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());
