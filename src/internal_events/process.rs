@@ -64,12 +64,15 @@ impl InternalEvent for VectorQuit {
 }
 
 #[derive(Debug)]
-pub struct VectorReloadError;
+pub struct VectorReloadError {
+    pub reason: &'static str,
+}
 
 impl InternalEvent for VectorReloadError {
     fn emit(self) {
         error!(
             message = "Reload was not successful.",
+            reason = self.reason,
             error_code = "reload",
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::PROCESSING,
@@ -80,6 +83,7 @@ impl InternalEvent for VectorReloadError {
             "error_code" => "reload",
             "error_type" => error_type::CONFIGURATION_FAILED,
             "stage" => error_stage::PROCESSING,
+            "reason" => self.reason,
         )
         .increment(1);
     }
