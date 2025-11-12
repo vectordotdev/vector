@@ -2,7 +2,7 @@ use std::env;
 
 use anyhow::Result;
 
-use crate::{app, util::CargoToml};
+use crate::{app, utils::cargo::CargoToml};
 
 const CARGO: &str = "cargo";
 const BASE_ARGS: [&str; 5] = [

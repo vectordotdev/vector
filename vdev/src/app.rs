@@ -13,7 +13,7 @@ use anyhow::{Context as _, Result, bail};
 use indicatif::{ProgressBar, ProgressStyle};
 use log::LevelFilter;
 
-use crate::{config::Config, git, platform, util};
+use crate::utils::{self, platform};
 
 // Use the `bash` interpreter included as part of the standard `git` install for our default shell
 // if nothing is specified in the environment.
@@ -30,15 +30,10 @@ pub static SHELL: LazyLock<OsString> =
     LazyLock::new(|| env::var_os("SHELL").unwrap_or_else(|| DEFAULT_SHELL.into()));
 
 static VERBOSITY: OnceLock<LevelFilter> = OnceLock::new();
-static CONFIG: OnceLock<Config> = OnceLock::new();
 static PATH: OnceLock<String> = OnceLock::new();
 
 pub fn verbosity() -> &'static LevelFilter {
     VERBOSITY.get().expect("verbosity is not initialized")
-}
-
-pub fn config() -> &'static Config {
-    CONFIG.get().expect("config is not initialized")
 }
 
 pub fn path() -> &'static String {
@@ -50,12 +45,12 @@ pub fn set_repo_dir() -> Result<()> {
 }
 
 pub fn version() -> Result<String> {
-    let mut version = util::get_version()?;
+    let mut version = utils::cargo::get_version()?;
 
-    let channel = util::get_channel();
+    let channel = utils::git::get_channel();
 
     if channel == "release" {
-        let head = util::git_head()?;
+        let head = utils::git::git_head()?;
         if !head.status.success() {
             let error = String::from_utf8_lossy(&head.stderr);
             bail!("Error running `git describe`:\n{error}");
@@ -69,7 +64,7 @@ pub fn version() -> Result<String> {
 
     // extend version for custom builds if not already
     } else if channel == "custom" && !version.contains("custom") {
-        let sha = git::get_git_sha()?;
+        let sha = utils::git::get_git_sha()?;
 
         // use '.' instead of '-' or '_' to avoid issues with rpm and deb package naming
         // format requirements.
@@ -256,10 +251,6 @@ fn get_progress_bar() -> Result<ProgressBar> {
 
 pub fn set_global_verbosity(verbosity: LevelFilter) {
     VERBOSITY.set(verbosity).expect("could not set verbosity");
-}
-
-pub fn set_global_config(config: Config) {
-    CONFIG.set(config).expect("could not set config");
 }
 
 pub fn set_global_path(path: String) {

@@ -6,6 +6,9 @@ edition = "2024"
 publish = false
 license = "MPL-2.0"
 
+[lints.clippy]
+unwrap-used = "forbid"
+
 [dependencies]
 tracing-core = { version = "0.1", default-features = false }
 tracing-subscriber = { workspace = true, features = ["registry", "std"] }
