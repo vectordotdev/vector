@@ -1,13 +1,19 @@
+mod channel;
+mod github;
+mod homebrew;
+mod prepare;
+mod push;
+
 crate::cli_subcommands! {
     "Manage the release process..."
     generate_cue,
-    mod channel,
+    channel,
     commit,
     docker,
-    mod github,
-    mod homebrew,
-    mod prepare,
-    mod push,
+    github,
+    homebrew,
+    prepare,
+    push,
     s3,
 }
 

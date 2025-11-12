@@ -187,7 +187,7 @@ snafu = { version = "0.8.9", default-features = false, features = ["futures", "s
 socket2 = { version = "0.5.10", default-features = false }
 tempfile = "3.23.0"
 tokio = { version = "1.45.1", default-features = false }
-toml = { version = "0.9.5", default-features = false, features = ["serde", "display", "parse"] }
+toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tracing = { version = "0.1.34", default-features = false }
@@ -999,7 +999,7 @@ webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
-test-utils = []
+test-utils = ["vector-lib/test"]
 
 # End-to-End testing-related features
 all-e2e-tests = [

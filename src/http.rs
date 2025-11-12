@@ -308,6 +308,14 @@ pub enum Auth {
         /// The AWS service name to use for signing.
         service: String,
     },
+
+    /// Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`
+    Custom {
+        /// Custom string value of the Authorization header
+        #[configurable(metadata(docs::examples = "${AUTH_HEADER_VALUE}"))]
+        #[configurable(metadata(docs::examples = "CUSTOM_PREFIX ${TOKEN}"))]
+        value: String,
+    },
 }
 
 pub trait MaybeAuth: Sized {
@@ -346,6 +354,18 @@ impl Auth {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
+            Auth::Custom { value } => {
+                // The value contains just the value for the Authorization header
+                // Expected format: "SSWS token123" or "Bearer token123", etc.
+                match HeaderValue::from_str(value) {
+                    Ok(header_val) => {
+                        map.insert(http::header::AUTHORIZATION, header_val);
+                    }
+                    Err(error) => {
+                        error!(message = "Invalid custom auth header value.", value = %value, %error)
+                    }
+                }
+            }
             #[cfg(feature = "aws-core")]
             _ => {}
         }
