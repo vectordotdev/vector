@@ -36,7 +36,7 @@ env:
 
 jobs:
   changes:
-    if: github.event_name == 'merge_group'
+    if: github.event_name == 'pull_request'
     uses: ./.github/workflows/changes.yml
     with:
       source: true
@@ -48,9 +48,8 @@ jobs:
     needs: changes
     if: ${{
       github.event_name == 'workflow_dispatch' ||
-      (github.event_name == 'merge_group' &&
+      (github.event_name == 'pull_request' &&
        (needs.changes.outputs.dependencies == 'true' ||
-        needs.changes.outputs.integration-yml == 'true' ||
         needs.changes.outputs.int-tests-any == 'true' ||
         needs.changes.outputs.e2e-tests-any == 'true'))
      }}
@@ -65,7 +64,7 @@ jobs:
       - changes
       - build-test-runner
 
-    if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
@@ -85,7 +84,7 @@ jobs:
 
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-        if: github.event_name == 'merge_group'
+        if: github.event_name == 'pull_request'
         with:
           name: int_tests_changes
 
@@ -133,7 +132,7 @@ jobs:
     needs:
       - changes
       - build-test-runner
-    if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ !failure() && !cancelled() && (github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
         service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics" ]
@@ -146,7 +145,7 @@ jobs:
 
       - name: Download JSON artifact from changes.yml
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
-        if: github.event_name == 'merge_group'
+        if: github.event_name == 'pull_request'
         with:
           name: e2e_tests_changes
 
