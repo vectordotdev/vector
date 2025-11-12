@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.51.0"
+version = "0.52.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -187,7 +187,7 @@ snafu = { version = "0.8.9", default-features = false, features = ["futures", "s
 socket2 = { version = "0.5.10", default-features = false }
 tempfile = "3.23.0"
 tokio = { version = "1.45.1", default-features = false }
-toml = { version = "0.9.5", default-features = false, features = ["serde", "display", "parse"] }
+toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tracing = { version = "0.1.34", default-features = false }
@@ -199,6 +199,8 @@ vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+mock_instant = { version = "0.6" }
+serial_test = { version = "3.2" }
 
 [dependencies]
 cfg-if.workspace = true
@@ -456,17 +458,19 @@ assert_cmd = { version = "2.0.17", default-features = false }
 aws-smithy-runtime = { version = "1.8.3", default-features = false, features = ["tls-rustls"] }
 azure_core = { version = "0.25", default-features = false, features = ["reqwest", "hmac_openssl", "azurite_workaround"] }
 azure_identity = { version = "0.25", default-features = false, features = ["reqwest"] }
-azure_storage_blobs = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl", "azurite_workaround"] }
 azure_storage = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl"] }
+azure_storage_blobs = { version = "0.21", default-features = false, features = ["enable_reqwest", "hmac_openssl", "azurite_workaround"] }
 base64 = "0.22.1"
 criterion = { version = "0.7.0", features = ["html_reports", "async_tokio"] }
 itertools.workspace = true
 libc.workspace = true
-similar-asserts = "1.7.0"
+mock_instant.workspace = true
 proptest.workspace = true
 quickcheck = "1.0.3"
 reqwest.workspace = true
 rstest = { version = "0.26.1" }
+serial_test.workspace = true
+similar-asserts = "1.7.0"
 tempfile.workspace = true
 test-generator = "0.3.1"
 tokio = { workspace = true, features = ["test-util"] }
@@ -643,7 +647,7 @@ sources-aws_ecs_metrics = ["sources-utils-http-client"]
 sources-aws_kinesis_firehose = ["dep:base64"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
-sources-datadog_agent = ["sources-utils-http-error", "protobuf-build", "dep:prost"]
+sources-datadog_agent = ["sources-utils-http-encoding", "protobuf-build", "dep:prost"]
 sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "dep:dnstap-parser", "protobuf-build", "dep:prost"]
 sources-docker_logs = ["docker"]
@@ -724,6 +728,7 @@ transforms-logs = [
   "transforms-exclusive-route",
   "transforms-sample",
   "transforms-throttle",
+  "transforms-trace_to_log"
 ]
 transforms-metrics = [
   "transforms-aggregate",
@@ -753,6 +758,7 @@ transforms-exclusive-route = []
 transforms-sample = ["transforms-impl-sample"]
 transforms-tag_cardinality_limit = ["dep:bloomy", "dep:hashbrown"]
 transforms-throttle = ["dep:governor"]
+transforms-trace_to_log = []
 
 # Implementations of transforms
 transforms-impl-sample = []
@@ -915,6 +921,7 @@ all-integration-tests = [
   "logstash-integration-tests",
   "loki-integration-tests",
   "mongodb_metrics-integration-tests",
+  "mqtt-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
   "opentelemetry-integration-tests",
@@ -994,7 +1001,7 @@ webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
-test-utils = []
+test-utils = ["vector-lib/test"]
 
 # End-to-End testing-related features
 all-e2e-tests = [

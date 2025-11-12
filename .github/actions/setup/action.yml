@@ -9,7 +9,7 @@ inputs:
   cargo-cache:
     required: false
     default: true
-    description: "Cache Cargo registry, index, git DB, and ~/.cargo/bin. Enabled automatically if any Rust tools are requested."
+    description: "Cache Cargo registry, index, and git DB. Enabled automatically if any Rust tools are requested."
 
   mold:
     required: false
@@ -58,6 +58,10 @@ inputs:
     required: false
     default: false
     description: "Install wasm-pack for Rust to WASM bridge."
+  vdev:
+    required: false
+    default: false
+    description: "Install vdev CLI tool (cached by vdev/ directory changes)."
 
   # prepare.sh - npm
   markdownlint:
@@ -87,7 +91,8 @@ runs:
                    "${{ inputs.cargo-deny }}" \
                    "${{ inputs.cargo-msrv }}" \
                    "${{ inputs.dd-rust-license-tool }}" \
-                   "${{ inputs.wasm-pack }}"; do
+                   "${{ inputs.wasm-pack }}" \
+                   "${{ inputs.vdev }}"; do
           if [[ "$val" == "true" ]]; then
             rust="true"
             break
@@ -119,12 +124,11 @@ runs:
         EOF
       shell: bash
 
-    - name: Cache Cargo registry + index
+    - name: Cache Cargo registry, index, and git DB
       if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
       with:
         path: |
-          ~/.cargo/bin/
           ~/.cargo/registry/index/
           ~/.cargo/registry/cache/
           ~/.cargo/git/db/
@@ -200,6 +204,28 @@ runs:
           -C "${TEMP}"
         sudo cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
+
+    - name: Install vdev
+      if: ${{ inputs.vdev == 'true' }}
+      uses: ./.github/actions/install-vdev
+
+    - name: Cache prepare.sh binaries
+      id: cache-prepare-binaries
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: |
+          ~/.cargo/bin/cargo-deb
+          ~/.cargo/bin/cross
+          ~/.cargo/bin/cargo-nextest
+          ~/.cargo/bin/cargo-deny
+          ~/.cargo/bin/cargo-msrv
+          ~/.cargo/bin/dd-rust-license-tool
+          ~/.cargo/bin/wasm-pack
+          /usr/local/bin/markdownlint
+          /usr/local/bin/datadog-ci
+        key: ${{ runner.os }}-prepare-binaries-${{ hashFiles('scripts/environment/*') }}
+        restore-keys: |
+          ${{ runner.os }}-prepare-binaries-
 
     - name: Run prepare.sh
       shell: bash

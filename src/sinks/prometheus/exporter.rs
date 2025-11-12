@@ -1186,7 +1186,7 @@ mod tests {
             },
         );
 
-        let metrics = vec![
+        let metrics = [
             base_summary_metric.clone(),
             base_summary_metric
                 .clone()
@@ -1305,7 +1305,7 @@ mod tests {
             },
         );
 
-        let metrics = vec![
+        let metrics = [
             base_summary_metric.clone(),
             base_summary_metric
                 .clone()
@@ -1406,7 +1406,7 @@ mod tests {
             MetricValue::Gauge { value: -10.0 },
         );
 
-        let metrics = vec![
+        let metrics = [
             base_absolute_gauge_metric.clone(),
             base_absolute_gauge_metric
                 .clone()

@@ -41,7 +41,7 @@ pub enum RequestError {
         source
     ))]
     ShuttingDown {
-        source: crate::source_sender::ClosedError,
+        source: vector_lib::source_sender::ClosedError,
         request_id: String,
     },
     #[snafu(display("Unsupported encoding: {}", encoding))]

@@ -36,7 +36,7 @@ pub mod dot_graph;
 mod enrichment_table;
 pub mod format;
 mod graph;
-mod loading;
+pub mod loading;
 pub mod provider;
 pub mod schema;
 mod secret;
@@ -54,9 +54,9 @@ pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
 pub use loading::{
-    COLLECTOR, CONFIG_PATHS, load, load_builder_from_paths, load_from_paths,
-    load_from_paths_with_provider_and_secrets, load_from_str, load_from_str_with_secrets,
-    load_source_from_paths, merge_path_lists, process_paths,
+    COLLECTOR, CONFIG_PATHS, load, load_from_paths, load_from_paths_with_provider_and_secrets,
+    load_from_str, load_from_str_with_secrets, load_source_from_paths, merge_path_lists,
+    process_paths,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
@@ -598,12 +598,12 @@ pub struct TestOutput<T: 'static = OutputId> {
 
 #[cfg(all(test, feature = "sources-file", feature = "sinks-console"))]
 mod tests {
-    use std::{collections::HashMap, path::PathBuf};
+    use std::path::PathBuf;
 
     use indoc::indoc;
 
     use super::{ComponentKey, ConfigDiff, Format, builder::ConfigBuilder, format, load_from_str};
-    use crate::{config, topology};
+    use crate::{config, topology::builder::TopologyPiecesBuilder};
 
     async fn load(config: &str, format: config::Format) -> Result<Vec<String>, Vec<String>> {
         match config::load_from_str(config, format) {
@@ -612,8 +612,7 @@ mod tests {
                 let c2 = config::load_from_str(config, format).unwrap();
                 match (
                     config::warnings(&c2),
-                    topology::TopologyPieces::build(&c, &diff, HashMap::new(), Default::default())
-                        .await,
+                    TopologyPiecesBuilder::new(&c, &diff).build().await,
                 ) {
                     (warnings, Ok(_pieces)) => Ok(warnings),
                     (_, Err(errors)) => Err(errors),

@@ -21,6 +21,7 @@ use crate::{
         splunk_hec::SplunkConfig,
     },
     test_util::{self, mock::basic_sink, next_addr, start_topology, temp_dir, wait_for_tcp},
+    topology::ReloadError::*,
 };
 
 fn internal_metrics_source() -> InternalMetricsConfig {
@@ -67,12 +68,10 @@ async fn topology_reuse_old_port() {
     new_config.add_sink("out", &["in2"], basic_sink(1).1);
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -94,12 +93,12 @@ async fn topology_rebuild_old() {
     let _bind = TcpListener::bind(address_1).unwrap();
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
-    assert!(
-        !topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    let result = topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await;
+
+    // Should fail with TopologyBuildFailed error due to port conflict
+    assert!(matches!(result, Err(TopologyBuildFailed)));
 }
 
 #[tokio::test]
@@ -113,12 +112,10 @@ async fn topology_old() {
     old_config.add_sink("out", &["in"], basic_sink(1).1);
 
     let (mut topology, _) = start_topology(old_config.clone().build().unwrap(), false).await;
-    assert!(
-        topology
-            .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -266,24 +263,20 @@ async fn topology_readd_input() {
     new_config.add_source("in1", internal_metrics_source());
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1"], prom_exporter_sink(address_0, 1));
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
 
     // re-add in2
     let mut new_config = Config::builder();
     new_config.add_source("in1", internal_metrics_source());
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1", "in2"], prom_exporter_sink(address_0, 1));
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
 
     sleep(Duration::from_secs(1)).await;
     topology.stop().await;
@@ -312,12 +305,10 @@ async fn topology_reload_component() {
 
     topology.extend_reload_set(HashSet::from_iter(vec![ComponentKey::from("out")]));
 
-    assert!(
-        topology
-            .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
 
     // TODO: Implement notification to avoid the sleep()
     // Give the old topology configuration a chance to shutdown cleanly, etc.
@@ -345,12 +336,10 @@ async fn reload_sink_test(
     sleep(Duration::from_secs(1)).await;
 
     // Now reload the topology with the "new" configuration, and make sure that a component is now listening on `new_address`.
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config, Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config, Default::default())
+        .await
+        .unwrap();
 
     // Give the old topology configuration a chance to shutdown cleanly, etc.
     sleep(Duration::from_secs(2)).await;
