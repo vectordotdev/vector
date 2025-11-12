@@ -38,38 +38,50 @@ pub(crate) struct SecretBackendOuter {
 }
 
 /// Loader for secrets backends.
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SecretBackendLoader {
     backends: IndexMap<ComponentKey, SecretBackends>,
-    pub(crate) secret_keys: HashMap<String, HashSet<String>>,
+    secret_keys: HashMap<String, HashSet<String>>,
+    interpolate_env: bool,
 }
 
 impl SecretBackendLoader {
-    pub(crate) fn new() -> Self {
-        Self {
-            backends: IndexMap::new(),
-            secret_keys: HashMap::new(),
-        }
+    /// Sets whether to interpolate environment variables in the config.
+    pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
+        self.interpolate_env = interpolate;
+        self
     }
 
-    pub(crate) async fn retrieve(
-        &mut self,
-        signal_rx: &mut signal::SignalRx,
+    /// Retrieve secrets from backends.
+    /// Returns an empty HashMap if there are no secrets to retrieve.
+    pub(crate) async fn retrieve_secrets(
+        mut self,
+        signal_handler: &mut signal::SignalHandler,
     ) -> Result<HashMap<String, String>, String> {
+        if self.secret_keys.is_empty() {
+            debug!(message = "No secret placeholder found, skipping secret resolution.");
+            return Ok(HashMap::new());
+        }
+
+        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
         let mut secrets: HashMap<String, String> = HashMap::new();
+        let mut signal_rx = signal_handler.subscribe();
 
         for (backend_name, keys) in &self.secret_keys {
-            let backend = self.backends
+            let backend = self
+                .backends
                 .get_mut(&ComponentKey::from(backend_name.clone()))
                 .ok_or_else(|| {
-                    format!("Backend \"{backend_name}\" is required for secret retrieval but was not found in config.")
+                    format!(
+                        "Backend \"{backend_name}\" is required for secret retrieval but was not found in config."
+                    )
                 })?;
 
             debug!(message = "Retrieving secrets from a backend.", backend = ?backend_name, keys = ?keys);
             let backend_secrets = backend
-                .retrieve(keys.clone(), signal_rx)
+                .retrieve(keys.clone(), &mut signal_rx)
                 .map_err(|e| {
-                    format!("Error while retrieving secret from backend \"{backend_name}\": {e}.",)
+                    format!("Error while retrieving secret from backend \"{backend_name}\": {e}.")
                 })
                 .await?;
 
@@ -81,15 +93,23 @@ impl SecretBackendLoader {
 
         Ok(secrets)
     }
+}
 
-    pub(crate) fn has_secrets_to_retrieve(&self) -> bool {
-        !self.secret_keys.is_empty()
+impl Default for SecretBackendLoader {
+    /// Creates a new SecretBackendLoader with default settings.
+    /// By default, environment variable interpolation is enabled.
+    fn default() -> Self {
+        Self {
+            backends: IndexMap::new(),
+            secret_keys: HashMap::new(),
+            interpolate_env: true,
+        }
     }
 }
 
 impl Process for SecretBackendLoader {
     fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
-        let config_string = prepare_input(input)?;
+        let config_string = prepare_input(input, self.interpolate_env)?;
         // Collect secret placeholders just after env var processing
         collect_secret_keys(&config_string, &mut self.secret_keys);
         Ok(config_string)
