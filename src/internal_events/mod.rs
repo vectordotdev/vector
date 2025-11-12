@@ -154,7 +154,6 @@ mod file;
 #[cfg(windows)]
 mod windows;
 
-pub mod config;
 #[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
 mod expansion;
 #[cfg(feature = "sources-mongodb_metrics")]

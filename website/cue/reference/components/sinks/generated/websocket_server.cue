@@ -621,6 +621,14 @@ generated: components: sinks: websocket_server: configuration: {
 																							[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 																							[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 																							"""
+										otlp: """
+																							Decodes the raw bytes as [OTLP (OpenTelemetry Protocol)][otlp] protobuf format.
+
+																							This decoder handles the three OTLP signal types: logs, metrics, and traces.
+																							It automatically detects which type of OTLP message is being decoded.
+
+																							[otlp]: https://opentelemetry.io/docs/specs/otlp/
+																							"""
 										protobuf: """
 																							Decodes the raw bytes as [protobuf][protobuf].
 
@@ -743,6 +751,28 @@ generated: components: sinks: websocket_server: configuration: {
 																								"""
 										required: false
 										type: bool: default: false
+									}
+								}
+							}
+							signal_types: {
+								description: """
+																				Signal types to attempt parsing, in priority order.
+
+																				The deserializer will try parsing in the order specified. This allows you to optimize
+																				performance when you know the expected signal types. For example, if you only receive
+																				traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
+
+																				If not specified, defaults to trying all types in order: logs, metrics, traces.
+																				Duplicate signal types are automatically removed while preserving order.
+																				"""
+								relevant_when: "codec = \"otlp\""
+								required:      false
+								type: array: {
+									default: ["logs", "metrics", "traces"]
+									items: type: string: enum: {
+										logs:    "OTLP logs signal (ExportLogsServiceRequest)"
+										metrics: "OTLP metrics signal (ExportMetricsServiceRequest)"
+										traces:  "OTLP traces signal (ExportTraceServiceRequest)"
 									}
 								}
 							}

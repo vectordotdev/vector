@@ -232,7 +232,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to flush all of s3://{}/{}: {}", bucket, key, source))]
     PipelineSend {
-        source: crate::source_sender::ClosedError,
+        source: vector_lib::source_sender::ClosedError,
         bucket: String,
         key: String,
     },
@@ -539,10 +539,7 @@ impl IngestorProcess {
         // Should consider removing failed deferrals from the delete_entries
         if !deferred_entries.is_empty() {
             let Some(deferred) = &self.state.deferred else {
-                warn!(
-                    message = "Deferred queue not configured, but received deferred entries.",
-                    internal_log_rate_limit = true
-                );
+                warn!("Deferred queue not configured, but received deferred entries.");
                 return Ok(());
             };
             let cloned_entries = deferred_entries.clone();
@@ -789,7 +786,7 @@ impl IngestorProcess {
             Err(_) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
-                Some(crate::source_sender::ClosedError)
+                Some(vector_lib::source_sender::ClosedError)
             }
         };
 
