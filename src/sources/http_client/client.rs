@@ -117,6 +117,9 @@ pub struct HttpClientConfig {
     /// Raw data to send as the HTTP request body.
     ///
     /// Can be a static string or a VRL expression.
+    ///
+    /// When a body is provided, the `Content-Type` header is automatically set to
+    /// `application/json` unless explicitly overridden in the `headers` configuration.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "body_examples()"))]
     pub body: Option<ParameterValue>,
