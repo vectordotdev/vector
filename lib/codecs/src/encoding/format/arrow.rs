@@ -369,20 +369,18 @@ fn build_string_array(
                         }
                         appended = true;
                     }
-                    Value::Object(obj) => match serde_json::to_string(&obj) {
-                        Ok(s) => {
+                    Value::Object(obj) => {
+                        if let Ok(s) = serde_json::to_string(&obj) {
                             builder.append_value(s);
                             appended = true;
                         }
-                        Err(_) => {}
-                    },
-                    Value::Array(arr) => match serde_json::to_string(&arr) {
-                        Ok(s) => {
+                    }
+                    Value::Array(arr) => {
+                        if let Ok(s) = serde_json::to_string(&arr) {
                             builder.append_value(s);
                             appended = true;
                         }
-                        Err(_) => {}
-                    },
+                    }
                     _ => {
                         builder.append_value(&value.to_string_lossy());
                         appended = true;
@@ -605,7 +603,7 @@ mod tests {
         log.insert("int16_field", 32000);
         log.insert("int32_field", 1000000);
         log.insert("int64_field", 42);
-        log.insert("float32_field", 3.14);
+        log.insert("float32_field", 3.15);
         log.insert("float64_field", 3.15);
         log.insert("bool_field", true);
         log.insert("bytes_field", bytes::Bytes::from("binary"));
@@ -704,7 +702,7 @@ mod tests {
                 .downcast_ref::<arrow::array::Float32Array>()
                 .unwrap()
                 .value(0)
-                - 3.14)
+                - 3.15)
                 .abs()
                 < 0.001
         );
