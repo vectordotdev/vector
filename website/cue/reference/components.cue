@@ -206,7 +206,6 @@ components: {
 			shape?:                   #FeaturesShape
 			window?:                  #FeaturesWindow
 			incremental_to_absolute?: #FeaturesIncrementalToAbsolute
-			trace_to_log?:			  #FeaturesTraceToLog
 		}
 
 		if Args.kind == "sink" {
@@ -341,8 +340,6 @@ components: {
 	#FeaturesWindow: {}
 
 	#FeaturesIncrementalToAbsolute: {}
-
-	#FeaturesTraceToLog: {}
 
 	#FeaturesSend: {
 		_args: {
