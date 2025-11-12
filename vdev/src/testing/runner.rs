@@ -2,15 +2,15 @@ use anyhow::Result;
 use std::{collections::HashSet, env, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
-use crate::testing::test_runner_dockerfile;
-use crate::utils::IS_A_TTY;
 use crate::{
     app::{self, CommandExt as _},
     testing::{
         build::prepare_build_command,
         docker::{DOCKER_SOCKET, docker_command},
+        test_runner_dockerfile,
     },
     utils::{
+        IS_A_TTY,
         command::ChainArgs as _,
         environment::{Environment, append_environment_variables},
     },
@@ -58,7 +58,6 @@ pub trait TestRunner {
         inner_env: &Environment,
         features: Option<&[String]>,
         args: &[String],
-        reuse_image: bool,
         build: bool,
     ) -> Result<()>;
 }
@@ -107,7 +106,6 @@ pub trait ContainerTestRunner: TestRunner {
         &self,
         features: Option<&[String]>,
         config_environment_variables: &Environment,
-        reuse_image: bool,
         build: bool,
     ) -> Result<()> {
         match self.state()? {
@@ -120,7 +118,7 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, config_environment_variables, reuse_image, build)?;
+                self.build(features, config_environment_variables, build)?;
                 self.create()?;
                 self.start()?;
             }
@@ -152,23 +150,9 @@ pub trait ContainerTestRunner: TestRunner {
         &self,
         features: Option<&[String]>,
         config_env_vars: &Environment,
-        reuse_image: bool,
         build: bool,
     ) -> Result<()> {
         let image_name = self.image_name();
-
-        // When reuse_image is true, skip build if image already exists (useful in CI).
-        // Otherwise, always rebuild to pick up local code changes.
-        if reuse_image {
-            let mut check_command = docker_command(["image", "inspect", &image_name]);
-            if check_command
-                .output()
-                .is_ok_and(|output| output.status.success())
-            {
-                info!("Image {image_name} already exists, skipping build");
-                return Ok(());
-            }
-        }
 
         let dockerfile = test_runner_dockerfile();
         let mut command =
@@ -252,10 +236,9 @@ where
         config_environment_variables: &Environment,
         features: Option<&[String]>,
         args: &[String],
-        reuse_image: bool,
         build: bool,
     ) -> Result<()> {
-        self.ensure_running(features, config_environment_variables, reuse_image, build)?;
+        self.ensure_running(features, config_environment_variables, build)?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
@@ -309,6 +292,11 @@ impl IntegrationTestRunner {
             network,
             volumes,
         })
+    }
+
+    /// Returns true if this runner uses the shared image (with all features)
+    pub(super) fn is_shared_runner(&self) -> bool {
+        self.integration.is_none()
     }
 
     pub(super) fn ensure_network(&self) -> Result<()> {
@@ -413,7 +401,6 @@ impl TestRunner for LocalTestRunner {
         inner_env: &Environment,
         _features: Option<&[String]>,
         args: &[String],
-        _reuse_image: bool,
         _build: bool,
     ) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);

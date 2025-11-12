@@ -11,7 +11,7 @@ use std::{
 use anyhow::{Context, Result};
 
 /// Find the Vector repository root by searching upward for markers like .git or Cargo.toml
-/// with a [workspace] section.
+/// with a `[workspace]` section.
 pub fn find_repo_root() -> Result<PathBuf> {
     let mut current = env::current_dir().context("Could not determine current directory")?;
 

@@ -86,7 +86,7 @@ updates:
         patterns:
         - "zstd*"
   - package-ecosystem: "docker"
-    directory: "/distribution/docker/"
+    directory: "/distribution/docker/alpine"
     schedule:
       interval: "monthly"
       time: "04:00" # UTC
@@ -96,6 +96,25 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+  - package-ecosystem: "docker"
+    directory: "/distribution/docker/debian"
+    schedule:
+      interval: "monthly"
+      time: "04:00" # UTC
+    labels:
+      - "domain: releasing"
+      - "no-changelog"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 100
+    groups:
+      docker-images:
+        patterns:
+          - "*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
