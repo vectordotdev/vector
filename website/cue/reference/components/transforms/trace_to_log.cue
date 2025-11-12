@@ -31,7 +31,7 @@ components: transforms: trace_to_log: {
 
     input: {
         logs:    false
-        metrics: false
+        metrics: null
         traces:  true
     }
 
@@ -47,18 +47,27 @@ components: transforms: trace_to_log: {
 
             configuration: {}
 
-            input: trace: {
-                span_id:   "abc123"
-                trace_id:  "xyz789"
-                span_name: "test-span"
-                service:   "my-service"
-            }
-            output: log: {
-                span_id:   "abc123"
-                trace_id:  "xyz789"
-                span_name: "test-span"
-                service:   "my-service"
-            }
+            input: [
+                {
+                    trace: {
+                        span_id:   "abc123"
+                        trace_id:  "xyz789"
+                        span_name: "test-span"
+                        service:   "my-service"
+                    }
+                },
+            ]
+
+            output: [
+                {
+                    log: {
+                        span_id:   "abc123"
+                        trace_id:  "xyz789"
+                        span_name: "test-span"
+                        service:   "my-service"
+                    }
+                },
+            ]
         },
     ]
 
