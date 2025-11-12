@@ -432,8 +432,9 @@ async fn build_unit_test(
         .collect::<Vec<_>>();
     valid_components.extend(unexpanded_transforms);
 
-    // We currently don't check if a transform uses enrichment table
-    // We can't be sure if an enrichment table is needed for a test, so they are all considered
+    // Enrichment tables consume inputs but are referenced dynamically in VRL transforms
+    // (via get_enrichment_table_record). Since we can't statically analyze VRL usage,
+    // we conservatively include all enrichment table inputs as valid components.
     config_builder
         .enrichment_tables
         .iter()
