@@ -178,6 +178,9 @@ generated: components: sources: http_client: configuration: {
 			Raw data to send as the HTTP request body.
 
 			Can be a static string or a VRL expression.
+
+			When a body is provided, the `Content-Type` header is automatically set to
+			`application/json` unless explicitly overridden in the `headers` configuration.
 			"""
 		required: false
 		type: {
@@ -210,15 +213,12 @@ generated: components: sources: http_client: configuration: {
 					}
 				}
 			}
-			string: examples: [{
-				type: "vrl"
-				value: """
-					encode_json({
-					  "searchStatements": [{"column": "auditAction", "operator": "=", "value": "DELETE"}],
-					  "timestamp": now()
-					})
-					"""
-			}]
+			string: examples: ["""
+				encode_json({
+				  "searchStatements": [{"column": "auditAction", "operator": "=", "value": "DELETE"}],
+				  "timestamp": now()
+				})
+				"""]
 		}
 	}
 	decoding: {
