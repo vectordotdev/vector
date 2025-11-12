@@ -10,7 +10,7 @@ badges:
 tags: [ "community", "open source", "cose", "contributions" ]
 ---
 
-## Our Journey
+## Our journey
 
 In October 2024, the
 [COSE (Community Open Source Engineering)](https://opensource.datadoghq.com/about/#the-community-open-source-engineering-team)
