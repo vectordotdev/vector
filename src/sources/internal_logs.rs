@@ -213,6 +213,8 @@ mod tests {
     use vector_lib::{event::Value, lookup::OwnedTargetPath};
     use vrl::value::kind::Collection;
 
+    use serial_test::serial;
+
     use super::*;
     use crate::{
         event::Event,
@@ -234,6 +236,7 @@ mod tests {
     // cases because `consume_early_buffer` (called within the
     // `start_source` helper) panics when called more than once.
     #[tokio::test]
+    #[serial]
     async fn receives_logs() {
         trace::init(false, false, "debug", 10);
         trace::reset_early_buffer();
@@ -339,6 +342,43 @@ mod tests {
         sleep(Duration::from_millis(1)).await;
         trace::stop_early_buffering();
         rx
+    }
+
+    // NOTE: This test requires #[serial] because it directly interacts with global tracing state.
+    // This is a pre-existing limitation around tracing initialization in tests.
+    #[tokio::test]
+    #[serial]
+    async fn repeated_logs_are_not_rate_limited() {
+        trace::init(false, false, "info", 10);
+        trace::reset_early_buffer();
+
+        let rx = start_source().await;
+
+        // Generate 20 identical log messages with the same component_id
+        for _ in 0..20 {
+            info!(component_id = "test", "Repeated test message");
+        }
+
+        sleep(Duration::from_millis(50)).await;
+        let events = collect_ready(rx).await;
+
+        // Filter to only our test messages
+        let test_events: Vec<_> = events
+            .iter()
+            .filter(|e| {
+                e.as_log()
+                    .get("message")
+                    .map(|m| m.to_string_lossy() == "Repeated test message")
+                    .unwrap_or(false)
+            })
+            .collect();
+
+        // We should receive all 20 messages, no rate limiting.
+        assert_eq!(
+            test_events.len(),
+            20,
+            "internal_logs source should capture all repeated messages without rate limiting"
+        );
     }
 
     #[test]
