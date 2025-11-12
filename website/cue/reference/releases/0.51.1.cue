@@ -19,6 +19,9 @@ releases: "0.51.1": {
 		properly exposed.
 
 		* `blackhole` sink's periodic statistics messages are no longer rate limited.
+
+		* The `internal_logs` source now captures all internal Vector logs without rate limiting.
+		Previously, repeated log messages were silently dropped.
 		"""
 
 	changelog: [
@@ -57,6 +60,14 @@ releases: "0.51.1": {
 				"""
 			contributors: ["pront"]
 		},
+		{
+			type: "fix"
+			description: """
+				The `internal_logs` source now captures all internal Vector logs without rate limiting. Previously, repeated log messages were silently
+				dropped.
+				"""
+			contributors: ["pront"]
+		},
 	]
 
 	vrl_changelog: """
@@ -87,5 +98,7 @@ releases: "0.51.1": {
 		{sha: "a7e68b17010c58d0ac2a1656fe13468063c6ddf3", date: "2025-11-11 00:18:14 UTC", description: "do not rate limit utlization report", pr_number: 24202, scopes: ["tracing"], type: "chore", breaking_change: false, author: "Pavlos Rontidis", files_count: 1, insertions_count: 1, deletions_count: 15},
 		{sha: "7d657023131d15334255a29a390f2a3604ff67cc", date: "2025-11-11 20:01:07 UTC", description: "move config_reload_* metrics to VectorReload*", pr_number: 24203, scopes: ["internal metrics"], type: "chore", breaking_change: false, author: "Pavlos Rontidis", files_count: 11, insertions_count: 184, deletions_count: 265},
 		{sha: "5432632b414472e004cc68a0cae56f0b4451e8af", date: "2025-11-11 23:42:09 UTC", description: "Add 0.51.0 known issues", pr_number: 24211, scopes: ["releasing"], type: "chore", breaking_change: false, author: "Thomas", files_count: 2, insertions_count: 27, deletions_count: 5},
+		{sha: "3e09dc86b8aaf6606abc9c5acc9ddf52f39f6e17", date: "2025-11-12 04:31:25 UTC", description: "prepare v0.51.1 release", pr_number: 24214, scopes: ["releasing"], type: "chore", breaking_change: false, author: "Thomas", files_count: 204, insertions_count: 1055, deletions_count: 756},
+		{sha: "3ca3ec6f55522c406680a183416bf7a8b35372ae", date: "2025-11-13 02:07:06 UTC", description: "remove rate limit", pr_number: 24218, scopes: ["internal_logs source"], type: "fix", breaking_change: false, author: "Pavlos Rontidis", files_count: 3, insertions_count: 48, deletions_count: 3},
 	]
 }
