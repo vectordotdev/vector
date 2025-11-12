@@ -53,7 +53,8 @@ jobs:
         needs.changes.outputs.integration-yml == 'true' ||
         needs.changes.outputs.int-tests-any == 'true' ||
         needs.changes.outputs.e2e-tests-any == 'true'))
-    }}
+     }}
+
     uses: ./.github/workflows/build-test-runner.yml
     with:
       commit_sha: ${{ github.sha }}
