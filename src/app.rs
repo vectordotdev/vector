@@ -308,19 +308,6 @@ impl StartedApplication {
         let mut signal_handler = signals.handler;
         let mut signal_rx = signals.receiver;
 
-        // Keep producing burst of logs for different components
-        std::thread::spawn(|| {
-            loop {
-
-                for i in 0..10 {
-                    for _ in 0..10 {
-                        info!(message = "Test log message", component_id = i);
-                    }
-                }
-                std::thread::sleep(Duration::from_secs(1));
-            }
-        });
-
         let signal = loop {
             let has_sources = !topology_controller.lock().await.topology.config.is_empty();
             tokio::select! {
