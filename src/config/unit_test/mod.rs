@@ -432,6 +432,15 @@ async fn build_unit_test(
         .collect::<Vec<_>>();
     valid_components.extend(unexpanded_transforms);
 
+    // Enrichment tables consume inputs but are referenced dynamically in VRL transforms
+    // (via get_enrichment_table_record). Since we can't statically analyze VRL usage,
+    // we conservatively include all enrichment table inputs as valid components.
+    config_builder
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, c)| c.as_sink(key).map(|(_, sink)| sink.inputs))
+        .for_each(|i| valid_components.extend(i.into_iter()));
+
     // Remove all transforms that are not relevant to the current test
     config_builder.transforms = config_builder
         .transforms
