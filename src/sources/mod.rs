@@ -102,7 +102,7 @@ pub use vector_lib::source::Source;
 #[allow(dead_code)] // Easier than listing out all the features that use this
 /// Common build errors
 #[derive(Debug, Snafu)]
-enum BuildError {
+pub enum BuildError {
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
     #[snafu(display("VRL compilation error: {}", message))]

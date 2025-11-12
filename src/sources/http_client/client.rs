@@ -214,7 +214,7 @@ pub struct Query {
 }
 
 impl Query {
-    pub fn new(params: &HashMap<String, QueryParameterValue>) -> Result<Self, String> {
+    pub fn new(params: &HashMap<String, QueryParameterValue>) -> Result<Self, sources::BuildError> {
         let functions = vrl::stdlib::all()
             .into_iter()
             .chain(vector_lib::enrichment::vrl_functions())
@@ -245,7 +245,7 @@ impl Query {
     fn compile_value(
         param: &ParameterValue,
         functions: &[Box<dyn Function>],
-    ) -> Result<CompiledParam, String> {
+    ) -> Result<CompiledParam, sources::BuildError> {
         let program = if param.is_vrl() {
             let state = TypeState::default();
             let config = CompileConfig::default();
@@ -261,7 +261,9 @@ impl Query {
                 }
                 Err(diagnostics) => {
                     let error = format_vrl_diagnostics(param.value(), diagnostics);
-                    return Err(format!("VRL compilation failed: {}", error));
+                    return Err(sources::BuildError::VrlCompilationError {
+                        message: format!("VRL compilation failed: {}", error),
+                    });
                 }
             }
         } else {
@@ -277,7 +279,7 @@ impl Query {
     fn compile_param(
         value: &QueryParameterValue,
         functions: &[Box<dyn Function>],
-    ) -> Result<CompiledQueryParameterValue, String> {
+    ) -> Result<CompiledQueryParameterValue, sources::BuildError> {
         match value {
             QueryParameterValue::SingleParam(param) => {
                 Ok(CompiledQueryParameterValue::SingleParam(Box::new(
@@ -299,8 +301,7 @@ impl Query {
 #[typetag::serde(name = "http_client")]
 impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let query = Query::new(&self.query.clone())
-            .map_err(|message| sources::BuildError::VrlCompilationError { message })?;
+        let query = Query::new(&self.query.clone())?;
 
         // Build the base URLs
         let endpoints = [self.endpoint.clone()];
