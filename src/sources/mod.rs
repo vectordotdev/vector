@@ -105,4 +105,6 @@ pub use vector_lib::source::Source;
 enum BuildError {
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
+    #[snafu(display("VRL compilation error: {}", message))]
+    VrlCompilationError { message: String },
 }

@@ -214,17 +214,19 @@ pub struct Query {
 }
 
 impl Query {
-    pub fn new(params: &HashMap<String, QueryParameterValue>) -> Self {
+    pub fn new(params: &HashMap<String, QueryParameterValue>) -> Result<Self, String> {
         let functions = vrl::stdlib::all()
             .into_iter()
             .chain(vector_lib::enrichment::vrl_functions())
             .chain(vector_vrl_functions::all())
             .collect::<Vec<_>>();
 
-        let compiled: HashMap<String, CompiledQueryParameterValue> = params
-            .iter()
-            .map(|(k, v)| (k.clone(), Self::compile_param(v, &functions)))
-            .collect();
+        let mut compiled: HashMap<String, CompiledQueryParameterValue> = HashMap::new();
+
+        for (k, v) in params.iter() {
+            let compiled_param = Self::compile_param(v, &functions)?;
+            compiled.insert(k.clone(), compiled_param);
+        }
 
         let has_vrl = compiled.values().any(|compiled| match compiled {
             CompiledQueryParameterValue::SingleParam(param) => param.program.is_some(),
@@ -233,14 +235,14 @@ impl Query {
             }
         });
 
-        Query {
+        Ok(Query {
             original: params.clone(),
             compiled,
             has_vrl,
-        }
+        })
     }
 
-    fn compile_value(param: &ParameterValue, functions: &[Box<dyn Function>]) -> CompiledParam {
+    fn compile_value(param: &ParameterValue, functions: &[Box<dyn Function>]) -> Result<CompiledParam, String> {
         let program = if param.is_vrl() {
             let state = TypeState::default();
             let config = CompileConfig::default();
@@ -256,34 +258,33 @@ impl Query {
                 }
                 Err(diagnostics) => {
                     let error = format_vrl_diagnostics(param.value(), diagnostics);
-                    warn!(message = "VRL compilation failed.", %error);
-                    None
+                    return Err(format!("VRL compilation failed: {}", error));
                 }
             }
         } else {
             None
         };
 
-        CompiledParam {
+        Ok(CompiledParam {
             value: param.value().to_string(),
             program,
-        }
+        })
     }
 
     fn compile_param(
         value: &QueryParameterValue,
         functions: &[Box<dyn Function>],
-    ) -> CompiledQueryParameterValue {
+    ) -> Result<CompiledQueryParameterValue, String> {
         match value {
-            QueryParameterValue::SingleParam(param) => CompiledQueryParameterValue::SingleParam(
-                Box::new(Self::compile_value(param, functions)),
-            ),
+            QueryParameterValue::SingleParam(param) => Ok(CompiledQueryParameterValue::SingleParam(
+                Box::new(Self::compile_value(param, functions)?),
+            )),
             QueryParameterValue::MultiParams(params) => {
                 let compiled = params
                     .iter()
                     .map(|p| Self::compile_value(p, functions))
-                    .collect();
-                CompiledQueryParameterValue::MultiParams(compiled)
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(CompiledQueryParameterValue::MultiParams(compiled))
             }
         }
     }
@@ -293,7 +294,8 @@ impl Query {
 #[typetag::serde(name = "http_client")]
 impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let query = Query::new(&self.query.clone());
+        let query = Query::new(&self.query.clone())
+            .map_err(|message| sources::BuildError::VrlCompilationError { message })?;
 
         // Build the base URLs
         let endpoints = [self.endpoint.clone()];
