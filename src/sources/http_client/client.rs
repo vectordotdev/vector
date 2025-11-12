@@ -242,7 +242,10 @@ impl Query {
         })
     }
 
-    fn compile_value(param: &ParameterValue, functions: &[Box<dyn Function>]) -> Result<CompiledParam, String> {
+    fn compile_value(
+        param: &ParameterValue,
+        functions: &[Box<dyn Function>],
+    ) -> Result<CompiledParam, String> {
         let program = if param.is_vrl() {
             let state = TypeState::default();
             let config = CompileConfig::default();
@@ -276,9 +279,11 @@ impl Query {
         functions: &[Box<dyn Function>],
     ) -> Result<CompiledQueryParameterValue, String> {
         match value {
-            QueryParameterValue::SingleParam(param) => Ok(CompiledQueryParameterValue::SingleParam(
-                Box::new(Self::compile_value(param, functions)?),
-            )),
+            QueryParameterValue::SingleParam(param) => {
+                Ok(CompiledQueryParameterValue::SingleParam(Box::new(
+                    Self::compile_value(param, functions)?,
+                )))
+            }
             QueryParameterValue::MultiParams(params) => {
                 let compiled = params
                     .iter()
