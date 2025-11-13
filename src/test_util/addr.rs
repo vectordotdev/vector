@@ -36,15 +36,15 @@ impl PortGuard {
 impl Drop for PortGuard {
     fn drop(&mut self) {
         // Remove from the reserved ports set when dropped
-        RESERVED_PORTS.lock().unwrap().remove(&self.addr);
+        RESERVED_PORTS.lock().unwrap().remove(&self.addr.port());
     }
 }
 
-/// Global set of reserved ports for collision detection.
-/// When a test allocates a port, we check this set to ensure the OS didn't recycle
-/// a port that's still in use by another test.
-static RESERVED_PORTS: LazyLock<Mutex<HashSet<SocketAddr>>> =
-    LazyLock::new(|| Mutex::new(HashSet::new()));
+/// Global set of reserved ports for collision detection. When a test allocates a port, we check this set to ensure the
+/// OS didn't recycle a port that's still in use by another test.
+/// Ports are tracked by number only (u16). This means IPv4 and IPv6 may block each other from using the same port.
+/// This simplification is acceptable for our tests.
+static RESERVED_PORTS: LazyLock<Mutex<HashSet<u16>>> = LazyLock::new(|| Mutex::new(HashSet::new()));
 
 /// Allocates a unique port and returns a guard that keeps it reserved.
 ///
@@ -64,10 +64,11 @@ pub fn next_addr_for_ip(ip: IpAddr) -> (PortGuard, SocketAddr) {
     for _ in 0..MAX_PORT_ALLOCATION_ATTEMPTS {
         let listener = StdTcpListener::bind((ip, 0)).expect("Failed to bind to OS-assigned port");
         let addr = listener.local_addr().expect("Failed to get local address");
+        let port = addr.port();
 
         // Check if this port is already reserved by another test WHILE still holding the listener
         let mut reserved = RESERVED_PORTS.lock().unwrap();
-        if reserved.contains(&addr) {
+        if reserved.contains(&port) {
             // OS recycled a port that's still reserved by another test.
             // Lock and listener will be dropped implicitly after continuing
             continue;
@@ -75,7 +76,7 @@ pub fn next_addr_for_ip(ip: IpAddr) -> (PortGuard, SocketAddr) {
 
         // Port is unique, mark it as reserved BEFORE dropping the listener
         // This ensures no race window between dropping listener and registering the port
-        reserved.insert(addr);
+        reserved.insert(port);
         drop(reserved);
 
         // Now it's safe to drop the listener - the registry protects the port
