@@ -84,7 +84,7 @@ use vrl::prelude::*;
 
 #[cfg(feature = "sources-odbc")]
 mod client;
-
+mod config;
 #[cfg(all(test, feature = "odbc-integration-tests"))]
 mod integration_tests;
 
