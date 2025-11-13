@@ -99,6 +99,21 @@ pub struct ParsedConnectionString {
     pub development_storage_proxy_uri: Option<String>,
 }
 
+impl Default for ParsedConnectionString {
+    fn default() -> Self {
+        Self {
+            account_name: None,
+            account_key: None,
+            shared_access_signature: None,
+            default_endpoints_protocol: None,
+            endpoint_suffix: None,
+            blob_endpoint: None,
+            use_development_storage: false,
+            development_storage_proxy_uri: None,
+        }
+    }
+}
+
 impl ParsedConnectionString {
     /// Parse a connection string into a `ParsedConnectionString`.
     ///
@@ -120,23 +135,28 @@ impl ParsedConnectionString {
         }
 
         // Build the structure from the parsed map.
-        let parsed = ParsedConnectionString {
-            account_name: map.get("accountname").cloned(),
-            account_key: map.get("accountkey").cloned(),
-            shared_access_signature: map
-                .get("sharedaccesssignature")
-                .map(|s| normalize_sas(s.as_str())),
-            default_endpoints_protocol: map
-                .get("defaultendpointsprotocol")
-                .map(|s| s.to_ascii_lowercase()),
-            endpoint_suffix: map.get("endpointsuffix").cloned(),
-            blob_endpoint: map.get("blobendpoint").cloned(),
-            use_development_storage: map
-                .get("usedevelopmentstorage")
-                .map(|v| v.eq_ignore_ascii_case("true"))
-                .unwrap_or(false),
-            development_storage_proxy_uri: map.get("developmentstorageproxyuri").cloned(),
-        };
+        let mut parsed = ParsedConnectionString::default();
+
+        parsed.account_name = map.get("accountname").cloned();
+        parsed.account_key = map.get("accountkey").cloned();
+        parsed.shared_access_signature = map
+            .get("sharedaccesssignature")
+            .map(|s| normalize_sas(s.as_str()));
+
+        parsed.default_endpoints_protocol = map
+            .get("defaultendpointsprotocol")
+            .map(|s| s.to_ascii_lowercase());
+
+        parsed.endpoint_suffix = map.get("endpointsuffix").cloned();
+
+        parsed.blob_endpoint = map.get("blobendpoint").cloned();
+
+        parsed.use_development_storage = map
+            .get("usedevelopmentstorage")
+            .map(|v| v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+
+        parsed.development_storage_proxy_uri = map.get("developmentstorageproxyuri").cloned();
 
         Ok(parsed)
     }
