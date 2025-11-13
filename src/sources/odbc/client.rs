@@ -2,25 +2,61 @@ use crate::config::{SourceContext, log_schema};
 use crate::internal_events::{OdbcEventsReceived, OdbcFailedError, OdbcQueryExecuted};
 use crate::sinks::prelude::*;
 use crate::sources::odbc::config::OdbcConfig;
-use crate::sources::odbc::{
-    ClosedSnafu, Column, Columns, ConfigSnafu, DbSnafu, OdbcError, Rows, load_params, map_value,
-    order_params, save_params,
-};
-use chrono::Utc;
+use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz;
 use futures::pin_mut;
 use futures_util::StreamExt;
 use itertools::Itertools;
 use odbc_api::buffers::TextRowSet;
 use odbc_api::parameter::VarCharBox;
-use odbc_api::{ConnectionOptions, Cursor, Environment, ResultSetMetadata};
-use snafu::{OptionExt, ResultExt};
+use odbc_api::{ConnectionOptions, Cursor, Environment, IntoParameter, ResultSetMetadata};
+use snafu::{OptionExt, ResultExt, Snafu};
+use std::fs;
+use std::fs::File;
+use std::io::BufReader;
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 use tokio::select;
 use vector_common::internal_event::{BytesReceived, Protocol};
 use vector_lib::emit;
+use vector_lib::source_sender::ClosedError;
 use vrl::prelude::*;
+
+const TIMESTAMP_FORMATS: &[&str] = &[
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y/%m/%d %H:%M:%S",
+    "%Y/%m/%dT%H:%M:%S",
+];
+
+struct Column {
+    column_name: String,
+    column_type: odbc_api::DataType,
+}
+
+/// Columns of the query result.
+type Columns = Vec<Column>;
+/// Rows of the query result.
+type Rows = Vec<Value>;
+
+#[derive(Debug, Snafu)]
+pub enum OdbcError {
+    #[snafu(display("ODBC database error: {source}"))]
+    Db { source: odbc_api::Error },
+
+    #[snafu(display("File IO error: {source}"))]
+    Io { source: std::io::Error },
+
+    #[snafu(display("Batch error: {source}"))]
+    Closed { source: ClosedError },
+
+    #[snafu(display("JSON error: {source}"))]
+    Json { source: serde_json::Error },
+
+    #[snafu(display("Configuration error: {cause}"))]
+    ConfigError { cause: &'static str },
+}
 
 pub(crate) struct Context {
     cfg: OdbcConfig,
@@ -273,4 +309,190 @@ pub fn execute_query(
     }
 
     Ok(rows)
+}
+
+/// Loads the previously saved result and returns it as SQL parameters.
+/// Parameters are generated in the order specified by `columns_order`.
+fn load_params(path: &str, columns_order: Option<&Vec<String>>) -> Option<Vec<VarCharBox>> {
+    let file = File::open(path).ok()?;
+    let reader = BufReader::new(file);
+    let map: ObjectMap = serde_json::from_reader(reader).ok()?;
+
+    order_params(map, columns_order)
+}
+
+/// Orders the parameters of a given `ObjectMap` based on an optional column order.
+fn order_params(map: ObjectMap, columns_order: Option<&Vec<String>>) -> Option<Vec<VarCharBox>> {
+    if columns_order.is_none() || columns_order.iter().len() == 0 {
+        let params = map
+            .iter()
+            .map(|p| p.1.to_string().into_parameter())
+            .collect_vec();
+        return Some(params);
+    }
+
+    let binding = vec![];
+    let columns_order = columns_order
+        .unwrap_or(&binding)
+        .iter()
+        .map(|col| col.as_str())
+        .collect_vec();
+
+    // Ensure parameters follow the declared column order.
+    let params = columns_order
+        .into_iter()
+        .filter_map(|col| {
+            let value = map.get(col)?;
+            Some(value.to_string().into_parameter())
+        })
+        .collect_vec();
+
+    Some(params)
+}
+
+/// Serializes and persists the latest tracked values for reuse as SQL parameters.
+fn save_params(path: &str, obj: &ObjectMap) -> Result<(), OdbcError> {
+    let json = serde_json::to_string(obj).context(JsonSnafu)?;
+    fs::write(path, json).context(IoSnafu)
+}
+
+/// Converts ODBC data types to Vector values.
+///
+/// # Arguments
+/// * `data_type`: The ODBC data type.
+/// * `value`: The ODBC value to convert.
+/// * `tz`: The timezone to use for date/time conversions.
+///
+/// # Returns
+/// A `Value` compatible with Vector events.
+fn map_value(data_type: &odbc_api::DataType, value: Option<&[u8]>, tz: Tz) -> Value {
+    match data_type {
+        // Convert to bytes.
+        odbc_api::DataType::Unknown
+        | odbc_api::DataType::Char { .. }
+        | odbc_api::DataType::WChar { .. }
+        | odbc_api::DataType::Varchar { .. }
+        | odbc_api::DataType::WVarchar { .. }
+        | odbc_api::DataType::LongVarchar { .. }
+        | odbc_api::DataType::WLongVarchar { .. }
+        | odbc_api::DataType::Varbinary { .. }
+        | odbc_api::DataType::Binary { .. }
+        | odbc_api::DataType::Other { .. }
+        | odbc_api::DataType::LongVarbinary { .. } => {
+            let Some(value) = value else {
+                return Value::Null;
+            };
+
+            Value::Bytes(Bytes::copy_from_slice(value))
+        }
+
+        // Convert to integer.
+        odbc_api::DataType::TinyInt
+        | odbc_api::DataType::SmallInt
+        | odbc_api::DataType::BigInt
+        | odbc_api::DataType::Integer => {
+            let Some(value) = value else {
+                return Value::Null;
+            };
+
+            // tinyint(1) -> Value::Boolean
+            if *data_type == odbc_api::DataType::TinyInt
+                && value.len() == 1
+                && (value[0] == b'0' || value[0] == b'1')
+            {
+                return Value::Boolean(value[0] == b'1');
+            }
+
+            std::str::from_utf8(value)
+                .ok()
+                .and_then(|s| s.parse::<i64>().ok())
+                .map_or(Value::Null, Value::Integer)
+        }
+
+        // Convert to float.
+        odbc_api::DataType::Float { .. }
+        | odbc_api::DataType::Real
+        | odbc_api::DataType::Decimal { .. }
+        | odbc_api::DataType::Numeric { .. }
+        | odbc_api::DataType::Double => {
+            let Some(value) = value else {
+                return Value::Null;
+            };
+
+            std::str::from_utf8(value)
+                .ok()
+                .and_then(|s| NotNan::from_str(s).ok())
+                .map_or(Value::Null, Value::Float)
+        }
+
+        // Convert to timestamp.
+        odbc_api::DataType::Timestamp { .. } => {
+            let Some(value) = value else {
+                return Value::Null;
+            };
+
+            let Ok(str) = std::str::from_utf8(value) else {
+                return Value::Null;
+            };
+
+            // Try RFC3339/ISO8601 first and convert to UTC
+            if let Ok(datetime) = chrono::DateTime::parse_from_rfc3339(str) {
+                return Value::Timestamp(datetime.into());
+            }
+
+            let datetime = TIMESTAMP_FORMATS
+                .iter()
+                .find_map(|fmt| NaiveDateTime::parse_from_str(str, fmt).ok())
+                .map(|ndt| ndt.and_utc());
+
+            datetime.map(Value::Timestamp).unwrap_or(Value::Null)
+        }
+
+        // Convert to timestamp.
+        odbc_api::DataType::Time { .. } => {
+            let Some(value) = value else {
+                return Value::Null;
+            };
+
+            std::str::from_utf8(value)
+                .ok()
+                .and_then(|s| NaiveTime::from_str(s).ok())
+                .map(|time| {
+                    let datetime = NaiveDateTime::new(NaiveDate::default(), time);
+                    let tz = tz.offset_from_utc_datetime(&datetime);
+                    Value::Timestamp(
+                        DateTime::<Tz>::from_naive_utc_and_offset(datetime, tz).to_utc(),
+                    )
+                })
+                .unwrap_or(Value::Null)
+        }
+
+        // Convert to timestamp.
+        odbc_api::DataType::Date => {
+            let Some(value) = value else {
+                return Value::Null;
+            };
+
+            std::str::from_utf8(value)
+                .ok()
+                .and_then(|s| chrono::NaiveDate::from_str(s).ok())
+                .map(|date| {
+                    let datetime = NaiveDateTime::new(date, NaiveTime::default());
+                    let tz = tz.offset_from_utc_datetime(&datetime);
+                    Value::Timestamp(
+                        DateTime::<Tz>::from_naive_utc_and_offset(datetime, tz).to_utc(),
+                    )
+                })
+                .unwrap_or(Value::Null)
+        }
+
+        // Convert to boolean.
+        odbc_api::DataType::Bit => {
+            let Some(value) = value else {
+                return Value::Null;
+            };
+
+            Value::Boolean(value[0] == 1 || value[0] == b'1')
+        }
+    }
 }
