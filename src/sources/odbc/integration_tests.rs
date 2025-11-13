@@ -1,4 +1,5 @@
-use crate::sources::odbc::client::{OdbcConfig, execute_query};
+use crate::sources::odbc::config::OdbcConfig;
+use crate::sources::odbc::client::execute_query;
 use crate::test_util::components::SOURCE_TAGS;
 use crate::test_util::components::run_and_assert_source_compliance;
 use bytes::Bytes;
