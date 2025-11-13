@@ -73,7 +73,7 @@ components: sinks: doris: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.doris.configuration
+	configuration: generated.components.sinks.doris.configuration
 
 	input: {
 		logs:    true
