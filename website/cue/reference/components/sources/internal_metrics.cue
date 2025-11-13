@@ -778,11 +778,11 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags: _component_tags & {
 				metric_name: {
-					description: "The name of the metric for which the tag value limit was exceeded."
+					description: "The name of the metric whose tag value limit was exceeded."
 					required:    true
 				}
 				tag_key: {
-					description: "The key of the tag for which the value limit was exceeded."
+					description: "The key of the tag whose value limit was exceeded."
 					required:    true
 				}
 			}
