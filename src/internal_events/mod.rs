@@ -250,6 +250,8 @@ pub(crate) use self::metric_to_log::*;
 pub(crate) use self::mqtt::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
+#[cfg(feature = "sources-odbc")]
+pub(crate) use self::odbc_metrics::*;
 #[cfg(any(
     feature = "sources-kubernetes_logs",
     feature = "transforms-log_to_metric",
