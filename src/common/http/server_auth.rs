@@ -443,11 +443,7 @@ mod tests {
         let matcher = basic_auth.build(&Default::default()).unwrap();
 
         let (_guard, addr) = next_addr();
-        let result = matcher.handle_auth(
-            Some(&addr),
-            &HeaderMap::new(),
-            "/",
-        );
+        let result = matcher.handle_auth(Some(&addr), &HeaderMap::new(), "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -467,11 +463,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("Basic wrong"));
         let (_guard, addr) = next_addr();
-        let result = matcher.handle_auth(
-            Some(&addr),
-            &headers,
-            "/",
-        );
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -496,11 +488,7 @@ mod tests {
             Authorization::basic(&username, &password).0.encode(),
         );
         let (_guard, addr) = next_addr();
-        let result = matcher.handle_auth(
-            Some(&addr),
-            &headers,
-            "/",
-        );
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_ok());
     }
@@ -516,11 +504,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("test"));
         let (_guard, addr) = next_addr();
-        let result = matcher.handle_auth(
-            Some(&addr),
-            &headers,
-            "/",
-        );
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_ok());
     }
@@ -536,11 +520,7 @@ mod tests {
         let matcher = custom_auth.build(&Default::default()).unwrap();
 
         let headers = HeaderMap::new();
-        let result = matcher.handle_auth(
-            Some(&addr),
-            &headers,
-            "/",
-        );
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_ok());
     }
@@ -571,11 +551,7 @@ mod tests {
 
         let headers = HeaderMap::new();
         let (_guard, addr) = next_addr();
-        let result = matcher.handle_auth(
-            Some(&addr),
-            &headers,
-            "/ok",
-        );
+        let result = matcher.handle_auth(Some(&addr), &headers, "/ok");
 
         assert!(result.is_ok());
     }
@@ -590,11 +566,7 @@ mod tests {
 
         let headers = HeaderMap::new();
         let (_guard, addr) = next_addr();
-        let result = matcher.handle_auth(
-            Some(&addr),
-            &headers,
-            "/bad",
-        );
+        let result = matcher.handle_auth(Some(&addr), &headers, "/bad");
 
         assert!(result.is_err());
     }
