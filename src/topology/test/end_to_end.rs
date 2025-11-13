@@ -82,8 +82,8 @@ pub fn http_client(
 async fn http_to_http(status: StatusCode, response: StatusCode) {
     test_util::trace_init();
 
-    let (_guard1, address1) = test_util::addr::next_addr();
-    let (_guard2, address2) = test_util::addr::next_addr();
+    let (_guard_1, address1) = test_util::addr::next_addr();
+    let (_guard_2, address2) = test_util::addr::next_addr();
     let config = config::load_from_str(
         &format!(
             r#"

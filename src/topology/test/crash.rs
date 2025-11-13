@@ -111,9 +111,9 @@ async fn test_sink_error() {
 
     let num_lines: usize = 10;
 
-    let (_guard, in1_addr) = next_addr();
-    let (_guard, in2_addr) = next_addr();
-    let (_guard, out_addr) = next_addr();
+    let (_guard_in1, in1_addr) = next_addr();
+    let (_guard_in2, in2_addr) = next_addr();
+    let (_guard_out, out_addr) = next_addr();
 
     let mut config = Config::builder();
     config.add_source("in1", SocketConfig::make_basic_tcp_config(in1_addr));
@@ -159,9 +159,9 @@ async fn test_sink_panic() {
 
     let num_lines: usize = 10;
 
-    let (_guard, in1_addr) = next_addr();
-    let (_guard, in2_addr) = next_addr();
-    let (_guard, out_addr) = next_addr();
+    let (_guard_in1, in1_addr) = next_addr();
+    let (_guard_in2, in2_addr) = next_addr();
+    let (_guard_out, out_addr) = next_addr();
 
     let mut config = Config::builder();
     config.add_source("in1", SocketConfig::make_basic_tcp_config(in1_addr));
