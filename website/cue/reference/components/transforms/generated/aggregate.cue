@@ -32,4 +32,45 @@ generated: components: transforms: aggregate: configuration: {
 			}
 		}
 	}
+	clock: {
+        description: """
+            Aggregation clock source.
+
+            Determines whether buckets are aligned by Vector's processing time
+            or by the event's own timestamp.
+            """
+        required: false
+        type: string: {
+            default: "Processing"
+            enum: {
+                Processing: "Buckets are driven by Vector's wall clock (processing time)."
+                Event:      "Buckets are driven by each event's own timestamp (event time)."
+            }
+        }
+    }
+    allowed_lateness_ms: {
+        description: """
+            Allowed lateness for event-time processing.
+
+            Specifies how long to wait for late or out-of-order samples before closing an event-time bucket.
+            """
+        required: false
+        type: uint: default: 120000
+    }
+    emit_ts: {
+        description: """
+            Output timestamp mode.
+
+            Controls whether the emitted metric's timestamp is set to the start
+            or to the end of the bucket window.
+            """
+        required: false
+        type: string: {
+            default: "BucketStart"
+            enum: {
+                BucketStart: "Stamp the output at the start of the bucket window."
+                BucketEnd:   "Stamp the output at the end of the bucket window."
+            }
+        }
+    }
 }
