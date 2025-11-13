@@ -125,8 +125,8 @@ impl TopologyBuilder {
 }
 
 fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedSource>) {
-    let (_guard, addr) = next_addr();
-    let input_listen_addr = GrpcAddress::from(addr);
+    // TODO: This needs refactoring to properly hold the PortGuard for the lifetime of the topology.
+    let input_listen_addr = GrpcAddress::from(next_addr().1);
     debug!(listen_addr = %input_listen_addr, "Creating controlled input edge.");
 
     let mut input_source = VectorSourceConfig::from_address(input_listen_addr.as_socket_addr());
@@ -139,10 +139,8 @@ fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedS
 }
 
 fn build_output_edge() -> (OutputEdge, impl Into<BoxedSink>) {
-    let output_listen_addr = GrpcAddress::from({
-        let (_guard3, addr) = next_addr();
-        addr
-    });
+    // TODO: This needs refactoring to properly hold the PortGuard for the lifetime of the topology.
+    let output_listen_addr = GrpcAddress::from(next_addr().1);
     debug!(endpoint = %output_listen_addr, "Creating controlled output edge.");
 
     let mut output_sink = VectorSinkConfig::from_address(output_listen_addr.as_uri());
