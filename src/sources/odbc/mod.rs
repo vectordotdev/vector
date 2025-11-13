@@ -57,7 +57,6 @@
 //! {"message":[{"datetime":"2025-04-28T01:20:04Z","id":5,"name":"test5"}],"timestamp":"2025-04-28T01:51:05.010063Z"}
 //! ```
 
-use crate::source_sender::ClosedError;
 use bytes::Bytes;
 use chrono::{DateTime, NaiveDate, NaiveDateTime, NaiveTime, TimeZone, Utc};
 use chrono_tz::Tz;
@@ -80,6 +79,7 @@ use tokio::time::sleep;
 use vector_config::schema::generate_string_schema;
 use vector_config::{Configurable, GenerateError, Metadata, ToValue};
 use vector_config_common::schema::{SchemaGenerator, SchemaObject};
+use vector_lib::source_sender::ClosedError;
 use vrl::prelude::*;
 
 #[cfg(feature = "sources-odbc")]
