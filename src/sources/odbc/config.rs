@@ -1,8 +1,8 @@
 use crate::config::{LogNamespace, SourceConfig, SourceContext, SourceOutput, log_schema};
 use crate::serde::default_decoding;
 use crate::sources::Source;
-use crate::sources::odbc::OdbcSchedule;
 use crate::sources::odbc::client::Context;
+use crate::sources::odbc::schedule::OdbcSchedule;
 use chrono_tz::Tz;
 use futures_util::FutureExt;
 use serde_with::DurationSeconds;
