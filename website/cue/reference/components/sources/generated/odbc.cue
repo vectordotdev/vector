@@ -246,7 +246,7 @@ generated: components: sources: odbc: configuration: {
 				description: """
 					Signal types to attempt parsing, in priority order.
 
-					The deserializer tries to parse signal types in the order specified. This allows you to optimize
+					The deserializer will try parsing in the order specified. This allows you to optimize
 					performance when you know the expected signal types. For example, if you only receive
 					traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
 
@@ -288,8 +288,8 @@ generated: components: sources: odbc: configuration: {
 					source: {
 						description: """
 																The [Vector Remap Language][vrl] (VRL) program to execute for each event.
-																Note that the final contents of the `.` target is used as the decoding result.
-																Compilation error or use of 'abort' in a program results in a decoding error.
+																Note that the final contents of the `.` target will be used as the decoding result.
+																Compilation error or use of 'abort' in a program will result in a decoding error.
 
 																[vrl]: https://vector.dev/docs/reference/vrl
 																"""
@@ -315,7 +315,7 @@ generated: components: sources: odbc: configuration: {
 	}
 	last_run_metadata_path: {
 		description: """
-			The path to the file where the last row of the result set is saved.
+			The path to the file where the last row of the result set will be saved.
 			The last row of the result set is saved in JSON format.
 			This file provides parameters for the SQL query in the next scheduled run.
 			If the file does not exist or the path is not specified, the initial value from `statement_init_params` is used.
