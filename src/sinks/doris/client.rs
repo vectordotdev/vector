@@ -103,7 +103,7 @@ impl DorisSinkClient {
 
         let uri = if let Some(redirect_url) = redirect_url {
             debug!(
-                message = "Using redirect URL",
+                message = "Using redirect URL.",
                 redirect_url = %redirect_url
             );
             redirect_url.parse::<Uri>().map_err(|error| {
@@ -130,7 +130,7 @@ impl DorisSinkClient {
         };
 
         debug!(
-            message = "Building request",
+            message = "Building request.",
             uri = %uri,
             label = %label
         );
@@ -172,7 +172,7 @@ impl DorisSinkClient {
         }
 
         debug!(
-            message = "Request built successfully",
+            message = "Request built successfully.",
             method = %request.method(),
             uri = %request.uri(),
             headers_count = request.headers().len()
@@ -223,7 +223,7 @@ impl DorisSinkClient {
             if let Some(location) = response.headers().get(http::header::LOCATION) {
                 if let Ok(location_str) = location.to_str() {
                     debug!(
-                        message = "Following redirect",
+                        message = "Following redirect.",
                         status = %status,
                         to = %location_str,
                         redirect_count = redirect_count + 1
@@ -246,7 +246,7 @@ impl DorisSinkClient {
                     redirect_count += 1;
 
                     debug!(
-                        message = "Received response after redirect",
+                        message = "Received response after redirect.",
                         new_status = %status,
                         redirect_count = redirect_count
                     );
@@ -296,13 +296,7 @@ impl DorisSinkClient {
                     StreamLoadStatus::Failure
                 }
             } else {
-                if response_json.get("code").is_some()
-                    || response_json.get("msg").and_then(|v| v.as_str()) == Some("Unauthorized")
-                {
-                    StreamLoadStatus::Failure
-                } else {
-                    StreamLoadStatus::Failure
-                }
+                StreamLoadStatus::Failure
             };
 
         Ok(DorisStreamLoadResponse {
@@ -329,7 +323,7 @@ impl DorisSinkClient {
         })?;
 
         debug!(
-            message = "Sending health check request to Doris FE node",
+            message = "Sending health check request to Doris FE node.",
             uri = %uri
         );
 
@@ -359,13 +353,13 @@ impl DorisSinkClient {
                     if let Some(msg) = json.get("msg").and_then(|m| m.as_str()) {
                         if msg.to_lowercase() == "success" {
                             debug!(
-                                message = "Doris FE node is healthy",
+                                message = "Doris FE node is healthy.",
                                 node = %endpoint
                             );
                             return Ok(());
                         } else {
                             debug!(
-                                message = "Doris FE node returned non-success message",
+                                message = "Doris FE node returned non-success message.",
                                 node = %endpoint,
                                 message = %msg
                             );
@@ -380,7 +374,7 @@ impl DorisSinkClient {
         }
 
         debug!(
-            message = "Doris FE node health check failed",
+            message = "Doris FE node health check failed.",
             node = %endpoint,
             status = %status
         );
@@ -487,10 +481,10 @@ mod tests {
         let table = "test_table".to_string(); // Update to your table name
         let payload = Bytes::from(json_data);
 
-        println!("Sending data to Doris server...");
-        println!("Database: {}, Table: {}", database, table);
-        println!("JSON data sample:");
-        println!(
+        info!("Sending data to Doris server.");
+        info!("Database: {}, Table: {}.", database, table);
+        info!("JSON data sample.");
+        info!(
             "{}",
             if json_data.len() > 300 {
                 &json_data[..300]
@@ -502,9 +496,9 @@ mod tests {
         let result = client.send_stream_load(database, table, payload).await;
         match result {
             Ok(response) => {
-                println!("HTTP Status Code: {}", response.http_status_code);
-                println!("Stream Load Status: {:?}", response.stream_load_status);
-                println!("Doris Response: {:?}", response.response_json);
+                info!("HTTP Status Code: {}", response.http_status_code);
+                info!("Stream Load Status: {:?}", response.stream_load_status);
+                info!("Doris Response: {:?}", response.response_json);
 
                 // Check key fields in the response
                 if let Some(status_str) = response
@@ -512,11 +506,11 @@ mod tests {
                     .get("status")
                     .and_then(|v| v.as_str())
                 {
-                    println!("Import Status: {}", status_str);
+                    info!("Import Status: {}", status_str);
                 }
 
                 if let Some(msg) = response.response_json.get("msg").and_then(|v| v.as_str()) {
-                    println!("Message: {}", msg);
+                    info!("Message: {}", msg);
                 }
 
                 if let Some(rows) = response
@@ -524,32 +518,32 @@ mod tests {
                     .get("number_loaded_rows")
                     .and_then(|v| v.as_u64())
                 {
-                    println!("Imported Rows: {}", rows);
+                    info!("Imported Rows: {}", rows);
                 } else if let Some(rows) = response
                     .response_json
                     .get("loaded_rows")
                     .and_then(|v| v.as_u64())
                 {
-                    println!("Imported Rows: {}", rows);
+                    info!("Imported Rows: {}", rows);
                 }
 
                 // Handle different statuses
                 match response.stream_load_status {
                     StreamLoadStatus::Successful => {
-                        println!("Data import successful!");
+                        info!("Data import successful.");
                     }
                     StreamLoadStatus::Failure => {
-                        println!(
+                        warn!(
                             "Data import failed! Please check error message and response status."
                         );
                     }
                 }
             }
             Err(e) => {
-                println!("Request failed: {}", e);
+                error!("Request failed: {}", e);
             }
         }
 
-        println!("Test completed");
+        info!("Test completed.");
     }
 }

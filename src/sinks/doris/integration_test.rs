@@ -107,7 +107,7 @@ async fn insert_events() {
 
     let client = DorisTestClient::new(doris_mysql_address_port()).await;
     info!(
-        "DorisTestClient created successfully, creating database...",
+        message = "DorisTestClient created successfully, creating database...",
         internal_log_rate_limit = true
     );
 
@@ -126,14 +126,13 @@ async fn insert_events() {
         table: table.clone().try_into().unwrap(),
         label_prefix: "vector_test".to_string(),
         log_request: true, // Explicitly enable for integration tests
-        log_progress_interval: 10,
         encoding: (
             Some(FramingConfig::NewlineDelimited),
             JsonSerializerConfig::new(MetricTagValues::Full, Default::default()),
         )
             .into(),
         headers: default_headers(),
-        batch: batch,
+        batch,
         auth: Some(crate::http::Auth::Basic {
             user: config_auth().user.clone(),
             password: SensitiveString::from(config_auth().password.clone()),
@@ -194,10 +193,10 @@ impl DorisTestClient {
         let (host, port) = query_address_port;
 
         info!(
-            "Connecting to Doris MySQL interface: {}:{} User: {}",
-            host,
-            port,
-            auth.user,
+            message = "Connecting to Doris MySQL interface.",
+            %host,
+            %port,
+            user = %auth.user,
             internal_log_rate_limit = true
         );
 
@@ -214,7 +213,7 @@ impl DorisTestClient {
             .disable_statement_logging();
 
         info!(
-            "DorisTestClient initialized successfully",
+            message = "DorisTestClient initialized successfully.",
             internal_log_rate_limit = true
         );
         DorisTestClient { connect_options }
@@ -230,8 +229,8 @@ impl DorisTestClient {
     /// Execute a query that doesn't return data (DDL/DML operations)
     async fn execute_query(&self, query: &str) {
         info!(
-            "Executing SQL query: {}",
-            query,
+            message = "Executing SQL query.",
+            %query,
             internal_log_rate_limit = true
         );
 
@@ -240,9 +239,9 @@ impl DorisTestClient {
         match conn.execute(query).await {
             Ok(result) => {
                 info!(
-                    "SQL query execution successful: {} - Affected rows: {}",
-                    query,
-                    result.rows_affected(),
+                    message = "SQL query execution successful.",
+                    %query,
+                    rows_affected = %result.rows_affected(),
                     internal_log_rate_limit = true
                 );
             }
@@ -250,9 +249,9 @@ impl DorisTestClient {
                 // Handle specific ignorable errors
                 if self.is_ignorable_error(query, &e) {
                     warn!(
-                        "Ignoring expected error for query '{}': {}",
-                        query,
-                        e,
+                        message = "Ignoring expected error for query.",
+                        %query,
+                        %e,
                         internal_log_rate_limit = true
                     );
                     return;
@@ -273,21 +272,18 @@ impl DorisTestClient {
     /// Execute a query that returns a single row
     async fn fetch_one_query(&self, query: &str, operation_name: &str) -> sqlx::mysql::MySqlRow {
         info!(
-            "{}: {}",
-            operation_name,
-            query,
+            message = "Executing fetch one query.",
+            %operation_name,
+            %query,
             internal_log_rate_limit = true
         );
 
         let mut conn = self.create_connection().await;
 
-        let result = conn
-            .fetch_one(query)
-            .await
-            .unwrap_or_else(|e| panic!("{} failed: {} - {}", operation_name, query, e));
-
         // Connection is automatically closed when it goes out of scope
-        result
+        conn.fetch_one(query)
+            .await
+            .unwrap_or_else(|e| panic!("{} failed: {} - {}", operation_name, query, e))
     }
 
     /// Execute a query that returns multiple rows
@@ -298,19 +294,17 @@ impl DorisTestClient {
     ) -> Vec<sqlx::mysql::MySqlRow> {
         let mut conn = self.create_connection().await;
 
-        let result = conn.fetch_all(query).await.unwrap_or_else(|e| {
+        // Connection is automatically closed when it goes out of scope
+        conn.fetch_all(query).await.unwrap_or_else(|e| {
             warn!(
-                "{} failed: {} - {}",
-                operation_name,
-                query,
-                e,
+                message = "Query failed.",
+                %operation_name,
+                %query,
+                %e,
                 internal_log_rate_limit = true
             );
             Vec::new()
-        });
-
-        // Connection is automatically closed when it goes out of scope
-        result
+        })
     }
 
     /// Create database using the common execute pattern
@@ -349,8 +343,8 @@ impl DorisTestClient {
 
         let count: i64 = row.get(0);
         info!(
-            "Count result: {} rows",
-            count,
+            message = "Count result.",
+            rows = %count,
             internal_log_rate_limit = true
         );
         count
@@ -406,7 +400,7 @@ impl DorisTestClient {
         }
 
         info!(
-            "Getting first row data successful",
+            message = "Getting first row data successful.",
             internal_log_rate_limit = true
         );
         result

@@ -27,7 +27,7 @@ pub struct DorisService {
 }
 
 impl DorisService {
-    pub fn new(client: ThreadSafeDorisSinkClient, log_request: bool) -> DorisService {
+    pub const fn new(client: ThreadSafeDorisSinkClient, log_request: bool) -> DorisService {
         DorisService {
             client,
             log_request,
@@ -46,7 +46,7 @@ impl DorisService {
                 Ok(pretty_json) => pretty_json,
                 Err(err) => {
                     // Log the error but continue with the original format
-                    warn!(message = "Failed to prettify JSON response", error = %err, internal_log_rate_limit = true);
+                    warn!(message = "Failed to prettify JSON response.", error = %err, internal_log_rate_limit = true);
                     response_json.to_string()
                 }
             };
@@ -59,34 +59,33 @@ impl DorisService {
                 internal_log_rate_limit = true
             );
         }
-        if http_status_code.is_success() {
-            if stream_load_status == StreamLoadStatus::Successful {
-                // Emit metrics for successfully loaded data
-                let load_bytes = response_json
-                    .get("LoadBytes")
-                    .and_then(|b| b.as_i64())
-                    .unwrap_or(0);
-                let loaded_rows = response_json
-                    .get("NumberLoadedRows")
-                    .and_then(|r| r.as_i64())
-                    .unwrap_or(0);
+        if http_status_code.is_success()
+            && stream_load_status == StreamLoadStatus::Successful
+        {
+            // Emit metrics for successfully loaded data
+            let load_bytes = response_json
+                .get("LoadBytes")
+                .and_then(|b| b.as_i64())
+                .unwrap_or(0);
+            let loaded_rows = response_json
+                .get("NumberLoadedRows")
+                .and_then(|r| r.as_i64())
+                .unwrap_or(0);
 
-                if loaded_rows > 0 || load_bytes > 0 {
-                    emit!(DorisRowsLoaded {
-                        loaded_rows,
-                        load_bytes,
-                    });
-                }
+            if loaded_rows > 0 || load_bytes > 0 {
+                emit!(DorisRowsLoaded {
+                    loaded_rows,
+                    load_bytes,
+                });
+            }
 
-                // Emit metrics for filtered rows
-                if let Some(filtered_rows) = response_json
-                    .get("NumberFilteredRows")
-                    .and_then(|r| r.as_i64())
-                {
-                    if filtered_rows > 0 {
-                        emit!(DorisRowsFiltered { filtered_rows });
-                    }
-                }
+            // Emit metrics for filtered rows
+            if let Some(filtered_rows) = response_json
+                .get("NumberFilteredRows")
+                .and_then(|r| r.as_i64())
+                && filtered_rows > 0
+            {
+                emit!(DorisRowsFiltered { filtered_rows });
             }
         }
         Ok(())

@@ -17,6 +17,7 @@ use crate::{
 use futures;
 use futures_util::TryFutureExt;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 /// Configuration for the `doris` sink.
 #[configurable_component(sink("doris", "Deliver log data to an Apache Doris database."))]
@@ -98,7 +99,7 @@ fn default_label_prefix() -> String {
     "vector".to_string()
 }
 
-fn default_max_retries() -> isize {
+const fn default_max_retries() -> isize {
     -1
 }
 
@@ -154,7 +155,7 @@ impl SinkConfig for DorisConfig {
             .cloned()
             .map(|common| {
                 let client_clone = client.clone();
-                let compression = self.compression.clone();
+                let compression = self.compression;
                 let label_prefix = self.label_prefix.clone();
                 let headers = self.headers.clone();
                 let log_request = self.log_request;
@@ -209,7 +210,7 @@ impl SinkConfig for DorisConfig {
                 client.clone(),
                 common.base_url.clone(),
                 common.auth.clone(),
-                self.compression.clone(),
+                self.compression,
                 self.label_prefix.clone(),
                 self.headers.clone(),
             )
@@ -219,7 +220,7 @@ impl SinkConfig for DorisConfig {
 
         // Use the previously saved client for health check, no need to create a new instance
         let healthcheck = futures::future::select_ok(commons.into_iter().map(move |common| {
-            let client = healthcheck_doris_client.clone();
+            let client = Arc::clone(&healthcheck_doris_client);
             async move { common.healthcheck(client).await }.boxed()
         }))
         .map_ok(|((), _)| ())
@@ -259,6 +260,7 @@ mod tests {
             endpoints = ["http://localhost:8030"]
             database = "test_db"
             table = "test_table"
+            encoding.codec = "json"
             "#,
         )
         .unwrap();
@@ -281,6 +283,7 @@ mod tests {
             label_prefix = "custom_prefix"
             log_request = false
             max_retries = 5
+            encoding.codec = "json"
             "#,
         )
         .unwrap();
@@ -306,6 +309,7 @@ mod tests {
             auth.strategy = "basic"
             auth.user = "admin"
             auth.password = "password"
+            encoding.codec = "json"
             "#,
         )
         .unwrap();
@@ -326,6 +330,7 @@ mod tests {
             endpoints = ["http://localhost:8030"]
             database = "test_db"
             table = "test_table"
+            encoding.codec = "json"
             [headers]
             "X-Custom-Header" = "custom_value"
             "Content-Type" = "application/json"
@@ -351,6 +356,7 @@ mod tests {
             endpoints = ["", ""]
             database = "test_db"
             table = "test_table"
+            encoding.codec = "json"
             distribution.retry_initial_backoff_secs = 10
         "#,
         )
