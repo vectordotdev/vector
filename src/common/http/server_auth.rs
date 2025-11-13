@@ -582,11 +582,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("wrong value"));
         let (_guard, addr) = next_addr();
-        let result = matcher.handle_auth(
-            Some(&addr),
-            &headers,
-            "/",
-        );
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();
@@ -605,11 +601,7 @@ mod tests {
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("test"));
         let (_guard, addr) = next_addr();
-        let result = matcher.handle_auth(
-            Some(&addr),
-            &headers,
-            "/",
-        );
+        let result = matcher.handle_auth(Some(&addr), &headers, "/");
 
         assert!(result.is_err());
         let error = result.unwrap_err();
