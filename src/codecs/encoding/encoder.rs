@@ -39,7 +39,7 @@ impl BatchEncoder {
 
     /// Get the HTTP content type.
     #[cfg(feature = "codecs-arrow")]
-    pub fn content_type(&self) -> &'static str {
+    pub const fn content_type(&self) -> &'static str {
         match &self.serializer {
             BatchSerializer::Arrow(_) => "application/vnd.apache.arrow.stream",
         }
