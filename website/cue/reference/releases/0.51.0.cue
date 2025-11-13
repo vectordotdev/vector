@@ -21,8 +21,7 @@ releases: "0.51.0": {
 			Blackhole sink periodic statistics messages are incorrectly rate limited.
 			""",
 		"""
-			A bug in the `internal_logs` source is rate limiting messages and formatting them as if
-			they are being outputted to the console. Repeated log messages are dropped.
+			The `internal_logs` source incorrectly rate limits and drops repeated messages.
 			""",
 		"""
 			When running Vector with debug logs enabled (`VECTOR_LOG=debug`), threads panic when log
