@@ -1,6 +1,7 @@
-use vector_lib::opentelemetry::proto::LOGS_REQUEST_MESSAGE_TYPE;
-use vector_lib::opentelemetry::proto::collector::logs::v1::ExportLogsServiceRequest;
-use vector_lib::opentelemetry::proto::common::v1::any_value::Value as AnyValueEnum;
+use vector_lib::opentelemetry::proto::{
+    LOGS_REQUEST_MESSAGE_TYPE, collector::logs::v1::ExportLogsServiceRequest,
+    common::v1::any_value::Value as AnyValueEnum,
+};
 
 use crate::opentelemetry::{
     assert_service_name_with, parse_line_to_export_type_request, read_file_helper,

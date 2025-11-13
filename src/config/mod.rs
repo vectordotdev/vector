@@ -36,7 +36,7 @@ pub mod dot_graph;
 mod enrichment_table;
 pub mod format;
 mod graph;
-mod loading;
+pub mod loading;
 pub mod provider;
 pub mod schema;
 mod secret;
@@ -54,9 +54,9 @@ pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
 pub use loading::{
-    COLLECTOR, CONFIG_PATHS, load, load_builder_from_paths, load_from_paths,
-    load_from_paths_with_provider_and_secrets, load_from_str, load_from_str_with_secrets,
-    load_source_from_paths, merge_path_lists, process_paths,
+    COLLECTOR, CONFIG_PATHS, load, load_from_paths, load_from_paths_with_provider_and_secrets,
+    load_from_str, load_from_str_with_secrets, load_source_from_paths, merge_path_lists,
+    process_paths,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;

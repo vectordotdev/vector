@@ -95,6 +95,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
+      fail-fast: false
       matrix:
         service: [
           "amqp", "appsignal", "aws", "axiom", "azure", "clickhouse", "databend", "datadog-agent",
@@ -134,6 +135,7 @@ jobs:
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         service: [
           "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"
