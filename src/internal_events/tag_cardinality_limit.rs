@@ -15,7 +15,12 @@ impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
             tag_key = self.tag_key,
             tag_value = self.tag_value,
         );
-        counter!("tag_value_limit_exceeded_total").increment(1);
+        counter!(
+            "tag_value_limit_exceeded_total",
+            "metric_name" => self.metric_name.to_string(),
+            "tag_key" => self.tag_key.to_string(),
+        )
+        .increment(1);
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
@@ -38,7 +43,12 @@ impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
             tag_key = self.tag_key,
             tag_value = self.tag_value,
         );
-        counter!("tag_value_limit_exceeded_total").increment(1);
+        counter!(
+            "tag_value_limit_exceeded_total",
+            "metric_name" => self.metric_name.to_string(),
+            "tag_key" => self.tag_key.to_string(),
+        )
+        .increment(1);
     }
 }
 

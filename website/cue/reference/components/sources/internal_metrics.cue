@@ -776,7 +776,16 @@ components: sources: internal_metrics: {
 				"""
 			type:              "counter"
 			default_namespace: "vector"
-			tags:              _component_tags
+			tags: _component_tags & {
+				metric_name: {
+					description: "The name of the metric for which the tag value limit was exceeded."
+					required:    true
+				}
+				tag_key: {
+					description: "The key of the tag for which the value limit was exceeded."
+					required:    true
+				}
+			}
 		}
 		timestamp_parse_errors_total: {
 			description:       "The total number of errors encountered parsing [RFC 3339](\(urls.rfc_3339)) timestamps."
