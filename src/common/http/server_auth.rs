@@ -442,11 +442,9 @@ mod tests {
 
         let matcher = basic_auth.build(&Default::default()).unwrap();
 
+        let (_guard, addr) = next_addr();
         let result = matcher.handle_auth(
-            Some(&{
-                let (_guard1, addr) = next_addr();
-                addr
-            }),
+            Some(&addr),
             &HeaderMap::new(),
             "/",
         );
@@ -468,11 +466,9 @@ mod tests {
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("Basic wrong"));
+        let (_guard, addr) = next_addr();
         let result = matcher.handle_auth(
-            Some(&{
-                let (_guard2, addr) = next_addr();
-                addr
-            }),
+            Some(&addr),
             &headers,
             "/",
         );
@@ -499,11 +495,9 @@ mod tests {
             AUTHORIZATION,
             Authorization::basic(&username, &password).0.encode(),
         );
+        let (_guard, addr) = next_addr();
         let result = matcher.handle_auth(
-            Some(&{
-                let (_guard3, addr) = next_addr();
-                addr
-            }),
+            Some(&addr),
             &headers,
             "/",
         );
@@ -521,11 +515,9 @@ mod tests {
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("test"));
+        let (_guard, addr) = next_addr();
         let result = matcher.handle_auth(
-            Some(&{
-                let (_guard4, addr) = next_addr();
-                addr
-            }),
+            Some(&addr),
             &headers,
             "/",
         );
@@ -545,10 +537,7 @@ mod tests {
 
         let headers = HeaderMap::new();
         let result = matcher.handle_auth(
-            Some(&{
-                let (_guard5, addr) = next_addr();
-                addr
-            }),
+            Some(&addr),
             &headers,
             "/",
         );
@@ -581,11 +570,9 @@ mod tests {
         let matcher = custom_auth.build(&Default::default()).unwrap();
 
         let headers = HeaderMap::new();
+        let (_guard, addr) = next_addr();
         let result = matcher.handle_auth(
-            Some(&{
-                let (_guard6, addr) = next_addr();
-                addr
-            }),
+            Some(&addr),
             &headers,
             "/ok",
         );
@@ -602,11 +589,9 @@ mod tests {
         let matcher = custom_auth.build(&Default::default()).unwrap();
 
         let headers = HeaderMap::new();
+        let (_guard, addr) = next_addr();
         let result = matcher.handle_auth(
-            Some(&{
-                let (_guard7, addr) = next_addr();
-                addr
-            }),
+            Some(&addr),
             &headers,
             "/bad",
         );

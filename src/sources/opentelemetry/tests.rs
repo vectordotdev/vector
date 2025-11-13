@@ -1070,8 +1070,8 @@ async fn receive_summary_metric() {
 #[tokio::test]
 async fn http_headers() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let (_guard, grpc_addr) = next_addr();
-        let (_guard, http_addr) = next_addr();
+        let (_guard_0, grpc_addr) = next_addr();
+        let (_guard_1, http_addr) = next_addr();
 
         let mut headers = HeaderMap::new();
         headers.insert("User-Agent", "test_client".parse().unwrap());
@@ -1185,8 +1185,8 @@ pub async fn build_otlp_test_env(
     event_name: &'static str,
     log_namespace: Option<bool>,
 ) -> OTelTestEnv {
-    let (_guard, grpc_addr) = next_addr();
-    let (_guard, http_addr) = next_addr();
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
 
     let config = OpentelemetryConfig {
         grpc: GrpcConfig {

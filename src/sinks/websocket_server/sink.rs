@@ -660,12 +660,10 @@ mod tests {
     async fn sink_spec_compliance() {
         let event = Event::Log(LogEvent::from("foo"));
 
+        let (_guard, address) = next_addr();
         let sink = WebSocketListenerSink::new(
             WebSocketListenerSinkConfig {
-                address: {
-                    let (_guard1, addr) = next_addr();
-                    addr
-                },
+                address,
                 ..Default::default()
             },
             SinkContext::default(),

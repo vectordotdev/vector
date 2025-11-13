@@ -125,10 +125,8 @@ impl TopologyBuilder {
 }
 
 fn build_input_edge(log_namespace: LogNamespace) -> (InputEdge, impl Into<BoxedSource>) {
-    let input_listen_addr = GrpcAddress::from({
-        let (_guard2, addr) = next_addr();
-        addr
-    });
+    let (_guard, addr) = next_addr();
+    let input_listen_addr = GrpcAddress::from(addr);
     debug!(listen_addr = %input_listen_addr, "Creating controlled input edge.");
 
     let mut input_source = VectorSourceConfig::from_address(input_listen_addr.as_socket_addr());
