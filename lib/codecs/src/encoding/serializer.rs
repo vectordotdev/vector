@@ -17,9 +17,20 @@ use super::format::{
 };
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
-use super::framing::{
-    CharacterDelimitedEncoderConfig, FramingConfig, LengthDelimitedEncoderConfig,
-    VarintLengthDelimitedEncoderConfig,
+use super::{
+    chunking::Chunker,
+    format::{
+        AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
+        CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer,
+        GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
+        LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
+        NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer,
+        RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
+    },
+    framing::{
+        CharacterDelimitedEncoderConfig, FramingConfig, LengthDelimitedEncoderConfig,
+        VarintLengthDelimitedEncoderConfig,
+    },
 };
 
 /// Serializer configuration.
