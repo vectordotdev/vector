@@ -36,7 +36,10 @@ impl PortGuard {
 impl Drop for PortGuard {
     fn drop(&mut self) {
         // Remove from the reserved ports set when dropped
-        RESERVED_PORTS.lock().unwrap().remove(&self.addr.port());
+        RESERVED_PORTS
+            .lock()
+            .expect("poisoned lock potentially due to test panicking")
+            .remove(&self.addr.port());
     }
 }
 
@@ -67,7 +70,9 @@ pub fn next_addr_for_ip(ip: IpAddr) -> (PortGuard, SocketAddr) {
         let port = addr.port();
 
         // Check if this port is already reserved by another test WHILE still holding the listener
-        let mut reserved = RESERVED_PORTS.lock().unwrap();
+        let mut reserved = RESERVED_PORTS
+            .lock()
+            .expect("poisoned lock potentially due to test panicking");
         if reserved.contains(&port) {
             // OS recycled a port that's still reserved by another test.
             // Lock and listener will be dropped implicitly after continuing
