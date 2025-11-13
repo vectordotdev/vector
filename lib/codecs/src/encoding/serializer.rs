@@ -4,17 +4,8 @@ use bytes::BytesMut;
 use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
-use super::chunking::Chunker;
 #[cfg(feature = "arrow")]
 use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
-use super::format::{
-    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
-    CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
-    JsonSerializer, JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig,
-    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
-    ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig,
-    TextSerializer, TextSerializerConfig,
-};
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
 use super::{
