@@ -4,20 +4,22 @@ use bytes::BytesMut;
 use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
-use super::chunking::Chunker;
-use super::format::{
-    AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
-    CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
-    JsonSerializer, JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig,
-    NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
-    ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer, RawMessageSerializerConfig,
-    TextSerializer, TextSerializerConfig,
-};
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
-use super::framing::{
-    CharacterDelimitedEncoderConfig, FramingConfig, LengthDelimitedEncoderConfig,
-    VarintLengthDelimitedEncoderConfig,
+use super::{
+    chunking::Chunker,
+    format::{
+        AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
+        CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer,
+        GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
+        LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
+        NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer,
+        RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
+    },
+    framing::{
+        CharacterDelimitedEncoderConfig, FramingConfig, LengthDelimitedEncoderConfig,
+        VarintLengthDelimitedEncoderConfig,
+    },
 };
 
 /// Serializer configuration.

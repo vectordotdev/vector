@@ -1,11 +1,14 @@
-use std::{collections::HashMap, collections::HashSet, process::Command};
+use std::{
+    collections::{HashMap, HashSet},
+    process::Command,
+};
 
 use anyhow::Result;
 use clap::Args;
 use itertools::Itertools as _;
 use regex::Regex;
 
-use crate::{app::CommandExt as _, util};
+use crate::{app::CommandExt as _, utils};
 
 /// Show information about crates versions pulled in by all dependencies
 #[derive(Args, Debug)]
@@ -46,7 +49,7 @@ impl Cli {
         }
 
         let width = versions.keys().map(String::len).max().unwrap_or(0).max(7);
-        if *util::IS_A_TTY {
+        if *utils::IS_A_TTY {
             println!("{:width$}  Version(s)", "Package");
             println!("{:width$}  ----------", "-------");
         }
