@@ -1157,10 +1157,6 @@ mod tests {
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
 
-            file1.sync_all().unwrap();
-            file2.sync_all().unwrap();
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
-
             for i in 0..n {
                 writeln!(&mut file1, "hello {i}").unwrap();
                 writeln!(&mut file2, "goodbye {i}").unwrap();
@@ -1215,9 +1211,6 @@ mod tests {
         let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
             let mut file = File::create(&path).unwrap();
 
-            file.sync_all().unwrap();
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
-
             writeln!(&mut file, "line for checkpointing").unwrap();
             for _i in 0..n {
                 writeln!(&mut file).unwrap();
@@ -1243,9 +1236,6 @@ mod tests {
         let path = dir.path().join("file");
         let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
             let mut file = File::create(&path).unwrap();
-
-            file.sync_all().unwrap();
-            sleep_500_millis().await; // The files must be observed at its original length before writing to it
 
             for i in 0..n {
                 writeln!(&mut file, "pretrunc {i}").unwrap();
@@ -1384,12 +1374,6 @@ mod tests {
             let mut file3 = File::create(&path3).unwrap();
             let mut file4 = File::create(&path4).unwrap();
 
-            file1.sync_all().unwrap();
-            file2.sync_all().unwrap();
-            file3.sync_all().unwrap();
-            file4.sync_all().unwrap();
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
-
             for i in 0..n {
                 writeln!(&mut file1, "1 {i}").unwrap();
                 writeln!(&mut file2, "2 {i}").unwrap();
@@ -1439,10 +1423,6 @@ mod tests {
             std::fs::create_dir_all(dir.path().join("a/b")).unwrap();
             let mut file1 = File::create(&path1).unwrap();
             let mut file2 = File::create(&path2).unwrap();
-
-            file1.sync_all().unwrap();
-            file2.sync_all().unwrap();
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
             for i in 0..n {
                 writeln!(&mut file1, "1 {i}").unwrap();
@@ -1495,9 +1475,6 @@ mod tests {
             let received = run_file_source(&config, true, acks, LogNamespace::Legacy, async {
                 let mut file = File::create(&path).unwrap();
 
-                file.sync_all().unwrap();
-                sleep_500_millis().await;
-
                 writeln!(&mut file, "hello there").unwrap();
                 file.flush().unwrap();
 
@@ -1525,9 +1502,6 @@ mod tests {
             let received = run_file_source(&config, true, acks, LogNamespace::Legacy, async {
                 let mut file = File::create(&path).unwrap();
 
-                file.sync_all().unwrap();
-                sleep_500_millis().await;
-
                 writeln!(&mut file, "hello there").unwrap();
                 file.flush().unwrap();
 
@@ -1553,9 +1527,6 @@ mod tests {
             let path = dir.path().join("file");
             let received = run_file_source(&config, true, acks, LogNamespace::Legacy, async {
                 let mut file = File::create(&path).unwrap();
-
-                file.sync_all().unwrap();
-                sleep_500_millis().await;
 
                 writeln!(&mut file, "hello there").unwrap();
 
@@ -1607,7 +1578,7 @@ mod tests {
         let path = dir.path().join("file");
         let mut file = File::create(&path).unwrap();
         writeln!(&mut file, "zeroth line").unwrap();
-        file.sync_all().unwrap();
+        file.flush().unwrap();
 
         // First time server runs it picks up existing lines.
         {
@@ -1768,8 +1739,6 @@ mod tests {
         {
             let received = run_file_source(&config, true, acking, LogNamespace::Legacy, async {
                 let mut file = File::create(&path).unwrap();
-                file.sync_all().unwrap();
-                sleep_500_millis().await;
                 writeln!(&mut file, "first line").unwrap();
                 file.flush().unwrap();
                 sleep_500_millis().await;
@@ -1786,8 +1755,6 @@ mod tests {
         {
             let received = run_file_source(&config, false, acking, LogNamespace::Legacy, async {
                 let mut file = File::create(&path).unwrap();
-                file.sync_all().unwrap();
-                sleep_500_millis().await;
                 writeln!(&mut file, "second line").unwrap();
                 file.flush().unwrap();
                 sleep_500_millis().await;
@@ -1896,9 +1863,6 @@ mod tests {
         let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
             let mut file = File::create(&path).unwrap();
 
-            file.sync_all().unwrap();
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
-
             writeln!(&mut file, "short").unwrap();
             writeln!(&mut file, "this is too long").unwrap();
             writeln!(&mut file, "11 eleven11").unwrap();
@@ -1940,9 +1904,6 @@ mod tests {
         let path = dir.path().join("file");
         let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
             let mut file = File::create(&path).unwrap();
-
-            file.sync_all().unwrap();
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
             writeln!(&mut file, "leftover foo").unwrap();
             writeln!(&mut file, "INFO hello").unwrap();
@@ -2003,9 +1964,6 @@ mod tests {
         let path = dir.path().join("file");
         let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
             let mut file = File::create(&path).unwrap();
-
-            file.sync_all().unwrap();
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
             writeln!(&mut file, "leftover foo").unwrap();
             writeln!(&mut file, "INFO hello").unwrap();
@@ -2330,9 +2288,6 @@ mod tests {
         let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
             let mut file = File::create(&path).unwrap();
 
-            file.sync_all().unwrap();
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
-
             write!(&mut file, "hello i am a line\r\n").unwrap();
             write!(&mut file, "and i am too\r\n").unwrap();
             write!(&mut file, "CRLF is how we end\r\n").unwrap();
@@ -2371,9 +2326,6 @@ mod tests {
         let path = dir.path().join("file");
         let received = run_file_source(&config, false, Acks, LogNamespace::Legacy, async {
             let mut file = File::create(&path).unwrap();
-
-            file.sync_all().unwrap();
-            sleep_500_millis().await; // The files must be observed at their original lengths before writing to them
 
             for i in 0..n {
                 writeln!(&mut file, "{i}").unwrap();
