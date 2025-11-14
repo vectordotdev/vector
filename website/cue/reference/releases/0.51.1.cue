@@ -11,8 +11,8 @@ releases: "0.51.1": {
 		longer panic when logging utilization or other debug messages.
 
 		* The `config_reload_rejected` and `config_reloaded` counters added in `0.51.0` were
-		not being emitted and have been replaced. `component_errors_total` with
-		`error_code="reload"` now replaces `config_reload_rejected` and `reloaded_total`
+		not being emitted and have been replaced. `component_errors_total` and
+		`error_code="reload"` replaces `config_reload_rejected` and `reloaded_total`
 		replaces `config_reloaded`.
 
 		* The `basename`, `dirname` and `split_path` VRL functions added in `0.51.0` are now
@@ -35,7 +35,7 @@ releases: "0.51.1": {
 		{
 			type: "fix"
 			description: """
-				Fixed a panic in the tracing rate limiter when config reload failed. While the panic didn't kill Vector (it was caught by tokio's task
+				Fixed a panic in the tracing rate limiter when a config reload failed. While the panic didn't kill Vector (it was caught by tokio's task
 				runtime), it could cause unexpected behavior. The rate limiter now gracefully handles events without standard message fields.
 				"""
 			contributors: ["pront"]
