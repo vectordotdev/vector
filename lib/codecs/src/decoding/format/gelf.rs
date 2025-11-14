@@ -45,7 +45,7 @@ pub enum ValidationMode {
     #[default]
     Strict,
 
-	/// Uses more relaxed validation that skips strict GELF specification checks.
+    /// Uses more relaxed validation that skips strict GELF specification checks.
     ///
     /// This mode will not treat specification violations as errors, allowing the decoder
     /// to accept messages from sources that don't strictly follow the GELF spec.
