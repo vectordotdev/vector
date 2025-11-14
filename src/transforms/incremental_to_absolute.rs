@@ -1,7 +1,9 @@
-use std::{collections::HashMap, future::ready, pin::Pin, time::Duration};
+use std::{collections::HashMap, pin::Pin, time::Duration};
 
 use futures::{Stream, StreamExt};
 use vector_lib::{config::LogNamespace, configurable::configurable_component};
+
+use crate::internal_events::incremental_to_absolute::IncrementalToAbsoluteMetricsCache;
 
 use crate::{
     config::{DataType, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
@@ -81,6 +83,21 @@ impl IncrementalToAbsolute {
             .make_absolute(event.as_metric().clone())
             .map(Event::Metric)
     }
+
+    // Emit metrics on cache entries, internally tracked size, and eviction count
+    fn emit_metrics(&mut self) {
+        let (size, has_capacity_policy) = match self.data.capacity_policy() {
+            Some(cp) => (cp.current_memory(), true),
+            None => (0, false),
+        };
+
+        emit!(IncrementalToAbsoluteMetricsCache {
+            size,
+            count: self.data.len(),
+            evictions: self.data.get_and_reset_eviction_count(),
+            has_capacity_policy,
+        });
+    }
 }
 
 impl TaskTransform<Event> for IncrementalToAbsolute {
@@ -92,7 +109,22 @@ impl TaskTransform<Event> for IncrementalToAbsolute {
         Self: 'static,
     {
         let mut inner = self;
-        Box::pin(task.filter_map(move |v| ready(inner.transform_one(v))))
+
+        // Emit initial metrics
+        inner.emit_metrics();
+
+        // Set up periodic metrics emission every 2 seconds
+        let mut interval = tokio::time::interval(Duration::from_secs(2));
+
+        Box::pin(task.filter_map(move |v| {
+            let mut cx = std::task::Context::from_waker(futures::task::noop_waker_ref());
+            // Poll the interval and emit metrics if ready
+            while interval.poll_tick(&mut cx).is_ready() {
+                inner.emit_metrics();
+            }
+            // Process the event as before
+            futures::future::ready(inner.transform_one(v))
+        }))
     }
 }
 
