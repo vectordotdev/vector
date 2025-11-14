@@ -45,9 +45,10 @@ pub enum ValidationMode {
     #[default]
     Strict,
 
-    /// Uses more relaxed validation similar to the [Go SDK][implementation].
+	/// Uses more relaxed validation that skips strict GELF specification checks.
     ///
-    /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
+    /// This mode will not treat specification violations as errors, allowing the decoder
+    /// to accept messages from sources that don't strictly follow the GELF spec.
     Relaxed,
 }
 
