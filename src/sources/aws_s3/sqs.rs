@@ -4,6 +4,7 @@ use std::{
     num::NonZeroUsize,
     panic,
     sync::{Arc, LazyLock},
+    time::Duration,
 };
 
 use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
