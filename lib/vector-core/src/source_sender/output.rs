@@ -17,7 +17,7 @@ use vector_common::{
 };
 use vrl::value::Value;
 
-use super::{CHUNK_SIZE, ClosedError, SourceSenderItem};
+use super::{CHUNK_SIZE, SendError, SourceSenderItem};
 use crate::{
     EstimatedJsonEncodedSizeOf,
     config::{OutputId, log_schema},
@@ -116,7 +116,7 @@ impl Output {
         &mut self,
         mut events: EventArray,
         unsent_event_count: &mut UnsentEventCount,
-    ) -> Result<(), ClosedError> {
+    ) -> Result<(), SendError> {
         let send_reference = Instant::now();
         let reference = Utc::now().timestamp_millis();
         events
@@ -138,8 +138,7 @@ impl Output {
                 events,
                 send_reference,
             })
-            .await
-            .map_err(|_| ClosedError)?;
+            .await?;
         self.events_sent.emit(CountByteSize(count, byte_size));
         unsent_event_count.decr(count);
         Ok(())
@@ -148,7 +147,7 @@ impl Output {
     pub(super) async fn send_event(
         &mut self,
         event: impl Into<EventArray>,
-    ) -> Result<(), ClosedError> {
+    ) -> Result<(), SendError> {
         let event: EventArray = event.into();
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
@@ -157,7 +156,7 @@ impl Output {
         self.send(event, &mut unsent_event_count).await
     }
 
-    pub(super) async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
+    pub(super) async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), SendError>
     where
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
@@ -169,7 +168,7 @@ impl Output {
         Ok(())
     }
 
-    pub(super) async fn send_batch<I, E>(&mut self, events: I) -> Result<(), ClosedError>
+    pub(super) async fn send_batch<I, E>(&mut self, events: I) -> Result<(), SendError>
     where
         E: Into<Event> + ByteSizeOf,
         I: IntoIterator<Item = E>,

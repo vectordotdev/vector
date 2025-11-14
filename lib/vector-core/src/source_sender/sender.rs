@@ -18,7 +18,7 @@ use vector_common::{
     json_size::JsonSize,
 };
 
-use super::{Builder, ClosedError, Output};
+use super::{Builder, Output, SendError};
 #[cfg(any(test, feature = "test"))]
 use super::{LAG_TIME_NAME, TEST_BUFFER_SIZE};
 use crate::{
@@ -201,14 +201,14 @@ impl SourceSender {
     /// Send an event to the default output.
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
-    pub async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
+    pub async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), SendError> {
         self.default_output_mut().send_event(event).await
     }
 
     /// Send a stream of events to the default output.
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
-    pub async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
+    pub async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), SendError>
     where
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
@@ -219,7 +219,7 @@ impl SourceSender {
     /// Send a batch of events to the default output.
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
-    pub async fn send_batch<I, E>(&mut self, events: I) -> Result<(), ClosedError>
+    pub async fn send_batch<I, E>(&mut self, events: I) -> Result<(), SendError>
     where
         E: Into<Event> + ByteSizeOf,
         I: IntoIterator<Item = E>,
@@ -231,7 +231,7 @@ impl SourceSender {
     /// Send a batch of events event to a named output.
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
-    pub async fn send_batch_named<I, E>(&mut self, name: &str, events: I) -> Result<(), ClosedError>
+    pub async fn send_batch_named<I, E>(&mut self, name: &str, events: I) -> Result<(), SendError>
     where
         E: Into<Event> + ByteSizeOf,
         I: IntoIterator<Item = E>,

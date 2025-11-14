@@ -35,15 +35,8 @@ pub enum RequestError {
         source: std::io::Error,
         request_id: String,
     },
-    #[snafu(display(
-        "Could not forward events for request {}, downstream is closed: {}",
-        request_id,
-        source
-    ))]
-    ShuttingDown {
-        source: vector_lib::source_sender::ClosedError,
-        request_id: String,
-    },
+    #[snafu(display("Could not forward events for request {request_id}, downstream is closed"))]
+    ShuttingDown { request_id: String },
     #[snafu(display("Unsupported encoding: {}", encoding))]
     UnsupportedEncoding {
         encoding: String,
