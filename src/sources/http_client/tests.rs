@@ -661,3 +661,92 @@ async fn post_with_vrl_body() {
         }
     }
 }
+
+/// VRL compilation errors in query parameters should fail the build
+#[tokio::test]
+async fn query_vrl_compilation_error() {
+    use crate::config::SourceConfig;
+    use vector_lib::source_sender::SourceSender;
+
+    let config = HttpClientConfig {
+        endpoint: "http://localhost:9999/endpoint".to_string(),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        query: HashMap::from([(
+            "bad_vrl".to_string(),
+            QueryParameterValue::SingleParam(ParameterValue::Typed {
+                value: "this_function_does_not_exist()".to_string(),
+                r#type: ParamType::Vrl,
+            }),
+        )]),
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        method: HttpMethod::Get,
+        body: None,
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    };
+
+    // Attempt to build the source - should fail
+    let (tx, _rx) = SourceSender::new_test();
+    let cx = crate::config::SourceContext::new_test(tx, None);
+    let result = config.build(cx).await;
+
+    // Verify it fails with a VRL compilation error
+    match result {
+        Err(err) => {
+            let err_msg = err.to_string();
+            assert!(
+                err_msg.contains("VRL compilation failed"),
+                "Expected VRL compilation error, got: {}",
+                err_msg
+            );
+        }
+        Ok(_) => panic!("Expected build to fail with VRL compilation error, but it succeeded"),
+    }
+}
+
+/// VRL compilation errors in request body should fail the build
+#[tokio::test]
+async fn body_vrl_compilation_error() {
+    use crate::config::SourceConfig;
+    use vector_lib::source_sender::SourceSender;
+
+    let config = HttpClientConfig {
+        endpoint: "http://localhost:9999/endpoint".to_string(),
+        interval: INTERVAL,
+        timeout: TIMEOUT,
+        query: HashMap::new(),
+        decoding: DeserializerConfig::Json(Default::default()),
+        framing: default_framing_message_based(),
+        headers: HashMap::new(),
+        method: HttpMethod::Post,
+        body: Some(ParameterValue::Typed {
+            value: "invalid_vrl_syntax((".to_string(),
+            r#type: ParamType::Vrl,
+        }),
+        tls: None,
+        auth: None,
+        log_namespace: None,
+    };
+
+    // Attempt to build the source - should fail
+    let (tx, _rx) = SourceSender::new_test();
+    let cx = crate::config::SourceContext::new_test(tx, None);
+    let result = config.build(cx).await;
+
+    // Verify it fails with a VRL compilation error
+    match result {
+        Err(err) => {
+            let err_msg = err.to_string();
+            assert!(
+                err_msg.contains("VRL compilation failed"),
+                "Expected VRL compilation error, got: {}",
+                err_msg
+            );
+        }
+        Ok(_) => panic!("Expected build to fail with VRL compilation error, but it succeeded"),
+    }
+}
