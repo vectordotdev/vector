@@ -401,7 +401,7 @@ impl IngestorProcess {
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
             events_received: register!(EventsReceived),
-            backoff: ExponentialBackoff::default(),
+            backoff: ExponentialBackoff::default().max_delay(Duration::from_secs(30)),
         }
     }
 
