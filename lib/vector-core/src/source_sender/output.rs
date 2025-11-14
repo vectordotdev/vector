@@ -221,10 +221,15 @@ impl Output {
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             self.send(events, &mut unsent_event_count)
                 .await
-                .inspect_err(|_| {
-                    // The unsent event count is discarded here because the callee emits the
-                    // `StreamClosedError`.
-                    unsent_event_count.discard();
+                .inspect_err(|error| match error {
+                    SendError::Timeout => {
+                        unsent_event_count.timed_out();
+                    }
+                    SendError::Closed => {
+                        // The unsent event count is discarded here because the callee emits the
+                        // `StreamClosedError`.
+                        unsent_event_count.discard();
+                    }
                 })?;
         }
         Ok(())
