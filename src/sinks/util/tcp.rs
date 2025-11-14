@@ -159,7 +159,7 @@ impl TcpConnector {
 
     const fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
-        ExponentialBackoff::recommended()
+        ExponentialBackoff::default()
     }
 
     async fn connect(&self) -> Result<MaybeTlsStream<TcpStream>, TcpError> {

@@ -15,14 +15,16 @@ pub(crate) struct ExponentialBackoff {
     max_delay: Option<Duration>,
 }
 
-impl ExponentialBackoff {
-    /// Constructs the recommended backoff strategy
-    pub(crate) const fn recommended() -> ExponentialBackoff {
-        ExponentialBackoff::from_millis(2)
+impl Default for ExponentialBackoff {
+    /// `ExponentialBackoff` instance with sensible default values
+    fn default() -> Self {
+        Self::from_millis(2)
             .factor(250)
             .max_delay(Duration::from_secs(60))
     }
+}
 
+impl ExponentialBackoff {
     /// Constructs a new exponential back-off strategy,
     /// given a base duration in milliseconds.
     ///
@@ -93,7 +95,7 @@ mod tests {
 
     #[test]
     fn test_exponential_backoff_sequence() {
-        let mut backoff = ExponentialBackoff::recommended();
+        let mut backoff = ExponentialBackoff::default();
 
         let expected_delays = [
             Duration::from_millis(500), // 2 * 250
@@ -115,7 +117,7 @@ mod tests {
 
     #[test]
     fn test_backoff_reset() {
-        let mut backoff = ExponentialBackoff::recommended();
+        let mut backoff = ExponentialBackoff::default();
 
         for _ in 0..2 {
             backoff.next();

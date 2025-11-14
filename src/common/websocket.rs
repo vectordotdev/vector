@@ -120,7 +120,7 @@ impl WebSocketConnector {
     }
 
     pub(crate) async fn connect_backoff(&self) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
-        let mut backoff = ExponentialBackoff::recommended();
+        let mut backoff = ExponentialBackoff::default();
 
         loop {
             match self.connect().await {

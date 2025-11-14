@@ -76,7 +76,7 @@ impl HealthConfig {
             open,
             // An exponential backoff starting from retry_initial_backoff_sec and doubling every time
             // up to retry_max_duration_secs.
-            backoff: ExponentialBackoff::recommended()
+            backoff: ExponentialBackoff::default()
                 .factor((self.retry_initial_backoff_secs.saturating_mul(1000) / 2).max(1))
                 .max_delay(self.retry_max_duration_secs),
         }

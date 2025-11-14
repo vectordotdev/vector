@@ -242,7 +242,7 @@ impl NetworkConnector {
 
     async fn connect_backoff(&self) -> NetworkConnection {
         // TODO: Make this configurable.
-        let mut backoff = ExponentialBackoff::recommended();
+        let mut backoff = ExponentialBackoff::default();
 
         loop {
             match self.connect().await {

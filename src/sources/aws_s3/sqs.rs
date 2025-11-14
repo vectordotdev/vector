@@ -402,7 +402,7 @@ impl IngestorProcess {
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
             events_received: register!(EventsReceived),
-            backoff: ExponentialBackoff::recommended(),
+            backoff: ExponentialBackoff::default(),
         }
     }
 
