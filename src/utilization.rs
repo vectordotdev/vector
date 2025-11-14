@@ -1,6 +1,7 @@
 use std::{
     collections::HashMap,
     pin::Pin,
+    sync::{Arc, Mutex},
     task::{Context, Poll, ready},
     time::Duration,
 };
@@ -10,9 +11,6 @@ use std::time::Instant;
 
 #[cfg(test)]
 use mock_instant::global::Instant;
-
-#[cfg(debug_assertions)]
-use std::sync::Arc;
 
 use futures::{Stream, StreamExt};
 use metrics::Gauge;
@@ -78,8 +76,6 @@ pub(crate) struct Timer {
     ewma: stats::Ewma,
     gauge: Gauge,
     #[cfg(debug_assertions)]
-    report_count: u32,
-    #[cfg(debug_assertions)]
     component_id: Arc<str>,
 }
 
@@ -100,8 +96,6 @@ impl Timer {
             total_wait: Duration::new(0, 0),
             ewma: stats::Ewma::new(0.9),
             gauge,
-            #[cfg(debug_assertions)]
-            report_count: 0,
             #[cfg(debug_assertions)]
             component_id,
         }
@@ -149,17 +143,7 @@ impl Timer {
         self.total_wait = Duration::new(0, 0);
 
         #[cfg(debug_assertions)]
-        self.report(avg_rounded);
-    }
-
-    #[cfg(debug_assertions)]
-    fn report(&mut self, utilization: f64) {
-        // Note that changing the reporting interval would also affect the actual metric reporting frequency.
-        // This check reduces debug log spamming.
-        if self.report_count.is_multiple_of(5) {
-            debug!(component_id = %self.component_id, %utilization);
-        }
-        self.report_count = self.report_count.wrapping_add(1);
+        debug!(component_id = %self.component_id, utilization = %avg_rounded, internal_log_rate_limit = false);
     }
 
     fn end_span(&mut self, at: Instant) {
@@ -203,33 +187,25 @@ impl UtilizationComponentSender {
     }
 }
 
-pub(crate) struct UtilizationEmitter {
-    timers: HashMap<ComponentKey, Timer>,
-    timer_rx: Receiver<UtilizationTimerMessage>,
+/// Registry for components sending utilization data.
+///
+/// Cloning this is cheap and does not clone the underlying data.
+#[derive(Clone)]
+pub struct UtilizationRegistry {
+    timers: Arc<Mutex<HashMap<ComponentKey, Timer>>>,
     timer_tx: Sender<UtilizationTimerMessage>,
-    intervals: IntervalStream,
 }
 
-impl UtilizationEmitter {
-    pub(crate) fn new() -> Self {
-        let (timer_tx, timer_rx) = channel(4096);
-        Self {
-            timers: HashMap::default(),
-            intervals: IntervalStream::new(interval(UTILIZATION_EMITTER_DURATION)),
-            timer_tx,
-            timer_rx,
-        }
-    }
-
+impl UtilizationRegistry {
     /// Adds a new component to this utilization metric emitter
     ///
     /// Returns a sender which can be used to send utilization information back to the emitter
     pub(crate) fn add_component(
-        &mut self,
+        &self,
         key: ComponentKey,
         gauge: Gauge,
     ) -> UtilizationComponentSender {
-        self.timers.insert(
+        self.timers.lock().expect("mutex poisoned").insert(
             key.clone(),
             Timer::new(
                 gauge,
@@ -243,23 +219,54 @@ impl UtilizationEmitter {
         }
     }
 
-    pub(crate) async fn run_utilization(&mut self, mut shutdown: ShutdownSignal) {
+    /// Removes a component from this utilization metric emitter
+    pub(crate) fn remove_component(&self, key: &ComponentKey) {
+        self.timers.lock().expect("mutex poisoned").remove(key);
+    }
+}
+
+pub(crate) struct UtilizationEmitter {
+    timers: Arc<Mutex<HashMap<ComponentKey, Timer>>>,
+    timer_rx: Receiver<UtilizationTimerMessage>,
+}
+
+impl UtilizationEmitter {
+    pub(crate) fn new() -> (Self, UtilizationRegistry) {
+        let (timer_tx, timer_rx) = channel(4096);
+        let timers = Arc::new(Mutex::new(HashMap::default()));
+        (
+            Self {
+                timers: Arc::clone(&timers),
+                timer_rx,
+            },
+            UtilizationRegistry { timers, timer_tx },
+        )
+    }
+
+    pub(crate) async fn run_utilization(mut self, mut shutdown: ShutdownSignal) {
+        let mut intervals = IntervalStream::new(interval(UTILIZATION_EMITTER_DURATION));
         loop {
             tokio::select! {
                 message = self.timer_rx.recv() => {
                     match message {
                         Some(UtilizationTimerMessage::StartWait(key, start_time)) => {
-                            self.timers.get_mut(&key).expect("Utilization timer missing for component").start_wait(start_time);
+                            // Timer could be removed in the registry while message is still in the queue
+                            if let Some(timer) = self.timers.lock().expect("mutex poisoned").get_mut(&key) {
+                                timer.start_wait(start_time);
+                            }
                         }
                         Some(UtilizationTimerMessage::StopWait(key, stop_time)) => {
-                            self.timers.get_mut(&key).expect("Utilization timer missing for component").stop_wait(stop_time);
+                            // Timer could be removed in the registry while message is still in the queue
+                            if let Some(timer) = self.timers.lock().expect("mutex poisoned").get_mut(&key) {
+                                timer.stop_wait(stop_time);
+                            }
                         }
                         None => break,
                     }
                 },
 
-                Some(_) = self.intervals.next() => {
-                    for timer in self.timers.values_mut() {
+                Some(_) = intervals.next() => {
+                    for timer in self.timers.lock().expect("mutex poisoned").values_mut() {
                         timer.update_utilization();
                     }
                 },

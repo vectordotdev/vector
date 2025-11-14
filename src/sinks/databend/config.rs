@@ -131,6 +131,9 @@ impl SinkConfig for DatabendConfig {
             Some(Auth::Bearer { .. }) => {
                 return Err("Bearer authentication is not supported currently".into());
             }
+            Some(Auth::Custom { .. }) => {
+                return Err("Custom authentication is not supported currently".into());
+            }
             None => {}
             #[cfg(feature = "aws-core")]
             _ => {}
