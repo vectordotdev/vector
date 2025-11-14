@@ -1,4 +1,9 @@
-use std::{fmt, num::NonZeroUsize, sync::Arc, time::Instant};
+use std::{
+    fmt,
+    num::NonZeroUsize,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use chrono::Utc;
 use futures::{Stream, StreamExt as _};
@@ -11,8 +16,8 @@ use vector_buffers::{
 use vector_common::{
     byte_size_of::ByteSizeOf,
     internal_event::{
-        self, ComponentEventsDropped, CountByteSize, EventsSent, InternalEventHandle as _,
-        Registered, UNINTENTIONAL,
+        self, ComponentEventsDropped, ComponentEventsTimedOut, CountByteSize, EventsSent,
+        InternalEventHandle as _, Registered, UNINTENTIONAL,
     },
 };
 use vrl::value::Value;
@@ -52,6 +57,14 @@ impl UnsentEventCount {
     const fn discard(&mut self) {
         self.count = 0;
     }
+
+    fn timed_out(&mut self) {
+        internal_event::emit(ComponentEventsTimedOut {
+            count: self.count,
+            reason: "Source send timed out.",
+        });
+        self.count = 0;
+    }
 }
 
 impl Drop for UnsentEventCount {
@@ -76,6 +89,7 @@ pub(super) struct Output {
     /// The OutputId related to this source sender. This is set as the `upstream_id` in
     /// `EventMetadata` for all event sent through here.
     id: Arc<OutputId>,
+    timeout: Option<Duration>,
 }
 
 #[expect(clippy::missing_fields_in_debug)]
@@ -84,6 +98,7 @@ impl fmt::Debug for Output {
         fmt.debug_struct("Output")
             .field("sender", &self.sender)
             .field("output_id", &self.id)
+            .field("timeout", &self.timeout)
             // `metrics::Histogram` is missing `impl Debug`
             .finish()
     }
@@ -96,6 +111,7 @@ impl Output {
         lag_time: Option<Histogram>,
         log_definition: Option<Arc<Definition>>,
         output_id: OutputId,
+        timeout: Option<Duration>,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let (tx, rx) = channel::limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap()));
         (
@@ -107,6 +123,7 @@ impl Output {
                 ))),
                 log_definition,
                 id: Arc::new(output_id),
+                timeout,
             },
             rx,
         )
@@ -133,15 +150,30 @@ impl Output {
 
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
-        self.sender
-            .send(SourceSenderItem {
-                events,
-                send_reference,
-            })
-            .await?;
+        self.send_with_timeout(events, send_reference).await?;
         self.events_sent.emit(CountByteSize(count, byte_size));
         unsent_event_count.decr(count);
         Ok(())
+    }
+
+    async fn send_with_timeout(
+        &mut self,
+        events: EventArray,
+        send_reference: Instant,
+    ) -> Result<(), SendError> {
+        let item = SourceSenderItem {
+            events,
+            send_reference,
+        };
+        if let Some(timeout) = self.timeout {
+            match tokio::time::timeout(timeout, self.sender.send(item)).await {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(error)) => Err(error.into()),
+                Err(_elapsed) => Err(SendError::Timeout),
+            }
+        } else {
+            self.sender.send(item).await.map_err(Into::into)
+        }
     }
 
     pub(super) async fn send_event(
@@ -153,7 +185,13 @@ impl Output {
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
         let mut unsent_event_count = UnsentEventCount::new(event.len());
-        self.send(event, &mut unsent_event_count).await
+        self.send(event, &mut unsent_event_count)
+            .await
+            .inspect_err(|error| {
+                if let SendError::Timeout = error {
+                    unsent_event_count.timed_out();
+                }
+            })
     }
 
     pub(super) async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), SendError>

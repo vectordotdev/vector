@@ -1,3 +1,5 @@
+#[cfg(any(test, feature = "test"))]
+use std::time::Duration;
 use std::{collections::HashMap, time::Instant};
 
 use futures::Stream;
@@ -101,14 +103,23 @@ impl SourceSender {
     }
 
     #[cfg(any(test, feature = "test"))]
-    pub fn new_test_sender_with_buffer(n: usize) -> (Self, LimitedReceiver<SourceSenderItem>) {
+    pub fn new_test_sender_with_options(
+        n: usize,
+        timeout: Option<Duration>,
+    ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let lag_time = Some(histogram!(LAG_TIME_NAME));
         let output_id = OutputId {
             component: "test".to_string().into(),
             port: None,
         };
-        let (default_output, rx) =
-            Output::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, None, output_id);
+        let (default_output, rx) = Output::new_with_buffer(
+            n,
+            DEFAULT_OUTPUT.to_owned(),
+            lag_time,
+            None,
+            output_id,
+            timeout,
+        );
         (
             Self {
                 default_output: Some(default_output),
@@ -120,14 +131,14 @@ impl SourceSender {
 
     #[cfg(any(test, feature = "test"))]
     pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_test_sender_with_options(TEST_BUFFER_SIZE, None);
         let recv = recv.into_stream().flat_map(into_event_stream);
         (pipe, recv)
     }
 
     #[cfg(any(test, feature = "test"))]
     pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_test_sender_with_options(TEST_BUFFER_SIZE, None);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
@@ -146,7 +157,7 @@ impl SourceSender {
     pub fn new_test_errors(
         error_at: impl Fn(usize) -> bool,
     ) -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_test_sender_with_options(TEST_BUFFER_SIZE, None);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
@@ -180,7 +191,8 @@ impl SourceSender {
             component: "test".to_string().into(),
             port: Some(name.clone()),
         };
-        let (output, recv) = Output::new_with_buffer(100, name.clone(), None, None, output_id);
+        let (output, recv) =
+            Output::new_with_buffer(100, name.clone(), None, None, output_id, None);
         let recv = recv.into_stream().map(move |mut item| {
             item.events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
