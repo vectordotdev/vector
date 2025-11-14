@@ -5,6 +5,9 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
+[lints.clippy]
+unwrap-used = "forbid"
+
 [[bin]]
 name = "generate-avro-fixtures"
 path = "tests/bin/generate-avro-fixtures.rs"
