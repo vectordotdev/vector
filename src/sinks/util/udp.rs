@@ -114,9 +114,7 @@ impl UdpConnector {
 
     const fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
-        ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60))
+        ExponentialBackoff::recommended()
     }
 
     async fn connect(&self) -> Result<UdpSocket, UdpError> {

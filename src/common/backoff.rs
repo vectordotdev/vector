@@ -16,6 +16,13 @@ pub(crate) struct ExponentialBackoff {
 }
 
 impl ExponentialBackoff {
+    /// Constructs the recommended backoff strategy
+    pub(crate) const fn recommended() -> ExponentialBackoff {
+        ExponentialBackoff::from_millis(2)
+            .factor(250)
+            .max_delay(Duration::from_secs(60))
+    }
+
     /// Constructs a new exponential back-off strategy,
     /// given a base duration in milliseconds.
     ///
@@ -86,9 +93,7 @@ mod tests {
 
     #[test]
     fn test_exponential_backoff_sequence() {
-        let mut backoff = ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(30));
+        let mut backoff = ExponentialBackoff::recommended();
 
         let expected_delays = [
             Duration::from_millis(500), // 2 * 250
@@ -97,8 +102,9 @@ mod tests {
             Duration::from_secs(4),     // 16 * 250
             Duration::from_secs(8),     // 32 * 250
             Duration::from_secs(16),    // 64 * 250
-            Duration::from_secs(30),    // 128 * 250 = 32s, capped at 30s
-            Duration::from_secs(30),    // Should stay capped
+            Duration::from_secs(32),    // 128 * 250
+            Duration::from_secs(60),    // 256 * 250 = 64s, capped at 60
+            Duration::from_secs(60),    // Should stay capped
         ];
 
         for expected in expected_delays.iter() {
@@ -109,9 +115,8 @@ mod tests {
 
     #[test]
     fn test_backoff_reset() {
-        let mut backoff = ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(30));
+        let mut backoff = ExponentialBackoff::recommended();
+
         for _ in 0..2 {
             backoff.next();
         }

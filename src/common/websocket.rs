@@ -84,12 +84,6 @@ impl WebSocketConnector {
         Ok((host, port))
     }
 
-    const fn fresh_backoff() -> ExponentialBackoff {
-        ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60))
-    }
-
     async fn tls_connect(&self) -> Result<MaybeTlsStream<TcpStream>, WebSocketError> {
         let ip = dns::Resolver
             .lookup_ip(self.host.clone())
@@ -126,7 +120,8 @@ impl WebSocketConnector {
     }
 
     pub(crate) async fn connect_backoff(&self) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
-        let mut backoff = Self::fresh_backoff();
+        let mut backoff = ExponentialBackoff::recommended();
+
         loop {
             match self.connect().await {
                 Ok(ws_stream) => {
