@@ -27,6 +27,7 @@ use http::StatusCode;
 use hyper::{Server, service::make_service_fn};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
@@ -39,6 +40,7 @@ use vector_lib::{
     internal_event::{EventsReceived, Registered},
     lookup::owned_value_path,
     schema::meaning,
+    source_sender::SendError,
     tls::MaybeTlsIncomingStream,
 };
 use vrl::{
@@ -73,6 +75,7 @@ pub const TRACES: &str = "traces";
     "datadog_agent",
     "Receive logs, metrics, and traces collected by a Datadog Agent."
 ))]
+#[serde_as]
 #[derive(Clone, Debug)]
 pub struct DatadogAgentConfig {
     /// The socket address to accept connections on.
@@ -150,6 +153,13 @@ pub struct DatadogAgentConfig {
     #[configurable(derived)]
     #[serde(default)]
     keepalive: KeepaliveConfig,
+
+    /// The timeout before responding to requests with a HTTP 503 Service Unavailable error.
+    ///
+    /// If not set, responses to completed requests will block indefinitely until connected
+    /// transforms or sinks are ready to receive the events.
+    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
+    send_timeout_secs: Option<Duration>,
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -169,6 +179,7 @@ impl GenerateConfig for DatadogAgentConfig {
             split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: KeepaliveConfig::default(),
+            send_timeout_secs: None,
         })
         .unwrap()
     }
@@ -201,8 +212,12 @@ impl SourceConfig for DatadogAgentConfig {
             self.split_metric_namespace,
         );
         let listener = tls.bind(&self.address).await?;
-        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
-        let filters = source.build_warp_filters(cx.out, acknowledgements, self)?;
+        let handler = RequestHandler {
+            acknowledgements: cx.do_acknowledgements(self.acknowledgements),
+            multiple_outputs: self.multiple_outputs,
+            out: cx.out,
+        };
+        let filters = source.build_warp_filters(handler, self)?;
         let shutdown = cx.shutdown;
         let keepalive_settings = self.keepalive.clone();
 
@@ -329,6 +344,10 @@ impl SourceConfig for DatadogAgentConfig {
     fn can_acknowledge(&self) -> bool {
         true
     }
+
+    fn send_timeout(&self) -> Option<Duration> {
+        self.send_timeout_secs
+    }
 }
 
 #[derive(Clone, Copy, Debug, Snafu)]
@@ -421,15 +440,9 @@ impl DatadogAgentSource {
 
     fn build_warp_filters(
         &self,
-        out: SourceSender,
-        acknowledgements: bool,
+        handler: RequestHandler,
         config: &DatadogAgentConfig,
     ) -> crate::Result<BoxedFilter<(Response,)>> {
-        let handler = RequestHandler {
-            acknowledgements,
-            multiple_outputs: config.multiple_outputs,
-            out,
-        };
         let mut filters =
             (!config.disable_logs).then(|| logs::build_warp_filter(handler.clone(), self.clone()));
 
@@ -526,15 +539,25 @@ impl RequestHandler {
         let count = events.len();
         let output = self.multiple_outputs.then_some(output);
 
-        if let Some(name) = output {
+        let result = if let Some(name) = output {
             self.out.send_batch_named(name, events).await
         } else {
             self.out.send_batch(events).await
+        };
+        match result {
+            Ok(()) => {}
+            Err(SendError::Closed) => {
+                emit!(StreamClosedError { count });
+                return Err(warp::reject::custom(ApiError::ServerShutdown));
+            }
+            Err(SendError::Timeout) => {
+                return Ok(warp::reply::with_status(
+                    "Service unavailable",
+                    StatusCode::SERVICE_UNAVAILABLE,
+                )
+                .into_response());
+            }
         }
-        .map_err(|_| {
-            emit!(StreamClosedError { count });
-            warp::reject::custom(ApiError::ServerShutdown)
-        })?;
         match receiver {
             None => Ok(warp::reply().into_response()),
             Some(receiver) => match receiver.await {

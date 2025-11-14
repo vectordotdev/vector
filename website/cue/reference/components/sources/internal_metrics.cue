@@ -84,6 +84,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		component_timedout_events_total: {
+			description:       "The total number of events for which this source responded with a timeout error."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		component_timedout_requests_total: {
+			description:       "The total number of requests for which this source responded with a timeout error."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		connection_established_total: {
 			description:       "The total number of times a connection has been established."
 			type:              "counter"

@@ -223,6 +223,8 @@ components: sources: datadog_agent: {
 	}
 
 	telemetry: metrics: {
+		component_timedout_events_total:      components.sources.internal_metrics.output.metrics.component_timedout_events_total
+		component_timedout_requests_total:    components.sources.internal_metrics.output.metrics.component_timedout_requests_total
 		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
 		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
 		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total

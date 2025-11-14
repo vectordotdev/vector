@@ -584,6 +584,25 @@ generated: components: sources: datadog_agent: configuration: {
 		required: false
 		type: bool: default: false
 	}
+	send_timeout_secs: {
+		description: """
+			The timeout before responding to requests with a HTTP 503 Service Unavailable error.
+
+			If not set, responses to completed requests will block indefinitely until connected
+			transforms or sinks are ready to receive the events.
+			"""
+		required: false
+		type: object: options: {
+			nsecs: {
+				required: true
+				type: number: {}
+			}
+			secs: {
+				required: true
+				type: number: {}
+			}
+		}
+	}
 	split_metric_namespace: {
 		description: """
 			If this is set to `true`, metric names are split at the first '.' into a namespace and name.
