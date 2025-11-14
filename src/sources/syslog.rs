@@ -471,8 +471,9 @@ mod test {
         event::{Event, LogEvent},
         test_util::{
             CountReceiver,
+            addr::next_addr,
             components::{SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance},
-            next_addr, random_maps, random_string, send_encodable, send_lines, wait_for_tcp,
+            random_maps, random_string, send_encodable, send_lines, wait_for_tcp,
         },
     };
 
@@ -1121,7 +1122,7 @@ mod test {
     async fn test_tcp_syslog() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 10000;
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
 
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Tcp {
@@ -1266,7 +1267,7 @@ mod test {
     async fn test_octet_counting_syslog() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
             let num_messages: usize = 10000;
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
 
             // Create and spawn the source.
             let config = SyslogConfig::from_mode(Mode::Tcp {
