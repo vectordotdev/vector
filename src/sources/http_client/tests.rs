@@ -508,7 +508,7 @@ async fn accept_header_override() {
 /// POST request with JSON body data should send the body correctly
 #[tokio::test]
 async fn post_with_body() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     // Endpoint that echoes back the request body
     let dummy_endpoint = warp::path!("endpoint")
@@ -557,7 +557,7 @@ async fn post_with_body() {
 /// POST request without body should work as before
 #[tokio::test]
 async fn post_without_body() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::post())
@@ -586,7 +586,7 @@ async fn post_without_body() {
 /// Custom Content-Type header should override the default
 #[tokio::test]
 async fn post_with_custom_content_type() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::post())
@@ -616,7 +616,7 @@ async fn post_with_custom_content_type() {
 /// POST request with VRL body should resolve correctly
 #[tokio::test]
 async fn post_with_vrl_body() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::post())
