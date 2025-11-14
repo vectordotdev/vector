@@ -39,14 +39,14 @@ impl AvroDeserializerConfig {
     }
 
     /// Build the `AvroDeserializer` from this configuration.
-    pub fn build(&self) -> AvroDeserializer {
+    pub fn build(&self) -> vector_common::Result<AvroDeserializer> {
         let schema = apache_avro::Schema::parse_str(&self.avro_options.schema)
-            .map_err(|error| format!("Failed building Avro serializer: {error}"))
-            .unwrap();
-        AvroDeserializer {
+            .map_err(|error| format!("Failed building Avro serializer: {error}"))?;
+
+        Ok(AvroDeserializer {
             schema,
             strip_schema_id_prefix: self.avro_options.strip_schema_id_prefix,
-        }
+        })
     }
 
     /// The data type of events that are accepted by `AvroDeserializer`.
