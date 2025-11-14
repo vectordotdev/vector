@@ -16,8 +16,8 @@ use vector_buffers::{
 use vector_common::{
     byte_size_of::ByteSizeOf,
     internal_event::{
-        self, ComponentEventsDropped, ComponentEventsTimedOut, CountByteSize, EventsSent,
-        InternalEventHandle as _, Registered, UNINTENTIONAL,
+        self, ComponentEventsDropped, ComponentEventsTimedOut, Count, CountByteSize, EventsSent,
+        InternalEventHandle as _, RegisterInternalEvent as _, Registered, UNINTENTIONAL,
     },
 };
 use vrl::value::Value;
@@ -59,10 +59,11 @@ impl UnsentEventCount {
     }
 
     fn timed_out(&mut self) {
-        internal_event::emit(ComponentEventsTimedOut {
-            count: self.count,
+        ComponentEventsTimedOut {
             reason: "Source send timed out.",
-        });
+        }
+        .register()
+        .emit(Count(self.count));
         self.count = 0;
     }
 }
