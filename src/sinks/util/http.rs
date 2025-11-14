@@ -949,7 +949,7 @@ mod test {
     };
 
     use super::*;
-    use crate::{config::ProxyConfig, test_util::next_addr};
+    use crate::{config::ProxyConfig, test_util::addr::next_addr};
 
     #[test]
     fn util_http_retry_logic() {
@@ -977,7 +977,7 @@ mod test {
 
     #[tokio::test]
     async fn util_http_it_makes_http_requests() {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
 
         let uri = format!("http://{}:{}/", addr.ip(), addr.port())
             .parse::<Uri>()

@@ -622,8 +622,9 @@ mod tests {
         http::HttpClient,
         sinks::prometheus::{distribution_to_agg_histogram, distribution_to_ddsketch},
         test_util::{
+            addr::next_addr,
             components::{SINK_TAGS, run_and_assert_sink_compliance},
-            next_addr, random_string, trace_init,
+            random_string, trace_init,
         },
         tls::MaybeTlsSettings,
     };
@@ -902,7 +903,7 @@ mod tests {
         let client_settings = MaybeTlsSettings::from_config(tls_config.as_ref(), false).unwrap();
         let proto = client_settings.http_protocol_name();
 
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let config = PrometheusExporterConfig {
             address,
             tls: tls_config,
@@ -989,7 +990,7 @@ mod tests {
         let client_settings = MaybeTlsSettings::from_config(None, false).unwrap();
         let proto = client_settings.http_protocol_name();
 
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let config = PrometheusExporterConfig {
             address,
             auth: server_auth_config,
@@ -1105,8 +1106,9 @@ mod tests {
 
     #[tokio::test]
     async fn sink_absolute() {
+        let (_guard, address) = next_addr();
         let config = PrometheusExporterConfig {
-            address: next_addr(), // Not actually bound, just needed to fill config
+            address,
             tls: None,
             ..Default::default()
         };
@@ -1158,8 +1160,9 @@ mod tests {
         // are the same -- without loss of accuracy.
 
         // This expects that the default for the sink is to render distributions as aggregated histograms.
+        let (_guard, address) = next_addr();
         let config = PrometheusExporterConfig {
-            address: next_addr(), // Not actually bound, just needed to fill config
+            address,
             tls: None,
             ..Default::default()
         };
@@ -1186,7 +1189,7 @@ mod tests {
             },
         );
 
-        let metrics = vec![
+        let metrics = [
             base_summary_metric.clone(),
             base_summary_metric
                 .clone()
@@ -1277,8 +1280,9 @@ mod tests {
         //
         // The render code is actually what will end up rendering those sketches as aggregated
         // summaries in the scrape output.
+        let (_guard, address) = next_addr();
         let config = PrometheusExporterConfig {
-            address: next_addr(), // Not actually bound, just needed to fill config
+            address,
             tls: None,
             distributions_as_summaries: true,
             ..Default::default()
@@ -1305,7 +1309,7 @@ mod tests {
             },
         );
 
-        let metrics = vec![
+        let metrics = [
             base_summary_metric.clone(),
             base_summary_metric
                 .clone()
@@ -1386,8 +1390,9 @@ mod tests {
 
         // This test ensures that this normalization works correctly when applied to a mix of both
         // Incremental and Absolute inputs.
+        let (_guard, address) = next_addr();
         let config = PrometheusExporterConfig {
-            address: next_addr(), // Not actually bound, just needed to fill config
+            address,
             tls: None,
             ..Default::default()
         };
@@ -1406,7 +1411,7 @@ mod tests {
             MetricValue::Gauge { value: -10.0 },
         );
 
-        let metrics = vec![
+        let metrics = [
             base_absolute_gauge_metric.clone(),
             base_absolute_gauge_metric
                 .clone()
