@@ -1,7 +1,6 @@
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
-    time::Duration,
 };
 
 use async_trait::async_trait;

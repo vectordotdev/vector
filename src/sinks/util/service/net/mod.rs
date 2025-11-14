@@ -8,7 +8,6 @@ use std::{
     io,
     net::SocketAddr,
     task::{Context, Poll, ready},
-    time::Duration,
 };
 
 use futures_util::{FutureExt, future::BoxFuture};

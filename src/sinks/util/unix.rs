@@ -3,7 +3,6 @@ use std::{
     os::fd::{AsFd, BorrowedFd},
     path::PathBuf,
     pin::Pin,
-    time::Duration,
 };
 
 use async_trait::async_trait;

@@ -3,7 +3,6 @@ use std::{
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
 };
 
 use async_trait::async_trait;
