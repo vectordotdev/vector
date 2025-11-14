@@ -57,10 +57,10 @@ use crate::{
     },
     event::Event,
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
-    internal_events::{HttpBytesReceived, HttpDecompressError, StreamClosedError},
+    internal_events::{HttpBytesReceived, StreamClosedError},
     schema,
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
-    sources::{self},
+    sources::{self, util::http::emit_decompress_error},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -425,34 +425,23 @@ impl DatadogAgentSource {
         acknowledgements: bool,
         config: &DatadogAgentConfig,
     ) -> crate::Result<BoxedFilter<(Response,)>> {
-        let mut filters = (!config.disable_logs).then(|| {
-            logs::build_warp_filter(
-                acknowledgements,
-                config.multiple_outputs,
-                out.clone(),
-                self.clone(),
-            )
-        });
+        let handler = RequestHandler {
+            acknowledgements,
+            multiple_outputs: config.multiple_outputs,
+            out,
+        };
+        let mut filters =
+            (!config.disable_logs).then(|| logs::build_warp_filter(handler.clone(), self.clone()));
 
         if !config.disable_traces {
-            let trace_filter = traces::build_warp_filter(
-                acknowledgements,
-                config.multiple_outputs,
-                out.clone(),
-                self.clone(),
-            );
+            let trace_filter = traces::build_warp_filter(handler.clone(), self.clone());
             filters = filters
                 .map(|f| f.or(trace_filter.clone()).unify().boxed())
                 .or(Some(trace_filter));
         }
 
         if !config.disable_metrics {
-            let metrics_filter = metrics::build_warp_filter(
-                acknowledgements,
-                config.multiple_outputs,
-                out,
-                self.clone(),
-            );
+            let metrics_filter = metrics::build_warp_filter(handler, self.clone());
             filters = filters
                 .map(|f| f.or(metrics_filter.clone()).unify().boxed())
                 .or(Some(metrics_filter));
@@ -475,20 +464,20 @@ impl DatadogAgentSource {
                         let mut decoded = Vec::new();
                         MultiGzDecoder::new(body.reader())
                             .read_to_end(&mut decoded)
-                            .map_err(|error| handle_decode_error(encoding, error))?;
+                            .map_err(|error| emit_decompress_error(encoding, error))?;
                         decoded.into()
                     }
                     "zstd" => {
                         let mut decoded = Vec::new();
                         zstd::stream::copy_decode(body.reader(), &mut decoded)
-                            .map_err(|error| handle_decode_error(encoding, error))?;
+                            .map_err(|error| emit_decompress_error(encoding, error))?;
                         decoded.into()
                     }
                     "deflate" | "x-deflate" => {
                         let mut decoded = Vec::new();
                         ZlibDecoder::new(body.reader())
                             .read_to_end(&mut decoded)
-                            .map_err(|error| handle_decode_error(encoding, error))?;
+                            .map_err(|error| emit_decompress_error(encoding, error))?;
                         decoded.into()
                     }
                     encoding => {
@@ -509,54 +498,58 @@ impl DatadogAgentSource {
     }
 }
 
-pub(crate) async fn handle_request(
-    events: Result<Vec<Event>, ErrorMessage>,
+#[derive(Clone)]
+struct RequestHandler {
     acknowledgements: bool,
-    mut out: SourceSender,
-    output: Option<&str>,
-) -> Result<Response, Rejection> {
-    match events {
-        Ok(mut events) => {
-            let receiver = BatchNotifier::maybe_apply_to(acknowledgements, &mut events);
-            let count = events.len();
-
-            if let Some(name) = output {
-                out.send_batch_named(name, events).await
-            } else {
-                out.send_batch(events).await
-            }
-            .map_err(|_| {
-                emit!(StreamClosedError { count });
-                warp::reject::custom(ApiError::ServerShutdown)
-            })?;
-            match receiver {
-                None => Ok(warp::reply().into_response()),
-                Some(receiver) => match receiver.await {
-                    BatchStatus::Delivered => Ok(warp::reply().into_response()),
-                    BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
-                        StatusCode::INTERNAL_SERVER_ERROR,
-                        "Error delivering contents to sink".into(),
-                    ))),
-                    BatchStatus::Rejected => Err(warp::reject::custom(ErrorMessage::new(
-                        StatusCode::BAD_REQUEST,
-                        "Contents failed to deliver to sink".into(),
-                    ))),
-                },
-            }
-        }
-        Err(err) => Err(warp::reject::custom(err)),
-    }
+    multiple_outputs: bool,
+    out: SourceSender,
 }
 
-fn handle_decode_error(encoding: &str, error: impl std::error::Error) -> ErrorMessage {
-    emit!(HttpDecompressError {
-        encoding,
-        error: &error
-    });
-    ErrorMessage::new(
-        StatusCode::UNPROCESSABLE_ENTITY,
-        format!("Failed decompressing payload with {encoding} decoder."),
-    )
+impl RequestHandler {
+    async fn handle_request(
+        mut self,
+        events: Result<Vec<Event>, ErrorMessage>,
+        output: &'static str,
+    ) -> Result<Response, Rejection> {
+        match events {
+            Ok(events) => self.handle_events(events, output).await,
+            Err(err) => Err(warp::reject::custom(err)),
+        }
+    }
+
+    async fn handle_events(
+        &mut self,
+        mut events: Vec<Event>,
+        output: &'static str,
+    ) -> Result<Response, Rejection> {
+        let receiver = BatchNotifier::maybe_apply_to(self.acknowledgements, &mut events);
+        let count = events.len();
+        let output = self.multiple_outputs.then_some(output);
+
+        if let Some(name) = output {
+            self.out.send_batch_named(name, events).await
+        } else {
+            self.out.send_batch(events).await
+        }
+        .map_err(|_| {
+            emit!(StreamClosedError { count });
+            warp::reject::custom(ApiError::ServerShutdown)
+        })?;
+        match receiver {
+            None => Ok(warp::reply().into_response()),
+            Some(receiver) => match receiver.await {
+                BatchStatus::Delivered => Ok(warp::reply().into_response()),
+                BatchStatus::Errored => Err(warp::reject::custom(ErrorMessage::new(
+                    StatusCode::INTERNAL_SERVER_ERROR,
+                    "Error delivering contents to sink".into(),
+                ))),
+                BatchStatus::Rejected => Err(warp::reject::custom(ErrorMessage::new(
+                    StatusCode::BAD_REQUEST,
+                    "Contents failed to deliver to sink".into(),
+                ))),
+            },
+        }
+    }
 }
 
 // https://github.com/DataDog/datadog-agent/blob/a33248c2bc125920a9577af1e16f12298875a4ad/pkg/logs/processor/json.go#L23-L49

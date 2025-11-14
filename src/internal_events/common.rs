@@ -67,7 +67,6 @@ impl<E: std::error::Error> InternalEvent for SocketOutgoingConnectionError<E> {
             error_code = "failed_connecting",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -93,7 +92,6 @@ impl InternalEvent for StreamClosedError {
             error_code = STREAM_CLOSED,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -138,7 +136,6 @@ impl<E: std::fmt::Display> InternalEvent for SinkRequestBuildError<E> {
             error = %self.error,
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::git;
+use crate::utils::git;
 
 /// Show information about the current environment
 #[derive(Args, Debug)]

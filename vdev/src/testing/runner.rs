@@ -1,15 +1,19 @@
 use anyhow::Result;
-use std::{collections::HashSet, env, path::PathBuf, process::Command};
+use std::{collections::HashSet, env, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::{
     app::{self, CommandExt as _},
-    environment::{Environment, append_environment_variables},
     testing::{
         build::prepare_build_command,
         docker::{DOCKER_SOCKET, docker_command},
+        test_runner_dockerfile,
     },
-    util::{ChainArgs as _, IS_A_TTY},
+    utils::{
+        IS_A_TTY,
+        command::ChainArgs as _,
+        environment::{Environment, append_environment_variables},
+    },
 };
 
 const MOUNT_PATH: &str = "/home/vector";
@@ -54,7 +58,7 @@ pub trait TestRunner {
         inner_env: &Environment,
         features: Option<&[String]>,
         args: &[String],
-        directory: &str,
+        build: bool,
     ) -> Result<()>;
 }
 
@@ -101,8 +105,8 @@ pub trait ContainerTestRunner: TestRunner {
     fn ensure_running(
         &self,
         features: Option<&[String]>,
-        directory: &str,
         config_environment_variables: &Environment,
+        build: bool,
     ) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
@@ -114,7 +118,7 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, directory, config_environment_variables)?;
+                self.build(features, config_environment_variables, build)?;
                 self.create()?;
                 self.start()?;
             }
@@ -145,16 +149,15 @@ pub trait ContainerTestRunner: TestRunner {
     fn build(
         &self,
         features: Option<&[String]>,
-        directory: &str,
         config_env_vars: &Environment,
+        build: bool,
     ) -> Result<()> {
-        let dockerfile: PathBuf = [app::path(), "scripts", directory, "Dockerfile"]
-            .iter()
-            .collect();
+        let image_name = self.image_name();
 
+        let dockerfile = test_runner_dockerfile();
         let mut command =
-            prepare_build_command(&self.image_name(), &dockerfile, features, config_env_vars);
-        waiting!("Building image {}", self.image_name());
+            prepare_build_command(&image_name, &dockerfile, features, config_env_vars, build);
+        waiting!("Building image {}", image_name);
         command.check_run()
     }
 
@@ -233,9 +236,9 @@ where
         config_environment_variables: &Environment,
         features: Option<&[String]>,
         args: &[String],
-        directory: &str,
+        build: bool,
     ) -> Result<()> {
-        self.ensure_running(features, directory, config_environment_variables)?;
+        self.ensure_running(features, config_environment_variables, build)?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
@@ -289,6 +292,11 @@ impl IntegrationTestRunner {
             network,
             volumes,
         })
+    }
+
+    /// Returns true if this runner uses the shared image (with all features)
+    pub(super) fn is_shared_runner(&self) -> bool {
+        self.integration.is_none()
     }
 
     pub(super) fn ensure_network(&self) -> Result<()> {
@@ -393,7 +401,7 @@ impl TestRunner for LocalTestRunner {
         inner_env: &Environment,
         _features: Option<&[String]>,
         args: &[String],
-        _directory: &str,
+        _build: bool,
     ) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);

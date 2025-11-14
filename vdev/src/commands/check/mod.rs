@@ -1,16 +1,26 @@
+mod component_docs;
+mod component_features;
+mod deny;
+mod examples;
+mod fmt;
+mod licenses;
+mod markdown;
+mod rust;
+mod scripts;
+
 crate::cli_subcommands! {
     "Check parts of the Vector code base..."
-    mod component_docs,
-    mod component_features,
-    mod deny,
+    component_docs,
+    component_features,
+    deny,
     docs,
     events,
-    mod examples,
-    mod fmt,
-    mod licenses,
-    mod markdown,
-    mod rust,
-    mod scripts,
+    examples,
+    fmt,
+    licenses,
+    markdown,
+    rust,
+    scripts,
 }
 
 // These should eventually be migrated to Rust code

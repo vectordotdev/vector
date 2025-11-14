@@ -421,6 +421,7 @@ mod test {
     use crate::{
         series,
         test_util::{
+            addr::next_addr,
             collect_limited,
             components::{
                 COMPONENT_ERROR_TAGS, SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance,
@@ -429,7 +430,6 @@ mod test {
             metrics::{
                 AbsoluteMetricState, assert_counter, assert_distribution, assert_gauge, assert_set,
             },
-            next_addr,
         },
     };
 
@@ -441,11 +441,11 @@ mod test {
     #[tokio::test]
     async fn test_statsd_udp() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
             let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
-                let bind_addr = next_addr();
+                let (_guard, bind_addr) = next_addr();
                 let socket = UdpSocket::bind(bind_addr).await.unwrap();
                 socket.connect(in_addr).await.unwrap();
                 while let Some(bytes) = receiver.next().await {
@@ -460,7 +460,7 @@ mod test {
     #[tokio::test]
     async fn test_statsd_tcp() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
             let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
@@ -481,7 +481,7 @@ mod test {
     #[tokio::test]
     async fn test_statsd_error() {
         assert_source_error(&COMPONENT_ERROR_TAGS, async move {
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
             let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
@@ -527,14 +527,14 @@ mod test {
 
     #[tokio::test]
     async fn test_statsd_udp_conversion_disabled() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
         let mut config = UdpConfig::from_address(in_addr.into());
         config.convert_to = ConversionUnit::Milliseconds;
         let statsd_config = StatsdConfig::Udp(config);
         let (mut sender, mut receiver) = mpsc::channel(200);
 
         tokio::spawn(async move {
-            let bind_addr = next_addr();
+            let (_guard, bind_addr) = next_addr();
             let socket = UdpSocket::bind(bind_addr).await.unwrap();
             socket.connect(in_addr).await.unwrap();
             while let Some(bytes) = receiver.next().await {

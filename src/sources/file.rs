@@ -490,7 +490,10 @@ pub fn file_source(
 ) -> super::Source {
     // the include option must be specified but also must contain at least one entry.
     if config.include.is_empty() {
-        error!(message = "`include` configuration option must contain at least one file pattern.");
+        error!(
+            message = "`include` configuration option must contain at least one file pattern.",
+            internal_log_rate_limit = false
+        );
         return Box::pin(future::ready(Err(())));
     }
 
@@ -691,7 +694,7 @@ pub fn file_source(
             // passed to the `JoinHandle` error, similar to the usual threads.
             result.expect("file server exited with an error");
         })
-        .map_err(|error| error!(message="File server unexpectedly stopped.", %error))
+        .map_err(|error| error!(message="File server unexpectedly stopped.", %error, internal_log_rate_limit = false))
         .await
     })
 }

@@ -1,12 +1,16 @@
 use std::{
     collections::HashMap,
     pin::Pin,
+    sync::{Arc, Mutex},
     task::{Context, Poll, ready},
-    time::{Duration, Instant},
+    time::Duration,
 };
 
-#[cfg(debug_assertions)]
-use std::sync::Arc;
+#[cfg(not(test))]
+use std::time::Instant;
+
+#[cfg(test)]
+use mock_instant::global::Instant;
 
 use futures::{Stream, StreamExt};
 use metrics::Gauge;
@@ -72,8 +76,6 @@ pub(crate) struct Timer {
     ewma: stats::Ewma,
     gauge: Gauge,
     #[cfg(debug_assertions)]
-    report_count: u32,
-    #[cfg(debug_assertions)]
     component_id: Arc<str>,
 }
 
@@ -95,8 +97,6 @@ impl Timer {
             ewma: stats::Ewma::new(0.9),
             gauge,
             #[cfg(debug_assertions)]
-            report_count: 0,
-            #[cfg(debug_assertions)]
             component_id,
         }
     }
@@ -104,30 +104,30 @@ impl Timer {
     /// Begin a new span representing time spent waiting
     pub(crate) fn start_wait(&mut self, at: Instant) {
         if !self.waiting {
-            self.end_span(at);
+            // Clamp start time in case of a late message
+            self.end_span(at.max(self.overall_start));
             self.waiting = true;
         }
     }
 
     /// Complete the current waiting span and begin a non-waiting span
-    pub(crate) fn stop_wait(&mut self, at: Instant) -> Instant {
+    pub(crate) fn stop_wait(&mut self, at: Instant) {
         if self.waiting {
-            let now = self.end_span(at);
+            // Clamp stop time in case of a late message
+            self.end_span(at.max(self.overall_start));
             self.waiting = false;
-            now
-        } else {
-            at
         }
     }
 
     /// Meant to be called on a regular interval, this method calculates wait
     /// ratio since the last time it was called and reports the resulting
     /// utilization average.
-    pub(crate) fn report(&mut self) {
+    pub(crate) fn update_utilization(&mut self) {
         // End the current span so it can be accounted for, but do not change
         // whether or not we're in the waiting state. This way the next span
         // inherits the correct status.
-        let now = self.end_span(Instant::now());
+        let now = Instant::now();
+        self.end_span(now);
 
         let total_duration = now.duration_since(self.overall_start);
         let wait_ratio = self.total_wait.as_secs_f64() / total_duration.as_secs_f64();
@@ -136,30 +136,23 @@ impl Timer {
         self.ewma.update(utilization);
         let avg = self.ewma.average().unwrap_or(f64::NAN);
         let avg_rounded = (avg * 10000.0).round() / 10000.0; // 4 digit precision
-
-        #[cfg(debug_assertions)]
-        {
-            // Note that changing the reporting interval would also affect the actual metric reporting frequency.
-            // This check reduces debug log spamming.
-            if self.report_count.is_multiple_of(5) {
-                debug!(component_id = %self.component_id, utilization = %avg_rounded);
-            }
-            self.report_count = self.report_count.wrapping_add(1);
-        }
-
         self.gauge.set(avg_rounded);
 
         // Reset overall statistics for the next reporting period.
-        self.overall_start = self.span_start;
+        self.overall_start = now;
         self.total_wait = Duration::new(0, 0);
+
+        #[cfg(debug_assertions)]
+        debug!(component_id = %self.component_id, utilization = %avg_rounded, internal_log_rate_limit = false);
     }
 
-    fn end_span(&mut self, at: Instant) -> Instant {
+    fn end_span(&mut self, at: Instant) {
         if self.waiting {
-            self.total_wait += at - self.span_start;
+            // `at` can be before span start here, the result will be clamped to 0
+            // because `duration_since` returns zero if `at` is before span start
+            self.total_wait += at.duration_since(self.span_start);
         }
         self.span_start = at;
-        self.span_start
     }
 }
 
@@ -194,33 +187,25 @@ impl UtilizationComponentSender {
     }
 }
 
-pub(crate) struct UtilizationEmitter {
-    timers: HashMap<ComponentKey, Timer>,
-    timer_rx: Receiver<UtilizationTimerMessage>,
+/// Registry for components sending utilization data.
+///
+/// Cloning this is cheap and does not clone the underlying data.
+#[derive(Clone)]
+pub struct UtilizationRegistry {
+    timers: Arc<Mutex<HashMap<ComponentKey, Timer>>>,
     timer_tx: Sender<UtilizationTimerMessage>,
-    intervals: IntervalStream,
 }
 
-impl UtilizationEmitter {
-    pub(crate) fn new() -> Self {
-        let (timer_tx, timer_rx) = channel(4096);
-        Self {
-            timers: HashMap::default(),
-            intervals: IntervalStream::new(interval(UTILIZATION_EMITTER_DURATION)),
-            timer_tx,
-            timer_rx,
-        }
-    }
-
+impl UtilizationRegistry {
     /// Adds a new component to this utilization metric emitter
     ///
     /// Returns a sender which can be used to send utilization information back to the emitter
     pub(crate) fn add_component(
-        &mut self,
+        &self,
         key: ComponentKey,
         gauge: Gauge,
     ) -> UtilizationComponentSender {
-        self.timers.insert(
+        self.timers.lock().expect("mutex poisoned").insert(
             key.clone(),
             Timer::new(
                 gauge,
@@ -234,24 +219,55 @@ impl UtilizationEmitter {
         }
     }
 
-    pub(crate) async fn run_utilization(&mut self, mut shutdown: ShutdownSignal) {
+    /// Removes a component from this utilization metric emitter
+    pub(crate) fn remove_component(&self, key: &ComponentKey) {
+        self.timers.lock().expect("mutex poisoned").remove(key);
+    }
+}
+
+pub(crate) struct UtilizationEmitter {
+    timers: Arc<Mutex<HashMap<ComponentKey, Timer>>>,
+    timer_rx: Receiver<UtilizationTimerMessage>,
+}
+
+impl UtilizationEmitter {
+    pub(crate) fn new() -> (Self, UtilizationRegistry) {
+        let (timer_tx, timer_rx) = channel(4096);
+        let timers = Arc::new(Mutex::new(HashMap::default()));
+        (
+            Self {
+                timers: Arc::clone(&timers),
+                timer_rx,
+            },
+            UtilizationRegistry { timers, timer_tx },
+        )
+    }
+
+    pub(crate) async fn run_utilization(mut self, mut shutdown: ShutdownSignal) {
+        let mut intervals = IntervalStream::new(interval(UTILIZATION_EMITTER_DURATION));
         loop {
             tokio::select! {
                 message = self.timer_rx.recv() => {
                     match message {
                         Some(UtilizationTimerMessage::StartWait(key, start_time)) => {
-                            self.timers.get_mut(&key).expect("Utilization timer missing for component").start_wait(start_time);
+                            // Timer could be removed in the registry while message is still in the queue
+                            if let Some(timer) = self.timers.lock().expect("mutex poisoned").get_mut(&key) {
+                                timer.start_wait(start_time);
+                            }
                         }
                         Some(UtilizationTimerMessage::StopWait(key, stop_time)) => {
-                            self.timers.get_mut(&key).expect("Utilization timer missing for component").stop_wait(stop_time);
+                            // Timer could be removed in the registry while message is still in the queue
+                            if let Some(timer) = self.timers.lock().expect("mutex poisoned").get_mut(&key) {
+                                timer.stop_wait(stop_time);
+                            }
                         }
                         None => break,
                     }
                 },
 
-                Some(_) = self.intervals.next() => {
-                    for timer in self.timers.values_mut() {
-                        timer.report();
+                Some(_) = intervals.next() => {
+                    for timer in self.timers.lock().expect("mutex poisoned").values_mut() {
+                        timer.update_utilization();
                     }
                 },
 
@@ -280,5 +296,139 @@ pub(crate) fn wrap<S>(
         timer_tx,
         component_key,
         inner,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mock_instant::global::MockClock;
+    use serial_test::serial;
+
+    use super::*;
+
+    /// Helper function to reset mock clock and create a timer at T=100
+    fn setup_timer() -> Timer {
+        // Set mock clock to T=100
+        MockClock::set_time(Duration::from_secs(100));
+
+        Timer::new(
+            metrics::gauge!("test_utilization"),
+            #[cfg(debug_assertions)]
+            "test_component".into(),
+        )
+    }
+
+    const TOLERANCE: f64 = 0.01;
+
+    /// Helper function to assert utilization is approximately equal to expected value
+    /// and within valid bounds [0, 1]
+    fn assert_approx_eq(actual: f64, expected: f64, description: &str) {
+        assert!(
+            (0.0..=1.0).contains(&actual),
+            "Utilization {actual} is outside [0, 1]"
+        );
+        assert!(
+            (actual - expected).abs() < TOLERANCE,
+            "Expected utilization {description}, got {actual}"
+        );
+    }
+
+    #[test]
+    #[serial]
+    fn test_utilization_in_bounds_on_late_start() {
+        let mut timer = setup_timer();
+
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.update_utilization();
+
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 1.0, "near 1.0 (never waiting)");
+
+        // Late message for start wait
+        timer.start_wait(Instant::now() - Duration::from_secs(1));
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.update_utilization();
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.1, "~0.1");
+    }
+
+    #[test]
+    #[serial]
+    fn test_utilization_in_bounds_on_late_stop() {
+        let mut timer = setup_timer();
+
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.waiting = true;
+        timer.update_utilization();
+
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.0, "near 0 (always waiting)");
+
+        // Late message for stop wait
+        timer.stop_wait(Instant::now() - Duration::from_secs(4));
+        MockClock::advance(Duration::from_secs(5));
+
+        timer.update_utilization();
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.9, "~0.9");
+    }
+
+    #[test]
+    #[serial]
+    fn test_normal_utilization_within_bounds() {
+        let mut timer = setup_timer();
+
+        // Timer created at T=100. Advance 1 second and start waiting
+        MockClock::advance(Duration::from_secs(1));
+        timer.start_wait(Instant::now());
+
+        // Advance 2 seconds while waiting (T=101 to T=103)
+        MockClock::advance(Duration::from_secs(2));
+        timer.stop_wait(Instant::now());
+
+        // Advance 2 more seconds (not waiting), then report (T=103 to T=105)
+        MockClock::advance(Duration::from_secs(2));
+        timer.update_utilization();
+
+        // total_wait = 2 seconds, total_duration = 5 seconds (T=100 to T=105)
+        // wait_ratio = 2/5 = 0.4, utilization = 1.0 - 0.4 = 0.6
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.6, "~0.6");
+    }
+
+    #[test]
+    #[serial]
+    fn test_always_waiting_utilization() {
+        let mut timer = setup_timer();
+
+        // Timer created at T=100. Start waiting immediately
+        timer.start_wait(Instant::now());
+
+        // Advance 5 seconds while waiting (T=100 to T=105)
+        MockClock::advance(Duration::from_secs(5));
+        timer.update_utilization();
+
+        // We waited the entire time: total_wait = 5s, total_duration = 5s
+        // wait_ratio = 1.0, utilization = 0.0
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 0.0, "near 0 (always waiting)");
+    }
+
+    #[test]
+    #[serial]
+    fn test_never_waiting_utilization() {
+        let mut timer = setup_timer();
+
+        // Advance 5 seconds without waiting (T=100 to T=105)
+        MockClock::advance(Duration::from_secs(5));
+        timer.update_utilization();
+
+        // Never waited: total_wait = 0, total_duration = 5s
+        // wait_ratio = 0.0, utilization = 1.0
+        let avg = timer.ewma.average().unwrap();
+        assert_approx_eq(avg, 1.0, "near 1.0 (never waiting)");
     }
 }

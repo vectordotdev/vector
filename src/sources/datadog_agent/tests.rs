@@ -50,8 +50,9 @@ use crate::{
         ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
     },
     test_util::{
+        addr::{PortGuard, next_addr},
         components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
-        next_addr, spawn_collect_n, trace_init, wait_for_tcp,
+        spawn_collect_n, trace_init, wait_for_tcp,
     },
 };
 
@@ -225,6 +226,7 @@ async fn source(
     Option<impl Stream<Item = Event>>,
     Option<impl Stream<Item = Event>>,
     SocketAddr,
+    PortGuard,
 ) {
     let (mut sender, recv) = SourceSender::new_test_finalize(status);
     let mut logs_output = None;
@@ -241,7 +243,7 @@ async fn source(
                 .flat_map(into_event_stream),
         );
     }
-    let address = next_addr();
+    let (_guard, address) = next_addr();
     let config = toml::from_str::<DatadogAgentConfig>(&format!(
         indoc! { r#"
             address = "{}"
@@ -262,7 +264,7 @@ async fn source(
         config.build(context).await.unwrap().await.unwrap();
     });
     wait_for_tcp(address).await;
-    (recv, logs_output, metrics_output, address)
+    (recv, logs_output, metrics_output, address, _guard)
 }
 
 async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, path: &str) -> u16 {
@@ -304,7 +306,8 @@ fn dd_api_key_headers() -> HeaderMap {
 #[tokio::test]
 async fn full_payload_v1() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -358,7 +361,8 @@ async fn full_payload_v1() {
 #[tokio::test]
 async fn full_payload_v2() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -412,7 +416,8 @@ async fn full_payload_v2() {
 #[tokio::test]
 async fn no_api_key() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -466,7 +471,8 @@ async fn no_api_key() {
 #[tokio::test]
 async fn api_key_in_url() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -523,7 +529,8 @@ async fn api_key_in_url() {
 #[tokio::test]
 async fn api_key_in_query_params() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -580,7 +587,8 @@ async fn api_key_in_query_params() {
 #[tokio::test]
 async fn api_key_in_header() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -637,7 +645,7 @@ async fn api_key_in_header() {
 #[tokio::test]
 async fn delivery_failure() {
     trace_init();
-    let (rx, _, _, addr) = source(EventStatus::Rejected, true, true, false, true).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Rejected, true, true, false, true).await;
 
     spawn_collect_n(
         async move {
@@ -673,7 +681,8 @@ async fn delivery_failure() {
 #[tokio::test]
 async fn ignores_disabled_acknowledgements() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Rejected, false, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Rejected, false, true, false, true).await;
 
         let events = send_and_collect(
             addr,
@@ -705,7 +714,8 @@ async fn ignores_disabled_acknowledgements() {
 #[tokio::test]
 async fn ignores_api_key() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, false, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, false, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -759,7 +769,8 @@ async fn ignores_api_key() {
 #[tokio::test]
 async fn decode_series_endpoint_v1() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let dd_metric_request = DatadogSeriesRequest {
             series: vec![
@@ -962,7 +973,8 @@ async fn decode_series_endpoint_v1() {
 #[tokio::test]
 async fn decode_sketches() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut buf = Vec::new();
         let sketch = ddmetric_proto::sketch_payload::Sketch {
@@ -1062,7 +1074,8 @@ async fn decode_sketches() {
 #[tokio::test]
 async fn decode_traces() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut headers = dd_api_key_headers();
         headers.insert("X-Datadog-Reported-Languages", "ada".parse().unwrap());
@@ -1299,7 +1312,7 @@ async fn decode_traces() {
 #[tokio::test]
 async fn split_outputs() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (_, rx_logs, rx_metrics, addr) =
+        let (_, rx_logs, rx_metrics, addr, _guard) =
             source(EventStatus::Delivered, true, true, true, true).await;
 
         let mut log_event = send_and_collect(
@@ -1949,7 +1962,8 @@ fn test_config_outputs() {
 #[tokio::test]
 async fn decode_series_endpoint_v2() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let series = vec![
             ddmetric_proto::metric_payload::MetricSeries {
@@ -2402,7 +2416,7 @@ async fn test_series_v1_split_metric_namespace_impl(
     expected_name: &str,
     expected_namespace: Option<&str>,
 ) {
-    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, split).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, split).await;
 
     let dd_metric_request = DatadogSeriesRequest {
         series: vec![DatadogSeriesMetric {
@@ -2454,7 +2468,7 @@ async fn test_series_v2_split_metric_namespace_impl(
     expected_name: &str,
     expected_namespace: Option<&str>,
 ) {
-    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, split).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, split).await;
 
     let series = vec![ddmetric_proto::metric_payload::MetricSeries {
         resources: vec![ddmetric_proto::metric_payload::Resource {
@@ -2515,7 +2529,7 @@ async fn test_sketches_split_metric_namespace_impl(
     expected_name: &str,
     expected_namespace: Option<&str>,
 ) {
-    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, split).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, split).await;
 
     let mut buf = Vec::new();
     let sketch = ddmetric_proto::sketch_payload::Sketch {

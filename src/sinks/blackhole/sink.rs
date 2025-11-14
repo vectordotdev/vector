@@ -65,6 +65,7 @@ impl StreamSink<EventArray> for BlackholeSink {
                             info!(
                                 events = total_events.load(Ordering::Relaxed),
                                 raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
+                                internal_log_rate_limit = false,
                                 "Collected events."
                             );
                         },
@@ -75,6 +76,7 @@ impl StreamSink<EventArray> for BlackholeSink {
                 info!(
                     events = total_events.load(Ordering::Relaxed),
                     raw_bytes_collected = total_raw_bytes.load(Ordering::Relaxed),
+                    internal_log_rate_limit = false,
                     "Collected events."
                 );
             });

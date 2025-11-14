@@ -1,7 +1,10 @@
 use anyhow::Result;
 use std::ffi::OsString;
 
-use crate::{app, git, util::ChainArgs as _};
+use crate::{
+    app,
+    utils::{command::ChainArgs as _, git},
+};
 
 /// Check the Rust code for errors
 #[derive(clap::Args, Debug)]
@@ -40,7 +43,7 @@ impl Cli {
             vec![
                 "--no-default-features".to_string(),
                 "--features".to_string(),
-                self.features.join(",").to_string(),
+                self.features.join(",").clone(),
             ]
         };
 
@@ -57,6 +60,7 @@ impl Cli {
         if self.fix {
             let has_changes = !git::get_modified_files()?.is_empty();
             if has_changes {
+                app::exec("cargo", ["fmt", "--all"], true)?;
                 git::commit("chore(vdev): apply vdev rust check fixes")?;
             }
         }

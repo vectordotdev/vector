@@ -230,6 +230,15 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
         AvroValue::LocalTimestampMillis(ts_millis) => Ok(VrlValue::from(ts_millis)),
         AvroValue::LocalTimestampMicros(ts_micros) => Ok(VrlValue::from(ts_micros)),
+        AvroValue::BigDecimal(_) => Err(vector_common::Error::from(
+            "AvroValue::BigDecimal is not supported",
+        )),
+        AvroValue::TimestampNanos(_) => Err(vector_common::Error::from(
+            "AvroValue::TimestampNanos is not supported",
+        )),
+        AvroValue::LocalTimestampNanos(_) => Err(vector_common::Error::from(
+            "AvroValue::LocalTimestampNanos is not supported",
+        )),
     }
 }
 

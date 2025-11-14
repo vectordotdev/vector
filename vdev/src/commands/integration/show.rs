@@ -1,5 +1,7 @@
-use crate::commands::compose_tests::show::{exec, exec_environments_only};
-use crate::testing::config::INTEGRATION_TESTS_DIR;
+use crate::{
+    commands::compose_tests::show::{exec, exec_environments_only},
+    testing::config::INTEGRATION_TESTS_DIR,
+};
 use anyhow::Result;
 use clap::Args;
 

@@ -137,6 +137,14 @@ pub struct RootOpts {
     #[arg(short, long, action = ArgAction::Count)]
     pub quiet: u8,
 
+    /// Disable interpolation of environment variables in configuration files.
+    #[arg(
+        long,
+        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub disable_env_var_interpolation: bool,
+
     /// Set the logging format
     #[arg(long, default_value = "text", env = "VECTOR_LOG_FORMAT")]
     pub log_format: LogFormat,
@@ -187,8 +195,8 @@ pub struct RootOpts {
     /// shows a suppression warning, and subsequent occurrences are silent until the
     /// window expires.
     ///
-    /// Logs are grouped by their location in the code and contextual fields so different log instances can be rate
-    /// limited independently.
+    /// Logs are grouped by their location in the code and the `component_id` field, so logs
+    /// from different components are rate limited independently.
     ///
     /// Examples:
     /// - 1: Very verbose, logs can repeat every second
@@ -410,7 +418,7 @@ pub enum WatchConfigMethod {
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
     for error in errors {
-        error!(message = "Configuration error.", %error);
+        error!(message = "Configuration error.", %error, internal_log_rate_limit = false);
     }
 
     exitcode::CONFIG

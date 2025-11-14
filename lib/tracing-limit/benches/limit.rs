@@ -58,8 +58,7 @@ fn bench(c: &mut Criterion) {
                             foo = "foo",
                             bar = "bar",
                             baz = 3,
-                            quuux = ?0.99,
-                            internal_log_rate_limit = true
+                            quuux = ?0.99
                         )
                     }
                 })
@@ -115,17 +114,17 @@ where
     }
 
     fn on_new_span(&self, span: &span::Attributes<'_>, _id: &span::Id, _ctx: Context<'_, S>) {
-        let mut visitor = Visitor(self.mutex.lock().unwrap());
+        let mut visitor = Visitor(self.mutex.lock().expect("mutex should not be poisoned"));
         span.record(&mut visitor);
     }
 
     fn on_record(&self, _id: &span::Id, values: &span::Record<'_>, _ctx: Context<'_, S>) {
-        let mut visitor = Visitor(self.mutex.lock().unwrap());
+        let mut visitor = Visitor(self.mutex.lock().expect("mutex should not be poisoned"));
         values.record(&mut visitor);
     }
 
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        let mut visitor = Visitor(self.mutex.lock().unwrap());
+        let mut visitor = Visitor(self.mutex.lock().expect("mutex should not be poisoned"));
         event.record(&mut visitor);
     }
 

@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::util::CargoToml;
+use crate::utils::cargo::CargoToml;
 
 /// Custom Starship prompt plugin
 #[derive(Args, Debug)]

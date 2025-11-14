@@ -14,7 +14,6 @@ impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
             metric_name = self.metric_name,
             tag_key = self.tag_key,
             tag_value = self.tag_value,
-            internal_log_rate_limit = true,
         );
         counter!("tag_value_limit_exceeded_total").increment(1);
 
@@ -38,7 +37,6 @@ impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
             metric_name = self.metric_name,
             tag_key = self.tag_key,
             tag_value = self.tag_value,
-            internal_log_rate_limit = true,
         );
         counter!("tag_value_limit_exceeded_total").increment(1);
     }

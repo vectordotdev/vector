@@ -91,8 +91,7 @@ impl InternalEvent for DockerLogsCommunicationError<'_> {
             error = ?self.error,
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
-            container_id = ?self.container_id,
-            internal_log_rate_limit = true
+            container_id = ?self.container_id
         );
         counter!(
             "component_errors_total",
@@ -116,8 +115,7 @@ impl InternalEvent for DockerLogsContainerMetadataFetchError<'_> {
             error = ?self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-            container_id = ?self.container_id,
-            internal_log_rate_limit = true
+            container_id = ?self.container_id
         );
         counter!(
             "component_errors_total",
@@ -142,8 +140,7 @@ impl InternalEvent for DockerLogsTimestampParseError<'_> {
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            container_id = ?self.container_id,
-            internal_log_rate_limit = true
+            container_id = ?self.container_id
         );
         counter!(
             "component_errors_total",
@@ -169,7 +166,6 @@ impl InternalEvent for DockerLogsLoggingDriverUnsupportedError<'_> {
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

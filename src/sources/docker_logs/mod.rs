@@ -611,7 +611,7 @@ impl DockerLogsSource {
                             }
                         }
                         None => {
-                            error!(message = "The docker_logs source main stream has ended unexpectedly.");
+                            error!(message = "The docker_logs source main stream has ended unexpectedly.", internal_log_rate_limit = false);
                             info!(message = "Shutting down docker_logs source.");
                             return;
                         }
@@ -666,7 +666,7 @@ impl DockerLogsSource {
                         },
                         None => {
                             // TODO: this could be fixed, but should be tried with some timeoff and exponential backoff
-                            error!(message = "Docker log event stream has ended unexpectedly.");
+                            error!(message = "Docker log event stream has ended unexpectedly.", internal_log_rate_limit = false);
                             info!(message = "Shutting down docker_logs source.");
                             return;
                         }
