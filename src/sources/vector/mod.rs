@@ -321,7 +321,7 @@ mod tests {
 
     #[tokio::test]
     async fn receive_message() {
-        let addr = test_util::next_addr();
+        let (_guard, addr) = test_util::addr::next_addr();
 
         let config = format!(r#"address = "{addr}""#);
         run_test(&config, addr).await;
@@ -329,7 +329,7 @@ mod tests {
 
     #[tokio::test]
     async fn receive_compressed_message() {
-        let addr = test_util::next_addr();
+        let (_guard, addr) = test_util::addr::next_addr();
 
         let config = format!(
             r#"address = "{addr}"

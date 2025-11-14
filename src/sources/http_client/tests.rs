@@ -19,8 +19,9 @@ use crate::{
     serde::{default_decoding, default_framing_message_based},
     sources::util::http::HttpMethod,
     test_util::{
+        addr::next_addr,
         components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
-        next_addr, test_generate_config, wait_for_tcp,
+        test_generate_config, wait_for_tcp,
     },
 };
 
@@ -80,7 +81,7 @@ register_validatable_component!(HttpClientConfig);
 /// Bytes should be decoded and HTTP header set to text/plain.
 #[tokio::test]
 async fn bytes_decoding() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     // validates the Accept header is set correctly for the Bytes codec
     let dummy_endpoint = warp::path!("endpoint")
@@ -109,7 +110,7 @@ async fn bytes_decoding() {
 /// JSON with newline delimiter should be decoded and HTTP header set to application/x-ndjson.
 #[tokio::test]
 async fn json_decoding_newline_delimited() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     // validates the Content-Type is set correctly for the Json codec
     let dummy_endpoint = warp::path!("endpoint")
@@ -139,7 +140,7 @@ async fn json_decoding_newline_delimited() {
 /// JSON with character delimiter should be decoded and HTTP header set to application/json.
 #[tokio::test]
 async fn json_decoding_character_delimited() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     // validates the Content-Type is set correctly for the Json codec
     let dummy_endpoint = warp::path!("endpoint")
@@ -174,7 +175,7 @@ async fn json_decoding_character_delimited() {
 /// HTTP request queries configured by the user should be applied correctly.
 #[tokio::test]
 async fn request_query_applied() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::query::raw())
@@ -242,7 +243,7 @@ async fn request_query_applied() {
 /// VRL query parameters should be parsed correctly
 #[tokio::test]
 async fn request_query_vrl_applied() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::query::raw())
@@ -372,7 +373,7 @@ async fn request_query_vrl_applied() {
 /// VRL query parameters should dynamically update on each request
 #[tokio::test]
 async fn request_query_vrl_dynamic_updates() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     // A handler that returns the query parameters as part of the response
     let dummy_endpoint = warp::path!("endpoint")
@@ -439,7 +440,7 @@ async fn request_query_vrl_dynamic_updates() {
 /// HTTP request headers configured by the user should be applied correctly.
 #[tokio::test]
 async fn headers_applied() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     let dummy_endpoint = warp::path!("endpoint")
         .and(warp::header::exact("Accept", "text/plain"))
@@ -477,7 +478,7 @@ async fn headers_applied() {
 /// ACCEPT HTTP request headers configured by the user should take precedence
 #[tokio::test]
 async fn accept_header_override() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     // (The Bytes decoder will default to text/plain encoding)
     let dummy_endpoint = warp::path!("endpoint")

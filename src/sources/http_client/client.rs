@@ -195,43 +195,6 @@ fn body_examples() -> Option<ParameterValue> {
     })
 }
 
-/// Helper function to get all VRL functions for compilation
-fn get_vrl_functions() -> Vec<Box<dyn Function>> {
-    vrl::stdlib::all()
-        .into_iter()
-        .chain(vector_lib::enrichment::vrl_functions())
-        .chain(vector_vrl_functions::all())
-        .collect()
-}
-
-/// Helper function to compile a VRL parameter value into a Program
-fn compile_parameter_vrl(
-    param: &ParameterValue,
-    functions: &[Box<dyn Function>],
-) -> Option<Program> {
-    if !param.is_vrl() {
-        return None;
-    }
-
-    let state = TypeState::default();
-    let config = CompileConfig::default();
-
-    match compile_vrl(param.value(), functions, &state, config) {
-        Ok(compilation_result) => {
-            if !compilation_result.warnings.is_empty() {
-                let warnings = format_vrl_diagnostics(param.value(), compilation_result.warnings);
-                warn!(message = "VRL compilation warnings.", %warnings);
-            }
-            Some(compilation_result.program)
-        }
-        Err(diagnostics) => {
-            let error = format_vrl_diagnostics(param.value(), diagnostics);
-            warn!(message = "VRL compilation failed.", %error);
-            None
-        }
-    }
-}
-
 impl Default for HttpClientConfig {
     fn default() -> Self {
         Self {
@@ -284,44 +247,79 @@ pub struct Query {
 }
 
 impl Query {
-    pub fn new(params: &HashMap<String, QueryParameterValue>) -> Self {
-        let functions = get_vrl_functions();
+    pub fn new(params: &HashMap<String, QueryParameterValue>) -> Result<Self, sources::BuildError> {
+        let functions = vrl::stdlib::all()
+            .into_iter()
+            .chain(vector_lib::enrichment::vrl_functions())
+            .chain(vector_vrl_functions::all())
+            .collect::<Vec<_>>();
 
-        let compiled: HashMap<String, CompiledQueryParameterValue> = params
-            .iter()
-            .map(|(k, v)| (k.clone(), Self::compile_param(v, &functions)))
-            .collect();
+        let mut compiled: HashMap<String, CompiledQueryParameterValue> = HashMap::new();
+
+        for (k, v) in params.iter() {
+            let compiled_param = Self::compile_param(v, &functions)?;
+            compiled.insert(k.clone(), compiled_param);
+        }
 
         let has_vrl = compiled.values().any(|v| v.has_vrl());
 
-        Query {
+        Ok(Query {
             original: params.clone(),
             compiled,
             has_vrl,
-        }
+        })
     }
 
-    fn compile_value(param: &ParameterValue, functions: &[Box<dyn Function>]) -> CompiledParam {
-        CompiledParam {
+    fn compile_value(
+        param: &ParameterValue,
+        functions: &[Box<dyn Function>],
+    ) -> Result<CompiledParam, sources::BuildError> {
+        let program = if param.is_vrl() {
+            let state = TypeState::default();
+            let config = CompileConfig::default();
+
+            match compile_vrl(param.value(), functions, &state, config) {
+                Ok(compilation_result) => {
+                    if !compilation_result.warnings.is_empty() {
+                        let warnings =
+                            format_vrl_diagnostics(param.value(), compilation_result.warnings);
+                        warn!(message = "VRL compilation warnings.", %warnings);
+                    }
+                    Some(compilation_result.program)
+                }
+                Err(diagnostics) => {
+                    let error = format_vrl_diagnostics(param.value(), diagnostics);
+                    return Err(sources::BuildError::VrlCompilationError {
+                        message: format!("VRL compilation failed: {}", error),
+                    });
+                }
+            }
+        } else {
+            None
+        };
+
+        Ok(CompiledParam {
             value: param.value().to_string(),
-            program: compile_parameter_vrl(param, functions),
-        }
+            program,
+        })
     }
 
     fn compile_param(
         value: &QueryParameterValue,
         functions: &[Box<dyn Function>],
-    ) -> CompiledQueryParameterValue {
+    ) -> Result<CompiledQueryParameterValue, sources::BuildError> {
         match value {
-            QueryParameterValue::SingleParam(param) => CompiledQueryParameterValue::SingleParam(
-                Box::new(Self::compile_value(param, functions)),
-            ),
+            QueryParameterValue::SingleParam(param) => {
+                Ok(CompiledQueryParameterValue::SingleParam(Box::new(
+                    Self::compile_value(param, functions)?,
+                )))
+            }
             QueryParameterValue::MultiParams(params) => {
                 let compiled = params
                     .iter()
                     .map(|p| Self::compile_value(p, functions))
-                    .collect();
-                CompiledQueryParameterValue::MultiParams(compiled)
+                    .collect::<Result<Vec<_>, _>>()?;
+                Ok(CompiledQueryParameterValue::MultiParams(compiled))
             }
         }
     }
@@ -331,16 +329,48 @@ impl Query {
 #[typetag::serde(name = "http_client")]
 impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
-        let query = Query::new(&self.query.clone());
+        let query = Query::new(&self.query.clone())?;
 
         // Compile body if present
-        let body = self.body.as_ref().map(|body_param| {
-            let functions = get_vrl_functions();
-            CompiledParam {
+        let body = if let Some(body_param) = &self.body {
+            let functions = vrl::stdlib::all()
+                .into_iter()
+                .chain(vector_lib::enrichment::vrl_functions())
+                .chain(vector_vrl_functions::all())
+                .collect::<Vec<_>>();
+
+            let program = if body_param.is_vrl() {
+                let state = TypeState::default();
+                let config = CompileConfig::default();
+
+                match compile_vrl(body_param.value(), &functions, &state, config) {
+                    Ok(compilation_result) => {
+                        if !compilation_result.warnings.is_empty() {
+                            let warnings =
+                                format_vrl_diagnostics(body_param.value(), compilation_result.warnings);
+                            warn!(message = "VRL compilation warnings.", %warnings);
+                        }
+                        Some(compilation_result.program)
+                    }
+                    Err(diagnostics) => {
+                        let error = format_vrl_diagnostics(body_param.value(), diagnostics);
+                        return Err(sources::BuildError::VrlCompilationError {
+                            message: format!("VRL compilation failed: {}", error),
+                        }
+                        .into());
+                    }
+                }
+            } else {
+                None
+            };
+
+            Some(CompiledParam {
                 value: body_param.value().to_string(),
-                program: compile_parameter_vrl(body_param, &functions),
-            }
-        });
+                program,
+            })
+        } else {
+            None
+        };
 
         // Build the base URLs
         let endpoints = [self.endpoint.clone()];
