@@ -12,11 +12,11 @@ generated: components: sinks: doris: configuration: {
 		required: false
 		type: object: options: enabled: {
 			description: """
-				Controls whether end-to-end acknowledgements are enabled.
+				Controls whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source that supports end-to-end
-				acknowledgements and is connected to that sink waits for events
-				to be acknowledged by **all connected sinks**, before acknowledging them at the source.
+				acknowledgements that is connected to that sink waits for events
+				to be acknowledged by **all connected sinks** before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -618,7 +618,7 @@ generated: components: sinks: doris: configuration: {
 						full: "All tags are exposed as arrays of either string or null values."
 						single: """
 															Tag values are exposed as single strings, the same as they were before this config
-															option. Tags with multiple values show the last assigned value and null values
+															option. Tags with multiple values show the last assigned value, and null values
 															are ignored.
 															"""
 					}
@@ -798,7 +798,7 @@ generated: components: sinks: doris: configuration: {
 
 			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
 
-			**Note**: The retry backoff policy follows the Fibonacci sequence.
+			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
 		type: object: options: {
@@ -838,7 +838,7 @@ generated: components: sinks: doris: configuration: {
 					}
 					initial_concurrency: {
 						description: """
-																The initial concurrency limit to use. If not specified, the initial limit is `1` (no concurrency).
+																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
 																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
@@ -862,7 +862,7 @@ generated: components: sinks: doris: configuration: {
 
 																Valid values are greater than or equal to `0`, and reasonable values range from `1.0` to `3.0`.
 
-																When calculating the past RTT average, a secondary "deviation" value is also computed that indicates how variable
+																When calculating the past RTT average, a secondary “deviation” value is also computed that indicates how variable
 																those values are. That deviation is used when comparing the past RTT average to the current measurements, so we
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
 																an appropriate range. Larger values cause the algorithm to ignore larger increases in the RTT.
@@ -890,7 +890,7 @@ generated: components: sinks: doris: configuration: {
 															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
 							none: """
-															A fixed concurrency of `1`.
+															A fixed concurrency of 1.
 
 															Only one request can be outstanding at any given time.
 															"""
@@ -944,7 +944,7 @@ generated: components: sinks: doris: configuration: {
 						Full: """
 															Full jitter.
 
-															The random delay is anywhere from `0` up to the maximum current delay calculated by the backoff
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
 															strategy.
 
 															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood

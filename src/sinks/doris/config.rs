@@ -62,7 +62,7 @@ pub struct DorisConfig {
     #[serde(default)]
     pub compression: Compression,
 
-    /// Number of retries that will be attempted before give up.
+    /// Number of retries attempted before failing.
     #[serde(default = "default_max_retries")]
     pub max_retries: isize,
 

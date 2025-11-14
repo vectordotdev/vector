@@ -59,9 +59,7 @@ impl DorisService {
                 internal_log_rate_limit = true
             );
         }
-        if http_status_code.is_success()
-            && stream_load_status == StreamLoadStatus::Successful
-        {
+        if http_status_code.is_success() && stream_load_status == StreamLoadStatus::Successful {
             // Emit metrics for successfully loaded data
             let load_bytes = response_json
                 .get("LoadBytes")
