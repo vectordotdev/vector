@@ -158,8 +158,8 @@ pub struct DatadogAgentConfig {
     ///
     /// If not set, responses to completed requests will block indefinitely until connected
     /// transforms or sinks are ready to receive the events.
-    #[serde_as(as = "serde_with::DurationSeconds<u64>")]
-    send_timeout_secs: Option<Duration>,
+    #[serde_as(as = "Option<serde_with::DurationSecondsWithFrac<f64>>")]
+    send_timeout_secs: Option<f64>,
 }
 
 impl GenerateConfig for DatadogAgentConfig {
@@ -346,7 +346,7 @@ impl SourceConfig for DatadogAgentConfig {
     }
 
     fn send_timeout(&self) -> Option<Duration> {
-        self.send_timeout_secs
+        self.send_timeout_secs.map(Duration::from_secs_f64)
     }
 }
 

@@ -777,6 +777,29 @@ async fn send_timeout_returns_service_unavailable() {
     drop(rx);
 }
 
+#[test]
+fn parse_config_with_send_timeout_secs() {
+    let config = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address = "0.0.0.0:8012"
+            send_timeout_secs = 1.5
+        "#})
+    .unwrap();
+
+    assert_eq!(config.send_timeout_secs, Some(1.5));
+    assert_eq!(config.send_timeout(), Some(Duration::from_secs_f64(1.5)));
+}
+
+#[test]
+fn parse_config_without_send_timeout_secs() {
+    let config = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address = "0.0.0.0:8012"
+        "#})
+    .unwrap();
+
+    assert_eq!(config.send_timeout_secs, None);
+    assert_eq!(config.send_timeout(), None);
+}
+
 #[tokio::test]
 async fn ignores_disabled_acknowledgements() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {

@@ -592,16 +592,7 @@ generated: components: sources: datadog_agent: configuration: {
 			transforms or sinks are ready to receive the events.
 			"""
 		required: false
-		type: object: options: {
-			nsecs: {
-				required: true
-				type: number: {}
-			}
-			secs: {
-				required: true
-				type: number: {}
-			}
-		}
+		type: float: {}
 	}
 	split_metric_namespace: {
 		description: """
