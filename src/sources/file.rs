@@ -1300,9 +1300,6 @@ mod tests {
         let received = run_file_source(&config, false, NoAcks, LogNamespace::Legacy, async {
             let mut file = File::create(&path).unwrap();
 
-            file.sync_all().unwrap();
-            sleep_500_millis().await; // The files must be observed at its original length before writing to it
-
             for i in 0..n {
                 writeln!(&mut file, "prerot {i}").unwrap();
             }
