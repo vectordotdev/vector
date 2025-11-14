@@ -323,6 +323,7 @@ fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
                 Auth::Bearer { token } => Some(HeaderValue::from_str(
                     format!("Bearer {}", token.inner()).as_str(),
                 )),
+                Auth::Custom { value } => Some(HeaderValue::from_str(value)),
                 #[cfg(feature = "aws-core")]
                 _ => None,
             };
