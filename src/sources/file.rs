@@ -2067,21 +2067,19 @@ mod tests {
 
         let older_path = dir.path().join("z_older_file");
         let mut older = File::create(&older_path).unwrap();
-        older.sync_all().unwrap();
-
-        let newer_path = dir.path().join("a_newer_file");
-        let mut newer = File::create(&newer_path).unwrap();
-        newer.sync_all().unwrap();
 
         writeln!(&mut older, "hello i am the old file").unwrap();
         writeln!(&mut older, "i have been around a while").unwrap();
         writeln!(&mut older, "you can read newer files at the same time").unwrap();
-        older.flush().unwrap();
+        older.sync_all().unwrap(); // sync_all is needed due to windows
+
+        let newer_path = dir.path().join("a_newer_file");
+        let mut newer = File::create(&newer_path).unwrap();
 
         writeln!(&mut newer, "and i am the new file").unwrap();
         writeln!(&mut newer, "this should be interleaved with the old one").unwrap();
         writeln!(&mut newer, "which is fine because we want fairness").unwrap();
-        newer.flush().unwrap();
+        newer.sync_all().unwrap(); // sync_all is needed due to windows
 
         let received = run_file_source(
             &config,
