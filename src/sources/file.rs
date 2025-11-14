@@ -2043,6 +2043,8 @@ mod tests {
         let received_after_restart =
             run_file_source(&config, false, Acks, LogNamespace::Legacy, async {
                 writeln!(&mut file, "INFO goodbye").unwrap();
+                file.flush().unwrap();
+                sleep_500_millis().await;
             })
             .await;
         assert_eq!(
