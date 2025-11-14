@@ -17,7 +17,7 @@ pub(crate) struct ExponentialBackoff {
 
 impl Default for ExponentialBackoff {
     /// `ExponentialBackoff` instance with sensible default values
-    const fn default() -> Self {
+    fn default() -> Self {
         Self::from_millis(2)
             .factor(250)
             .max_delay(Duration::from_secs(60))

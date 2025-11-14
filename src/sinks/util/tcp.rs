@@ -157,7 +157,7 @@ impl TcpConnector {
         Self::new(host, port, None, None.into(), None)
     }
 
-    const fn fresh_backoff() -> ExponentialBackoff {
+    fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
         ExponentialBackoff::default()
     }

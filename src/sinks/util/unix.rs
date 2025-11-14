@@ -124,7 +124,7 @@ impl UnixConnector {
         Self { path, mode }
     }
 
-    const fn fresh_backoff() -> ExponentialBackoff {
+    fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
         ExponentialBackoff::default()
     }
