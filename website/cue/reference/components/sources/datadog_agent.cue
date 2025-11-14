@@ -220,6 +220,28 @@ components: sources: datadog_agent: {
 				duration distribution).
 				"""
 		}
+		request_timeouts: {
+			title: "Request timeout handling"
+			body: """
+				When the Datadog Agent sends a request to this Vector source, and the source
+				blocks on sending the events in that request to the connected transforms or sinks,
+				the agent will eventually time out the request and drop the connection. When that
+				happens, by default, Vector will emit an "Events dropped." error and increment
+				the `component_discarded_events_total` internal metric.
+
+				However, while it is technically true that Vector has dropped the events, the
+				Agent will retry resending that request indefinitely, which means the events will
+				eventually be received unless the blockage above is permanent or the Agent is
+				killed before the request is accepted.
+
+				To prevent this potentially misleading telemetry, you can configure
+				the `send_timeout_secs` option to a
+				value _less than_ the Agent's timeout, which defaults to 10 seconds.
+				This will cause Vector to respond to the Agent when such blockages occur with a HTTP 503
+				Service Unavailable response, emit a warning instead of an error,
+				and increment the `component_timedout_requests_total` internal metric.
+				"""
+		}
 	}
 
 	telemetry: metrics: {
