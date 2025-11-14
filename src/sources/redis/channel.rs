@@ -1,7 +1,7 @@
 use futures_util::StreamExt;
 use snafu::Snafu;
 use std::time::Duration;
-use tracing::{trace, warn, info};
+use tracing::{info, trace, warn};
 
 use crate::{
     internal_events::RedisReceiveEventError,
@@ -127,8 +127,7 @@ impl InputHandler {
                         // We'll reconnect in the outer loop.
                         warn!(
                             endpoint,
-                            channel,
-                            "Redis pubsub stream ended; will reconnect"
+                            channel, "Redis pubsub stream ended; will reconnect"
                         );
                         return SessionEnd::Disconnected;
                     }
@@ -204,7 +203,7 @@ impl InputHandler {
                     &mut self,
                     &endpoint,
                 )
-                    .await;
+                .await;
 
                 match end_reason {
                     SessionEnd::Shutdown => {
