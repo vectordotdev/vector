@@ -11,7 +11,7 @@ use std::{
     sync::Mutex,
 };
 
-use config_builder::ConfigBuilderLoader;
+pub use config_builder::ConfigBuilderLoader;
 use glob::glob;
 use loader::process::Process;
 pub use loader::*;
@@ -20,9 +20,10 @@ pub use source::*;
 use vector_lib::configurable::NamedComponent;
 
 use super::{
-    Config, ConfigPath, Format, FormatHint, builder::ConfigBuilder, format, validation, vars,
+    Config, ConfigPath, Format, FormatHint, ProviderConfig, builder::ConfigBuilder, format,
+    validation, vars,
 };
-use crate::{config::ProviderConfig, signal};
+use crate::signal;
 
 pub static CONFIG_PATHS: Mutex<Vec<ConfigPath>> = Mutex::new(Vec::new());
 
@@ -127,7 +128,9 @@ pub fn load_from_paths(
     config_paths: &[ConfigPath],
     interpolate_env: bool,
 ) -> Result<Config, Vec<String>> {
-    let builder = load_builder_from_paths_with_opts(config_paths, interpolate_env)?;
+    let builder = ConfigBuilderLoader::default()
+        .interpolate_env(interpolate_env)
+        .load_from_paths(config_paths)?;
     let (config, build_warnings) = builder.build_with_warnings()?;
 
     for warning in build_warnings {
@@ -146,27 +149,20 @@ pub async fn load_from_paths_with_provider_and_secrets(
     allow_empty: bool,
     interpolate_env: bool,
 ) -> Result<Config, Vec<String>> {
-    // Load secret backends first
-    let mut secrets_backends_loader =
-        load_secret_backends_from_paths_with_opts(config_paths, interpolate_env)?;
-    // And then, if needed, retrieve secrets from configured backends
-    let mut builder = if secrets_backends_loader.has_secrets_to_retrieve() {
-        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
-        let resolved_secrets = secrets_backends_loader
-            .retrieve(&mut signal_handler.subscribe())
-            .await
-            .map_err(|e| vec![e])?;
-        load_builder_from_paths_with_opts_with_secrets_and_opts(
-            config_paths,
-            resolved_secrets,
-            interpolate_env,
-        )?
-    } else {
-        debug!(message = "No secret placeholder found, skipping secret resolution.");
-        load_builder_from_paths_with_opts(config_paths, interpolate_env)?
-    };
+    let secrets_backends_loader = loader_from_paths(
+        SecretBackendLoader::default().interpolate_env(interpolate_env),
+        config_paths,
+    )?;
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
 
-    builder.allow_empty = allow_empty;
+    let mut builder = ConfigBuilderLoader::default()
+        .interpolate_env(interpolate_env)
+        .allow_empty(allow_empty)
+        .secrets(secrets)
+        .load_from_paths(config_paths)?;
 
     validation::check_provider(&builder)?;
     signal_handler.clear();
@@ -177,15 +173,7 @@ pub async fn load_from_paths_with_provider_and_secrets(
         debug!(message = "Provider configured.", provider = ?provider.get_component_name());
     }
 
-    let (new_config, build_warnings) = builder.build_with_warnings()?;
-
-    validation::check_buffer_preconditions(&new_config).await?;
-
-    for warning in build_warnings {
-        warn!("{}", warning);
-    }
-
-    Ok(new_config)
+    finalize_config(builder).await
 }
 
 pub async fn load_from_str_with_secrets(
@@ -195,29 +183,27 @@ pub async fn load_from_str_with_secrets(
     allow_empty: bool,
     interpolate_env: bool,
 ) -> Result<Config, Vec<String>> {
-    // Load secret backends first
-    let mut secrets_backends_loader =
-        load_secret_backends_from_input_with_opts(input.as_bytes(), format, interpolate_env)?;
-    // And then, if needed, retrieve secrets from configured backends
-    let mut builder = if secrets_backends_loader.has_secrets_to_retrieve() {
-        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
-        let resolved_secrets = secrets_backends_loader
-            .retrieve(&mut signal_handler.subscribe())
-            .await
-            .map_err(|e| vec![e])?;
-        load_builder_from_input_with_secrets_and_opts(
-            input.as_bytes(),
-            format,
-            resolved_secrets,
-            interpolate_env,
-        )?
-    } else {
-        debug!(message = "No secret placeholder found, skipping secret resolution.");
-        load_builder_from_input_with_opts(input.as_bytes(), format, interpolate_env)?
-    };
+    let secrets_backends_loader = loader_from_input(
+        SecretBackendLoader::default().interpolate_env(interpolate_env),
+        input.as_bytes(),
+        format,
+    )?;
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
 
-    builder.allow_empty = allow_empty;
+    let builder = ConfigBuilderLoader::default()
+        .interpolate_env(interpolate_env)
+        .allow_empty(allow_empty)
+        .secrets(secrets)
+        .load_from_input(input.as_bytes(), format)?;
     signal_handler.clear();
+
+    finalize_config(builder).await
+}
+
+async fn finalize_config(builder: ConfigBuilder) -> Result<Config, Vec<String>> {
     let (new_config, build_warnings) = builder.build_with_warnings()?;
 
     validation::check_buffer_preconditions(&new_config).await?;
@@ -229,7 +215,11 @@ pub async fn load_from_str_with_secrets(
     Ok(new_config)
 }
 
-fn loader_from_input<T, L, R>(mut loader: L, input: R, format: Format) -> Result<T, Vec<String>>
+pub(super) fn loader_from_input<T, L, R>(
+    mut loader: L,
+    input: R,
+    format: Format,
+) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
     L: Loader<T> + Process,
@@ -239,7 +229,10 @@ where
 }
 
 /// Iterators over `ConfigPaths`, and processes a file/dir according to a provided `Loader`.
-fn loader_from_paths<T, L>(mut loader: L, config_paths: &[ConfigPath]) -> Result<T, Vec<String>>
+pub(super) fn loader_from_paths<T, L>(
+    mut loader: L,
+    config_paths: &[ConfigPath],
+) -> Result<T, Vec<String>>
 where
     T: serde::de::DeserializeOwned,
     L: Loader<T> + Process,
@@ -275,82 +268,11 @@ where
     }
 }
 
-/// Uses `ConfigBuilderLoader` to process `ConfigPaths`, deserializing to a `ConfigBuilder`.
-pub fn load_builder_from_paths_with_opts(
-    config_paths: &[ConfigPath],
-    interpolate_env: bool,
-) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_paths(
-        ConfigBuilderLoader::new(interpolate_env, None),
-        config_paths,
-    )
-}
-
-fn load_builder_from_input_with_opts<R: std::io::Read>(
-    input: R,
-    format: Format,
-    interpolate_env: bool,
-) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_input(
-        ConfigBuilderLoader::new(interpolate_env, None),
-        input,
-        format,
-    )
-}
-
-/// Uses `ConfigBuilderLoader` to process `ConfigPaths`, performing secret replacement and deserializing to a `ConfigBuilder`
-pub fn load_builder_from_paths_with_opts_with_secrets_and_opts(
-    config_paths: &[ConfigPath],
-    secrets: HashMap<String, String>,
-    interpolate_env: bool,
-) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_paths(
-        ConfigBuilderLoader::new(interpolate_env, Some(secrets)),
-        config_paths,
-    )
-}
-
-fn load_builder_from_input_with_secrets_and_opts<R: std::io::Read>(
-    input: R,
-    format: Format,
-    secrets: HashMap<String, String>,
-    interpolate_env: bool,
-) -> Result<ConfigBuilder, Vec<String>> {
-    loader_from_input(
-        ConfigBuilderLoader::new(interpolate_env, Some(secrets)),
-        input,
-        format,
-    )
-}
-
 /// Uses `SourceLoader` to process `ConfigPaths`, deserializing to a toml `SourceMap`.
 pub fn load_source_from_paths(
     config_paths: &[ConfigPath],
 ) -> Result<toml::value::Table, Vec<String>> {
     loader_from_paths(SourceLoader::new(), config_paths)
-}
-
-/// Uses `SecretBackendLoader` to process `ConfigPaths`, deserializing to a `SecretBackends`.
-pub fn load_secret_backends_from_paths_with_opts(
-    config_paths: &[ConfigPath],
-    interpolate_env: bool,
-) -> Result<SecretBackendLoader, Vec<String>> {
-    loader_from_paths(
-        SecretBackendLoader::new_with_opts(interpolate_env),
-        config_paths,
-    )
-}
-
-fn load_secret_backends_from_input_with_opts<R: std::io::Read>(
-    input: R,
-    format: Format,
-    interpolate_env: bool,
-) -> Result<SecretBackendLoader, Vec<String>> {
-    loader_from_input(
-        SecretBackendLoader::new_with_opts(interpolate_env),
-        input,
-        format,
-    )
 }
 
 pub fn load_from_str(input: &str, format: Format) -> Result<Config, Vec<String>> {
@@ -441,84 +363,4 @@ fn default_config_paths() -> Vec<ConfigPath> {
     let default_path = default_path();
 
     vec![ConfigPath::File(default_path, Some(Format::Yaml))]
-}
-
-#[cfg(all(
-    test,
-    feature = "sinks-elasticsearch",
-    feature = "transforms-sample",
-    feature = "sources-demo_logs",
-    feature = "sinks-console"
-))]
-mod tests {
-    use std::path::PathBuf;
-
-    use super::load_builder_from_paths_with_opts;
-    use crate::config::{ComponentKey, ConfigPath};
-
-    #[test]
-    fn load_namespacing_folder() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("namespacing")
-            .join("success");
-        let configs = vec![ConfigPath::Dir(path)];
-        let builder = load_builder_from_paths_with_opts(&configs, true).unwrap();
-        assert!(
-            builder
-                .transforms
-                .contains_key(&ComponentKey::from("apache_parser"))
-        );
-        assert!(
-            builder
-                .sources
-                .contains_key(&ComponentKey::from("apache_logs"))
-        );
-        assert!(
-            builder
-                .sinks
-                .contains_key(&ComponentKey::from("es_cluster"))
-        );
-        assert_eq!(builder.tests.len(), 2);
-    }
-
-    #[test]
-    fn load_namespacing_ignore_invalid() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("namespacing")
-            .join("ignore-invalid");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths_with_opts(&configs, true).unwrap();
-    }
-
-    #[test]
-    fn load_directory_ignores_unknown_file_formats() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("config-dir")
-            .join("ignore-unknown");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths_with_opts(&configs, true).unwrap();
-    }
-
-    #[test]
-    fn load_directory_globals() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("config-dir")
-            .join("globals");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths_with_opts(&configs, true).unwrap();
-    }
-
-    #[test]
-    fn load_directory_globals_duplicates() {
-        let path = PathBuf::from(".")
-            .join("tests")
-            .join("config-dir")
-            .join("globals-duplicate");
-        let configs = vec![ConfigPath::Dir(path)];
-        load_builder_from_paths_with_opts(&configs, true).unwrap();
-    }
 }

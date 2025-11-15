@@ -21,7 +21,7 @@ use crate::{
         util::{Compression, test::build_test_server},
     },
     template::Template,
-    test_util::next_addr,
+    test_util::addr::next_addr,
 };
 
 fn get_counter() -> Metric {
@@ -322,7 +322,7 @@ fn test_encode_event_gauge_overridden_namespace_returns_expected_json() {
 
 #[tokio::test]
 async fn splunk_passthrough_token() {
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     let config = HecMetricsSinkConfig {
         default_token: "token".to_owned().into(),
         endpoint: format!("http://{addr}"),

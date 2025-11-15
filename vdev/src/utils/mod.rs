@@ -21,7 +21,6 @@ pub mod macros;
 
 pub mod cargo;
 pub mod command;
-pub mod config;
 pub mod environment;
 pub mod features;
 pub mod git;
