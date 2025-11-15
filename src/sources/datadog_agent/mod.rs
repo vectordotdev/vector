@@ -157,7 +157,12 @@ pub struct DatadogAgentConfig {
     /// The timeout before responding to requests with a HTTP 503 Service Unavailable error.
     ///
     /// If not set, responses to completed requests will block indefinitely until connected
-    /// transforms or sinks are ready to receive the events.
+    /// transforms or sinks are ready to receive the events. When this happens, the sending Datadog
+    /// Agent will eventually time out the request and drop the connection, resulting Vector
+    /// generating an "Events dropped." error and incrementing the `component_discarded_events_total`
+    /// internal metric. By setting this option to a value less than the Agent's timeout, Vector
+    /// will instead respond to the Agent with a HTTP 503 Service Unavailable error, emit a warning,
+    /// and increment the `component_timedout_events_total` internal metric instead.
     #[serde_as(as = "Option<serde_with::DurationSecondsWithFrac<f64>>")]
     send_timeout_secs: Option<f64>,
 }

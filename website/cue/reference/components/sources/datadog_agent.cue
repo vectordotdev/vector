@@ -225,7 +225,7 @@ components: sources: datadog_agent: {
 			body: """
 				When the Datadog Agent sends a request to this Vector source, and the source
 				blocks on sending the events in that request to the connected transforms or sinks,
-				the agent will eventually time out the request and drop the connection. When that
+				the Agent will eventually time out the request and drop the connection. When that
 				happens, by default, Vector will emit an "Events dropped." error and increment
 				the `component_discarded_events_total` internal metric.
 
