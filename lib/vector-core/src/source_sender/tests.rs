@@ -161,8 +161,8 @@ async fn emits_component_discarded_events_total_for_send_batch() {
     assert!(res.is_err(), "Send should have timed out.");
 
     let metrics = get_component_metrics();
-    assert_no_metric(&metrics, "component_timedout_events_total");
-    assert_no_metric(&metrics, "component_timedout_requests_total");
+    assert_no_metric(&metrics, "component_timed_out_events_total");
+    assert_no_metric(&metrics, "component_timed_out_requests_total");
     assert_counter_metric(
         &metrics,
         "component_discarded_events_total",
@@ -204,8 +204,8 @@ async fn times_out_send_event_with_timeout() {
 
     let metrics = get_component_metrics();
     assert_no_metric(&metrics, "component_discarded_events_total");
-    assert_counter_metric(&metrics, "component_timedout_events_total", 1.0);
-    assert_counter_metric(&metrics, "component_timedout_requests_total", 1.0);
+    assert_counter_metric(&metrics, "component_timed_out_events_total", 1.0);
+    assert_counter_metric(&metrics, "component_timed_out_requests_total", 1.0);
 }
 
 fn get_component_metrics() -> Vec<Metric> {

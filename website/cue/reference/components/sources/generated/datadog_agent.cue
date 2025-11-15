@@ -594,7 +594,7 @@ generated: components: sources: datadog_agent: configuration: {
 			generating an "Events dropped." error and incrementing the `component_discarded_events_total`
 			internal metric. By setting this option to a value less than the Agent's timeout, Vector
 			will instead respond to the Agent with a HTTP 503 Service Unavailable error, emit a warning,
-			and increment the `component_timedout_events_total` internal metric instead.
+			and increment the `component_timed_out_events_total` internal metric instead.
 			"""
 		required: false
 		type: float: {}

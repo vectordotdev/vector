@@ -239,14 +239,14 @@ components: sources: datadog_agent: {
 				value _less than_ the Agent's timeout, which defaults to 10 seconds.
 				This will cause Vector to respond to the Agent when such blockages occur with a HTTP 503
 				Service Unavailable response, emit a warning instead of an error,
-				and increment the `component_timedout_requests_total` internal metric.
+				and increment the `component_timed_out_requests_total` internal metric.
 				"""
 		}
 	}
 
 	telemetry: metrics: {
-		component_timedout_events_total:      components.sources.internal_metrics.output.metrics.component_timedout_events_total
-		component_timedout_requests_total:    components.sources.internal_metrics.output.metrics.component_timedout_requests_total
+		component_timed_out_events_total:     components.sources.internal_metrics.output.metrics.component_timed_out_events_total
+		component_timed_out_requests_total:   components.sources.internal_metrics.output.metrics.component_timed_out_requests_total
 		http_server_handler_duration_seconds: components.sources.internal_metrics.output.metrics.http_server_handler_duration_seconds
 		http_server_requests_received_total:  components.sources.internal_metrics.output.metrics.http_server_requests_received_total
 		http_server_responses_sent_total:     components.sources.internal_metrics.output.metrics.http_server_responses_sent_total

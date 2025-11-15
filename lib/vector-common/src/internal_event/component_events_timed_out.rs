@@ -6,8 +6,8 @@ crate::registered_event! {
     ComponentEventsTimedOut {
         reason: &'static str,
     } => {
-        timed_out_events: Counter = counter!("component_timedout_events_total"),
-        timed_out_requests: Counter = counter!("component_timedout_requests_total"),
+        timed_out_events: Counter = counter!("component_timed_out_events_total"),
+        timed_out_requests: Counter = counter!("component_timed_out_requests_total"),
         reason: &'static str = self.reason,
     }
 
