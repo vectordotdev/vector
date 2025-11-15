@@ -15,7 +15,7 @@ use nix::{
 };
 use serde_json::{Value, json};
 use similar_asserts::assert_eq;
-use vector::test_util::{next_addr, temp_file};
+use vector::test_util::{addr::next_addr, temp_file};
 
 use crate::{create_directory, create_file, overwrite_file};
 
@@ -76,7 +76,7 @@ fn source_vector(source: &str) -> Command {
 }
 
 fn vector(config: &str) -> Command {
-    vector_with(create_file(config), next_addr(), false)
+    vector_with(create_file(config), next_addr().1, false)
 }
 
 fn vector_with(config_path: PathBuf, address: SocketAddr, quiet: bool) -> Command {
@@ -289,7 +289,8 @@ fn configuration_path_recomputed() {
     );
 
     // Vector command
-    let mut cmd = vector_with(dir.join("*"), next_addr(), true);
+    let (_guard, address) = next_addr();
+    let mut cmd = vector_with(dir.join("*"), address, true);
 
     // Run vector
     let mut vector = cmd
@@ -427,7 +428,7 @@ fn timely_shutdown_journald() {
 
 #[test]
 fn timely_shutdown_prometheus() {
-    let address = next_addr();
+    let (_guard, address) = next_addr();
     test_timely_shutdown_with_sub(
         vector_with(create_file(PROMETHEUS_SINK_CONFIG), address, false),
         |_| {
@@ -612,7 +613,8 @@ fn timely_reload_shutdown() {
         .as_str(),
     );
 
-    let mut cmd = vector_with(path.clone(), next_addr(), false);
+    let (_guard, address) = next_addr();
+    let mut cmd = vector_with(path.clone(), address, false);
     cmd.arg("-w");
 
     test_timely_shutdown_with_sub(cmd, |vector| {

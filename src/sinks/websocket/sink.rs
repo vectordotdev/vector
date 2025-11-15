@@ -226,8 +226,9 @@ mod tests {
         http::Auth,
         test_util::{
             CountReceiver,
+            addr::next_addr,
             components::{SINK_TAGS, run_and_assert_sink_compliance},
-            next_addr, random_lines_with_stream, trace_init,
+            random_lines_with_stream, trace_init,
         },
         tls::{self, MaybeTlsSettings, TlsConfig, TlsEnableableConfig},
     };
@@ -236,7 +237,7 @@ mod tests {
     async fn test_websocket() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
@@ -261,7 +262,7 @@ mod tests {
             token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string().into(),
         });
         let auth_clone = auth.clone();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
@@ -282,7 +283,7 @@ mod tests {
     async fn test_tls_websocket() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let tls_config = Some(TlsEnableableConfig::test_config());
         let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true).unwrap();
 
@@ -313,7 +314,7 @@ mod tests {
     async fn test_websocket_reconnect() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
@@ -419,6 +420,7 @@ mod tests {
                                                 user: _user,
                                                 password: _password,
                                             } => { /* Not needed for tests at the moment */ }
+                                            Auth::Custom { .. } => { /* Not needed for tests at the moment */ }
                                             #[cfg(feature = "aws-core")]
                                             _ => {}
                                         }

@@ -1,6 +1,5 @@
 use anyhow::{Ok, Result};
-use std::fs::File;
-use std::io::Write;
+use std::{fs::File, io::Write};
 
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;

@@ -1,4 +1,5 @@
 large-error-threshold = 256  # in bytes
+allow-unwrap-in-tests = true
 
 # for `disallowed_method`:
 # https://rust-lang.github.io/rust-clippy/master/index.html#disallowed_method

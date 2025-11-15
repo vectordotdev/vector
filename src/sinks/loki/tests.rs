@@ -100,7 +100,7 @@ async fn healthcheck_includes_auth() {
     )
     .unwrap();
 
-    let addr = test_util::next_addr();
+    let (_guard, addr) = test_util::addr::next_addr();
     let endpoint = format!("http://{addr}");
     config.endpoint = endpoint
         .clone()

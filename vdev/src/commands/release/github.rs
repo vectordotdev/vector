@@ -1,5 +1,4 @@
-use crate::app::CommandExt as _;
-use crate::utils::cargo;
+use crate::{app::CommandExt as _, utils::cargo};
 use anyhow::{Ok, Result, anyhow};
 use glob::glob;
 use std::process::Command;

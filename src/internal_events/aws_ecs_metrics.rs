@@ -52,8 +52,9 @@ impl InternalEvent for AwsEcsMetricsParseError<'_> {
             error_type = error_type::PARSER_FAILED,
         );
         debug!(
-            message = %format!("Failed to parse response:\\n\\n{}\\n\\n", self.body.escape_debug()),
+            response = %self.body.escape_debug(),
             endpoint = %self.endpoint,
+            "Failed to parse response.",
         );
         counter!("parse_errors_total").increment(1);
         counter!(

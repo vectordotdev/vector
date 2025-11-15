@@ -45,6 +45,7 @@ impl AmqpPropertiesConfig {
                     error = %error,
                     error_type = error_type::TEMPLATE_FAILED,
                     stage = error_stage::PROCESSING,
+                    internal_log_rate_limit = false,
                 );
                 Default::default()
             });

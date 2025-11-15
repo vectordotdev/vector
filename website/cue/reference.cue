@@ -87,7 +87,8 @@ _values: {
 
 #Event: {
 	{log?: #LogEvent} |
-	{metric?: #MetricEvent}
+	{metric?: #MetricEvent} |
+	{trace?: #TraceEvent}
 }
 
 // `#EventType` represents one of Vector's supported event types.
@@ -151,6 +152,10 @@ _values: {
 }
 
 #LogEvent: {
+	...
+}
+
+#TraceEvent: {
 	...
 }
 

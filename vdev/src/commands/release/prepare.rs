@@ -1,18 +1,17 @@
 #![allow(clippy::print_stdout)]
 #![allow(clippy::print_stderr)]
 
-use crate::utils::command::run_command;
-use crate::utils::{git, paths};
+use crate::utils::{command::run_command, git, paths};
 use anyhow::{Context, Result, anyhow};
 use reqwest::blocking::Client;
 use semver::Version;
-use std::fs::File;
-use std::io::BufRead;
-use std::io::BufReader;
-use std::io::Write;
-use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::{env, fs};
+use std::{
+    env, fs,
+    fs::File,
+    io::{BufRead, BufReader, Write},
+    path::{Path, PathBuf},
+    process::Command,
+};
 use toml::Value;
 use toml_edit::DocumentMut;
 

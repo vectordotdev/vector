@@ -76,8 +76,6 @@ pub(crate) struct Timer {
     ewma: stats::Ewma,
     gauge: Gauge,
     #[cfg(debug_assertions)]
-    report_count: u32,
-    #[cfg(debug_assertions)]
     component_id: Arc<str>,
 }
 
@@ -98,8 +96,6 @@ impl Timer {
             total_wait: Duration::new(0, 0),
             ewma: stats::Ewma::new(0.9),
             gauge,
-            #[cfg(debug_assertions)]
-            report_count: 0,
             #[cfg(debug_assertions)]
             component_id,
         }
@@ -147,17 +143,7 @@ impl Timer {
         self.total_wait = Duration::new(0, 0);
 
         #[cfg(debug_assertions)]
-        self.report(avg_rounded);
-    }
-
-    #[cfg(debug_assertions)]
-    fn report(&mut self, utilization: f64) {
-        // Note that changing the reporting interval would also affect the actual metric reporting frequency.
-        // This check reduces debug log spamming.
-        if self.report_count.is_multiple_of(5) {
-            debug!(component_id = %self.component_id, %utilization);
-        }
-        self.report_count = self.report_count.wrapping_add(1);
+        debug!(component_id = %self.component_id, utilization = %avg_rounded, internal_log_rate_limit = false);
     }
 
     fn end_span(&mut self, at: Instant) {

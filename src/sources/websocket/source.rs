@@ -462,10 +462,10 @@ mod tests {
         common::websocket::WebSocketCommonConfig,
         sources::websocket::config::{PongMessage, WebSocketConfig},
         test_util::{
+            addr::next_addr,
             components::{
                 SOURCE_TAGS, run_and_assert_source_compliance, run_and_assert_source_error,
             },
-            next_addr,
         },
     };
 
@@ -481,7 +481,7 @@ mod tests {
 
     /// Starts a WebSocket server that pushes a binary message to the first client.
     async fn start_binary_push_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -501,7 +501,7 @@ mod tests {
 
     /// Starts a WebSocket server that pushes a message to the first client that connects.
     async fn start_push_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -523,7 +523,7 @@ mod tests {
     /// Starts a WebSocket server that waits for an initial message from the client,
     /// and upon receiving it, sends a confirmation message back.
     async fn start_subscribe_server(initial_message: String, response_message: String) -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -547,7 +547,7 @@ mod tests {
     }
 
     async fn start_reconnect_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -647,7 +647,7 @@ mod tests {
     }
 
     async fn start_reject_initial_message_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -679,7 +679,7 @@ mod tests {
     }
 
     async fn start_unresponsive_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -712,7 +712,7 @@ mod tests {
     }
 
     async fn start_blackhole_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 

@@ -308,6 +308,14 @@ pub enum Auth {
         /// The AWS service name to use for signing.
         service: String,
     },
+
+    /// Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`
+    Custom {
+        /// Custom string value of the Authorization header
+        #[configurable(metadata(docs::examples = "${AUTH_HEADER_VALUE}"))]
+        #[configurable(metadata(docs::examples = "CUSTOM_PREFIX ${TOKEN}"))]
+        value: String,
+    },
 }
 
 pub trait MaybeAuth: Sized {
@@ -346,6 +354,18 @@ impl Auth {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
+            Auth::Custom { value } => {
+                // The value contains just the value for the Authorization header
+                // Expected format: "SSWS token123" or "Bearer token123", etc.
+                match HeaderValue::from_str(value) {
+                    Ok(header_val) => {
+                        map.insert(http::header::AUTHORIZATION, header_val);
+                    }
+                    Err(error) => {
+                        error!(message = "Invalid custom auth header value.", value = %value, %error)
+                    }
+                }
+            }
             #[cfg(feature = "aws-core")]
             _ => {}
         }
@@ -686,7 +706,7 @@ mod tests {
     use tower::ServiceBuilder;
 
     use super::*;
-    use crate::test_util::next_addr;
+    use crate::test_util::addr::next_addr;
 
     #[test]
     fn test_default_request_headers_defaults() {
@@ -874,7 +894,7 @@ mod tests {
     async fn test_max_connection_age_service_with_hyper_server() {
         // Create a hyper server with the max connection age layer.
         let max_connection_age = Duration::from_secs(1);
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let make_svc = make_service_fn(move |conn: &AddrStream| {
             let svc = ServiceBuilder::new()
                 .layer(MaxConnectionAgeLayer::new(
