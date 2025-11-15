@@ -38,6 +38,7 @@ use vector_lib::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
     lookup::{PathPrefix, metadata_path, path},
+    source_sender::SendError,
 };
 
 use crate::{
@@ -232,7 +233,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to flush all of s3://{}/{}: {}", bucket, key, source))]
     PipelineSend {
-        source: vector_lib::source_sender::ClosedError,
+        source: vector_lib::source_sender::SendError,
         bucket: String,
         key: String,
     },
@@ -783,11 +784,12 @@ impl IngestorProcess {
 
         let send_error = match self.out.send_event_stream(&mut stream).await {
             Ok(_) => None,
-            Err(_) => {
+            Err(SendError::Closed) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
-                Some(vector_lib::source_sender::ClosedError)
+                Some(SendError::Closed)
             }
+            Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
         };
 
         // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,

@@ -1,61 +1,26 @@
 use std::fmt;
 
-use tokio::sync::mpsc;
-use vector_buffers::topology::channel::SendError;
+use vector_buffers::topology::channel;
 
-use crate::event::{Event, EventArray};
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub enum SendError {
+    Timeout,
+    Closed,
+}
 
-#[derive(Clone, Debug)]
-pub struct ClosedError;
-
-impl fmt::Display for ClosedError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.write_str("Sender is closed.")
+impl<T> From<channel::SendError<T>> for SendError {
+    fn from(_: channel::SendError<T>) -> Self {
+        Self::Closed
     }
 }
 
-impl std::error::Error for ClosedError {}
-
-impl From<mpsc::error::SendError<Event>> for ClosedError {
-    fn from(_: mpsc::error::SendError<Event>) -> Self {
-        Self
-    }
-}
-
-impl From<mpsc::error::SendError<EventArray>> for ClosedError {
-    fn from(_: mpsc::error::SendError<EventArray>) -> Self {
-        Self
-    }
-}
-
-impl<T> From<SendError<T>> for ClosedError {
-    fn from(_: SendError<T>) -> Self {
-        Self
-    }
-}
-
-#[derive(Debug)]
-pub enum StreamSendError<E> {
-    Closed(ClosedError),
-    Stream(E),
-}
-
-impl<E> fmt::Display for StreamSendError<E>
-where
-    E: fmt::Display,
-{
+impl fmt::Display for SendError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            StreamSendError::Closed(e) => e.fmt(f),
-            StreamSendError::Stream(e) => e.fmt(f),
+            Self::Timeout => f.write_str("Send timed out."),
+            Self::Closed => f.write_str("Sender is closed."),
         }
     }
 }
 
-impl<E> std::error::Error for StreamSendError<E> where E: std::error::Error {}
-
-impl<E> From<ClosedError> for StreamSendError<E> {
-    fn from(e: ClosedError) -> Self {
-        StreamSendError::Closed(e)
-    }
-}
+impl std::error::Error for SendError {}

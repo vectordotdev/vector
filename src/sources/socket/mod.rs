@@ -811,7 +811,7 @@ mod test {
         // shutdown.
         let (guard, addr) = next_addr();
 
-        let (source_tx, source_rx) = SourceSender::new_test_sender_with_buffer(10_000);
+        let (source_tx, source_rx) = SourceSender::new_test_sender_with_options(10_000, None);
         let source_key = ComponentKey::from("tcp_shutdown_infinite_stream");
         let (source_cx, mut shutdown) = SourceContext::new_shutdown(&source_key, source_tx);
 
