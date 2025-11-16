@@ -420,6 +420,7 @@ mod tests {
                                                 user: _user,
                                                 password: _password,
                                             } => { /* Not needed for tests at the moment */ }
+                                            Auth::Custom { .. } => { /* Not needed for tests at the moment */ }
                                             #[cfg(feature = "aws-core")]
                                             _ => {}
                                         }
