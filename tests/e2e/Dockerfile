@@ -20,6 +20,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     zlib1g-dev \
     zlib1g \
     unixodbc \
+    unixodbc-dev \
     unzip \
     mold \
   && rm -rf /var/lib/apt/lists/*
