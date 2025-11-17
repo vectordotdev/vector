@@ -1,3 +1,5 @@
+#[cfg(any(test, feature = "test"))]
+use std::time::Duration;
 use std::{collections::HashMap, time::Instant};
 
 use futures::Stream;
@@ -18,7 +20,7 @@ use vector_common::{
     json_size::JsonSize,
 };
 
-use super::{Builder, ClosedError, Output};
+use super::{Builder, Output, SendError};
 #[cfg(any(test, feature = "test"))]
 use super::{LAG_TIME_NAME, TEST_BUFFER_SIZE};
 use crate::{
@@ -101,14 +103,23 @@ impl SourceSender {
     }
 
     #[cfg(any(test, feature = "test"))]
-    pub fn new_test_sender_with_buffer(n: usize) -> (Self, LimitedReceiver<SourceSenderItem>) {
+    pub fn new_test_sender_with_options(
+        n: usize,
+        timeout: Option<Duration>,
+    ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let lag_time = Some(histogram!(LAG_TIME_NAME));
         let output_id = OutputId {
             component: "test".to_string().into(),
             port: None,
         };
-        let (default_output, rx) =
-            Output::new_with_buffer(n, DEFAULT_OUTPUT.to_owned(), lag_time, None, output_id);
+        let (default_output, rx) = Output::new_with_buffer(
+            n,
+            DEFAULT_OUTPUT.to_owned(),
+            lag_time,
+            None,
+            output_id,
+            timeout,
+        );
         (
             Self {
                 default_output: Some(default_output),
@@ -120,14 +131,14 @@ impl SourceSender {
 
     #[cfg(any(test, feature = "test"))]
     pub fn new_test() -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_test_sender_with_options(TEST_BUFFER_SIZE, None);
         let recv = recv.into_stream().flat_map(into_event_stream);
         (pipe, recv)
     }
 
     #[cfg(any(test, feature = "test"))]
     pub fn new_test_finalize(status: EventStatus) -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_test_sender_with_options(TEST_BUFFER_SIZE, None);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
@@ -146,7 +157,7 @@ impl SourceSender {
     pub fn new_test_errors(
         error_at: impl Fn(usize) -> bool,
     ) -> (Self, impl Stream<Item = Event> + Unpin) {
-        let (pipe, recv) = Self::new_test_sender_with_buffer(TEST_BUFFER_SIZE);
+        let (pipe, recv) = Self::new_test_sender_with_options(TEST_BUFFER_SIZE, None);
         // In a source test pipeline, there is no sink to acknowledge
         // events, so we have to add a map to the receiver to handle the
         // finalization.
@@ -180,7 +191,8 @@ impl SourceSender {
             component: "test".to_string().into(),
             port: Some(name.clone()),
         };
-        let (output, recv) = Output::new_with_buffer(100, name.clone(), None, None, output_id);
+        let (output, recv) =
+            Output::new_with_buffer(100, name.clone(), None, None, output_id, None);
         let recv = recv.into_stream().map(move |mut item| {
             item.events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();
@@ -201,14 +213,14 @@ impl SourceSender {
     /// Send an event to the default output.
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
-    pub async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), ClosedError> {
+    pub async fn send_event(&mut self, event: impl Into<EventArray>) -> Result<(), SendError> {
         self.default_output_mut().send_event(event).await
     }
 
     /// Send a stream of events to the default output.
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
-    pub async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
+    pub async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), SendError>
     where
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
@@ -219,7 +231,7 @@ impl SourceSender {
     /// Send a batch of events to the default output.
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
-    pub async fn send_batch<I, E>(&mut self, events: I) -> Result<(), ClosedError>
+    pub async fn send_batch<I, E>(&mut self, events: I) -> Result<(), SendError>
     where
         E: Into<Event> + ByteSizeOf,
         I: IntoIterator<Item = E>,
@@ -231,7 +243,7 @@ impl SourceSender {
     /// Send a batch of events event to a named output.
     ///
     /// This internally handles emitting [EventsSent] and [ComponentEventsDropped] events.
-    pub async fn send_batch_named<I, E>(&mut self, name: &str, events: I) -> Result<(), ClosedError>
+    pub async fn send_batch_named<I, E>(&mut self, name: &str, events: I) -> Result<(), SendError>
     where
         E: Into<Event> + ByteSizeOf,
         I: IntoIterator<Item = E>,

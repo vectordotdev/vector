@@ -31,7 +31,7 @@ use vector_lib::{
     lookup::{self, event_path, lookup_v2::OptionalValuePath, owned_value_path},
     schema::meaning,
     sensitive_string::SensitiveString,
-    source_sender::ClosedError,
+    source_sender::SendError,
     tls::MaybeTlsIncomingStream,
 };
 use vrl::{
@@ -433,10 +433,16 @@ impl SplunkSource {
                             }
                         }
 
-                        if !events.is_empty()
-                            && let Err(ClosedError) = out.send_batch(events).await
-                        {
-                            return Err(Rejection::from(ApiError::ServerShutdown));
+                        if !events.is_empty() {
+                            match out.send_batch(events).await {
+                                Ok(()) => (),
+                                Err(SendError::Closed) => {
+                                    return Err(Rejection::from(ApiError::ServerShutdown));
+                                }
+                                Err(SendError::Timeout) => {
+                                    unreachable!("No timeout is configured for this source.")
+                                }
+                            }
                         }
 
                         if let Some(error) = error {

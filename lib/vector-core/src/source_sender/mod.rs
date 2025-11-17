@@ -13,7 +13,7 @@ mod sender;
 mod tests;
 
 pub use builder::Builder;
-pub use errors::{ClosedError, StreamSendError};
+pub use errors::SendError;
 use output::Output;
 pub use sender::{SourceSender, SourceSenderItem};
 
