@@ -703,7 +703,7 @@ impl DockerLogsSource {
                     true
                 }
                 _ = self.esb.shutdown.clone() => {
-                    info!(message = "Shutdown signal received during retry backoff.");
+                    info!("Shutdown signal received during retry backoff.");
                     false
                 }
             }
