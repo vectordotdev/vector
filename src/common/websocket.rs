@@ -166,7 +166,12 @@ impl WebSocketConnector {
                 }
             }
 
-            time::sleep(backoff.next().expect("backoff iterator always returns some value")()).await;
+            time::sleep(
+                backoff
+                    .next()
+                    .expect("backoff iterator always returns some value"),
+            )
+            .await;
         }
     }
 
