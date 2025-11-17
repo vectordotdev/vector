@@ -89,6 +89,11 @@ enum BuildError {
         value,
     ))]
     DuplicatedMatches { field: String, value: String },
+    #[snafu(display(
+        "`current_boot_only: false` not supported for systemd versions 250 through 257 (got {}).",
+        systemd_version
+    ))]
+    AllBootsNotSupported { systemd_version: u32 },
 }
 
 type Matches = HashMap<String, HashSet<String>>;
@@ -370,10 +375,7 @@ impl SourceConfig for JournaldConfig {
 
         if !self.current_boot_only && (250..258).contains(&systemd_version) {
             // https://github.com/vectordotdev/vector/issues/18068
-            warn!(
-                "`current_boot_only: false` not supported for systemd versions 250 through 257 (got {}).",
-                systemd_version
-            );
+            return Err(BuildError::AllBootsNotSupported { systemd_version }.into());
         }
 
         let starter = StartJournalctl::new(
