@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, time::Duration};
 
 use metrics::{Histogram, histogram};
 use vector_buffers::topology::channel::LimitedReceiver;
@@ -12,6 +12,7 @@ pub struct Builder {
     default_output: Option<Output>,
     named_outputs: HashMap<String, Output>,
     lag_time: Option<Histogram>,
+    timeout: Option<Duration>,
 }
 
 impl Default for Builder {
@@ -21,6 +22,7 @@ impl Default for Builder {
             default_output: None,
             named_outputs: Default::default(),
             lag_time: Some(histogram!(LAG_TIME_NAME)),
+            timeout: None,
         }
     }
 }
@@ -29,6 +31,12 @@ impl Builder {
     #[must_use]
     pub fn with_buffer(mut self, n: usize) -> Self {
         self.buf_size = n;
+        self
+    }
+
+    #[must_use]
+    pub fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
+        self.timeout = timeout;
         self
     }
 
@@ -51,6 +59,7 @@ impl Builder {
                     lag_time,
                     log_definition,
                     output_id,
+                    self.timeout,
                 );
                 self.default_output = Some(output);
                 rx
@@ -62,6 +71,7 @@ impl Builder {
                     lag_time,
                     log_definition,
                     output_id,
+                    self.timeout,
                 );
                 self.named_outputs.insert(name, output);
                 rx

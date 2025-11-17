@@ -3,7 +3,6 @@ use std::{
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -157,11 +156,9 @@ impl TcpConnector {
         Self::new(host, port, None, None.into(), None)
     }
 
-    const fn fresh_backoff() -> ExponentialBackoff {
+    fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
-        ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60))
+        ExponentialBackoff::default()
     }
 
     async fn connect(&self) -> Result<MaybeTlsStream<TcpStream>, TcpError> {
@@ -339,18 +336,18 @@ mod test {
     use tokio::net::TcpListener;
 
     use super::*;
-    use crate::test_util::{next_addr, trace_init};
+    use crate::test_util::{addr::next_addr, trace_init};
 
     #[tokio::test]
     async fn healthcheck() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let _listener = TcpListener::bind(&addr).await.unwrap();
         let good = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(good.healthcheck().await.is_ok());
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let bad = TcpConnector::from_host_port(addr.ip().to_string(), addr.port());
         assert!(bad.healthcheck().await.is_err());
     }

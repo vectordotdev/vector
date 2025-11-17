@@ -6,6 +6,8 @@ pub mod format;
 pub mod framing;
 pub mod serializer;
 pub use chunking::{Chunker, Chunking, GelfChunker};
+#[cfg(feature = "arrow")]
+pub use format::{ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig};
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
@@ -24,18 +26,22 @@ pub use framing::{
     NewlineDelimitedEncoderConfig, VarintLengthDelimitedEncoder,
     VarintLengthDelimitedEncoderConfig,
 };
+#[cfg(feature = "arrow")]
+pub use serializer::BatchSerializerConfig;
 pub use serializer::{Serializer, SerializerConfig};
 
 /// An error that occurred while building an encoder.
 pub type BuildError = Box<dyn std::error::Error + Send + Sync + 'static>;
 
-/// An error that occurred while encoding structured events into byte frames.
+/// An error that occurred while encoding structured events.
 #[derive(Debug)]
 pub enum Error {
     /// The error occurred while encoding the byte frame boundaries.
     FramingError(BoxedFramingError),
     /// The error occurred while serializing a structured event into bytes.
     SerializingError(vector_common::Error),
+    /// A schema constraint was violated during encoding (e.g., null value for non-nullable field).
+    SchemaConstraintViolation(vector_common::Error),
 }
 
 impl std::fmt::Display for Error {
@@ -43,6 +49,9 @@ impl std::fmt::Display for Error {
         match self {
             Self::FramingError(error) => write!(formatter, "FramingError({error})"),
             Self::SerializingError(error) => write!(formatter, "SerializingError({error})"),
+            Self::SchemaConstraintViolation(error) => {
+                write!(formatter, "SchemaConstraintViolation({error})")
+            }
         }
     }
 }
