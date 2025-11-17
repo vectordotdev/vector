@@ -373,7 +373,7 @@ impl SourceConfig for JournaldConfig {
 
         let systemd_version = get_systemd_version_from_journalctl(&journalctl_path).await?;
 
-        if !self.current_boot_only && (250..258).contains(&systemd_version) {
+        if !self.current_boot_only && (250..=257).contains(&systemd_version) {
             // https://github.com/vectordotdev/vector/issues/18068
             return Err(BuildError::AllBootsNotSupported { systemd_version }.into());
         }
