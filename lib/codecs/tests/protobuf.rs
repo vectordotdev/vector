@@ -1,5 +1,7 @@
 //! Tests for the behaviour of Protobuf serializer and deserializer (together).
 
+#![allow(clippy::unwrap_used)]
+
 use std::path::{Path, PathBuf};
 
 use bytes::{Bytes, BytesMut};

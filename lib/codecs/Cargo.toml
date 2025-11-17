@@ -6,7 +6,7 @@ edition = "2024"
 publish = false
 
 [lints.clippy]
-unwrap-used = "forbid"
+unwrap-used = "deny"
 
 [[bin]]
 name = "generate-avro-fixtures"
