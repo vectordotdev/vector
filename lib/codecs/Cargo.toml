@@ -15,6 +15,7 @@ path = "tests/bin/generate-avro-fixtures.rs"
 [dependencies]
 apache-avro = { version = "0.20.0", default-features = false }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc"] }
+async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 rust_decimal = { version = "1.37", default-features = false, features = ["std"] }

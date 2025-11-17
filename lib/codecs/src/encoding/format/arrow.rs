@@ -16,6 +16,7 @@ use arrow::{
     ipc::writer::StreamWriter,
     record_batch::RecordBatch,
 };
+use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
@@ -24,6 +25,15 @@ use std::sync::Arc;
 use vector_config::configurable_component;
 
 use vector_core::event::{Event, Value};
+
+/// Provides Arrow schema for encoding.
+///
+/// Sinks can implement this trait to provide custom schema fetching logic.
+#[async_trait]
+pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
+    /// Get the Arrow schema for encoding events.
+    async fn get_schema(&self) -> Result<Arc<Schema>, ArrowEncodingError>;
+}
 
 /// Configuration for Arrow IPC stream serialization
 #[configurable_component]
@@ -45,6 +55,10 @@ pub struct ArrowStreamSerializerConfig {
     #[serde(default)]
     #[configurable(metadata(docs::examples = true))]
     pub allow_nullable_fields: bool,
+
+    /// Schema provider for lazy schema loading.
+    #[serde(skip)]
+    schema_provider: Option<Arc<dyn SchemaProvider>>,
 }
 
 impl std::fmt::Debug for ArrowStreamSerializerConfig {
@@ -58,6 +72,10 @@ impl std::fmt::Debug for ArrowStreamSerializerConfig {
                     .map(|s| format!("{} fields", s.fields().len())),
             )
             .field("allow_nullable_fields", &self.allow_nullable_fields)
+            .field(
+                "schema_provider",
+                &self.schema_provider.as_ref().map(|_| "<provider>"),
+            )
             .finish()
     }
 }
@@ -68,6 +86,38 @@ impl ArrowStreamSerializerConfig {
         Self {
             schema: Some(schema),
             allow_nullable_fields: false,
+            schema_provider: None,
+        }
+    }
+
+    /// Create a new ArrowStreamSerializerConfig with a schema provider
+    pub fn with_provider(provider: Arc<dyn SchemaProvider>) -> Self {
+        Self {
+            schema: None,
+            schema_provider: Some(provider),
+            allow_nullable_fields: false,
+        }
+    }
+
+    /// Get the schema provider if one was configured
+    pub fn provider(&self) -> Option<&Arc<dyn SchemaProvider>> {
+        self.schema_provider.as_ref()
+    }
+
+    /// Resolve the schema from the provider if present.
+    pub async fn resolve(&mut self) -> Result<(), ArrowEncodingError> {
+        // If schema already exists, nothing to do
+        if self.schema.is_some() {
+            return Ok(());
+        }
+
+        // Fetch from provider if available
+        if let Some(provider) = &self.schema_provider {
+            let schema = provider.get_schema().await?;
+            self.schema = Some(schema);
+            Ok(())
+        } else {
+            Err(ArrowEncodingError::NoSchemaProvided)
         }
     }
 
@@ -153,6 +203,13 @@ pub enum ArrowEncodingError {
     /// Schema must be provided before encoding
     #[snafu(display("Schema must be provided before encoding"))]
     NoSchemaProvided,
+
+    /// Failed to fetch schema from provider
+    #[snafu(display("Failed to fetch schema from provider: {}", message))]
+    SchemaFetchError {
+        /// Error message from the provider
+        message: String,
+    },
 
     /// Unsupported Arrow data type for field
     #[snafu(display(

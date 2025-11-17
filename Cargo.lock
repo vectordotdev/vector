@@ -2595,6 +2595,7 @@ version = "0.1.0"
 dependencies = [
  "apache-avro 0.20.0",
  "arrow",
+ "async-trait",
  "bytes 1.10.1",
  "chrono",
  "csv-core",
@@ -12502,6 +12503,7 @@ dependencies = [
  "arc-swap",
  "arr_macro",
  "arrow",
+ "arrow-schema",
  "assert_cmd",
  "async-compression",
  "async-graphql",

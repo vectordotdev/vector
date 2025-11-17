@@ -1,10 +1,10 @@
 //! Configuration for the `Clickhouse` sink.
 
-use std::fmt;
+use std::{fmt, sync::Arc};
 
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
-use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
+use vector_lib::codecs::encoding::{ArrowStreamSerializerConfig, BatchSerializerConfig};
 
 use super::{
     request_builder::ClickhouseRequestBuilder,
@@ -39,6 +39,9 @@ pub enum Format {
 
     /// JSONAsString.
     JsonAsString,
+
+    /// ArrowStream.
+    ArrowStream,
 }
 
 impl fmt::Display for Format {
@@ -47,6 +50,7 @@ impl fmt::Display for Format {
             Format::JsonEachRow => write!(f, "JSONEachRow"),
             Format::JsonAsObject => write!(f, "JSONAsObject"),
             Format::JsonAsString => write!(f, "JSONAsString"),
+            Format::ArrowStream => write!(f, "ArrowStream"),
         }
     }
 }
@@ -94,6 +98,14 @@ pub struct ClickhouseConfig {
     #[configurable(derived)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     pub encoding: Transformer,
+
+    /// The batch encoding configuration for encoding events in batches.
+    ///
+    /// When specified, events are encoded together as a single batch
+    /// This is mutually exclusive with per-event encoding based on the `format` field.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub batch_encoding: Option<BatchSerializerConfig>,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -215,15 +227,14 @@ impl SinkConfig for ClickhouseConfig {
                 .expect("'default' should be a valid template")
         });
 
+        // Resolve the encoding strategy (format + encoder) based on configuration
+        let (format, encoder_kind) = self
+            .resolve_strategy(&client, &endpoint, &database, auth.as_ref())
+            .await?;
+
         let request_builder = ClickhouseRequestBuilder {
             compression: self.compression,
-            encoding: (
-                self.encoding.clone(),
-                Encoder::<Framer>::new(
-                    NewlineDelimitedEncoderConfig.build().into(),
-                    JsonSerializerConfig::default().build().into(),
-                ),
-            ),
+            encoder: (self.encoding.clone(), encoder_kind),
         };
 
         let sink = ClickhouseSink::new(
@@ -231,7 +242,7 @@ impl SinkConfig for ClickhouseConfig {
             service,
             database,
             self.table.clone(),
-            self.format,
+            format,
             request_builder,
         );
 
@@ -246,6 +257,127 @@ impl SinkConfig for ClickhouseConfig {
 
     fn acknowledgements(&self) -> &AcknowledgementsConfig {
         &self.acknowledgements
+    }
+}
+
+impl ClickhouseConfig {
+    /// Resolves the encoding strategy (format + encoder) based on configuration.
+    ///
+    /// This method determines the appropriate ClickHouse format and Vector encoder
+    /// based on the user's configuration, ensuring they are consistent.
+    async fn resolve_strategy(
+        &self,
+        client: &HttpClient,
+        endpoint: &Uri,
+        database: &Template,
+        auth: Option<&Auth>,
+    ) -> crate::Result<(Format, crate::codecs::EncoderKind)> {
+        use crate::codecs::EncoderKind;
+        use vector_lib::codecs::{
+            JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer,
+        };
+
+        if let Some(batch_encoding) = &self.batch_encoding {
+            use crate::codecs::{BatchEncoder, BatchSerializer};
+
+            // Validate that batch_encoding is only compatible with ArrowStream format
+            if self.format != Format::ArrowStream {
+                return Err(format!(
+                    "'batch_encoding' is only compatible with 'format: arrow_stream'. \
+                         Found 'format: {}'.",
+                    match self.format {
+                        Format::JsonEachRow => "json_each_row",
+                        Format::JsonAsObject => "json_as_object",
+                        Format::JsonAsString => "json_as_string",
+                        Format::ArrowStream => "arrow_stream",
+                    }
+                )
+                .into());
+            }
+
+            let base_arrow_config = match batch_encoding {
+                BatchSerializerConfig::ArrowStream(config) => config.clone(),
+            };
+
+            let resolved_config = self
+                .resolve_arrow_schema(
+                    client,
+                    endpoint.to_string(),
+                    database,
+                    auth,
+                    base_arrow_config,
+                )
+                .await?;
+
+            let resolved_batch_config = BatchSerializerConfig::ArrowStream(resolved_config);
+            let arrow_serializer = resolved_batch_config.build()?;
+            let batch_serializer = BatchSerializer::Arrow(arrow_serializer);
+            let encoder = EncoderKind::Batch(BatchEncoder::new(batch_serializer));
+
+            return Ok((Format::ArrowStream, encoder));
+        }
+
+        let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(
+            NewlineDelimitedEncoderConfig.build().into(),
+            JsonSerializerConfig::default().build().into(),
+        )));
+
+        Ok((self.format, encoder))
+    }
+
+    async fn resolve_arrow_schema(
+        &self,
+        client: &HttpClient,
+        endpoint: String,
+        database: &Template,
+        auth: Option<&Auth>,
+        base_config: ArrowStreamSerializerConfig,
+    ) -> crate::Result<ArrowStreamSerializerConfig> {
+        use super::arrow_schema;
+
+        if self.table.is_dynamic() || database.is_dynamic() {
+            return Err(
+                "Arrow codec requires a static table and database. Dynamic schema inference is not supported."
+                    .into(),
+            );
+        }
+
+        let table_str = self.table.get_ref();
+        let database_str = database.get_ref();
+
+        debug!(
+            "Fetching schema for table {}.{} at startup",
+            database_str, table_str
+        );
+
+        let provider = Arc::new(arrow_schema::ClickHouseSchemaProvider::new(
+            client.clone(),
+            endpoint,
+            database_str.to_string(),
+            table_str.to_string(),
+            auth.cloned(),
+        ));
+
+        let mut arrow_config = ArrowStreamSerializerConfig::with_provider(provider);
+        // Preserve allow_nullable_fields setting from the user's config
+        arrow_config.allow_nullable_fields = base_config.allow_nullable_fields;
+        arrow_config.resolve().await.map_err(|e| {
+            format!(
+                "Failed to fetch schema for {}.{}: {}.",
+                database_str, table_str, e
+            )
+        })?;
+
+        debug!(
+            "Successfully fetched Arrow schema with {} fields",
+            arrow_config
+                .schema
+                .as_ref()
+                .map(|s| s.fields().len())
+                .unwrap_or(0)
+        );
+
+        Ok(arrow_config)
     }
 }
 
@@ -277,6 +409,7 @@ async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> c
 #[cfg(test)]
 mod tests {
     use super::*;
+    use vector_lib::codecs::encoding::ArrowStreamSerializerConfig;
 
     #[test]
     fn generate_config() {
@@ -297,5 +430,83 @@ mod tests {
             get_healthcheck_uri(&"http://localhost:8123/path/".parse().unwrap()),
             "http://localhost:8123/path/?query=SELECT%201"
         );
+    }
+
+    /// Helper to create a minimal ClickhouseConfig for testing
+    fn create_test_config(
+        format: Format,
+        batch_encoding: Option<BatchSerializerConfig>,
+    ) -> ClickhouseConfig {
+        ClickhouseConfig {
+            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            table: "test_table".try_into().unwrap(),
+            database: Some("test_db".try_into().unwrap()),
+            format,
+            batch_encoding,
+            ..Default::default()
+        }
+    }
+
+    #[tokio::test]
+    async fn test_format_selection_with_batch_encoding() {
+        use crate::http::HttpClient;
+        use crate::tls::TlsSettings;
+
+        // Create minimal dependencies for resolve_strategy
+        let tls = TlsSettings::default();
+        let client = HttpClient::new(tls, &Default::default()).unwrap();
+        let endpoint: http::Uri = "http://localhost:8123".parse().unwrap();
+        let database: Template = "test_db".try_into().unwrap();
+
+        // Test incompatible formats - should all return errors
+        let incompatible_formats = vec![
+            (Format::JsonEachRow, "json_each_row"),
+            (Format::JsonAsObject, "json_as_object"),
+            (Format::JsonAsString, "json_as_string"),
+        ];
+
+        for (format, format_name) in incompatible_formats {
+            let config = create_test_config(
+                format,
+                Some(BatchSerializerConfig::ArrowStream(
+                    ArrowStreamSerializerConfig::default(),
+                )),
+            );
+
+            let result = config
+                .resolve_strategy(&client, &endpoint, &database, None)
+                .await;
+
+            assert!(
+                result.is_err(),
+                "Expected error for format {} with batch_encoding, but got success",
+                format_name
+            );
+        }
+    }
+
+    #[test]
+    fn test_format_selection_without_batch_encoding() {
+        // When batch_encoding is None, the configured format should be used
+        let configs = vec![
+            Format::JsonEachRow,
+            Format::JsonAsObject,
+            Format::JsonAsString,
+            Format::ArrowStream,
+        ];
+
+        for format in configs {
+            let config = create_test_config(format, None);
+
+            assert!(
+                config.batch_encoding.is_none(),
+                "batch_encoding should be None for format {:?}",
+                format
+            );
+            assert_eq!(
+                config.format, format,
+                "format should match configured value"
+            );
+        }
     }
 }
