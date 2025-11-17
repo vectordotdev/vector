@@ -249,7 +249,7 @@ impl CloudWatchMetricsSvc {
 
         let service = CloudWatchMetricsSvc {
             client,
-            storage_resolution: config.storage_resolution,
+            storage_resolution: validate_storage_resolutions(config.storage_resolution)?,
         };
         let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
         let mut normalizer = MetricNormalizer::<AwsCloudwatchMetricNormalize>::default();
@@ -368,4 +368,13 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
             Ok(())
         })
     }
+}
+
+fn validate_storage_resolutions(storage_resolutions: IndexMap<String, i32>) -> crate::Result<IndexMap<String, i32>> {
+    for (metric_name, storage_resolution) in storage_resolutions.iter() {
+        if !matches!(storage_resolution, 1 | 60) {
+            return Err(format!("Storage resolution for {metric_name} should be '1' or '60'").into())
+        }
+    }
+    Ok(storage_resolutions)
 }
