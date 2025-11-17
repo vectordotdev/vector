@@ -232,7 +232,10 @@ impl TlsSettings {
         self.identity.as_ref().map(|identity| {
             // we have verified correct formatting at ingest time
             let mut cert = identity.cert.to_pem().expect("Invalid stored identity");
-            let key = identity.key.private_key_to_pem_pkcs8().expect("Invalid stored identity");
+            let key = identity
+                .key
+                .private_key_to_pem_pkcs8()
+                .expect("Invalid stored identity");
             if let Some(chain) = identity.ca.as_ref() {
                 for authority in chain {
                     cert.extend(
@@ -419,7 +422,10 @@ impl TlsConfig {
                 for intermediate in crt_stack {
                     ca_stack.push(intermediate).context(CaStackPushSnafu)?;
                 }
-                let ca: Vec<X509> = ca_stack.iter().map(std::borrow::ToOwned::to_owned).collect();
+                let ca: Vec<X509> = ca_stack
+                    .iter()
+                    .map(std::borrow::ToOwned::to_owned)
+                    .collect();
                 Ok(Some(IdentityStore {
                     cert,
                     key,
@@ -430,10 +436,7 @@ impl TlsConfig {
     }
 
     /// Parse identity from a DER encoded PKCS#12 archive
-    fn parse_pkcs12_identity(
-        &self,
-        der: &[u8],
-    ) -> Result<Option<IdentityStore>> {
+    fn parse_pkcs12_identity(&self, der: &[u8]) -> Result<Option<IdentityStore>> {
         let pkcs12 = Pkcs12::from_der(der).context(ParsePkcs12Snafu)?;
         // Verify password
         let key_pass = self.key_pass.as_deref().unwrap_or("");
@@ -444,11 +447,7 @@ impl TlsConfig {
         let ca: Option<Vec<X509>> = parsed
             .ca
             .map(|stack| stack.iter().map(std::borrow::ToOwned::to_owned).collect());
-        Ok(Some(IdentityStore {
-            cert,
-            key,
-            ca,
-        }))
+        Ok(Some(IdentityStore { cert, key, ca }))
     }
 }
 
