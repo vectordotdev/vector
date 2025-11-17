@@ -119,7 +119,10 @@ pub struct CloudWatchMetricsSinkConfig {
     /// Valid values are 1 (high resolution) and 60 (standard resolution).
     /// If unset, the AWS SDK default of 60 (standard resolution) is used.
     /// See [AWS Metrics Resolution](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Resolution_definition)
-    /// See [MetricDatum::storage_resolution()](https://docs.rs/aws-sdk-cloudwatch/1.91.0/aws_sdk_cloudwatch/types/struct.MetricDatum.html#structfield.storage_resolution)
+    /// See [MetricDatum::storage_resolution](https://docs.rs/aws-sdk-cloudwatch/1.91.0/aws_sdk_cloudwatch/types/struct.MetricDatum.html#structfield.storage_resolution)
+    #[configurable(
+        metadata(docs::additional_props_description = "An AWS storage resolution.")
+    )]
     #[serde(default)]
     pub storage_resolution: IndexMap<String, i32>,
 }

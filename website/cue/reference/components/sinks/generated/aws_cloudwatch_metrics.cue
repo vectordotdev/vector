@@ -427,6 +427,24 @@ generated: components: sinks: aws_cloudwatch_metrics: configuration: {
 			}
 		}
 	}
+	storage_resolution: {
+		description: """
+			A map from metric name to AWS storage resolution.
+
+			- `1`: High-resolution metrics (1-second granularity, higher cost)
+			- `60`: Standard resolution (1-minute granularity, standard cost)
+
+			If a metric name is not in this map, AWS SDK default of 60 (standard resolution) is used.
+			See [AWS Metrics Resolution](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Resolution_definition)
+			See [MetricDatum::storage_resolution](https://docs.rs/aws-sdk-cloudwatch/1.91.0/aws_sdk_cloudwatch/types/struct.MetricDatum.html#structfield.storage_resolution)
+			"""
+		required: false
+		type: object: options: "*": {
+			description: "An AWS storage resolution."
+			required:    true
+			type: int: {}
+		}
+	}
 	tls: {
 		description: "TLS configuration."
 		required:    false
