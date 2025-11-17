@@ -287,15 +287,17 @@ pub struct Config {
     rotate_wait: Duration,
 
     /// The strategy to use for log collection.
+    #[serde(default)]
     log_collection_strategy: LogCollectionStrategy,
 }
 
 /// Configuration for the log collection strategy.
 #[configurable_component]
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
 #[serde(rename_all = "snake_case")]
 enum LogCollectionStrategy {
     /// Collect logs by reading log files from the filesystem.
+    #[default]
     File,
     /// Collect logs via the Kubernetes Logs API.
     Api,
@@ -947,7 +949,7 @@ impl Source {
                 log_namespace,
             );
 
-            // TODO: annotate the logs with pods's metadata
+            // TODO: annotate the logs with pods's metadata. Need to honor the `insert_namespace_fields` flag
             if log_collection_strategy == LogCollectionStrategy::Api {
                 return event;
             }
