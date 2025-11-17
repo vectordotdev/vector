@@ -40,11 +40,12 @@ use crate::{
         },
     },
     test_util::{
+        addr::next_addr,
         components::{
             self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, init_test, run_and_assert_sink_compliance,
             run_and_assert_sink_error_with_events,
         },
-        create_events_batch_with_fn, next_addr, random_lines_with_stream,
+        create_events_batch_with_fn, random_lines_with_stream,
     },
 };
 
@@ -506,7 +507,7 @@ async fn json_compression(compression: &str) {
     components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
         let num_lines = 1000;
 
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let config = r#"
         uri = "http://$IN_ADDR/frames"
@@ -565,7 +566,7 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
     components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
         let num_lines = 1000;
 
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let config = r#"
         uri = "http://$IN_ADDR/frames"
@@ -635,7 +636,7 @@ async fn templateable_uri_path() {
     let num_events_per_id = 100;
     let an_id = 1;
     let another_id = 2;
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     let config = format!(
         r#"
@@ -706,7 +707,7 @@ async fn templateable_uri_auth() {
     let a_pass = "a_pass";
     let another_user = "another_user";
     let another_pass = "another_pass";
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
     let config = format!(
         r#"
         uri = "http://{{{{user}}}}:{{{{pass}}}}@{in_addr}/"
@@ -774,7 +775,7 @@ async fn templateable_uri_auth() {
 async fn missing_field_in_uri_template() {
     init_test();
 
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
     let config = format!(
         r#"
         uri = "http://{in_addr}/{{{{missing_field}}}}"
@@ -819,7 +820,7 @@ async fn missing_field_in_uri_template() {
 async fn http_uri_auth_conflict() {
     init_test();
 
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
     let config = format!(
         r#"
         uri = "http://user:pass@{in_addr}/"
@@ -914,7 +915,7 @@ async fn run_sink_with_events(
 }
 
 async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::VectorSink) {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     let config = format!(
         r#"
