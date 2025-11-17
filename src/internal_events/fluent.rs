@@ -11,7 +11,6 @@ pub struct FluentMessageReceived {
 impl InternalEvent for FluentMessageReceived {
     fn emit(self) {
         trace!(message = "Received fluent message.", byte_size = %self.byte_size);
-        counter!("component_received_events_total").increment(1);
     }
 }
 
@@ -29,7 +28,6 @@ impl InternalEvent for FluentMessageDecodeError<'_> {
             base64_encoded_message = %self.base64_encoded_message,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

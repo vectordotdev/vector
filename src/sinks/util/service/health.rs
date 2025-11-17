@@ -76,7 +76,7 @@ impl HealthConfig {
             open,
             // An exponential backoff starting from retry_initial_backoff_sec and doubling every time
             // up to retry_max_duration_secs.
-            backoff: ExponentialBackoff::from_millis(2)
+            backoff: ExponentialBackoff::default()
                 .factor((self.retry_initial_backoff_secs.saturating_mul(1000) / 2).max(1))
                 .max_delay(self.retry_max_duration_secs),
         }
@@ -235,7 +235,7 @@ where
     fn poll(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Self::Output> {
         // Poll inner
         let this = self.project();
-        let output = ready!(this.inner.poll(cx)).map_err(Into::into);
+        let output = ready!(this.inner.poll(cx));
 
         match this.logic.is_healthy(&output) {
             None => (),

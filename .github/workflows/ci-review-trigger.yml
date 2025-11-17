@@ -11,7 +11,9 @@
 #
 # /ci-run-all                 : runs all of the below
 # /ci-run-cli                 : runs CLI - Linux
-# /ci-run-misc                : runs Miscellaneous - Linux
+# /ci-run-test-behavior       : runs make test-behavior
+# /ci-run-check-examples      : runs make check-examples
+# /ci-run-test-docs           : runs make test-docs
 # /ci-run-deny                : runs Deny - Linux
 # /ci-run-component-features  : runs Component Features - Linux
 # /ci-run-cross               : runs Cross
@@ -32,13 +34,10 @@ permissions:
 env:
   DD_ENV: "ci"
   RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
   PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
 
 # The below concurrency group settings would let us cancel in progress runs that were triggered with the
 # same comment on a given PR, which could save on time consuming runs.
@@ -56,7 +55,9 @@ jobs:
     if: |
         startsWith(github.event.review.body, '/ci-run-all')
         || startsWith(github.event.review.body, '/ci-run-cli')
-        || startsWith(github.event.review.body, '/ci-run-misc')
+        || startsWith(github.event.review.body, '/ci-run-test-behavior')
+        || startsWith(github.event.review.body, '/ci-run-check-examples')
+        || startsWith(github.event.review.body, '/ci-run-test-docs')
         || startsWith(github.event.review.body, '/ci-run-deny')
         || startsWith(github.event.review.body, '/ci-run-component-features')
         || startsWith(github.event.review.body, '/ci-run-cross')
@@ -89,10 +90,31 @@ jobs:
     uses: ./.github/workflows/cli.yml
     secrets: inherit
 
-  misc:
+  make-test-behavior:
     needs: validate
-    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-misc')
-    uses: ./.github/workflows/misc.yml
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-test-behavior')
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-behavior
+      job_name: make test-behavior
+    secrets: inherit
+
+  make-check-examples:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-check-examples')
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: check-examples
+      job_name: make check-examples
+    secrets: inherit
+
+  make-test-docs:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-test-docs')
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-docs
+      job_name: make test-docs
     secrets: inherit
 
   deny:

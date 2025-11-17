@@ -148,8 +148,9 @@ impl SinkConfig for SocketSinkConfig {
             Mode::Udp(UdpMode { config, encoding }) => {
                 let transformer = encoding.transformer();
                 let serializer = encoding.build()?;
+                let chunker = serializer.chunker();
                 let encoder = Encoder::<()>::new(serializer);
-                config.build(transformer, encoder)
+                config.build(transformer, encoder, chunker)
             }
             #[cfg(unix)]
             Mode::UnixStream(UnixMode { config, encoding }) => {
@@ -237,8 +238,9 @@ mod test {
         event::{Event, LogEvent},
         test_util::{
             CountReceiver,
+            addr::{next_addr, next_addr_v6},
             components::{SINK_TAGS, assert_sink_compliance, run_and_assert_sink_compliance},
-            next_addr, next_addr_v6, random_lines_with_stream, trace_init,
+            random_lines_with_stream, trace_init,
         },
     };
 
@@ -314,14 +316,16 @@ mod test {
     async fn udp_ipv4() {
         trace_init();
 
-        test_datagram(DatagramSocketAddr::Udp(next_addr())).await;
+        let (_guard, addr) = next_addr();
+        test_datagram(DatagramSocketAddr::Udp(addr)).await;
     }
 
     #[tokio::test]
     async fn udp_ipv6() {
         trace_init();
 
-        test_datagram(DatagramSocketAddr::Udp(next_addr_v6())).await;
+        let (_guard, addr) = next_addr_v6();
+        test_datagram(DatagramSocketAddr::Udp(addr)).await;
     }
 
     #[cfg(all(unix, not(target_os = "macos")))]
@@ -339,7 +343,7 @@ mod test {
     async fn tcp_stream() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(addr.to_string()),
@@ -449,7 +453,7 @@ mod test {
 
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::new(
@@ -583,7 +587,7 @@ mod test {
     async fn reconnect() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = SocketSinkConfig {
             mode: Mode::Tcp(TcpMode {
                 config: TcpSinkConfig::from_address(addr.to_string()),

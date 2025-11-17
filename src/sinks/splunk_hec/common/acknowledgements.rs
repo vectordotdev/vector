@@ -1,12 +1,12 @@
+use hyper::Body;
+use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
+    io::Write,
     num::{NonZeroU8, NonZeroU64},
     sync::Arc,
     time::Duration,
 };
-
-use hyper::Body;
-use serde::{Deserialize, Serialize};
 use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 use vector_lib::{configurable::configurable_component, event::EventStatus};
 
@@ -18,7 +18,7 @@ use crate::{
         SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
         SplunkIndexerAcknowledgementAcksRemoved,
     },
-    sinks::util::Compression,
+    sinks::util::Compressor,
 };
 
 /// Splunk HEC acknowledgement configuration.
@@ -96,12 +96,6 @@ impl HecAckClient {
         client: HttpClient,
         http_request_builder: Arc<HttpRequestBuilder>,
     ) -> Self {
-        // Reimplement with compression support, see https://github.com/vectordotdev/vector/issues/23748
-        let http_request_builder = Arc::new(HttpRequestBuilder {
-            compression: Compression::None,
-            ..(*http_request_builder).clone()
-        });
-
         Self {
             acks: HashMap::new(),
             retry_limit,
@@ -222,10 +216,18 @@ impl HecAckClient {
         let request_body_bytes = crate::serde::json::to_bytes(request_body)
             .map_err(|_| HecAckApiError::ClientBuildRequest)?
             .freeze();
+        let mut compressor = Compressor::from(self.http_request_builder.compression);
+        compressor
+            .write_all(request_body_bytes.as_ref())
+            .map_err(|_| HecAckApiError::ClientBuildRequest)?;
+        let payload = compressor
+            .finish()
+            .map_err(|_| HecAckApiError::ClientBuildRequest)?
+            .freeze();
         let request = self
             .http_request_builder
             .build_request(
-                request_body_bytes,
+                payload,
                 "/services/collector/ack",
                 None,
                 MetadataFields::default(),

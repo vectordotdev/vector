@@ -1,5 +1,7 @@
 use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
+#[cfg(feature = "codecs-arrow")]
+use vector_lib::codecs::encoding::ArrowStreamSerializer;
 use vector_lib::codecs::{
     CharacterDelimitedEncoder, NewlineDelimitedEncoder, TextSerializerConfig,
     encoding::{Error, Framer, Serializer},
@@ -9,6 +11,74 @@ use crate::{
     event::Event,
     internal_events::{EncoderFramingError, EncoderSerializeError},
 };
+
+/// Serializers that support batch encoding (encoding all events at once).
+#[derive(Debug, Clone)]
+pub enum BatchSerializer {
+    /// Arrow IPC stream format serializer.
+    #[cfg(feature = "codecs-arrow")]
+    Arrow(ArrowStreamSerializer),
+}
+
+/// An encoder that encodes batches of events.
+#[derive(Debug, Clone)]
+pub struct BatchEncoder {
+    serializer: BatchSerializer,
+}
+
+impl BatchEncoder {
+    /// Creates a new `BatchEncoder` with the specified batch serializer.
+    pub const fn new(serializer: BatchSerializer) -> Self {
+        Self { serializer }
+    }
+
+    /// Get the batch serializer.
+    pub const fn serializer(&self) -> &BatchSerializer {
+        &self.serializer
+    }
+
+    /// Get the HTTP content type.
+    #[cfg(feature = "codecs-arrow")]
+    pub const fn content_type(&self) -> &'static str {
+        match &self.serializer {
+            BatchSerializer::Arrow(_) => "application/vnd.apache.arrow.stream",
+        }
+    }
+}
+
+impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
+    type Error = Error;
+
+    #[allow(unused_variables)]
+    fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+        #[allow(unreachable_patterns)]
+        match &mut self.serializer {
+            #[cfg(feature = "codecs-arrow")]
+            BatchSerializer::Arrow(serializer) => {
+                serializer.encode(events, buffer).map_err(|err| {
+                    use vector_lib::codecs::encoding::ArrowEncodingError;
+                    match err {
+                        ArrowEncodingError::NullConstraint { .. } => {
+                            Error::SchemaConstraintViolation(Box::new(err))
+                        }
+                        _ => Error::SerializingError(Box::new(err)),
+                    }
+                })
+            }
+            _ => unreachable!("BatchSerializer cannot be constructed without encode()"),
+        }
+    }
+}
+
+/// An wrapper that supports both framed and batch encoding modes.
+#[derive(Debug, Clone)]
+pub enum EncoderKind {
+    /// Uses framing to encode individual events
+    Framed(Box<Encoder<Framer>>),
+    /// Encodes events in batches without framing
+    #[cfg(feature = "codecs-arrow")]
+    Batch(BatchEncoder),
+}
 
 #[derive(Debug, Clone)]
 /// An encoder that can encode structured events into byte frames.
@@ -128,6 +198,8 @@ impl Encoder<Framer> {
                 | Serializer::Text(_),
                 _,
             ) => "text/plain",
+            #[cfg(feature = "codecs-opentelemetry")]
+            (Serializer::Otlp(_), _) => "application/x-protobuf",
         }
     }
 }

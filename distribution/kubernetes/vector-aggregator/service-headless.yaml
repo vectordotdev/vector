@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/name: vector
     app.kubernetes.io/instance: vector
     app.kubernetes.io/component: Aggregator
-    app.kubernetes.io/version: "0.49.0-distroless-libc"
+    app.kubernetes.io/version: "0.51.1-distroless-libc"
   annotations:
 spec:
   clusterIP: None

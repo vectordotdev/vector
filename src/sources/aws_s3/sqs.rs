@@ -4,6 +4,7 @@ use std::{
     num::NonZeroUsize,
     panic,
     sync::{Arc, LazyLock},
+    time::Duration,
 };
 
 use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
@@ -37,12 +38,14 @@ use vector_lib::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
     lookup::{PathPrefix, metadata_path, path},
+    source_sender::SendError,
 };
 
 use crate::{
     SourceSender,
     aws::AwsTimeout,
     codecs::Decoder,
+    common::backoff::ExponentialBackoff,
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
@@ -230,7 +233,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to flush all of s3://{}/{}: {}", bucket, key, source))]
     PipelineSend {
-        source: crate::source_sender::ClosedError,
+        source: vector_lib::source_sender::SendError,
         bucket: String,
         key: String,
     },
@@ -381,6 +384,7 @@ pub struct IngestorProcess {
     log_namespace: LogNamespace,
     bytes_received: Registered<BytesReceived>,
     events_received: Registered<EventsReceived>,
+    backoff: ExponentialBackoff,
 }
 
 impl IngestorProcess {
@@ -399,6 +403,7 @@ impl IngestorProcess {
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
             events_received: register!(EventsReceived),
+            backoff: ExponentialBackoff::default().max_delay(Duration::from_secs(30)),
         }
     }
 
@@ -409,23 +414,39 @@ impl IngestorProcess {
         loop {
             select! {
                 _ = &mut shutdown => break,
-                _ = self.run_once() => {},
+                result = self.run_once() => {
+                    match result {
+                        Ok(()) => {
+                            // Reset backoff on successful receive
+                            self.backoff.reset();
+                        }
+                        Err(_) => {
+                            let delay = self.backoff.next().expect("backoff never ends");
+                            trace!(
+                                delay_ms = delay.as_millis(),
+                                "`run_once` failed, will retry after delay.",
+                            );
+                            tokio::time::sleep(delay).await;
+                        }
+                    }
+                },
             }
         }
     }
 
-    async fn run_once(&mut self) {
-        let messages = self.receive_messages().await;
-        let messages = messages
-            .inspect(|messages| {
+    async fn run_once(&mut self) -> Result<(), ()> {
+        let messages = match self.receive_messages().await {
+            Ok(messages) => {
                 emit!(SqsMessageReceiveSucceeded {
                     count: messages.len(),
                 });
-            })
-            .inspect_err(|err| {
-                emit!(SqsMessageReceiveError { error: err });
-            })
-            .unwrap_or_default();
+                messages
+            }
+            Err(err) => {
+                emit!(SqsMessageReceiveError { error: &err });
+                return Err(());
+            }
+        };
 
         let mut delete_entries = Vec::new();
         let mut deferred_entries = Vec::new();
@@ -517,11 +538,8 @@ impl IngestorProcess {
         // Should consider removing failed deferrals from the delete_entries
         if !deferred_entries.is_empty() {
             let Some(deferred) = &self.state.deferred else {
-                warn!(
-                    message = "Deferred queue not configured, but received deferred entries.",
-                    internal_log_rate_limit = true
-                );
-                return;
+                warn!("Deferred queue not configured, but received deferred entries.");
+                return Ok(());
             };
             let cloned_entries = deferred_entries.clone();
             match self
@@ -576,6 +594,7 @@ impl IngestorProcess {
                 }
             }
         }
+        Ok(())
     }
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
@@ -763,11 +782,12 @@ impl IngestorProcess {
 
         let send_error = match self.out.send_event_stream(&mut stream).await {
             Ok(_) => None,
-            Err(_) => {
+            Err(SendError::Closed) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
-                Some(crate::source_sender::ClosedError)
+                Some(SendError::Closed)
             }
+            Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
         };
 
         // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,

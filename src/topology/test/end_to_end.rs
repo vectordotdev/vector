@@ -1,4 +1,4 @@
-use std::{collections::HashMap, net::SocketAddr, sync::Arc};
+use std::{net::SocketAddr, sync::Arc};
 
 use hyper::{
     Body, Request, Response, Server, StatusCode,
@@ -10,11 +10,12 @@ use tokio::{
     time::{Duration, timeout},
 };
 
-use super::{RunningTopology, TopologyPieces};
+use super::RunningTopology;
 use crate::{
     Error,
     config::{self, ConfigDiff, Format},
     test_util,
+    topology::builder::TopologyPiecesBuilder,
 };
 
 type Lock = Arc<Mutex<()>>;
@@ -81,8 +82,8 @@ pub fn http_client(
 async fn http_to_http(status: StatusCode, response: StatusCode) {
     test_util::trace_init();
 
-    let address1 = test_util::next_addr();
-    let address2 = test_util::next_addr();
+    let (_guard_1, address1) = test_util::addr::next_addr();
+    let (_guard_2, address2) = test_util::addr::next_addr();
     let config = config::load_from_str(
         &format!(
             r#"
@@ -102,10 +103,10 @@ uri = "http://{address2}/"
     )
     .unwrap();
     let diff = ConfigDiff::initial(&config);
-    let pieces =
-        TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new(), Default::default())
-            .await
-            .unwrap();
+    let pieces = TopologyPiecesBuilder::new(&config, &diff)
+        .build_or_log_errors()
+        .await
+        .unwrap();
     let (_topology, _) = RunningTopology::start_validated(config, diff, pieces)
         .await
         .unwrap();

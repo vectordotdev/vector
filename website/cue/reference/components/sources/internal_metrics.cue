@@ -84,6 +84,18 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
 		}
+		component_timed_out_events_total: {
+			description:       "The total number of events for which this source responded with a timeout error."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		component_timed_out_requests_total: {
+			description:       "The total number of requests for which this source responded with a timeout error."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		connection_established_total: {
 			description:       "The total number of times a connection has been established."
 			type:              "counter"
@@ -884,6 +896,22 @@ components: sources: internal_metrics: {
 			description: """
 				The total number of times the Windows service has been uninstalled.
 				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+
+		// config metrics
+		config_reload_rejected: {
+			description:       "Number of configuration reload attempts that were rejected."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _internal_metrics_tags & {
+				reason: _reason
+			}
+		}
+		config_reloaded: {
+			description:       "Number of times a new configuration was loaded successfully."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags

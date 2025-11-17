@@ -2,6 +2,7 @@ mod bytes_received;
 mod bytes_sent;
 pub mod cached_event;
 pub mod component_events_dropped;
+pub mod component_events_timed_out;
 mod events_received;
 mod events_sent;
 mod optional_tag;
@@ -10,11 +11,12 @@ pub mod service;
 
 use std::ops::{Add, AddAssign};
 
-pub use bytes_received::BytesReceived;
+pub use bytes_received::{BytesReceived, BytesReceivedHandle};
 pub use bytes_sent::BytesSent;
 #[allow(clippy::module_name_repetitions)]
 pub use cached_event::{RegisterTaggedInternalEvent, RegisteredEventCache};
 pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
+pub use component_events_timed_out::ComponentEventsTimedOut;
 pub use events_received::{EventsReceived, EventsReceivedHandle};
 pub use events_sent::{DEFAULT_OUTPUT, EventsSent, TaggedEventsSent};
 pub use metrics::SharedString;

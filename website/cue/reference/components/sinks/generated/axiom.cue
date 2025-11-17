@@ -6,7 +6,7 @@ generated: components: sinks: axiom: configuration: {
 		required:    false
 		type: object: options: enabled: {
 			description: """
-				Whether or not end-to-end acknowledgements are enabled.
+				Controls whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source that supports end-to-end
 				acknowledgements that is connected to that sink waits for events
@@ -97,6 +97,17 @@ generated: components: sinks: axiom: configuration: {
 		required: false
 		type: string: examples: ["${AXIOM_ORG_ID}", "123abc"]
 	}
+	region: {
+		description: """
+			The Axiom regional edge domain to use for ingestion.
+
+			Specify the domain name only (no scheme, no path).
+			When set, data is sent to `https://{region}/v1/ingest/{dataset}`.
+			Cannot be used together with `url`.
+			"""
+		required: false
+		type: string: examples: ["${AXIOM_REGION}", "mumbai.axiom.co", "eu-central-1.aws.edge.axiom.co"]
+	}
 	request: {
 		description: "Outbound HTTP request settings."
 		required:    false
@@ -159,12 +170,12 @@ generated: components: sinks: axiom: configuration: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
-																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
+																Valid values are greater than or equal to `0`, and reasonable values range from `1.0` to `3.0`.
 
-																When calculating the past RTT average, we also compute a secondary “deviation” value that indicates how variable
-																those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
+																When calculating the past RTT average, a secondary “deviation” value is also computed that indicates how variable
+																those values are. That deviation is used when comparing the past RTT average to the current measurements, so we
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
-																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
+																an appropriate range. Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
 						required: false
 						type: float: default: 2.5
@@ -243,7 +254,7 @@ generated: components: sinks: axiom: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
+					After the first retry has failed, the Fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -401,9 +412,11 @@ generated: components: sinks: axiom: configuration: {
 		description: """
 			URI of the Axiom endpoint to send data to.
 
-			Only required if not using Axiom Cloud.
+			If a path is provided, the URL is used as-is.
+			If no path (or only `/`) is provided, `/v1/datasets/{dataset}/ingest` is appended for backwards compatibility.
+			This takes precedence over `region` if both are set (but both should not be set).
 			"""
 		required: false
-		type: string: examples: ["https://axiom.my-domain.com", "${AXIOM_URL}"]
+		type: string: examples: ["https://api.eu.axiom.co", "http://localhost:3400/ingest", "${AXIOM_URL}"]
 	}
 }
