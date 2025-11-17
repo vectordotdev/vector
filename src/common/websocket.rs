@@ -146,7 +146,7 @@ impl WebSocketConnector {
         &self,
         timeout_duration: Duration,
     ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
-        let mut backoff = Self::fresh_backoff();
+        let mut backoff = ExponentialBackoff::default();
 
         loop {
             match time::timeout(timeout_duration, self.connect()).await {
