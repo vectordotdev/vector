@@ -38,7 +38,7 @@ Clone Vector's source:
 git clone https://github.com/vectordotdev/vector
 cd vector
 
-# Checkout a specific version (optional)
+# (Optional) Check out a specific version
 # git checkout v0.51.1
 
 # Or use the latest release tag
@@ -113,7 +113,7 @@ First, clone Vector's source:
 git clone https://github.com/vectordotdev/vector
 cd vector
 
-# Optionally checkout a specific version
+# (Optional) Check out a specific version
 # git checkout v{{< version >}}
 
 # Alternative: Download tarball
