@@ -4,6 +4,8 @@ use bytes::BytesMut;
 use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
+#[cfg(feature = "arrow")]
+use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
 use super::{
@@ -131,6 +133,53 @@ pub enum SerializerConfig {
 impl Default for SerializerConfig {
     fn default() -> Self {
         Self::Json(JsonSerializerConfig::default())
+    }
+}
+
+/// Batch serializer configuration.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(tag = "codec", rename_all = "snake_case")]
+#[configurable(metadata(
+    docs::enum_tag_description = "The codec to use for batch encoding events."
+))]
+pub enum BatchSerializerConfig {
+    /// Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
+    ///
+    /// This is the streaming variant of the Arrow IPC format, which writes
+    /// a continuous stream of record batches.
+    ///
+    /// [apache_arrow]: https://arrow.apache.org/
+    #[cfg(feature = "arrow")]
+    #[serde(rename = "arrow_stream")]
+    ArrowStream(ArrowStreamSerializerConfig),
+}
+
+#[cfg(feature = "arrow")]
+impl BatchSerializerConfig {
+    /// Build the `ArrowStreamSerializer` from this configuration.
+    pub fn build(
+        &self,
+    ) -> Result<ArrowStreamSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
+        match self {
+            BatchSerializerConfig::ArrowStream(arrow_config) => {
+                ArrowStreamSerializer::new(arrow_config.clone())
+            }
+        }
+    }
+
+    /// The data type of events that are accepted by this batch serializer.
+    pub fn input_type(&self) -> DataType {
+        match self {
+            BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
+        }
+    }
+
+    /// The schema required by the batch serializer.
+    pub fn schema_requirement(&self) -> schema::Requirement {
+        match self {
+            BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
+        }
     }
 }
 

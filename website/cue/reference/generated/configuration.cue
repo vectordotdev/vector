@@ -1,6 +1,31 @@
 package metadata
 
 generated: configuration: configuration: {
+	healthcheck: {
+		type: object: options: {
+			enabled: {
+				type: bool: default: true
+				description: """
+					Whether or not healthchecks are enabled for all sinks.
+
+					Can be overridden on a per-sink basis.
+					"""
+				required: false
+			}
+			require_healthy: {
+				type: bool: default: false
+				description: """
+					Whether or not to require a sink to report as being healthy during startup.
+
+					When enabled and a sink reports not being healthy, Vector will exit during start-up.
+
+					Can be alternatively set, and overridden by, the `--require-healthy` command-line flag.
+					"""
+				required: false
+			}
+		}
+		description: "Healthcheck options."
+	}
 	enrichment_tables: {
 		type: object: options: {
 			file: {

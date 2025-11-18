@@ -46,8 +46,8 @@ use crate::{
     sources::opentelemetry::config::{GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig},
     test_util::{
         self,
+        addr::next_addr,
         components::{SOURCE_TAGS, assert_source_compliance},
-        next_addr,
     },
 };
 
@@ -1070,8 +1070,8 @@ async fn receive_summary_metric() {
 #[tokio::test]
 async fn http_headers() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let grpc_addr = next_addr();
-        let http_addr = next_addr();
+        let (_guard_0, grpc_addr) = next_addr();
+        let (_guard_1, http_addr) = next_addr();
 
         let mut headers = HeaderMap::new();
         headers.insert("User-Agent", "test_client".parse().unwrap());
@@ -1185,8 +1185,8 @@ pub async fn build_otlp_test_env(
     event_name: &'static str,
     log_namespace: Option<bool>,
 ) -> OTelTestEnv {
-    let grpc_addr = next_addr();
-    let http_addr = next_addr();
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
 
     let config = OpentelemetryConfig {
         grpc: GrpcConfig {
