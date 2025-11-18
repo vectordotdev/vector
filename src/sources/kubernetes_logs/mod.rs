@@ -25,7 +25,7 @@ use kube::{
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
 use tokio::pin;
-use tokio_stream::wrappers::BroadcastStream;
+use tokio_stream::wrappers::{BroadcastStream, errors::BroadcastStreamRecvError};
 
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
@@ -38,7 +38,7 @@ use vector_lib::{
     file_source_common::{
         Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
     },
-    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol, ComponentEventsDropped, UNINTENTIONAL},
     lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
 use vrl::value::{Kind, kind::Collection};
@@ -791,7 +791,22 @@ impl Source {
         let reflector_stream = BroadcastStream::new(reflector_rx).filter_map(|result| {
             ready(match result {
                 Ok(event) => Some(Ok(event)),
-                Err(_) => None,
+                Err(BroadcastStreamRecvError::Lagged(skipped_count)) => {
+                    // Emit proper internal event for dropped messages
+                    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                        count: skipped_count as usize,
+                        reason: "Pod events lagged: broadcast receiver fell behind, some pod events were skipped"
+                    });
+                    
+                    warn!(
+                        message = "Pod events broadcast receiver lagged, some events were skipped",
+                        skipped_count = skipped_count,
+                        receiver = "reflector_stream"
+                    );
+                    
+                    // Continue processing (don't terminate the stream)
+                    None
+                },
             })
         });
 
