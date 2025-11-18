@@ -286,7 +286,7 @@ impl CloudWatchMetricsSvc {
                     .timestamp()
                     .map(|x| AwsDateTime::from_millis(x.timestamp_millis()));
                 let dimensions = event.tags().map(tags_to_dimensions);
-                let resolution = resolutions.get(&metric_name).map(|x| *x);
+                let resolution = resolutions.get(&metric_name).copied();
                 // AwsCloudwatchMetricNormalize converts these to the right MetricKind
                 match event.value() {
                     MetricValue::Counter { value } => Some(
