@@ -121,7 +121,6 @@ pub struct HttpClientConfig {
     /// When a body is provided, the `Content-Type` header is automatically set to
     /// `application/json` unless explicitly overridden in the `headers` configuration.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "body_examples()"))]
     pub body: Option<ParameterValue>,
 
     /// TLS configuration.
@@ -182,17 +181,6 @@ fn headers_examples() -> HashMap<String, Vec<String>> {
             ],
         ),
     ])
-}
-
-fn body_examples() -> Option<ParameterValue> {
-    Some(ParameterValue::Typed {
-        value: r#"encode_json({
-  "searchStatements": [{"column": "auditAction", "operator": "=", "value": "DELETE"}],
-  "timestamp": now()
-})"#
-        .to_owned(),
-        r#type: ParamType::Vrl,
-    })
 }
 
 /// Helper function to get all VRL functions for compilation

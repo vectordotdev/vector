@@ -191,41 +191,25 @@ generated: components: sources: http_client: configuration: {
 			"""
 		required: false
 		type: {
-			object: {
-				examples: [{
-					type: "vrl"
-					value: """
-						encode_json({
-						  "searchStatements": [{"column": "auditAction", "operator": "=", "value": "DELETE"}],
-						  "timestamp": now()
-						})
-						"""
-				}]
-				options: {
-					type: {
-						description: "The parameter type, indicating how the `value` should be treated."
-						required:    false
-						type: string: {
-							default: "string"
-							enum: {
-								string: "The parameter value is a plain string."
-								vrl:    "The parameter value is a VRL expression that is evaluated before each request."
-							}
+			object: options: {
+				type: {
+					description: "The parameter type, indicating how the `value` should be treated."
+					required:    false
+					type: string: {
+						default: "string"
+						enum: {
+							string: "The parameter value is a plain string."
+							vrl:    "The parameter value is a VRL expression that is evaluated before each request."
 						}
 					}
-					value: {
-						description: "The raw value of the parameter."
-						required:    true
-						type: string: {}
-					}
+				}
+				value: {
+					description: "The raw value of the parameter."
+					required:    true
+					type: string: {}
 				}
 			}
-			string: examples: ["""
-				encode_json({
-				  "searchStatements": [{"column": "auditAction", "operator": "=", "value": "DELETE"}],
-				  "timestamp": now()
-				})
-				"""]
+			string: {}
 		}
 	}
 	decoding: {

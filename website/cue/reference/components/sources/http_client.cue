@@ -158,6 +158,39 @@ components: sources: http_client: {
 								- mango
 								- papaya
 								- kiwi
+							start_time:
+								type: vrl
+								value: "now()"
+				```
+				"""
+		}
+		request_body_generation: {
+            title: "Request Body Generation"
+            body: """
+				The request body can be a static string or a dynamic value generated via VRL. 
+				Using VRL allows you to construct JSON payloads or other formats dynamically at request time.
+
+				When a body is provided, the `Content-Type` header is automatically set to
+				`application/json` unless explicitly overridden in the `headers` configuration.
+
+				**Static Body**
+
+				```yaml
+				body: "{"foo": "bar"}"
+				```
+
+				**Dynamic VRL Body**
+
+				When `type` is set to `vrl`, the `value` is evaluated as a VRL expression. The result is used as the request body.
+
+				```yaml
+				body:
+					type: vrl
+					value: |
+					encode_json({
+						"searchStatements": [{"column": "auditAction", "operator": "=", "value": "DELETE"}],
+					"timestamp": now()
+					})
 				```
 				"""
 		}
