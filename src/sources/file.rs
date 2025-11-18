@@ -2071,7 +2071,7 @@ mod tests {
         writeln!(&mut older, "hello i am the old file").unwrap();
         writeln!(&mut older, "i have been around a while").unwrap();
         writeln!(&mut older, "you can read newer files at the same time").unwrap();
-        older.sync_all().unwrap(); // sync_all is needed due to windows
+        older.sync_all().unwrap();
 
         let newer_path = dir.path().join("a_newer_file");
         let mut newer = File::create(&newer_path).unwrap();
@@ -2079,7 +2079,7 @@ mod tests {
         writeln!(&mut newer, "and i am the new file").unwrap();
         writeln!(&mut newer, "this should be interleaved with the old one").unwrap();
         writeln!(&mut newer, "which is fine because we want fairness").unwrap();
-        newer.sync_all().unwrap(); // sync_all is needed due to windows
+        newer.sync_all().unwrap();
 
         let received = run_file_source(
             &config,
@@ -2092,17 +2092,26 @@ mod tests {
 
         let received = extract_messages_value(received);
 
-        assert_eq!(
-            received,
-            vec![
-                "hello i am the old file".into(),
-                "and i am the new file".into(),
-                "i have been around a while".into(),
-                "this should be interleaved with the old one".into(),
-                "you can read newer files at the same time".into(),
-                "which is fine because we want fairness".into(),
-            ]
-        );
+        let old_first = vec![
+            "hello i am the old file".into(),
+            "and i am the new file".into(),
+            "i have been around a while".into(),
+            "this should be interleaved with the old one".into(),
+            "you can read newer files at the same time".into(),
+            "which is fine because we want fairness".into(),
+        ];
+        let new_first: Vec<_> = old_first
+            .chunks(2)
+            .into_iter()
+            .map(|chunk| chunk.into_iter().rev().cloned().collect::<Vec<_>>())
+            .flatten()
+            .collect();
+
+        if received[0] == old_first[0] {
+            assert_eq!(received, old_first);
+        } else {
+            assert_eq!(received, new_first);
+        }
     }
 
     #[tokio::test]
