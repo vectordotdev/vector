@@ -3,6 +3,7 @@ use std::{
     iter::FromIterator,
     net::SocketAddr,
     str,
+    time::Duration,
 };
 
 use bytes::Bytes;
@@ -14,6 +15,7 @@ use ordered_float::NotNan;
 use prost::Message;
 use quickcheck::{Arbitrary, Gen, QuickCheck, TestResult};
 use similar_asserts::assert_eq;
+use tokio::time::timeout;
 use vector_lib::{
     codecs::{
         BytesDecoder, BytesDeserializer, CharacterDelimitedDecoderConfig,
@@ -50,8 +52,9 @@ use crate::{
         ddtrace_proto, logs::decode_log_body, metrics::DatadogSeriesRequest,
     },
     test_util::{
+        addr::{PortGuard, next_addr},
         components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
-        next_addr, spawn_collect_n, trace_init, wait_for_tcp,
+        spawn_collect_n, trace_init, wait_for_tcp,
     },
 };
 
@@ -62,6 +65,7 @@ const DD_API_SERIES_V1_PATH: &str = "/api/v1/series";
 const DD_API_SERIES_V2_PATH: &str = "/api/v2/series";
 const DD_API_SKETCHES_PATH: &str = "/api/beta/sketches";
 const DD_API_TRACES_PATH: &str = "/api/v0.2/traces";
+const HTTP_REQUEST_TIMEOUT: Duration = Duration::from_secs(5);
 
 fn test_logs_schema_definition() -> schema::Definition {
     schema::Definition::empty_legacy_namespace().with_event_field(
@@ -225,8 +229,62 @@ async fn source(
     Option<impl Stream<Item = Event>>,
     Option<impl Stream<Item = Event>>,
     SocketAddr,
+    PortGuard,
 ) {
-    let (mut sender, recv) = SourceSender::new_test_finalize(status);
+    let (sender, recv) = SourceSender::new_test_finalize(status);
+    let (logs_output, metrics_output, address, guard) = source_with_sender(
+        sender,
+        status,
+        acknowledgements,
+        store_api_key,
+        multiple_outputs,
+        split_metric_namespace,
+    )
+    .await;
+    (recv, logs_output, metrics_output, address, guard)
+}
+
+async fn source_with_timeout(
+    status: EventStatus,
+    acknowledgements: bool,
+    store_api_key: bool,
+    multiple_outputs: bool,
+    split_metric_namespace: bool,
+    send_timeout: Duration,
+) -> (
+    impl Stream<Item = Event> + Unpin,
+    Option<impl Stream<Item = Event>>,
+    Option<impl Stream<Item = Event>>,
+    SocketAddr,
+    PortGuard,
+) {
+    let (sender, recv) = SourceSender::new_test_sender_with_options(1, Some(send_timeout));
+    let (logs_output, metrics_output, address, guard) = source_with_sender(
+        sender,
+        status,
+        acknowledgements,
+        store_api_key,
+        multiple_outputs,
+        split_metric_namespace,
+    )
+    .await;
+    let recv = recv.into_stream().flat_map(into_event_stream);
+    (recv, logs_output, metrics_output, address, guard)
+}
+
+async fn source_with_sender(
+    mut sender: SourceSender,
+    status: EventStatus,
+    acknowledgements: bool,
+    store_api_key: bool,
+    multiple_outputs: bool,
+    split_metric_namespace: bool,
+) -> (
+    Option<impl Stream<Item = Event>>,
+    Option<impl Stream<Item = Event>>,
+    SocketAddr,
+    PortGuard,
+) {
     let mut logs_output = None;
     let mut metrics_output = None;
     if multiple_outputs {
@@ -241,7 +299,7 @@ async fn source(
                 .flat_map(into_event_stream),
         );
     }
-    let address = next_addr();
+    let (guard, address) = next_addr();
     let config = toml::from_str::<DatadogAgentConfig>(&format!(
         indoc! { r#"
             address = "{}"
@@ -262,19 +320,23 @@ async fn source(
         config.build(context).await.unwrap().await.unwrap();
     });
     wait_for_tcp(address).await;
-    (recv, logs_output, metrics_output, address)
+    (logs_output, metrics_output, address, guard)
 }
 
 async fn send_with_path(address: SocketAddr, body: &str, headers: HeaderMap, path: &str) -> u16 {
-    reqwest::Client::new()
-        .post(format!("http://{address}{path}"))
-        .headers(headers)
-        .body(body.to_owned())
-        .send()
-        .await
-        .unwrap()
-        .status()
-        .as_u16()
+    timeout(
+        HTTP_REQUEST_TIMEOUT,
+        reqwest::Client::new()
+            .post(format!("http://{address}{path}"))
+            .headers(headers)
+            .body(body.to_owned())
+            .send(),
+    )
+    .await
+    .expect("send_with_path request timed out")
+    .unwrap()
+    .status()
+    .as_u16()
 }
 
 async fn send_and_collect(
@@ -304,7 +366,8 @@ fn dd_api_key_headers() -> HeaderMap {
 #[tokio::test]
 async fn full_payload_v1() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -358,7 +421,8 @@ async fn full_payload_v1() {
 #[tokio::test]
 async fn full_payload_v2() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -412,7 +476,8 @@ async fn full_payload_v2() {
 #[tokio::test]
 async fn no_api_key() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -466,7 +531,8 @@ async fn no_api_key() {
 #[tokio::test]
 async fn api_key_in_url() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -523,7 +589,8 @@ async fn api_key_in_url() {
 #[tokio::test]
 async fn api_key_in_query_params() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -580,7 +647,8 @@ async fn api_key_in_query_params() {
 #[tokio::test]
 async fn api_key_in_header() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -637,7 +705,7 @@ async fn api_key_in_header() {
 #[tokio::test]
 async fn delivery_failure() {
     trace_init();
-    let (rx, _, _, addr) = source(EventStatus::Rejected, true, true, false, true).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Rejected, true, true, false, true).await;
 
     spawn_collect_n(
         async move {
@@ -671,9 +739,72 @@ async fn delivery_failure() {
 }
 
 #[tokio::test]
+async fn send_timeout_returns_service_unavailable() {
+    trace_init();
+    let (rx, _, _, addr, _guard) = source_with_timeout(
+        EventStatus::Delivered,
+        false,
+        true,
+        false,
+        true,
+        Duration::from_millis(50),
+    )
+    .await;
+
+    let body = serde_json::to_string(&[LogMsg {
+        message: Bytes::from("foo"),
+        timestamp: Utc
+            .timestamp_opt(123, 0)
+            .single()
+            .expect("invalid timestamp"),
+        hostname: Bytes::from("festeburg"),
+        status: Bytes::from("notice"),
+        service: Bytes::from("vector"),
+        ddsource: Bytes::from("curl"),
+        ddtags: Bytes::from("one,two,three"),
+    }])
+    .unwrap();
+
+    assert_eq!(
+        200,
+        send_with_path(addr, &body, HeaderMap::new(), DD_API_LOGS_V1_PATH).await
+    );
+
+    assert_eq!(
+        503,
+        send_with_path(addr, &body, HeaderMap::new(), DD_API_LOGS_V1_PATH).await
+    );
+    drop(rx);
+}
+
+#[test]
+fn parse_config_with_send_timeout_secs() {
+    let config = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address = "0.0.0.0:8012"
+            send_timeout_secs = 1.5
+        "#})
+    .unwrap();
+
+    assert_eq!(config.send_timeout_secs, Some(1.5));
+    assert_eq!(config.send_timeout(), Some(Duration::from_secs_f64(1.5)));
+}
+
+#[test]
+fn parse_config_without_send_timeout_secs() {
+    let config = toml::from_str::<DatadogAgentConfig>(indoc! { r#"
+            address = "0.0.0.0:8012"
+        "#})
+    .unwrap();
+
+    assert_eq!(config.send_timeout_secs, None);
+    assert_eq!(config.send_timeout(), None);
+}
+
+#[tokio::test]
 async fn ignores_disabled_acknowledgements() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Rejected, false, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Rejected, false, true, false, true).await;
 
         let events = send_and_collect(
             addr,
@@ -705,7 +836,8 @@ async fn ignores_disabled_acknowledgements() {
 #[tokio::test]
 async fn ignores_api_key() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, false, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, false, false, true).await;
 
         let mut events = send_and_collect(
             addr,
@@ -759,7 +891,8 @@ async fn ignores_api_key() {
 #[tokio::test]
 async fn decode_series_endpoint_v1() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let dd_metric_request = DatadogSeriesRequest {
             series: vec![
@@ -962,7 +1095,8 @@ async fn decode_series_endpoint_v1() {
 #[tokio::test]
 async fn decode_sketches() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut buf = Vec::new();
         let sketch = ddmetric_proto::sketch_payload::Sketch {
@@ -1062,7 +1196,8 @@ async fn decode_sketches() {
 #[tokio::test]
 async fn decode_traces() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let mut headers = dd_api_key_headers();
         headers.insert("X-Datadog-Reported-Languages", "ada".parse().unwrap());
@@ -1299,7 +1434,7 @@ async fn decode_traces() {
 #[tokio::test]
 async fn split_outputs() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (_, rx_logs, rx_metrics, addr) =
+        let (_, rx_logs, rx_metrics, addr, _guard) =
             source(EventStatus::Delivered, true, true, true, true).await;
 
         let mut log_event = send_and_collect(
@@ -1485,6 +1620,7 @@ fn test_config_outputs_with_disabled_data_types() {
             split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: Default::default(),
+            send_timeout_secs: None,
         };
 
         let outputs: Vec<DataType> = config
@@ -1928,6 +2064,7 @@ fn test_config_outputs() {
             split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: Default::default(),
+            send_timeout_secs: None,
         };
 
         let mut outputs = config
@@ -1949,7 +2086,8 @@ fn test_config_outputs() {
 #[tokio::test]
 async fn decode_series_endpoint_v2() {
     assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
-        let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, true).await;
+        let (rx, _, _, addr, _guard) =
+            source(EventStatus::Delivered, true, true, false, true).await;
 
         let series = vec![
             ddmetric_proto::metric_payload::MetricSeries {
@@ -2402,7 +2540,7 @@ async fn test_series_v1_split_metric_namespace_impl(
     expected_name: &str,
     expected_namespace: Option<&str>,
 ) {
-    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, split).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, split).await;
 
     let dd_metric_request = DatadogSeriesRequest {
         series: vec![DatadogSeriesMetric {
@@ -2454,7 +2592,7 @@ async fn test_series_v2_split_metric_namespace_impl(
     expected_name: &str,
     expected_namespace: Option<&str>,
 ) {
-    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, split).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, split).await;
 
     let series = vec![ddmetric_proto::metric_payload::MetricSeries {
         resources: vec![ddmetric_proto::metric_payload::Resource {
@@ -2515,7 +2653,7 @@ async fn test_sketches_split_metric_namespace_impl(
     expected_name: &str,
     expected_namespace: Option<&str>,
 ) {
-    let (rx, _, _, addr) = source(EventStatus::Delivered, true, true, false, split).await;
+    let (rx, _, _, addr, _guard) = source(EventStatus::Delivered, true, true, false, split).await;
 
     let mut buf = Vec::new();
     let sketch = ddmetric_proto::sketch_payload::Sketch {
@@ -2599,6 +2737,7 @@ impl ValidatableComponent for DatadogAgentConfig {
             split_metric_namespace: true,
             log_namespace: Some(false),
             keepalive: Default::default(),
+            send_timeout_secs: None,
         };
 
         let log_namespace: LogNamespace = config.log_namespace.unwrap_or_default().into();
