@@ -39,14 +39,14 @@ impl AvroDeserializerConfig {
     }
 
     /// Build the `AvroDeserializer` from this configuration.
-    pub fn build(&self) -> AvroDeserializer {
+    pub fn build(&self) -> vector_common::Result<AvroDeserializer> {
         let schema = apache_avro::Schema::parse_str(&self.avro_options.schema)
-            .map_err(|error| format!("Failed building Avro serializer: {error}"))
-            .unwrap();
-        AvroDeserializer {
+            .map_err(|error| format!("Failed building Avro serializer: {error}"))?;
+
+        Ok(AvroDeserializer {
             schema,
             strip_schema_id_prefix: self.avro_options.strip_schema_id_prefix,
-        }
+        })
     }
 
     /// The data type of events that are accepted by `AvroDeserializer`.
@@ -230,6 +230,15 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
         AvroValue::LocalTimestampMillis(ts_millis) => Ok(VrlValue::from(ts_millis)),
         AvroValue::LocalTimestampMicros(ts_micros) => Ok(VrlValue::from(ts_micros)),
+        AvroValue::BigDecimal(_) => Err(vector_common::Error::from(
+            "AvroValue::BigDecimal is not supported",
+        )),
+        AvroValue::TimestampNanos(_) => Err(vector_common::Error::from(
+            "AvroValue::TimestampNanos is not supported",
+        )),
+        AvroValue::LocalTimestampNanos(_) => Err(vector_common::Error::from(
+            "AvroValue::LocalTimestampNanos is not supported",
+        )),
     }
 }
 

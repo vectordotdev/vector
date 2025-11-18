@@ -7,6 +7,7 @@ use std::{
 };
 
 use futures::{Future, FutureExt, future};
+use snafu::Snafu;
 use stream_cancel::Trigger;
 use tokio::{
     sync::{mpsc, watch},
@@ -22,7 +23,7 @@ use vector_lib::{
 
 use super::{
     BuiltBuffer, TaskHandle,
-    builder::{self, TopologyPieces, reload_enrichment_tables},
+    builder::{self, TopologyPieces, TopologyPiecesBuilder, reload_enrichment_tables},
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
     task::{Task, TaskOutput},
@@ -31,13 +32,25 @@ use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     extra_context::ExtraContext,
-    internal_events::config::{ConfigReloadRejected, ConfigReloaded},
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
+    utilization::UtilizationRegistry,
 };
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
+
+#[derive(Debug, Snafu)]
+pub enum ReloadError {
+    #[snafu(display("global options changed: {}", changed_fields.join(", ")))]
+    GlobalOptionsChanged { changed_fields: Vec<String> },
+    #[snafu(display("failed to compute global diff: {}", source))]
+    GlobalDiffFailed { source: serde_json::Error },
+    #[snafu(display("topology build failed"))]
+    TopologyBuildFailed,
+    #[snafu(display("failed to restore previous config"))]
+    FailedToRestore,
+}
 
 #[allow(dead_code)]
 pub struct RunningTopology {
@@ -54,6 +67,7 @@ pub struct RunningTopology {
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
+    utilization_registry: Option<UtilizationRegistry>,
     utilization_task: Option<TaskHandle>,
     utilization_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
@@ -75,6 +89,7 @@ impl RunningTopology {
             running: Arc::new(AtomicBool::new(true)),
             graceful_shutdown_duration: config.graceful_shutdown_duration,
             config,
+            utilization_registry: None,
             utilization_task: None,
             utilization_task_shutdown_trigger: None,
             pending_reload: None,
@@ -176,7 +191,8 @@ impl RunningTopology {
 
                 error!(
                     components = ?remaining_components,
-                    "Failed to gracefully shut down in time. Killing components."
+                    message = "Failed to gracefully shut down in time. Killing components.",
+                    internal_log_rate_limit = false
                 );
             }) as future::BoxFuture<'static, ()>
         } else {
@@ -248,35 +264,26 @@ impl RunningTopology {
     /// Attempts to load a new configuration and update this running topology.
     ///
     /// If the new configuration was valid, and all changes were able to be made -- removing of
-    /// old components, changing of existing components, adding of new components -- then `Ok(true)`
-    /// is returned.
+    /// old components, changing of existing components, adding of new components -- then
+    /// `Ok(())` is returned.
     ///
     /// If the new configuration is not valid, or not all of the changes in the new configuration
     /// were able to be made, then this method will attempt to undo the changes made and bring the
-    /// topology back to its previous state.  If either of these scenarios occur, then `Ok(false)`
-    /// is returned.
+    /// topology back to its previous state, returning the appropriate error.
     ///
-    /// # Errors
-    ///
-    /// If all changes from the new configuration cannot be made, and the current configuration
-    /// cannot be fully restored, then `Err(())` is returned.
+    /// If the restore also fails, `ReloadError::FailedToRestore` is returned.
     pub async fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
         extra_context: ExtraContext,
-    ) -> Result<bool, ()> {
+    ) -> Result<(), ReloadError> {
         info!("Reloading running topology with new configuration.");
 
         if self.config.global != new_config.global {
-            match self.config.global.diff(&new_config.global) {
-                Ok(changed) => {
-                    emit!(ConfigReloadRejected::global_options_changed(changed));
-                }
-                Err(err) => {
-                    emit!(ConfigReloadRejected::failed_to_compute_global_diff(err));
-                }
-            }
-            return Ok(false);
+            return match self.config.global.diff(&new_config.global) {
+                Ok(changed_fields) => Err(ReloadError::GlobalOptionsChanged { changed_fields }),
+                Err(source) => Err(ReloadError::GlobalDiffFailed { source }),
+            };
         }
 
         // Calculate the change between the current configuration and the new configuration, and
@@ -302,13 +309,12 @@ impl RunningTopology {
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
-        if let Some(mut new_pieces) = TopologyPieces::build_or_log_errors(
-            &new_config,
-            &diff,
-            buffers.clone(),
-            extra_context.clone(),
-        )
-        .await
+        if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&new_config, &diff)
+            .with_buffers(buffers.clone())
+            .with_extra_context(extra_context.clone())
+            .with_utilization_registry(self.utilization_registry.clone())
+            .build_or_log_errors()
+            .await
         {
             // If healthchecks are configured for any of the changing/new components, try running
             // them before moving forward with connecting and spawning.  In some cases, healthchecks
@@ -321,9 +327,9 @@ impl RunningTopology {
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
 
-                emit!(ConfigReloaded);
+                info!("New configuration loaded successfully.");
 
-                return Ok(true);
+                return Ok(());
             }
         }
 
@@ -333,9 +339,12 @@ impl RunningTopology {
         warn!("Failed to completely load new configuration. Restoring old configuration.");
 
         let diff = diff.flip();
-        if let Some(mut new_pieces) =
-            TopologyPieces::build_or_log_errors(&self.config, &diff, buffers, extra_context.clone())
-                .await
+        if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&self.config, &diff)
+            .with_buffers(buffers)
+            .with_extra_context(extra_context.clone())
+            .with_utilization_registry(self.utilization_registry.clone())
+            .build_or_log_errors()
+            .await
             && self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
@@ -345,12 +354,15 @@ impl RunningTopology {
 
             info!("Old configuration restored successfully.");
 
-            return Ok(false);
+            return Err(ReloadError::TopologyBuildFailed);
         }
 
-        error!("Failed to restore old configuration.");
+        error!(
+            message = "Failed to restore old configuration.",
+            internal_log_rate_limit = false
+        );
 
-        Err(())
+        Err(ReloadError::FailedToRestore)
     }
 
     /// Attempts to reload enrichment tables.
@@ -378,7 +390,10 @@ impl RunningTopology {
                     info!("All healthchecks passed.");
                     true
                 } else {
-                    error!("Sinks unhealthy.");
+                    error!(
+                        message = "Sinks unhealthy.",
+                        internal_log_rate_limit = false
+                    );
                     false
                 }
             } else {
@@ -453,6 +468,10 @@ impl RunningTopology {
 
             self.remove_inputs(key, diff, new_config).await;
             self.remove_outputs(key);
+
+            if let Some(registry) = self.utilization_registry.as_ref() {
+                registry.remove_component(key);
+            }
         }
 
         for key in &diff.transforms.to_change {
@@ -579,6 +598,10 @@ impl RunningTopology {
         for key in &removed_sinks {
             debug!(component_id = %key, "Removing sink.");
             self.remove_inputs(key, diff, new_config).await;
+
+            if let Some(registry) = self.utilization_registry.as_ref() {
+                registry.remove_component(key);
+            }
         }
 
         // After that, for any changed sinks, we temporarily detach their inputs (not remove) so
@@ -1231,9 +1254,10 @@ impl RunningTopology {
         extra_context: ExtraContext,
     ) -> Option<(Self, ShutdownErrorReceiver)> {
         let diff = ConfigDiff::initial(&config);
-        let pieces =
-            TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new(), extra_context)
-                .await?;
+        let pieces = TopologyPiecesBuilder::new(&config, &diff)
+            .with_extra_context(extra_context)
+            .build_or_log_errors()
+            .await?;
         Self::start_validated(config, diff, pieces).await
     }
 
@@ -1259,7 +1283,10 @@ impl RunningTopology {
                 }
             }
             (Some(_), Some(_)) => {
-                error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
+                error!(
+                    message = "Cannot set both `expire_metrics` and `expire_metrics_secs`.",
+                    internal_log_rate_limit = false
+                );
                 return None;
             }
             (None, Some(e)) => {
@@ -1283,12 +1310,12 @@ impl RunningTopology {
                     .unwrap_or_default(),
             )
         {
-            error!(message = "Invalid metrics expiry.", %error);
+            error!(message = "Invalid metrics expiry.", %error, internal_log_rate_limit = false);
             return None;
         }
 
-        let mut utilization_emitter = pieces
-            .utilization_emitter
+        let (utilization_emitter, utilization_registry) = pieces
+            .utilization
             .take()
             .expect("Topology is missing the utilization metric emitter!");
         let mut running_topology = Self::new(config, abort_tx);
@@ -1304,6 +1331,7 @@ impl RunningTopology {
 
         let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
             ShutdownSignal::new_wired();
+        running_topology.utilization_registry = Some(utilization_registry.clone());
         running_topology.utilization_task_shutdown_trigger =
             Some(utilization_task_shutdown_trigger);
         running_topology.utilization_task = Some(tokio::spawn(Task::new(

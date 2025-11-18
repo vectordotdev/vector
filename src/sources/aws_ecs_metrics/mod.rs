@@ -259,14 +259,15 @@ mod test {
         Error,
         event::MetricValue,
         test_util::{
+            addr::next_addr,
             components::{SOURCE_TAGS, run_and_assert_source_compliance},
-            next_addr, wait_for_tcp,
+            wait_for_tcp,
         },
     };
 
     #[tokio::test]
     async fn test_aws_ecs_metrics_source() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
