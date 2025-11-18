@@ -2102,9 +2102,7 @@ mod tests {
         ];
         let new_first: Vec<_> = old_first
             .chunks(2)
-            .into_iter()
-            .map(|chunk| chunk.into_iter().rev().cloned().collect::<Vec<_>>())
-            .flatten()
+            .flat_map(|chunk| chunk.iter().rev().cloned().collect::<Vec<_>>())
             .collect();
 
         if received[0] == old_first[0] {
