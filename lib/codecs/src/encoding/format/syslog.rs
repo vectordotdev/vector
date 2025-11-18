@@ -46,20 +46,52 @@ impl SyslogSerializerConfig {
 #[serde(default)]
 pub struct SyslogSerializerOptions {
     /// RFC to use for formatting.
+    ///
+    /// RFC 5424 is the modern syslog protocol with structured data support.
+    /// RFC 3164 is the legacy BSD syslog format.
     rfc: SyslogRFC,
+
     /// Path to a field in the event to use for the facility. Defaults to "user".
+    ///
+    /// Can be specified as either:
+    /// - A string name (case-insensitive): "kern", "user", "mail", "daemon", etc.
+    /// - A numeric value (0-23): 0 for kern, 1 for user, 3 for daemon, etc.
     facility: Option<ConfigTargetPath>,
+
     /// Path to a field in the event to use for the severity. Defaults to "informational".
+    ///
+    /// Can be specified as either:
+    /// - A string name (case-insensitive): "emergency", "alert", "error", "warning", etc.
+    /// - A numeric value (0-7): 0 for emergency, 3 for error, 6 for informational, etc.
     severity: Option<ConfigTargetPath>,
+
     /// Path to a field in the event to use for the app name. Defaults to "vector".
+    ///
+    /// For RFC 5424: Limited to 48 characters (automatically truncated if longer).
+    /// For RFC 3164: Part of the TAG field, which is limited to 32 characters total.
     app_name: Option<ConfigTargetPath>,
+
     /// Path to a field in the event to use for the proc ID.
+    ///
+    /// For RFC 5424: Limited to 128 characters (automatically truncated if longer).
+    /// For RFC 3164: Included in brackets after app_name in the TAG field.
     proc_id: Option<ConfigTargetPath>,
+
     /// Path to a field in the event to use for the msg ID.
+    ///
+    /// Only applicable to RFC 5424. Limited to 32 characters (automatically truncated).
+    /// For RFC 3164, this field is ignored.
     msg_id: Option<ConfigTargetPath>,
+
     /// Path to a field in the event to use for the main message payload.
+    ///
+    /// If not specified, falls back to the event's `.message` field.
+    ///
+    /// Note: For RFC 3164, non-printable ASCII characters are automatically
+    /// replaced with spaces to ensure compliance.
     payload_key: Option<ConfigTargetPath>,
 }
+
 
 /// Serializer that converts an `Event` to bytes using the Syslog format.
 #[derive(Debug, Clone)]
