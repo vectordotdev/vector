@@ -18,49 +18,57 @@ We recommend installing Vector through a supported platform, package manager, or
 
 ### Linux
 
-Install Rust:
+Install compilation dependencies for your distribution, if they aren't pre-installed on your system:
 
 ```shell
+# Install Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+
+# Install protoc
+./scripts/environment/install-protoc.sh
+
+# Install other dependencies, example for Ubuntu/Debian:
+sudo apt-get update
+sudo apt-get install -y build-essential cmake curl git
 ```
 
-Install compilation dependencies, specifically C and C++ compilers (GCC or Clang) and GNU `make` if they aren't pre-installed on your system.
+Clone Vector's source:
 
-Download Vector's source:
+ ```shell
 
-```shell
-# Latest ({{< version >}})
-mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/vectordotdev/vector/tarball/v{{< version >}} | \
-  tar xzf - -C vector --strip-components=1
+git clone https://github.com/vectordotdev/vector
+ cd vector
 
-# Master
-mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://github.com/vectordotdev/vector/archive/master.tar.gz | \
-  tar xzf - -C vector --strip-components=1
+
+# Master branch (development)
+git clone https://github.com/vectordotdev/vector
+cd vector
+
+# Checkout a specific version (optional)
+# git checkout v0.51.1
+
+# Or use the latest release tag
+# git checkout $(git describe --tags --abbrev=0)
 ```
 
-Change into your Vector directory:
+Change into your Vector directory, compile and finally run:
 
 ```shell
 cd vector
+make build
+
+# Or specify with custom features
+# FEATURES="<flag1>,<flag2>,..." make build
+
+# Run your custom build
+target/release/vector --config config/vector.yaml
 ```
 
-Compile Vector:
+The `FEATURES` environment variable is optional. You can override the default features using this variable.
+See [feature flags](#feature-flags) for more info.
 
-```shell
-[FEATURES="<flag1>,<flag2>,..."] make build
-```
-
-The `FEATURES` environment variable is optional. You can override the default features using this variable. See [feature flags](#feature-flags) for more info.
-
-When finished, the Vector binary is placed in `target/<target>/release/vector`. If you're building Vector on your Mac, for example, the target triple is `arm64-apple-darwin` and the Vector binary will be located at `target/arm64-apple-darwin/release/vector`.
-
-Finally, you can start Vector:
-
-```shell
-target/<target>/release/vector --config config/vector.yaml
-```
+When finished, the Vector binary is placed in `target/<target>/release/vector`. If you're building Vector on your Mac, for example, the
+target triple is `arm64-apple-darwin` and the Vector binary will be located at `target/arm64-apple-darwin/release/vector`.
 
 ### Windows
 
