@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use bytes::BytesMut;
 use codecs::{
     NativeJsonDeserializerConfig, NativeJsonSerializerConfig, decoding::format::Deserializer,
