@@ -120,9 +120,7 @@ pub struct CloudWatchMetricsSinkConfig {
     /// If unset, the AWS SDK default of 60 (standard resolution) is used.
     /// See [AWS Metrics Resolution](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Resolution_definition)
     /// See [MetricDatum::storage_resolution](https://docs.rs/aws-sdk-cloudwatch/1.91.0/aws_sdk_cloudwatch/types/struct.MetricDatum.html#structfield.storage_resolution)
-    #[configurable(
-        metadata(docs::additional_props_description = "An AWS storage resolution.")
-    )]
+    #[configurable(metadata(docs::additional_props_description = "An AWS storage resolution."))]
     #[serde(default)]
     pub storage_resolution: IndexMap<String, i32>,
 }
@@ -370,10 +368,14 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
     }
 }
 
-fn validate_storage_resolutions(storage_resolutions: IndexMap<String, i32>) -> crate::Result<IndexMap<String, i32>> {
+fn validate_storage_resolutions(
+    storage_resolutions: IndexMap<String, i32>,
+) -> crate::Result<IndexMap<String, i32>> {
     for (metric_name, storage_resolution) in storage_resolutions.iter() {
         if !matches!(storage_resolution, 1 | 60) {
-            return Err(format!("Storage resolution for {metric_name} should be '1' or '60'").into())
+            return Err(
+                format!("Storage resolution for {metric_name} should be '1' or '60'").into(),
+            );
         }
     }
     Ok(storage_resolutions)
