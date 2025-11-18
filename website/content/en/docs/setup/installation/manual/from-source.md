@@ -34,13 +34,7 @@ sudo apt-get install -y build-essential cmake curl git
 
 Clone Vector's source:
 
- ```shell
-
-git clone https://github.com/vectordotdev/vector
- cd vector
-
-
-# Master branch (development)
+```shell
 git clone https://github.com/vectordotdev/vector
 cd vector
 
@@ -51,10 +45,9 @@ cd vector
 # git checkout $(git describe --tags --abbrev=0)
 ```
 
-Change into your Vector directory, compile and finally run:
+Compile and run Vector:
 
 ```shell
-cd vector
 make build
 
 # Or specify with custom features
@@ -66,9 +59,6 @@ target/release/vector --config config/vector.yaml
 
 The `FEATURES` environment variable is optional. You can override the default features using this variable.
 See [feature flags](#feature-flags) for more info.
-
-When finished, the Vector binary is placed in `target/<target>/release/vector`. If you're building Vector on your Mac, for example, the
-target triple is `arm64-apple-darwin` and the Vector binary will be located at `target/arm64-apple-darwin/release/vector`.
 
 ### Windows
 
@@ -125,6 +115,11 @@ cd vector
 
 # Optionally checkout a specific version
 # git checkout v{{< version >}}
+
+# Alternative: Download tarball
+# mkdir -p vector && \
+#   curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/vectordotdev/vector/tarball/v{{< version >}} | \
+#   tar xzf - -C vector --strip-components=1 && cd vector
 ```
 
 Second, [install cross][cross].
@@ -241,6 +236,13 @@ To update Vector, follow the same [installation](#installation) instructions abo
 Vector supports many feature flags to customize which features are included in a build. By default,
 all sources, transforms, and sinks are enabled. To view a complete list of features, they are listed
 under "[features]" [here](https://github.com/vectordotdev/vector/blob/master/Cargo.toml).
+
+Example of building with only specific components:
+
+```shell
+# Build with only file source, remap transform, and console sink
+FEATURES="api,sources-file,transforms-remap,sinks-console" make build
+```
 
 [buffer]: /docs/reference/glossary/#buffer
 [cmake]: https://cmake.org/
