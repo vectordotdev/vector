@@ -72,6 +72,8 @@ pub struct ComponentTests<'a, 'b, 'c> {
     tagged_counters: &'b [&'b str],
     /// The list of counter metrics (with no particular tags) that must be incremented
     untagged_counters: &'c [&'c str],
+    /// Whether the source sender metrics must be emitted
+    require_source_sender_metrics: bool,
 }
 
 /// The component test specification for all sources.
@@ -84,6 +86,7 @@ pub static SOURCE_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| ComponentTe
         "component_sent_events_total",
         "component_sent_event_bytes_total",
     ],
+    require_source_sender_metrics: true,
 });
 
 /// The component error test specification (sources and sinks).
@@ -91,6 +94,7 @@ pub static COMPONENT_TESTS_ERROR: LazyLock<ComponentTests> = LazyLock::new(|| Co
     events: &["Error"],
     tagged_counters: &["component_errors_total"],
     untagged_counters: &[],
+    require_source_sender_metrics: false,
 });
 
 /// The component test specification for all transforms.
@@ -103,6 +107,7 @@ pub static TRANSFORM_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| Componen
         "component_sent_events_total",
         "component_sent_event_bytes_total",
     ],
+    require_source_sender_metrics: false,
 });
 
 /// The component test specification for sinks that are push-based.
@@ -114,6 +119,7 @@ pub static SINK_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| {
             "component_sent_events_total",
             "component_sent_event_bytes_total",
         ],
+        require_source_sender_metrics: false,
     }
 });
 
@@ -126,6 +132,7 @@ pub static DATA_VOLUME_SINK_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| {
             "component_sent_event_bytes_total",
         ],
         untagged_counters: &[],
+        require_source_sender_metrics: false,
     }
 });
 
@@ -137,6 +144,7 @@ pub static NONSENDING_SINK_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| Co
         "component_sent_event_bytes_total",
     ],
     untagged_counters: &[],
+    require_source_sender_metrics: false,
 });
 
 /// The component test specification for components with multiple outputs.
@@ -148,6 +156,7 @@ pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: LazyLock<ComponentTests> =
             "component_sent_event_bytes_total",
         ],
         untagged_counters: &[],
+        require_source_sender_metrics: false,
     });
 
 impl ComponentTests<'_, '_, '_> {
@@ -158,6 +167,9 @@ impl ComponentTests<'_, '_, '_> {
         test.emitted_all_events(self.events);
         test.emitted_all_counters(self.tagged_counters, tags);
         test.emitted_all_counters(self.untagged_counters, &[]);
+        if self.require_source_sender_metrics {
+            test.emitted_source_sender_metrics();
+        }
         if !test.errors.is_empty() {
             panic!(
                 "Failed to assert compliance, errors:\n{}\n",
@@ -248,6 +260,52 @@ impl ComponentTester {
                 self.errors.push(format!("  - {err_msg}"));
             }
         }
+    }
+
+    fn emitted_source_sender_metrics(&mut self) {
+        const METRIC_NAME: &str = "source_sender_buffer_utilization";
+        let mut partial_matches = Vec::new();
+
+        for metric in self.metrics.iter().filter(|m| m.name() == METRIC_NAME) {
+            let tags = metric.tags();
+            let has_output_tag = tags.is_some_and(|t| t.contains_key("output"));
+            let has_capacity_tag =
+                tags.is_some_and(|t| t.contains_key("max_events") || t.contains_key("max_bytes"));
+            let is_histogram = matches!(metric.value(), MetricValue::AggregatedHistogram { .. });
+
+            if is_histogram && has_output_tag && has_capacity_tag {
+                return;
+            }
+
+            let tags_desc = tags
+                .map(|t| format!("{{{}}}", itertools::join(t.keys(), ",")))
+                .unwrap_or_default();
+
+            let mut reasons = Vec::new();
+            if !is_histogram {
+                reasons.push(format!("unexpected type `{}`", metric.value().as_name()));
+            }
+            if !has_output_tag {
+                reasons.push("missing `output` tag".to_string());
+            }
+            if !has_capacity_tag {
+                reasons.push("missing `max_events`/`max_bytes` tag".to_string());
+            }
+            let detail = if reasons.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", reasons.join(", "))
+            };
+            partial_matches.push(format!(
+                "\n    -> Found metric `{}{}`{}",
+                METRIC_NAME, tags_desc, detail
+            ));
+        }
+
+        let partial = partial_matches.join("");
+        self.errors.push(format!(
+            "  - Missing metric `source_sender_buffer_utilization` with tags `output` and `max_events`/`max_bytes`{partial}"
+        ));
     }
 }
 
@@ -529,6 +587,7 @@ pub async fn assert_sink_error_with_events<T>(
         events,
         tagged_counters: &["component_errors_total"],
         untagged_counters: &[],
+        require_source_sender_metrics: false,
     };
     assert_sink_error_with_component_tests(&component_tests, tags, f).await
 }

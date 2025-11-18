@@ -238,3 +238,51 @@ fn assert_counter_metric(metrics: &[Metric], name: &str, expected: f64) {
         "Only one {name} metric should be present"
     );
 }
+
+#[tokio::test]
+async fn emits_buffer_utilization_histogram_on_send_and_receive() {
+    metrics::init_test();
+    let buffer_size = 2;
+    let (mut sender, mut recv) = SourceSender::new_test_sender_with_options(buffer_size, None);
+
+    let event = Event::Log(LogEvent::from("test event"));
+    sender
+        .send_event(event.clone())
+        .await
+        .expect("first send succeeds");
+    sender
+        .send_event(event)
+        .await
+        .expect("second send succeeds");
+
+    // Drain the channel so both the send and receive paths are exercised.
+    assert!(recv.next().await.is_some());
+    assert!(recv.next().await.is_some());
+
+    let utilization_metrics = Controller::get()
+        .expect("metrics controller available")
+        .capture_metrics()
+        .into_iter()
+        .filter(|metric| metric.name() == "source_sender_buffer_utilization")
+        .collect::<Vec<_>>();
+    assert_eq!(
+        utilization_metrics.len(),
+        1,
+        "expected a single utilization histogram"
+    );
+
+    let metric = &utilization_metrics[0];
+    let tags = metric.tags().expect("utilization histogram has tags");
+    let max_events = buffer_size.to_string();
+    assert_eq!(tags.get("output"), Some("_default"));
+    assert_eq!(tags.get("max_events"), Some(max_events.as_str()));
+
+    let MetricValue::AggregatedHistogram { count, sum, .. } = metric.value() else {
+        panic!("source_sender_buffer_utilization should be a histogram");
+    };
+    assert_eq!(*count, 2, "one sample per send expected");
+    assert!(
+        (*sum - 3.0).abs() <= 0.001,
+        "unexpected histogram sum: expected 3.0, got {sum}"
+    );
+}

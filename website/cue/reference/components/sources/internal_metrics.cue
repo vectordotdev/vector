@@ -718,6 +718,22 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		source_sender_buffer_utilization: {
+			description:       "The utilization level of the buffer that all sources send into."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+				max_bytes: {
+					description: "The maximum number of bytes the buffer can hold."
+					required:    false
+				}
+				max_events: {
+					description: "The maximum number of events the buffer can hold."
+					required:    false
+				}
+			}
+		}
 		splunk_pending_acks: {
 			description:       "The number of outstanding Splunk HEC indexer acknowledgement acks."
 			type:              "gauge"
