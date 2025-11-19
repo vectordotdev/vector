@@ -39,7 +39,7 @@ where
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
-    P: Partitioner<Item = Event, Key = Option<String>> + Unpin + Send,
+    P: Partitioner<Item = Event, Key = String> + Unpin + Send,
     P::Key: Eq + std::hash::Hash + Clone,
     P::Item: ByteSizeOf,
 {
@@ -83,7 +83,7 @@ where
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
-    P: Partitioner<Item = Event, Key = Option<String>> + Unpin + Send,
+    P: Partitioner<Item = Event, Key = String> + Unpin + Send,
     P::Key: Eq + std::hash::Hash + Clone,
     P::Item: ByteSizeOf,
 {

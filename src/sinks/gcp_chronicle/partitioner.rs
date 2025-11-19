@@ -31,45 +31,43 @@ impl ChroniclePartitioner {
 
 impl Partitioner for ChroniclePartitioner {
     type Item = Event;
-    type Key = Option<ChroniclePartitionKey>;
+    type Key = ChroniclePartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        let log_type = self
-            .log_type
-            .render_string(item)
-            .or_else(|error| {
-                if let Some(fallback_log_type) = &self.fallback_log_type {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("log_type"),
-                        drop_event: false,
-                    });
-                    Ok(fallback_log_type.clone())
-                } else {
-                    Err(emit!(TemplateRenderingError {
-                        error,
-                        field: Some("log_type"),
-                        drop_event: true,
-                    }))
-                }
-            })
-            .ok()?;
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+        let log_type = self.log_type.render_string(item).or_else(|error| {
+            if let Some(fallback_log_type) = &self.fallback_log_type {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some("log_type"),
+                    drop_event: false,
+                });
+                Ok(fallback_log_type.clone())
+            } else {
+                emit!(TemplateRenderingError {
+                    error: error.clone(),
+                    field: Some("log_type"),
+                    drop_event: true,
+                });
+                Err(error)
+            }
+        })?;
 
         let namespace = self
             .namespace_template
             .as_ref()
             .map(|namespace| {
-                namespace.render_string(item).map_err(|error| {
+                namespace.render_string(item).inspect_err(|error| {
                     emit!(TemplateRenderingError {
-                        error,
+                        error: error.clone(),
                         field: Some("namespace"),
                         drop_event: true,
                     });
                 })
             })
-            .transpose()
-            .ok()?;
-        Some(ChroniclePartitionKey {
+            .transpose()?;
+
+        Ok(ChroniclePartitionKey {
             log_type,
             namespace,
         })
