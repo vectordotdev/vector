@@ -11,7 +11,7 @@ use std::{
 use async_stream::stream;
 use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
-use metrics::{Histogram, histogram};
+use metrics::{Gauge, Histogram, gauge, histogram};
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
 use crate::{InMemoryBufferable, config::MemoryBufferSize};
@@ -89,13 +89,47 @@ where
     }
 }
 
+#[derive(Clone, Debug)]
+struct Metrics {
+    histogram: Histogram,
+    gauge: Gauge,
+    // We hold a handle to the max gauge to avoid it being dropped by the metrics collector, but
+    // since the value is static, we never need to update it. The compiler detects this as an unused
+    // field, so we need to suppress the warning here.
+    #[expect(dead_code)]
+    max_gauge: Gauge,
+}
+
+impl Metrics {
+    #[expect(clippy::cast_precision_loss)] // We have to convert buffer sizes for a gauge, it's okay to lose precision here.
+    fn new(limit: MemoryBufferSize, prefix: &'static str, output: &str) -> Self {
+        let (gauge_suffix, max_value) = match limit {
+            MemoryBufferSize::MaxEvents(max_events) => ("_max_event_size", max_events.get() as f64),
+            MemoryBufferSize::MaxSize(max_bytes) => ("_max_byte_size", max_bytes.get() as f64),
+        };
+        let max_gauge = gauge!(format!("{prefix}{gauge_suffix}"), "output" => output.to_string());
+        max_gauge.set(max_value);
+        Self {
+            histogram: histogram!(format!("{prefix}_utilization"), "output" => output.to_string()),
+            gauge: gauge!(format!("{prefix}_utilization_level"), "output" => output.to_string()),
+            max_gauge,
+        }
+    }
+
+    #[expect(clippy::cast_precision_loss)]
+    fn record(&self, value: usize) {
+        self.histogram.record(value as f64);
+        self.gauge.set(value as f64);
+    }
+}
+
 #[derive(Debug)]
 struct Inner<T> {
     data: Arc<dyn QueueImpl<(OwnedSemaphorePermit, T)>>,
     limit: MemoryBufferSize,
     limiter: Arc<Semaphore>,
     read_waker: Arc<Notify>,
-    depth: Option<Histogram>,
+    metrics: Option<Metrics>,
 }
 
 impl<T> Clone for Inner<T> {
@@ -105,40 +139,30 @@ impl<T> Clone for Inner<T> {
             limit: self.limit,
             limiter: self.limiter.clone(),
             read_waker: self.read_waker.clone(),
-            depth: self.depth.clone(),
+            metrics: self.metrics.clone(),
         }
     }
 }
 
 impl<T: InMemoryBufferable> Inner<T> {
-    fn new(limit: MemoryBufferSize, metric_name: Option<(&'static str, &str)>) -> Self {
+    fn new(limit: MemoryBufferSize, metric_name_output: Option<(&'static str, &str)>) -> Self {
         let read_waker = Arc::new(Notify::new());
+        let metrics =
+            metric_name_output.map(|(prefix, output)| Metrics::new(limit, prefix, output));
         match limit {
             MemoryBufferSize::MaxEvents(max_events) => Inner {
                 data: Arc::new(ArrayQueue::new(max_events.get())),
                 limit,
                 limiter: Arc::new(Semaphore::new(max_events.get())),
                 read_waker,
-                depth: metric_name.map(|(name, output)| {
-                    histogram!(
-                            name,
-                            "max_events" => max_events.to_string(),
-                            "output" => output.to_string()
-                    )
-                }),
+                metrics,
             },
             MemoryBufferSize::MaxSize(max_bytes) => Inner {
                 data: Arc::new(SegQueue::new()),
                 limit,
                 limiter: Arc::new(Semaphore::new(max_bytes.get())),
                 read_waker,
-                depth: metric_name.map(|(name, output)| {
-                    histogram!(
-                        name,
-                        "max_bytes" => max_bytes.to_string(),
-                        "output" => output.to_string()
-                    )
-                }),
+                metrics,
             },
         }
     }
@@ -149,9 +173,8 @@ impl<T: InMemoryBufferable> Inner<T> {
         // Due to the race between getting the available capacity, acquiring the permits, and the
         // above push, the total may be inaccurate. Record it anyways as the histogram totals will
         // _eventually_ converge on a true picture of the buffer utilization.
-        if let Some(histogram) = self.depth.as_ref() {
-            #[expect(clippy::cast_precision_loss)]
-            histogram.record(total as f64);
+        if let Some(metrics) = self.metrics.as_ref() {
+            metrics.record(total);
         }
     }
 }

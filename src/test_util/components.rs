@@ -7,10 +7,11 @@
 //! internal events and metrics, and testing that they fit the required
 //! patterns.
 
-use std::{env, sync::LazyLock, time::Duration};
+use std::{collections::HashSet, env, sync::LazyLock, time::Duration};
 
 use futures::{SinkExt, Stream, StreamExt, stream};
 use futures_util::Future;
+use itertools::Itertools as _;
 use tokio::{pin, select, time::sleep};
 use vector_lib::event_test_util;
 
@@ -63,6 +64,12 @@ pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
 /// The standard set of tags for all `AWS`-based sinks.
 pub const AWS_SINK_TAGS: [&str; 2] = ["protocol", "region"];
+
+/// The list of source sender buffer metrics that must be emitted.
+const SOURCE_SENDER_BUFFER_METRICS: [&str; 2] = [
+    "source_sender_buffer_utilization",
+    "source_sender_buffer_utilization_level",
+];
 
 /// This struct is used to describe a set of component tests.
 pub struct ComponentTests<'a, 'b, 'c> {
@@ -263,18 +270,22 @@ impl ComponentTester {
     }
 
     fn emitted_source_sender_metrics(&mut self) {
-        const METRIC_NAME: &str = "source_sender_buffer_utilization";
         let mut partial_matches = Vec::new();
+        let mut missing: HashSet<&str> = SOURCE_SENDER_BUFFER_METRICS.iter().copied().collect();
 
-        for metric in self.metrics.iter().filter(|m| m.name() == METRIC_NAME) {
+        for metric in self
+            .metrics
+            .iter()
+            .filter(|m| SOURCE_SENDER_BUFFER_METRICS.contains(&m.name()))
+        {
             let tags = metric.tags();
             let has_output_tag = tags.is_some_and(|t| t.contains_key("output"));
-            let has_capacity_tag =
-                tags.is_some_and(|t| t.contains_key("max_events") || t.contains_key("max_bytes"));
             let is_histogram = matches!(metric.value(), MetricValue::AggregatedHistogram { .. });
+            let is_gauge = matches!(metric.value(), MetricValue::Gauge { .. });
 
-            if is_histogram && has_output_tag && has_capacity_tag {
-                return;
+            if (is_histogram || is_gauge) && has_output_tag {
+                missing.remove(metric.name());
+                continue;
             }
 
             let tags_desc = tags
@@ -282,14 +293,11 @@ impl ComponentTester {
                 .unwrap_or_default();
 
             let mut reasons = Vec::new();
-            if !is_histogram {
+            if !is_histogram && !is_gauge {
                 reasons.push(format!("unexpected type `{}`", metric.value().as_name()));
             }
             if !has_output_tag {
                 reasons.push("missing `output` tag".to_string());
-            }
-            if !has_capacity_tag {
-                reasons.push("missing `max_events`/`max_bytes` tag".to_string());
             }
             let detail = if reasons.is_empty() {
                 String::new()
@@ -297,15 +305,18 @@ impl ComponentTester {
                 format!(" ({})", reasons.join(", "))
             };
             partial_matches.push(format!(
-                "\n    -> Found metric `{}{}`{}",
-                METRIC_NAME, tags_desc, detail
+                "\n    -> Found metric `{}{tags_desc}`{detail}",
+                metric.name(),
             ));
         }
 
-        let partial = partial_matches.join("");
-        self.errors.push(format!(
-            "  - Missing metric `source_sender_buffer_utilization` with tags `output` and `max_events`/`max_bytes`{partial}"
-        ));
+        if !missing.is_empty() {
+            let partial = partial_matches.join("");
+            self.errors.push(format!(
+                "  - Missing metric `{}*` with tag `output`{partial}",
+                missing.iter().join(", ")
+            ));
+        }
     }
 }
 

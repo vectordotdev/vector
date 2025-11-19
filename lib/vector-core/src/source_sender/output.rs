@@ -30,7 +30,7 @@ use crate::{
     schema::Definition,
 };
 
-const UTILIZATION_METRIC_NAME: &str = "source_sender_buffer_utilization";
+const UTILIZATION_METRIC_PREFIX: &str = "source_sender_buffer";
 
 /// UnsentEvents tracks the number of events yet to be sent in the buffer. This is used to
 /// increment the appropriate counters when a future is not polled to completion. Particularly,
@@ -117,7 +117,7 @@ impl Output {
         timeout: Option<Duration>,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap());
-        let (tx, rx) = channel::limited(limit, Some((UTILIZATION_METRIC_NAME, &output)));
+        let (tx, rx) = channel::limited(limit, Some((UTILIZATION_METRIC_PREFIX, &output)));
         (
             Self {
                 sender: tx,
