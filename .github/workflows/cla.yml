@@ -5,6 +5,7 @@ on:
   pull_request_target:
     types: [opened, closed, synchronize]
   merge_group:
+    types: [checks_requested]
 
 permissions:
   contents: read
