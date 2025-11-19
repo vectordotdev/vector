@@ -165,9 +165,9 @@ components: sources: http_client: {
 				"""
 		}
 		request_body_generation: {
-            title: "Request Body Generation"
-            body: """
-				The request body can be a static string or a dynamic value generated via VRL. 
+			title: "Request Body Generation"
+			body: """
+				The request body can be a static string or a dynamic value generated via VRL.
 				Using VRL allows you to construct JSON payloads or other formats dynamically at request time.
 
 				When a body is provided, the `Content-Type` header is automatically set to
