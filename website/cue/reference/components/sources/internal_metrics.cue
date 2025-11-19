@@ -719,7 +719,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		source_sender_buffer_utilization: {
-			description:       "The utilization level of the buffer that all sources send into."
+			description:       "The utilization level of the buffer that the source's outputs send into."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags: _component_tags & {
