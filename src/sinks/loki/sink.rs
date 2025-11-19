@@ -524,7 +524,7 @@ impl LokiSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let mut encoder = self.encoder.clone();
+        let encoder = self.encoder.clone();
         let mut filter = RecordFilter::new(self.out_of_order_action);
 
         // out_of_order_action's that require a complete ordering are limited to building 1 request
@@ -538,7 +538,18 @@ impl LokiSink {
         let batch_settings = self.batch_settings;
 
         input
-            .map(|event| encoder.encode_event(event).unwrap()) // FIXME unwrap used
+            .filter_map(|event| {
+                let mut encoder = encoder.clone();
+                async move {
+                    match encoder.encode_event(event) {
+                        Ok(record) => Some(record),
+                        Err(error) => {
+                            emit!(SinkRequestBuildError { error });
+                            None
+                        }
+                    }
+                }
+            })
             .map(|record| filter.filter_record(record))
             .batched_partitioned(RecordPartitioner, || batch_settings.as_byte_size_config())
             .map(|partition| partition.expect("RecordPartitioner::partitioner failed"))
