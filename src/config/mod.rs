@@ -36,7 +36,7 @@ pub mod dot_graph;
 mod enrichment_table;
 pub mod format;
 mod graph;
-mod loading;
+pub mod loading;
 pub mod provider;
 pub mod schema;
 mod secret;
@@ -54,9 +54,9 @@ pub use diff::ConfigDiff;
 pub use enrichment_table::{EnrichmentTableConfig, EnrichmentTableOuter};
 pub use format::{Format, FormatHint};
 pub use loading::{
-    COLLECTOR, CONFIG_PATHS, load, load_builder_from_paths, load_from_paths,
-    load_from_paths_with_provider_and_secrets, load_from_str, load_from_str_with_secrets,
-    load_source_from_paths, merge_path_lists, process_paths,
+    COLLECTOR, CONFIG_PATHS, load, load_from_paths, load_from_paths_with_provider_and_secrets,
+    load_from_str, load_from_str_with_secrets, load_source_from_paths, merge_path_lists,
+    process_paths,
 };
 pub use provider::ProviderConfig;
 pub use secret::SecretBackend;
@@ -270,7 +270,7 @@ impl Config {
 }
 
 /// Healthcheck options.
-#[configurable_component]
+#[configurable_component(global_option("healthchecks"))]
 #[derive(Clone, Copy, Debug)]
 #[serde(default)]
 pub struct HealthcheckOptions {
@@ -308,6 +308,8 @@ impl Default for HealthcheckOptions {
         }
     }
 }
+
+impl_generate_config_from_default!(HealthcheckOptions);
 
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]

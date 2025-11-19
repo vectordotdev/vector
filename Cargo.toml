@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.51.0"
+version = "0.52.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -112,7 +112,6 @@ members = [
   "lib/k8s-e2e-tests",
   "lib/k8s-test-framework",
   "lib/loki-logproto",
-  "lib/portpicker",
   "lib/prometheus-parser",
   "lib/opentelemetry-proto",
   "lib/tracing-limit",
@@ -179,6 +178,7 @@ rand = { version = "0.9.2", default-features = false, features = ["small_rng", "
 rand_distr = { version = "0.5.1", default-features = false }
 regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11.26", features = ["json"] }
+rust_decimal = { version = "1.33", default-features = false, features = ["std"] }
 semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.143", default-features = false, features = ["raw_value", "std"] }
@@ -187,7 +187,7 @@ snafu = { version = "0.8.9", default-features = false, features = ["futures", "s
 socket2 = { version = "0.5.10", default-features = false }
 tempfile = "3.23.0"
 tokio = { version = "1.45.1", default-features = false }
-toml = { version = "0.9.5", default-features = false, features = ["serde", "display", "parse"] }
+toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tracing = { version = "0.1.34", default-features = false }
@@ -219,7 +219,6 @@ vrl.workspace = true
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
 dnstap-parser = { path = "lib/dnstap-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
-portpicker = { path = "lib/portpicker" }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-common = { path = "lib/vector-common", default-features = false }
 vector-lib.workspace = true
@@ -339,6 +338,7 @@ greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingest
 arc-swap = { version = "1.7", default-features = false, optional = true }
 async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
+arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { workspace = true, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
@@ -385,7 +385,7 @@ listenfd = { version = "1.0.2", default-features = false, optional = true }
 lru = { version = "0.16.0", default-features = false }
 maxminddb = { version = "0.26.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
-mongodb = { version = "2.8.2", default-features = false, features = ["tokio-runtime"], optional = true }
+mongodb = { version = "3.3.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
 async-nats = { version = "0.42.0", default-features = false, optional = true, features = ["ring"] }
 nkeys = { version = "0.4.5", default-features = false, optional = true }
 nom = { workspace = true, optional = true }
@@ -404,6 +404,7 @@ redis = { version = "0.32.4", default-features = false, features = ["connection-
 regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
 rumqttc = { version = "0.24.0", default-features = false, features = ["use-rustls"], optional = true }
+rust_decimal = { workspace = true, optional = true }
 seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
@@ -580,8 +581,9 @@ enrichment-tables-mmdb = ["dep:maxminddb"]
 enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
-codecs-syslog = ["vector-lib/syslog"]
+codecs-arrow = ["vector-lib/arrow"]
 codecs-opentelemetry = ["vector-lib/opentelemetry"]
+codecs-syslog = ["vector-lib/syslog"]
 
 # Secrets
 secrets = ["secrets-aws-secrets-manager"]
@@ -728,6 +730,7 @@ transforms-logs = [
   "transforms-exclusive-route",
   "transforms-sample",
   "transforms-throttle",
+  "transforms-trace_to_log"
 ]
 transforms-metrics = [
   "transforms-aggregate",
@@ -757,6 +760,7 @@ transforms-exclusive-route = []
 transforms-sample = ["transforms-impl-sample"]
 transforms-tag_cardinality_limit = ["dep:bloomy", "dep:hashbrown"]
 transforms-throttle = ["dep:governor"]
+transforms-trace_to_log = []
 
 # Implementations of transforms
 transforms-impl-sample = []
@@ -999,7 +1003,7 @@ webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
-test-utils = []
+test-utils = ["vector-lib/test"]
 
 # End-to-End testing-related features
 all-e2e-tests = [

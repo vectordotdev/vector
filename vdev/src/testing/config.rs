@@ -10,7 +10,10 @@ use itertools::{self, Itertools};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-use crate::{app, environment::Environment, util};
+use crate::{
+    app,
+    utils::{environment::Environment, paths},
+};
 
 const FILE_NAME: &str = "test.yaml";
 const CONFIG_SUBDIR: &str = "config";
@@ -19,14 +22,9 @@ pub const INTEGRATION_TESTS_DIR: &str = "integration";
 pub const E2E_TESTS_DIR: &str = "e2e";
 
 /// Returns the base directory and whether to use config subdirectory for the given test type.
-/// Integration tests are in tests/integration with config/ subdirectories.
-/// E2E tests are in scripts/e2e without config/ subdirectories.
-fn test_dir_config(root_dir: &str) -> (&'static str, bool) {
-    if root_dir == INTEGRATION_TESTS_DIR {
-        ("tests", true)
-    } else {
-        ("scripts", false)
-    }
+/// All tests (integration and E2E) are now in tests/ with config/ subdirectories.
+fn test_dir_config(_root_dir: &str) -> (&'static str, bool) {
+    ("tests", true)
 }
 
 #[derive(Deserialize, Debug)]
@@ -251,7 +249,7 @@ impl ComposeTestConfig {
                 } else {
                     [entry.path().to_str().unwrap(), FILE_NAME].iter().collect()
                 };
-                if util::exists(&config_file)? {
+                if paths::exists(&config_file)? {
                     let config = Self::parse_file(&config_file)?;
                     configs.insert(entry.file_name().into_string().unwrap(), config);
                 }

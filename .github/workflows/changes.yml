@@ -388,7 +388,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: int_tests_changes
           path: int_tests_changes.json
@@ -413,7 +413,7 @@ jobs:
 
       # creates a yaml file that contains the filters for each test,
       # extracted from the output of the `vdev int ci-paths` command, which
-      # sources the paths from the scripts/e2e/.../test.yaml files
+      # sources the paths from the tests/e2e/.../test.yaml files
       - name: Create filter rules for e2e tests
         run: vdev e2e ci-paths > int_test_filters.yaml
 
@@ -446,7 +446,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
         with:
           name: e2e_tests_changes
           path: e2e_tests_changes.json
