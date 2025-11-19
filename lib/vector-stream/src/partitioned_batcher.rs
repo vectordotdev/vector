@@ -11,7 +11,7 @@ use futures::stream::{Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use tokio_util::time::{DelayQueue, delay_queue::Key};
 use twox_hash::XxHash64;
-use vector_common::byte_size_of::ByteSizeOf;
+use vector_common::{Result, byte_size_of::ByteSizeOf};
 use vector_core::{partition::Partitioner, time::KeyedTimer};
 
 use crate::batcher::{
@@ -258,7 +258,7 @@ where
     C: BatchConfig<Prt::Item, Batch = B>,
     F: Fn() -> C + Send,
 {
-    type Item = (Prt::Key, B);
+    type Item = Result<(Prt::Key, B)>;
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.stream.size_hint()
@@ -268,7 +268,7 @@ where
         let mut this = self.project();
         loop {
             if !this.closed_batches.is_empty() {
-                return Poll::Ready(this.closed_batches.pop());
+                return Poll::Ready(this.closed_batches.pop().map(Result::Ok));
             }
             match this.stream.as_mut().poll_next(cx) {
                 Poll::Pending => match this.timer.poll_expired(cx) {
@@ -301,7 +301,10 @@ where
                     return Poll::Ready(None);
                 }
                 Poll::Ready(Some(item)) => {
-                    let item_key = this.partitioner.partition(&item);
+                    let item_key = match this.partitioner.partition(&item) {
+                        Ok(item_key) => item_key,
+                        Err(e) => return Poll::Ready(Some(Err(e))),
+                    };
 
                     // Get the batch for this partition, or create a new one.
                     let batch = if let Some(batch) = this.batches.get_mut(&item_key) {
@@ -360,6 +363,7 @@ mod test {
     use pin_project::pin_project;
     use proptest::prelude::*;
     use tokio::{pin, time::advance};
+    use vector_common::Result;
     use vector_core::{partition::Partitioner, time::KeyedTimer};
 
     use crate::{
@@ -448,9 +452,9 @@ mod test {
         type Key = u8;
 
         #[allow(clippy::cast_possible_truncation)]
-        fn partition(&self, item: &Self::Item) -> Self::Key {
+        fn partition(&self, item: &Self::Item) -> Result<Self::Key> {
             let key = *item % u64::from(self.key_space.get());
-            key as Self::Key
+            Ok(key as Self::Key)
         }
     }
 
@@ -512,13 +516,17 @@ mod test {
                     Poll::Ready(None) => {
                         break;
                     }
-                    Poll::Ready(Some((_, batch))) => {
+                    Poll::Ready(Some(Ok((_, batch)))) => {
                         debug_assert!(
                             batch.len() <= item_limit.get(),
                             "{} < {}",
                             batch.len(),
                             item_limit.get()
                         );
+                    }
+
+                    Poll::Ready(Some(Err(e))) => {
+                        unreachable!("{e:?}")
                     }
                 }
             }
@@ -537,7 +545,7 @@ mod test {
         let mut map = stream
             .into_iter()
             .map(|item| {
-                let key = partitioner.partition(&item);
+                let key = partitioner.partition(&item).expect("Paritioning failed");
                 (key, item)
             })
             .fold(
@@ -583,7 +591,7 @@ mod test {
                     Poll::Ready(None) => {
                         break;
                     }
-                    Poll::Ready(Some((key, actual_batch))) => {
+                    Poll::Ready(Some(Ok((key, actual_batch)))) => {
                         let expected_partition = partitions
                             .get_mut(&key)
                             .expect("impossible situation");
@@ -591,6 +599,9 @@ mod test {
                         for item in actual_batch {
                             assert_eq!(item, expected_partition.pop().unwrap());
                         }
+                    }
+                    Poll::Ready(Some(Err(e))) => {
+                        unreachable!("{e:?}")
                     }
                 }
             }
@@ -631,9 +642,13 @@ mod test {
                         assert_eq!(observed_items, total_items);
                         break;
                     }
-                    Poll::Ready(Some((_, batch))) => {
+                    Poll::Ready(Some(Ok((_, batch)))) => {
                         observed_items += batch.len();
                         assert!(observed_items <= total_items);
+                    }
+
+                    Poll::Ready(Some(Err(e))) => {
+                        unreachable!("{e:?}")
                     }
                 }
             }

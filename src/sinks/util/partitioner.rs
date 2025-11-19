@@ -1,3 +1,4 @@
+use vector_common::Result;
 use vector_lib::{event::Event, partition::Partitioner};
 
 use crate::{internal_events::TemplateRenderingError, template::Template};
@@ -22,10 +23,11 @@ impl KeyPartitioner {
 
 impl Partitioner for KeyPartitioner {
     type Item = Event;
-    type Key = Option<String>;
+    type Key = String;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        self.key_prefix_template
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key> {
+        Ok(self
+            .key_prefix_template
             .render_string(item)
             .or_else(|error| {
                 if let Some(dead_letter_key_prefix) = &self.dead_letter_key_prefix {
@@ -36,13 +38,13 @@ impl Partitioner for KeyPartitioner {
                     });
                     Ok(dead_letter_key_prefix.clone())
                 } else {
-                    Err(emit!(TemplateRenderingError {
-                        error,
+                    emit!(TemplateRenderingError {
+                        error: error.clone(),
                         field: Some("key_prefix"),
                         drop_event: true,
-                    }))
+                    });
+                    Err(error)
                 }
-            })
-            .ok()
+            })?)
     }
 }
