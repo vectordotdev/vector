@@ -7,7 +7,7 @@ use std::hash::Hash;
 pub trait Partitioner {
     type Item;
     type Key: Clone + Eq + Hash;
-    type Error: std::error::Error;
+    type Error: std::error::Error + Send;
 
     /// Partition the `Item` by calculating its `Key`
     ///
