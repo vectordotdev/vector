@@ -8,8 +8,7 @@ release: "0.11.0"
 hide_on_release_notes: false
 badges:
   type: "new feature"
-  domains: ["networking"]
-  domains: ["performance", "reliability"]
+  domains: ["networking", "performance", "reliability"]
 ---
 
 Vector 0.11 includes a new Adaptive Request Concurrency (ARC) feature that
