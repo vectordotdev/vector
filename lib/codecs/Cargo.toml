@@ -20,7 +20,7 @@ chrono.workspace = true
 rust_decimal = { version = "1.37", default-features = false, features = ["std"] }
 csv-core = { version = "0.1.12", default-features = false }
 derivative.workspace = true
-derive_more = { version = "0.99", optional = true }
+derive_more = { version = "2.0.1", optional = true, features = ["from", "display"] }
 dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
 influxdb-line-protocol = { version = "2", default-features = false }
