@@ -1,4 +1,3 @@
-use vector_common::Result;
 use vector_lib::{event::Event, partition::Partitioner};
 
 use crate::{internal_events::TemplateRenderingError, template::Template};
@@ -24,8 +23,9 @@ impl KeyPartitioner {
 impl Partitioner for KeyPartitioner {
     type Item = Event;
     type Key = String;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
         Ok(self
             .key_prefix_template
             .render_string(item)

@@ -11,7 +11,7 @@ use futures::stream::{Fuse, Stream, StreamExt};
 use pin_project::pin_project;
 use tokio_util::time::{DelayQueue, delay_queue::Key};
 use twox_hash::XxHash64;
-use vector_common::{Result, byte_size_of::ByteSizeOf};
+use vector_common::byte_size_of::ByteSizeOf;
 use vector_core::{partition::Partitioner, time::KeyedTimer};
 
 use crate::batcher::{
@@ -258,7 +258,7 @@ where
     C: BatchConfig<Prt::Item, Batch = B>,
     F: Fn() -> C + Send,
 {
-    type Item = Result<(Prt::Key, B)>;
+    type Item = Result<(Prt::Key, B), Prt::Error>;
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.stream.size_hint()
@@ -363,7 +363,6 @@ mod test {
     use pin_project::pin_project;
     use proptest::prelude::*;
     use tokio::{pin, time::advance};
-    use vector_common::Result;
     use vector_core::{partition::Partitioner, time::KeyedTimer};
 
     use crate::{
@@ -450,9 +449,10 @@ mod test {
     impl Partitioner for TestPartitioner {
         type Item = u64;
         type Key = u8;
+        type Error = std::convert::Infallible;
 
         #[allow(clippy::cast_possible_truncation)]
-        fn partition(&self, item: &Self::Item) -> Result<Self::Key> {
+        fn partition(&self, item: &Self::Item) -> Result<Self::Key, std::convert::Infallible> {
             let key = *item % u64::from(self.key_space.get());
             Ok(key as Self::Key)
         }
