@@ -207,6 +207,7 @@ impl<'a> ConfigDecanter<'a> {
 
 const NIL_VALUE: &str = "-";
 const SYSLOG_V1: &str = "1";
+const RFC3164_TAG_MAX_LENGTH: usize = 32;
 
 /// The syslog RFC standard to use for formatting.
 #[configurable_component]
@@ -259,16 +260,16 @@ impl SyslogMessage {
 
         if let Some(sd) = &self.structured_data {
             let sd_string = sd.encode();
-            if !sd.elements.is_empty() {
-                if *rfc == SyslogRFC::Rfc3164 {
-                    if !self.message.is_empty() {
+            if *rfc == SyslogRFC::Rfc3164 {
+                if !sd.elements.is_empty() {
+                    if !message_part.is_empty() {
                         message_part = format!("{sd_string} {message_part}");
                     } else {
                         message_part = sd_string;
                     }
-                } else {
-                    parts.push(sd_string);
                 }
+            } else {
+                parts.push(sd_string);
             }
         } else if *rfc == SyslogRFC::Rfc5424 {
             parts.push(NIL_VALUE.to_string());
@@ -309,8 +310,8 @@ impl Tag {
         } else {
             format!("{}:", self.app_name)
         };
-        if tag.len() > 32 {
-            tag.truncate(31);
+        if tag.len() > RFC3164_TAG_MAX_LENGTH {
+            tag.truncate(RFC3164_TAG_MAX_LENGTH);
             if !tag.ends_with(':') {
                 tag.pop();
                 tag.push(':');
@@ -475,7 +476,8 @@ mod tests {
     use super::*;
     use bytes::BytesMut;
     use chrono::NaiveDate;
-    use vector_core::event::Event;
+    use vector_core::event::Event::Metric;
+    use vector_core::event::{Event, MetricKind, MetricValue, StatisticKind};
     use vrl::{event_path, value};
 
     fn run_encode(config: SyslogSerializerConfig, event: Event) -> String {
@@ -677,12 +679,125 @@ mod tests {
         let mut log = create_simple_log();
         log.insert(
             event_path!("app_name"),
-            "this-is-a-very-long-application-name",
+            "this-is-a-very-very-long-application-name",
         );
         log.insert(event_path!("proc_id"), "1234567890");
 
         let output = run_encode(config, Event::Log(log));
-        let expected_tag = "this-is-a-very-long-applicatio:";
+        let expected_tag = "this-is-a-very-very-long-applic:";
         assert!(output.contains(expected_tag));
+    }
+
+    #[test]
+    fn test_rfc5424_missing_fields() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc5424"
+        app_name = ".app"  # configured path, but not in log
+        proc_id = ".pid"   # configured path, but not in log
+        msg_id = ".mid"    # configured path, but not in log
+    "#,
+        )
+        .unwrap();
+
+        let log = create_simple_log();
+        let output = run_encode(config, Event::Log(log));
+
+        let expected =
+            "<14>1 2025-08-28T18:30:00.123456Z test-host.com vector - - - original message";
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_invalid_parsing_fallback() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc5424"
+        facility = ".fac"
+        severity = ".sev"
+    "#,
+        )
+        .unwrap();
+
+        let mut log = create_simple_log();
+
+        log.insert(event_path!("fac"), "");
+        log.insert(event_path!("sev"), "invalid_severity_name");
+
+        let output = run_encode(config, Event::Log(log));
+
+        let expected_pri = "<14>";
+        assert!(output.starts_with(expected_pri));
+
+        let expected_suffix = "vector - - - original message";
+        assert!(output.ends_with(expected_suffix));
+    }
+
+    #[test]
+    fn test_rfc5424_empty_message_and_sd() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc5424"
+        app_name = ".app"
+        proc_id = ".pid"
+        msg_id = ".mid"
+    "#,
+        )
+        .unwrap();
+
+        let mut log = create_simple_log();
+        log.insert(event_path!("message"), "");
+        log.insert(event_path!("structured_data"), value!({}));
+
+        let output = run_encode(config, Event::Log(log));
+        let expected = "<14>1 2025-08-28T18:30:00.123456Z test-host.com vector - - -";
+        assert_eq!(output, expected);
+    }
+
+    #[test]
+    fn test_non_log_event_filtering() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc5424"
+    "#,
+        )
+        .unwrap();
+
+        let metric_event = Metric(vector_core::event::Metric::new(
+            "metric1",
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vector_core::samples![10.0 => 1],
+                statistic: StatisticKind::Histogram,
+            },
+        ));
+
+        let mut serializer = SyslogSerializer::new(&config);
+        let mut buffer = BytesMut::new();
+
+        let result = serializer.encode(metric_event, &mut buffer);
+
+        assert!(result.is_ok());
+        assert!(buffer.is_empty());
+    }
+
+    #[test]
+    fn test_minimal_event() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+    "#,
+        )
+        .unwrap();
+        let log = LogEvent::from("");
+
+        let output = run_encode(config, Event::Log(log));
+        let expected_suffix = "vector - - -";
+        assert!(output.starts_with("<14>1"));
+        assert!(output.ends_with(expected_suffix));
     }
 }
