@@ -102,8 +102,18 @@ impl<'a> ConfigDecanter<'a> {
 
     fn decant_config(&self, config: &SyslogSerializerOptions) -> SyslogMessage {
         let mut app_name = self
-            .get_value(&config.app_name)
-            .unwrap_or_else(|| "vector".to_owned());
+            .get_value(&config.app_name) // P1: Configured path
+            .unwrap_or_else(|| {
+                // P2: Semantic Fallback: Check for the field designated as "service" in the schema
+                self.log
+                    .get_by_meaning("service")
+                    .map(|v| v.to_string_lossy().to_string())
+                    // P3: Hardcoded default
+                    .unwrap_or_else(|| "vector".to_owned())
+            });
+        // let mut app_name = self
+        //     .get_value(&config.app_name)
+        //     .unwrap_or_else(|| "vector".to_owned());
         let mut proc_id = self.get_value(&config.proc_id);
         let mut msg_id = self.get_value(&config.msg_id);
         if config.rfc == SyslogRFC::Rfc5424 {
@@ -476,9 +486,13 @@ mod tests {
     use super::*;
     use bytes::BytesMut;
     use chrono::NaiveDate;
+    use std::sync::Arc;
+    use vector_core::config::LogNamespace;
     use vector_core::event::Event::Metric;
     use vector_core::event::{Event, MetricKind, MetricValue, StatisticKind};
-    use vrl::{event_path, value};
+    use vrl::path::parse_target_path;
+    use vrl::prelude::Kind;
+    use vrl::{btreemap, event_path, value};
 
     fn run_encode(config: SyslogSerializerConfig, event: Event) -> String {
         let mut serializer = SyslogSerializer::new(&config);
@@ -799,5 +813,38 @@ mod tests {
         let expected_suffix = "vector - - -";
         assert!(output.starts_with("<14>1"));
         assert!(output.ends_with(expected_suffix));
+    }
+
+    #[test]
+    fn test_app_name_meaning_fallback() {
+        let config = toml::from_str::<SyslogSerializerConfig>(
+            r#"
+        [syslog]
+        rfc = "rfc5424"
+        severity = ".sev"
+        app_name = ".nonexistent"
+    "#,
+        )
+        .unwrap();
+
+        let mut log = LogEvent::default();
+        log.insert("syslog.service", "meaning-app");
+
+        let schema = schema::Definition::new_with_default_metadata(
+            Kind::object(btreemap! {
+                "syslog" => Kind::object(btreemap! {
+                    "service" => Kind::bytes(),
+                })
+            }),
+            [LogNamespace::Vector],
+        );
+        let schema = schema.with_meaning(parse_target_path("syslog.service").unwrap(), "service");
+        let mut event = Event::from(log);
+        event
+            .metadata_mut()
+            .set_schema_definition(&Arc::new(schema));
+
+        let output = run_encode(config, event);
+        assert!(output.contains("meaning-app - -"));
     }
 }
