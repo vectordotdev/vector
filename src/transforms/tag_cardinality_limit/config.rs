@@ -138,7 +138,8 @@ impl GenerateConfig for TagCardinalityLimitConfig {
                 mode: Mode::Exact,
                 value_limit: default_value_limit(),
                 limit_exceeded_action: default_limit_exceeded_action(),
-                include_extended_tags_in_limit_metric: default_include_extended_tags_in_limit_metric(),
+                include_extended_tags_in_limit_metric:
+                    default_include_extended_tags_in_limit_metric(),
             },
             per_metric_limits: HashMap::default(),
         })

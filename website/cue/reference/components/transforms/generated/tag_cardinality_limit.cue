@@ -12,6 +12,16 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 		required:      false
 		type: uint: default: 5120
 	}
+	include_extended_tags_in_limit_metric: {
+		description: """
+			Whether to include extended labels (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+
+			This can be useful for debugging, but should be used with caution as it can significantly
+			increase metric cardinality if metric names or tag keys are high cardinality.
+			"""
+		required: false
+		type: bool: default: false
+	}
 	limit_exceeded_action: {
 		description: """
 			Possible actions to take when an event arrives that would exceed the cardinality limit for one
@@ -63,6 +73,16 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 					relevant_when: "mode = \"probabilistic\""
 					required:      false
 					type: uint: default: 5120
+				}
+				include_extended_tags_in_limit_metric: {
+					description: """
+						Whether to include extended labels (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+
+						This can be useful for debugging, but should be used with caution as it can significantly
+						increase metric cardinality if metric names or tag keys are high cardinality.
+						"""
+					required: false
+					type: bool: default: false
 				}
 				limit_exceeded_action: {
 					description: """

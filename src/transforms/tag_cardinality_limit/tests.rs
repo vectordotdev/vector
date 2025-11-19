@@ -53,6 +53,7 @@ fn make_transform_hashset(
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
+            include_extended_tags_in_limit_metric: false,
         },
         per_metric_limits: HashMap::new(),
     }
@@ -69,6 +70,7 @@ fn make_transform_bloom(
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
+            include_extended_tags_in_limit_metric: false,
         },
         per_metric_limits: HashMap::new(),
     }
@@ -84,6 +86,7 @@ const fn make_transform_hashset_with_per_metric_limits(
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
+            include_extended_tags_in_limit_metric: false,
         },
         per_metric_limits,
     }
@@ -101,6 +104,7 @@ const fn make_transform_bloom_with_per_metric_limits(
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
+            include_extended_tags_in_limit_metric: false,
         },
         per_metric_limits,
     }
