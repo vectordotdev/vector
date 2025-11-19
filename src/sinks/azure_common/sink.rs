@@ -36,7 +36,7 @@ where
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
-    P: Partitioner<Item = Event, Key = Option<String>> + Unpin + Send,
+    P: Partitioner<Item = Event, Key = String> + Unpin + Send,
     P::Key: Eq + std::hash::Hash + Clone,
     P::Item: ByteSizeOf,
 {
@@ -48,11 +48,20 @@ where
 
         input
             .batched_partitioned(partitioner, || settings.as_byte_size_config())
+            .filter_map(|result| async move {
+                match result {
+                    Ok((key, batch)) => Some((key, batch)),
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
+                        None
+                    }
+                }
+            })
             .filter_map(|(key, batch)| async move {
                 // We don't need to emit an error here if the event is dropped since this will occur if the template
                 // couldn't be rendered during the partitioning. A `TemplateRenderingError` is already emitted when
                 // that occurs.
-                key.map(move |k| (k, batch))
+                Some((key, batch))
             })
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
@@ -81,7 +90,7 @@ where
     RB: RequestBuilder<(String, Vec<Event>)> + Send + Sync + 'static,
     RB::Error: fmt::Display + Send,
     RB::Request: Finalizable + MetaDescriptive + Send,
-    P: Partitioner<Item = Event, Key = Option<String>> + Unpin + Send,
+    P: Partitioner<Item = Event, Key = String> + Unpin + Send,
     P::Key: Eq + std::hash::Hash + Clone,
     P::Item: ByteSizeOf,
 {
