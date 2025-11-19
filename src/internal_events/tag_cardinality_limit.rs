@@ -5,6 +5,7 @@ pub struct TagCardinalityLimitRejectingEvent<'a> {
     pub metric_name: &'a str,
     pub tag_key: &'a str,
     pub tag_value: &'a str,
+    pub include_extended_tags_in_limit_metric: bool,
 }
 
 impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
@@ -15,12 +16,16 @@ impl InternalEvent for TagCardinalityLimitRejectingEvent<'_> {
             tag_key = self.tag_key,
             tag_value = self.tag_value,
         );
-        counter!(
-            "tag_value_limit_exceeded_total",
-            "metric_name" => self.metric_name.to_string(),
-            "tag_key" => self.tag_key.to_string(),
-        )
-        .increment(1);
+        if self.include_extended_tags_in_limit_metric {
+            counter!(
+                "tag_value_limit_exceeded_total",
+                "metric_name" => self.metric_name.to_string(),
+                "tag_key" => self.tag_key.to_string(),
+            )
+            .increment(1);
+        } else {
+            counter!("tag_value_limit_exceeded_total").increment(1);
+        }
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {
             count: 1,
@@ -33,6 +38,7 @@ pub struct TagCardinalityLimitRejectingTag<'a> {
     pub metric_name: &'a str,
     pub tag_key: &'a str,
     pub tag_value: &'a str,
+    pub include_extended_tags_in_limit_metric: bool,
 }
 
 impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
@@ -43,12 +49,16 @@ impl InternalEvent for TagCardinalityLimitRejectingTag<'_> {
             tag_key = self.tag_key,
             tag_value = self.tag_value,
         );
-        counter!(
-            "tag_value_limit_exceeded_total",
-            "metric_name" => self.metric_name.to_string(),
-            "tag_key" => self.tag_key.to_string(),
-        )
-        .increment(1);
+        if self.include_extended_tags_in_limit_metric {
+            counter!(
+                "tag_value_limit_exceeded_total",
+                "metric_name" => self.metric_name.to_string(),
+                "tag_key" => self.tag_key.to_string(),
+            )
+            .increment(1);
+        } else {
+            counter!("tag_value_limit_exceeded_total").increment(1);
+        }
     }
 }
 

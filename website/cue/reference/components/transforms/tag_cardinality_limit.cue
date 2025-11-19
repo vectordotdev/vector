@@ -187,7 +187,13 @@ components: transforms: tag_cardinality_limit: {
 	}
 
 	telemetry: metrics: {
-		tag_value_limit_exceeded_total: components.sources.internal_metrics.output.metrics.tag_value_limit_exceeded_total
+		tag_value_limit_exceeded_total: components.sources.internal_metrics.output.metrics.tag_value_limit_exceeded_total & {
+			description: """
+				The number of times a tag value limit was exceeded. When `include_extended_tags_in_limit_metric` is enabled,
+				this metric includes `metric_name` and `tag_key` labels to help identify which specific metrics and tag keys
+				are hitting the configured value limit. By default, this metric has no labels to keep cardinality low.
+				"""
+		}
 		value_limit_reached_total:      components.sources.internal_metrics.output.metrics.value_limit_reached_total
 	}
 }

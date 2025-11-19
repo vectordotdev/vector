@@ -772,18 +772,27 @@ components: sources: internal_metrics: {
 		tag_value_limit_exceeded_total: {
 			description: """
 				The total number of events discarded because the tag has been rejected after
-				hitting the configured `value_limit`.
+				hitting the configured `value_limit`. When `include_extended_tags_in_limit_metric`
+				is enabled in the `tag_cardinality_limit` transform, this metric includes
+				`metric_name` and `tag_key` labels. By default, this metric has no labels to
+				keep cardinality low.
 				"""
 			type:              "counter"
 			default_namespace: "vector"
 			tags: _component_tags & {
 				metric_name: {
-					description: "The name of the metric whose tag value limit was exceeded."
-					required:    true
+					description: """
+						The name of the metric whose tag value limit was exceeded.
+						Only present when `include_extended_tags_in_limit_metric` is enabled.
+						"""
+					required:    false
 				}
 				tag_key: {
-					description: "The key of the tag whose value limit was exceeded."
-					required:    true
+					description: """
+						The key of the tag whose value limit was exceeded.
+						Only present when `include_extended_tags_in_limit_metric` is enabled.
+						"""
+					required:    false
 				}
 			}
 		}
