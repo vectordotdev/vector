@@ -126,6 +126,14 @@ generated: components: sources: datadog_agent: configuration: {
 															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
+						otlp: """
+															Decodes the raw bytes as [OTLP (OpenTelemetry Protocol)][otlp] protobuf format.
+
+															This decoder handles the three OTLP signal types: logs, metrics, and traces.
+															It automatically detects which type of OTLP message is being decoded.
+
+															[otlp]: https://opentelemetry.io/docs/specs/otlp/
+															"""
 						protobuf: """
 															Decodes the raw bytes as [protobuf][protobuf].
 
@@ -152,16 +160,34 @@ generated: components: sources: datadog_agent: configuration: {
 				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
 				required:      false
-				type: object: options: lossy: {
-					description: """
-						Determines whether to replace invalid UTF-8 sequences instead of failing.
+				type: object: options: {
+					lossy: {
+						description: """
+																Determines whether to replace invalid UTF-8 sequences instead of failing.
 
-						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+																When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
-						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-						"""
-					required: false
-					type: bool: default: true
+																[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+																"""
+						required: false
+						type: bool: default: true
+					}
+					validation: {
+						description: "Configures the decoding validation mode."
+						required:    false
+						type: string: {
+							default: "strict"
+							enum: {
+								relaxed: """
+																			Uses more relaxed validation that skips strict GELF specification checks.
+
+																			This mode will not treat specification violations as errors, allowing the decoder
+																			to accept messages from sources that don't strictly follow the GELF spec.
+																			"""
+								strict: "Uses strict validation that closely follows the GELF spec."
+							}
+						}
+					}
 				}
 			}
 			influxdb: {
@@ -248,6 +274,28 @@ generated: components: sources: datadog_agent: configuration: {
 																"""
 						required: false
 						type: bool: default: false
+					}
+				}
+			}
+			signal_types: {
+				description: """
+					Signal types to attempt parsing, in priority order.
+
+					The deserializer will try parsing in the order specified. This allows you to optimize
+					performance when you know the expected signal types. For example, if you only receive
+					traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
+
+					If not specified, defaults to trying all types in order: logs, metrics, traces.
+					Duplicate signal types are automatically removed while preserving order.
+					"""
+				relevant_when: "codec = \"otlp\""
+				required:      false
+				type: array: {
+					default: ["logs", "metrics", "traces"]
+					items: type: string: enum: {
+						logs:    "OTLP logs signal (ExportLogsServiceRequest)"
+						metrics: "OTLP metrics signal (ExportMetricsServiceRequest)"
+						traces:  "OTLP traces signal (ExportTraceServiceRequest)"
 					}
 				}
 			}
@@ -553,6 +601,21 @@ generated: components: sources: datadog_agent: configuration: {
 			"""
 		required: false
 		type: bool: default: false
+	}
+	send_timeout_secs: {
+		description: """
+			The timeout before responding to requests with a HTTP 503 Service Unavailable error.
+
+			If not set, responses to completed requests will block indefinitely until connected
+			transforms or sinks are ready to receive the events. When this happens, the sending Datadog
+			Agent will eventually time out the request and drop the connection, resulting Vector
+			generating an "Events dropped." error and incrementing the `component_discarded_events_total`
+			internal metric. By setting this option to a value less than the Agent's timeout, Vector
+			will instead respond to the Agent with a HTTP 503 Service Unavailable error, emit a warning,
+			and increment the `component_timed_out_events_total` internal metric instead.
+			"""
+		required: false
+		type: float: {}
 	}
 	split_metric_namespace: {
 		description: """

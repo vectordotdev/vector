@@ -5,14 +5,19 @@ authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 publish = false
 
+[lints.clippy]
+unwrap-used = "deny"
+
 [[bin]]
 name = "generate-avro-fixtures"
 path = "tests/bin/generate-avro-fixtures.rs"
 
 [dependencies]
-apache-avro = { version = "0.16.0", default-features = false }
+apache-avro = { version = "0.20.0", default-features = false }
+arrow = { version = "56.2.0", default-features = false, features = ["ipc"] }
 bytes.workspace = true
 chrono.workspace = true
+rust_decimal = { version = "1.37", default-features = false, features = ["std"] }
 csv-core = { version = "0.1.12", default-features = false }
 derivative.workspace = true
 dyn-clone = { version = "1", default-features = false }
@@ -53,5 +58,6 @@ uuid.workspace = true
 vrl.workspace = true
 
 [features]
-syslog = ["dep:syslog_loose"]
+arrow = []
 opentelemetry = ["dep:opentelemetry-proto"]
+syslog = ["dep:syslog_loose"]

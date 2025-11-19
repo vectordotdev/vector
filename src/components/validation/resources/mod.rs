@@ -173,6 +173,8 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         // TODO: Influxdb has no serializer yet
         DeserializerConfig::Influxdb { .. } => todo!(),
         DeserializerConfig::Vrl { .. } => unimplemented!(),
+        #[cfg(feature = "codecs-opentelemetry")]
+        DeserializerConfig::Otlp { .. } => SerializerConfig::Otlp,
     };
 
     serializer_config

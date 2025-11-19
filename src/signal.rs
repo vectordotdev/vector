@@ -20,7 +20,7 @@ pub enum SignalTo {
     ReloadComponents(HashSet<ComponentKey>),
     /// Signal to reload config from a string.
     ReloadFromConfigBuilder(ConfigBuilder),
-    /// Signal to reload config from the filesystem.
+    /// Signal to reload config from the filesystem and reload components with external files.
     ReloadFromDisk,
     /// Signal to reload all enrichment tables.
     ReloadEnrichmentTables,
@@ -131,7 +131,10 @@ impl SignalHandler {
 
             while let Some(value) = stream.next().await {
                 if tx.send(value.into()).is_err() {
-                    error!(message = "Couldn't send signal.");
+                    error!(
+                        message = "Couldn't send signal.",
+                        internal_log_rate_limit = false
+                    );
                     break;
                 }
             }
@@ -161,12 +164,12 @@ impl SignalHandler {
                     _ = shutdown_rx.recv() => break,
                     Some(value) = stream.next() => {
                         if tx.send(value.into()).is_err() {
-                            error!(message = "Couldn't send signal.");
+                            error!(message = "Couldn't send signal.", internal_log_rate_limit = false);
                             break;
                         }
                     }
                     else => {
-                        error!(message = "Underlying stream is closed.");
+                        error!(message = "Underlying stream is closed.", internal_log_rate_limit = false);
                         break;
                     }
                 }
