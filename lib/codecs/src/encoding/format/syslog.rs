@@ -43,7 +43,7 @@ impl SyslogSerializerConfig {
 /// Syslog serializer options.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
-#[serde(default)]
+#[serde(default, deny_unknown_fields)]
 pub struct SyslogSerializerOptions {
     /// RFC to use for formatting.
     rfc: SyslogRFC,
@@ -57,8 +57,6 @@ pub struct SyslogSerializerOptions {
     proc_id: Option<ConfigTargetPath>,
     /// Path to a field in the event to use for the msg ID.
     msg_id: Option<ConfigTargetPath>,
-    /// Path to a field in the event to use for the main message payload.
-    payload_key: Option<ConfigTargetPath>,
 }
 
 /// Serializer that converts an `Event` to bytes using the Syslog format.
@@ -137,7 +135,7 @@ impl<'a> ConfigDecanter<'a> {
                 msg_id,
             },
             structured_data: self.get_structured_data(),
-            message: self.get_payload(config),
+            message: self.get_payload(),
         }
     }
 
@@ -161,13 +159,11 @@ impl<'a> ConfigDecanter<'a> {
         Utc::now()
     }
 
-    fn get_payload(&self, config: &SyslogSerializerOptions) -> String {
-        self.get_value(&config.payload_key).unwrap_or_else(|| {
-            self.log
-                .get_message()
-                .map(|v| v.to_string_lossy().to_string())
-                .unwrap_or_default()
-        })
+    fn get_payload(&self) -> String {
+        self.log
+            .get_message()
+            .map(|v| v.to_string_lossy().to_string())
+            .unwrap_or_default()
     }
 
     fn get_facility(&self, config: &SyslogSerializerOptions) -> Facility {
@@ -544,7 +540,6 @@ mod tests {
             msg_id = ".mid"
             facility = ".fac"
             severity = ".sev"
-            payload_key = ".message"
         "#,
         )
         .unwrap();
@@ -564,7 +559,6 @@ mod tests {
             severity = ".sev"
             app_name = ".app"
             proc_id = ".pid"
-            payload_key = ".message"
         "#,
         )
         .unwrap();
