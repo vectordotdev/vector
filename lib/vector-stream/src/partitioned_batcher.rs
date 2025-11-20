@@ -545,7 +545,7 @@ mod test {
         let mut map = stream
             .into_iter()
             .map(|item| {
-                let key = partitioner.partition(&item).expect("Paritioning failed");
+                let key = partitioner.partition(&item).expect("Partitioning failed");
                 (key, item)
             })
             .fold(
