@@ -109,22 +109,31 @@ impl TaskTransform<Event> for IncrementalToAbsolute {
         Self: 'static,
     {
         let mut inner = self;
+        let mut task = task;
 
-        // Emit initial metrics
-        inner.emit_metrics();
+        Box::pin(async_stream::stream! {
+            inner.emit_metrics();
 
-        // Set up periodic metrics emission every 2 seconds
-        let mut interval = tokio::time::interval(Duration::from_secs(2));
+            let mut interval = tokio::time::interval(Duration::from_secs(2));
 
-        Box::pin(task.filter_map(move |v| {
-            let mut cx = std::task::Context::from_waker(futures::task::noop_waker_ref());
-            // Poll the interval and emit metrics if ready
-            while interval.poll_tick(&mut cx).is_ready() {
-                inner.emit_metrics();
+            loop {
+                tokio::select! {
+                    _ = interval.tick() => {
+                        inner.emit_metrics();
+                    },
+                    maybe_event = task.next() => {
+                        match maybe_event {
+                            Some(event) => {
+                                if let Some(transformed) = inner.transform_one(event) {
+                                    yield transformed;
+                                }
+                            },
+                            None => break,
+                        }
+                    }
+                }
             }
-            // Process the event as before
-            futures::future::ready(inner.transform_one(v))
-        }))
+        })
     }
 }
 
