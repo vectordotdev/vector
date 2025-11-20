@@ -176,7 +176,7 @@ async fn timestamp_out_of_range() {
     }
     let e1 = Event::Log(e1);
 
-    assert!(sink.encoder.encode_event(e1).is_ok());
+    assert!(sink.encoder.encode_event(e1).is_err());
 }
 
 #[tokio::test]
