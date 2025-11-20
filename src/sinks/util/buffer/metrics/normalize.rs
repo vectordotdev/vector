@@ -330,7 +330,7 @@ impl CapacityPolicy {
 
     /// Gets the total memory size of entry/series, excluding LRU cache overhead.
     pub fn item_size(&self, series: &MetricSeries, entry: &MetricEntry) -> usize {
-        entry.allocated_bytes() + series.allocated_bytes()
+        entry.size_of() + series.size_of()
     }
 }
 

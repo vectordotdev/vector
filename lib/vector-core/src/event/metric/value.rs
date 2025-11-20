@@ -360,16 +360,12 @@ impl MetricValue {
 impl ByteSizeOf for MetricValue {
     fn allocated_bytes(&self) -> usize {
         match self {
-            Self::Counter { .. } | Self::Gauge { .. } => size_of::<f64>(),
-            Self::Set { values } => values.allocated_bytes() + size_of_val(values),
-            Self::Distribution { samples, .. } => samples.allocated_bytes() + size_of_val(samples),
-            Self::AggregatedHistogram { buckets, .. } => {
-                buckets.allocated_bytes() + size_of_val(buckets)
-            }
-            Self::AggregatedSummary { quantiles, .. } => {
-                quantiles.allocated_bytes() + size_of_val(quantiles)
-            }
-            Self::Sketch { sketch } => sketch.allocated_bytes() + size_of_val(sketch),
+            Self::Counter { .. } | Self::Gauge { .. } => 0,
+            Self::Set { values } => values.allocated_bytes(),
+            Self::Distribution { samples, .. } => samples.allocated_bytes(),
+            Self::AggregatedHistogram { buckets, .. } => buckets.allocated_bytes(),
+            Self::AggregatedSummary { quantiles, .. } => quantiles.allocated_bytes(),
+            Self::Sketch { sketch } => sketch.allocated_bytes(),
         }
     }
 }
@@ -600,7 +596,7 @@ impl PartialEq for Sample {
 
 impl ByteSizeOf for Sample {
     fn allocated_bytes(&self) -> usize {
-        size_of::<Self>()
+        0
     }
 }
 
@@ -674,7 +670,7 @@ impl PartialEq for Bucket {
 
 impl ByteSizeOf for Bucket {
     fn allocated_bytes(&self) -> usize {
-        size_of::<Self>()
+        0
     }
 }
 
@@ -743,6 +739,6 @@ impl Quantile {
 
 impl ByteSizeOf for Quantile {
     fn allocated_bytes(&self) -> usize {
-        size_of::<Self>()
+        0
     }
 }
