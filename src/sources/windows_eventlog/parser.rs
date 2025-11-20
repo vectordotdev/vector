@@ -1,4 +1,3 @@
-
 use vector_lib::config::{LogNamespace, log_schema};
 use vrl::value::{ObjectMap, Value};
 
@@ -62,7 +61,10 @@ impl EventLogParser {
 
         // Set timestamp
         if let Some(timestamp_key) = log_schema.timestamp_key() {
-            log_event.try_insert(timestamp_key.to_string().as_str(), Value::Timestamp(event.time_created.into()));
+            log_event.try_insert(
+                timestamp_key.to_string().as_str(),
+                Value::Timestamp(event.time_created.into()),
+            );
         }
 
         // Set message (rendered message or event data)
@@ -73,12 +75,18 @@ impl EventLogParser {
                 .cloned()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
 
-            log_event.try_insert(message_key.to_string().as_str(), Value::Bytes(message.into()));
+            log_event.try_insert(
+                message_key.to_string().as_str(),
+                Value::Bytes(message.into()),
+            );
         }
 
         // Set source/host
         if let Some(host_key) = log_schema.host_key() {
-            log_event.try_insert(host_key.to_string().as_str(), Value::Bytes(event.computer.clone().into()));
+            log_event.try_insert(
+                host_key.to_string().as_str(),
+                Value::Bytes(event.computer.clone().into()),
+            );
         }
 
         // Set Windows-specific fields
@@ -97,7 +105,10 @@ impl EventLogParser {
 
         // Set standard fields
         if let Some(timestamp_key) = log_schema.timestamp_key() {
-            log_event.try_insert(timestamp_key.to_string().as_str(), Value::Timestamp(event.time_created.into()));
+            log_event.try_insert(
+                timestamp_key.to_string().as_str(),
+                Value::Timestamp(event.time_created.into()),
+            );
         }
 
         if let Some(message_key) = log_schema.message_key() {
@@ -107,11 +118,17 @@ impl EventLogParser {
                 .cloned()
                 .unwrap_or_else(|| self.extract_message_from_event_data(event));
 
-            log_event.try_insert(message_key.to_string().as_str(), Value::Bytes(message.into()));
+            log_event.try_insert(
+                message_key.to_string().as_str(),
+                Value::Bytes(message.into()),
+            );
         }
 
         if let Some(host_key) = log_schema.host_key() {
-            log_event.try_insert(host_key.to_string().as_str(), Value::Bytes(event.computer.clone().into()));
+            log_event.try_insert(
+                host_key.to_string().as_str(),
+                Value::Bytes(event.computer.clone().into()),
+            );
         }
 
         // Set Windows-specific fields at root level
@@ -189,7 +206,8 @@ impl EventLogParser {
 
         // StringInserts field for FluentBit compatibility
         if !event.string_inserts.is_empty() {
-            let string_inserts: Vec<Value> = event.string_inserts
+            let string_inserts: Vec<Value> = event
+                .string_inserts
                 .iter()
                 .map(|s| Value::Bytes(s.clone().into()))
                 .collect();
@@ -262,7 +280,7 @@ impl EventLogParser {
                     }
                 })
                 .collect();
-            
+
             for key in keys_to_remove {
                 log_event.remove(key.as_str());
             }
@@ -337,7 +355,10 @@ impl EventLogParser {
                         });
                     }
                 };
-                Ok(Value::Float(ordered_float::NotNan::new(float_value).unwrap_or_else(|_| ordered_float::NotNan::new(0.0).unwrap())))
+                Ok(Value::Float(
+                    ordered_float::NotNan::new(float_value)
+                        .unwrap_or_else(|_| ordered_float::NotNan::new(0.0).unwrap()),
+                ))
             }
             EventDataFormat::Boolean => {
                 let bool_value = match value {
@@ -361,7 +382,6 @@ impl EventLogParser {
             }
         }
     }
-
 }
 
 #[cfg(test)]
@@ -521,7 +541,6 @@ mod tests {
         // Other fields should still be there
         assert!(log_event.get("event_id").is_some());
     }
-
 
     #[test]
     fn test_extract_message_from_event_data() {

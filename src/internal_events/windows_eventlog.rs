@@ -451,7 +451,6 @@ mod tests {
     use super::*;
     use std::time::Duration;
 
-
     #[test]
     fn test_subscription_started_event() {
         let channels = vec!["System".to_string(), "Application".to_string()];
@@ -621,7 +620,7 @@ mod tests {
         let channels = vec!["System".to_string(), "Application".to_string()];
         let event = WindowsEventLogSubscriptionError {
             error: "Failed to create subscription".to_string(),
-            channels: channels,
+            channels,
         };
         event.emit();
     }

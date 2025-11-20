@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use vector_config::component::GenerateConfig;
 use vector_lib::configurable::configurable_component;
 
-
 /// Configuration for the `windows_eventlog` source.
 #[configurable_component(source(
     "windows_eventlog",
@@ -224,7 +223,7 @@ impl WindowsEventLogConfig {
             return Err("Connection timeout must be between 1 and 3600 seconds".into());
         }
 
-        // Validate event timeout 
+        // Validate event timeout
         if self.event_timeout_ms == 0 || self.event_timeout_ms > 60000 {
             return Err("Event timeout must be between 1 and 60000 milliseconds".into());
         }
@@ -244,15 +243,24 @@ impl WindowsEventLogConfig {
             if channel.trim().is_empty() {
                 return Err("Channel names cannot be empty".into());
             }
-            
+
             // Prevent excessively long channel names
             if channel.len() > 256 {
-                return Err(format!("Channel name '{}' exceeds maximum length of 256 characters", channel).into());
+                return Err(format!(
+                    "Channel name '{}' exceeds maximum length of 256 characters",
+                    channel
+                )
+                .into());
             }
-            
+
             // Validate channel name contains only safe characters
-            if !channel.chars().all(|c| c.is_ascii_alphanumeric() || "-_ /\\".contains(c)) {
-                return Err(format!("Channel name '{}' contains invalid characters", channel).into());
+            if !channel
+                .chars()
+                .all(|c| c.is_ascii_alphanumeric() || "-_ /\\".contains(c))
+            {
+                return Err(
+                    format!("Channel name '{}' contains invalid characters", channel).into(),
+                );
             }
         }
 
@@ -261,16 +269,16 @@ impl WindowsEventLogConfig {
             if query.trim().is_empty() {
                 return Err("Event query cannot be empty".into());
             }
-            
+
             // Prevent excessively long XPath queries
             if query.len() > 4096 {
                 return Err("Event query exceeds maximum length of 4096 characters".into());
             }
-            
+
             // Check for unbalanced brackets and parentheses
             let mut bracket_count = 0;
             let mut paren_count = 0;
-            
+
             for ch in query.chars() {
                 match ch {
                     '[' => bracket_count += 1,
@@ -279,32 +287,49 @@ impl WindowsEventLogConfig {
                     ')' => paren_count -= 1,
                     _ => {}
                 }
-                
+
                 // Check for negative counts (more closing than opening)
                 if bracket_count < 0 || paren_count < 0 {
                     return Err("Event query contains unbalanced brackets or parentheses".into());
                 }
             }
-            
+
             // Check for unmatched opening brackets/parentheses
             if bracket_count != 0 || paren_count != 0 {
                 return Err("Event query contains unbalanced brackets or parentheses".into());
             }
-            
+
             // Check for potentially dangerous patterns that could indicate XPath injection
             let dangerous_patterns = [
-                "javascript:", "vbscript:", "file:", "http:", "https:", "ftp:",
-                "<script", "</script", "eval(", "expression(", "document.",
-                "import ", "exec(", "system(", "cmd.exe", "powershell"
+                "javascript:",
+                "vbscript:",
+                "file:",
+                "http:",
+                "https:",
+                "ftp:",
+                "<script",
+                "</script",
+                "eval(",
+                "expression(",
+                "document.",
+                "import ",
+                "exec(",
+                "system(",
+                "cmd.exe",
+                "powershell",
             ];
-            
+
             let query_lower = query.to_lowercase();
             for pattern in &dangerous_patterns {
                 if query_lower.contains(pattern) {
-                    return Err(format!("Event query contains potentially unsafe pattern: '{}'", pattern).into());
+                    return Err(format!(
+                        "Event query contains potentially unsafe pattern: '{}'",
+                        pattern
+                    )
+                    .into());
                 }
             }
-            
+
             // Basic XPath syntax validation - check balanced brackets and parentheses
             let mut bracket_count = 0i32;
             let mut paren_count = 0i32;
@@ -316,13 +341,16 @@ impl WindowsEventLogConfig {
                     ')' => paren_count -= 1,
                     _ => {}
                 }
-                
+
                 // Prevent negative counts which indicate malformed syntax
                 if bracket_count < 0 || paren_count < 0 {
-                    return Err("Event query has malformed syntax - unbalanced brackets or parentheses".into());
+                    return Err(
+                        "Event query has malformed syntax - unbalanced brackets or parentheses"
+                            .into(),
+                    );
                 }
             }
-            
+
             if bracket_count != 0 || paren_count != 0 {
                 return Err("Event query has unbalanced brackets or parentheses".into());
             }
@@ -333,12 +361,12 @@ impl WindowsEventLogConfig {
             if event_ids.is_empty() {
                 return Err("Only event IDs list cannot be empty when specified".into());
             }
-            
+
             if event_ids.len() > 1000 {
                 return Err("Only event IDs list cannot contain more than 1000 entries".into());
             }
         }
-        
+
         if self.ignore_event_ids.len() > 1000 {
             return Err("Ignore event IDs list cannot contain more than 1000 entries".into());
         }
@@ -348,20 +376,28 @@ impl WindowsEventLogConfig {
             if include_fields.is_empty() {
                 return Err("Include fields list cannot be empty when specified".into());
             }
-            
+
             if include_fields.len() > 100 {
                 return Err("Include fields list cannot contain more than 100 entries".into());
             }
-            
+
             for field in include_fields {
                 if field.trim().is_empty() || field.len() > 128 {
                     return Err(format!("Invalid field name: '{}'", field).into());
                 }
-                
+
                 // Enhanced security validation for field names
-                if field.contains('\0') || field.contains('\r') || field.contains('\n') 
-                   || field.contains('<') || field.contains('>') {
-                    return Err(format!("Invalid field name contains dangerous characters: '{}'", field).into());
+                if field.contains('\0')
+                    || field.contains('\r')
+                    || field.contains('\n')
+                    || field.contains('<')
+                    || field.contains('>')
+                {
+                    return Err(format!(
+                        "Invalid field name contains dangerous characters: '{}'",
+                        field
+                    )
+                    .into());
                 }
             }
         }
@@ -370,24 +406,31 @@ impl WindowsEventLogConfig {
             if exclude_fields.is_empty() {
                 return Err("Exclude fields list cannot be empty when specified".into());
             }
-            
+
             if exclude_fields.len() > 100 {
                 return Err("Exclude fields list cannot contain more than 100 entries".into());
             }
-            
+
             for field in exclude_fields {
                 if field.trim().is_empty() || field.len() > 128 {
                     return Err(format!("Invalid field name: '{}'", field).into());
                 }
-                
+
                 // Enhanced security validation for field names
-                if field.contains('\0') || field.contains('\r') || field.contains('\n') 
-                   || field.contains('<') || field.contains('>') {
-                    return Err(format!("Invalid field name contains dangerous characters: '{}'", field).into());
+                if field.contains('\0')
+                    || field.contains('\r')
+                    || field.contains('\n')
+                    || field.contains('<')
+                    || field.contains('>')
+                {
+                    return Err(format!(
+                        "Invalid field name contains dangerous characters: '{}'",
+                        field
+                    )
+                    .into());
                 }
             }
         }
-
 
         Ok(())
     }
@@ -533,7 +576,10 @@ mod tests {
 
         assert_eq!(config.channels, deserialized.channels);
         assert_eq!(config.event_query, deserialized.event_query);
-        assert_eq!(config.connection_timeout_secs, deserialized.connection_timeout_secs);
+        assert_eq!(
+            config.connection_timeout_secs,
+            deserialized.connection_timeout_secs
+        );
         assert_eq!(
             config.read_existing_events,
             deserialized.read_existing_events

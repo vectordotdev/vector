@@ -3,10 +3,7 @@ use tokio::select;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
-    config::LogNamespace,
-};
+use vector_lib::{EstimatedJsonEncodedSizeOf, config::LogNamespace};
 use vrl::value::Kind;
 
 use crate::{
@@ -32,7 +29,6 @@ pub use self::config::*;
 use self::{
     error::WindowsEventLogError, parser::EventLogParser, subscription::EventLogSubscription,
 };
-
 
 /// Windows Event Log source implementation
 pub struct WindowsEventLogSource {
@@ -171,7 +167,10 @@ impl SourceConfig for WindowsEventLogConfig {
             })
             .unwrap_or_else(vector_lib::schema::Definition::any);
 
-        vec![SourceOutput::new_maybe_logs(DataType::Log, schema_definition)]
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
     }
 
     fn resources(&self) -> Vec<crate::config::Resource> {

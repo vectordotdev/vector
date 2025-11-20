@@ -293,10 +293,9 @@ pub(crate) use self::websocket_server::*;
 pub(crate) use self::window::*;
 #[cfg(windows)]
 pub(crate) use self::windows::*;
-#[cfg(all(windows, feature = "sources-windows_eventlog"))]
-// pub(crate) use self::windows_eventlog::*;
-
 pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
     heartbeat::*, http::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
 };
+
+pub use vector_lib::internal_event::EventsReceived;

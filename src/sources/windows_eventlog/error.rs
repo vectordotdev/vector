@@ -59,7 +59,6 @@ pub enum WindowsEventLogError {
     #[snafu(display("Channel '{}' not found", channel))]
     ChannelNotFoundError { channel: String },
 
-
     #[snafu(display("I/O error: {}", source))]
     IoError { source: std::io::Error },
 
@@ -82,7 +81,6 @@ pub enum WindowsEventLogError {
         #[cfg(not(windows))]
         source: Box<dyn std::error::Error + Send + Sync>,
     },
-
 
     #[snafu(display("Failed to format message: {}", message))]
     FormatMessageError { message: String },
@@ -143,7 +141,7 @@ impl WindowsEventLogError {
             | Self::LoadPublisherMetadataError { .. } => false,
 
             // Parsing errors might be recoverable depending on the specific error
-            Self::ParseXmlError { .. } 
+            Self::ParseXmlError { .. }
             | Self::RenderMessageError { .. }
             | Self::FormatMessageError { .. }
             | Self::RenderError { .. } => false,

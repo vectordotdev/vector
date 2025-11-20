@@ -159,8 +159,11 @@ impl EventLogSubscription {
     }
 
     /// Get the next batch of events from the subscription
-    pub async fn next_events(&mut self, max_events: usize) -> Result<Vec<WindowsEvent>, WindowsEventLogError> {
-        use tokio::time::{timeout, Duration};
+    pub async fn next_events(
+        &mut self,
+        max_events: usize,
+    ) -> Result<Vec<WindowsEvent>, WindowsEventLogError> {
+        use tokio::time::{Duration, timeout};
 
         let mut events = Vec::with_capacity(max_events.min(1000));
 
@@ -199,7 +202,7 @@ impl EventLogSubscription {
     ) -> Result<(), WindowsEventLogError> {
         use windows::{
             Win32::System::EventLog::{
-                EvtSubscribe, EvtSubscribeToFutureEvents, EvtSubscribeStartAtOldestRecord,
+                EvtSubscribe, EvtSubscribeStartAtOldestRecord, EvtSubscribeToFutureEvents,
             },
             core::HSTRING,
         };
@@ -263,7 +266,10 @@ impl EventLogSubscription {
         true
     }
 
-    fn build_xpath_query(config: &WindowsEventLogConfig, _channel: &str) -> Result<String, WindowsEventLogError> {
+    fn build_xpath_query(
+        config: &WindowsEventLogConfig,
+        _channel: &str,
+    ) -> Result<String, WindowsEventLogError> {
         let query = if let Some(ref custom_query) = config.event_query {
             custom_query.clone()
         } else {
@@ -314,10 +320,8 @@ impl EventLogSubscription {
                     }
                 })
                 .unwrap_or(0),
-            version: Self::extract_xml_value(xml, "Version")
-                .and_then(|v| v.parse().ok()),
-            qualifiers: Self::extract_xml_attribute(xml, "Qualifiers")
-                .and_then(|v| v.parse().ok()),
+            version: Self::extract_xml_value(xml, "Version").and_then(|v| v.parse().ok()),
+            qualifiers: Self::extract_xml_attribute(xml, "Qualifiers").and_then(|v| v.parse().ok()),
             record_id: Self::extract_xml_value(xml, "EventRecordID")
                 .and_then(|v| v.parse().ok())
                 .unwrap_or(0),
@@ -345,7 +349,8 @@ impl EventLogSubscription {
     pub fn extract_xml_attribute(xml: &str, attr_name: &str) -> Option<String> {
         // Use regex with proper escaping to prevent injection
         let pattern = format!(r#"{}="([^"]+)""#, regex::escape(attr_name));
-        regex::Regex::new(&pattern).ok()?
+        regex::Regex::new(&pattern)
+            .ok()?
             .captures(xml)?
             .get(1)
             .map(|m| m.as_str().to_string())
@@ -412,17 +417,16 @@ impl EventLogSubscription {
         None
     }
 
-
     /// Enhanced EventData extraction supporting both structured data and StringInserts
     /// Follows Open/Closed Principle - extensible without modifying existing code
     pub fn extract_event_data(xml: &str) -> EventDataResult {
         let mut structured_data = HashMap::new();
         let mut string_inserts = Vec::new();
         let mut user_data = HashMap::new();
-        
+
         Self::parse_section(xml, "EventData", &mut structured_data, &mut string_inserts);
         Self::parse_section(xml, "UserData", &mut user_data, &mut Vec::new());
-        
+
         EventDataResult {
             structured_data,
             string_inserts,
@@ -432,30 +436,30 @@ impl EventLogSubscription {
 
     /// Parse a specific XML section (EventData or UserData) - Single Responsibility
     fn parse_section(
-        xml: &str, 
-        section_name: &str, 
+        xml: &str,
+        section_name: &str,
         named_data: &mut HashMap<String, String>,
-        inserts: &mut Vec<String>
+        inserts: &mut Vec<String>,
     ) {
         let mut reader = Reader::from_str(xml);
         reader.trim_text(true);
-        
+
         let mut buf = Vec::new();
         let mut inside_section = false;
         let mut inside_data = false;
         let mut current_data_name = String::new();
         let mut current_data_value = String::new();
-        
+
         const MAX_ITERATIONS: usize = 500; // Security limit
-        const MAX_FIELDS: usize = 100;     // Memory limit
+        const MAX_FIELDS: usize = 100; // Memory limit
         let mut iterations = 0;
-        
+
         loop {
             if iterations >= MAX_ITERATIONS || named_data.len() >= MAX_FIELDS {
                 break;
             }
             iterations += 1;
-            
+
             match reader.read_event_into(&mut buf) {
                 Ok(XmlEvent::Start(ref e)) => {
                     let name = e.name();
@@ -465,7 +469,7 @@ impl EventLogSubscription {
                         inside_data = true;
                         current_data_name.clear();
                         current_data_value.clear();
-                        
+
                         // Extract Name attribute with proper validation
                         for attr in e.attributes() {
                             if let Ok(attr) = attr {
@@ -486,16 +490,17 @@ impl EventLogSubscription {
                         inside_section = false;
                     } else if name.as_ref() == b"Data" && inside_data {
                         inside_data = false;
-                        
+
                         // Apply security limits
                         if current_data_value.len() > 1024 {
                             current_data_value.truncate(1024);
                             current_data_value.push_str("...[truncated]");
                         }
-                        
+
                         // Store in appropriate format based on whether Name attribute exists
                         if !current_data_name.is_empty() {
-                            named_data.insert(current_data_name.clone(), current_data_value.clone());
+                            named_data
+                                .insert(current_data_name.clone(), current_data_value.clone());
                         } else if section_name == "EventData" {
                             // Add to StringInserts for FluentBit compatibility
                             inserts.push(current_data_value.clone());
@@ -515,19 +520,27 @@ impl EventLogSubscription {
                 Err(_) => break, // Security: fail gracefully
                 _ => {}
             }
-            
+
             buf.clear();
         }
     }
 
-    fn extract_message_from_xml(xml: &str, event_id: u32, provider_name: &str, computer: &str) -> Option<String> {
+    fn extract_message_from_xml(
+        xml: &str,
+        event_id: u32,
+        provider_name: &str,
+        computer: &str,
+    ) -> Option<String> {
         let event_data_result = Self::extract_event_data(xml);
         let event_data = &event_data_result.structured_data;
-        
+
         match event_id {
             6009 => {
-                if let (Some(version), Some(build)) = (event_data.get("Data_0"), event_data.get("Data_1")) {
-                    return Some(format!("Microsoft Windows kernel version {} build {} started", 
+                if let (Some(version), Some(build)) =
+                    (event_data.get("Data_0"), event_data.get("Data_1"))
+                {
+                    return Some(format!(
+                        "Microsoft Windows kernel version {} build {} started",
                         version.chars().take(50).collect::<String>(),
                         build.chars().take(50).collect::<String>()
                     ));
@@ -535,27 +548,33 @@ impl EventLogSubscription {
             }
             _ => {
                 if !event_data.is_empty() {
-                    let data_summary: Vec<String> = event_data.iter()
+                    let data_summary: Vec<String> = event_data
+                        .iter()
                         .take(3)
-                        .map(|(k, v)| format!("{}={}", 
-                            k.chars().take(32).collect::<String>(),
-                            v.chars().take(64).collect::<String>()
-                        ))
+                        .map(|(k, v)| {
+                            format!(
+                                "{}={}",
+                                k.chars().take(32).collect::<String>(),
+                                v.chars().take(64).collect::<String>()
+                            )
+                        })
                         .collect();
                     if !data_summary.is_empty() {
-                        return Some(format!("Event ID {} from {} ({})", 
-                            event_id, 
-                            provider_name.chars().take(64).collect::<String>(), 
+                        return Some(format!(
+                            "Event ID {} from {} ({})",
+                            event_id,
+                            provider_name.chars().take(64).collect::<String>(),
                             data_summary.join(", ")
                         ));
                     }
                 }
             }
         }
-        
-        Some(format!("Event ID {} from {} on {}", 
-            event_id, 
-            provider_name.chars().take(64).collect::<String>(), 
+
+        Some(format!(
+            "Event ID {} from {} on {}",
+            event_id,
+            provider_name.chars().take(64).collect::<String>(),
             computer.chars().take(64).collect::<String>()
         ))
     }
@@ -585,7 +604,6 @@ impl EventLogSubscription {
             return Ok(None);
         }
 
-
         // Apply event ID filters early
         if let Some(ref only_ids) = config.only_event_ids {
             if !only_ids.contains(&event_id) {
@@ -612,11 +630,7 @@ impl EventLogSubscription {
                 // Validate timestamp is reasonable (within 10 years)
                 let now = Utc::now();
                 let diff = (now - dt_utc).num_days().abs();
-                if diff > 365 * 10 {
-                    now
-                } else {
-                    dt_utc
-                }
+                if diff > 365 * 10 { now } else { dt_utc }
             })
             .unwrap_or_else(|| Utc::now());
 
@@ -631,7 +645,12 @@ impl EventLogSubscription {
         // Use comprehensive parsing for complete field coverage
         let system_fields = Self::extract_system_fields(&xml);
         let event_data_result = Self::extract_event_data(&xml);
-        let rendered_message = Self::extract_message_from_xml(&xml, system_fields.event_id, &system_fields.provider_name, &system_fields.computer);
+        let rendered_message = Self::extract_message_from_xml(
+            &xml,
+            system_fields.event_id,
+            &system_fields.provider_name,
+            &system_fields.computer,
+        );
 
         let event = WindowsEvent {
             record_id: system_fields.record_id,
@@ -693,7 +712,7 @@ unsafe extern "system" fn event_subscription_callback(
     _user_context: *const std::ffi::c_void,
     event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
 ) -> u32 {
-    use windows::Win32::System::EventLog::{EvtSubscribeActionError, EvtSubscribeActionDeliver};
+    use windows::Win32::System::EventLog::{EvtSubscribeActionDeliver, EvtSubscribeActionError};
 
     #[allow(non_upper_case_globals)] // Windows API constants don't follow Rust conventions
     match action {
@@ -715,9 +734,11 @@ unsafe extern "system" fn event_subscription_callback(
 }
 
 #[cfg(windows)]
-fn process_callback_event(event_handle: windows::Win32::System::EventLog::EVT_HANDLE) -> Result<(), WindowsEventLogError> {
-    use windows::Win32::System::EventLog::{EvtRender, EvtRenderEventXml};
+fn process_callback_event(
+    event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
+) -> Result<(), WindowsEventLogError> {
     use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
+    use windows::Win32::System::EventLog::{EvtRender, EvtRenderEventXml};
 
     // Get callback context
     let context = {
@@ -801,10 +822,7 @@ fn process_callback_event(event_handle: windows::Win32::System::EventLog::EVT_HA
     }
 
     let u16_slice = unsafe {
-        std::slice::from_raw_parts(
-            buffer.as_ptr() as *const u16,
-            buffer_used as usize / 2
-        )
+        std::slice::from_raw_parts(buffer.as_ptr() as *const u16, buffer_used as usize / 2)
     };
 
     // Remove null terminator if present
@@ -854,12 +872,30 @@ mod tests {
         </Event>
         "#;
 
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "EventID"), Some("1".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "Level"), Some("4".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "EventRecordID"), Some("12345".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "Channel"), Some("System".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "Computer"), Some("TEST-MACHINE".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "NonExistent"), None);
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "EventID"),
+            Some("1".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "Level"),
+            Some("4".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "EventRecordID"),
+            Some("12345".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "Channel"),
+            Some("System".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "Computer"),
+            Some("TEST-MACHINE".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "NonExistent"),
+            None
+        );
     }
 
     #[test]
@@ -873,9 +909,18 @@ mod tests {
         </Event>
         "#;
 
-        assert_eq!(EventLogSubscription::extract_xml_attribute(xml, "Name"), Some("Microsoft-Windows-Kernel-General".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_attribute(xml, "SystemTime"), Some("2025-08-29T00:15:41.123456Z".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_attribute(xml, "NonExistent"), None);
+        assert_eq!(
+            EventLogSubscription::extract_xml_attribute(xml, "Name"),
+            Some("Microsoft-Windows-Kernel-General".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_attribute(xml, "SystemTime"),
+            Some("2025-08-29T00:15:41.123456Z".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_attribute(xml, "NonExistent"),
+            None
+        );
     }
 
     #[test]
@@ -924,17 +969,23 @@ mod tests {
     #[test]
     fn test_security_limits() {
         // Test XML element extraction with size limits
-        let large_xml = format!(r#"
+        let large_xml = format!(
+            r#"
         <Event>
             <System>
                 <EventID>{}</EventID>
             </System>
         </Event>
-        "#, "x".repeat(10000)); // Very large content
+        "#,
+            "x".repeat(10000)
+        ); // Very large content
 
         // Should not panic or consume excessive memory
         // Security limits should prevent processing excessively large content
         let result = EventLogSubscription::extract_xml_value(&large_xml, "EventID");
-        assert!(result.is_none(), "Security limits should reject excessively large XML content");
+        assert!(
+            result.is_none(),
+            "Security limits should reject excessively large XML content"
+        );
     }
 }

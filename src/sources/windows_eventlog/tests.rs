@@ -225,7 +225,10 @@ mod config_tests {
         let deserialized: WindowsEventLogConfig = serde_json::from_str(&serialized).unwrap();
 
         assert_eq!(config.channels, deserialized.channels);
-        assert_eq!(config.connection_timeout_secs, deserialized.connection_timeout_secs);
+        assert_eq!(
+            config.connection_timeout_secs,
+            deserialized.connection_timeout_secs
+        );
         assert_eq!(config.event_timeout_ms, deserialized.event_timeout_ms);
         assert_eq!(config.batch_size, deserialized.batch_size);
         assert_eq!(config.render_message, deserialized.render_message);
@@ -596,12 +599,30 @@ mod subscription_tests {
         </Event>
         "#;
 
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "EventID"), Some("1".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "Level"), Some("4".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "EventRecordID"), Some("12345".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "Channel"), Some("System".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "Computer"), Some("TEST-MACHINE".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_value(xml, "NonExistent"), None);
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "EventID"),
+            Some("1".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "Level"),
+            Some("4".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "EventRecordID"),
+            Some("12345".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "Channel"),
+            Some("System".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "Computer"),
+            Some("TEST-MACHINE".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_value(xml, "NonExistent"),
+            None
+        );
     }
 
     #[test]
@@ -615,9 +636,18 @@ mod subscription_tests {
         </Event>
         "#;
 
-        assert_eq!(EventLogSubscription::extract_xml_attribute(xml, "Name"), Some("Microsoft-Windows-Kernel-General".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_attribute(xml, "SystemTime"), Some("2025-08-29T00:15:41.123456Z".to_string()));
-        assert_eq!(EventLogSubscription::extract_xml_attribute(xml, "NonExistent"), None);
+        assert_eq!(
+            EventLogSubscription::extract_xml_attribute(xml, "Name"),
+            Some("Microsoft-Windows-Kernel-General".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_attribute(xml, "SystemTime"),
+            Some("2025-08-29T00:15:41.123456Z".to_string())
+        );
+        assert_eq!(
+            EventLogSubscription::extract_xml_attribute(xml, "NonExistent"),
+            None
+        );
     }
 
     #[test]
@@ -639,8 +669,14 @@ mod subscription_tests {
             event_data.structured_data.get("TargetUserName"),
             Some(&"administrator".to_string())
         );
-        assert_eq!(event_data.structured_data.get("TargetLogonId"), Some(&"0x3e7".to_string()));
-        assert_eq!(event_data.structured_data.get("LogonType"), Some(&"2".to_string()));
+        assert_eq!(
+            event_data.structured_data.get("TargetLogonId"),
+            Some(&"0x3e7".to_string())
+        );
+        assert_eq!(
+            event_data.structured_data.get("LogonType"),
+            Some(&"2".to_string())
+        );
         assert_eq!(
             event_data.structured_data.get("WorkstationName"),
             Some(&"WIN-TEST".to_string())
@@ -650,13 +686,16 @@ mod subscription_tests {
     #[test]
     fn test_security_limits() {
         // Test XML element extraction with size limits
-        let large_xml = format!(r#"
+        let large_xml = format!(
+            r#"
         <Event>
             <System>
                 <EventID>{}</EventID>
             </System>
         </Event>
-        "#, "x".repeat(10000)); // Very large content
+        "#,
+            "x".repeat(10000)
+        ); // Very large content
 
         // Should not panic or consume excessive memory
         let result = EventLogSubscription::extract_xml_value(&large_xml, "EventID");
@@ -717,10 +756,10 @@ async fn run_source_integration_test() -> Result<(), Box<dyn std::error::Error>>
     match source {
         Ok(source) => {
             let source_handle = tokio::spawn(source);
-            
+
             // Let it run for a short time
             tokio::time::sleep(Duration::from_millis(100)).await;
-            
+
             // The task will complete naturally
             let _ = source_handle.await;
         }
@@ -920,15 +959,15 @@ mod security_tests {
         // Test dangerous channel names
         let excessive_length = "A".repeat(300);
         let dangerous_channels = vec![
-            "", // Empty channel
-            "   ", // Whitespace only
-            "System\0", // Null byte injection
-            "System\r\nmalicious", // CRLF injection
+            "",                                    // Empty channel
+            "   ",                                 // Whitespace only
+            "System\0",                            // Null byte injection
+            "System\r\nmalicious",                 // CRLF injection
             "System<script>alert('xss')</script>", // HTML injection
-            "System'; DROP TABLE events; --", // SQL injection attempt
-            "System$(malicious_command)", // Command substitution
-            "System`malicious_command`", // Command substitution
-            &excessive_length, // Excessive length
+            "System'; DROP TABLE events; --",      // SQL injection attempt
+            "System$(malicious_command)",          // Command substitution
+            "System`malicious_command`",           // Command substitution
+            &excessive_length,                     // Excessive length
         ];
 
         for dangerous_channel in &dangerous_channels {
@@ -973,10 +1012,7 @@ mod security_tests {
         let long_query = "*[System[".to_string() + &"Level=1 and ".repeat(1000) + "Level=2]]";
         config.event_query = Some(long_query);
         let result = config.validate();
-        assert!(
-            result.is_err(),
-            "Excessively long query should be rejected"
-        );
+        assert!(result.is_err(), "Excessively long query should be rejected");
         assert!(
             result
                 .unwrap_err()
@@ -1014,9 +1050,12 @@ mod buffer_safety_tests {
 
         // This should not panic or cause memory issues
         let result = EventLogSubscription::extract_event_data(&large_xml);
-        
+
         // Should have some reasonable limit on parsed data
-        assert!(result.structured_data.len() <= 100, "Should limit parsed data size to prevent DoS");
+        assert!(
+            result.structured_data.len() <= 100,
+            "Should limit parsed data size to prevent DoS"
+        );
     }
 
     /// Test XML parsing with deeply nested structures
@@ -1024,7 +1063,8 @@ mod buffer_safety_tests {
     fn test_deeply_nested_xml_protection() {
         // Create deeply nested XML structure (reduced nesting for memory safety)
         let mut nested_xml = "<Event>".to_string();
-        for i in 0..100 { // Reduced from 1000
+        for i in 0..100 {
+            // Reduced from 1000
             nested_xml.push_str(&format!("<Level{}>", i));
         }
         nested_xml.push_str("<EventData><Data Name='test'>value</Data></EventData>");
@@ -1035,10 +1075,13 @@ mod buffer_safety_tests {
 
         // This should not cause stack overflow or excessive memory usage
         let result = EventLogSubscription::extract_event_data(&nested_xml);
-        
+
         // Should handle gracefully - either succeeds or fails safely
         // The key is that it doesn't crash or consume excessive resources
-        assert!(result.structured_data.len() <= 100, "Should limit parsed data for deeply nested XML");
+        assert!(
+            result.structured_data.len() <= 100,
+            "Should limit parsed data for deeply nested XML"
+        );
     }
 
     /// Test handling of XML with excessive attributes
@@ -1046,27 +1089,34 @@ mod buffer_safety_tests {
     fn test_excessive_xml_attributes_handling() {
         // Create XML with many attributes (reduced count for safety)
         let mut xml_with_attrs = "<Event><EventData>".to_string();
-        for i in 0..200 { // Reduced from 5000
-            xml_with_attrs.push_str(&format!("<Data Name='attr{}' Value='value{}'>data{}</Data>", i, i, i));
+        for i in 0..200 {
+            // Reduced from 5000
+            xml_with_attrs.push_str(&format!(
+                "<Data Name='attr{}' Value='value{}'>data{}</Data>",
+                i, i, i
+            ));
         }
         xml_with_attrs.push_str("</EventData></Event>");
 
         // Should handle gracefully without memory exhaustion
         let result = EventLogSubscription::extract_event_data(&xml_with_attrs);
-        
+
         // Should have reasonable limits on parsed attributes
-        assert!(result.structured_data.len() <= 100, "Should limit number of parsed attributes");
+        assert!(
+            result.structured_data.len() <= 100,
+            "Should limit number of parsed attributes"
+        );
     }
 }
 
 // ================================================================================================
-// CONCURRENCY AND RACE CONDITION TESTS  
+// CONCURRENCY AND RACE CONDITION TESTS
 // ================================================================================================
 
 #[cfg(test)]
 mod concurrency_tests {
     use super::*;
-    
+
     #[tokio::test]
     async fn test_concurrent_subscription_creation() {
         // Test that multiple subscription attempts don't interfere
@@ -1088,7 +1138,10 @@ mod fault_tolerance_tests {
         let invalid_xml = "not valid xml <tag>";
         let result = EventLogSubscription::extract_event_data(invalid_xml);
         // Should return empty result or handle gracefully without crashing
-        assert!(result.structured_data.len() == 0, "Invalid XML should result in empty data");
+        assert!(
+            result.structured_data.len() == 0,
+            "Invalid XML should result in empty data"
+        );
     }
 
     #[tokio::test]
@@ -1103,7 +1156,10 @@ mod fault_tolerance_tests {
         for malicious_xml in &malicious_xmls {
             let result = EventLogSubscription::extract_event_data(&malicious_xml);
             // Should handle without crashing or excessive resource usage
-            assert!(result.structured_data.len() <= 100, "Malicious XML should be limited in processing");
+            assert!(
+                result.structured_data.len() <= 100,
+                "Malicious XML should be limited in processing"
+            );
         }
     }
 }

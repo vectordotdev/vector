@@ -11,7 +11,7 @@ use super::*;
 use crate::{
     config::{SourceConfig, SourceContext},
     test_util::{
-        components::{run_and_assert_source_compliance, SourceTestRunner},
+        components::{SourceTestRunner, run_and_assert_source_compliance},
         random_string,
     },
 };
@@ -28,7 +28,10 @@ async fn test_windows_eventlog_integration() {
     };
 
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
-    assert!(!events.is_empty(), "Should receive at least one event from Windows Event Log");
+    assert!(
+        !events.is_empty(),
+        "Should receive at least one event from Windows Event Log"
+    );
 
     // Verify event structure
     let event = &events[0];
@@ -100,13 +103,19 @@ async fn test_windows_eventlog_with_xml() {
     if !events.is_empty() {
         let event = &events[0];
         let log = event.as_log();
-        
+
         // Should have XML field
-        assert!(log.contains("xml"), "Event should include XML when configured");
-        
+        assert!(
+            log.contains("xml"),
+            "Event should include XML when configured"
+        );
+
         if let Some(xml) = log.get("xml") {
             let xml_str = xml.to_string_lossy();
-            assert!(xml_str.contains("<Event"), "XML should contain Event element");
+            assert!(
+                xml_str.contains("<Event"),
+                "XML should contain Event element"
+            );
             assert!(xml_str.contains("</Event>"), "XML should be well-formed");
         }
     }
@@ -145,8 +154,8 @@ async fn test_windows_eventlog_event_filtering() {
 async fn test_windows_eventlog_resilience() {
     let config = WindowsEventLogConfig {
         channels: vec!["System".to_string(), "Application".to_string()],
-        connection_timeout_secs: 5,  // Shorter timeout for resilience test
-        event_timeout_ms: 1000,      // Short timeout
+        connection_timeout_secs: 5, // Shorter timeout for resilience test
+        event_timeout_ms: 1000,     // Short timeout
         batch_size: 5,
         ..Default::default()
     };
@@ -168,8 +177,8 @@ async fn test_windows_eventlog_field_filtering() {
         batch_size: 5,
         field_filter: FieldFilter {
             include_system_fields: true,
-            include_event_data: false,  // Exclude event data
-            include_user_data: false,   // Exclude user data
+            include_event_data: false, // Exclude event data
+            include_user_data: false,  // Exclude user data
             include_fields: Some(vec![
                 "event_id".to_string(),
                 "level".to_string(),
@@ -195,7 +204,10 @@ async fn test_windows_eventlog_field_filtering() {
 
         // Should not have excluded fields
         assert!(!log.contains("raw_xml"), "Should exclude raw_xml");
-        assert!(!log.contains("event_data"), "Should exclude event_data when configured");
+        assert!(
+            !log.contains("event_data"),
+            "Should exclude event_data when configured"
+        );
     }
 }
 
@@ -212,7 +224,8 @@ async fn test_windows_eventlog_namespaces() {
         ..Default::default()
     };
 
-    let events = run_and_assert_source_compliance(config.clone(), Duration::from_secs(2), &[]).await;
+    let events =
+        run_and_assert_source_compliance(config.clone(), Duration::from_secs(2), &[]).await;
 
     if !events.is_empty() {
         let event = &events[0];
@@ -251,7 +264,10 @@ async fn test_windows_eventlog_error_handling() {
     }));
 
     // Source should handle invalid channels gracefully without panicking
-    assert!(result.is_ok(), "Source should handle invalid channels gracefully");
+    assert!(
+        result.is_ok(),
+        "Source should handle invalid channels gracefully"
+    );
 }
 
 /// Performance test for Windows Event Log source
@@ -261,7 +277,7 @@ async fn test_windows_eventlog_performance() {
         channels: vec!["System".to_string(), "Application".to_string()],
         connection_timeout_secs: 30,
         event_timeout_ms: 5000,
-        batch_size: 50, // Larger batch size for performance test
+        batch_size: 50,             // Larger batch size for performance test
         read_existing_events: true, // Read existing events to ensure we have data
         ..Default::default()
     };
@@ -306,31 +322,36 @@ async fn test_windows_eventlog_real_time_events() {
 
     // Start the source
     let mut runner = SourceTestRunner::new(config);
-    
+
     // Generate a test event using Windows eventcreate command
     let test_id = random_string(8);
     let test_message = format!("Vector integration test event {}", test_id);
-    
+
     let output = Command::new("eventcreate")
         .args(&[
-            "/T", "INFORMATION",
-            "/ID", "1001",
-            "/L", "APPLICATION",
-            "/SO", "VectorTest",
-            "/D", &test_message,
+            "/T",
+            "INFORMATION",
+            "/ID",
+            "1001",
+            "/L",
+            "APPLICATION",
+            "/SO",
+            "VectorTest",
+            "/D",
+            &test_message,
         ])
         .output();
 
     if let Ok(output) = output {
         if output.status.success() {
             println!("Successfully created test event");
-            
+
             // Wait for the event to be processed
             tokio::time::sleep(Duration::from_secs(2)).await;
-            
+
             // Check if we received the test event
             let events = runner.collect_events_for(Duration::from_secs(3)).await;
-            
+
             let found_test_event = events.iter().any(|event| {
                 if let Some(message) = event.as_log().get("message") {
                     message.to_string_lossy().contains(&test_id)
@@ -338,14 +359,17 @@ async fn test_windows_eventlog_real_time_events() {
                     false
                 }
             });
-            
+
             if found_test_event {
                 println!("Successfully detected generated test event");
             } else {
                 println!("Test event not detected in {} events", events.len());
             }
         } else {
-            println!("Failed to create test event: {}", String::from_utf8_lossy(&output.stderr));
+            println!(
+                "Failed to create test event: {}",
+                String::from_utf8_lossy(&output.stderr)
+            );
         }
     }
 }
