@@ -54,7 +54,11 @@ where
                 ),
                 || batcher_settings.as_byte_size_config(),
             )
-            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .filter_map(|result| async move {
+                result
+                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                    .ok()
+            })
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
