@@ -991,7 +991,7 @@ mod tests {
             .collect::<Vec<_>>();
         let mut filter = RecordFilter::new(OutOfOrderAction::Drop);
         let stream = futures::stream::iter(events)
-            .map(|event| encoder.encode_event(event))
+            .map(|event| encoder.encode_event(event).ok())
             .filter_map(|event| async { event })
             .filter_map(|event| {
                 let res = filter.filter_record(event);
