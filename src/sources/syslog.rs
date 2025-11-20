@@ -237,7 +237,7 @@ impl SourceConfig for SyslogConfig {
                     Deserializer::Syslog(
                         SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
                     ),
-                );
+                ).with_log_namespace(log_namespace);
 
                 build_unix_stream_source(
                     path,
@@ -294,7 +294,7 @@ impl TcpSource for SyslogTcpSource {
         Decoder::new(
             Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(self.max_length)),
             Deserializer::Syslog(SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build()),
-        )
+        ).with_log_namespace(self.log_namespace)
     }
 
     fn handle_events(&self, events: &mut [Event], host: SocketAddr) {
@@ -348,7 +348,7 @@ pub fn udp(
                 Deserializer::Syslog(
                     SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
                 ),
-            ),
+            ).with_log_namespace(log_namespace),
         )
         .take_until(shutdown)
         .filter_map(|frame| {
