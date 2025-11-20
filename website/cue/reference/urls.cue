@@ -675,6 +675,7 @@ urls: {
 	websocket:                                  "\(wikipedia)/wiki/WebSocket"
 	wikipedia:                                  "https://en.wikipedia.org"
 	windows:                                    "https://www.microsoft.com/en-us/windows"
+	windows_event_log:                          "https://learn.microsoft.com/en-us/windows/win32/eventlog/event-logging"
 	windows_installer:                          "\(wikipedia)/wiki/Windows_Installer"
 	windows_service:                            "https://docs.microsoft.com/en-us/powershell/module/microsoft.powershell.management/new-service"
 	woothee:                                    "https://github.com/woothee/woothee"
