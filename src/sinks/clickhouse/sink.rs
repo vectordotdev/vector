@@ -45,7 +45,11 @@ where
                 KeyPartitioner::new(self.database, self.table, self.format),
                 || batch_settings.as_byte_size_config(),
             )
-            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .filter_map(|result| async move {
+                result
+                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                    .ok()
+            })
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -105,28 +109,30 @@ impl KeyPartitioner {
         }
     }
 
-    fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
-        template
-            .render_string(item)
-            .map_err(|error| {
-                emit!(TemplateRenderingError {
-                    error,
-                    field: Some(field),
-                    drop_event: true,
-                });
-            })
-            .ok()
+    fn render(
+        template: &Template,
+        item: &Event,
+        field: &'static str,
+    ) -> Result<String, crate::template::TemplateRenderingError> {
+        template.render_string(item).inspect_err(|error| {
+            emit!(TemplateRenderingError {
+                error: error.clone(),
+                field: Some(field),
+                drop_event: true,
+            });
+        })
     }
 }
 
 impl Partitioner for KeyPartitioner {
     type Item = Event;
-    type Key = Option<PartitionKey>;
+    type Key = PartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
         let database = Self::render(&self.database, item, "database_key")?;
         let table = Self::render(&self.table, item, "table_key")?;
-        Some(PartitionKey {
+        Ok(PartitionKey {
             database,
             table,
             format: self.format,
