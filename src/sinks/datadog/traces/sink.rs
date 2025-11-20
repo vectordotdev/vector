@@ -18,7 +18,7 @@ use vrl::{event_path, path::PathPrefix};
 
 use super::service::TraceApiRequest;
 use crate::{
-    internal_events::DatadogTracesEncodingError,
+    internal_events::{DatadogTracesEncodingError, SinkRequestBuildError},
     sinks::{datadog::traces::request_builder::DatadogTracesRequestBuilder, util::SinkBuilderExt},
 };
 
@@ -41,8 +41,9 @@ pub(crate) struct PartitionKey {
 impl Partitioner for EventPartitioner {
     type Item = Event;
     type Key = PartitionKey;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
         match item {
             Event::Metric(_) => {
                 panic!("unexpected metric");
@@ -50,7 +51,7 @@ impl Partitioner for EventPartitioner {
             Event::Log(_) => {
                 panic!("unexpected log");
             }
-            Event::Trace(t) => PartitionKey {
+            Event::Trace(t) => Ok(PartitionKey {
                 api_key: item.metadata().datadog_api_key(),
                 env: t
                     .get(event_path!("env"))
@@ -68,7 +69,7 @@ impl Partitioner for EventPartitioner {
                 error_tps: t
                     .get(event_path!("error_tps"))
                     .and_then(|tps| tps.as_integer()),
-            },
+            }),
         }
     }
 }
@@ -109,6 +110,11 @@ where
 
         input
             .batched_partitioned(EventPartitioner, || batch_settings.as_byte_size_config())
+            .filter_map(|result| async move {
+                result
+                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                    .ok()
+            })
             .incremental_request_builder(self.request_builder)
             .flat_map(stream::iter)
             .filter_map(|request| async move {
