@@ -20,7 +20,7 @@ use std::time::{Duration, Instant};
 use tokio::select;
 use vector_common::internal_event::{BytesReceived, Protocol};
 use vector_lib::emit;
-use vector_lib::source_sender::ClosedError;
+use vector_lib::source_sender::SendError;
 use vrl::prelude::*;
 
 const TIMESTAMP_FORMATS: &[&str] = &[
@@ -48,8 +48,8 @@ pub enum OdbcError {
     #[snafu(display("File IO error: {source}"))]
     Io { source: std::io::Error },
 
-    #[snafu(display("Batch error: {source}"))]
-    Closed { source: ClosedError },
+    #[snafu(display("Send error: {source}"))]
+    SendError { source: SendError },
 
     #[snafu(display("JSON error: {source}"))]
     Json { source: serde_json::Error },
@@ -188,7 +188,7 @@ impl Context {
         );
 
         let mut out = out.clone();
-        out.send_event(event).await.context(ClosedSnafu)?;
+        out.send_event(event).await.context(SendSnafu)?;
 
         if let Some(last) = rows.last() {
             let Some(tracking_columns) = cfg.tracking_columns else {
