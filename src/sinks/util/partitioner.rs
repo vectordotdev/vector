@@ -26,8 +26,7 @@ impl Partitioner for KeyPartitioner {
     type Error = crate::template::TemplateRenderingError;
 
     fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
-        self
-            .key_prefix_template
+        self.key_prefix_template
             .render_string(item)
             .or_else(|error| {
                 if let Some(dead_letter_key_prefix) = &self.dead_letter_key_prefix {
