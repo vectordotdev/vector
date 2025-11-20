@@ -47,37 +47,47 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
     let mut discarded_for_size_and_truncated = Vec::new();
     let mut reader = Box::new(reader);
 
-    // Track partial delimiter matches across buffer boundaries
+    // Used to track partial delimiter matches across buffer boundaries.
+    // Data is read in chunks from the reader (see `fill_buf` below).
+    // A multi-byte delimiter may be split across the "old" and "new" buffers.
+    // Any potential partial delimiter that was found in the "old" buffer is stored in this variable.
     let mut partial_delim: BytesMut = BytesMut::with_capacity(delim_len);
 
     loop {
+        // Read the next chunk of data
         let available: &[u8] = match reader.fill_buf().await {
             Ok(n) => n,
             Err(ref e) if e.kind() == io::ErrorKind::Interrupted => continue,
             Err(e) => return Err(e),
         };
 
-        // First, check if we have a partial delimiter from the previous iteration
+        // First, check if we have a partial delimiter from the previous iteration/buffer
         if !partial_delim.is_empty() {
             let expected_suffix = &delim[partial_delim.len()..];
             let expected_suffix_len = expected_suffix.len();
 
+            // We already know that we have a partial delimiter match from the previous buffer.
+            // Here we check what part of the delimiter is missing and whether the new buffer
+            // contains the remaining part.
             if available.len() >= expected_suffix_len
                 && &available[..expected_suffix_len] == expected_suffix
             {
-                // Complete delimiter found! Consume the suffix
+                // Complete delimiter found! Consume the remainder of the delimiter so we can start
+                // processing data after the delimiter.
                 reader.consume(expected_suffix_len);
                 *position += expected_suffix_len as u64;
                 total_read += expected_suffix_len;
                 partial_delim.clear();
 
-                // Found a complete delimiter, return the current buffer
+                // Found a complete delimiter, return the current buffer so we can proceed with the
+                // next record after this delimiter in the next call.
                 return Ok(ReadResult {
                     successfully_read: Some(total_read),
                     discarded_for_size_and_truncated,
                 });
             } else {
-                // Not a complete delimiter after all. Add partial_delim to output buffer
+                // Not a complete delimiter after all.
+                // Add partial_delim to output buffer as it is actual data.
                 if !discarding {
                     buf.extend_from_slice(&partial_delim);
                 }
@@ -95,16 +105,44 @@ pub async fn read_until_with_max_size<'a, R: AsyncBufRead + ?Sized + Unpin>(
                     (true, i + delim_len)
                 }
                 None => {
-                    // No delimiter found in current buffer. Check if buffer ends with a
-                    // partial delimiter match. For multi-byte delimiters like \r\n, we need
-                    // to handle the case where the delimiter is split across buffer boundaries.
+                    // No delimiter found in current buffer. But there could be a partial delimiter
+                    // at the end of this buffer. For multi-byte delimiters like \r\n, we need
+                    // to handle the case where the delimiter is split across buffer boundaries
+                    // (e.g. \r in the "old" buffer, then we read new data and find \n in the new
+                    // buffer).
                     let mut partial_match_len = 0;
+
+                    // We only need to check if we're not already at the end of the buffer and if we
+                    // have a delimiter that has more than one byte.
                     if !available.is_empty() && delim_len > 1 {
-                        // Check if the end matches a prefix of the delimiter.
-                        // We iterate from longest to shortest prefix and break on first match.
-                        // Performance: For typical 2-byte delimiters (CRLF), this is 1 iteration.
-                        // For longer delimiters, this runs O(delim_len) times but only occurs
-                        // at buffer boundaries (~every 8KB), making the impact negligible.
+                        // Check if the end of the current buffer matches a prefix of the delimiter
+                        // by testing from longest to shortest possible prefix.
+                        //
+                        // This loop runs at most (delim_len - 1) iterations:
+                        //   - 2-byte delimiter (\r\n): 1 iteration max
+                        //   - 5-byte delimiter: 4 iterations max
+                        //
+                        // This part of the code is only called if all of these are true:
+                        //
+                        // - We have a new buffer (e.g. every 8kB, i.e. only called once per buffer)
+                        // - We have a multi-byte delimiter
+                        // - This delimiter could not be found in the current buffer
+                        //
+                        // Even for longer delimiters the performance impact is negligible.
+                        //
+                        // Example 1:
+                        //   Delimiter: \r\n
+                        //   Iteration 1: It checks if the current buffer ends with "\r",
+                        //     if it does we have a potential partial delimiter.
+                        //   The next chunk will confirm whether this is truly part of a delimiter.
+
+                        // Example 2:
+                        //   Delimiter: ABCDE
+                        //   Iteration 1: It checks if the current buffer ends with "ABCD" (we don't
+                        //     need to check "ABCDE" because that would have been caught by
+                        //     `delim_finder.find` earlier)
+                        //   Iteration 2: It checks if the current buffer ends with "ABC"
+                        //   Iterations 3-4: Same for "AB" and "A"
                         for prefix_len in (1..delim_len).rev() {
                             if available.len() >= prefix_len
                                 && available.ends_with(&delim[..prefix_len])
