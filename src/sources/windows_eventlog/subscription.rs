@@ -90,6 +90,9 @@ pub struct EventLogSubscription {
     #[cfg(windows)]
     #[allow(dead_code)] // Used for RAII cleanup of Windows handles via Drop trait
     subscriptions: Arc<Mutex<Vec<SubscriptionHandle>>>,
+    #[cfg(windows)]
+    // Shared subscription error state - checked by next_events()
+    subscription_error: Arc<Mutex<Option<WindowsEventLogError>>>,
 }
 
 #[cfg(windows)]
@@ -110,14 +113,24 @@ impl Drop for SubscriptionHandle {
     }
 }
 
-// Global callback context - needed because C callbacks can't capture Rust closures
-#[cfg(windows)]
-static CALLBACK_CONTEXT: Mutex<Option<Arc<CallbackContext>>> = Mutex::new(None);
-
 #[cfg(windows)]
 struct CallbackContext {
     event_sender: mpsc::UnboundedSender<WindowsEvent>,
     config: Arc<WindowsEventLogConfig>,
+    // Shared error state - allows callback to signal fatal subscription errors
+    subscription_error: Arc<Mutex<Option<WindowsEventLogError>>>,
+}
+
+// Convert CallbackContext pointer to raw pointer for passing through Windows API
+#[cfg(windows)]
+impl CallbackContext {
+    fn into_raw(ctx: Arc<CallbackContext>) -> *const std::ffi::c_void {
+        Arc::into_raw(ctx) as *const std::ffi::c_void
+    }
+
+    unsafe fn from_raw(ptr: *const std::ffi::c_void) -> Arc<CallbackContext> {
+        unsafe { Arc::from_raw(ptr as *const CallbackContext) }
+    }
 }
 
 impl EventLogSubscription {
@@ -132,28 +145,28 @@ impl EventLogSubscription {
         {
             let config = Arc::new(config.clone());
             let (event_sender, event_receiver) = mpsc::unbounded_channel();
+            let subscription_error = Arc::new(Mutex::new(None));
 
             // Validate channels exist and are accessible
             Self::validate_channels(&config)?;
 
-            // Set up global callback context
-            {
-                let mut global_ctx = CALLBACK_CONTEXT.lock().unwrap();
-                *global_ctx = Some(Arc::new(CallbackContext {
-                    event_sender: event_sender.clone(),
-                    config: Arc::clone(&config),
-                }));
-            }
+            // Create callback context for this subscription
+            let callback_context = Arc::new(CallbackContext {
+                event_sender: event_sender.clone(),
+                config: Arc::clone(&config),
+                subscription_error: Arc::clone(&subscription_error),
+            });
 
             let subscriptions = Arc::new(Mutex::new(Vec::new()));
 
-            // Create subscriptions for each channel
-            Self::create_subscriptions(&config, Arc::clone(&subscriptions))?;
+            // Create subscriptions for each channel, passing our context
+            Self::create_subscriptions(&config, Arc::clone(&subscriptions), Arc::clone(&callback_context))?;
 
             Ok(Self {
                 config,
                 event_receiver,
                 subscriptions,
+                subscription_error,
             })
         }
     }
@@ -165,12 +178,28 @@ impl EventLogSubscription {
     ) -> Result<Vec<WindowsEvent>, WindowsEventLogError> {
         use tokio::time::{Duration, timeout};
 
+        // Check for subscription errors first
+        #[cfg(windows)]
+        {
+            if let Some(error) = self.subscription_error.lock().unwrap().take() {
+                return Err(error);
+            }
+        }
+
         let mut events = Vec::with_capacity(max_events.min(1000));
 
         // Use timeout to prevent blocking indefinitely
         let timeout_duration = Duration::from_millis(self.config.event_timeout_ms);
 
         while events.len() < max_events {
+            // Check for subscription errors during event collection
+            #[cfg(windows)]
+            {
+                if let Some(error) = self.subscription_error.lock().unwrap().take() {
+                    return Err(error);
+                }
+            }
+
             match timeout(timeout_duration, self.event_receiver.recv()).await {
                 Ok(Some(event)) => {
                     if Self::should_include_event(&self.config, &event) {
@@ -180,6 +209,14 @@ impl EventLogSubscription {
                 Ok(None) => {
                     // Channel closed, subscription ended
                     debug!("Event subscription channel closed");
+
+                    // Check if closure was due to an error
+                    #[cfg(windows)]
+                    {
+                        if let Some(error) = self.subscription_error.lock().unwrap().take() {
+                            return Err(error);
+                        }
+                    }
                     break;
                 }
                 Err(_) => {
@@ -199,6 +236,7 @@ impl EventLogSubscription {
     fn create_subscriptions(
         config: &Arc<WindowsEventLogConfig>,
         subscriptions: Arc<Mutex<Vec<SubscriptionHandle>>>,
+        callback_context: Arc<CallbackContext>,
     ) -> Result<(), WindowsEventLogError> {
         use windows::{
             Win32::System::EventLog::{
@@ -228,6 +266,9 @@ impl EventLogSubscription {
                 read_existing = config.read_existing_events
             );
 
+            // Convert context to raw pointer for passing through Windows API
+            let context_ptr = CallbackContext::into_raw(Arc::clone(&callback_context));
+
             // Create subscription using EvtSubscribe with callback
             let subscription_handle = unsafe {
                 EvtSubscribe(
@@ -236,7 +277,7 @@ impl EventLogSubscription {
                     &channel_hstring,
                     &query_hstring,
                     None, // Bookmark (not using bookmarks in refactored version)
-                    None, // Context (will be passed via global state)
+                    Some(context_ptr), // Context - per-subscription context!
                     Some(event_subscription_callback), // Callback function
                     subscription_flags,
                 )
@@ -280,15 +321,48 @@ impl EventLogSubscription {
     }
 
     #[cfg(windows)]
-    fn validate_channels(_config: &WindowsEventLogConfig) -> Result<(), WindowsEventLogError> {
-        use windows::Win32::System::EventLog::{EvtClose, EvtOpenChannelEnum};
+    fn validate_channels(config: &WindowsEventLogConfig) -> Result<(), WindowsEventLogError> {
+        use windows::Win32::System::EventLog::{EvtClose, EvtOpenChannelConfig};
+        use windows::core::HSTRING;
 
-        // Try to enumerate channels to validate they exist
-        let enum_handle = unsafe { EvtOpenChannelEnum(None, 0) }
-            .map_err(|e| WindowsEventLogError::CreateSubscriptionError { source: e })?;
+        // Validate each channel exists and is accessible
+        for channel in &config.channels {
+            let channel_hstring = HSTRING::from(channel.as_str());
 
-        if let Err(e) = unsafe { EvtClose(enum_handle) } {
-            warn!("Failed to close enum handle: {}", e);
+            // Try to open the channel configuration to verify it exists
+            let channel_handle = unsafe {
+                EvtOpenChannelConfig(None, &channel_hstring, 0)
+            };
+
+            match channel_handle {
+                Ok(handle) => {
+                    // Channel exists - close the handle and continue
+                    if let Err(e) = unsafe { EvtClose(handle) } {
+                        warn!("Failed to close channel config handle: {}", e);
+                    }
+                }
+                Err(e) => {
+                    // Channel doesn't exist or can't be accessed
+                    let error_code = e.code().0 as u32;
+
+                    // ERROR_FILE_NOT_FOUND (2) or ERROR_EVT_CHANNEL_NOT_FOUND (15007)
+                    if error_code == 2 || error_code == 15007 {
+                        return Err(WindowsEventLogError::ChannelNotFoundError {
+                            channel: channel.clone(),
+                        });
+                    } else if error_code == 5 {
+                        // ERROR_ACCESS_DENIED
+                        return Err(WindowsEventLogError::AccessDeniedError {
+                            channel: channel.clone(),
+                        });
+                    } else {
+                        return Err(WindowsEventLogError::OpenChannelError {
+                            channel: channel.clone(),
+                            source: e,
+                        });
+                    }
+                }
+            }
         }
 
         Ok(())
@@ -694,62 +768,107 @@ impl EventLogSubscription {
     }
 }
 
-impl Drop for EventLogSubscription {
-    fn drop(&mut self) {
-        #[cfg(windows)]
-        {
-            // Cleanup global callback context
-            let mut global_ctx = CALLBACK_CONTEXT.lock().unwrap();
-            *global_ctx = None;
-        }
-    }
-}
+// No Drop implementation needed - context cleanup is handled automatically via Arc
 
 // Windows Event Log subscription callback function
 #[cfg(windows)]
 unsafe extern "system" fn event_subscription_callback(
     action: windows::Win32::System::EventLog::EVT_SUBSCRIBE_NOTIFY_ACTION,
-    _user_context: *const std::ffi::c_void,
+    user_context: *const std::ffi::c_void,
     event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
 ) -> u32 {
     use windows::Win32::System::EventLog::{EvtSubscribeActionDeliver, EvtSubscribeActionError};
 
+    // Safety check: user_context must not be null
+    if user_context.is_null() {
+        error!("Callback received null user_context");
+        return 0;
+    }
+
+    // Retrieve the callback context from user_context parameter
+    // Clone the Arc to increment ref count, then immediately forget it to not drop
+    let ctx = unsafe {
+        let arc = CallbackContext::from_raw(user_context);
+        let cloned = Arc::clone(&arc);
+        std::mem::forget(arc); // Don't drop - Windows still owns this
+        cloned
+    };
+
     #[allow(non_upper_case_globals)] // Windows API constants don't follow Rust conventions
     match action {
         EvtSubscribeActionDeliver => {
-            // Process the event
-            if let Err(e) = process_callback_event(event_handle) {
+            // Process the event with the correct context
+            if let Err(e) = process_callback_event(event_handle, &ctx) {
                 warn!("Error processing callback event: {}", e);
             }
+            0 // Return success
         }
         EvtSubscribeActionError => {
-            warn!("Windows Event Log subscription error occurred");
+            // Extract the actual Windows error using EvtGetExtendedStatus
+            let error_message = unsafe { extract_windows_extended_status() };
+
+            error!(
+                message = "Windows Event Log subscription error - subscription will be terminated",
+                error = %error_message
+            );
+
+            // Store the error in the shared state so next_events() can retrieve it
+            let mut error_state = ctx.subscription_error.lock().unwrap();
+            if error_state.is_none() {
+                *error_state = Some(WindowsEventLogError::SubscriptionError {
+                    source: windows::core::Error::from_win32(),
+                });
+            }
+
+            // Return ERROR_CANCELLED to signal Windows that we're done with this subscription
+            // This prevents the callback storm by telling Windows to stop calling us
+            windows::Win32::Foundation::ERROR_CANCELLED.0
         }
         _ => {
             debug!("Unknown subscription callback action: {}", action.0);
+            0
         }
     }
+}
 
-    0 // Return success
+/// Extract extended error information from Windows Event Log API
+#[cfg(windows)]
+unsafe fn extract_windows_extended_status() -> String {
+    use windows::Win32::System::EventLog::EvtGetExtendedStatus;
+    use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
+
+    const MAX_ERROR_BUFFER: usize = 2048;
+    let mut buffer_size = 0u32;
+
+    // First call to get required buffer size
+    let status = unsafe { EvtGetExtendedStatus(None, &mut buffer_size) };
+
+    if status != ERROR_INSUFFICIENT_BUFFER.0 || buffer_size == 0 || buffer_size as usize > MAX_ERROR_BUFFER {
+        return "Unknown error (unable to retrieve extended status)".to_string();
+    }
+
+    // Allocate buffer and retrieve the error message
+    let mut buffer = vec![0u16; buffer_size as usize];
+    let mut actual_size = 0u32;
+
+    let status = unsafe { EvtGetExtendedStatus(Some(&mut buffer), &mut actual_size) };
+
+    if status == 0 {
+        // Success - remove null terminator if present
+        let msg_len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+        String::from_utf16_lossy(&buffer[..msg_len])
+    } else {
+        "Unknown error (EvtGetExtendedStatus failed)".to_string()
+    }
 }
 
 #[cfg(windows)]
 fn process_callback_event(
     event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
+    ctx: &Arc<CallbackContext>,
 ) -> Result<(), WindowsEventLogError> {
     use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
     use windows::Win32::System::EventLog::{EvtRender, EvtRenderEventXml};
-
-    // Get callback context
-    let context = {
-        let global_ctx = CALLBACK_CONTEXT.lock().unwrap();
-        global_ctx.clone()
-    };
-
-    let Some(ctx) = context else {
-        warn!("No callback context available");
-        return Ok(());
-    };
 
     const MAX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB limit
     const DEFAULT_BUFFER_SIZE: u32 = 4096; // 4KB default
@@ -987,5 +1106,168 @@ mod tests {
             result.is_none(),
             "Security limits should reject excessively large XML content"
         );
+    }
+
+    /// Integration test for invalid XPath query error handling
+    /// This test verifies that invalid XPath queries are properly detected and reported
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_invalid_xpath_query_error() {
+        use tokio::time::Duration;
+
+        // Create a config with an intentionally invalid XPath query
+        // This query has malformed syntax that Windows will reject
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.event_query = Some("*[System[(EventID=INVALID_SYNTAX!!!".to_string()); // Deliberately malformed
+        config.event_timeout_ms = 1000; // Shorter timeout for testing
+
+        // Create subscription - should succeed initially as EvtSubscribe doesn't validate query syntax
+        let mut subscription =
+            EventLogSubscription::new(&config).expect("Subscription creation should succeed");
+
+        // Give Windows time to call the callback with EvtSubscribeActionError
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Try to get events - should return an error propagated from the callback
+        let result = subscription.next_events(10).await;
+
+        match result {
+            Err(WindowsEventLogError::SubscriptionError { .. }) => {
+                // Success! The error was properly detected and propagated
+                println!("Invalid XPath query error correctly detected and propagated");
+            }
+            Ok(_) => {
+                panic!("Expected SubscriptionError but got success - error handling failed");
+            }
+            Err(other) => {
+                panic!(
+                    "Expected SubscriptionError but got different error: {:?}",
+                    other
+                );
+            }
+        }
+    }
+
+    /// Integration test for valid wildcard query
+    /// Verifies that the fix doesn't break valid queries
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_valid_wildcard_query() {
+        use tokio::time::Duration;
+
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.event_query = Some("*".to_string()); // Valid wildcard
+        config.event_timeout_ms = 2000;
+
+        let mut subscription =
+            EventLogSubscription::new(&config).expect("Subscription creation should succeed");
+
+        // Give subscription time to initialize
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Try to get events - should succeed (even if no events are available)
+        let result = subscription.next_events(10).await;
+
+        assert!(
+            result.is_ok(),
+            "Valid wildcard query should not produce subscription errors: {:?}",
+            result
+        );
+    }
+
+    /// Test for moderately complex but valid XPath queries
+    /// Tests real-world filtering scenarios
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_valid_filtered_xpath_query() {
+        use tokio::time::Duration;
+
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        // Valid XPath query filtering by event level
+        config.event_query = Some("*[System[Level=1 or Level=2 or Level=3]]".to_string());
+        config.event_timeout_ms = 2000;
+
+        let mut subscription =
+            EventLogSubscription::new(&config).expect("Subscription creation should succeed");
+
+        // Give subscription time to initialize
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Try to get events - should succeed
+        let result = subscription.next_events(10).await;
+
+        assert!(
+            result.is_ok(),
+            "Valid filtered XPath query should not produce subscription errors: {:?}",
+            result
+        );
+    }
+
+    /// Regression test for multiple concurrent subscriptions
+    /// Verifies that multiple EventLogSubscription instances don't interfere with each other
+    /// This tests the fix for the global context bug where subscriptions would overwrite each other
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_multiple_concurrent_subscriptions() {
+        use tokio::time::Duration;
+
+        // Create three separate subscriptions (simulating real-world multi-source config)
+        let mut config1 = WindowsEventLogConfig::default();
+        config1.channels = vec!["Application".to_string()];
+        config1.event_timeout_ms = 2000;
+
+        let mut config2 = WindowsEventLogConfig::default();
+        config2.channels = vec!["System".to_string()];
+        config2.event_timeout_ms = 2000;
+
+        let mut config3 = WindowsEventLogConfig::default();
+        config3.channels = vec!["Security".to_string()];
+        config3.event_timeout_ms = 2000;
+
+        // Create all three subscriptions concurrently
+        let mut sub1 = EventLogSubscription::new(&config1)
+            .expect("Subscription 1 (Application) should succeed");
+        let mut sub2 = EventLogSubscription::new(&config2)
+            .expect("Subscription 2 (System) should succeed");
+        let mut sub3 = EventLogSubscription::new(&config3)
+            .expect("Subscription 3 (Security) should succeed");
+
+        // Give all subscriptions time to initialize
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        // Try to get events from each subscription independently
+        // All should succeed without interfering with each other
+        let result1 = sub1.next_events(5).await;
+        let result2 = sub2.next_events(5).await;
+        let result3 = sub3.next_events(5).await;
+
+        assert!(
+            result1.is_ok(),
+            "Subscription 1 (Application) should not error: {:?}",
+            result1
+        );
+        assert!(
+            result2.is_ok(),
+            "Subscription 2 (System) should not error: {:?}",
+            result2
+        );
+        assert!(
+            result3.is_ok(),
+            "Subscription 3 (Security) should not error: {:?}",
+            result3
+        );
+
+        // Verify subscriptions are independent by collecting events again
+        // If contexts were shared/overwritten, callbacks would route to wrong channels
+        let result1_again = sub1.next_events(5).await;
+        let result2_again = sub2.next_events(5).await;
+        let result3_again = sub3.next_events(5).await;
+
+        assert!(result1_again.is_ok(), "Subscription 1 should remain healthy");
+        assert!(result2_again.is_ok(), "Subscription 2 should remain healthy");
+        assert!(result3_again.is_ok(), "Subscription 3 should remain healthy");
     }
 }
