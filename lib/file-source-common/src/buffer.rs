@@ -336,6 +336,7 @@ mod test {
     /// 1. Creates test data with delimiters positioned to split at buffer boundaries
     /// 2. Tests multiple iterations to ensure state tracking works correctly
     /// 3. Verifies all lines are correctly separated without merging
+    #[cfg(test)]
     async fn test_delimiter_boundary_split_helper(delimiter: &[u8], num_lines: usize) {
         let delimiter_len = delimiter.len();
 
