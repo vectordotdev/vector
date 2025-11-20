@@ -13,6 +13,7 @@ use vector_lib::{
 
 use crate::{
     event::{Event, EventFinalizers, Finalizable},
+    internal_events::SinkRequestBuildError,
     sinks::{
         aws_cloudwatch_logs::{
             CloudwatchKey,
@@ -51,6 +52,11 @@ where
             })
             .batched_partitioned(CloudwatchPartitioner, || {
                 batcher_settings.as_byte_size_config()
+            })
+            .filter_map(|result| async move {
+                result
+                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                    .ok()
             })
             .map(|(key, events)| {
                 let metadata = RequestMetadata::from_batch(
@@ -97,9 +103,10 @@ struct CloudwatchPartitioner;
 impl Partitioner for CloudwatchPartitioner {
     type Item = CloudwatchRequest;
     type Key = CloudwatchKey;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.key.clone()
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+        Ok(item.key.clone())
     }
 }
 
