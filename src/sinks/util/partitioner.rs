@@ -26,7 +26,7 @@ impl Partitioner for KeyPartitioner {
     type Error = crate::template::TemplateRenderingError;
 
     fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
-        Ok(self
+        self
             .key_prefix_template
             .render_string(item)
             .or_else(|error| {
@@ -45,6 +45,6 @@ impl Partitioner for KeyPartitioner {
                     });
                     Err(error)
                 }
-            })?)
+            })
     }
 }
