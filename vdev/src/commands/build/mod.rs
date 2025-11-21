@@ -1,6 +1,7 @@
 mod licenses;
 mod publish_metadata;
 mod vector;
+mod vrl_examples;
 mod vrl_wasm;
 
 crate::cli_subcommands! {
@@ -12,6 +13,7 @@ crate::cli_subcommands! {
     release_cue,
     vector,
     vrl_wasm,
+    vrl_examples,
 }
 
 crate::script_wrapper! {
