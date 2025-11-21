@@ -31,9 +31,10 @@ impl S3KeyPartitioner {
 
 impl Partitioner for S3KeyPartitioner {
     type Item = Event;
-    type Key = Option<S3PartitionKey>;
+    type Key = S3PartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
         let key_prefix = self
             .key_prefix_template
             .render_string(item)
@@ -46,30 +47,30 @@ impl Partitioner for S3KeyPartitioner {
                     });
                     Ok(dead_letter_key_prefix.clone())
                 } else {
-                    Err(emit!(TemplateRenderingError {
-                        error,
+                    emit!(TemplateRenderingError {
+                        error: error.clone(),
                         field: Some("key_prefix"),
                         drop_event: true,
-                    }))
+                    });
+                    Err(error)
                 }
-            })
-            .ok()?;
+            })?;
 
         let ssekms_key_id = self
             .ssekms_key_id_template
             .as_ref()
             .map(|ssekms_key_id| {
-                ssekms_key_id.render_string(item).map_err(|error| {
+                ssekms_key_id.render_string(item).inspect_err(|error| {
                     emit!(TemplateRenderingError {
-                        error,
+                        error: error.clone(),
                         field: Some("ssekms_key_id"),
                         drop_event: true,
                     });
                 })
             })
-            .transpose()
-            .ok()?;
-        Some(S3PartitionKey {
+            .transpose()?;
+
+        Ok(S3PartitionKey {
             key_prefix,
             ssekms_key_id,
         })

@@ -53,33 +53,36 @@ impl KeyPartitioner {
         }
     }
 
-    fn render(template: &Template, item: &Event, field: &'static str) -> Option<String> {
-        template
-            .render_string(item)
-            .map_err(|error| {
-                emit!(TemplateRenderingError {
-                    error,
-                    field: Some(field),
-                    drop_event: true,
-                });
-            })
-            .ok()
+    fn render(
+        template: &Template,
+        item: &Event,
+        field: &'static str,
+    ) -> Result<String, crate::template::TemplateRenderingError> {
+        template.render_string(item).inspect_err(|error| {
+            emit!(TemplateRenderingError {
+                error: error.clone(),
+                field: Some(field),
+                drop_event: true,
+            });
+        })
     }
 }
 
 impl Partitioner for KeyPartitioner {
     type Item = Event;
-    type Key = Option<PartitionKey>;
+    type Key = PartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
         let dbname = Self::render(&self.dbname, item, "dbname_key")?;
         let table = Self::render(&self.table, item, "table_key")?;
         let pipeline_name = Self::render(&self.pipeline_name, item, "pipeline_name")?;
         let pipeline_version = self
             .pipeline_version
             .as_ref()
-            .and_then(|template| Self::render(template, item, "pipeline_version"));
-        Some(PartitionKey {
+            .map(|template| Self::render(template, item, "pipeline_version"))
+            .transpose()?;
+        Ok(PartitionKey {
             dbname,
             table,
             pipeline_name,

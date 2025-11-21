@@ -3,6 +3,7 @@ use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct TemplateRenderingError<'a> {
     pub field: Option<&'a str>,
     pub drop_event: bool,

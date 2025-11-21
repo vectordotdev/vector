@@ -20,7 +20,7 @@ use super::{
     request_builder::DatadogMetricsRequestBuilder, service::DatadogMetricsRequest,
 };
 use crate::{
-    internal_events::DatadogMetricsEncodingError,
+    internal_events::{DatadogMetricsEncodingError, SinkRequestBuildError},
     sinks::util::{
         SinkBuilderExt,
         buffer::metrics::{AggregatedSummarySplitter, MetricSplitter},
@@ -38,8 +38,9 @@ struct DatadogMetricsTypePartitioner;
 impl Partitioner for DatadogMetricsTypePartitioner {
     type Item = Metric;
     type Key = (Option<Arc<str>>, DatadogMetricsEndpoint);
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
         let endpoint = match item.data().value() {
             MetricValue::Counter { .. } => DatadogMetricsEndpoint::series(),
             MetricValue::Gauge { .. } => DatadogMetricsEndpoint::series(),
@@ -50,7 +51,7 @@ impl Partitioner for DatadogMetricsTypePartitioner {
             MetricValue::AggregatedSummary { .. } => DatadogMetricsEndpoint::series(),
             MetricValue::Sketch { .. } => DatadogMetricsEndpoint::Sketches,
         };
-        (item.metadata().datadog_api_key(), endpoint)
+        Ok((item.metadata().datadog_api_key(), endpoint))
     }
 }
 
@@ -108,6 +109,11 @@ where
             // last-write-wins situation when they hit the DD metrics intake.
             //
             // This also sorts metrics by name, which significantly improves HTTP compression.
+            .filter_map(|result| async move {
+                result
+                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                    .ok()
+            })
             .concurrent_map(
                 default_request_builder_concurrency_limit(),
                 |((api_key, endpoint), metrics)| {
