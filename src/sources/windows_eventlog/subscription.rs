@@ -329,10 +329,11 @@ impl EventLogSubscription {
             for (channel, record_id) in channel_max_records {
                 if let Err(e) = self.checkpointer.set(channel.clone(), record_id).await {
                     warn!(
-                        message = "Failed to update checkpoint",
+                        message = "Failed to update checkpoint - events may be reprocessed after restart",
                         channel = %channel,
                         record_id = record_id,
-                        error = %e
+                        error = %e,
+                        internal_log_rate_limit = true
                     );
                 }
             }
@@ -987,7 +988,7 @@ fn process_callback_event(
     use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
     use windows::Win32::System::EventLog::{EvtRender, EvtRenderEventXml};
 
-    const MAX_BUFFER_SIZE: u32 = 1024 * 1024; // 1MB limit
+    const MAX_BUFFER_SIZE: u32 = 10 * 1024 * 1024; // 10MB limit (increased to handle large events)
     const DEFAULT_BUFFER_SIZE: u32 = 4096; // 4KB default
 
     let buffer_size = DEFAULT_BUFFER_SIZE;
@@ -1011,9 +1012,18 @@ fn process_callback_event(
     // Handle buffer reallocation if needed
     if let Err(e) = result {
         if e.code() == ERROR_INSUFFICIENT_BUFFER.into() {
-            if buffer_used == 0 || buffer_used > MAX_BUFFER_SIZE {
-                warn!("Event XML buffer size invalid, skipping event");
+            if buffer_used == 0 {
+                warn!("Event XML buffer size is zero, skipping event");
                 return Ok(());
+            }
+
+            if buffer_used > MAX_BUFFER_SIZE {
+                error!(
+                    message = "Event XML exceeds maximum buffer size, cannot process",
+                    buffer_size_requested = buffer_used,
+                    max_buffer_size = MAX_BUFFER_SIZE
+                );
+                return Err(WindowsEventLogError::ReadEventError { source: e });
             }
 
             // Reallocate with exact required size
@@ -1081,8 +1091,14 @@ fn process_callback_event(
 
     // Parse the XML to extract event data
     if let Ok(Some(event)) = EventLogSubscription::parse_event_xml(xml, &channel, &ctx.config) {
-        if let Err(_) = ctx.event_sender.send(event) {
-            debug!("Failed to send event - receiver dropped");
+        if let Err(e) = ctx.event_sender.send(event) {
+            // Check if the receiver has been dropped (channel closed)
+            warn!(
+                message = "Failed to send event - receiver may be closed or dropped",
+                error = ?e,
+                channel = %channel
+            );
+            // Note: We continue processing other events rather than terminating the callback
         }
     }
 

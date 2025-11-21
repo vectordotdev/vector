@@ -351,12 +351,11 @@ impl WindowsEventLogConfig {
             }
 
             // Check for potentially dangerous patterns that could indicate XPath injection
+            // Note: We exclude "http:" and "https:" as they are legitimate in XML namespace URIs
             let dangerous_patterns = [
                 "javascript:",
                 "vbscript:",
-                "file:",
-                "http:",
-                "https:",
+                "file://", // Changed from "file:" to be more specific
                 "ftp:",
                 "<script",
                 "</script",
