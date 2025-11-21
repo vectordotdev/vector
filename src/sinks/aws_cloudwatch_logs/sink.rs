@@ -53,11 +53,7 @@ where
             .batched_partitioned(CloudwatchPartitioner, || {
                 batcher_settings.as_byte_size_config()
             })
-            .filter_map(|result| async move {
-                result
-                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
-                    .ok()
-            })
+            .unwrap_infallible()
             .map(|(key, events)| {
                 let metadata = RequestMetadata::from_batch(
                     events.iter().map(|req| req.get_metadata().clone()),

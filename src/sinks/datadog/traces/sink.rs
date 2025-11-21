@@ -18,7 +18,7 @@ use vrl::{event_path, path::PathPrefix};
 
 use super::service::TraceApiRequest;
 use crate::{
-    internal_events::{DatadogTracesEncodingError, SinkRequestBuildError},
+    internal_events::DatadogTracesEncodingError,
     sinks::{datadog::traces::request_builder::DatadogTracesRequestBuilder, util::SinkBuilderExt},
 };
 
@@ -110,11 +110,7 @@ where
 
         input
             .batched_partitioned(EventPartitioner, || batch_settings.as_byte_size_config())
-            .filter_map(|result| async move {
-                result
-                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
-                    .ok()
-            })
+            .unwrap_infallible()
             .incremental_request_builder(self.request_builder)
             .flat_map(stream::iter)
             .filter_map(|request| async move {

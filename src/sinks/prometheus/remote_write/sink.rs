@@ -190,11 +190,7 @@ where
                 batch_settings
                     .as_reducer_config(ByteSizeOfItemSize, EventCollection::new(self.aggregate))
             })
-            .filter_map(|result| async move {
-                result
-                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
-                    .ok()
-            })
+            .unwrap_infallible()
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
                 match request {

@@ -56,9 +56,6 @@ struct RecordPartitioner;
 impl Partitioner for RecordPartitioner {
     type Item = Option<FilteredRecord>;
     type Key = Option<PartitionKey>;
-
-    // NOTE: should this ever be able to return an actual error, the .expect should be
-    // removed and the code should properly handle partitioning errors
     type Error = std::convert::Infallible;
 
     fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
@@ -551,7 +548,7 @@ impl LokiSink {
             })
             .map(|record| filter.filter_record(record))
             .batched_partitioned(RecordPartitioner, || batch_settings.as_byte_size_config())
-            .map(|partition| partition.expect("RecordPartitioner::partitioner failed"))
+            .unwrap_infallible()
             .filter_map(|(partition, batch)| async {
                 if let Some(partition) = partition {
                     let mut count: usize = 0;

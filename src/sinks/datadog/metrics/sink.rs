@@ -104,16 +104,12 @@ where
             .batched_partitioned(DatadogMetricsTypePartitioner, || {
                 batch_settings.as_byte_size_config()
             })
+            .unwrap_infallible()
             // Aggregate counters with identical timestamps, otherwise identical counters (same
             // series and same timestamp, when rounded to whole seconds) will be dropped in a
             // last-write-wins situation when they hit the DD metrics intake.
             //
             // This also sorts metrics by name, which significantly improves HTTP compression.
-            .filter_map(|result| async move {
-                result
-                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
-                    .ok()
-            })
             .concurrent_map(
                 default_request_builder_concurrency_limit(),
                 |((api_key, endpoint), metrics)| {

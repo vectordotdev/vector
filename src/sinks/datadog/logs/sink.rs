@@ -391,11 +391,7 @@ where
             .batched_partitioned(partitioner, || {
                 batch_settings.as_item_size_config(HttpJsonBatchSizer)
             })
-            .filter_map(|result| async move {
-                result
-                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
-                    .ok()
-            })
+            .unwrap_infallible()
             .concurrent_map(default_request_builder_concurrency_limit(), move |input| {
                 let builder = Arc::clone(&builder);
 
