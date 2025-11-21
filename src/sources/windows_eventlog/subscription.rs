@@ -98,7 +98,15 @@ pub struct EventLogSubscription {
 #[cfg(windows)]
 struct SubscriptionHandle {
     handle: windows::Win32::System::EventLog::EVT_HANDLE,
+    // Raw pointer to CallbackContext - must be freed in Drop to prevent memory leak
+    context: *const std::ffi::c_void,
 }
+
+// SAFETY: SubscriptionHandle contains a raw pointer to Arc<CallbackContext>.
+// Arc is thread-safe, and the raw pointer is only used for cleanup in Drop.
+// The pointer is never dereferenced except to reconstruct the Arc when dropping.
+#[cfg(windows)]
+unsafe impl Send for SubscriptionHandle {}
 
 #[cfg(windows)]
 impl Drop for SubscriptionHandle {
@@ -108,6 +116,14 @@ impl Drop for SubscriptionHandle {
                 if let Err(e) = windows::Win32::System::EventLog::EvtClose(self.handle) {
                     warn!("Failed to close subscription handle: {}", e);
                 }
+            }
+        }
+
+        // Free the CallbackContext to prevent memory leak
+        // EvtSubscribe incremented the Arc refcount via into_raw(), so we must decrement it
+        if !self.context.is_null() {
+            unsafe {
+                let _ = Arc::from_raw(self.context as *const CallbackContext);
             }
         }
     }
@@ -160,7 +176,11 @@ impl EventLogSubscription {
             let subscriptions = Arc::new(Mutex::new(Vec::new()));
 
             // Create subscriptions for each channel, passing our context
-            Self::create_subscriptions(&config, Arc::clone(&subscriptions), Arc::clone(&callback_context))?;
+            Self::create_subscriptions(
+                &config,
+                Arc::clone(&subscriptions),
+                Arc::clone(&callback_context),
+            )?;
 
             Ok(Self {
                 config,
@@ -276,7 +296,7 @@ impl EventLogSubscription {
                     None, // Signal event (we use callback instead)
                     &channel_hstring,
                     &query_hstring,
-                    None, // Bookmark (not using bookmarks in refactored version)
+                    None,              // Bookmark (not using bookmarks in refactored version)
                     Some(context_ptr), // Context - per-subscription context!
                     Some(event_subscription_callback), // Callback function
                     subscription_flags,
@@ -294,6 +314,7 @@ impl EventLogSubscription {
                 let mut subs = subscriptions.lock().unwrap();
                 subs.push(SubscriptionHandle {
                     handle: subscription_handle,
+                    context: context_ptr,
                 });
             }
         }
@@ -330,9 +351,7 @@ impl EventLogSubscription {
             let channel_hstring = HSTRING::from(channel.as_str());
 
             // Try to open the channel configuration to verify it exists
-            let channel_handle = unsafe {
-                EvtOpenChannelConfig(None, &channel_hstring, 0)
-            };
+            let channel_handle = unsafe { EvtOpenChannelConfig(None, &channel_hstring, 0) };
 
             match channel_handle {
                 Ok(handle) => {
@@ -768,7 +787,7 @@ impl EventLogSubscription {
     }
 }
 
-// No Drop implementation needed - context cleanup is handled automatically via Arc
+// CallbackContext cleanup is handled in SubscriptionHandle::drop via Arc::from_raw
 
 // Windows Event Log subscription callback function
 #[cfg(windows)]
@@ -781,8 +800,8 @@ unsafe extern "system" fn event_subscription_callback(
 
     // Safety check: user_context must not be null
     if user_context.is_null() {
-        error!("Callback received null user_context");
-        return 0;
+        error!("Callback received null user_context - cancelling subscription");
+        return windows::Win32::Foundation::ERROR_CANCELLED.0;
     }
 
     // Retrieve the callback context from user_context parameter
@@ -834,17 +853,26 @@ unsafe extern "system" fn event_subscription_callback(
 /// Extract extended error information from Windows Event Log API
 #[cfg(windows)]
 unsafe fn extract_windows_extended_status() -> String {
-    use windows::Win32::System::EventLog::EvtGetExtendedStatus;
     use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
+    use windows::Win32::System::EventLog::EvtGetExtendedStatus;
 
-    const MAX_ERROR_BUFFER: usize = 2048;
+    const MAX_ERROR_BUFFER: usize = 8192; // 8KB max for error messages
     let mut buffer_size = 0u32;
 
     // First call to get required buffer size
     let status = unsafe { EvtGetExtendedStatus(None, &mut buffer_size) };
 
-    if status != ERROR_INSUFFICIENT_BUFFER.0 || buffer_size == 0 || buffer_size as usize > MAX_ERROR_BUFFER {
+    if status != ERROR_INSUFFICIENT_BUFFER.0 || buffer_size == 0 {
         return "Unknown error (unable to retrieve extended status)".to_string();
+    }
+
+    // Enforce maximum size but still try to get the error message
+    if buffer_size as usize > MAX_ERROR_BUFFER {
+        warn!(
+            "Extended error status buffer size {} exceeds maximum {}, truncating",
+            buffer_size, MAX_ERROR_BUFFER
+        );
+        buffer_size = MAX_ERROR_BUFFER as u32;
     }
 
     // Allocate buffer and retrieve the error message
@@ -1127,7 +1155,8 @@ mod tests {
             EventLogSubscription::new(&config).expect("Subscription creation should succeed");
 
         // Give Windows time to call the callback with EvtSubscribeActionError
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Using longer timeout for reliability on slower systems and CI environments
+        tokio::time::sleep(Duration::from_millis(500)).await;
 
         // Try to get events - should return an error propagated from the callback
         let result = subscription.next_events(10).await;
@@ -1165,7 +1194,8 @@ mod tests {
             EventLogSubscription::new(&config).expect("Subscription creation should succeed");
 
         // Give subscription time to initialize
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Using longer timeout for reliability on slower systems and CI environments
+        tokio::time::sleep(Duration::from_millis(300)).await;
 
         // Try to get events - should succeed (even if no events are available)
         let result = subscription.next_events(10).await;
@@ -1194,7 +1224,8 @@ mod tests {
             EventLogSubscription::new(&config).expect("Subscription creation should succeed");
 
         // Give subscription time to initialize
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Using longer timeout for reliability on slower systems and CI environments
+        tokio::time::sleep(Duration::from_millis(300)).await;
 
         // Try to get events - should succeed
         let result = subscription.next_events(10).await;
@@ -1230,13 +1261,14 @@ mod tests {
         // Create all three subscriptions concurrently
         let mut sub1 = EventLogSubscription::new(&config1)
             .expect("Subscription 1 (Application) should succeed");
-        let mut sub2 = EventLogSubscription::new(&config2)
-            .expect("Subscription 2 (System) should succeed");
-        let mut sub3 = EventLogSubscription::new(&config3)
-            .expect("Subscription 3 (Security) should succeed");
+        let mut sub2 =
+            EventLogSubscription::new(&config2).expect("Subscription 2 (System) should succeed");
+        let mut sub3 =
+            EventLogSubscription::new(&config3).expect("Subscription 3 (Security) should succeed");
 
         // Give all subscriptions time to initialize
-        tokio::time::sleep(Duration::from_millis(200)).await;
+        // Using longer timeout for reliability on slower systems and CI environments
+        tokio::time::sleep(Duration::from_millis(500)).await;
 
         // Try to get events from each subscription independently
         // All should succeed without interfering with each other
@@ -1266,8 +1298,17 @@ mod tests {
         let result2_again = sub2.next_events(5).await;
         let result3_again = sub3.next_events(5).await;
 
-        assert!(result1_again.is_ok(), "Subscription 1 should remain healthy");
-        assert!(result2_again.is_ok(), "Subscription 2 should remain healthy");
-        assert!(result3_again.is_ok(), "Subscription 3 should remain healthy");
+        assert!(
+            result1_again.is_ok(),
+            "Subscription 1 should remain healthy"
+        );
+        assert!(
+            result2_again.is_ok(),
+            "Subscription 2 should remain healthy"
+        );
+        assert!(
+            result3_again.is_ok(),
+            "Subscription 3 should remain healthy"
+        );
     }
 }
