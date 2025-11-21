@@ -1,0 +1,17 @@
+version: '3'
+
+services:
+  mariadb:
+    image: docker.io/mariadb:${CONFIG_VERSION}
+    ports:
+      - "3306:3306"
+    environment:
+      - MYSQL_USER=vector
+      - MYSQL_PASSWORD=vector
+      - MYSQL_ROOT_PASSWORD=vector
+      - MYSQL_DATABASE=vector_db
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
