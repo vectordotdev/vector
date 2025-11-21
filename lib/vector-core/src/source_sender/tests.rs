@@ -240,6 +240,7 @@ fn assert_counter_metric(metrics: &[Metric], name: &str, expected: f64) {
 }
 
 #[tokio::test]
+#[expect(clippy::cast_precision_loss)]
 async fn emits_buffer_utilization_histogram_on_send_and_receive() {
     metrics::init_test();
     let buffer_size = 2;
@@ -259,30 +260,34 @@ async fn emits_buffer_utilization_histogram_on_send_and_receive() {
     assert!(recv.next().await.is_some());
     assert!(recv.next().await.is_some());
 
-    let utilization_metrics = Controller::get()
+    let metrics: Vec<_> = Controller::get()
         .expect("metrics controller available")
         .capture_metrics()
         .into_iter()
-        .filter(|metric| metric.name() == "source_sender_buffer_utilization")
-        .collect::<Vec<_>>();
-    assert_eq!(
-        utilization_metrics.len(),
-        1,
-        "expected a single utilization histogram"
-    );
+        .filter(|metric| metric.name().starts_with("source_sender_buffer_"))
+        .collect();
+    assert_eq!(metrics.len(), 3, "expected 3 utilization metrics");
 
-    let metric = &utilization_metrics[0];
-    let tags = metric.tags().expect("utilization histogram has tags");
-    let max_events = buffer_size.to_string();
-    assert_eq!(tags.get("output"), Some("_default"));
-    assert_eq!(tags.get("max_events"), Some(max_events.as_str()));
-
-    let MetricValue::AggregatedHistogram { count, sum, .. } = metric.value() else {
-        panic!("source_sender_buffer_utilization should be a histogram");
+    let find_metric = |name: &str| {
+        metrics
+            .iter()
+            .find(|m| m.name() == name)
+            .unwrap_or_else(|| panic!("missing metric: {name}"))
     };
-    assert_eq!(*count, 2, "one sample per send expected");
-    assert!(
-        (*sum - 3.0).abs() <= 0.001,
-        "unexpected histogram sum: expected 3.0, got {sum}"
-    );
+
+    let metric = find_metric("source_sender_buffer_utilization");
+    let tags = metric.tags().expect("utilization histogram has tags");
+    assert_eq!(tags.get("output"), Some("_default"));
+
+    let metric = find_metric("source_sender_buffer_utilization_level");
+    let MetricValue::Gauge { value } = metric.value() else {
+        panic!("source_sender_buffer_utilization_level should be a gauge");
+    };
+    assert_eq!(*value, 2.0);
+
+    let metric = find_metric("source_sender_buffer_max_event_size");
+    let MetricValue::Gauge { value } = metric.value() else {
+        panic!("source_sender_buffer_max_event_size should be a gauge");
+    };
+    assert_eq!(*value, buffer_size as f64);
 }
