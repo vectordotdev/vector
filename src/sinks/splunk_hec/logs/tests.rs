@@ -27,7 +27,7 @@ use crate::{
         },
     },
     template::Template,
-    test_util::addr::next_addr,
+    test_util::next_addr,
 };
 
 #[derive(Deserialize, Debug)]
@@ -77,7 +77,16 @@ fn get_processed_event_timestamp(
     event.as_mut_log().insert("event_index", "test_index");
     event.as_mut_log().insert("host_key", "test_host");
     event.as_mut_log().insert("event_field1", "test_value1");
-    event.as_mut_log().insert("event_field2", "test_value2");
+    event.as_mut_log().insert("event_field2.user.id", 23);
+    event.as_mut_log().insert("event_field2.user.height", 1.23);
+    event.as_mut_log().insert("event_field2.user.name", "");
+    event.as_mut_log().insert("event_field2.user.active", true);
+    event
+        .as_mut_log()
+        .insert("event_field2.user.foo", [1, 2, 3]);
+    event
+        .as_mut_log()
+        .insert("event_field2.user.key", Value::Null);
     event.as_mut_log().insert("key", "value");
     event.as_mut_log().insert("int_val", 123);
 
@@ -150,8 +159,29 @@ fn splunk_process_log_event() {
     assert_eq!(metadata.source, Some("test_source".to_string()));
     assert_eq!(metadata.index, Some("test_index".to_string()));
     assert_eq!(metadata.host, Some(Value::from("test_host")));
-    assert!(metadata.fields.contains("event_field1"));
-    assert!(metadata.fields.contains("event_field2"));
+    assert!(metadata.fields.contains_key("event_field1"));
+    assert!(!metadata.fields.contains_key("event_field2"));
+    assert!(metadata.fields.contains_key("event_field2.user.name"));
+    assert_eq!(
+        metadata.fields.get("event_field2.user.key"),
+        Some(&Value::Null)
+    );
+    assert_eq!(
+        metadata.fields.get("event_field2.user.id"),
+        Some(&Value::from("23"))
+    );
+    assert_eq!(
+        metadata.fields.get("event_field2.user.height"),
+        Some(&Value::from(1.23))
+    );
+    assert_eq!(
+        metadata.fields.get("event_field2.user.active"),
+        Some(&Value::from(true))
+    );
+    assert_eq!(
+        metadata.fields.get("event_field2.user.foo"),
+        Some(&Value::from([1, 2, 3]))
+    );
 }
 
 fn hec_encoder(encoding: EncodingConfig) -> HecLogsEncoder {
@@ -216,7 +246,7 @@ fn splunk_encode_log_event_text() {
 
 #[tokio::test]
 async fn splunk_passthrough_token() {
-    let (_guard, addr) = next_addr();
+    let addr = next_addr();
     let config = HecLogsSinkConfig {
         default_token: "token".to_string().into(),
         endpoint: format!("http://{addr}"),
