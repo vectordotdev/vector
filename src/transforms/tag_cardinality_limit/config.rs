@@ -11,6 +11,23 @@ use crate::{
     transforms::{Transform, tag_cardinality_limit::TagCardinalityLimit},
 };
 
+/// Configuration of internal metrics for the TagCardinalityLimit transform.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[serde(deny_unknown_fields)]
+pub struct TagCardinalityLimitInternalMetricsConfig {
+    /// Whether to include extended labels (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+    ///
+    /// This can be useful for debugging, but should be used with caution as it can significantly
+    /// increase metric cardinality if metric names or tag keys are high cardinality.
+    ///
+    /// Note that this defaults to false because the extended tags have potentially unbounded cardinality.
+    /// Only set this to true if you know that the number of unique metric names and tag keys is bounded.
+    #[serde(default = "default_include_key_in_limit_metric")]
+    #[configurable(metadata(docs::human_name = "Include Key in Limit Metric"))]
+    pub include_key_in_limit_metric: bool,
+}
+
 /// Configuration for the `tag_cardinality_limit` transform.
 #[configurable_component(transform(
     "tag_cardinality_limit",
@@ -45,13 +62,9 @@ pub struct TagCardinalityLimitInnerConfig {
     #[serde(flatten)]
     pub mode: Mode,
 
-    /// Whether to include extended labels (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
-    ///
-    /// This can be useful for debugging, but should be used with caution as it can significantly
-    /// increase metric cardinality if metric names or tag keys are high cardinality.
-    #[serde(default = "default_include_extended_tags_in_limit_metric")]
-    #[configurable(metadata(docs::human_name = "Include Extended Tags in Limit Metric"))]
-    pub include_extended_tags_in_limit_metric: bool,
+    #[configurable(derived)]
+    #[serde(default)]
+    pub internal_metrics: TagCardinalityLimitInternalMetricsConfig,
 }
 
 /// Controls the approach taken for tracking tag cardinality.
@@ -123,7 +136,7 @@ const fn default_value_limit() -> usize {
     500
 }
 
-const fn default_include_extended_tags_in_limit_metric() -> bool {
+const fn default_include_key_in_limit_metric() -> bool {
     false
 }
 
@@ -138,8 +151,7 @@ impl GenerateConfig for TagCardinalityLimitConfig {
                 mode: Mode::Exact,
                 value_limit: default_value_limit(),
                 limit_exceeded_action: default_limit_exceeded_action(),
-                include_extended_tags_in_limit_metric:
-                    default_include_extended_tags_in_limit_metric(),
+                internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
             },
             per_metric_limits: HashMap::default(),
         })

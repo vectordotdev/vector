@@ -16,7 +16,9 @@ use crate::{
     event::{Event, Metric, MetricTags, metric, metric::TagValue},
     test_util::components::assert_transform_compliance,
     transforms::{
-        tag_cardinality_limit::config::{BloomFilterConfig, Mode, default_cache_size},
+        tag_cardinality_limit::config::{
+            BloomFilterConfig, Mode, TagCardinalityLimitInternalMetricsConfig, default_cache_size,
+        },
         test::create_topology,
     },
 };
@@ -53,7 +55,7 @@ fn make_transform_hashset(
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
-            include_extended_tags_in_limit_metric: false,
+            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
         },
         per_metric_limits: HashMap::new(),
     }
@@ -70,7 +72,7 @@ fn make_transform_bloom(
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
-            include_extended_tags_in_limit_metric: false,
+            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
         },
         per_metric_limits: HashMap::new(),
     }
@@ -86,7 +88,9 @@ const fn make_transform_hashset_with_per_metric_limits(
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
-            include_extended_tags_in_limit_metric: false,
+            internal_metrics: TagCardinalityLimitInternalMetricsConfig {
+                include_key_in_limit_metric: false,
+            },
         },
         per_metric_limits,
     }
@@ -104,7 +108,9 @@ const fn make_transform_bloom_with_per_metric_limits(
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
-            include_extended_tags_in_limit_metric: false,
+            internal_metrics: TagCardinalityLimitInternalMetricsConfig {
+                include_key_in_limit_metric: false,
+            },
         },
         per_metric_limits,
     }
