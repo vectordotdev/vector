@@ -8,6 +8,7 @@ use chrono::{TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{Channel, acker::Acker, message::Delivery};
+use lapin::options::BasicQosOptions;
 use snafu::Snafu;
 use tokio_util::codec::FramedRead;
 use vector_lib::{
@@ -100,6 +101,17 @@ pub struct AmqpSourceConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub(crate) acknowledgements: SourceAcknowledgementsConfig,
+
+	/// Maximum number of unacknowledged messages the broker will deliver to this consumer.
+	///
+	/// This controls flow control via AMQP QoS prefetch. Lower values limit memory usage and
+	/// prevent overwhelming slow consumers, but may reduce throughput. Higher values increase
+	/// throughput but consume more memory.
+	///
+	/// If not set, the broker/client default applies (often unlimited).
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "100"))]
+    pub(crate) prefetch_count: Option<u16>,
 }
 
 fn default_queue() -> String {
@@ -421,6 +433,17 @@ async fn run_amqp_source(
 ) -> Result<(), ()> {
     let (finalizer, mut ack_stream) =
         UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
+
+    // Apply AMQP QoS (prefetch) before starting consumption.
+    if let Some(count) = config.prefetch_count {
+        // per-consumer prefetch (global = false)
+        channel
+            .basic_qos(count, BasicQosOptions { global: false })
+            .await
+            .map_err(|error| {
+                error!(message = "Failed to apply basic_qos.", ?error);
+            })?;
+    }
 
     debug!("Starting amqp source, listening to queue {}.", config.queue);
     let mut consumer = channel
