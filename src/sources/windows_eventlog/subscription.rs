@@ -8,7 +8,7 @@ use quick_xml::{Reader, events::Event as XmlEvent};
 use regex;
 use tokio::sync::mpsc;
 
-use super::{config::WindowsEventLogConfig, error::*};
+use super::{checkpoint::Checkpointer, config::WindowsEventLogConfig, error::*};
 
 /// System fields from Windows Event Log XML (Single Responsibility)
 #[derive(Debug, Clone)]
@@ -87,6 +87,7 @@ impl WindowsEvent {
 pub struct EventLogSubscription {
     config: Arc<WindowsEventLogConfig>,
     event_receiver: mpsc::UnboundedReceiver<WindowsEvent>,
+    checkpointer: Arc<Checkpointer>,
     #[cfg(windows)]
     #[allow(dead_code)] // Used for RAII cleanup of Windows handles via Drop trait
     subscriptions: Arc<Mutex<Vec<SubscriptionHandle>>>,
@@ -151,9 +152,13 @@ impl CallbackContext {
 
 impl EventLogSubscription {
     /// Create a new event-driven subscription using EvtSubscribe with callback
-    pub fn new(config: &WindowsEventLogConfig) -> Result<Self, WindowsEventLogError> {
+    pub async fn new(
+        config: &WindowsEventLogConfig,
+        checkpointer: Arc<Checkpointer>,
+    ) -> Result<Self, WindowsEventLogError> {
         #[cfg(not(windows))]
         {
+            let _ = checkpointer; // Suppress unused warning on non-Windows
             return Err(WindowsEventLogError::NotSupportedError);
         }
 
@@ -165,6 +170,22 @@ impl EventLogSubscription {
 
             // Validate channels exist and are accessible
             Self::validate_channels(&config)?;
+
+            // Log checkpoint resume information
+            for channel in &config.channels {
+                if let Some(checkpoint) = checkpointer.get(channel).await {
+                    info!(
+                        message = "Resuming from checkpoint",
+                        channel = %channel,
+                        record_id = checkpoint.record_id
+                    );
+                } else {
+                    info!(
+                        message = "No checkpoint found, starting fresh",
+                        channel = %channel
+                    );
+                }
+            }
 
             // Create callback context for this subscription
             let callback_context = Arc::new(CallbackContext {
@@ -185,6 +206,7 @@ impl EventLogSubscription {
             Ok(Self {
                 config,
                 event_receiver,
+                checkpointer,
                 subscriptions,
                 subscription_error,
             })
@@ -222,6 +244,20 @@ impl EventLogSubscription {
 
             match timeout(timeout_duration, self.event_receiver.recv()).await {
                 Ok(Some(event)) => {
+                    // Check if we've already processed this event (resume from checkpoint)
+                    if let Some(checkpoint) = self.checkpointer.get(&event.channel).await {
+                        if event.record_id <= checkpoint.record_id {
+                            // Skip events we've already processed
+                            debug!(
+                                message = "Skipping already-processed event",
+                                channel = %event.channel,
+                                record_id = event.record_id,
+                                checkpoint_record_id = checkpoint.record_id
+                            );
+                            continue;
+                        }
+                    }
+
                     if Self::should_include_event(&self.config, &event) {
                         events.push(event);
                     }
@@ -245,6 +281,33 @@ impl EventLogSubscription {
                         trace!("No events received within timeout");
                     }
                     break;
+                }
+            }
+        }
+
+        // Update checkpoints for all events in this batch
+        // We checkpoint after collecting the batch to ensure we don't lose events
+        if !events.is_empty() {
+            // Group events by channel and find the max record_id for each
+            let mut channel_max_records: HashMap<String, u64> = HashMap::new();
+            for event in &events {
+                let max = channel_max_records
+                    .entry(event.channel.clone())
+                    .or_insert(0);
+                if event.record_id > *max {
+                    *max = event.record_id;
+                }
+            }
+
+            // Update checkpoint for each channel
+            for (channel, record_id) in channel_max_records {
+                if let Err(e) = self.checkpointer.set(channel.clone(), record_id).await {
+                    warn!(
+                        message = "Failed to update checkpoint",
+                        channel = %channel,
+                        record_id = record_id,
+                        error = %e
+                    );
                 }
             }
         }
@@ -296,7 +359,7 @@ impl EventLogSubscription {
                     None, // Signal event (we use callback instead)
                     &channel_hstring,
                     &query_hstring,
-                    None,              // Bookmark (not using bookmarks in refactored version)
+                    None,              // Bookmark (handled via checkpointer for persistence)
                     Some(context_ptr), // Context - per-subscription context!
                     Some(event_subscription_callback), // Callback function
                     subscription_flags,
@@ -1101,11 +1164,19 @@ mod tests {
         assert_eq!(event.level_name(), "Error");
     }
 
+    #[cfg(test)]
+    async fn create_test_checkpointer() -> (Arc<Checkpointer>, tempfile::TempDir) {
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let checkpointer = Arc::new(Checkpointer::new(temp_dir.path()).await.unwrap());
+        (checkpointer, temp_dir)
+    }
+
     #[cfg(not(windows))]
-    #[test]
-    fn test_not_supported_error() {
+    #[tokio::test]
+    async fn test_not_supported_error() {
         let config = WindowsEventLogConfig::default();
-        let result = EventLogSubscription::new(&config);
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+        let result = EventLogSubscription::new(&config, checkpointer).await;
 
         assert!(matches!(
             result,
@@ -1150,9 +1221,12 @@ mod tests {
         config.event_query = Some("*[System[(EventID=INVALID_SYNTAX!!!".to_string()); // Deliberately malformed
         config.event_timeout_ms = 1000; // Shorter timeout for testing
 
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
         // Create subscription - should succeed initially as EvtSubscribe doesn't validate query syntax
-        let mut subscription =
-            EventLogSubscription::new(&config).expect("Subscription creation should succeed");
+        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+            .await
+            .expect("Subscription creation should succeed");
 
         // Give Windows time to call the callback with EvtSubscribeActionError
         // Using longer timeout for reliability on slower systems and CI environments
@@ -1190,8 +1264,11 @@ mod tests {
         config.event_query = Some("*".to_string()); // Valid wildcard
         config.event_timeout_ms = 2000;
 
-        let mut subscription =
-            EventLogSubscription::new(&config).expect("Subscription creation should succeed");
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+            .await
+            .expect("Subscription creation should succeed");
 
         // Give subscription time to initialize
         // Using longer timeout for reliability on slower systems and CI environments
@@ -1220,8 +1297,11 @@ mod tests {
         config.event_query = Some("*[System[Level=1 or Level=2 or Level=3]]".to_string());
         config.event_timeout_ms = 2000;
 
-        let mut subscription =
-            EventLogSubscription::new(&config).expect("Subscription creation should succeed");
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+            .await
+            .expect("Subscription creation should succeed");
 
         // Give subscription time to initialize
         // Using longer timeout for reliability on slower systems and CI environments
@@ -1258,13 +1338,20 @@ mod tests {
         config3.channels = vec!["Security".to_string()];
         config3.event_timeout_ms = 2000;
 
+        let (checkpointer1, _temp_dir1) = create_test_checkpointer().await;
+        let (checkpointer2, _temp_dir2) = create_test_checkpointer().await;
+        let (checkpointer3, _temp_dir3) = create_test_checkpointer().await;
+
         // Create all three subscriptions concurrently
-        let mut sub1 = EventLogSubscription::new(&config1)
+        let mut sub1 = EventLogSubscription::new(&config1, checkpointer1)
+            .await
             .expect("Subscription 1 (Application) should succeed");
-        let mut sub2 =
-            EventLogSubscription::new(&config2).expect("Subscription 2 (System) should succeed");
-        let mut sub3 =
-            EventLogSubscription::new(&config3).expect("Subscription 3 (Security) should succeed");
+        let mut sub2 = EventLogSubscription::new(&config2, checkpointer2)
+            .await
+            .expect("Subscription 2 (System) should succeed");
+        let mut sub3 = EventLogSubscription::new(&config3, checkpointer3)
+            .await
+            .expect("Subscription 3 (Security) should succeed");
 
         // Give all subscriptions time to initialize
         // Using longer timeout for reliability on slower systems and CI environments

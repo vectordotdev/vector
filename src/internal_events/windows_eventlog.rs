@@ -1,4 +1,4 @@
-#![allow(dead_code)] // Structs will be used when Windows Event Log source is integrated
+#![allow(dead_code)] // Internal events for observability - will be integrated as usage grows
 
 use std::time::Duration;
 

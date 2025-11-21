@@ -1,9 +1,11 @@
+use std::sync::Arc;
+
 use async_trait::async_trait;
 use tokio::select;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
-use vector_lib::{EstimatedJsonEncodedSizeOf, config::LogNamespace};
+use vector_lib::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
 use vrl::value::Kind;
 
 use crate::{
@@ -13,6 +15,7 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
+mod checkpoint;
 mod config;
 pub mod error;
 mod parser;
@@ -27,7 +30,8 @@ mod integration_tests;
 
 pub use self::config::*;
 use self::{
-    error::WindowsEventLogError, parser::EventLogParser, subscription::EventLogSubscription,
+    checkpoint::Checkpointer, error::WindowsEventLogError, parser::EventLogParser,
+    subscription::EventLogSubscription,
 };
 
 /// Windows Event Log source implementation
@@ -48,13 +52,19 @@ impl WindowsEventLogSource {
         mut out: SourceSender,
         mut shutdown: ShutdownSignal,
     ) -> Result<(), WindowsEventLogError> {
-        let mut subscription = EventLogSubscription::new(&self.config)?;
+        // Initialize checkpointer for state persistence
+        let checkpointer = Arc::new(Checkpointer::new(&self.config.data_dir).await?);
+
+        let mut subscription =
+            EventLogSubscription::new(&self.config, Arc::clone(&checkpointer)).await?;
         let parser = EventLogParser::new(&self.config);
 
         let events_received = register!(EventsReceived);
         let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
 
-        info!("Starting Windows Event Log source with event-driven subscription");
+        info!(
+            "Starting Windows Event Log source with event-driven subscription and checkpoint persistence"
+        );
 
         loop {
             select! {

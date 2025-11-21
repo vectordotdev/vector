@@ -216,7 +216,7 @@ impl From<quick_xml::Error> for WindowsEventLogError {
     }
 }
 
-// Removed rusqlite dependency - bookmark persistence is now file-based
+// Bookmark persistence is handled via the checkpoint module (JSON-based)
 
 impl From<std::io::Error> for WindowsEventLogError {
     fn from(error: std::io::Error) -> Self {

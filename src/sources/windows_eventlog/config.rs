@@ -1,7 +1,18 @@
-use std::collections::HashMap;
+use std::{collections::HashMap, path::PathBuf};
 
 use vector_config::component::GenerateConfig;
 use vector_lib::configurable::configurable_component;
+
+// Validation constants
+const MAX_CHANNEL_NAME_LENGTH: usize = 256;
+const MAX_XPATH_QUERY_LENGTH: usize = 4096;
+const MAX_FIELD_NAME_LENGTH: usize = 128;
+const MAX_FIELD_COUNT: usize = 100;
+const MAX_EVENT_ID_LIST_SIZE: usize = 1000;
+const MAX_CONNECTION_TIMEOUT_SECS: u64 = 3600;
+const MAX_EVENT_TIMEOUT_MS: u64 = 60000;
+const MAX_BATCH_SIZE: u32 = 10000;
+const MAX_READ_LIMIT_BYTES: usize = 100 * 1024 * 1024; // 100 MB
 
 /// Configuration for the `windows_eventlog` source.
 #[configurable_component(source(
@@ -119,6 +130,15 @@ pub struct WindowsEventLogConfig {
     /// Controls which event fields are included in the output.
     #[serde(default)]
     pub field_filter: FieldFilter,
+
+    /// The directory where checkpoint data is stored.
+    ///
+    /// Vector stores the last processed record ID for each channel to allow
+    /// resuming from the correct position after restarts.
+    #[serde(default = "default_data_dir")]
+    #[configurable(metadata(docs::examples = "/var/lib/vector/windows_eventlog"))]
+    #[configurable(metadata(docs::examples = "C:\\ProgramData\\vector\\windows_eventlog"))]
+    pub data_dir: PathBuf,
 }
 
 /// Event data formatting options.
@@ -201,6 +221,7 @@ impl Default for WindowsEventLogConfig {
             event_timeout_ms: default_event_timeout_ms(),
             log_namespace: None,
             field_filter: FieldFilter::default(),
+            data_dir: default_data_dir(),
         }
     }
 }
@@ -219,23 +240,37 @@ impl WindowsEventLogConfig {
         }
 
         // Enhanced security validation for connection timeout to prevent DoS
-        if self.connection_timeout_secs == 0 || self.connection_timeout_secs > 3600 {
-            return Err("Connection timeout must be between 1 and 3600 seconds".into());
+        if self.connection_timeout_secs == 0
+            || self.connection_timeout_secs > MAX_CONNECTION_TIMEOUT_SECS
+        {
+            return Err(format!(
+                "Connection timeout must be between 1 and {} seconds",
+                MAX_CONNECTION_TIMEOUT_SECS
+            )
+            .into());
         }
 
         // Validate event timeout
-        if self.event_timeout_ms == 0 || self.event_timeout_ms > 60000 {
-            return Err("Event timeout must be between 1 and 60000 milliseconds".into());
+        if self.event_timeout_ms == 0 || self.event_timeout_ms > MAX_EVENT_TIMEOUT_MS {
+            return Err(format!(
+                "Event timeout must be between 1 and {} milliseconds",
+                MAX_EVENT_TIMEOUT_MS
+            )
+            .into());
         }
 
         // Prevent resource exhaustion via excessive batch sizes
-        if self.batch_size == 0 || self.batch_size > 10000 {
-            return Err("Batch size must be greater than 0".into());
+        if self.batch_size == 0 || self.batch_size > MAX_BATCH_SIZE {
+            return Err(format!("Batch size must be between 1 and {}", MAX_BATCH_SIZE).into());
         }
 
         // Validate read limits to prevent memory exhaustion
-        if self.read_limit_bytes == 0 || self.read_limit_bytes > 100 * 1024 * 1024 {
-            return Err("Read limit must be greater than 0".into());
+        if self.read_limit_bytes == 0 || self.read_limit_bytes > MAX_READ_LIMIT_BYTES {
+            return Err(format!(
+                "Read limit must be between 1 and {} bytes",
+                MAX_READ_LIMIT_BYTES
+            )
+            .into());
         }
 
         // Enhanced channel name validation with security checks
@@ -245,10 +280,10 @@ impl WindowsEventLogConfig {
             }
 
             // Prevent excessively long channel names
-            if channel.len() > 256 {
+            if channel.len() > MAX_CHANNEL_NAME_LENGTH {
                 return Err(format!(
-                    "Channel name '{}' exceeds maximum length of 256 characters",
-                    channel
+                    "Channel name '{}' exceeds maximum length of {} characters",
+                    channel, MAX_CHANNEL_NAME_LENGTH
                 )
                 .into());
             }
@@ -271,13 +306,17 @@ impl WindowsEventLogConfig {
             }
 
             // Prevent excessively long XPath queries
-            if query.len() > 4096 {
-                return Err("Event query exceeds maximum length of 4096 characters".into());
+            if query.len() > MAX_XPATH_QUERY_LENGTH {
+                return Err(format!(
+                    "Event query exceeds maximum length of {} characters",
+                    MAX_XPATH_QUERY_LENGTH
+                )
+                .into());
             }
 
             // Check for unbalanced brackets and parentheses
-            let mut bracket_count = 0;
-            let mut paren_count = 0;
+            let mut bracket_count = 0i32;
+            let mut paren_count = 0i32;
 
             for ch in query.chars() {
                 match ch {
@@ -329,31 +368,6 @@ impl WindowsEventLogConfig {
                     .into());
                 }
             }
-
-            // Basic XPath syntax validation - check balanced brackets and parentheses
-            let mut bracket_count = 0i32;
-            let mut paren_count = 0i32;
-            for ch in query.chars() {
-                match ch {
-                    '[' => bracket_count += 1,
-                    ']' => bracket_count -= 1,
-                    '(' => paren_count += 1,
-                    ')' => paren_count -= 1,
-                    _ => {}
-                }
-
-                // Prevent negative counts which indicate malformed syntax
-                if bracket_count < 0 || paren_count < 0 {
-                    return Err(
-                        "Event query has malformed syntax - unbalanced brackets or parentheses"
-                            .into(),
-                    );
-                }
-            }
-
-            if bracket_count != 0 || paren_count != 0 {
-                return Err("Event query has unbalanced brackets or parentheses".into());
-            }
         }
 
         // Validate event ID filter lists to prevent resource exhaustion
@@ -362,13 +376,21 @@ impl WindowsEventLogConfig {
                 return Err("Only event IDs list cannot be empty when specified".into());
             }
 
-            if event_ids.len() > 1000 {
-                return Err("Only event IDs list cannot contain more than 1000 entries".into());
+            if event_ids.len() > MAX_EVENT_ID_LIST_SIZE {
+                return Err(format!(
+                    "Only event IDs list cannot contain more than {} entries",
+                    MAX_EVENT_ID_LIST_SIZE
+                )
+                .into());
             }
         }
 
-        if self.ignore_event_ids.len() > 1000 {
-            return Err("Ignore event IDs list cannot contain more than 1000 entries".into());
+        if self.ignore_event_ids.len() > MAX_EVENT_ID_LIST_SIZE {
+            return Err(format!(
+                "Ignore event IDs list cannot contain more than {} entries",
+                MAX_EVENT_ID_LIST_SIZE
+            )
+            .into());
         }
 
         // Validate field filter settings
@@ -377,12 +399,16 @@ impl WindowsEventLogConfig {
                 return Err("Include fields list cannot be empty when specified".into());
             }
 
-            if include_fields.len() > 100 {
-                return Err("Include fields list cannot contain more than 100 entries".into());
+            if include_fields.len() > MAX_FIELD_COUNT {
+                return Err(format!(
+                    "Include fields list cannot contain more than {} entries",
+                    MAX_FIELD_COUNT
+                )
+                .into());
             }
 
             for field in include_fields {
-                if field.trim().is_empty() || field.len() > 128 {
+                if field.trim().is_empty() || field.len() > MAX_FIELD_NAME_LENGTH {
                     return Err(format!("Invalid field name: '{}'", field).into());
                 }
 
@@ -407,12 +433,16 @@ impl WindowsEventLogConfig {
                 return Err("Exclude fields list cannot be empty when specified".into());
             }
 
-            if exclude_fields.len() > 100 {
-                return Err("Exclude fields list cannot contain more than 100 entries".into());
+            if exclude_fields.len() > MAX_FIELD_COUNT {
+                return Err(format!(
+                    "Exclude fields list cannot contain more than {} entries",
+                    MAX_FIELD_COUNT
+                )
+                .into());
             }
 
             for field in exclude_fields {
-                if field.trim().is_empty() || field.len() > 128 {
+                if field.trim().is_empty() || field.len() > MAX_FIELD_NAME_LENGTH {
                     return Err(format!("Invalid field name: '{}'", field).into());
                 }
 
@@ -475,6 +505,17 @@ const fn default_include_event_data() -> bool {
 
 const fn default_include_user_data() -> bool {
     true
+}
+
+fn default_data_dir() -> PathBuf {
+    #[cfg(windows)]
+    {
+        PathBuf::from("C:\\ProgramData\\vector\\windows_eventlog")
+    }
+    #[cfg(not(windows))]
+    {
+        PathBuf::from("/var/lib/vector/windows_eventlog")
+    }
 }
 
 #[cfg(test)]
@@ -567,6 +608,7 @@ mod tests {
             event_timeout_ms: 5000,
             log_namespace: Some(true),
             field_filter: FieldFilter::default(),
+            data_dir: PathBuf::from("/test/data"),
         };
 
         // Should serialize and deserialize without errors
