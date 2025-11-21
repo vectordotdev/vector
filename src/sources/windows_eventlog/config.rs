@@ -139,6 +139,17 @@ pub struct WindowsEventLogConfig {
     #[configurable(metadata(docs::examples = "/var/lib/vector/windows_eventlog"))]
     #[configurable(metadata(docs::examples = "C:\\ProgramData\\vector\\windows_eventlog"))]
     pub data_dir: PathBuf,
+
+    /// Maximum number of events to process per second.
+    ///
+    /// When set to a non-zero value, Vector will rate-limit event processing
+    /// to prevent overwhelming downstream systems. A value of 0 (default) means
+    /// no rate limiting is applied.
+    #[serde(default = "default_events_per_second")]
+    #[configurable(metadata(docs::examples = 100))]
+    #[configurable(metadata(docs::examples = 1000))]
+    #[configurable(metadata(docs::examples = 5000))]
+    pub events_per_second: u32,
 }
 
 /// Event data formatting options.
@@ -222,6 +233,7 @@ impl Default for WindowsEventLogConfig {
             log_namespace: None,
             field_filter: FieldFilter::default(),
             data_dir: default_data_dir(),
+            events_per_second: default_events_per_second(),
         }
     }
 }
@@ -518,6 +530,10 @@ fn default_data_dir() -> PathBuf {
     }
 }
 
+const fn default_events_per_second() -> u32 {
+    0 // 0 means no rate limiting
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -609,6 +625,7 @@ mod tests {
             log_namespace: Some(true),
             field_filter: FieldFilter::default(),
             data_dir: PathBuf::from("/test/data"),
+            events_per_second: 1000,
         };
 
         // Should serialize and deserialize without errors

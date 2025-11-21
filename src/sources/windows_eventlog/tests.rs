@@ -28,6 +28,8 @@ fn create_test_config() -> WindowsEventLogConfig {
         event_timeout_ms: 5000,
         log_namespace: Some(false),
         field_filter: FieldFilter::default(),
+        data_dir: std::path::PathBuf::from("/tmp/vector_test"),
+        events_per_second: 0,
     }
 }
 

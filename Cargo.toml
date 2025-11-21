@@ -716,7 +716,7 @@ sources-utils-net-tcp = ["listenfd", "dep:ipnet"]
 sources-utils-net-udp = ["listenfd"]
 sources-utils-net-unix = []
 sources-websocket = ["dep:tokio-tungstenite"]
-sources-windows_eventlog = ["dep:windows", "dep:quick-xml"]
+sources-windows_eventlog = ["dep:windows", "dep:quick-xml", "dep:governor"]
 sources-windows_eventlog-integration-tests = ["sources-windows_eventlog"]
 
 sources-vector = ["dep:prost", "dep:tonic", "protobuf-build"]

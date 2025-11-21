@@ -5,7 +5,7 @@ use tokio::select;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
-use vector_lib::{config::LogNamespace, EstimatedJsonEncodedSizeOf};
+use vector_lib::{EstimatedJsonEncodedSizeOf, config::LogNamespace};
 use vrl::value::Kind;
 
 use crate::{

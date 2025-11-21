@@ -1,9 +1,15 @@
 use std::{
     collections::HashMap,
+    num::NonZeroU32,
     sync::{Arc, Mutex},
 };
 
 use chrono::{DateTime, Utc};
+use governor::{
+    Quota, RateLimiter,
+    clock::DefaultClock,
+    state::{InMemoryState, NotKeyed},
+};
 use quick_xml::{Reader, events::Event as XmlEvent};
 use regex;
 use tokio::sync::mpsc;
@@ -94,6 +100,8 @@ pub struct EventLogSubscription {
     #[cfg(windows)]
     // Shared subscription error state - checked by next_events()
     subscription_error: Arc<Mutex<Option<WindowsEventLogError>>>,
+    // Rate limiter for controlling event throughput
+    rate_limiter: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
 }
 
 #[cfg(windows)]
@@ -156,6 +164,19 @@ impl EventLogSubscription {
         config: &WindowsEventLogConfig,
         checkpointer: Arc<Checkpointer>,
     ) -> Result<Self, WindowsEventLogError> {
+        // Create rate limiter if configured
+        let rate_limiter = if config.events_per_second > 0 {
+            NonZeroU32::new(config.events_per_second).map(|rate| {
+                info!(
+                    message = "Enabling rate limiting for Windows Event Log source",
+                    events_per_second = config.events_per_second
+                );
+                RateLimiter::direct(Quota::per_second(rate))
+            })
+        } else {
+            None
+        };
+
         #[cfg(not(windows))]
         {
             let _ = checkpointer; // Suppress unused warning on non-Windows
@@ -209,6 +230,7 @@ impl EventLogSubscription {
                 checkpointer,
                 subscriptions,
                 subscription_error,
+                rate_limiter,
             })
         }
     }
@@ -259,6 +281,10 @@ impl EventLogSubscription {
                     }
 
                     if Self::should_include_event(&self.config, &event) {
+                        // Apply rate limiting before adding the event
+                        if let Some(limiter) = &self.rate_limiter {
+                            limiter.until_ready().await;
+                        }
                         events.push(event);
                     }
                 }
@@ -1182,6 +1208,64 @@ mod tests {
             result,
             Err(WindowsEventLogError::NotSupportedError)
         ));
+    }
+
+    #[test]
+    fn test_rate_limiter_configuration() {
+        // Test with rate limiting disabled (default)
+        let mut config = WindowsEventLogConfig::default();
+        assert_eq!(config.events_per_second, 0);
+
+        // Test with rate limiting enabled
+        config.events_per_second = 1000;
+        assert_eq!(config.events_per_second, 1000);
+    }
+
+    /// Test rate limiting functionality (unit test, not integration test)
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_rate_limiting_delays_events() {
+        use std::time::Instant;
+
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.events_per_second = 10; // 10 events per second
+        config.event_timeout_ms = 100; // Short timeout for test
+        config.read_existing_events = true; // Read existing events for testing
+
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+            .await
+            .expect("Subscription creation should succeed");
+
+        // Verify rate limiter was created
+        assert!(subscription.rate_limiter.is_some());
+
+        // Try to collect events and measure time
+        let start = Instant::now();
+        let events = subscription.next_events(20).await.unwrap_or_default();
+        let elapsed = start.elapsed();
+
+        if events.len() >= 10 {
+            // If we got 10+ events, it should have taken at least ~0.9 seconds (10 events at 10/sec)
+            // Using 0.8 seconds as threshold to account for timing variance
+            assert!(
+                elapsed.as_millis() >= 800,
+                "Rate limiting should delay processing: got {} events in {:?}",
+                events.len(),
+                elapsed
+            );
+        }
+    }
+
+    #[tokio::test]
+    async fn test_rate_limiter_disabled_by_default() {
+        let config = WindowsEventLogConfig::default();
+        assert_eq!(
+            config.events_per_second, 0,
+            "Rate limiting should be disabled by default"
+        );
     }
 
     #[test]
