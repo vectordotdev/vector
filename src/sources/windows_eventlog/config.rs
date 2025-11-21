@@ -150,6 +150,25 @@ pub struct WindowsEventLogConfig {
     #[configurable(metadata(docs::examples = 1000))]
     #[configurable(metadata(docs::examples = 5000))]
     pub events_per_second: u32,
+
+    /// Maximum length for event data field values.
+    ///
+    /// Event data values longer than this will be truncated with "...[truncated]" appended.
+    /// Set to 0 for no limit (matches Winlogbeat behavior).
+    #[serde(default = "default_max_event_data_length")]
+    #[configurable(metadata(docs::examples = 1024))]
+    #[configurable(metadata(docs::examples = 4096))]
+    pub max_event_data_length: usize,
+
+    /// Maximum length for message summary field.
+    ///
+    /// The message field contains a human-readable summary with event data samples.
+    /// Individual event data values in the message will be truncated to this length.
+    /// Set to 0 for no limit (matches Winlogbeat behavior).
+    #[serde(default = "default_max_message_field_length")]
+    #[configurable(metadata(docs::examples = 256))]
+    #[configurable(metadata(docs::examples = 1024))]
+    pub max_message_field_length: usize,
 }
 
 /// Event data formatting options.
@@ -234,6 +253,8 @@ impl Default for WindowsEventLogConfig {
             field_filter: FieldFilter::default(),
             data_dir: default_data_dir(),
             events_per_second: default_events_per_second(),
+            max_event_data_length: default_max_event_data_length(),
+            max_message_field_length: default_max_message_field_length(),
         }
     }
 }
@@ -531,6 +552,14 @@ fn default_data_dir() -> PathBuf {
 
 const fn default_events_per_second() -> u32 {
     0 // 0 means no rate limiting
+}
+
+const fn default_max_event_data_length() -> usize {
+    0 // 0 means no truncation (matches Winlogbeat)
+}
+
+const fn default_max_message_field_length() -> usize {
+    0 // 0 means no truncation (matches Winlogbeat)
 }
 
 #[cfg(test)]

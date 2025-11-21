@@ -523,7 +523,7 @@ impl EventLogSubscription {
                 .and_then(|v| DateTime::parse_from_rfc3339(&v).ok())
                 .map(|dt| dt.with_timezone(&Utc))
                 .unwrap_or_else(Utc::now),
-            provider_name: Self::extract_xml_attribute(xml, "Name").unwrap_or_default(),
+            provider_name: Self::extract_provider_name(xml).unwrap_or_default(),
             provider_guid: Self::extract_xml_attribute(xml, "Guid"),
         }
     }
@@ -537,6 +537,48 @@ impl EventLogSubscription {
             .captures(xml)?
             .get(1)
             .map(|m| m.as_str().to_string())
+    }
+
+    /// Extract provider name specifically from Provider element using proper XML parsing
+    fn extract_provider_name(xml: &str) -> Option<String> {
+        let mut reader = Reader::from_str(xml);
+        reader.trim_text(true);
+        let mut buf = Vec::new();
+
+        // Limit iterations for security
+        const MAX_ITERATIONS: usize = 1000;
+        let mut iterations = 0;
+
+        loop {
+            if iterations >= MAX_ITERATIONS {
+                return None;
+            }
+            iterations += 1;
+
+            match reader.read_event_into(&mut buf) {
+                Ok(XmlEvent::Start(ref e)) | Ok(XmlEvent::Empty(ref e)) => {
+                    let name = e.name();
+                    // Check if this is a Provider element (local name only, ignore namespace)
+                    if name.local_name().as_ref() == b"Provider" {
+                        // Extract the Name attribute
+                        for attr in e.attributes() {
+                            if let Ok(attr) = attr {
+                                if attr.key.local_name().as_ref() == b"Name" {
+                                    return String::from_utf8(attr.value.to_vec()).ok();
+                                }
+                            }
+                        }
+                    }
+                }
+                Ok(XmlEvent::Eof) => break,
+                Err(_) => return None,
+                _ => {}
+            }
+
+            buf.clear();
+        }
+
+        None
     }
 
     pub fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
@@ -602,13 +644,35 @@ impl EventLogSubscription {
 
     /// Enhanced EventData extraction supporting both structured data and StringInserts
     /// Follows Open/Closed Principle - extensible without modifying existing code
-    pub fn extract_event_data(xml: &str) -> EventDataResult {
+    pub fn extract_event_data(xml: &str, config: &WindowsEventLogConfig) -> EventDataResult {
         let mut structured_data = HashMap::new();
         let mut string_inserts = Vec::new();
         let mut user_data = HashMap::new();
 
         Self::parse_section(xml, "EventData", &mut structured_data, &mut string_inserts);
         Self::parse_section(xml, "UserData", &mut user_data, &mut Vec::new());
+
+        // Apply configurable truncation to event data values
+        if config.max_event_data_length > 0 {
+            for value in structured_data.values_mut() {
+                if value.len() > config.max_event_data_length {
+                    value.truncate(config.max_event_data_length);
+                    value.push_str("...[truncated]");
+                }
+            }
+            for value in user_data.values_mut() {
+                if value.len() > config.max_event_data_length {
+                    value.truncate(config.max_event_data_length);
+                    value.push_str("...[truncated]");
+                }
+            }
+            for value in string_inserts.iter_mut() {
+                if value.len() > config.max_event_data_length {
+                    value.truncate(config.max_event_data_length);
+                    value.push_str("...[truncated]");
+                }
+            }
+        }
 
         EventDataResult {
             structured_data,
@@ -674,12 +738,7 @@ impl EventLogSubscription {
                     } else if name.as_ref() == b"Data" && inside_data {
                         inside_data = false;
 
-                        // Apply security limits
-                        if current_data_value.len() > 1024 {
-                            current_data_value.truncate(1024);
-                            current_data_value.push_str("...[truncated]");
-                        }
-
+                        // Note: Truncation is now configurable and handled later
                         // Store in appropriate format based on whether Name attribute exists
                         if !current_data_name.is_empty() {
                             named_data
@@ -693,7 +752,10 @@ impl EventLogSubscription {
                 Ok(XmlEvent::Text(ref e)) => {
                     if inside_section && inside_data {
                         if let Ok(text) = e.unescape() {
-                            if current_data_value.len() + text.len() <= 1024 {
+                            // Append text without length check (configurable truncation applied later)
+                            // Still enforce a maximum for security to prevent OOM
+                            const MAX_VALUE_SIZE: usize = 1024 * 1024; // 1MB hard limit for security
+                            if current_data_value.len() + text.len() <= MAX_VALUE_SIZE {
                                 current_data_value.push_str(&text);
                             }
                         }
@@ -713,9 +775,24 @@ impl EventLogSubscription {
         event_id: u32,
         provider_name: &str,
         computer: &str,
+        config: &WindowsEventLogConfig,
     ) -> Option<String> {
-        let event_data_result = Self::extract_event_data(xml);
+        let event_data_result = Self::extract_event_data(xml, config);
         let event_data = &event_data_result.structured_data;
+
+        // Helper function to apply configurable truncation
+        let truncate = |s: &str| -> String {
+            if config.max_message_field_length > 0 && s.len() > config.max_message_field_length {
+                let mut truncated = s
+                    .chars()
+                    .take(config.max_message_field_length)
+                    .collect::<String>();
+                truncated.push_str("...");
+                truncated
+            } else {
+                s.to_string()
+            }
+        };
 
         match event_id {
             6009 => {
@@ -724,8 +801,8 @@ impl EventLogSubscription {
                 {
                     return Some(format!(
                         "Microsoft Windows kernel version {} build {} started",
-                        version.chars().take(50).collect::<String>(),
-                        build.chars().take(50).collect::<String>()
+                        truncate(version),
+                        truncate(build)
                     ));
                 }
             }
@@ -734,19 +811,13 @@ impl EventLogSubscription {
                     let data_summary: Vec<String> = event_data
                         .iter()
                         .take(3)
-                        .map(|(k, v)| {
-                            format!(
-                                "{}={}",
-                                k.chars().take(32).collect::<String>(),
-                                v.chars().take(64).collect::<String>()
-                            )
-                        })
+                        .map(|(k, v)| format!("{}={}", truncate(k), truncate(v)))
                         .collect();
                     if !data_summary.is_empty() {
                         return Some(format!(
                             "Event ID {} from {} ({})",
                             event_id,
-                            provider_name.chars().take(64).collect::<String>(),
+                            truncate(provider_name),
                             data_summary.join(", ")
                         ));
                     }
@@ -757,8 +828,8 @@ impl EventLogSubscription {
         Some(format!(
             "Event ID {} from {} on {}",
             event_id,
-            provider_name.chars().take(64).collect::<String>(),
-            computer.chars().take(64).collect::<String>()
+            truncate(provider_name),
+            truncate(computer)
         ))
     }
 
@@ -827,12 +898,13 @@ impl EventLogSubscription {
 
         // Use comprehensive parsing for complete field coverage
         let system_fields = Self::extract_system_fields(&xml);
-        let event_data_result = Self::extract_event_data(&xml);
+        let event_data_result = Self::extract_event_data(&xml, config);
         let rendered_message = Self::extract_message_from_xml(
             &xml,
             system_fields.event_id,
             &system_fields.provider_name,
             &system_fields.computer,
+            config,
         );
 
         let event = WindowsEvent {
@@ -1176,6 +1248,45 @@ mod tests {
     }
 
     #[test]
+    fn test_extract_provider_name() {
+        // Test with Provider element before EventData
+        let xml = r#"
+        <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+            <System>
+                <Provider Name="Microsoft-Windows-Security-Auditing" Guid="{54849625-5478-4994-A5BA-3E3B0328C30D}"/>
+                <EventID>4688</EventID>
+            </System>
+            <EventData>
+                <Data Name="SubjectUserSid">S-1-5-18</Data>
+                <Data Name="ProcessName">cmd.exe</Data>
+            </EventData>
+        </Event>
+        "#;
+
+        assert_eq!(
+            EventLogSubscription::extract_provider_name(xml),
+            Some("Microsoft-Windows-Security-Auditing".to_string())
+        );
+
+        // Test that it doesn't match Data elements
+        let xml_data_first = r#"
+        <Event>
+            <EventData>
+                <Data Name="SomeField">Value</Data>
+            </EventData>
+            <System>
+                <Provider Name="TestProvider"/>
+            </System>
+        </Event>
+        "#;
+
+        assert_eq!(
+            EventLogSubscription::extract_provider_name(xml_data_first),
+            Some("TestProvider".to_string())
+        );
+    }
+
+    #[test]
     fn test_windows_event_level_name() {
         let event = WindowsEvent {
             record_id: 1,
@@ -1304,6 +1415,164 @@ mod tests {
         assert!(
             result.is_none(),
             "Security limits should reject excessively large XML content"
+        );
+    }
+
+    #[test]
+    fn test_configurable_truncation_disabled_by_default() {
+        let config = WindowsEventLogConfig::default();
+
+        // Default should be no truncation
+        assert_eq!(
+            config.max_event_data_length, 0,
+            "Event data truncation should be disabled by default"
+        );
+        assert_eq!(
+            config.max_message_field_length, 0,
+            "Message field truncation should be disabled by default"
+        );
+    }
+
+    #[test]
+    fn test_event_data_truncation_when_enabled() {
+        let xml = r#"
+        <Event>
+            <EventData>
+                <Data Name="LongValue">This is a very long value that should be truncated when the limit is set</Data>
+                <Data Name="ShortValue">Short</Data>
+            </EventData>
+        </Event>
+        "#;
+
+        // Test with truncation enabled
+        let mut config = WindowsEventLogConfig::default();
+        config.max_event_data_length = 20;
+
+        let result = EventLogSubscription::extract_event_data(xml, &config);
+
+        let long_value = result.structured_data.get("LongValue").unwrap();
+        assert!(
+            long_value.ends_with("...[truncated]"),
+            "Long value should be truncated"
+        );
+        assert!(
+            long_value.len() <= 20 + "...[truncated]".len(),
+            "Truncated value should respect limit"
+        );
+
+        let short_value = result.structured_data.get("ShortValue").unwrap();
+        assert_eq!(short_value, "Short", "Short value should not be truncated");
+        assert!(
+            !short_value.contains("truncated"),
+            "Short value should not have truncation marker"
+        );
+    }
+
+    #[test]
+    fn test_event_data_no_truncation_when_disabled() {
+        let xml = r#"
+        <Event>
+            <EventData>
+                <Data Name="LongValue">This is a very long value that should NOT be truncated when truncation is disabled by setting max_event_data_length to 0</Data>
+            </EventData>
+        </Event>
+        "#;
+
+        // Test with truncation disabled (default)
+        let config = WindowsEventLogConfig::default();
+        assert_eq!(
+            config.max_event_data_length, 0,
+            "Default should be no truncation"
+        );
+
+        let result = EventLogSubscription::extract_event_data(xml, &config);
+
+        let long_value = result.structured_data.get("LongValue").unwrap();
+        assert!(
+            !long_value.ends_with("...[truncated]"),
+            "Value should not be truncated when limit is 0"
+        );
+        assert!(long_value.len() > 100, "Full value should be preserved");
+        assert!(
+            long_value.contains("disabled by setting max_event_data_length to 0"),
+            "Full text should be present"
+        );
+    }
+
+    #[test]
+    fn test_message_field_truncation_when_enabled() {
+        let xml = r#"
+        <Event>
+            <System>
+                <Provider Name="TestProvider"/>
+                <EventID>1000</EventID>
+                <Computer>TestComputer</Computer>
+            </System>
+            <EventData>
+                <Data Name="Field1">This is a very long field value that will be truncated in the message summary</Data>
+            </EventData>
+        </Event>
+        "#;
+
+        let mut config = WindowsEventLogConfig::default();
+        config.max_message_field_length = 20;
+
+        let message = EventLogSubscription::extract_message_from_xml(
+            xml,
+            1000,
+            "TestProvider",
+            "TestComputer",
+            &config,
+        )
+        .unwrap();
+
+        // Message should contain truncated values
+        assert!(
+            message.contains("..."),
+            "Message should contain truncation indicator"
+        );
+    }
+
+    #[test]
+    fn test_message_field_no_truncation_when_disabled() {
+        let xml = r#"
+        <Event>
+            <System>
+                <Provider Name="VeryLongProviderNameThatExceedsSixtyFourCharactersAndShouldNotBeTruncated"/>
+                <EventID>1000</EventID>
+                <Computer>VeryLongComputerNameThatShouldAlsoNotBeTruncatedWhenLimitIsZero</Computer>
+            </System>
+            <EventData>
+                <Data Name="Field1">VeryLongValueThatShouldNotBeTruncated</Data>
+            </EventData>
+        </Event>
+        "#;
+
+        let config = WindowsEventLogConfig::default();
+        assert_eq!(
+            config.max_message_field_length, 0,
+            "Default should be no truncation"
+        );
+
+        let message = EventLogSubscription::extract_message_from_xml(
+            xml,
+            1000,
+            "VeryLongProviderNameThatExceedsSixtyFourCharactersAndShouldNotBeTruncated",
+            "VeryLongComputerNameThatShouldAlsoNotBeTruncatedWhenLimitIsZero",
+            &config,
+        )
+        .unwrap();
+
+        // Message should contain full values
+        assert!(
+            message.contains(
+                "VeryLongProviderNameThatExceedsSixtyFourCharactersAndShouldNotBeTruncated"
+            )
+        );
+        assert!(message.contains("VeryLongValueThatShouldNotBeTruncated"));
+        assert!(
+            !message.contains("..."),
+            "Message should not contain truncation when limit is 0"
         );
     }
 

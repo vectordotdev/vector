@@ -1,10 +1,21 @@
 The `windows_eventlog` source allows collecting logs from Windows Event Log channels using the Windows Event Log API.
 
-This Windows-specific source polls Event Log channels and streams events with comprehensive security validation, configurable field filtering, and support for XPath event queries. Key features include:
+This Windows-specific source uses event-driven subscriptions to stream events in real-time with comprehensive security validation, configurable field filtering, and support for XPath event queries. Key features include:
 
-- Support for multiple channels (System, Application, Security, etc.)
+- Support for multiple channels (System, Application, Security, and 140+ specialized channels)
+- Real-time event-driven subscriptions using EvtSubscribe API
 - XPath query filtering for selective event collection
-- Configurable polling intervals and batch sizes
-- Bookmark persistence for reliable event tracking
-- Security hardening against injection attacks and resource exhaustion
+- Checkpoint persistence for reliable resumption after restarts (similar to journald)
+- Configurable rate limiting to prevent overwhelming downstream systems
+- Configurable field truncation for storage optimization (Winlogbeat-compatible)
+- Enhanced provider name extraction using proper XML parsing
+- Support for large events (up to 10MB)
+- Security hardening against XPath injection, resource exhaustion, and memory leaks
 - Flexible event data formatting and field filtering
+- FluentBit-compatible string_inserts field for parameter arrays
+
+New configuration options:
+- `events_per_second`: Rate limit event processing (0 = unlimited)
+- `max_event_data_length`: Truncate event data values (0 = no truncation, Winlogbeat default)
+- `max_message_field_length`: Truncate message summary field (0 = no truncation, Winlogbeat default)
+- `data_dir`: Directory for checkpoint persistence
