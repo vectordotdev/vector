@@ -521,7 +521,6 @@ num_cpus,https://github.com/seanmonstar/num_cpus,MIT OR Apache-2.0,Sean McArthur
 num_enum,https://github.com/illicitonion/num_enum,BSD-3-Clause OR MIT OR Apache-2.0,"Daniel Wagner-Hall <dawagner@gmail.com>, Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>, Vincent Esche <regexident@gmail.com>"
 num_enum_derive,https://github.com/illicitonion/num_enum,BSD-3-Clause OR MIT OR Apache-2.0,"Daniel Wagner-Hall <dawagner@gmail.com>, Daniel Henry-Mantilla <daniel.henry.mantilla@gmail.com>, Vincent Esche <regexident@gmail.com>"
 num_threads,https://github.com/jhpratt/num_threads,MIT OR Apache-2.0,Jacob Pratt <open-source@jhpratt.dev>
-number_prefix,https://github.com/ogham/rust-number-prefix,MIT,Benjamin Sago <ogham@bsago.me>
 oauth2,https://github.com/ramosbugs/oauth2-rs,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Florin Lipan <florinlipan@gmail.com>, David A. Ramos <ramos@cs.stanford.edu>"
 objc,http://github.com/SSheldon/rust-objc,MIT,Steven Sheldon
 objc2-core-foundation,https://github.com/madsmtm/objc2,Zlib OR Apache-2.0 OR MIT,The objc2-core-foundation Authors
@@ -833,6 +832,7 @@ unicode-normalization,https://github.com/unicode-rs/unicode-normalization,MIT OR
 unicode-segmentation,https://github.com/unicode-rs/unicode-segmentation,MIT OR Apache-2.0,"kwantam <kwantam@gmail.com>, Manish Goregaokar <manishsmail@gmail.com>"
 unicode-truncate,https://github.com/Aetf/unicode-truncate,MIT OR Apache-2.0,Aetf <aetf@unlimitedcodeworks.xyz>
 unicode-width,https://github.com/unicode-rs/unicode-width,MIT OR Apache-2.0,"kwantam <kwantam@gmail.com>, Manish Goregaokar <manishsmail@gmail.com>"
+unit-prefix,https://codeberg.org/commons-rs/unit-prefix,MIT,"Fabio Valentini <decathorpe@gmail.com>, Benjamin Sago <ogham@bsago.me>"
 universal-hash,https://github.com/RustCrypto/traits,MIT OR Apache-2.0,RustCrypto Developers
 unreachable,https://github.com/reem/rust-unreachable,MIT  OR  Apache-2.0,Jonathan Reem <jonathan.reem@gmail.com>
 unsafe-libyaml,https://github.com/dtolnay/unsafe-libyaml,MIT,David Tolnay <dtolnay@gmail.com>
