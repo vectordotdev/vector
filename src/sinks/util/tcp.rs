@@ -3,7 +3,6 @@ use std::{
     net::SocketAddr,
     pin::Pin,
     task::{Context, Poll},
-    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -157,11 +156,9 @@ impl TcpConnector {
         Self::new(host, port, None, None.into(), None)
     }
 
-    const fn fresh_backoff() -> ExponentialBackoff {
+    fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
-        ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60))
+        ExponentialBackoff::default()
     }
 
     async fn connect(&self) -> Result<MaybeTlsStream<TcpStream>, TcpError> {

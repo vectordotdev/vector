@@ -270,7 +270,7 @@ impl Config {
 }
 
 /// Healthcheck options.
-#[configurable_component]
+#[configurable_component(global_option("healthchecks"))]
 #[derive(Clone, Copy, Debug)]
 #[serde(default)]
 pub struct HealthcheckOptions {
@@ -308,6 +308,8 @@ impl Default for HealthcheckOptions {
         }
     }
 }
+
+impl_generate_config_from_default!(HealthcheckOptions);
 
 /// Unique thing, like port, of which only one owner can be.
 #[derive(Clone, Debug, Eq, PartialEq, Hash, Ord, PartialOrd)]
