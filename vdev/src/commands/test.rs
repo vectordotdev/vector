@@ -34,7 +34,7 @@ fn parse_env(env: Vec<String>) -> BTreeMap<String, Option<String>> {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        let runner = get_agent_test_runner(self.container)?;
+        let runner = get_agent_test_runner(self.container);
 
         let mut args = vec!["--workspace".to_string()];
 
