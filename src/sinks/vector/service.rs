@@ -1,4 +1,8 @@
-use std::task::{Context, Poll};
+use std::{
+    sync::{Arc, Mutex},
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
 
 use futures::{TryFutureExt, future::BoxFuture};
 use http::Uri;
@@ -16,17 +20,43 @@ use vector_lib::{
 use super::VectorSinkError;
 use crate::{
     Error,
+    config::ProxyConfig,
     event::{EventFinalizers, EventStatus, Finalizable},
+    http::build_proxy_connector,
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
     sinks::util::uri,
+    tls::MaybeTlsSettings,
 };
 
-#[derive(Clone, Debug)]
+struct ClientState {
+    client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
+    created_at: Instant,
+}
+
+#[derive(Clone)]
 pub struct VectorService {
     pub client: proto_vector::Client<HyperSvc>,
     pub protocol: String,
     pub endpoint: String,
+    uri: Uri,
+    compression: bool,
+    connection_ttl: Option<Duration>,
+    tls_settings: MaybeTlsSettings,
+    proxy_config: ProxyConfig,
+    client_state: Arc<Mutex<ClientState>>,
+}
+
+impl std::fmt::Debug for VectorService {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("VectorService")
+            .field("protocol", &self.protocol)
+            .field("endpoint", &self.endpoint)
+            .field("uri", &self.uri)
+            .field("compression", &self.compression)
+            .field("connection_ttl", &self.connection_ttl)
+            .finish_non_exhaustive()
+    }
 }
 
 pub struct VectorResponse {
@@ -71,20 +101,67 @@ impl VectorService {
         hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
         uri: Uri,
         compression: bool,
+        connection_ttl: Option<Duration>,
+        tls_settings: MaybeTlsSettings,
+        proxy_config: ProxyConfig,
     ) -> Self {
         let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
         let mut proto_client = proto_vector::Client::new(HyperSvc {
-            uri,
-            client: hyper_client,
+            uri: uri.clone(),
+            client: hyper_client.clone(),
         });
 
         if compression {
             proto_client = proto_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);
         }
+
+        let client_state = Arc::new(Mutex::new(ClientState {
+            client: hyper_client,
+            created_at: Instant::now(),
+        }));
+
         Self {
             client: proto_client,
             protocol,
             endpoint,
+            uri,
+            compression,
+            connection_ttl,
+            tls_settings,
+            proxy_config,
+            client_state,
+        }
+    }
+
+    fn check_and_recreate_client(&mut self) {
+        if let Some(ttl) = self.connection_ttl {
+            let mut state = self.client_state.lock().unwrap();
+            let elapsed = state.created_at.elapsed();
+
+            if elapsed >= ttl {
+                // Recreate the client
+                if let Ok(proxy) =
+                    build_proxy_connector(self.tls_settings.clone(), &self.proxy_config)
+                {
+                    let new_client = hyper::Client::builder().http2_only(true).build(proxy);
+
+                    state.client = new_client.clone();
+                    state.created_at = Instant::now();
+
+                    // Update the proto client with the new hyper client
+                    let mut proto_client = proto_vector::Client::new(HyperSvc {
+                        uri: self.uri.clone(),
+                        client: new_client,
+                    });
+
+                    if self.compression {
+                        proto_client =
+                            proto_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);
+                    }
+
+                    self.client = proto_client;
+                }
+            }
         }
     }
 }
@@ -106,6 +183,9 @@ impl Service<VectorRequest> for VectorService {
 
     // Emission of internal events for errors and dropped events is handled upstream by the caller.
     fn call(&mut self, mut list: VectorRequest) -> Self::Future {
+        // Check if we need to recreate the client due to TTL expiration
+        self.check_and_recreate_client();
+
         let mut service = self.clone();
         let byte_size = list.request.encoded_len();
         let metadata = std::mem::take(list.metadata_mut());
