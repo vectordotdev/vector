@@ -379,7 +379,7 @@ indexmap.workspace = true
 inventory = { version = "0.3.20", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
 itertools.workspace = true
-k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26"], optional = true }
+k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_30"], optional = true }
 kube = { version = "0.93.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
 lru = { version = "0.16.0", default-features = false }
