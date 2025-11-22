@@ -56,6 +56,7 @@ async fn invalid_endpoint() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -75,6 +76,7 @@ async fn collected_logs_bytes() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -100,6 +102,7 @@ async fn collected_logs_json() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -125,6 +128,7 @@ async fn collected_metrics_native_json() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -155,6 +159,7 @@ async fn collected_trace_native_json() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -180,6 +185,7 @@ async fn unauthorized_no_auth() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         auth: None,
         tls: None,
         log_namespace: None,
@@ -199,6 +205,7 @@ async fn unauthorized_wrong_auth() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: Some(Auth::Basic {
             user: "white_rabbit".to_string(),
@@ -221,6 +228,7 @@ async fn authorized() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: Some(Auth::Basic {
             user: "user".to_string(),
@@ -243,6 +251,7 @@ async fn tls_invalid_ca() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: Some(TlsConfig {
             ca_file: Some("tests/integration/http-client/data/certs/invalid-ca-cert.pem".into()),
             ..Default::default()
@@ -265,6 +274,7 @@ async fn tls_valid() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: Some(TlsConfig {
             ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
             ..Default::default()
@@ -288,6 +298,7 @@ async fn shutdown() {
         framing: default_framing_message_based(),
         headers: HashMap::new(),
         method: HttpMethod::Get,
+        body: None,
         tls: None,
         auth: None,
         log_namespace: None,
