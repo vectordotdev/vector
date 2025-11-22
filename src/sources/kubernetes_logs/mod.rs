@@ -8,8 +8,11 @@ use std::{cmp::min, path::PathBuf, time::Duration};
 
 use bytes::Bytes;
 use chrono::Utc;
-use futures::{future::FutureExt, stream::StreamExt};
-use futures_util::Stream;
+use futures_util::{
+    Stream,
+    future::{FutureExt, ready},
+    stream::StreamExt,
+};
 use http_1::{HeaderName, HeaderValue};
 use k8s_openapi::api::core::v1::{Namespace, Node, Pod};
 use k8s_paths_provider::K8sPathsProvider;
@@ -21,6 +24,9 @@ use kube::{
 };
 use lifecycle::Lifecycle;
 use serde_with::serde_as;
+use tokio::pin;
+use tokio_stream::wrappers::{BroadcastStream, errors::BroadcastStreamRecvError};
+
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, TimeZone,
     codecs::{BytesDeserializer, BytesDeserializerConfig},
@@ -32,7 +38,7 @@ use vector_lib::{
     file_source_common::{
         Checkpointer, FingerprintStrategy, Fingerprinter, ReadFrom, ReadFromConfig,
     },
-    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol, ComponentEventsDropped, UNINTENTIONAL},
     lookup::{OwnedTargetPath, lookup_v2::OptionalTargetPath, owned_value_path, path},
 };
 use vrl::value::{Kind, kind::Collection};
@@ -53,8 +59,7 @@ use crate::{
     },
     kubernetes::{custom_reflector, meta_cache::MetaCache},
     shutdown::ShutdownSignal,
-    sources,
-    sources::kubernetes_logs::partial_events_merger::merge_partial_events,
+    sources::{self, kubernetes_logs::partial_events_merger::merge_partial_events},
     transforms::{FunctionTransform, OutputBuffer},
 };
 
@@ -65,7 +70,9 @@ mod node_metadata_annotator;
 mod parser;
 mod partial_events_merger;
 mod path_helpers;
+mod pod_info;
 mod pod_metadata_annotator;
+mod reconciler;
 mod transform_utils;
 mod util;
 
@@ -278,6 +285,22 @@ pub struct Config {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[serde(default = "default_rotate_wait", rename = "rotate_wait_secs")]
     rotate_wait: Duration,
+
+    /// The strategy to use for log collection.
+    #[serde(default)]
+    log_collection_strategy: LogCollectionStrategy,
+}
+
+/// Configuration for the log collection strategy.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Default)]
+#[serde(rename_all = "snake_case")]
+enum LogCollectionStrategy {
+    /// Collect logs by reading log files from the filesystem.
+    #[default]
+    File,
+    /// Collect logs via the Kubernetes Logs API.
+    Api,
 }
 
 const fn default_read_from() -> ReadFromConfig {
@@ -326,6 +349,7 @@ impl Default for Config {
             log_namespace: None,
             internal_metrics: Default::default(),
             rotate_wait: default_rotate_wait(),
+            log_collection_strategy: default_log_collection_strategy(),
         }
     }
 }
@@ -584,6 +608,7 @@ struct Source {
     delay_deletion: Duration,
     include_file_metric_tag: bool,
     rotate_wait: Duration,
+    log_collection_strategy: LogCollectionStrategy,
 }
 
 impl Source {
@@ -673,6 +698,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag: config.internal_metrics.include_file_tag,
             rotate_wait: config.rotate_wait,
+            log_collection_strategy: config.log_collection_strategy.clone(),
         })
     }
 
@@ -710,6 +736,7 @@ impl Source {
             delay_deletion,
             include_file_metric_tag,
             rotate_wait,
+            log_collection_strategy,
         } = self;
 
         let mut reflectors = Vec::new();
@@ -734,6 +761,55 @@ impl Source {
         )
         .backoff(watcher::DefaultBackoff::default());
 
+        // Create shared broadcast channel for pod events
+        let (pod_event_tx, _) = tokio::sync::broadcast::channel(1000);
+        let reflector_rx = pod_event_tx.subscribe();
+
+        // Spawn task to forward pod events to broadcast channel
+        let pod_forwarder_tx = pod_event_tx.clone();
+        let pod_forwarder = tokio::spawn(async move {
+            pin!(pod_watcher);
+            while let Some(event_result) = pod_watcher.next().await {
+                match event_result {
+                    Ok(event) => {
+                        // Only broadcast successful events
+                        if pod_forwarder_tx.send(event).is_err() {
+                            // All receivers have been dropped
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        warn!("Pod watcher error: {}", e);
+                        // Continue on errors to maintain resilience
+                    }
+                }
+            }
+        });
+        reflectors.push(pod_forwarder);
+
+        // Convert broadcast receiver to stream for reflector
+        let reflector_stream = BroadcastStream::new(reflector_rx).filter_map(|result| {
+            ready(match result {
+                Ok(event) => Some(Ok(event)),
+                Err(BroadcastStreamRecvError::Lagged(skipped_count)) => {
+                    // Emit proper internal event for dropped messages
+                    emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+                        count: skipped_count as usize,
+                        reason: "Pod events lagged: broadcast receiver fell behind, some pod events were skipped"
+                    });
+                    
+                    warn!(
+                        message = "Pod events broadcast receiver lagged, some events were skipped",
+                        skipped_count = skipped_count,
+                        receiver = "reflector_stream"
+                    );
+                    
+                    // Continue processing (don't terminate the stream)
+                    None
+                },
+            })
+        });
+
         let pod_store_w = reflector::store::Writer::default();
         let pod_state = pod_store_w.as_reader();
         let pod_cacher = MetaCache::new();
@@ -741,7 +817,7 @@ impl Source {
         reflectors.push(tokio::spawn(custom_reflector(
             pod_store_w,
             pod_cacher,
-            pod_watcher,
+            reflector_stream,
             delay_deletion,
         )));
 
@@ -772,7 +848,7 @@ impl Source {
 
         // -----------------------------------------------------------------
 
-        let nodes = Api::<Node>::all(client);
+        let nodes = Api::<Node>::all(client.clone());
         let node_watcher = watcher(
             nodes,
             watcher::Config {
@@ -888,8 +964,11 @@ impl Source {
                 log_namespace,
             );
 
+            // TODO: annotate the logs with pods's metadata. Need to honor the `insert_namespace_fields` flag
+            if log_collection_strategy == LogCollectionStrategy::Api {
+                return event;
+            }
             let file_info = annotator.annotate(&mut event, &line.filename);
-
             emit!(KubernetesLogsEventsReceived {
                 file: &line.filename,
                 byte_size: event.estimated_json_encoded_size_of(),
@@ -940,17 +1019,43 @@ impl Source {
         let event_processing_loop = out.send_event_stream(&mut stream);
 
         let mut lifecycle = Lifecycle::new();
-        {
+        // Only add file server when log_collection_strategy is File
+        if log_collection_strategy == LogCollectionStrategy::File {
             let (slot, shutdown) = lifecycle.add();
-            let fut = util::run_file_server(file_server, file_source_tx, shutdown, checkpointer)
-                .map(|result| match result {
-                    Ok(FileServerShutdown) => info!(message = "File server completed gracefully."),
+            let fut =
+                util::run_file_server(file_server, file_source_tx.clone(), shutdown, checkpointer)
+                    .map(|result| match result {
+                        Ok(FileServerShutdown) => {
+                            info!(message = "File server completed gracefully.")
+                        }
+                        Err(error) => emit!(KubernetesLifecycleError {
+                            message: "File server exited with an error.",
+                            error,
+                            count: events_count,
+                        }),
+                    });
+            slot.bind(Box::pin(fut));
+        }
+        if log_collection_strategy == LogCollectionStrategy::Api {
+            let reconciler_rx = pod_event_tx.subscribe();
+            let reconciler =
+                reconciler::Reconciler::new(client.clone(), file_source_tx.clone(), reconciler_rx);
+            let (slot, shutdown) = lifecycle.add();
+            let fut = util::complete_with_deadline_on_signal(
+                reconciler.run(),
+                shutdown,
+                Duration::from_secs(30), // more than enough time to propagate
+            )
+            .map(|result| {
+                match result {
+                    Ok(_) => info!(message = "Reconciler completed gracefully."),
                     Err(error) => emit!(KubernetesLifecycleError {
-                        message: "File server exited with an error.",
                         error,
+                        message: "Reconciler timed out during the shutdown.",
                         count: events_count,
                     }),
-                });
+                };
+            });
             slot.bind(Box::pin(fut));
         }
         {
@@ -1092,6 +1197,9 @@ const fn default_delay_deletion_ms() -> Duration {
 
 const fn default_rotate_wait() -> Duration {
     Duration::from_secs(u64::MAX / 2)
+}
+const fn default_log_collection_strategy() -> LogCollectionStrategy {
+    LogCollectionStrategy::File
 }
 
 // This function constructs the patterns we include for file watching, created
