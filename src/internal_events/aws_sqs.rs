@@ -9,13 +9,40 @@ use vector_lib::internal_event::{error_stage, error_type};
 
 #[cfg(feature = "sources-aws_s3")]
 mod s3 {
+    use std::time::Duration;
+
     use aws_sdk_sqs::types::{
         BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry,
         SendMessageBatchRequestEntry, SendMessageBatchResultEntry,
     };
+    use metrics::histogram;
 
     use super::*;
     use crate::sources::aws_s3::sqs::ProcessingError;
+
+    #[derive(Debug)]
+    pub struct S3ObjectProcessingCompleted<'a> {
+        pub bucket: &'a str,
+        pub duration: Duration,
+        pub status: &'static str,
+    }
+
+    impl InternalEvent for S3ObjectProcessingCompleted<'_> {
+        fn emit(self) {
+            debug!(
+                message = "S3 object processing completed.",
+                bucket = %self.bucket,
+                duration_ms = %self.duration.as_millis(),
+                status = %self.status,
+            );
+            histogram!(
+                "s3_object_processing_duration_seconds",
+                "bucket" => self.bucket.to_owned(),
+                "status" => self.status,
+            )
+            .record(self.duration);
+        }
+    }
 
     #[derive(Debug)]
     pub struct SqsMessageProcessingError<'a> {
