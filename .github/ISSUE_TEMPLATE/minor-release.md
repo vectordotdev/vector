@@ -80,8 +80,8 @@ Automated steps include:
           commit. This makes it easier to cherry-pick to master after the release.
     - [ ] Merge release preparation branch into the release branch.
         - `git switch "${RELEASE_BRANCH}" && git merge --ff-only "${PREP_BRANCH}"`
-
 - [ ] Tag new release
+  - [ ] Create new ephemeral GitHub PAT and update the `HOMEBREW_PAT` [secret](https://github.com/vectordotdev/vector/settings/secrets/actions/HOMEBREW_PAT).
   - [ ] `git tag v"${NEW_VECTOR_VERSION}" -a -m v"${NEW_VECTOR_VERSION}"`
   - [ ] `git push origin v"${NEW_VECTOR_VERSION}"`
 - [ ] Wait for release workflow to complete.
