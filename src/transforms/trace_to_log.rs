@@ -1,4 +1,4 @@
-use vector_lib::config::{LogNamespace, clone_input_definitions};
+use vector_lib::config::clone_input_definitions;
 use vector_lib::configurable::configurable_component;
 
 use crate::config::OutputId;
@@ -50,9 +50,8 @@ impl TransformConfig for TraceToLogConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::Log,
