@@ -3,7 +3,7 @@ title: Celebrating COSE's First Year
 short: COSE Team - First Year Retrospective
 description: Celebrating the first year of the COSE team and highlighting our contributions to the Vector open source community
 authors: [ "pront" ]
-date: "2025-11-04"
+date: "2025-11-13"
 badges:
   type: retrospective
   domains: [ "dev", "community" ]

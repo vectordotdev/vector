@@ -759,7 +759,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         event::{LogEvent, Metric, metric},
-        test_util::{components::assert_transform_compliance, next_addr},
+        test_util::{addr::next_addr, components::assert_transform_compliance},
         transforms::test::create_topology,
     };
 
@@ -899,7 +899,7 @@ mod integration_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn timeout() {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
 
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
             tokio::time::sleep(Duration::from_secs(3)).await;
@@ -930,7 +930,7 @@ mod integration_tests {
     // validates the configuration setting 'required'=false allows vector to run
     #[tokio::test(flavor = "multi_thread")]
     async fn not_required() {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
 
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
             tokio::time::sleep(Duration::from_secs(3)).await;

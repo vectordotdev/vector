@@ -456,8 +456,8 @@ mod tests {
             config::InternalMetricsConfig,
         },
         test_util::{
+            addr::next_addr,
             components::{SINK_TAGS, run_and_assert_sink_compliance},
-            next_addr,
         },
     };
 
@@ -475,7 +475,7 @@ mod tests {
         let event = Event::Log(LogEvent::from("foo"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -502,7 +502,7 @@ mod tests {
         let event2 = Event::Log(LogEvent::from("foo2"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -534,7 +534,7 @@ mod tests {
         let event = Event::Log(LogEvent::from("foo"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -563,7 +563,7 @@ mod tests {
         let event = Event::Log(LogEvent::from("foo"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -601,7 +601,7 @@ mod tests {
         let event = Event::Log(LogEvent::from("foo"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -660,9 +660,10 @@ mod tests {
     async fn sink_spec_compliance() {
         let event = Event::Log(LogEvent::from("foo"));
 
+        let (_guard, address) = next_addr();
         let sink = WebSocketListenerSink::new(
             WebSocketListenerSinkConfig {
-                address: next_addr(),
+                address,
                 ..Default::default()
             },
             SinkContext::default(),
@@ -683,7 +684,7 @@ mod tests {
         let event2 = Event::Log(LogEvent::from("foo2"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -728,7 +729,7 @@ mod tests {
         let event2 = Event::Log(LogEvent::from("foo2"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(
@@ -772,7 +773,7 @@ mod tests {
         let event3 = Event::Log(LogEvent::from("foo3"));
 
         let (mut sender, input_events) = build_test_event_channel();
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let port = address.port();
 
         let websocket_sink = start_websocket_server_sink(

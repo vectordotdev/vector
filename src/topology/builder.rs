@@ -262,7 +262,9 @@ impl<'a> Builder<'a> {
                 key.id()
             );
 
-            let mut builder = SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE);
+            let mut builder = SourceSender::builder()
+                .with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+                .with_timeout(source.inner.send_timeout());
             let mut pumps = Vec::new();
             let mut controls = HashMap::new();
             let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -345,8 +347,6 @@ impl<'a> Builder<'a> {
             };
             let pump = Task::new(key.clone(), typetag, pump);
 
-            let pipeline = builder.build();
-
             let (shutdown_signal, force_shutdown_tripwire) = self
                 .shutdown_coordinator
                 .register_source(key, INTERNAL_SOURCES.contains(&typetag));
@@ -357,15 +357,14 @@ impl<'a> Builder<'a> {
                 enrichment_tables: enrichment_tables.clone(),
                 metrics_storage: METRICS_STORAGE.clone(),
                 shutdown: shutdown_signal,
-                out: pipeline,
+                out: builder.build(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, &source.proxy),
                 acknowledgements: source.sink_acknowledgements,
                 schema_definitions,
                 schema: self.config.schema,
                 extra_context: self.extra_context.clone(),
             };
-            let source = source.inner.build(context).await;
-            let server = match source {
+            let server = match source.inner.build(context).await {
                 Err(error) => {
                     self.errors.push(format!("Source \"{key}\": {error}"));
                     continue;

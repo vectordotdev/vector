@@ -706,7 +706,7 @@ mod tests {
     use tower::ServiceBuilder;
 
     use super::*;
-    use crate::test_util::next_addr;
+    use crate::test_util::addr::next_addr;
 
     #[test]
     fn test_default_request_headers_defaults() {
@@ -894,7 +894,7 @@ mod tests {
     async fn test_max_connection_age_service_with_hyper_server() {
         // Create a hyper server with the max connection age layer.
         let max_connection_age = Duration::from_secs(1);
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let make_svc = make_service_fn(move |conn: &AddrStream| {
             let svc = ServiceBuilder::new()
                 .layer(MaxConnectionAgeLayer::new(
