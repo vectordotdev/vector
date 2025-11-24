@@ -27,6 +27,9 @@ static UNDOCUMENTED_FNS: [&str; 6] = [
     "type_def",
 ];
 
+// FIXME this shouldn't exist, all functions should have examples
+static NO_EXAMPLES_FNS: [&str; 1] = ["strip_ansi_escape_codes"];
+
 impl Cli {
     pub fn exec(self) -> Result<()> {
         app::set_repo_dir()?;
@@ -52,11 +55,15 @@ impl Cli {
             let function_name = function.identifier();
             let examples = function.examples();
 
-            if examples.is_empty() {
+            if UNDOCUMENTED_FNS.contains(&function_name) {
                 continue;
             }
 
-            functions_with_examples.insert(function_name.to_string(), examples);
+            if !NO_EXAMPLES_FNS.contains(&function_name) {
+                assert!(!examples.is_empty(), "{function_name} has no examples!");
+            }
+
+            functions_with_examples.insert(function_name.to_string(), function);
         }
 
         println!(
@@ -64,16 +71,12 @@ impl Cli {
             functions_with_examples.len(),
             functions_with_examples
                 .values()
-                .map(|v| v.len())
+                .map(|v| v.examples().len())
                 .sum::<usize>()
         );
 
         // Inject examples into docs.json
-        for (function_name, examples) in &functions_with_examples {
-            if UNDOCUMENTED_FNS.contains(&function_name.as_str()) {
-                continue;
-            }
-
+        for (function_name, function) in &functions_with_examples {
             // Navigate to remap.functions.<function_name>
             let function_obj = docs
                 .get_mut("remap")
@@ -100,7 +103,7 @@ impl Cli {
             };
 
             // Append new examples
-            for example in *examples {
+            for example in function.examples() {
                 let mut example_json = json!({
                     "title": example.title,
                     "source": example.source,
@@ -127,10 +130,13 @@ impl Cli {
             if self.dry_run {
                 println!(
                     "[DRY RUN] Would append {} examples to {function_name}",
-                    examples.len()
+                    function.examples().len()
                 );
             } else {
-                println!("✓ Appended {} examples to {function_name}", examples.len());
+                println!(
+                    "✓ Appended {} examples to {function_name}",
+                    function.examples().len()
+                );
             }
         }
 
