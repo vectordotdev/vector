@@ -385,7 +385,7 @@ listenfd = { version = "1.0.2", default-features = false, optional = true }
 lru = { version = "0.16.0", default-features = false }
 maxminddb = { version = "0.26.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
-mongodb = { version = "2.8.2", default-features = false, features = ["tokio-runtime"], optional = true }
+mongodb = { version = "3.3.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
 async-nats = { version = "0.42.0", default-features = false, optional = true, features = ["ring"] }
 nkeys = { version = "0.4.5", default-features = false, optional = true }
 nom = { workspace = true, optional = true }

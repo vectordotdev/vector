@@ -18,7 +18,7 @@ tokio-stream = { version = "0.1.17", default-features = false, features = ["net"
 url.workspace = true
 humantime = { version = "2.2.0", default-features = false }
 crossterm = { version = "0.29.0", default-features = false, features = ["event-stream", "windows"] }
-number_prefix = { version = "0.4.0", default-features = false, features = ["std"] }
+unit-prefix = { version = "0.5.2", default-features = false, features = ["std"] }
 num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"] }
 ratatui = { version = "0.29.0", default-features = false, features = ["crossterm"] }
 vector-common = { path = "../vector-common" }

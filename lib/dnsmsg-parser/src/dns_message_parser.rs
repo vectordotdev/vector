@@ -219,7 +219,12 @@ impl DnsMessageParser {
             };
         self.raw_message_for_rdata_parsing = Some(raw_message_for_rdata_parsing_data);
 
-        BinDecoder::new(self.raw_message_for_rdata_parsing.as_ref().unwrap()).clone(index as u16)
+        BinDecoder::new(
+            self.raw_message_for_rdata_parsing
+                .as_ref()
+                .expect("None raw_message_for_rdata_parsing"),
+        )
+        .clone(index as u16)
     }
 
     fn parse_wks_rdata(
