@@ -102,7 +102,7 @@ pub struct AmqpSourceConfig {
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub(crate) acknowledgements: SourceAcknowledgementsConfig,
 
-	/// Maximum number of unacknowledged messages the broker will deliver to this consumer .
+	/// Maximum number of unacknowledged messages the broker will deliver to this consumer.
 	///
 	/// This controls flow control via AMQP QoS prefetch. Lower values limit memory usage and
 	/// prevent overwhelming slow consumers, but may reduce throughput. Higher values increase
