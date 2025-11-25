@@ -724,38 +724,8 @@ async fn test_source_resources() {
 async fn test_source_acknowledgements() {
     let config = create_test_config();
 
-    // Windows Event Log source doesn't support acknowledgements
-    assert!(!config.can_acknowledge());
-}
-
-// Integration test helper
-#[cfg(windows)]
-#[allow(dead_code)]
-async fn run_source_integration_test() -> Result<(), Box<dyn std::error::Error>> {
-    let config = create_test_config();
-
-    let (sender, _recv) = SourceSender::new_test();
-    let context = SourceContext::new_test(sender, None);
-
-    // Start the source
-    let source = config.build(context).await;
-    match source {
-        Ok(source) => {
-            let source_handle = tokio::spawn(source);
-
-            // Let it run for a short time
-            tokio::time::sleep(Duration::from_millis(100)).await;
-
-            // The task will complete naturally
-            let _ = source_handle.await;
-        }
-        Err(e) => {
-            // Expected on non-Windows systems or if EventLog is not available
-            println!("Source build failed (expected on non-Windows): {}", e);
-        }
-    }
-
-    Ok(())
+    // Windows Event Log source supports acknowledgements
+    assert!(config.can_acknowledge());
 }
 
 #[test]

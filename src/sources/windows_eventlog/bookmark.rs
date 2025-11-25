@@ -1,23 +1,7 @@
 //! Windows Event Log Bookmark Management
 //!
-//! This module provides bookmark-based checkpointing for Windows Event Log subscriptions.
-//! Bookmarks are more robust than record IDs because they:
-//! - Survive channel clears and log rotations
-//! - Provide O(1) seeking instead of O(n)
-//! - Are managed by Windows, eliminating edge cases
-//!
-//! ## Usage
-//!
-//! ```rust,ignore
-//! // Create a bookmark from checkpoint data
-//! let bookmark = BookmarkManager::from_xml(checkpoint_xml)?;
-//!
-//! // Update bookmark after processing an event
-//! bookmark.update(event_handle)?;
-//!
-//! // Serialize bookmark for checkpointing
-//! let xml = bookmark.to_xml()?;
-//! ```
+//! Provides bookmark-based checkpointing for Windows Event Log subscriptions.
+//! Bookmarks survive channel clears and log rotations, and provide O(1) seeking.
 
 use tracing::{debug, error, warn};
 use windows::{
@@ -136,7 +120,6 @@ impl BookmarkManager {
     /// Note: For lock-free serialization, prefer `serialize_handle()` which
     /// allows copying the handle out of a lock before serializing.
     #[cfg(windows)]
-    #[allow(dead_code)] // Kept for API completeness; serialize_handle() preferred for performance
     pub fn to_xml(&self) -> Result<String, WindowsEventLogError> {
         unsafe {
             // First call to get required buffer size

@@ -23,7 +23,7 @@ use super::{
 
 use crate::internal_events::{WindowsEventLogBookmarkError, WindowsEventLogSubscriptionError};
 
-/// System fields from Windows Event Log XML (Single Responsibility)
+/// System fields extracted from Windows Event Log XML
 #[derive(Debug, Clone)]
 struct SystemFields {
     pub event_id: u32,
@@ -722,8 +722,7 @@ impl EventLogSubscription {
         Ok(())
     }
 
-    /// Comprehensive System section parser for all Windows Event Log fields
-    /// Extracts fields following Single Responsibility Principle
+    /// Parse all System section fields from Windows Event Log XML
     fn extract_system_fields(xml: &str) -> SystemFields {
         SystemFields {
             event_id: Self::extract_xml_value(xml, "EventID")
@@ -898,8 +897,8 @@ impl EventLogSubscription {
         None
     }
 
-    /// Enhanced EventData extraction supporting both structured data and StringInserts
-    /// Follows Open/Closed Principle - extensible without modifying existing code
+    /// Extract EventData and UserData sections from event XML.
+    /// Supports both named fields and positional StringInserts for FluentBit compatibility.
     pub fn extract_event_data(xml: &str, config: &WindowsEventLogConfig) -> EventDataResult {
         let mut structured_data = HashMap::new();
         let mut string_inserts = Vec::new();
@@ -937,7 +936,7 @@ impl EventLogSubscription {
         }
     }
 
-    /// Parse a specific XML section (EventData or UserData) - Single Responsibility
+    /// Parse a specific XML section (EventData or UserData)
     fn parse_section(
         xml: &str,
         section_name: &str,
