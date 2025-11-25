@@ -119,7 +119,7 @@ impl BookmarkManager {
     ///
     /// Note: For lock-free serialization, prefer `serialize_handle()` which
     /// allows copying the handle out of a lock before serializing.
-    #[cfg(windows)]
+    #[cfg(all(windows, test))]
     pub fn to_xml(&self) -> Result<String, WindowsEventLogError> {
         unsafe {
             // First call to get required buffer size

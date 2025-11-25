@@ -1,7 +1,10 @@
 use std::{
     collections::HashMap,
     num::NonZeroU32,
-    sync::{Arc, Mutex, RwLock},
+    sync::{
+        Arc, Mutex, RwLock,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 use chrono::{DateTime, Utc};
@@ -145,8 +148,25 @@ impl Drop for SubscriptionHandle {
         // Free the CallbackContext to prevent memory leak
         // EvtSubscribe incremented the Arc refcount via into_raw(), so we must decrement it
         if !self.context.is_null() {
+            // Wait for any in-flight callbacks to complete before freeing
+            // This prevents use-after-free when callbacks are still executing
             unsafe {
-                let _ = Arc::from_raw(self.context as *const CallbackContext);
+                // Temporarily borrow the context to check the counter
+                let arc = Arc::from_raw(self.context as *const CallbackContext);
+
+                // Wait for in-flight callbacks with timeout (max 5 seconds)
+                let start = std::time::Instant::now();
+                let timeout = std::time::Duration::from_secs(5);
+                while arc.in_flight_callbacks.load(Ordering::SeqCst) > 0 {
+                    if start.elapsed() > timeout {
+                        warn!("Timeout waiting for callbacks to complete during cleanup");
+                        break;
+                    }
+                    std::thread::sleep(std::time::Duration::from_millis(10));
+                }
+
+                // Now it's safe to drop the Arc - callbacks have finished
+                drop(arc);
             }
         }
     }
@@ -167,6 +187,8 @@ struct CallbackContext {
     channels_with_checkpoints: std::collections::HashSet<String>,
     // Checkpointer for periodic bookmark persistence
     checkpointer: Arc<Checkpointer>,
+    // Track in-flight callbacks to prevent use-after-free during cleanup
+    in_flight_callbacks: AtomicUsize,
 }
 
 // Convert CallbackContext pointer to raw pointer for passing through Windows API
@@ -257,6 +279,7 @@ impl EventLogSubscription {
                 bookmarks: Arc::new(RwLock::new(bookmarks)),
                 channels_with_checkpoints,
                 checkpointer: Arc::clone(&checkpointer),
+                in_flight_callbacks: AtomicUsize::new(0),
             });
 
             let subscriptions = Arc::new(Mutex::new(Vec::new()));
@@ -1460,42 +1483,53 @@ unsafe extern "system" fn event_subscription_callback(
         cloned
     };
 
-    #[allow(non_upper_case_globals)] // Windows API constants don't follow Rust conventions
-    match action {
-        EvtSubscribeActionDeliver => {
-            // Process the event with the correct context
-            if let Err(e) = process_callback_event(event_handle, &ctx) {
-                warn!("Error processing callback event: {}", e);
+    // Track in-flight callbacks to prevent use-after-free during cleanup
+    ctx.in_flight_callbacks.fetch_add(1, Ordering::SeqCst);
+
+    // Use a scope guard to ensure we decrement even on panic/early return
+    let result = {
+        #[allow(non_upper_case_globals)] // Windows API constants don't follow Rust conventions
+        match action {
+            EvtSubscribeActionDeliver => {
+                // Process the event with the correct context
+                if let Err(e) = process_callback_event(event_handle, &ctx) {
+                    warn!("Error processing callback event: {}", e);
+                }
+                0 // Return success
             }
-            0 // Return success
-        }
-        EvtSubscribeActionError => {
-            // Extract the actual Windows error using EvtGetExtendedStatus
-            let error_message = unsafe { extract_windows_extended_status() };
+            EvtSubscribeActionError => {
+                // Extract the actual Windows error using EvtGetExtendedStatus
+                let error_message = unsafe { extract_windows_extended_status() };
 
-            // Emit internal event for metrics
-            emit!(WindowsEventLogSubscriptionError {
-                error: error_message.clone(),
-                channels: ctx.config.channels.clone(),
-            });
-
-            // Store the error in the shared state so next_events() can retrieve it
-            let mut error_state = ctx.subscription_error.lock().unwrap();
-            if error_state.is_none() {
-                *error_state = Some(WindowsEventLogError::SubscriptionError {
-                    source: windows::core::Error::from_win32(),
+                // Emit internal event for metrics
+                emit!(WindowsEventLogSubscriptionError {
+                    error: error_message.clone(),
+                    channels: ctx.config.channels.clone(),
                 });
-            }
 
-            // Return ERROR_CANCELLED to signal Windows that we're done with this subscription
-            // This prevents the callback storm by telling Windows to stop calling us
-            windows::Win32::Foundation::ERROR_CANCELLED.0
+                // Store the error in the shared state so next_events() can retrieve it
+                let mut error_state = ctx.subscription_error.lock().unwrap();
+                if error_state.is_none() {
+                    *error_state = Some(WindowsEventLogError::SubscriptionError {
+                        source: windows::core::Error::from_win32(),
+                    });
+                }
+
+                // Return ERROR_CANCELLED to signal Windows that we're done with this subscription
+                // This prevents the callback storm by telling Windows to stop calling us
+                windows::Win32::Foundation::ERROR_CANCELLED.0
+            }
+            _ => {
+                debug!("Unknown subscription callback action: {}", action.0);
+                0
+            }
         }
-        _ => {
-            debug!("Unknown subscription callback action: {}", action.0);
-            0
-        }
-    }
+    };
+
+    // Decrement in-flight counter
+    ctx.in_flight_callbacks.fetch_sub(1, Ordering::SeqCst);
+
+    result
 }
 
 /// Extract extended error information from Windows Event Log API

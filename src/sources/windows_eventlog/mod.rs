@@ -44,13 +44,12 @@ use self::{
 
 /// Entry for the acknowledgment finalizer containing checkpoint information.
 /// Each entry represents a batch of events that need to be acknowledged before
-/// the checkpoint can be safely updated.
+/// the checkpoint can be safely updated. Contains all channel bookmarks from
+/// the batch since a single batch may span multiple channels.
 #[derive(Debug, Clone)]
 struct FinalizerEntry {
-    /// Channel name for the checkpoint
-    channel: String,
-    /// Windows bookmark XML for position tracking
-    bookmark_xml: String,
+    /// Channel bookmarks: (channel_name, bookmark_xml) pairs
+    bookmarks: Vec<(String, String)>,
 }
 
 /// Shared checkpointer type for use with the finalizer
@@ -75,32 +74,28 @@ impl Finalizer {
         shutdown: ShutdownSignal,
     ) -> Self {
         if acknowledgements {
-            let (finalizer, mut ack_stream) = OrderedFinalizer::new(Some(shutdown.clone()));
+            let (finalizer, mut ack_stream) =
+                OrderedFinalizer::<FinalizerEntry>::new(Some(shutdown.clone()));
 
             // Spawn background task to process acknowledgments and update checkpoints
             tokio::spawn(async move {
                 while let Some((status, entry)) = ack_stream.next().await {
                     if status == BatchStatus::Delivered {
                         // Only update checkpoint on successful delivery
-                        if let Err(e) = checkpointer
-                            .set_batch(vec![(entry.channel.clone(), entry.bookmark_xml.clone())])
-                            .await
-                        {
+                        if let Err(e) = checkpointer.set_batch(entry.bookmarks.clone()).await {
                             warn!(
                                 message = "Failed to update checkpoint after acknowledgement",
-                                channel = %entry.channel,
                                 error = %e
                             );
                         } else {
                             debug!(
                                 message = "Checkpoint updated after acknowledgement",
-                                channel = %entry.channel
+                                channels = entry.bookmarks.len()
                             );
                         }
                     } else {
                         debug!(
                             message = "Events not delivered, checkpoint not updated",
-                            channel = %entry.channel,
                             status = ?status
                         );
                     }
@@ -121,13 +116,9 @@ impl Finalizer {
         match (self, receiver) {
             (Self::Sync(checkpointer), None) => {
                 // Immediate checkpoint update (no acks)
-                if let Err(e) = checkpointer
-                    .set_batch(vec![(entry.channel.clone(), entry.bookmark_xml.clone())])
-                    .await
-                {
+                if let Err(e) = checkpointer.set_batch(entry.bookmarks.clone()).await {
                     warn!(
                         message = "Failed to update checkpoint",
-                        channel = %entry.channel,
                         error = %e
                     );
                 }
@@ -273,16 +264,20 @@ impl WindowsEventLogSource {
                                     break;
                                 }
 
-                                // Register checkpoint entries with finalizer
-                                // For each channel in the batch, capture current bookmark state
-                                for channel in channels_in_batch {
-                                    if let Some(bookmark_xml) = subscription.get_bookmark_xml(&channel) {
-                                        let entry = FinalizerEntry {
-                                            channel,
-                                            bookmark_xml,
-                                        };
-                                        finalizer.finalize(entry, receiver.clone()).await;
-                                    }
+                                // Register checkpoint entry with finalizer
+                                // Collect all channel bookmarks from this batch
+                                let bookmarks: Vec<(String, String)> = channels_in_batch
+                                    .into_iter()
+                                    .filter_map(|channel| {
+                                        subscription
+                                            .get_bookmark_xml(&channel)
+                                            .map(|xml| (channel, xml))
+                                    })
+                                    .collect();
+
+                                if !bookmarks.is_empty() {
+                                    let entry = FinalizerEntry { bookmarks };
+                                    finalizer.finalize(entry, receiver).await;
                                 }
                             }
                         }

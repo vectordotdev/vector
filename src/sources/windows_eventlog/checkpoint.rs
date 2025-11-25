@@ -99,6 +99,7 @@ impl Checkpointer {
     ///
     /// Note: For better performance with multiple channels, prefer `set_batch()`
     /// which writes all checkpoints in a single disk operation.
+    #[cfg(test)]
     pub async fn set(
         &self,
         channel: String,
@@ -251,6 +252,7 @@ impl Checkpointer {
     }
 
     /// Remove checkpoint for a channel (useful for testing or reset)
+    #[cfg(test)]
     pub async fn remove(&self, channel: &str) -> Result<(), WindowsEventLogError> {
         let mut state = self.state.lock().await;
         state.channels.remove(channel);
@@ -265,6 +267,7 @@ impl Checkpointer {
     }
 
     /// Get all channel checkpoints (useful for debugging)
+    #[cfg(test)]
     pub async fn list(&self) -> Vec<ChannelCheckpoint> {
         let state = self.state.lock().await;
         state.channels.values().cloned().collect()
