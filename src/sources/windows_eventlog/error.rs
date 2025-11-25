@@ -59,6 +59,17 @@ pub enum WindowsEventLogError {
     #[snafu(display("Channel '{}' not found", channel))]
     ChannelNotFoundError { channel: String },
 
+    #[snafu(display("Failed to enumerate event log channels: {}", source))]
+    ChannelEnumerationError {
+        #[cfg(windows)]
+        source: windows::core::Error,
+        #[cfg(not(windows))]
+        source: Box<dyn std::error::Error + Send + Sync>,
+    },
+
+    #[snafu(display("No channels matched pattern '{}'", pattern))]
+    NoChannelsMatchedPattern { pattern: String },
+
     #[snafu(display("I/O error: {}", source))]
     IoError { source: std::io::Error },
 
@@ -135,6 +146,8 @@ impl WindowsEventLogError {
             | Self::SubscriptionError { .. }
             | Self::AccessDeniedError { .. }
             | Self::ChannelNotFoundError { .. }
+            | Self::ChannelEnumerationError { .. }
+            | Self::NoChannelsMatchedPattern { .. }
             | Self::InvalidXPathQuery { .. }
             | Self::ConfigError { .. }
             | Self::CreateRenderContextError { .. }

@@ -322,9 +322,10 @@ impl WindowsEventLogConfig {
             }
 
             // Validate channel name contains only safe characters
+            // Allow *, ?, [ for glob pattern matching (e.g., "Microsoft-Windows-*")
             if !channel
                 .chars()
-                .all(|c| c.is_ascii_alphanumeric() || "-_ /\\".contains(c))
+                .all(|c| c.is_ascii_alphanumeric() || "-_ /\\*?[]".contains(c))
             {
                 return Err(
                     format!("Channel name '{}' contains invalid characters", channel).into(),
@@ -496,6 +497,11 @@ impl WindowsEventLogConfig {
 
         Ok(())
     }
+}
+
+/// Check if a channel name contains glob pattern characters
+pub fn is_channel_pattern(name: &str) -> bool {
+    name.contains('*') || name.contains('?') || name.contains('[')
 }
 
 // Default value functions
@@ -674,5 +680,47 @@ mod tests {
             deserialized.read_existing_events
         );
         assert_eq!(config.batch_size, deserialized.batch_size);
+    }
+
+    #[test]
+    fn test_is_channel_pattern() {
+        // Exact channel names are not patterns
+        assert!(!is_channel_pattern("System"));
+        assert!(!is_channel_pattern("Application"));
+        assert!(!is_channel_pattern("Microsoft-Windows-Sysmon/Operational"));
+
+        // Wildcard patterns
+        assert!(is_channel_pattern("Microsoft-Windows-*"));
+        assert!(is_channel_pattern("*"));
+        assert!(is_channel_pattern("Microsoft-Windows-Sysmon/*"));
+
+        // Single character wildcard
+        assert!(is_channel_pattern("System?"));
+        assert!(is_channel_pattern("Microsoft-Windows-???"));
+
+        // Character class patterns
+        assert!(is_channel_pattern("Microsoft-Windows-[A-Z]*"));
+        assert!(is_channel_pattern("[Ss]ystem"));
+    }
+
+    #[test]
+    fn test_config_validation_allows_wildcards() {
+        let mut config = WindowsEventLogConfig::default();
+
+        // Wildcard patterns should be allowed in channel names
+        config.channels = vec![
+            "System".to_string(),
+            "Microsoft-Windows-*".to_string(),
+            "Microsoft-Windows-Sysmon/*".to_string(),
+        ];
+        assert!(config.validate().is_ok());
+
+        // Single character wildcards should work
+        config.channels = vec!["System?".to_string()];
+        assert!(config.validate().is_ok());
+
+        // Character classes should work
+        config.channels = vec!["[Ss]ystem".to_string()];
+        assert!(config.validate().is_ok());
     }
 }

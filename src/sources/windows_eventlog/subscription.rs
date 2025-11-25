@@ -15,7 +15,10 @@ use regex;
 use tokio::sync::{mpsc, watch};
 
 use super::{
-    bookmark::BookmarkManager, checkpoint::Checkpointer, config::WindowsEventLogConfig, error::*,
+    bookmark::BookmarkManager,
+    checkpoint::Checkpointer,
+    config::{WindowsEventLogConfig, is_channel_pattern},
+    error::*,
 };
 
 /// System fields from Windows Event Log XML (Single Responsibility)
@@ -208,7 +211,14 @@ impl EventLogSubscription {
 
         #[cfg(windows)]
         {
-            let config = Arc::new(config.clone());
+            // Expand channel patterns (e.g., "Microsoft-Windows-*") to actual channel names
+            let expanded_channels = expand_channel_patterns(&config.channels)?;
+
+            // Create config with expanded channels
+            let mut expanded_config = config.clone();
+            expanded_config.channels = expanded_channels;
+            let config = Arc::new(expanded_config);
+
             let (event_sender, event_receiver) = mpsc::unbounded_channel();
             let subscription_error = Arc::new(Mutex::new(None));
 
@@ -538,7 +548,7 @@ impl EventLogSubscription {
             let context_ptr = CallbackContext::into_raw(Arc::clone(&callback_context));
 
             // Create subscription using EvtSubscribe with callback and bookmark
-            let subscription_handle = unsafe {
+            let subscription_result = unsafe {
                 if has_valid_checkpoint {
                     EvtSubscribe(
                         None, // Session handle (local)
@@ -550,7 +560,6 @@ impl EventLogSubscription {
                         Some(event_subscription_callback), // Callback function
                         subscription_flags,
                     )
-                    .map_err(|e| WindowsEventLogError::CreateSubscriptionError { source: e })?
                 } else {
                     EvtSubscribe(
                         None, // Session handle (local)
@@ -562,24 +571,70 @@ impl EventLogSubscription {
                         Some(event_subscription_callback), // Callback function
                         subscription_flags,
                     )
-                    .map_err(|e| WindowsEventLogError::CreateSubscriptionError { source: e })?
                 }
             };
 
-            info!(
-                message = "Windows Event Log subscription created successfully",
-                channel = %channel
-            );
+            match subscription_result {
+                Ok(subscription_handle) => {
+                    info!(
+                        message = "Windows Event Log subscription created successfully",
+                        channel = %channel
+                    );
 
-            // Store subscription handle for cleanup
-            {
-                let mut subs = subscriptions.lock().unwrap();
-                subs.push(SubscriptionHandle {
-                    handle: subscription_handle,
-                    context: context_ptr,
-                });
+                    // Store subscription handle for cleanup
+                    {
+                        let mut subs = subscriptions.lock().unwrap();
+                        subs.push(SubscriptionHandle {
+                            handle: subscription_handle,
+                            context: context_ptr,
+                        });
+                    }
+                }
+                Err(e) => {
+                    // ERROR_EVT_CHANNEL_CANNOT_ACTIVATE (0x80073AA1) means this is a
+                    // direct/analytic channel that can't be subscribed to - skip it
+                    // Also handle access denied gracefully for wildcard expansions
+                    let error_code = e.code().0 as u32;
+                    if error_code == 0x80073AA1 {
+                        warn!(
+                            message = "Skipping direct/analytic channel (cannot subscribe)",
+                            channel = %channel
+                        );
+                        // Clean up the context pointer since we won't use it
+                        unsafe {
+                            let _ = CallbackContext::from_raw(context_ptr);
+                        }
+                        continue;
+                    } else if error_code == 5 {
+                        // Access denied - skip with warning
+                        warn!(
+                            message = "Skipping channel due to access denied",
+                            channel = %channel
+                        );
+                        unsafe {
+                            let _ = CallbackContext::from_raw(context_ptr);
+                        }
+                        continue;
+                    } else {
+                        // Other errors are fatal
+                        return Err(WindowsEventLogError::CreateSubscriptionError { source: e });
+                    }
+                }
             }
         }
+
+        // Verify we subscribed to at least one channel
+        let sub_count = subscriptions.lock().unwrap().len();
+        if sub_count == 0 {
+            return Err(WindowsEventLogError::ConfigError {
+                message: "No channels could be subscribed to. All channels may be inaccessible or direct/analytic channels.".into(),
+            });
+        }
+
+        info!(
+            message = "Successfully subscribed to channels",
+            channel_count = sub_count
+        );
 
         Ok(())
     }
@@ -1139,6 +1194,145 @@ impl EventLogSubscription {
 }
 
 // CallbackContext cleanup is handled in SubscriptionHandle::drop via Arc::from_raw
+
+/// Enumerate all available Windows Event Log channels on the system
+#[cfg(windows)]
+fn enumerate_all_channels() -> Result<Vec<String>, WindowsEventLogError> {
+    use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_NO_MORE_ITEMS};
+    use windows::Win32::System::EventLog::{EvtClose, EvtNextChannelPath, EvtOpenChannelEnum};
+
+    let enum_handle = unsafe {
+        EvtOpenChannelEnum(None, 0)
+            .map_err(|e| WindowsEventLogError::ChannelEnumerationError { source: e })?
+    };
+
+    let mut channels = Vec::new();
+    let mut buffer = vec![0u16; 512]; // Most channel names are < 256 chars
+
+    loop {
+        let mut buffer_used: u32 = 0;
+
+        let result =
+            unsafe { EvtNextChannelPath(enum_handle, Some(&mut buffer), &mut buffer_used) };
+
+        match result {
+            Ok(()) => {
+                // Convert UTF-16 to String
+                let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+                let channel = String::from_utf16_lossy(&buffer[..len]);
+                if !channel.is_empty() {
+                    channels.push(channel);
+                }
+            }
+            Err(e) => {
+                // ERROR_NO_MORE_ITEMS means we've enumerated all channels
+                if e.code() == ERROR_NO_MORE_ITEMS.into() {
+                    break;
+                }
+                // ERROR_INSUFFICIENT_BUFFER - resize and retry
+                if e.code() == ERROR_INSUFFICIENT_BUFFER.into() && buffer_used > 0 {
+                    buffer.resize(buffer_used as usize, 0);
+                    continue;
+                }
+                // Other errors - close handle and return error
+                unsafe {
+                    let _ = EvtClose(enum_handle);
+                }
+                return Err(WindowsEventLogError::ChannelEnumerationError { source: e });
+            }
+        }
+    }
+
+    unsafe {
+        let _ = EvtClose(enum_handle);
+    }
+
+    debug!(
+        message = "Enumerated Windows Event Log channels",
+        channel_count = channels.len()
+    );
+
+    Ok(channels)
+}
+
+/// Expand channel patterns (e.g., "Microsoft-Windows-*") to actual channel names
+#[cfg(windows)]
+fn expand_channel_patterns(patterns: &[String]) -> Result<Vec<String>, WindowsEventLogError> {
+    use glob::Pattern;
+
+    let mut matched_channels = Vec::new();
+    let mut has_patterns = false;
+
+    // Check if any patterns need expansion
+    for pattern in patterns {
+        if is_channel_pattern(pattern) {
+            has_patterns = true;
+            break;
+        }
+    }
+
+    // If no patterns, return the original list (will be validated later)
+    if !has_patterns {
+        return Ok(patterns.to_vec());
+    }
+
+    // Enumerate all channels for pattern matching
+    let all_channels = enumerate_all_channels()?;
+
+    for pattern_str in patterns {
+        if is_channel_pattern(pattern_str) {
+            // Compile glob pattern (case-insensitive for Windows)
+            let pattern =
+                Pattern::new(pattern_str).map_err(|e| WindowsEventLogError::ConfigError {
+                    message: format!("Invalid channel pattern '{}': {}", pattern_str, e),
+                })?;
+
+            let mut pattern_matched = false;
+            for channel in &all_channels {
+                // Case-insensitive matching
+                if pattern.matches(&channel.to_lowercase()) || pattern.matches(channel) {
+                    matched_channels.push(channel.clone());
+                    pattern_matched = true;
+                }
+            }
+
+            if !pattern_matched {
+                warn!(
+                    message = "Channel pattern matched no channels",
+                    pattern = %pattern_str
+                );
+            }
+        } else {
+            // Exact channel name - include as-is (will be validated later)
+            matched_channels.push(pattern_str.clone());
+        }
+    }
+
+    // Deduplicate while preserving order
+    let mut seen = std::collections::HashSet::new();
+    matched_channels.retain(|c| seen.insert(c.clone()));
+
+    if matched_channels.is_empty() {
+        return Err(WindowsEventLogError::ConfigError {
+            message: "No channels matched any of the specified patterns".into(),
+        });
+    }
+
+    info!(
+        message = "Expanded channel patterns",
+        patterns = ?patterns,
+        matched_channels = matched_channels.len()
+    );
+
+    Ok(matched_channels)
+}
+
+/// Non-Windows stub for pattern expansion
+#[cfg(not(windows))]
+fn expand_channel_patterns(patterns: &[String]) -> Result<Vec<String>, WindowsEventLogError> {
+    // On non-Windows, just return patterns as-is (they'll fail at subscription time anyway)
+    Ok(patterns.to_vec())
+}
 
 /// Format event message using Windows EvtFormatMessage API
 ///
@@ -2420,6 +2614,102 @@ mod tests {
              Got {} events, all with fallback messages. This may indicate EvtFormatMessage \
              is not working correctly.",
             events.len()
+        );
+    }
+
+    /// Test that exact channel names pass through expand_channel_patterns unchanged
+    #[test]
+    fn test_expand_channel_patterns_exact_names() {
+        let patterns = vec![
+            "System".to_string(),
+            "Application".to_string(),
+            "Security".to_string(),
+        ];
+
+        let result = expand_channel_patterns(&patterns);
+        assert!(result.is_ok());
+
+        let expanded = result.unwrap();
+        assert_eq!(
+            expanded, patterns,
+            "Exact names should pass through unchanged"
+        );
+    }
+
+    /// Integration test: Verify wildcard patterns expand to real channels
+    #[cfg(windows)]
+    #[test]
+    fn test_enumerate_all_channels_returns_channels() {
+        let result = enumerate_all_channels();
+        assert!(result.is_ok(), "Channel enumeration should succeed");
+
+        let channels = result.unwrap();
+        assert!(!channels.is_empty(), "Should find at least some channels");
+
+        // Common channels that should exist on any Windows system
+        let has_system = channels.iter().any(|c| c == "System");
+        let has_application = channels.iter().any(|c| c == "Application");
+
+        assert!(has_system, "System channel should exist");
+        assert!(has_application, "Application channel should exist");
+    }
+
+    /// Integration test: Verify wildcard pattern expansion works
+    #[cfg(windows)]
+    #[test]
+    fn test_expand_channel_patterns_with_wildcards() {
+        // Test with a pattern that should match multiple channels
+        let patterns = vec!["System".to_string(), "Microsoft-Windows-*".to_string()];
+
+        let result = expand_channel_patterns(&patterns);
+        assert!(result.is_ok(), "Pattern expansion should succeed");
+
+        let expanded = result.unwrap();
+
+        // Should include exact match
+        assert!(
+            expanded.contains(&"System".to_string()),
+            "Should include exact match 'System'"
+        );
+
+        // Should have expanded the wildcard to multiple channels
+        assert!(
+            expanded.len() > 2,
+            "Wildcard should expand to multiple channels, got {}",
+            expanded.len()
+        );
+
+        // All expanded channels starting with Microsoft-Windows- should exist
+        let ms_channels: Vec<_> = expanded
+            .iter()
+            .filter(|c| c.starts_with("Microsoft-Windows-"))
+            .collect();
+        assert!(
+            !ms_channels.is_empty(),
+            "Should have matched some Microsoft-Windows-* channels"
+        );
+    }
+
+    /// Integration test: Create subscription with wildcard patterns
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_subscription_with_wildcard_patterns() {
+        let mut config = WindowsEventLogConfig::default();
+        // Use a pattern that will match System and Application
+        config.channels = vec![
+            "Sys*".to_string(), // Should match "System"
+            "Application".to_string(),
+        ];
+        config.read_existing_events = false;
+        config.event_timeout_ms = 1000;
+
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let result = EventLogSubscription::new(&config, checkpointer).await;
+        assert!(
+            result.is_ok(),
+            "Subscription with wildcard should succeed: {:?}",
+            result.err()
         );
     }
 }
