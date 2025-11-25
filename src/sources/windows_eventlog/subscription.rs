@@ -451,13 +451,13 @@ impl EventLogSubscription {
             match timeout(timeout_duration, self.event_receiver.recv()).await {
                 Ok(Some(event)) => {
                     // Bookmarks handle resume/deduplication automatically via EvtSubscribe
-                    if Self::should_include_event(&self.config, &event) {
-                        // Apply rate limiting before adding the event
-                        if let Some(limiter) = &self.rate_limiter {
-                            limiter.until_ready().await;
-                        }
-                        events.push(event);
+                    // Event ID and age filtering already applied in parse_event_xml
+                    // Field filtering is applied in the parser
+                    // Apply rate limiting before adding the event
+                    if let Some(limiter) = &self.rate_limiter {
+                        limiter.until_ready().await;
                     }
+                    events.push(event);
                 }
                 Ok(None) => {
                     // Channel closed, subscription ended
@@ -505,7 +505,7 @@ impl EventLogSubscription {
 
         for channel in &config.channels {
             let channel_hstring = HSTRING::from(channel.as_str());
-            let query = Self::build_xpath_query(config, channel)?;
+            let query = Self::build_xpath_query(config)?;
             let query_hstring = HSTRING::from(query.clone());
 
             // Check if this channel has a valid checkpoint (restored from disk)
@@ -639,16 +639,7 @@ impl EventLogSubscription {
         Ok(())
     }
 
-    fn should_include_event(_config: &WindowsEventLogConfig, _event: &WindowsEvent) -> bool {
-        // Implement filtering logic based on field_filter configuration
-        // For now, include all events that passed the XML parsing filters
-        true
-    }
-
-    fn build_xpath_query(
-        config: &WindowsEventLogConfig,
-        _channel: &str,
-    ) -> Result<String, WindowsEventLogError> {
+    fn build_xpath_query(config: &WindowsEventLogConfig) -> Result<String, WindowsEventLogError> {
         let query = if let Some(ref custom_query) = config.event_query {
             custom_query.clone()
         } else {

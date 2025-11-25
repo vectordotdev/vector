@@ -18,7 +18,6 @@ fn create_test_config() -> WindowsEventLogConfig {
         connection_timeout_secs: 30,
         read_existing_events: false,
         batch_size: 10,
-        read_limit_bytes: 524_288,
         render_message: true,
         include_xml: false,
         event_data_format: HashMap::new(),
@@ -28,13 +27,15 @@ fn create_test_config() -> WindowsEventLogConfig {
         event_timeout_ms: 5000,
         log_namespace: Some(false),
         field_filter: FieldFilter::default(),
-        data_dir: std::path::PathBuf::from("/tmp/vector_test"),
+        data_dir: None, // Use Vector's global data_dir
         events_per_second: 0,
         max_event_data_length: 0,
         max_message_field_length: 0,
     }
 }
 
+/// Creates a realistic Security audit event (4624 = successful logon) for integration-level tests.
+/// Note: parser.rs has its own simpler create_test_event() for unit testing parser logic.
 fn create_test_event() -> WindowsEvent {
     let mut event_data = HashMap::new();
     event_data.insert("TargetUserName".to_string(), "admin".to_string());
@@ -102,12 +103,16 @@ mod config_tests {
         assert_eq!(config.event_timeout_ms, 5000);
         assert!(!config.read_existing_events);
         assert_eq!(config.batch_size, 10);
-        assert_eq!(config.read_limit_bytes, 524_288);
         assert!(config.render_message);
         assert!(!config.include_xml);
         assert!(config.field_filter.include_system_fields);
         assert!(config.field_filter.include_event_data);
         assert!(config.field_filter.include_user_data);
+    }
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<WindowsEventLogConfig>();
     }
 
     #[test]
@@ -173,21 +178,6 @@ mod config_tests {
                 .unwrap_err()
                 .to_string()
                 .contains("Batch size must be between 1 and")
-        );
-    }
-
-    #[test]
-    fn test_config_validation_zero_read_limit() {
-        let mut config = create_test_config();
-        config.read_limit_bytes = 0;
-
-        let result = config.validate();
-        assert!(result.is_err());
-        assert!(
-            result
-                .unwrap_err()
-                .to_string()
-                .contains("Read limit must be between 1 and")
         );
     }
 
@@ -531,17 +521,7 @@ mod error_tests {
 mod subscription_tests {
     use super::*;
 
-    #[cfg(not(windows))]
-    #[test]
-    fn test_subscription_not_supported() {
-        let config = create_test_config();
-        let result = EventLogSubscription::new(&config);
-
-        assert!(matches!(
-            result,
-            Err(WindowsEventLogError::NotSupportedError)
-        ));
-    }
+    // Note: test_not_supported_error is in subscription.rs to avoid duplication
 
     #[test]
     fn test_build_xpath_query() {
@@ -939,20 +919,6 @@ mod security_tests {
         assert!(
             config.validate().is_err(),
             "Excessive batch size should be rejected"
-        );
-
-        // Test excessive read limits (memory exhaustion prevention)
-        config.batch_size = 10; // Reset to valid value
-        config.read_limit_bytes = 0;
-        assert!(
-            config.validate().is_err(),
-            "Zero read limit should be rejected"
-        );
-
-        config.read_limit_bytes = 1024 * 1024 * 1024; // 1GB
-        assert!(
-            config.validate().is_err(),
-            "Excessive read limit should be rejected"
         );
     }
 

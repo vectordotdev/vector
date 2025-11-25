@@ -320,8 +320,6 @@ mod tests {
         let io_error = std::io::Error::new(std::io::ErrorKind::PermissionDenied, "test");
         let converted: WindowsEventLogError = io_error.into();
         assert!(matches!(converted, WindowsEventLogError::IoError { .. }));
-
-        // Removed rusqlite conversion test
     }
 
     #[cfg(not(windows))]

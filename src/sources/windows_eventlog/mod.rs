@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
@@ -27,7 +28,8 @@ mod subscription;
 #[cfg(test)]
 mod tests;
 
-// Integration tests are feature-gated to avoid requiring Windows Event Log service
+// Integration tests are feature-gated to avoid requiring Windows Event Log service.
+// To run integration tests on Windows: cargo test --features sources-windows_eventlog-integration-tests
 #[cfg(all(test, feature = "sources-windows_eventlog-integration-tests"))]
 mod integration_tests;
 
@@ -40,14 +42,15 @@ use self::{
 /// Windows Event Log source implementation
 pub struct WindowsEventLogSource {
     config: WindowsEventLogConfig,
+    data_dir: PathBuf,
 }
 
 impl WindowsEventLogSource {
-    pub fn new(config: WindowsEventLogConfig) -> crate::Result<Self> {
+    pub fn new(config: WindowsEventLogConfig, data_dir: PathBuf) -> crate::Result<Self> {
         // Validate configuration
         config.validate()?;
 
-        Ok(Self { config })
+        Ok(Self { config, data_dir })
     }
 
     async fn run_internal(
@@ -56,7 +59,7 @@ impl WindowsEventLogSource {
         mut shutdown: ShutdownSignal,
     ) -> Result<(), WindowsEventLogError> {
         // Initialize checkpointer for state persistence
-        let checkpointer = Arc::new(Checkpointer::new(&self.config.data_dir).await?);
+        let checkpointer = Arc::new(Checkpointer::new(&self.data_dir).await?);
 
         let mut subscription =
             EventLogSubscription::new(&self.config, Arc::clone(&checkpointer)).await?;
@@ -149,7 +152,12 @@ impl WindowsEventLogSource {
 #[typetag::serde(name = "windows_eventlog")]
 impl SourceConfig for WindowsEventLogConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let source = WindowsEventLogSource::new(self.clone())?;
+        // Resolve data directory using Vector's global data_dir, creating a subdir for this source
+        let data_dir = cx
+            .globals
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
+
+        let source = WindowsEventLogSource::new(self.clone(), data_dir)?;
         Ok(Box::pin(async move {
             let mut source = source;
             if let Err(error) = source.run_internal(cx.out, cx.shutdown).await {
@@ -159,35 +167,44 @@ impl SourceConfig for WindowsEventLogConfig {
         }))
     }
 
-    fn outputs(&self, _global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
-        let schema_definition = self
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        // Respect the per-source log_namespace setting, falling back to global
+        let log_namespace = self
             .log_namespace
-            .unwrap_or(false)
-            .then(|| {
-                vector_lib::schema::Definition::new_with_default_metadata(
-                    Kind::object(std::collections::BTreeMap::from([
-                        ("timestamp".into(), Kind::timestamp().or_undefined()),
-                        ("message".into(), Kind::bytes().or_undefined()),
-                        ("level".into(), Kind::bytes().or_undefined()),
-                        ("source".into(), Kind::bytes().or_undefined()),
-                        ("event_id".into(), Kind::integer().or_undefined()),
-                        ("provider_name".into(), Kind::bytes().or_undefined()),
-                        ("computer".into(), Kind::bytes().or_undefined()),
-                        ("user_id".into(), Kind::bytes().or_undefined()),
-                        ("record_id".into(), Kind::integer().or_undefined()),
-                        ("activity_id".into(), Kind::bytes().or_undefined()),
-                        ("related_activity_id".into(), Kind::bytes().or_undefined()),
-                        ("process_id".into(), Kind::integer().or_undefined()),
-                        ("thread_id".into(), Kind::integer().or_undefined()),
-                        ("channel".into(), Kind::bytes().or_undefined()),
-                        ("opcode".into(), Kind::bytes().or_undefined()),
-                        ("task".into(), Kind::bytes().or_undefined()),
-                        ("keywords".into(), Kind::bytes().or_undefined()),
-                    ])),
-                    [LogNamespace::Legacy],
-                )
+            .map(|b| {
+                if b {
+                    LogNamespace::Vector
+                } else {
+                    LogNamespace::Legacy
+                }
             })
-            .unwrap_or_else(vector_lib::schema::Definition::any);
+            .unwrap_or(global_log_namespace);
+
+        let schema_definition = match log_namespace {
+            LogNamespace::Vector => vector_lib::schema::Definition::new_with_default_metadata(
+                Kind::object(std::collections::BTreeMap::from([
+                    ("timestamp".into(), Kind::timestamp().or_undefined()),
+                    ("message".into(), Kind::bytes().or_undefined()),
+                    ("level".into(), Kind::bytes().or_undefined()),
+                    ("source".into(), Kind::bytes().or_undefined()),
+                    ("event_id".into(), Kind::integer().or_undefined()),
+                    ("provider_name".into(), Kind::bytes().or_undefined()),
+                    ("computer".into(), Kind::bytes().or_undefined()),
+                    ("user_id".into(), Kind::bytes().or_undefined()),
+                    ("record_id".into(), Kind::integer().or_undefined()),
+                    ("activity_id".into(), Kind::bytes().or_undefined()),
+                    ("related_activity_id".into(), Kind::bytes().or_undefined()),
+                    ("process_id".into(), Kind::integer().or_undefined()),
+                    ("thread_id".into(), Kind::integer().or_undefined()),
+                    ("channel".into(), Kind::bytes().or_undefined()),
+                    ("opcode".into(), Kind::bytes().or_undefined()),
+                    ("task".into(), Kind::bytes().or_undefined()),
+                    ("keywords".into(), Kind::bytes().or_undefined()),
+                ])),
+                [LogNamespace::Vector],
+            ),
+            LogNamespace::Legacy => vector_lib::schema::Definition::any(),
+        };
 
         vec![SourceOutput::new_maybe_logs(
             DataType::Log,
@@ -214,7 +231,7 @@ inventory::submit! {
     SourceDescription::new::<WindowsEventLogConfig>(
         "windows_eventlog",
         "Collect logs from Windows Event Log channels",
-        "A Windows-specific source that polls Windows Event Log channels and streams events.",
+        "A Windows-specific source that subscribes to Windows Event Log channels and streams events in real-time using the Windows Event Log API.",
         "https://vector.dev/docs/reference/configuration/sources/windows_eventlog/"
     )
 }

@@ -12,7 +12,6 @@ const MAX_EVENT_ID_LIST_SIZE: usize = 1000;
 const MAX_CONNECTION_TIMEOUT_SECS: u64 = 3600;
 const MAX_EVENT_TIMEOUT_MS: u64 = 60000;
 const MAX_BATCH_SIZE: u32 = 10000;
-const MAX_READ_LIMIT_BYTES: usize = 100 * 1024 * 1024; // 100 MB
 
 /// Configuration for the `windows_eventlog` source.
 #[configurable_component(source(
@@ -62,13 +61,6 @@ pub struct WindowsEventLogConfig {
     #[configurable(metadata(docs::examples = 10))]
     #[configurable(metadata(docs::examples = 100))]
     pub batch_size: u32,
-
-    /// Maximum size in bytes to read per polling cycle.
-    ///
-    /// This controls the maximum amount of data read from Windows Event Logs
-    /// in a single polling cycle to prevent memory issues.
-    #[serde(default = "default_read_limit_bytes")]
-    pub read_limit_bytes: usize,
 
     /// Whether to render the event message.
     ///
@@ -133,12 +125,15 @@ pub struct WindowsEventLogConfig {
 
     /// The directory where checkpoint data is stored.
     ///
-    /// Vector stores the last processed record ID for each channel to allow
-    /// resuming from the correct position after restarts.
-    #[serde(default = "default_data_dir")]
-    #[configurable(metadata(docs::examples = "/var/lib/vector/windows_eventlog"))]
-    #[configurable(metadata(docs::examples = "C:\\ProgramData\\vector\\windows_eventlog"))]
-    pub data_dir: PathBuf,
+    /// By default, the [global `data_dir` option][global_data_dir] is used.
+    /// Make sure the running user has write permissions to this directory.
+    ///
+    /// [global_data_dir]: https://vector.dev/docs/reference/configuration/global-options/#data_dir
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "/var/lib/vector"))]
+    #[configurable(metadata(docs::examples = "C:\\ProgramData\\vector"))]
+    #[configurable(metadata(docs::human_name = "Data Directory"))]
+    pub data_dir: Option<PathBuf>,
 
     /// Maximum number of events to process per second.
     ///
@@ -171,20 +166,25 @@ pub struct WindowsEventLogConfig {
     pub max_message_field_length: usize,
 }
 
-/// Event data formatting options.
+/// Event data formatting options for custom field type conversion.
+///
+/// These options control how specific event fields are formatted in the output.
+/// Use `event_data_format` config to map field names to their desired format.
 #[configurable_component]
 #[derive(Clone, Debug)]
 #[serde(rename_all = "snake_case")]
 pub enum EventDataFormat {
-    /// Format as string
+    /// Format the field value as a string.
     String,
-    /// Format as integer
+    /// Parse and format the field value as an integer.
     Integer,
-    /// Format as floating-point number
+    /// Parse and format the field value as a floating-point number.
     Float,
-    /// Format as boolean
+    /// Parse and format the field value as a boolean.
+    /// Recognizes "true", "1", "yes", "on" as true (case-insensitive).
     Boolean,
-    /// Keep original format
+    /// Keep the original format unchanged (passthrough).
+    /// The field value will not be converted or modified.
     Auto,
 }
 
@@ -241,7 +241,6 @@ impl Default for WindowsEventLogConfig {
             connection_timeout_secs: default_connection_timeout_secs(),
             read_existing_events: default_read_existing_events(),
             batch_size: default_batch_size(),
-            read_limit_bytes: default_read_limit_bytes(),
             render_message: default_render_message(),
             include_xml: default_include_xml(),
             event_data_format: HashMap::new(),
@@ -251,7 +250,7 @@ impl Default for WindowsEventLogConfig {
             event_timeout_ms: default_event_timeout_ms(),
             log_namespace: None,
             field_filter: FieldFilter::default(),
-            data_dir: default_data_dir(),
+            data_dir: None,
             events_per_second: default_events_per_second(),
             max_event_data_length: default_max_event_data_length(),
             max_message_field_length: default_max_message_field_length(),
@@ -295,15 +294,6 @@ impl WindowsEventLogConfig {
         // Prevent resource exhaustion via excessive batch sizes
         if self.batch_size == 0 || self.batch_size > MAX_BATCH_SIZE {
             return Err(format!("Batch size must be between 1 and {}", MAX_BATCH_SIZE).into());
-        }
-
-        // Validate read limits to prevent memory exhaustion
-        if self.read_limit_bytes == 0 || self.read_limit_bytes > MAX_READ_LIMIT_BYTES {
-            return Err(format!(
-                "Read limit must be between 1 and {} bytes",
-                MAX_READ_LIMIT_BYTES
-            )
-            .into());
         }
 
         // Enhanced channel name validation with security checks
@@ -521,10 +511,6 @@ const fn default_batch_size() -> u32 {
     10
 }
 
-const fn default_read_limit_bytes() -> usize {
-    524_288 // 512 KiB
-}
-
 const fn default_render_message() -> bool {
     true
 }
@@ -543,17 +529,6 @@ const fn default_include_event_data() -> bool {
 
 const fn default_include_user_data() -> bool {
     true
-}
-
-fn default_data_dir() -> PathBuf {
-    #[cfg(windows)]
-    {
-        PathBuf::from("C:\\ProgramData\\vector\\windows_eventlog")
-    }
-    #[cfg(not(windows))]
-    {
-        PathBuf::from("/var/lib/vector/windows_eventlog")
-    }
 }
 
 const fn default_events_per_second() -> u32 {
@@ -615,13 +590,8 @@ mod tests {
         config.batch_size = 10;
         assert!(config.validate().is_ok());
 
-        // Zero read limit should fail
-        config.read_limit_bytes = 0;
-        assert!(config.validate().is_err());
-
         // Empty channel name should fail
         config.channels = vec!["".to_string()];
-        config.read_limit_bytes = default_read_limit_bytes();
         assert!(config.validate().is_err());
 
         // Empty query should fail
@@ -648,7 +618,6 @@ mod tests {
             connection_timeout_secs: 30,
             read_existing_events: true,
             batch_size: 50,
-            read_limit_bytes: 1024000,
             render_message: false,
             include_xml: true,
             event_data_format: HashMap::new(),

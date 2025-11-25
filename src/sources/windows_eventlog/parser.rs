@@ -390,6 +390,9 @@ mod tests {
     use chrono::Utc;
     use std::collections::HashMap;
 
+    /// Creates a generic test event for parser unit tests.
+    /// Note: tests.rs has a separate create_test_event() with realistic Security audit data.
+    /// This version uses simple generic values to isolate parser logic testing.
     fn create_test_event() -> WindowsEvent {
         WindowsEvent {
             record_id: 12345,
