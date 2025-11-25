@@ -1,12 +1,17 @@
-use std::collections::BTreeMap;
+use std::cell::LazyCell;
+use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fs;
 use std::path::Path;
+use std::str::FromStr;
 
 use anyhow::{Context, Result, ensure};
 use clap::Args;
+use itertools::Itertools;
 use serde_json::{Value, json};
+use vrl::prelude::{NotNan, Parameter};
+use vrl::value;
 
-use crate::app;
+use crate::app::{self, path};
 
 /// Generate VRL function examples from VRL stdlib and inject into docs.json
 #[derive(Args, Debug)]
@@ -29,6 +34,151 @@ static UNDOCUMENTED_FNS: [&str; 6] = [
 
 // FIXME this shouldn't exist, all functions should have examples
 static NO_EXAMPLES_FNS: [&str; 1] = ["strip_ansi_escape_codes"];
+
+/// Create bogus data just to get type information
+fn args_from_kind(function_name: &str, p: &Parameter) -> Vec<vrl::value::Value> {
+    const VALUE_EXCEPTIONS: LazyCell<
+        HashMap<&'static str, HashMap<&'static str, Vec<vrl::value::Value>>>,
+    > = LazyCell::new(|| {
+        let proto_file_path = format!(
+            "{}/lib/vector-vrl/tests/resources/protobuf_descriptor_set.desc",
+            path()
+        );
+        HashMap::from([
+            (
+                "chunks",
+                HashMap::from([("chunk_size", vec![vrl::value::Value::Integer(1)])]),
+            ),
+            (
+                "decrypt",
+                HashMap::from([("algorithm", vec![value!("AES-256-CFB")])]),
+            ),
+            (
+                "del", // FIXME
+                HashMap::from([("target", vec![value!(".field")])]),
+            ),
+            (
+                "encode_proto",
+                HashMap::from([
+                    (
+                        "desc_file",
+                        vec![vrl::value::Value::Bytes(proto_file_path.clone().into())],
+                    ),
+                    ("message_type", vec![value!("test_protobuf.Person")]),
+                ]),
+            ),
+            (
+                "encrypt",
+                HashMap::from([("algorithm", vec![value!("AES-256-CFB")])]),
+            ),
+            (
+                "exists", // FIXME
+                HashMap::from([("field", vec![value!(".field")])]),
+            ),
+            (
+                "ip_cidr_contains",
+                HashMap::from([("cidr", vec![value!("0.0.0.0/24")])]), // TODO add array
+            ),
+            (
+                "parse_apache_log",
+                HashMap::from([(
+                    "format",
+                    vec![value!("common"), value!("combined"), value!("error")],
+                )]),
+            ),
+            (
+                "parse_grok",
+                HashMap::from([(
+                    "pattern",
+                    vec![value!(
+                        "%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}"
+                    )],
+                )]),
+            ),
+            (
+                "parse_nginx_log",
+                HashMap::from([(
+                    "format",
+                    vec![
+                        value!("combined"),
+                        value!("error"),
+                        value!("ingress_upstreaminfo"),
+                        value!("main"),
+                    ],
+                )]),
+            ),
+            (
+                "parse_proto",
+                HashMap::from([
+                    (
+                        "desc_file",
+                        vec![vrl::value::Value::Bytes(proto_file_path.clone().into())],
+                    ),
+                    ("message_type", vec![value!("test_protobuf.Person")]),
+                ]),
+            ),
+            (
+                "random_float",
+                HashMap::from([(
+                    "max",
+                    vec![
+                        vrl::value::Value::Float(NotNan::try_from(1.0).unwrap()),
+                        vrl::value::Value::Integer(1),
+                    ],
+                )]),
+            ),
+        ])
+    });
+
+    if let Some(fn_override) = VALUE_EXCEPTIONS.get(function_name)
+        && let Some(args_override) = fn_override.get(p.keyword)
+    {
+        return args_override.to_vec();
+    }
+
+    let kind = p.kind();
+    let mut args = vec![];
+    let any = kind.contains_undefined();
+
+    if kind.contains_bytes() || any {
+        args.push(vrl::value::Value::Bytes(Default::default()));
+    }
+
+    if kind.contains_integer() || any {
+        args.push(vrl::value::Value::Integer(Default::default()));
+    }
+
+    if kind.contains_float() || any {
+        args.push(vrl::value::Value::Float(Default::default()));
+    }
+
+    if kind.contains_boolean() || any {
+        args.push(vrl::value::Value::Boolean(Default::default()));
+    }
+
+    if kind.contains_timestamp() || any {
+        args.push(vrl::value::Value::Timestamp(Default::default()));
+    }
+
+    if kind.contains_regex() || any {
+        args.push(vrl::value::Value::Regex(
+            regex::Regex::from_str("").unwrap().into(),
+        ));
+    }
+
+    if kind.contains_null() || any {
+        args.push(vrl::value::Value::Null);
+    }
+
+    if kind.contains_array() || any {
+        args.push(vrl::value::Value::Array(Default::default()));
+    }
+
+    if kind.contains_object() || any {
+        args.push(vrl::value::Value::Object(Default::default()));
+    }
+    args
+}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
@@ -77,6 +227,23 @@ impl Cli {
 
         // Inject examples into docs.json
         for (function_name, function) in &functions_with_examples {
+            if function_name == "del"
+                || function_name == "exists"
+                || function_name == "filter"
+                || function_name == "for_each"
+                || function_name == "map_keys"
+                || function_name == "map_values"
+                /* BUG */
+                || function_name == "merge"
+                /* issue with Kind */
+                || function_name == "random_float"
+                || function_name == "random_int"
+                || function_name == "replace_with"
+                || function_name == "unnest"
+            {
+                // FIXME
+                continue;
+            }
             // Navigate to remap.functions.<function_name>
             let function_obj = docs
                 .get_mut("remap")
@@ -85,6 +252,66 @@ impl Cli {
                 .with_context(|| {
                     format!("⚠ VRL function not found in docs.json: {function_name}")
                 })?;
+
+            let documented_return = function_obj
+                .get("return")
+                .and_then(|r| r.get("types"))
+                .with_context(|| panic!("{function_name} doesn't have return"))?
+                .as_array()
+                .with_context(|| panic!("{function_name}.return isn't an array"))?;
+            let mut documented_return = documented_return
+                .into_iter()
+                .map(|v| v.as_str().unwrap())
+                .collect_vec();
+            documented_return.sort();
+
+            let actual_return = {
+                let mut return_type = HashSet::new();
+
+                let required = function
+                    .parameters()
+                    .iter()
+                    .filter(|p| p.required)
+                    .collect_vec();
+
+                let required_args = required
+                    .iter()
+                    .map(|p| {
+                        std::iter::once(p.keyword)
+                            .cartesian_product(args_from_kind(function_name, p))
+                    })
+                    .multi_cartesian_product();
+
+                // TODO non required args
+
+                for args in required_args {
+                    let state = vrl::compiler::state::TypeState::default();
+                    let config = vrl::compiler::CompileConfig::default();
+                    let ctx = &mut vrl::compiler::function::FunctionCompileContext::new(
+                        vrl::diagnostic::Span::new(0, 0),
+                        config,
+                    );
+
+                    let arguments: HashMap<&'static str, vrl::value::Value> =
+                        HashMap::from_iter(args.into_iter());
+                    let compiled = function
+                        .compile(&state, ctx, arguments.into())
+                        .unwrap_or_else(|e| {
+                            panic!("function `{function_name}` failed to compile: {e:?}")
+                        });
+                    // return_type.insert(dbg!(compiled.type_def(&state).to_string()));
+                    return_type.insert(compiled.type_def(&state).to_string());
+                }
+
+                let mut return_type = return_type.into_iter().collect_vec();
+                return_type.sort();
+                return_type
+            };
+
+            if documented_return != actual_return {
+                println!("{function_name:?}");
+                println!("{documented_return:?} != {actual_return:?}");
+            }
 
             let examples_array = {
                 if function_obj.get("examples").is_none() {
