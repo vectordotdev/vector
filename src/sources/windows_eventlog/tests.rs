@@ -30,6 +30,8 @@ fn create_test_config() -> WindowsEventLogConfig {
         field_filter: FieldFilter::default(),
         data_dir: std::path::PathBuf::from("/tmp/vector_test"),
         events_per_second: 0,
+        max_event_data_length: 0,
+        max_message_field_length: 0,
     }
 }
 
@@ -665,7 +667,8 @@ mod subscription_tests {
             </Event>
         "#;
 
-        let event_data = EventLogSubscription::extract_event_data(xml);
+        let config = WindowsEventLogConfig::default();
+        let event_data = EventLogSubscription::extract_event_data(xml, &config);
 
         assert_eq!(
             event_data.structured_data.get("TargetUserName"),
@@ -1051,7 +1054,8 @@ mod buffer_safety_tests {
         );
 
         // This should not panic or cause memory issues
-        let result = EventLogSubscription::extract_event_data(&large_xml);
+        let config = WindowsEventLogConfig::default();
+        let result = EventLogSubscription::extract_event_data(&large_xml, &config);
 
         // Should have some reasonable limit on parsed data
         assert!(
@@ -1076,7 +1080,8 @@ mod buffer_safety_tests {
         nested_xml.push_str("</Event>");
 
         // This should not cause stack overflow or excessive memory usage
-        let result = EventLogSubscription::extract_event_data(&nested_xml);
+        let config = WindowsEventLogConfig::default();
+        let result = EventLogSubscription::extract_event_data(&nested_xml, &config);
 
         // Should handle gracefully - either succeeds or fails safely
         // The key is that it doesn't crash or consume excessive resources
@@ -1101,7 +1106,8 @@ mod buffer_safety_tests {
         xml_with_attrs.push_str("</EventData></Event>");
 
         // Should handle gracefully without memory exhaustion
-        let result = EventLogSubscription::extract_event_data(&xml_with_attrs);
+        let config = WindowsEventLogConfig::default();
+        let result = EventLogSubscription::extract_event_data(&xml_with_attrs, &config);
 
         // Should have reasonable limits on parsed attributes
         assert!(
@@ -1138,7 +1144,8 @@ mod fault_tolerance_tests {
     #[tokio::test]
     async fn test_invalid_xml_handling() {
         let invalid_xml = "not valid xml <tag>";
-        let result = EventLogSubscription::extract_event_data(invalid_xml);
+        let config = WindowsEventLogConfig::default();
+        let result = EventLogSubscription::extract_event_data(invalid_xml, &config);
         // Should return empty result or handle gracefully without crashing
         assert!(
             result.structured_data.len() == 0,
@@ -1155,8 +1162,9 @@ mod fault_tolerance_tests {
             format!("<Event>{}data{}</Event>", "<nested>".repeat(1000), "</nested>".repeat(1000)), // Deep nesting
         ];
 
+        let config = WindowsEventLogConfig::default();
         for malicious_xml in &malicious_xmls {
-            let result = EventLogSubscription::extract_event_data(&malicious_xml);
+            let result = EventLogSubscription::extract_event_data(&malicious_xml, &config);
             // Should handle without crashing or excessive resource usage
             assert!(
                 result.structured_data.len() <= 100,

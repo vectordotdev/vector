@@ -17,12 +17,15 @@ use super::error::WindowsEventLogError;
 const CHECKPOINT_FILENAME: &str = "windows_eventlog_checkpoints.json";
 
 /// Checkpoint data for a single Windows Event Log channel
+///
+/// Uses Windows Event Log bookmarks for robust position tracking that survives
+/// channel clears, log rotations, and provides O(1) seeking.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct ChannelCheckpoint {
     /// The channel name (e.g., "System", "Application", "Security")
     pub channel: String,
-    /// The last successfully processed record ID
-    pub record_id: u64,
+    /// Windows Event Log bookmark XML for position tracking
+    pub bookmark_xml: String,
     /// Timestamp when this checkpoint was last updated (for debugging)
     #[serde(default)]
     pub updated_at: String,
@@ -40,7 +43,7 @@ struct CheckpointState {
 impl Default for CheckpointState {
     fn default() -> Self {
         Self {
-            version: 1,
+            version: 1,  // Version 1: bookmark-based checkpointing
             channels: HashMap::new(),
         }
     }
@@ -48,8 +51,9 @@ impl Default for CheckpointState {
 
 /// Manages checkpoint persistence for Windows Event Log subscriptions
 ///
-/// Similar to Vector's journald checkpointer, this stores the last processed
-/// record ID for each channel to allow resumption after restarts.
+/// Uses Windows Event Log bookmarks (opaque XML handles) to track position in
+/// each channel. Bookmarks are more robust than record IDs as they survive
+/// channel clears, log rotations, and provide O(1) seeking on restart.
 pub struct Checkpointer {
     checkpoint_path: PathBuf,
     state: Mutex<CheckpointState>,
@@ -88,13 +92,24 @@ impl Checkpointer {
         state.channels.get(channel).cloned()
     }
 
-    /// Update the checkpoint for a specific channel
-    pub async fn set(&self, channel: String, record_id: u64) -> Result<(), WindowsEventLogError> {
+    /// Update the checkpoint for a specific channel using bookmark XML
+    ///
+    /// Bookmarks provide robust position tracking that survives channel clears,
+    /// log rotations, and provides O(1) seeking on restart.
+    ///
+    /// Note: For better performance with multiple channels, prefer `set_batch()`
+    /// which writes all checkpoints in a single disk operation.
+    #[allow(dead_code)] // Kept for single-channel use cases and testing
+    pub async fn set(
+        &self,
+        channel: String,
+        bookmark_xml: String,
+    ) -> Result<(), WindowsEventLogError> {
         let mut state = self.state.lock().await;
 
         let checkpoint = ChannelCheckpoint {
             channel: channel.clone(),
-            record_id,
+            bookmark_xml,
             updated_at: chrono::Utc::now().to_rfc3339(),
         };
 
@@ -105,8 +120,47 @@ impl Checkpointer {
 
         debug!(
             message = "Updated checkpoint for channel",
-            channel = %channel,
-            record_id = record_id
+            channel = %channel
+        );
+
+        Ok(())
+    }
+
+    /// Update multiple channel checkpoints in a single atomic disk write
+    ///
+    /// This is much more efficient than calling `set()` multiple times because:
+    /// - Single file write instead of N writes
+    /// - Single fsync instead of N fsyncs
+    /// - Atomic - either all channels update or none do
+    ///
+    /// This matches the behavior of enterprise tools like Winlogbeat and Splunk UF
+    /// which batch checkpoint updates for performance.
+    pub async fn set_batch(
+        &self,
+        updates: Vec<(String, String)>,
+    ) -> Result<(), WindowsEventLogError> {
+        if updates.is_empty() {
+            return Ok(());
+        }
+
+        let mut state = self.state.lock().await;
+        let timestamp = chrono::Utc::now().to_rfc3339();
+
+        for (channel, bookmark_xml) in &updates {
+            let checkpoint = ChannelCheckpoint {
+                channel: channel.clone(),
+                bookmark_xml: bookmark_xml.clone(),
+                updated_at: timestamp.clone(),
+            };
+            state.channels.insert(channel.clone(), checkpoint);
+        }
+
+        // Single disk write for all channels
+        self.save_to_disk(&state).await?;
+
+        debug!(
+            message = "Batch updated checkpoints",
+            channels_updated = updates.len()
         );
 
         Ok(())
@@ -225,6 +279,14 @@ mod tests {
     use super::*;
     use tempfile::TempDir;
 
+    /// Helper to create test bookmark XML
+    fn test_bookmark_xml(channel: &str, record_id: u64) -> String {
+        format!(
+            r#"<BookmarkList><Bookmark Channel="{}" RecordId="{}" IsCurrent="True"/></BookmarkList>"#,
+            channel, record_id
+        )
+    }
+
     async fn create_test_checkpointer() -> (Checkpointer, TempDir) {
         let temp_dir = TempDir::new().unwrap();
         let checkpointer = Checkpointer::new(temp_dir.path()).await.unwrap();
@@ -239,24 +301,34 @@ mod tests {
         assert!(checkpointer.get("System").await.is_none());
 
         // Set checkpoint
-        checkpointer.set("System".to_string(), 12345).await.unwrap();
+        let bookmark = test_bookmark_xml("System", 12345);
+        checkpointer
+            .set("System".to_string(), bookmark.clone())
+            .await
+            .unwrap();
 
         // Retrieve checkpoint
         let checkpoint = checkpointer.get("System").await.unwrap();
         assert_eq!(checkpoint.channel, "System");
-        assert_eq!(checkpoint.record_id, 12345);
+        assert_eq!(checkpoint.bookmark_xml, bookmark);
     }
 
     #[tokio::test]
     async fn test_checkpoint_persistence() {
         let temp_dir = TempDir::new().unwrap();
 
+        let system_bookmark = test_bookmark_xml("System", 100);
+        let app_bookmark = test_bookmark_xml("Application", 200);
+
         // Create first checkpointer and set values
         {
             let checkpointer = Checkpointer::new(temp_dir.path()).await.unwrap();
-            checkpointer.set("System".to_string(), 100).await.unwrap();
             checkpointer
-                .set("Application".to_string(), 200)
+                .set("System".to_string(), system_bookmark.clone())
+                .await
+                .unwrap();
+            checkpointer
+                .set("Application".to_string(), app_bookmark.clone())
                 .await
                 .unwrap();
         }
@@ -265,10 +337,10 @@ mod tests {
         {
             let checkpointer = Checkpointer::new(temp_dir.path()).await.unwrap();
             let system_checkpoint = checkpointer.get("System").await.unwrap();
-            assert_eq!(system_checkpoint.record_id, 100);
+            assert_eq!(system_checkpoint.bookmark_xml, system_bookmark);
 
             let app_checkpoint = checkpointer.get("Application").await.unwrap();
-            assert_eq!(app_checkpoint.record_id, 200);
+            assert_eq!(app_checkpoint.bookmark_xml, app_bookmark);
         }
     }
 
@@ -277,40 +349,68 @@ mod tests {
         let (checkpointer, _temp_dir) = create_test_checkpointer().await;
 
         // Set initial value
-        checkpointer.set("System".to_string(), 100).await.unwrap();
+        let bookmark1 = test_bookmark_xml("System", 100);
+        checkpointer
+            .set("System".to_string(), bookmark1)
+            .await
+            .unwrap();
 
         // Update value
-        checkpointer.set("System".to_string(), 200).await.unwrap();
+        let bookmark2 = test_bookmark_xml("System", 200);
+        checkpointer
+            .set("System".to_string(), bookmark2.clone())
+            .await
+            .unwrap();
 
         // Verify updated value
         let checkpoint = checkpointer.get("System").await.unwrap();
-        assert_eq!(checkpoint.record_id, 200);
+        assert_eq!(checkpoint.bookmark_xml, bookmark2);
     }
 
     #[tokio::test]
     async fn test_checkpoint_multiple_channels() {
         let (checkpointer, _temp_dir) = create_test_checkpointer().await;
 
-        checkpointer.set("System".to_string(), 100).await.unwrap();
+        let system_bookmark = test_bookmark_xml("System", 100);
+        let app_bookmark = test_bookmark_xml("Application", 200);
+        let security_bookmark = test_bookmark_xml("Security", 300);
+
         checkpointer
-            .set("Application".to_string(), 200)
+            .set("System".to_string(), system_bookmark.clone())
             .await
             .unwrap();
-        checkpointer.set("Security".to_string(), 300).await.unwrap();
+        checkpointer
+            .set("Application".to_string(), app_bookmark.clone())
+            .await
+            .unwrap();
+        checkpointer
+            .set("Security".to_string(), security_bookmark.clone())
+            .await
+            .unwrap();
 
-        assert_eq!(checkpointer.get("System").await.unwrap().record_id, 100);
         assert_eq!(
-            checkpointer.get("Application").await.unwrap().record_id,
-            200
+            checkpointer.get("System").await.unwrap().bookmark_xml,
+            system_bookmark
         );
-        assert_eq!(checkpointer.get("Security").await.unwrap().record_id, 300);
+        assert_eq!(
+            checkpointer.get("Application").await.unwrap().bookmark_xml,
+            app_bookmark
+        );
+        assert_eq!(
+            checkpointer.get("Security").await.unwrap().bookmark_xml,
+            security_bookmark
+        );
     }
 
     #[tokio::test]
     async fn test_checkpoint_remove() {
         let (checkpointer, _temp_dir) = create_test_checkpointer().await;
 
-        checkpointer.set("System".to_string(), 100).await.unwrap();
+        let bookmark = test_bookmark_xml("System", 100);
+        checkpointer
+            .set("System".to_string(), bookmark)
+            .await
+            .unwrap();
         assert!(checkpointer.get("System").await.is_some());
 
         checkpointer.remove("System").await.unwrap();
@@ -321,9 +421,15 @@ mod tests {
     async fn test_checkpoint_list() {
         let (checkpointer, _temp_dir) = create_test_checkpointer().await;
 
-        checkpointer.set("System".to_string(), 100).await.unwrap();
+        let system_bookmark = test_bookmark_xml("System", 100);
+        let app_bookmark = test_bookmark_xml("Application", 200);
+
         checkpointer
-            .set("Application".to_string(), 200)
+            .set("System".to_string(), system_bookmark)
+            .await
+            .unwrap();
+        checkpointer
+            .set("Application".to_string(), app_bookmark)
             .await
             .unwrap();
 
@@ -346,7 +452,91 @@ mod tests {
         assert!(checkpointer.get("System").await.is_none());
 
         // Should be able to write new checkpoints
-        checkpointer.set("System".to_string(), 100).await.unwrap();
-        assert_eq!(checkpointer.get("System").await.unwrap().record_id, 100);
+        let bookmark = test_bookmark_xml("System", 100);
+        checkpointer
+            .set("System".to_string(), bookmark.clone())
+            .await
+            .unwrap();
+        assert_eq!(
+            checkpointer.get("System").await.unwrap().bookmark_xml,
+            bookmark
+        );
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_batch_update() {
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let system_bookmark = test_bookmark_xml("System", 100);
+        let app_bookmark = test_bookmark_xml("Application", 200);
+        let security_bookmark = test_bookmark_xml("Security", 300);
+
+        // Batch update all channels at once
+        checkpointer
+            .set_batch(vec![
+                ("System".to_string(), system_bookmark.clone()),
+                ("Application".to_string(), app_bookmark.clone()),
+                ("Security".to_string(), security_bookmark.clone()),
+            ])
+            .await
+            .unwrap();
+
+        // Verify all channels were updated
+        assert_eq!(
+            checkpointer.get("System").await.unwrap().bookmark_xml,
+            system_bookmark
+        );
+        assert_eq!(
+            checkpointer.get("Application").await.unwrap().bookmark_xml,
+            app_bookmark
+        );
+        assert_eq!(
+            checkpointer.get("Security").await.unwrap().bookmark_xml,
+            security_bookmark
+        );
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_batch_empty() {
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        // Empty batch should succeed without writing
+        checkpointer.set_batch(vec![]).await.unwrap();
+
+        // No checkpoints should exist
+        assert!(checkpointer.list().await.is_empty());
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_batch_persistence() {
+        let temp_dir = TempDir::new().unwrap();
+
+        let system_bookmark = test_bookmark_xml("System", 100);
+        let app_bookmark = test_bookmark_xml("Application", 200);
+
+        // Create first checkpointer and batch update
+        {
+            let checkpointer = Checkpointer::new(temp_dir.path()).await.unwrap();
+            checkpointer
+                .set_batch(vec![
+                    ("System".to_string(), system_bookmark.clone()),
+                    ("Application".to_string(), app_bookmark.clone()),
+                ])
+                .await
+                .unwrap();
+        }
+
+        // Create new checkpointer (simulating restart) and verify persistence
+        {
+            let checkpointer = Checkpointer::new(temp_dir.path()).await.unwrap();
+            assert_eq!(
+                checkpointer.get("System").await.unwrap().bookmark_xml,
+                system_bookmark
+            );
+            assert_eq!(
+                checkpointer.get("Application").await.unwrap().bookmark_xml,
+                app_bookmark
+            );
+        }
     }
 }

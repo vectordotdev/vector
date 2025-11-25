@@ -15,6 +15,7 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
+mod bookmark;
 mod checkpoint;
 mod config;
 pub mod error;
@@ -70,6 +71,13 @@ impl WindowsEventLogSource {
             select! {
                 _ = &mut shutdown => {
                     info!("Windows Event Log source received shutdown signal");
+                    #[cfg(windows)]
+                    {
+                        info!("Flushing bookmarks before shutdown");
+                        if let Err(e) = subscription.flush_bookmarks().await {
+                            warn!("Failed to flush bookmarks on shutdown: {}", e);
+                        }
+                    }
                     break;
                 }
 

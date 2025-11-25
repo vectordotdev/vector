@@ -1,7 +1,7 @@
 use std::{
     collections::HashMap,
     num::NonZeroU32,
-    sync::{Arc, Mutex},
+    sync::{Arc, Mutex, RwLock},
 };
 
 use chrono::{DateTime, Utc};
@@ -12,9 +12,9 @@ use governor::{
 };
 use quick_xml::{Reader, events::Event as XmlEvent};
 use regex;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, watch};
 
-use super::{checkpoint::Checkpointer, config::WindowsEventLogConfig, error::*};
+use super::{bookmark::BookmarkManager, checkpoint::Checkpointer, config::WindowsEventLogConfig, error::*};
 
 /// System fields from Windows Event Log XML (Single Responsibility)
 #[derive(Debug, Clone)]
@@ -93,15 +93,22 @@ impl WindowsEvent {
 pub struct EventLogSubscription {
     config: Arc<WindowsEventLogConfig>,
     event_receiver: mpsc::UnboundedReceiver<WindowsEvent>,
-    checkpointer: Arc<Checkpointer>,
+    // Checkpointing is handled by CallbackContext via bookmarks
     #[cfg(windows)]
     #[allow(dead_code)] // Used for RAII cleanup of Windows handles via Drop trait
     subscriptions: Arc<Mutex<Vec<SubscriptionHandle>>>,
     #[cfg(windows)]
     // Shared subscription error state - checked by next_events()
     subscription_error: Arc<Mutex<Option<WindowsEventLogError>>>,
+    #[cfg(windows)]
+    // Callback context for accessing bookmarks/checkpointer on shutdown
+    callback_context: Arc<CallbackContext>,
     // Rate limiter for controlling event throughput
     rate_limiter: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
+    // Shutdown signal for background checkpoint task
+    #[cfg(windows)]
+    #[allow(dead_code)] // Sender is kept alive to signal shutdown on drop
+    shutdown_tx: watch::Sender<bool>,
 }
 
 #[cfg(windows)]
@@ -144,6 +151,15 @@ struct CallbackContext {
     config: Arc<WindowsEventLogConfig>,
     // Shared error state - allows callback to signal fatal subscription errors
     subscription_error: Arc<Mutex<Option<WindowsEventLogError>>>,
+    // Per-channel bookmarks for checkpoint tracking (RwLock for better concurrency)
+    // - Background task takes read lock to serialize bookmarks
+    // - Callback takes write lock briefly to update bookmarks
+    bookmarks: Arc<RwLock<HashMap<String, BookmarkManager>>>,
+    // Channels that have valid checkpoints (restored from disk)
+    // Used to distinguish fresh bookmarks from restored ones for read_existing_events logic
+    channels_with_checkpoints: std::collections::HashSet<String>,
+    // Checkpointer for periodic bookmark persistence
+    checkpointer: Arc<Checkpointer>,
 }
 
 // Convert CallbackContext pointer to raw pointer for passing through Windows API
@@ -155,6 +171,11 @@ impl CallbackContext {
 
     unsafe fn from_raw(ptr: *const std::ffi::c_void) -> Arc<CallbackContext> {
         unsafe { Arc::from_raw(ptr as *const CallbackContext) }
+    }
+
+    /// Get reference to checkpointer (ensures field is marked as used)
+    fn checkpointer(&self) -> &Arc<Checkpointer> {
+        &self.checkpointer
     }
 }
 
@@ -192,20 +213,26 @@ impl EventLogSubscription {
             // Validate channels exist and are accessible
             Self::validate_channels(&config)?;
 
-            // Log checkpoint resume information
+            // Initialize bookmarks from checkpoints or create fresh ones
+            // Track which channels have valid checkpoints (for read_existing_events logic)
+            let mut bookmarks = HashMap::new();
+            let mut channels_with_checkpoints = std::collections::HashSet::new();
             for channel in &config.channels {
-                if let Some(checkpoint) = checkpointer.get(channel).await {
+                let bookmark = if let Some(checkpoint) = checkpointer.get(channel).await {
                     info!(
-                        message = "Resuming from checkpoint",
-                        channel = %channel,
-                        record_id = checkpoint.record_id
-                    );
-                } else {
-                    info!(
-                        message = "No checkpoint found, starting fresh",
+                        message = "Resuming from checkpoint bookmark",
                         channel = %channel
                     );
-                }
+                    channels_with_checkpoints.insert(channel.clone());
+                    BookmarkManager::from_xml(&checkpoint.bookmark_xml)?
+                } else {
+                    info!(
+                        message = "No checkpoint found, creating fresh bookmark",
+                        channel = %channel
+                    );
+                    BookmarkManager::new()?
+                };
+                bookmarks.insert(channel.clone(), bookmark);
             }
 
             // Create callback context for this subscription
@@ -213,9 +240,15 @@ impl EventLogSubscription {
                 event_sender: event_sender.clone(),
                 config: Arc::clone(&config),
                 subscription_error: Arc::clone(&subscription_error),
+                bookmarks: Arc::new(RwLock::new(bookmarks)),
+                channels_with_checkpoints,
+                checkpointer: Arc::clone(&checkpointer),
             });
 
             let subscriptions = Arc::new(Mutex::new(Vec::new()));
+
+            // Create shutdown channel for background task
+            let (shutdown_tx, shutdown_rx) = watch::channel(false);
 
             // Create subscriptions for each channel, passing our context
             Self::create_subscriptions(
@@ -224,15 +257,149 @@ impl EventLogSubscription {
                 Arc::clone(&callback_context),
             )?;
 
+            // Start background task to periodically save bookmarks (every 5 seconds)
+            // This avoids blocking event processing with serialization/I/O
+            let checkpoint_saver_ctx = Arc::clone(&callback_context);
+            let mut shutdown_rx_clone = shutdown_rx.clone();
+            tokio::spawn(async move {
+                debug!(message = "Checkpoint saver background task started");
+                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+                loop {
+                    // Wait for either interval tick or shutdown signal
+                    tokio::select! {
+                        _ = interval.tick() => {}
+                        _ = shutdown_rx_clone.changed() => {
+                            debug!(message = "Checkpoint saver task received shutdown signal");
+                            break;
+                        }
+                    }
+
+                    // Step 1: Copy handles while holding lock briefly (handles are just integers)
+                    let bookmark_handles: Vec<(String, windows::Win32::System::EventLog::EVT_HANDLE)> = {
+                        let bookmarks = match checkpoint_saver_ctx.bookmarks.read() {
+                            Ok(guard) => guard,
+                            Err(poisoned) => {
+                                warn!(message = "Bookmark lock poisoned, recovering");
+                                poisoned.into_inner()
+                            }
+                        };
+                        bookmarks
+                            .iter()
+                            .map(|(channel, bookmark)| (channel.clone(), bookmark.as_handle()))
+                            .collect()
+                    }; // Lock released IMMEDIATELY
+
+                    // Step 2: Serialize handles OUTSIDE the lock (slow Windows API calls)
+                    let bookmark_xmls: Vec<(String, String)> = bookmark_handles
+                        .into_iter()
+                        .filter_map(|(channel, handle)| {
+                            match BookmarkManager::serialize_handle(handle) {
+                                Ok(xml) if Self::is_valid_bookmark_xml(&xml) => Some((channel, xml)),
+                                Ok(_) => None, // Empty or invalid = bookmark not yet updated with events
+                                Err(e) => {
+                                    warn!(
+                                        message = "Failed to serialize bookmark",
+                                        channel = %channel,
+                                        error = %e
+                                    );
+                                    None
+                                }
+                            }
+                        })
+                        .collect();
+
+                    // Save all checkpoints in a single batched disk write (no locks held)
+                    if !bookmark_xmls.is_empty() {
+                        if let Err(e) = checkpoint_saver_ctx
+                            .checkpointer()
+                            .set_batch(bookmark_xmls)
+                            .await
+                        {
+                            error!(
+                                message = "Failed to save bookmark checkpoints",
+                                error = %e
+                            );
+                        }
+                    }
+                }
+                debug!(message = "Checkpoint saver task terminated");
+            });
+
             Ok(Self {
                 config,
                 event_receiver,
-                checkpointer,
                 subscriptions,
                 subscription_error,
+                callback_context,
                 rate_limiter,
+                shutdown_tx,
             })
         }
+    }
+
+    /// Flush all bookmarks to checkpoint storage
+    ///
+    /// Call this before shutdown to ensure no events are lost.
+    /// Saves all current bookmarks for all channels to disk.
+    #[cfg(windows)]
+    pub async fn flush_bookmarks(&self) -> Result<(), WindowsEventLogError> {
+        debug!(message = "Flushing bookmarks to checkpoint storage");
+
+        // Signal shutdown to background task first
+        let _ = self.shutdown_tx.send(true);
+
+        // Copy handles quickly while holding lock, then serialize outside
+        let bookmark_handles: Vec<(String, windows::Win32::System::EventLog::EVT_HANDLE)> = {
+            let bookmarks = match self.callback_context.bookmarks.read() {
+                Ok(guard) => guard,
+                Err(poisoned) => {
+                    warn!(message = "Bookmark lock poisoned during flush, recovering");
+                    poisoned.into_inner()
+                }
+            };
+            bookmarks
+                .iter()
+                .map(|(channel, bookmark)| (channel.clone(), bookmark.as_handle()))
+                .collect()
+        };
+        // Lock released immediately
+
+        // Serialize outside the lock
+        let bookmark_xmls: Vec<(String, String)> = bookmark_handles
+            .into_iter()
+            .filter_map(|(channel, handle)| {
+                match BookmarkManager::serialize_handle(handle) {
+                    Ok(xml) if Self::is_valid_bookmark_xml(&xml) => Some((channel, xml)),
+                    Ok(_) => None, // Empty or invalid = bookmark not yet updated
+                    Err(e) => {
+                        warn!(
+                            message = "Failed to serialize bookmark for flushing",
+                            channel = %channel,
+                            error = %e
+                        );
+                        None
+                    }
+                }
+            })
+            .collect();
+
+        // Save all bookmarks in a single batched write
+        if !bookmark_xmls.is_empty() {
+            if let Err(e) = self
+                .callback_context
+                .checkpointer()
+                .set_batch(bookmark_xmls)
+                .await
+            {
+                warn!(
+                    message = "Failed to flush bookmarks on shutdown",
+                    error = %e
+                );
+            }
+        }
+
+        debug!(message = "Bookmark flush complete");
+        Ok(())
     }
 
     /// Get the next batch of events from the subscription
@@ -266,20 +433,7 @@ impl EventLogSubscription {
 
             match timeout(timeout_duration, self.event_receiver.recv()).await {
                 Ok(Some(event)) => {
-                    // Check if we've already processed this event (resume from checkpoint)
-                    if let Some(checkpoint) = self.checkpointer.get(&event.channel).await {
-                        if event.record_id <= checkpoint.record_id {
-                            // Skip events we've already processed
-                            debug!(
-                                message = "Skipping already-processed event",
-                                channel = %event.channel,
-                                record_id = event.record_id,
-                                checkpoint_record_id = checkpoint.record_id
-                            );
-                            continue;
-                        }
-                    }
-
+                    // Bookmarks handle resume/deduplication automatically via EvtSubscribe
                     if Self::should_include_event(&self.config, &event) {
                         // Apply rate limiting before adding the event
                         if let Some(limiter) = &self.rate_limiter {
@@ -311,34 +465,8 @@ impl EventLogSubscription {
             }
         }
 
-        // Update checkpoints for all events in this batch
-        // We checkpoint after collecting the batch to ensure we don't lose events
-        if !events.is_empty() {
-            // Group events by channel and find the max record_id for each
-            let mut channel_max_records: HashMap<String, u64> = HashMap::new();
-            for event in &events {
-                let max = channel_max_records
-                    .entry(event.channel.clone())
-                    .or_insert(0);
-                if event.record_id > *max {
-                    *max = event.record_id;
-                }
-            }
-
-            // Update checkpoint for each channel
-            for (channel, record_id) in channel_max_records {
-                if let Err(e) = self.checkpointer.set(channel.clone(), record_id).await {
-                    warn!(
-                        message = "Failed to update checkpoint - events may be reprocessed after restart",
-                        channel = %channel,
-                        record_id = record_id,
-                        error = %e,
-                        internal_log_rate_limit = true
-                    );
-                }
-            }
-        }
-
+        // Bookmarks are automatically updated per-event in the callback
+        // and periodically saved to checkpoints, so no batch-level checkpointing needed
         Ok(events)
     }
 
@@ -350,7 +478,8 @@ impl EventLogSubscription {
     ) -> Result<(), WindowsEventLogError> {
         use windows::{
             Win32::System::EventLog::{
-                EvtSubscribe, EvtSubscribeStartAtOldestRecord, EvtSubscribeToFutureEvents,
+                EvtSubscribe, EvtSubscribeStartAfterBookmark, EvtSubscribeStartAtOldestRecord,
+                EvtSubscribeToFutureEvents, EVT_HANDLE,
             },
             core::HSTRING,
         };
@@ -362,8 +491,29 @@ impl EventLogSubscription {
             let query = Self::build_xpath_query(config, channel)?;
             let query_hstring = HSTRING::from(query.clone());
 
-            // Determine subscription flags based on configuration
-            let subscription_flags = if config.read_existing_events {
+            // Check if this channel has a valid checkpoint (restored from disk)
+            // This is different from just having a bookmark object (we always create one)
+            let has_valid_checkpoint = callback_context.channels_with_checkpoints.contains(channel);
+
+            // Get bookmark handle for this channel from context
+            let bookmark_handle = {
+                let bookmarks = match callback_context.bookmarks.read() {
+                    Ok(guard) => guard,
+                    Err(poisoned) => poisoned.into_inner(),
+                };
+                bookmarks
+                    .get(channel)
+                    .map(|bm| bm.as_handle())
+                    .unwrap_or(EVT_HANDLE::default())
+            };
+
+            // Determine subscription flags:
+            // - If we have a valid checkpoint, resume from bookmark
+            // - If no checkpoint AND read_existing_events=true, start from oldest
+            // - If no checkpoint AND read_existing_events=false, start from future events only
+            let subscription_flags = if has_valid_checkpoint {
+                EvtSubscribeStartAfterBookmark.0
+            } else if config.read_existing_events {
                 EvtSubscribeStartAtOldestRecord.0
             } else {
                 EvtSubscribeToFutureEvents.0
@@ -373,25 +523,40 @@ impl EventLogSubscription {
                 message = "Creating Windows Event Log subscription",
                 channel = %channel,
                 query = %query,
+                has_valid_checkpoint = has_valid_checkpoint,
                 read_existing = config.read_existing_events
             );
 
             // Convert context to raw pointer for passing through Windows API
             let context_ptr = CallbackContext::into_raw(Arc::clone(&callback_context));
 
-            // Create subscription using EvtSubscribe with callback
+            // Create subscription using EvtSubscribe with callback and bookmark
             let subscription_handle = unsafe {
-                EvtSubscribe(
-                    None, // Session handle (local)
-                    None, // Signal event (we use callback instead)
-                    &channel_hstring,
-                    &query_hstring,
-                    None,              // Bookmark (handled via checkpointer for persistence)
-                    Some(context_ptr), // Context - per-subscription context!
-                    Some(event_subscription_callback), // Callback function
-                    subscription_flags,
-                )
-                .map_err(|e| WindowsEventLogError::CreateSubscriptionError { source: e })?
+                if has_valid_checkpoint {
+                    EvtSubscribe(
+                        None, // Session handle (local)
+                        None, // Signal event (we use callback instead)
+                        &channel_hstring,
+                        &query_hstring,
+                        bookmark_handle, // Bookmark for resume from checkpoint
+                        Some(context_ptr), // Context - per-subscription context!
+                        Some(event_subscription_callback), // Callback function
+                        subscription_flags,
+                    )
+                    .map_err(|e| WindowsEventLogError::CreateSubscriptionError { source: e })?
+                } else {
+                    EvtSubscribe(
+                        None, // Session handle (local)
+                        None, // Signal event (we use callback instead)
+                        &channel_hstring,
+                        &query_hstring,
+                        None, // No bookmark for fresh start
+                        Some(context_ptr), // Context - per-subscription context!
+                        Some(event_subscription_callback), // Callback function
+                        subscription_flags,
+                    )
+                    .map_err(|e| WindowsEventLogError::CreateSubscriptionError { source: e })?
+                }
             };
 
             info!(
@@ -526,6 +691,17 @@ impl EventLogSubscription {
             provider_name: Self::extract_provider_name(xml).unwrap_or_default(),
             provider_guid: Self::extract_xml_attribute(xml, "Guid"),
         }
+    }
+
+    /// Check if bookmark XML is valid (contains an actual bookmark position)
+    ///
+    /// Windows may return XML structure for empty bookmarks like `<BookmarkList/>`
+    /// which we should NOT save as a checkpoint. A valid bookmark must contain
+    /// a `<Bookmark` element with `RecordId` attribute.
+    fn is_valid_bookmark_xml(xml: &str) -> bool {
+        // Must be non-empty and contain actual bookmark data
+        // Valid bookmark looks like: <BookmarkList><Bookmark Channel='...' RecordId='123' .../>
+        !xml.is_empty() && xml.contains("<Bookmark") && xml.contains("RecordId")
     }
 
     // XML parsing helper methods - cleaned up and more secure
@@ -1052,6 +1228,41 @@ unsafe fn extract_windows_extended_status() -> String {
     }
 }
 
+/// Update bookmark for a channel (in-memory only, fast)
+///
+/// The callback should ONLY update bookmarks, not serialize/save them.
+/// Serialization happens in a background task to avoid blocking event processing.
+///
+/// Uses RwLock for better concurrency - write lock is held only briefly for
+/// the in-memory update (< 1 microsecond), allowing concurrent reads during
+/// checkpoint serialization.
+#[cfg(windows)]
+fn update_bookmark_and_checkpoint(
+    ctx: &Arc<CallbackContext>,
+    channel: String,
+    event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
+) {
+    // ONLY update the bookmark in-memory (< 1 microsecond, no I/O)
+    // Do NOT serialize or save here - that happens in background task
+    let mut bookmarks = match ctx.bookmarks.write() {
+        Ok(guard) => guard,
+        Err(poisoned) => {
+            warn!(message = "Bookmark lock poisoned during update, recovering");
+            poisoned.into_inner()
+        }
+    };
+    if let Some(bookmark) = bookmarks.get_mut(&channel) {
+        if let Err(e) = bookmark.update(event_handle) {
+            warn!(
+                message = "Failed to update bookmark",
+                channel = %channel,
+                error = %e
+            );
+        }
+    }
+    // Lock released - event processing continues immediately
+}
+
 #[cfg(windows)]
 fn process_callback_event(
     event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
@@ -1163,6 +1374,8 @@ fn process_callback_event(
 
     // Parse the XML to extract event data
     if let Ok(Some(event)) = EventLogSubscription::parse_event_xml(xml, &channel, &ctx.config) {
+        let event_channel = event.channel.clone();
+
         if let Err(e) = ctx.event_sender.send(event) {
             // Check if the receiver has been dropped (channel closed)
             warn!(
@@ -1171,6 +1384,9 @@ fn process_callback_event(
                 channel = %channel
             );
             // Note: We continue processing other events rather than terminating the callback
+        } else {
+            // Event sent successfully - update bookmark for this channel
+            update_bookmark_and_checkpoint(ctx, event_channel, event_handle);
         }
     }
 
@@ -1765,6 +1981,219 @@ mod tests {
         assert!(
             result3_again.is_ok(),
             "Subscription 3 should remain healthy"
+        );
+    }
+
+    /// Regression test for read_existing_events=false behavior
+    ///
+    /// This test verifies that when read_existing_events=false and there's no checkpoint,
+    /// the subscription only receives NEW events (EvtSubscribeToFutureEvents), not
+    /// historical events from the beginning of the log.
+    ///
+    /// Bug fixed: Previously, we always created a BookmarkManager object, so has_bookmark
+    /// was always true. With EvtSubscribeStartAfterBookmark and an empty bookmark, Windows
+    /// starts from the oldest record, ignoring read_existing_events=false.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_read_existing_events_false_only_receives_future_events() {
+        use chrono::Utc;
+        use tokio::time::Duration;
+
+        // Create config with read_existing_events=false (the default, but be explicit)
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.read_existing_events = false; // Explicitly false - only future events
+        config.event_timeout_ms = 500; // Short timeout since we expect few/no events
+
+        // Use a fresh temp directory with NO checkpoint file
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        // Record the time BEFORE creating the subscription
+        let subscription_start_time = Utc::now();
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+            .await
+            .expect("Subscription creation should succeed");
+
+        // Give a brief moment for subscription to initialize
+        tokio::time::sleep(Duration::from_millis(100)).await;
+
+        // Try to get events - with read_existing_events=false, we should only get
+        // events that occurred AFTER the subscription was created
+        let result = subscription.next_events(100).await;
+        assert!(result.is_ok(), "Should not error: {:?}", result);
+
+        let events = result.unwrap();
+
+        // If we got any events, they should all have timestamps AFTER we created
+        // the subscription (within a reasonable tolerance for clock skew)
+        let tolerance = chrono::Duration::seconds(5);
+        let earliest_allowed = subscription_start_time - tolerance;
+
+        for event in &events {
+            assert!(
+                event.time_created >= earliest_allowed,
+                "Event timestamp {} is before subscription start time {} (minus {}s tolerance). \
+                 This suggests read_existing_events=false is not being respected and historical \
+                 events are being read. Event ID: {}, Record ID: {}",
+                event.time_created,
+                subscription_start_time,
+                tolerance.num_seconds(),
+                event.event_id,
+                event.record_id
+            );
+        }
+
+        // Note: We can't assert events.is_empty() because new events might genuinely
+        // occur during the test. The key assertion is that any events we DO receive
+        // have recent timestamps, not timestamps from days/weeks ago.
+    }
+
+    /// Regression test for read_existing_events=true behavior
+    ///
+    /// This test verifies that when read_existing_events=true and there's no checkpoint,
+    /// the subscription DOES receive historical events from the log.
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_read_existing_events_true_receives_historical_events() {
+        use chrono::Utc;
+        use tokio::time::Duration;
+
+        // Create config with read_existing_events=true
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.read_existing_events = true; // Read from beginning of log
+        config.event_timeout_ms = 2000;
+
+        // Use a fresh temp directory with NO checkpoint file
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let subscription_start_time = Utc::now();
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+            .await
+            .expect("Subscription creation should succeed");
+
+        // Give time to receive historical events
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        let result = subscription.next_events(100).await;
+        assert!(result.is_ok(), "Should not error: {:?}", result);
+
+        let events = result.unwrap();
+
+        // With read_existing_events=true, we should receive events
+        // The Application log typically has many historical events
+        assert!(
+            !events.is_empty(),
+            "With read_existing_events=true, we should receive historical events from the log"
+        );
+
+        // At least some events should have timestamps BEFORE the subscription started
+        // (proving we're reading historical events, not just future ones)
+        let has_historical = events
+            .iter()
+            .any(|e| e.time_created < subscription_start_time);
+
+        assert!(
+            has_historical,
+            "With read_existing_events=true, at least some events should be historical \
+             (timestamps before {}). Got {} events, oldest timestamp: {:?}",
+            subscription_start_time,
+            events.len(),
+            events.iter().map(|e| e.time_created).min()
+        );
+    }
+
+    /// Test that checkpoint restoration correctly uses bookmark-based resume
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_checkpoint_restoration_uses_bookmark() {
+        use tokio::time::Duration;
+
+        // Create a checkpointer and manually set a checkpoint
+        let temp_dir = tempfile::TempDir::new().unwrap();
+        let checkpointer = Arc::new(Checkpointer::new(temp_dir.path()).await.unwrap());
+
+        // Create a fake bookmark XML (this is what Windows bookmark XML looks like)
+        // Using a very high record ID to ensure we don't receive any events
+        let fake_bookmark = r#"<BookmarkList><Bookmark Channel='Application' RecordId='999999999' IsCurrent='true'/></BookmarkList>"#;
+
+        checkpointer
+            .set("Application".to_string(), fake_bookmark.to_string())
+            .await
+            .expect("Should be able to set checkpoint");
+
+        // Now create a subscription - it should use the checkpoint
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.read_existing_events = true; // Even with this true, checkpoint should take precedence
+        config.event_timeout_ms = 500;
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+            .await
+            .expect("Subscription creation should succeed");
+
+        tokio::time::sleep(Duration::from_millis(200)).await;
+
+        let result = subscription.next_events(100).await;
+        assert!(result.is_ok(), "Should not error: {:?}", result);
+
+        let events = result.unwrap();
+
+        // With a checkpoint pointing to record 999999999, we should receive very few
+        // or no events (since that record ID likely doesn't exist yet)
+        // This proves the checkpoint is being used, not read_existing_events
+        assert!(
+            events.len() < 10,
+            "With checkpoint at record 999999999, we should receive few/no events. \
+             Got {} events, suggesting checkpoint was ignored and read_existing_events=true \
+             is reading from the beginning.",
+            events.len()
+        );
+    }
+
+    /// Test bookmark XML validation logic
+    ///
+    /// This verifies that empty/invalid bookmark XML is not saved as a checkpoint,
+    /// which prevents the bug where channels with no events get "empty" bookmarks
+    /// saved, causing them to read from the beginning on restart.
+    #[test]
+    fn test_is_valid_bookmark_xml() {
+        // Valid bookmark XML (actual Windows format)
+        let valid = r#"<BookmarkList>
+  <Bookmark Channel='Application' RecordId='12345' IsCurrent='true'/>
+</BookmarkList>"#;
+        assert!(
+            EventLogSubscription::is_valid_bookmark_xml(valid),
+            "Should accept valid bookmark with RecordId"
+        );
+
+        // Empty string
+        assert!(
+            !EventLogSubscription::is_valid_bookmark_xml(""),
+            "Should reject empty string"
+        );
+
+        // Empty BookmarkList (what Windows returns for never-updated bookmark)
+        let empty_list = "<BookmarkList/>";
+        assert!(
+            !EventLogSubscription::is_valid_bookmark_xml(empty_list),
+            "Should reject empty BookmarkList"
+        );
+
+        // BookmarkList with no bookmarks
+        let empty_list2 = "<BookmarkList></BookmarkList>";
+        assert!(
+            !EventLogSubscription::is_valid_bookmark_xml(empty_list2),
+            "Should reject BookmarkList without Bookmark element"
+        );
+
+        // Bookmark without RecordId (malformed)
+        let no_record_id = "<BookmarkList><Bookmark Channel='System'/></BookmarkList>";
+        assert!(
+            !EventLogSubscription::is_valid_bookmark_xml(no_record_id),
+            "Should reject Bookmark without RecordId"
         );
     }
 }

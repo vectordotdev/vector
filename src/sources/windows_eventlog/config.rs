@@ -654,6 +654,8 @@ mod tests {
             field_filter: FieldFilter::default(),
             data_dir: PathBuf::from("/test/data"),
             events_per_second: 1000,
+            max_event_data_length: 0,
+            max_message_field_length: 0,
         };
 
         // Should serialize and deserialize without errors
