@@ -11,7 +11,7 @@ use governor::{
     state::{InMemoryState, NotKeyed},
 };
 use quick_xml::{Reader, events::Event as XmlEvent};
-use regex;
+use regex::{Regex, escape as regex_escape};
 use tokio::sync::{mpsc, watch};
 
 use super::{
@@ -769,8 +769,8 @@ impl EventLogSubscription {
     // XML parsing helper methods - cleaned up and more secure
     pub fn extract_xml_attribute(xml: &str, attr_name: &str) -> Option<String> {
         // Use regex with proper escaping to prevent injection
-        let pattern = format!(r#"{}="([^"]+)""#, regex::escape(attr_name));
-        regex::Regex::new(&pattern)
+        let pattern = format!(r#"{}="([^"]+)""#, regex_escape(attr_name));
+        Regex::new(&pattern)
             .ok()?
             .captures(xml)?
             .get(1)

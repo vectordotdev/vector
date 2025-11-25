@@ -172,7 +172,7 @@ mod config_tests {
             result
                 .unwrap_err()
                 .to_string()
-                .contains("Batch size must be greater than 0")
+                .contains("Batch size must be between 1 and")
         );
     }
 
@@ -187,7 +187,7 @@ mod config_tests {
             result
                 .unwrap_err()
                 .to_string()
-                .contains("Read limit must be greater than 0")
+                .contains("Read limit must be between 1 and")
         );
     }
 

@@ -63,7 +63,7 @@ impl WindowsEventLogSource {
         let parser = EventLogParser::new(&self.config);
 
         let events_received = register!(EventsReceived);
-        let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
+        let bytes_received = register!(BytesReceived::from(Protocol::from("windows_eventlog")));
 
         info!(
             "Starting Windows Event Log source with event-driven subscription and checkpoint persistence"
