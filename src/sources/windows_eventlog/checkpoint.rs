@@ -43,7 +43,7 @@ struct CheckpointState {
 impl Default for CheckpointState {
     fn default() -> Self {
         Self {
-            version: 1,  // Version 1: bookmark-based checkpointing
+            version: 1, // Version 1: bookmark-based checkpointing
             channels: HashMap::new(),
         }
     }

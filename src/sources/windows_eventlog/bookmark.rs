@@ -21,10 +21,10 @@
 
 use tracing::{debug, error, warn};
 use windows::{
-    core::HSTRING,
     Win32::System::EventLog::{
-        EvtCreateBookmark, EvtRender, EvtRenderBookmark, EvtUpdateBookmark, EVT_HANDLE,
+        EVT_HANDLE, EvtCreateBookmark, EvtRender, EvtRenderBookmark, EvtUpdateBookmark,
     },
+    core::HSTRING,
 };
 
 use super::error::WindowsEventLogError;
@@ -114,8 +114,7 @@ impl BookmarkManager {
     #[cfg(windows)]
     pub fn update(&mut self, event_handle: EVT_HANDLE) -> Result<(), WindowsEventLogError> {
         unsafe {
-            EvtUpdateBookmark(self.handle, event_handle)
-            .map_err(|e| {
+            EvtUpdateBookmark(self.handle, event_handle).map_err(|e| {
                 error!(message = "Failed to update bookmark", error = %e);
                 WindowsEventLogError::SubscriptionError { source: e }
             })?;
@@ -190,7 +189,10 @@ impl BookmarkManager {
             // Convert UTF-16 buffer to String
             let xml = String::from_utf16_lossy(&buffer[0..((buffer_used / 2) as usize)]);
 
-            debug!(message = "Serialized bookmark to XML", xml_length = xml.len());
+            debug!(
+                message = "Serialized bookmark to XML",
+                xml_length = xml.len()
+            );
 
             Ok(xml.trim_end_matches('\0').to_string())
         }

@@ -14,7 +14,9 @@ use quick_xml::{Reader, events::Event as XmlEvent};
 use regex;
 use tokio::sync::{mpsc, watch};
 
-use super::{bookmark::BookmarkManager, checkpoint::Checkpointer, config::WindowsEventLogConfig, error::*};
+use super::{
+    bookmark::BookmarkManager, checkpoint::Checkpointer, config::WindowsEventLogConfig, error::*,
+};
 
 /// System fields from Windows Event Log XML (Single Responsibility)
 #[derive(Debug, Clone)]
@@ -275,7 +277,10 @@ impl EventLogSubscription {
                     }
 
                     // Step 1: Copy handles while holding lock briefly (handles are just integers)
-                    let bookmark_handles: Vec<(String, windows::Win32::System::EventLog::EVT_HANDLE)> = {
+                    let bookmark_handles: Vec<(
+                        String,
+                        windows::Win32::System::EventLog::EVT_HANDLE,
+                    )> = {
                         let bookmarks = match checkpoint_saver_ctx.bookmarks.read() {
                             Ok(guard) => guard,
                             Err(poisoned) => {
@@ -294,7 +299,9 @@ impl EventLogSubscription {
                         .into_iter()
                         .filter_map(|(channel, handle)| {
                             match BookmarkManager::serialize_handle(handle) {
-                                Ok(xml) if Self::is_valid_bookmark_xml(&xml) => Some((channel, xml)),
+                                Ok(xml) if Self::is_valid_bookmark_xml(&xml) => {
+                                    Some((channel, xml))
+                                }
                                 Ok(_) => None, // Empty or invalid = bookmark not yet updated with events
                                 Err(e) => {
                                     warn!(
@@ -478,8 +485,8 @@ impl EventLogSubscription {
     ) -> Result<(), WindowsEventLogError> {
         use windows::{
             Win32::System::EventLog::{
-                EvtSubscribe, EvtSubscribeStartAfterBookmark, EvtSubscribeStartAtOldestRecord,
-                EvtSubscribeToFutureEvents, EVT_HANDLE,
+                EVT_HANDLE, EvtSubscribe, EvtSubscribeStartAfterBookmark,
+                EvtSubscribeStartAtOldestRecord, EvtSubscribeToFutureEvents,
             },
             core::HSTRING,
         };
@@ -538,7 +545,7 @@ impl EventLogSubscription {
                         None, // Signal event (we use callback instead)
                         &channel_hstring,
                         &query_hstring,
-                        bookmark_handle, // Bookmark for resume from checkpoint
+                        bookmark_handle,   // Bookmark for resume from checkpoint
                         Some(context_ptr), // Context - per-subscription context!
                         Some(event_subscription_callback), // Callback function
                         subscription_flags,
@@ -550,8 +557,8 @@ impl EventLogSubscription {
                         None, // Signal event (we use callback instead)
                         &channel_hstring,
                         &query_hstring,
-                        None, // No bookmark for fresh start
-                        Some(context_ptr), // Context - per-subscription context!
+                        None,                              // No bookmark for fresh start
+                        Some(context_ptr),                 // Context - per-subscription context!
                         Some(event_subscription_callback), // Callback function
                         subscription_flags,
                     )
@@ -1013,6 +1020,7 @@ impl EventLogSubscription {
         xml: String,
         channel: &str,
         config: &WindowsEventLogConfig,
+        pre_rendered_message: Option<String>,
     ) -> Result<Option<WindowsEvent>, WindowsEventLogError> {
         // Extract basic event information with validation
         let record_id = Self::extract_xml_attribute(&xml, "EventRecordID")
@@ -1075,13 +1083,18 @@ impl EventLogSubscription {
         // Use comprehensive parsing for complete field coverage
         let system_fields = Self::extract_system_fields(&xml);
         let event_data_result = Self::extract_event_data(&xml, config);
-        let rendered_message = Self::extract_message_from_xml(
-            &xml,
-            system_fields.event_id,
-            &system_fields.provider_name,
-            &system_fields.computer,
-            config,
-        );
+
+        // Use pre-rendered message from EvtFormatMessage if available,
+        // otherwise fall back to XML-based extraction
+        let rendered_message = pre_rendered_message.or_else(|| {
+            Self::extract_message_from_xml(
+                &xml,
+                system_fields.event_id,
+                &system_fields.provider_name,
+                &system_fields.computer,
+                config,
+            )
+        });
 
         let event = WindowsEvent {
             record_id: system_fields.record_id,
@@ -1126,6 +1139,91 @@ impl EventLogSubscription {
 }
 
 // CallbackContext cleanup is handled in SubscriptionHandle::drop via Arc::from_raw
+
+/// Format event message using Windows EvtFormatMessage API
+///
+/// This provides properly localized, parameter-substituted messages like
+/// "An account was successfully logged on" instead of raw event data.
+/// Returns None on any failure (graceful fallback to XML-based extraction).
+#[cfg(windows)]
+fn format_event_message(
+    event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
+    provider_name: &str,
+) -> Option<String> {
+    use windows::Win32::System::EventLog::{
+        EvtClose, EvtFormatMessage, EvtFormatMessageEvent, EvtOpenPublisherMetadata,
+    };
+    use windows::core::HSTRING;
+
+    const MAX_MESSAGE_SIZE: usize = 64 * 1024; // 64KB max for messages
+
+    // Open publisher metadata to get message templates
+    let provider_hstring = HSTRING::from(provider_name);
+    let metadata_handle = unsafe {
+        match EvtOpenPublisherMetadata(None, &provider_hstring, None, 0, 0) {
+            Ok(handle) => handle,
+            Err(_) => return None, // Provider not found - graceful fallback
+        }
+    };
+
+    // Two-pass buffer allocation for EvtFormatMessage
+    // First call with None buffer to get required size
+    let mut buffer_used: u32 = 0;
+    let _ = unsafe {
+        EvtFormatMessage(
+            metadata_handle,
+            event_handle,
+            0,
+            None,
+            EvtFormatMessageEvent.0,
+            None,
+            &mut buffer_used,
+        )
+    };
+
+    // Check if we got a valid size
+    if buffer_used == 0 || buffer_used as usize > MAX_MESSAGE_SIZE {
+        unsafe {
+            let _ = EvtClose(metadata_handle);
+        }
+        return None;
+    }
+
+    // Allocate buffer and get the formatted message
+    let mut buffer = vec![0u16; buffer_used as usize];
+    let mut actual_used: u32 = 0;
+
+    let result = unsafe {
+        EvtFormatMessage(
+            metadata_handle,
+            event_handle,
+            0,
+            None,
+            EvtFormatMessageEvent.0,
+            Some(&mut buffer),
+            &mut actual_used,
+        )
+    };
+
+    // Close metadata handle regardless of result
+    unsafe {
+        let _ = EvtClose(metadata_handle);
+    }
+
+    if result.is_err() {
+        return None;
+    }
+
+    // Convert UTF-16 to String, trimming null terminator
+    let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+    let message = String::from_utf16_lossy(&buffer[..len]);
+
+    if message.is_empty() {
+        None
+    } else {
+        Some(message)
+    }
+}
 
 // Windows Event Log subscription callback function
 #[cfg(windows)]
@@ -1372,8 +1470,16 @@ fn process_callback_event(
     let channel = EventLogSubscription::extract_xml_value(&xml, "Channel")
         .unwrap_or_else(|| "Unknown".to_string());
 
+    // Extract provider name and get properly formatted message via EvtFormatMessage
+    let provider_name = EventLogSubscription::extract_provider_name(&xml);
+    let rendered_message = provider_name
+        .as_ref()
+        .and_then(|name| format_event_message(event_handle, name));
+
     // Parse the XML to extract event data
-    if let Ok(Some(event)) = EventLogSubscription::parse_event_xml(xml, &channel, &ctx.config) {
+    if let Ok(Some(event)) =
+        EventLogSubscription::parse_event_xml(xml, &channel, &ctx.config, rendered_message)
+    {
         let event_channel = event.channel.clone();
 
         if let Err(e) = ctx.event_sender.send(event) {
@@ -2194,6 +2300,126 @@ mod tests {
         assert!(
             !EventLogSubscription::is_valid_bookmark_xml(no_record_id),
             "Should reject Bookmark without RecordId"
+        );
+    }
+
+    /// Test that parse_event_xml uses pre-rendered message when provided
+    #[test]
+    fn test_parse_event_xml_uses_pre_rendered_message() {
+        let xml = r#"
+        <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+            <System>
+                <Provider Name="TestProvider"/>
+                <EventID>1000</EventID>
+                <Level>4</Level>
+                <EventRecordID>12345</EventRecordID>
+                <TimeCreated SystemTime="2025-01-01T00:00:00.000000Z"/>
+                <Channel>Application</Channel>
+                <Computer>TEST-PC</Computer>
+            </System>
+        </Event>
+        "#;
+
+        let config = WindowsEventLogConfig::default();
+        let pre_rendered = Some("Pre-rendered message from EvtFormatMessage".to_string());
+
+        let result = EventLogSubscription::parse_event_xml(
+            xml.to_string(),
+            "Application",
+            &config,
+            pre_rendered,
+        );
+
+        let event = result.unwrap().unwrap();
+        assert_eq!(
+            event.rendered_message,
+            Some("Pre-rendered message from EvtFormatMessage".to_string()),
+            "Should use pre-rendered message when provided"
+        );
+    }
+
+    /// Test that parse_event_xml falls back to XML extraction when no pre-rendered message
+    #[test]
+    fn test_parse_event_xml_fallback_without_pre_rendered() {
+        let xml = r#"
+        <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+            <System>
+                <Provider Name="TestProvider"/>
+                <EventID>1000</EventID>
+                <Level>4</Level>
+                <EventRecordID>12345</EventRecordID>
+                <TimeCreated SystemTime="2025-01-01T00:00:00.000000Z"/>
+                <Channel>Application</Channel>
+                <Computer>TEST-PC</Computer>
+            </System>
+        </Event>
+        "#;
+
+        let config = WindowsEventLogConfig::default();
+
+        let result =
+            EventLogSubscription::parse_event_xml(xml.to_string(), "Application", &config, None);
+
+        let event = result.unwrap().unwrap();
+        assert!(
+            event.rendered_message.is_some(),
+            "Should fall back to XML-based message extraction"
+        );
+        assert!(
+            event.rendered_message.as_ref().unwrap().contains("1000"),
+            "Fallback message should contain event ID"
+        );
+    }
+
+    /// Integration test: Verify EvtFormatMessage produces meaningful messages
+    /// for real Windows events (Application channel typically has events)
+    #[cfg(windows)]
+    #[tokio::test]
+    async fn test_evt_format_message_produces_real_messages() {
+        use tokio::time::Duration;
+
+        let mut config = WindowsEventLogConfig::default();
+        config.channels = vec!["Application".to_string()];
+        config.read_existing_events = true; // Read historical events
+        config.event_timeout_ms = 2000;
+
+        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
+
+        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+            .await
+            .expect("Subscription should succeed");
+
+        tokio::time::sleep(Duration::from_millis(500)).await;
+
+        let result = subscription.next_events(50).await;
+        assert!(result.is_ok(), "Should get events: {:?}", result);
+
+        let events = result.unwrap();
+        if events.is_empty() {
+            // Skip test if no events available (unlikely but possible)
+            return;
+        }
+
+        // Check that at least some events have properly formatted messages
+        // (not just "Event ID X from Y on Z" fallback pattern)
+        let has_formatted_message = events.iter().any(|e| {
+            e.rendered_message
+                .as_ref()
+                .map(|msg| {
+                    // Formatted messages typically don't follow our fallback pattern
+                    !msg.starts_with("Event ID ")
+                })
+                .unwrap_or(false)
+        });
+
+        // Note: This assertion may fail if all events come from providers
+        // without message tables, which is rare but possible
+        assert!(
+            has_formatted_message,
+            "Expected at least some events to have EvtFormatMessage-rendered messages. \
+             Got {} events, all with fallback messages. This may indicate EvtFormatMessage \
+             is not working correctly.",
+            events.len()
         );
     }
 }

@@ -439,7 +439,7 @@ byteorder = "1.5.0"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.8.0"
-windows = { version = "0.58", features = ["Win32_System_EventLog", "Win32_Foundation", "Win32_System_Com"], optional = true }
+windows = { version = "0.58", features = ["Win32_System_EventLog", "Win32_Foundation", "Win32_System_Com", "Win32_Security"], optional = true }
 quick-xml = { version = "0.31", default-features = false, features = ["serialize"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
