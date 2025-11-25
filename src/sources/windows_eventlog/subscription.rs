@@ -21,6 +21,8 @@ use super::{
     error::*,
 };
 
+use crate::internal_events::{WindowsEventLogBookmarkError, WindowsEventLogSubscriptionError};
+
 /// System fields from Windows Event Log XML (Single Responsibility)
 #[derive(Debug, Clone)]
 struct SystemFields {
@@ -314,11 +316,10 @@ impl EventLogSubscription {
                                 }
                                 Ok(_) => None, // Empty or invalid = bookmark not yet updated with events
                                 Err(e) => {
-                                    warn!(
-                                        message = "Failed to serialize bookmark",
-                                        channel = %channel,
-                                        error = %e
-                                    );
+                                    emit!(WindowsEventLogBookmarkError {
+                                        channel: channel.clone(),
+                                        error: e.to_string(),
+                                    });
                                     None
                                 }
                             }
@@ -389,11 +390,10 @@ impl EventLogSubscription {
                     Ok(xml) if Self::is_valid_bookmark_xml(&xml) => Some((channel, xml)),
                     Ok(_) => None, // Empty or invalid = bookmark not yet updated
                     Err(e) => {
-                        warn!(
-                            message = "Failed to serialize bookmark for flushing",
-                            channel = %channel,
-                            error = %e
-                        );
+                        emit!(WindowsEventLogBookmarkError {
+                            channel: channel.clone(),
+                            error: e.to_string(),
+                        });
                         None
                     }
                 }
@@ -1456,10 +1456,11 @@ unsafe extern "system" fn event_subscription_callback(
             // Extract the actual Windows error using EvtGetExtendedStatus
             let error_message = unsafe { extract_windows_extended_status() };
 
-            error!(
-                message = "Windows Event Log subscription error - subscription will be terminated",
-                error = %error_message
-            );
+            // Emit internal event for metrics
+            emit!(WindowsEventLogSubscriptionError {
+                error: error_message.clone(),
+                channels: ctx.config.channels.clone(),
+            });
 
             // Store the error in the shared state so next_events() can retrieve it
             let mut error_state = ctx.subscription_error.lock().unwrap();
@@ -1545,11 +1546,10 @@ fn update_bookmark_and_checkpoint(
     };
     if let Some(bookmark) = bookmarks.get_mut(&channel) {
         if let Err(e) = bookmark.update(event_handle) {
-            warn!(
-                message = "Failed to update bookmark",
-                channel = %channel,
-                error = %e
-            );
+            emit!(WindowsEventLogBookmarkError {
+                channel: channel.clone(),
+                error: e.to_string(),
+            });
         }
     }
     // Lock released - event processing continues immediately

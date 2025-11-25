@@ -11,7 +11,9 @@ use vrl::value::Kind;
 use crate::{
     SourceSender,
     config::{DataType, SourceConfig, SourceContext, SourceOutput},
-    internal_events::{EventsReceived, StreamClosedError},
+    internal_events::{
+        EventsReceived, StreamClosedError, WindowsEventLogParseError, WindowsEventLogQueryError,
+    },
     shutdown::ShutdownSignal,
 };
 
@@ -98,6 +100,8 @@ impl WindowsEventLogSource {
                             let mut total_byte_size = 0;
 
                             for event in events {
+                                let channel = event.channel.clone();
+                                let event_id = event.event_id;
                                 match parser.parse_event(event) {
                                     Ok(log_event) => {
                                         let byte_size = log_event.estimated_json_encoded_size_of();
@@ -105,11 +109,11 @@ impl WindowsEventLogSource {
                                         log_events.push(log_event);
                                     }
                                     Err(e) => {
-                                        warn!(
-                                            message = "Failed to parse Windows event",
-                                            error = %e,
-                                            internal_log_rate_limit = true
-                                        );
+                                        emit!(WindowsEventLogParseError {
+                                            error: e.to_string(),
+                                            channel,
+                                            event_id: Some(event_id),
+                                        });
                                     }
                                 }
                             }
@@ -126,11 +130,11 @@ impl WindowsEventLogSource {
                             }
                         }
                         Err(e) => {
-                            error!(
-                                message = "Error receiving Windows Event Log events",
-                                error = %e,
-                                internal_log_rate_limit = true
-                            );
+                            emit!(WindowsEventLogQueryError {
+                                channel: "all".to_string(),
+                                query: None,
+                                error: e.to_string(),
+                            });
                         }
                     }
                 }
