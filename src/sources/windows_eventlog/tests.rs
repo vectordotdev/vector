@@ -31,6 +31,7 @@ fn create_test_config() -> WindowsEventLogConfig {
         events_per_second: 0,
         max_event_data_length: 0,
         max_message_field_length: 0,
+        acknowledgements: Default::default(),
     }
 }
 
@@ -1137,5 +1138,107 @@ mod fault_tolerance_tests {
                 "Malicious XML should be limited in processing"
             );
         }
+    }
+}
+
+// ================================================================================================
+// ACKNOWLEDGMENT TESTS
+// ================================================================================================
+
+#[cfg(test)]
+mod acknowledgement_tests {
+    use super::*;
+    use crate::config::SourceAcknowledgementsConfig;
+
+    #[test]
+    fn test_acknowledgements_config_default_disabled() {
+        let config = WindowsEventLogConfig::default();
+        // Acknowledgements should be disabled by default
+        assert!(
+            !config.acknowledgements.enabled(),
+            "Acknowledgements should be disabled by default"
+        );
+    }
+
+    #[test]
+    fn test_acknowledgements_config_enabled() {
+        let mut config = create_test_config();
+        config.acknowledgements = SourceAcknowledgementsConfig::from(true);
+        assert!(
+            config.acknowledgements.enabled(),
+            "Acknowledgements should be enabled when configured"
+        );
+    }
+
+    #[test]
+    fn test_can_acknowledge_returns_true() {
+        use crate::config::SourceConfig;
+        let config = WindowsEventLogConfig::default();
+        assert!(
+            config.can_acknowledge(),
+            "can_acknowledge() should return true to support acknowledgements"
+        );
+    }
+
+    #[test]
+    fn test_acknowledgements_config_serialization() {
+        // Test that acknowledgements config serializes correctly
+        let config = WindowsEventLogConfig {
+            acknowledgements: SourceAcknowledgementsConfig::from(true),
+            ..Default::default()
+        };
+
+        let serialized = serde_json::to_string(&config).expect("serialization should succeed");
+        assert!(
+            serialized.contains("acknowledgements"),
+            "Serialized config should contain acknowledgements field"
+        );
+
+        // Test deserialization
+        let deserialized: WindowsEventLogConfig =
+            serde_json::from_str(&serialized).expect("deserialization should succeed");
+        assert!(
+            deserialized.acknowledgements.enabled(),
+            "Acknowledgements should be enabled after deserialization"
+        );
+    }
+
+    #[test]
+    fn test_acknowledgements_toml_parsing() {
+        // Test parsing from TOML with acknowledgements enabled
+        let toml_with_acks = r#"
+            channels = ["System"]
+            acknowledgements = true
+        "#;
+        let config: WindowsEventLogConfig =
+            toml::from_str(toml_with_acks).expect("TOML parsing should succeed");
+        assert!(
+            config.acknowledgements.enabled(),
+            "Acknowledgements should be enabled from TOML"
+        );
+
+        // Test parsing with acknowledgements as struct
+        let toml_with_acks_struct = r#"
+            channels = ["System"]
+            [acknowledgements]
+            enabled = true
+        "#;
+        let config: WindowsEventLogConfig =
+            toml::from_str(toml_with_acks_struct).expect("TOML parsing should succeed");
+        assert!(
+            config.acknowledgements.enabled(),
+            "Acknowledgements should be enabled from TOML struct"
+        );
+
+        // Test parsing without acknowledgements (default)
+        let toml_without_acks = r#"
+            channels = ["System"]
+        "#;
+        let config: WindowsEventLogConfig =
+            toml::from_str(toml_without_acks).expect("TOML parsing should succeed");
+        assert!(
+            !config.acknowledgements.enabled(),
+            "Acknowledgements should be disabled by default"
+        );
     }
 }

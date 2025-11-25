@@ -419,6 +419,33 @@ impl EventLogSubscription {
         Ok(())
     }
 
+    /// Get the current bookmark XML for a specific channel.
+    ///
+    /// This is used for acknowledgment-based checkpointing where the bookmark
+    /// state needs to be captured when events are read (not when they're acknowledged).
+    /// Returns None if the channel has no valid bookmark yet.
+    #[cfg(windows)]
+    pub fn get_bookmark_xml(&self, channel: &str) -> Option<String> {
+        let bookmarks = match self.callback_context.bookmarks.read() {
+            Ok(guard) => guard,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+
+        bookmarks.get(channel).and_then(|bookmark| {
+            let handle = bookmark.as_handle();
+            match BookmarkManager::serialize_handle(handle) {
+                Ok(xml) if Self::is_valid_bookmark_xml(&xml) => Some(xml),
+                _ => None,
+            }
+        })
+    }
+
+    /// Get the current bookmark XML for a specific channel (non-Windows stub).
+    #[cfg(not(windows))]
+    pub fn get_bookmark_xml(&self, _channel: &str) -> Option<String> {
+        None
+    }
+
     /// Get the next batch of events from the subscription
     pub async fn next_events(
         &mut self,

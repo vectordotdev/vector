@@ -3,6 +3,8 @@ use std::{collections::HashMap, path::PathBuf};
 use vector_config::component::GenerateConfig;
 use vector_lib::configurable::configurable_component;
 
+use crate::{config::SourceAcknowledgementsConfig, serde::bool_or_struct};
+
 // Validation constants
 const MAX_CHANNEL_NAME_LENGTH: usize = 256;
 const MAX_XPATH_QUERY_LENGTH: usize = 4096;
@@ -164,6 +166,20 @@ pub struct WindowsEventLogConfig {
     #[configurable(metadata(docs::examples = 256))]
     #[configurable(metadata(docs::examples = 1024))]
     pub max_message_field_length: usize,
+
+    /// Controls how acknowledgements are handled for this source.
+    ///
+    /// When enabled, the source will wait for downstream sinks to acknowledge
+    /// receipt of events before updating checkpoints. This provides exactly-once
+    /// delivery guarantees at the cost of potential duplicate events on restart
+    /// if acknowledgements are pending.
+    ///
+    /// When disabled (default), checkpoints are updated immediately after reading
+    /// events, which may result in data loss if Vector crashes before events are
+    /// delivered to sinks.
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "bool_or_struct")]
+    pub acknowledgements: SourceAcknowledgementsConfig,
 }
 
 /// Event data formatting options for custom field type conversion.
@@ -254,6 +270,7 @@ impl Default for WindowsEventLogConfig {
             events_per_second: default_events_per_second(),
             max_event_data_length: default_max_event_data_length(),
             max_message_field_length: default_max_message_field_length(),
+            acknowledgements: Default::default(),
         }
     }
 }
@@ -631,6 +648,7 @@ mod tests {
             events_per_second: 1000,
             max_event_data_length: 0,
             max_message_field_length: 0,
+            acknowledgements: SourceAcknowledgementsConfig::from(true),
         };
 
         // Should serialize and deserialize without errors

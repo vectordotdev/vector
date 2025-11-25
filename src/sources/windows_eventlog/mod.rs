@@ -2,7 +2,9 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use async_trait::async_trait;
+use futures::StreamExt;
 use tokio::select;
+use vector_lib::finalizer::OrderedFinalizer;
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
@@ -12,6 +14,7 @@ use vrl::value::Kind;
 use crate::{
     SourceSender,
     config::{DataType, SourceConfig, SourceContext, SourceOutput},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver},
     internal_events::{
         EventsReceived, StreamClosedError, WindowsEventLogParseError, WindowsEventLogQueryError,
     },
@@ -39,27 +42,149 @@ use self::{
     subscription::EventLogSubscription,
 };
 
+/// Entry for the acknowledgment finalizer containing checkpoint information.
+/// Each entry represents a batch of events that need to be acknowledged before
+/// the checkpoint can be safely updated.
+#[derive(Debug, Clone)]
+struct FinalizerEntry {
+    /// Channel name for the checkpoint
+    channel: String,
+    /// Windows bookmark XML for position tracking
+    bookmark_xml: String,
+}
+
+/// Shared checkpointer type for use with the finalizer
+type SharedCheckpointer = Arc<Checkpointer>;
+
+/// Finalizer for handling acknowledgments.
+/// Supports both synchronous (immediate checkpoint) and asynchronous (deferred checkpoint) modes.
+enum Finalizer {
+    /// Synchronous mode: checkpoints are updated immediately after reading events.
+    /// Used when acknowledgements are disabled.
+    Sync(SharedCheckpointer),
+    /// Asynchronous mode: checkpoints are updated only after downstream sinks acknowledge receipt.
+    /// Used when acknowledgements are enabled.
+    Async(OrderedFinalizer<FinalizerEntry>),
+}
+
+impl Finalizer {
+    /// Create a new finalizer based on acknowledgement configuration.
+    fn new(
+        acknowledgements: bool,
+        checkpointer: SharedCheckpointer,
+        shutdown: ShutdownSignal,
+    ) -> Self {
+        if acknowledgements {
+            let (finalizer, mut ack_stream) = OrderedFinalizer::new(Some(shutdown.clone()));
+
+            // Spawn background task to process acknowledgments and update checkpoints
+            tokio::spawn(async move {
+                while let Some((status, entry)) = ack_stream.next().await {
+                    if status == BatchStatus::Delivered {
+                        // Only update checkpoint on successful delivery
+                        if let Err(e) = checkpointer
+                            .set_batch(vec![(entry.channel.clone(), entry.bookmark_xml.clone())])
+                            .await
+                        {
+                            warn!(
+                                message = "Failed to update checkpoint after acknowledgement",
+                                channel = %entry.channel,
+                                error = %e
+                            );
+                        } else {
+                            debug!(
+                                message = "Checkpoint updated after acknowledgement",
+                                channel = %entry.channel
+                            );
+                        }
+                    } else {
+                        debug!(
+                            message = "Events not delivered, checkpoint not updated",
+                            channel = %entry.channel,
+                            status = ?status
+                        );
+                    }
+                }
+                debug!("Acknowledgement stream completed");
+            });
+
+            Self::Async(finalizer)
+        } else {
+            Self::Sync(checkpointer)
+        }
+    }
+
+    /// Finalize a batch of events.
+    /// In sync mode, immediately updates the checkpoint.
+    /// In async mode, registers the entry for deferred checkpoint update.
+    async fn finalize(&self, entry: FinalizerEntry, receiver: Option<BatchStatusReceiver>) {
+        match (self, receiver) {
+            (Self::Sync(checkpointer), None) => {
+                // Immediate checkpoint update (no acks)
+                if let Err(e) = checkpointer
+                    .set_batch(vec![(entry.channel.clone(), entry.bookmark_xml.clone())])
+                    .await
+                {
+                    warn!(
+                        message = "Failed to update checkpoint",
+                        channel = %entry.channel,
+                        error = %e
+                    );
+                }
+            }
+            (Self::Async(finalizer), Some(receiver)) => {
+                // Deferred checkpoint update (with acks)
+                finalizer.add(entry, receiver);
+            }
+            (Self::Sync(_), Some(_)) => {
+                // This shouldn't happen - acks enabled but sync mode
+                warn!("Received acknowledgement receiver in sync mode, ignoring");
+            }
+            (Self::Async(_), None) => {
+                // This shouldn't happen - async mode but no receiver
+                warn!("No acknowledgement receiver in async mode, checkpoint may be lost");
+            }
+        }
+    }
+}
+
 /// Windows Event Log source implementation
 pub struct WindowsEventLogSource {
     config: WindowsEventLogConfig,
     data_dir: PathBuf,
+    acknowledgements: bool,
 }
 
 impl WindowsEventLogSource {
-    pub fn new(config: WindowsEventLogConfig, data_dir: PathBuf) -> crate::Result<Self> {
+    pub fn new(
+        config: WindowsEventLogConfig,
+        data_dir: PathBuf,
+        acknowledgements: bool,
+    ) -> crate::Result<Self> {
         // Validate configuration
         config.validate()?;
 
-        Ok(Self { config, data_dir })
+        Ok(Self {
+            config,
+            data_dir,
+            acknowledgements,
+        })
     }
 
     async fn run_internal(
         &mut self,
         mut out: SourceSender,
-        mut shutdown: ShutdownSignal,
+        shutdown: ShutdownSignal,
     ) -> Result<(), WindowsEventLogError> {
         // Initialize checkpointer for state persistence
         let checkpointer = Arc::new(Checkpointer::new(&self.data_dir).await?);
+
+        // Create finalizer based on acknowledgement configuration
+        let finalizer = Finalizer::new(
+            self.acknowledgements,
+            Arc::clone(&checkpointer),
+            shutdown.clone(),
+        );
 
         let mut subscription =
             EventLogSubscription::new(&self.config, Arc::clone(&checkpointer)).await?;
@@ -69,18 +194,23 @@ impl WindowsEventLogSource {
         let bytes_received = register!(BytesReceived::from(Protocol::from("windows_eventlog")));
 
         info!(
-            "Starting Windows Event Log source with event-driven subscription and checkpoint persistence"
+            message = "Starting Windows Event Log source",
+            acknowledgements = self.acknowledgements,
         );
 
+        let mut shutdown = shutdown;
         loop {
             select! {
                 _ = &mut shutdown => {
                     info!("Windows Event Log source received shutdown signal");
                     #[cfg(windows)]
                     {
-                        info!("Flushing bookmarks before shutdown");
-                        if let Err(e) = subscription.flush_bookmarks().await {
-                            warn!("Failed to flush bookmarks on shutdown: {}", e);
+                        // Only flush bookmarks in sync mode - async mode handles via finalizer
+                        if !self.acknowledgements {
+                            info!("Flushing bookmarks before shutdown");
+                            if let Err(e) = subscription.flush_bookmarks().await {
+                                warn!("Failed to flush bookmarks on shutdown: {}", e);
+                            }
                         }
                     }
                     break;
@@ -99,16 +229,28 @@ impl WindowsEventLogSource {
                                 event_count = events.len()
                             );
 
+                            // Create batch notifier for acknowledgement tracking
+                            let (batch, receiver) =
+                                BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
+
                             let mut log_events = Vec::new();
                             let mut total_byte_size = 0;
+                            let mut channels_in_batch = std::collections::HashSet::new();
 
                             for event in events {
                                 let channel = event.channel.clone();
+                                channels_in_batch.insert(channel.clone());
                                 let event_id = event.event_id;
                                 match parser.parse_event(event) {
-                                    Ok(log_event) => {
+                                    Ok(mut log_event) => {
                                         let byte_size = log_event.estimated_json_encoded_size_of();
                                         total_byte_size += byte_size.get();
+
+                                        // Attach batch notifier to event for acknowledgement tracking
+                                        if let Some(ref batch) = batch {
+                                            log_event = log_event.with_batch_notifier(batch);
+                                        }
+
                                         log_events.push(log_event);
                                     }
                                     Err(e) => {
@@ -129,6 +271,18 @@ impl WindowsEventLogSource {
                                 if let Err(_error) = out.send_batch(log_events).await {
                                     emit!(StreamClosedError { count });
                                     break;
+                                }
+
+                                // Register checkpoint entries with finalizer
+                                // For each channel in the batch, capture current bookmark state
+                                for channel in channels_in_batch {
+                                    if let Some(bookmark_xml) = subscription.get_bookmark_xml(&channel) {
+                                        let entry = FinalizerEntry {
+                                            channel,
+                                            bookmark_xml,
+                                        };
+                                        finalizer.finalize(entry, receiver.clone()).await;
+                                    }
                                 }
                             }
                         }
@@ -157,7 +311,10 @@ impl SourceConfig for WindowsEventLogConfig {
             .globals
             .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
 
-        let source = WindowsEventLogSource::new(self.clone(), data_dir)?;
+        // Check if acknowledgements are enabled (merges source and global config)
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+
+        let source = WindowsEventLogSource::new(self.clone(), data_dir, acknowledgements)?;
         Ok(Box::pin(async move {
             let mut source = source;
             if let Err(error) = source.run_internal(cx.out, cx.shutdown).await {
@@ -221,7 +378,7 @@ impl SourceConfig for WindowsEventLogConfig {
     }
 
     fn can_acknowledge(&self) -> bool {
-        false
+        true
     }
 }
 
