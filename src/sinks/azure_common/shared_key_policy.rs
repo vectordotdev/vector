@@ -94,6 +94,9 @@ impl SharedKeyAuthorizationPolicy {
         s.push_str(method);
         s.push('\n');
 
+        // Newline characters for empty headers
+        // https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key
+
         // Content-Encoding
         s.push('\n');
         // Content-Language
