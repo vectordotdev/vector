@@ -177,8 +177,12 @@ impl WindowsEventLogSource {
             shutdown.clone(),
         );
 
-        let mut subscription =
-            EventLogSubscription::new(&self.config, Arc::clone(&checkpointer)).await?;
+        let mut subscription = EventLogSubscription::new(
+            &self.config,
+            Arc::clone(&checkpointer),
+            self.acknowledgements,
+        )
+        .await?;
         let parser = EventLogParser::new(&self.config);
 
         let events_received = register!(EventsReceived);

@@ -18,10 +18,7 @@ use regex::{Regex, escape as regex_escape};
 use tokio::sync::{mpsc, watch};
 
 use super::{
-    bookmark::BookmarkManager,
-    checkpoint::Checkpointer,
-    config::WindowsEventLogConfig,
-    error::*,
+    bookmark::BookmarkManager, checkpoint::Checkpointer, config::WindowsEventLogConfig, error::*,
 };
 
 use crate::internal_events::{WindowsEventLogBookmarkError, WindowsEventLogSubscriptionError};
@@ -210,9 +207,17 @@ impl CallbackContext {
 
 impl EventLogSubscription {
     /// Create a new event-driven subscription using EvtSubscribe with callback
+    ///
+    /// # Arguments
+    /// * `config` - Configuration for the Windows Event Log source
+    /// * `checkpointer` - Shared checkpointer for persisting bookmarks
+    /// * `acknowledgements` - Whether end-to-end acknowledgements are enabled.
+    ///   When true, the background checkpoint saver is disabled because checkpoints
+    ///   are managed by the finalizer after sink acknowledgement.
     pub async fn new(
         config: &WindowsEventLogConfig,
         checkpointer: Arc<Checkpointer>,
+        acknowledgements: bool,
     ) -> Result<Self, WindowsEventLogError> {
         // Create rate limiter if configured
         let rate_limiter = if config.events_per_second > 0 {
@@ -290,75 +295,83 @@ impl EventLogSubscription {
 
             // Start background task to periodically save bookmarks (every 5 seconds)
             // This avoids blocking event processing with serialization/I/O
-            let checkpoint_saver_ctx = Arc::clone(&callback_context);
-            let mut shutdown_rx_clone = shutdown_rx.clone();
-            tokio::spawn(async move {
-                debug!(message = "Checkpoint saver background task started");
-                let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
-                loop {
-                    // Wait for either interval tick or shutdown signal
-                    tokio::select! {
-                        _ = interval.tick() => {}
-                        _ = shutdown_rx_clone.changed() => {
-                            debug!(message = "Checkpoint saver task received shutdown signal");
-                            break;
+            //
+            // IMPORTANT: Only run this when acknowledgements are DISABLED.
+            // When acks are enabled, checkpoints are managed by the Finalizer
+            // which only updates after the sink confirms delivery.
+            if !acknowledgements {
+                let checkpoint_saver_ctx = Arc::clone(&callback_context);
+                let mut shutdown_rx_clone = shutdown_rx.clone();
+                tokio::spawn(async move {
+                    debug!(message = "Checkpoint saver background task started (acks disabled)");
+                    let mut interval = tokio::time::interval(tokio::time::Duration::from_secs(5));
+                    loop {
+                        // Wait for either interval tick or shutdown signal
+                        tokio::select! {
+                            _ = interval.tick() => {}
+                            _ = shutdown_rx_clone.changed() => {
+                                debug!(message = "Checkpoint saver task received shutdown signal");
+                                break;
+                            }
+                        }
+
+                        // Step 1: Copy handles while holding lock briefly (handles are just integers)
+                        let bookmark_handles: Vec<(
+                            String,
+                            windows::Win32::System::EventLog::EVT_HANDLE,
+                        )> = {
+                            let bookmarks = match checkpoint_saver_ctx.bookmarks.read() {
+                                Ok(guard) => guard,
+                                Err(poisoned) => {
+                                    warn!(message = "Bookmark lock poisoned, recovering");
+                                    poisoned.into_inner()
+                                }
+                            };
+                            bookmarks
+                                .iter()
+                                .map(|(channel, bookmark)| (channel.clone(), bookmark.as_handle()))
+                                .collect()
+                        }; // Lock released IMMEDIATELY
+
+                        // Step 2: Serialize handles OUTSIDE the lock (slow Windows API calls)
+                        let bookmark_xmls: Vec<(String, String)> = bookmark_handles
+                            .into_iter()
+                            .filter_map(|(channel, handle)| {
+                                match BookmarkManager::serialize_handle(handle) {
+                                    Ok(xml) if Self::is_valid_bookmark_xml(&xml) => {
+                                        Some((channel, xml))
+                                    }
+                                    Ok(_) => None, // Empty or invalid = bookmark not yet updated with events
+                                    Err(e) => {
+                                        emit!(WindowsEventLogBookmarkError {
+                                            channel: channel.clone(),
+                                            error: e.to_string(),
+                                        });
+                                        None
+                                    }
+                                }
+                            })
+                            .collect();
+
+                        // Save all checkpoints in a single batched disk write (no locks held)
+                        if !bookmark_xmls.is_empty() {
+                            if let Err(e) = checkpoint_saver_ctx
+                                .checkpointer()
+                                .set_batch(bookmark_xmls)
+                                .await
+                            {
+                                error!(
+                                    message = "Failed to save bookmark checkpoints",
+                                    error = %e
+                                );
+                            }
                         }
                     }
-
-                    // Step 1: Copy handles while holding lock briefly (handles are just integers)
-                    let bookmark_handles: Vec<(
-                        String,
-                        windows::Win32::System::EventLog::EVT_HANDLE,
-                    )> = {
-                        let bookmarks = match checkpoint_saver_ctx.bookmarks.read() {
-                            Ok(guard) => guard,
-                            Err(poisoned) => {
-                                warn!(message = "Bookmark lock poisoned, recovering");
-                                poisoned.into_inner()
-                            }
-                        };
-                        bookmarks
-                            .iter()
-                            .map(|(channel, bookmark)| (channel.clone(), bookmark.as_handle()))
-                            .collect()
-                    }; // Lock released IMMEDIATELY
-
-                    // Step 2: Serialize handles OUTSIDE the lock (slow Windows API calls)
-                    let bookmark_xmls: Vec<(String, String)> = bookmark_handles
-                        .into_iter()
-                        .filter_map(|(channel, handle)| {
-                            match BookmarkManager::serialize_handle(handle) {
-                                Ok(xml) if Self::is_valid_bookmark_xml(&xml) => {
-                                    Some((channel, xml))
-                                }
-                                Ok(_) => None, // Empty or invalid = bookmark not yet updated with events
-                                Err(e) => {
-                                    emit!(WindowsEventLogBookmarkError {
-                                        channel: channel.clone(),
-                                        error: e.to_string(),
-                                    });
-                                    None
-                                }
-                            }
-                        })
-                        .collect();
-
-                    // Save all checkpoints in a single batched disk write (no locks held)
-                    if !bookmark_xmls.is_empty() {
-                        if let Err(e) = checkpoint_saver_ctx
-                            .checkpointer()
-                            .set_batch(bookmark_xmls)
-                            .await
-                        {
-                            error!(
-                                message = "Failed to save bookmark checkpoints",
-                                error = %e
-                            );
-                        }
-                    }
-                }
-                debug!(message = "Checkpoint saver task terminated");
-            });
+                    debug!(message = "Checkpoint saver task terminated");
+                });
+            } else {
+                debug!(message = "Background checkpoint saver disabled (acks enabled)");
+            }
 
             Ok(Self {
                 config,
@@ -1073,7 +1086,9 @@ impl EventLogSubscription {
                     if !data_summary.is_empty() {
                         return Some(format!(
                             "Event ID {} from {} ({})",
-                            event_id, provider_name, data_summary.join(", ")
+                            event_id,
+                            provider_name,
+                            data_summary.join(", ")
                         ));
                     }
                 }
@@ -1467,9 +1482,7 @@ fn process_callback_event(
         .unwrap_or_else(|| "Unknown".to_string());
 
     // Parse the XML to extract event data
-    if let Ok(Some(event)) =
-        EventLogSubscription::parse_event_xml(xml, &channel, &ctx.config)
-    {
+    if let Ok(Some(event)) = EventLogSubscription::parse_event_xml(xml, &channel, &ctx.config) {
         let event_channel = event.channel.clone();
 
         if let Err(e) = ctx.event_sender.send(event) {
@@ -1641,7 +1654,7 @@ mod tests {
     async fn test_not_supported_error() {
         let config = WindowsEventLogConfig::default();
         let (checkpointer, _temp_dir) = create_test_checkpointer().await;
-        let result = EventLogSubscription::new(&config, checkpointer).await;
+        let result = EventLogSubscription::new(&config, checkpointer, false).await;
 
         assert!(matches!(
             result,
@@ -1674,7 +1687,7 @@ mod tests {
 
         let (checkpointer, _temp_dir) = create_test_checkpointer().await;
 
-        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
             .await
             .expect("Subscription creation should succeed");
 
@@ -1824,7 +1837,7 @@ mod tests {
         let (checkpointer, _temp_dir) = create_test_checkpointer().await;
 
         // Create subscription - should succeed initially as EvtSubscribe doesn't validate query syntax
-        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
             .await
             .expect("Subscription creation should succeed");
 
@@ -1866,7 +1879,7 @@ mod tests {
 
         let (checkpointer, _temp_dir) = create_test_checkpointer().await;
 
-        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
             .await
             .expect("Subscription creation should succeed");
 
@@ -1899,7 +1912,7 @@ mod tests {
 
         let (checkpointer, _temp_dir) = create_test_checkpointer().await;
 
-        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
             .await
             .expect("Subscription creation should succeed");
 
@@ -1943,13 +1956,13 @@ mod tests {
         let (checkpointer3, _temp_dir3) = create_test_checkpointer().await;
 
         // Create all three subscriptions concurrently
-        let mut sub1 = EventLogSubscription::new(&config1, checkpointer1)
+        let mut sub1 = EventLogSubscription::new(&config1, checkpointer1, false)
             .await
             .expect("Subscription 1 (Application) should succeed");
-        let mut sub2 = EventLogSubscription::new(&config2, checkpointer2)
+        let mut sub2 = EventLogSubscription::new(&config2, checkpointer2, false)
             .await
             .expect("Subscription 2 (System) should succeed");
-        let mut sub3 = EventLogSubscription::new(&config3, checkpointer3)
+        let mut sub3 = EventLogSubscription::new(&config3, checkpointer3, false)
             .await
             .expect("Subscription 3 (Security) should succeed");
 
@@ -2026,7 +2039,7 @@ mod tests {
         // Record the time BEFORE creating the subscription
         let subscription_start_time = Utc::now();
 
-        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
             .await
             .expect("Subscription creation should succeed");
 
@@ -2085,7 +2098,7 @@ mod tests {
 
         let subscription_start_time = Utc::now();
 
-        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
             .await
             .expect("Subscription creation should succeed");
 
@@ -2145,7 +2158,7 @@ mod tests {
         config.read_existing_events = true; // Even with this true, checkpoint should take precedence
         config.event_timeout_ms = 500;
 
-        let mut subscription = EventLogSubscription::new(&config, checkpointer)
+        let mut subscription = EventLogSubscription::new(&config, checkpointer, false)
             .await
             .expect("Subscription creation should succeed");
 
@@ -2231,8 +2244,7 @@ mod tests {
 
         let config = WindowsEventLogConfig::default();
 
-        let result =
-            EventLogSubscription::parse_event_xml(xml.to_string(), "Application", &config);
+        let result = EventLogSubscription::parse_event_xml(xml.to_string(), "Application", &config);
 
         let event = result.unwrap().unwrap();
         assert!(
@@ -2244,5 +2256,4 @@ mod tests {
             "Message should contain event ID"
         );
     }
-
 }

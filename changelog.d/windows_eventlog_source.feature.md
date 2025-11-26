@@ -6,6 +6,7 @@ This Windows-specific source uses event-driven subscriptions to stream events in
 - Real-time event-driven subscriptions using EvtSubscribe API
 - XPath query filtering for selective event collection
 - Checkpoint persistence for reliable resumption after restarts (similar to journald)
+- End-to-end acknowledgment support for at-least-once delivery guarantees
 - Configurable rate limiting to prevent overwhelming downstream systems
 - Configurable field truncation for storage optimization (Winlogbeat-compatible)
 - Enhanced provider name extraction using proper XML parsing
@@ -18,3 +19,7 @@ New configuration options:
 - `events_per_second`: Rate limit event processing (0 = unlimited)
 - `max_event_data_length`: Truncate event data values (0 = no truncation, Winlogbeat default)
 - `data_dir`: Directory for checkpoint persistence
+
+Note: Wildcard channel patterns (e.g., `Microsoft-Windows-*`) are not supported. Specify exact channel names.
+
+authors: tot19
