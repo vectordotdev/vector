@@ -20,7 +20,7 @@ use tokio::sync::{mpsc, watch};
 use super::{
     bookmark::BookmarkManager,
     checkpoint::Checkpointer,
-    config::{WindowsEventLogConfig, is_channel_pattern},
+    config::WindowsEventLogConfig,
     error::*,
 };
 
@@ -235,13 +235,7 @@ impl EventLogSubscription {
 
         #[cfg(windows)]
         {
-            // Expand channel patterns (e.g., "Microsoft-Windows-*") to actual channel names
-            let expanded_channels = expand_channel_patterns(&config.channels)?;
-
-            // Create config with expanded channels
-            let mut expanded_config = config.clone();
-            expanded_config.channels = expanded_channels;
-            let config = Arc::new(expanded_config);
+            let config = Arc::new(config.clone());
 
             let (event_sender, event_receiver) = mpsc::unbounded_channel();
             let subscription_error = Arc::new(Mutex::new(None));
@@ -1058,20 +1052,6 @@ impl EventLogSubscription {
         let event_data_result = Self::extract_event_data(xml, config);
         let event_data = &event_data_result.structured_data;
 
-        // Helper function to apply configurable truncation
-        let truncate = |s: &str| -> String {
-            if config.max_message_field_length > 0 && s.len() > config.max_message_field_length {
-                let mut truncated = s
-                    .chars()
-                    .take(config.max_message_field_length)
-                    .collect::<String>();
-                truncated.push_str("...");
-                truncated
-            } else {
-                s.to_string()
-            }
-        };
-
         match event_id {
             6009 => {
                 if let (Some(version), Some(build)) =
@@ -1079,8 +1059,7 @@ impl EventLogSubscription {
                 {
                     return Some(format!(
                         "Microsoft Windows kernel version {} build {} started",
-                        truncate(version),
-                        truncate(build)
+                        version, build
                     ));
                 }
             }
@@ -1089,14 +1068,12 @@ impl EventLogSubscription {
                     let data_summary: Vec<String> = event_data
                         .iter()
                         .take(3)
-                        .map(|(k, v)| format!("{}={}", truncate(k), truncate(v)))
+                        .map(|(k, v)| format!("{}={}", k, v))
                         .collect();
                     if !data_summary.is_empty() {
                         return Some(format!(
                             "Event ID {} from {} ({})",
-                            event_id,
-                            truncate(provider_name),
-                            data_summary.join(", ")
+                            event_id, provider_name, data_summary.join(", ")
                         ));
                     }
                 }
@@ -1105,9 +1082,7 @@ impl EventLogSubscription {
 
         Some(format!(
             "Event ID {} from {} on {}",
-            event_id,
-            truncate(provider_name),
-            truncate(computer)
+            event_id, provider_name, computer
         ))
     }
 
@@ -1115,7 +1090,6 @@ impl EventLogSubscription {
         xml: String,
         channel: &str,
         config: &WindowsEventLogConfig,
-        pre_rendered_message: Option<String>,
     ) -> Result<Option<WindowsEvent>, WindowsEventLogError> {
         // Extract basic event information with validation
         let record_id = Self::extract_xml_attribute(&xml, "EventRecordID")
@@ -1179,17 +1153,14 @@ impl EventLogSubscription {
         let system_fields = Self::extract_system_fields(&xml);
         let event_data_result = Self::extract_event_data(&xml, config);
 
-        // Use pre-rendered message from EvtFormatMessage if available,
-        // otherwise fall back to XML-based extraction
-        let rendered_message = pre_rendered_message.or_else(|| {
-            Self::extract_message_from_xml(
-                &xml,
-                system_fields.event_id,
-                &system_fields.provider_name,
-                &system_fields.computer,
-                config,
-            )
-        });
+        // Extract message from XML event data
+        let rendered_message = Self::extract_message_from_xml(
+            &xml,
+            system_fields.event_id,
+            &system_fields.provider_name,
+            &system_fields.computer,
+            config,
+        );
 
         let event = WindowsEvent {
             record_id: system_fields.record_id,
@@ -1235,230 +1206,6 @@ impl EventLogSubscription {
 
 // CallbackContext cleanup is handled in SubscriptionHandle::drop via Arc::from_raw
 
-/// Enumerate all available Windows Event Log channels on the system
-#[cfg(windows)]
-fn enumerate_all_channels() -> Result<Vec<String>, WindowsEventLogError> {
-    use windows::Win32::Foundation::{ERROR_INSUFFICIENT_BUFFER, ERROR_NO_MORE_ITEMS};
-    use windows::Win32::System::EventLog::{EvtClose, EvtNextChannelPath, EvtOpenChannelEnum};
-
-    let enum_handle = unsafe {
-        EvtOpenChannelEnum(None, 0)
-            .map_err(|e| WindowsEventLogError::ChannelEnumerationError { source: e })?
-    };
-
-    let mut channels = Vec::new();
-    let mut buffer = vec![0u16; 512]; // Most channel names are < 256 chars
-
-    loop {
-        let mut buffer_used: u32 = 0;
-
-        let result =
-            unsafe { EvtNextChannelPath(enum_handle, Some(&mut buffer), &mut buffer_used) };
-
-        match result {
-            Ok(()) => {
-                // Convert UTF-16 to String
-                let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
-                let channel = String::from_utf16_lossy(&buffer[..len]);
-                if !channel.is_empty() {
-                    channels.push(channel);
-                }
-            }
-            Err(e) => {
-                // ERROR_NO_MORE_ITEMS means we've enumerated all channels
-                if e.code() == ERROR_NO_MORE_ITEMS.into() {
-                    break;
-                }
-                // ERROR_INSUFFICIENT_BUFFER - resize and retry
-                if e.code() == ERROR_INSUFFICIENT_BUFFER.into() && buffer_used > 0 {
-                    buffer.resize(buffer_used as usize, 0);
-                    continue;
-                }
-                // Other errors - close handle and return error
-                unsafe {
-                    let _ = EvtClose(enum_handle);
-                }
-                return Err(WindowsEventLogError::ChannelEnumerationError { source: e });
-            }
-        }
-    }
-
-    unsafe {
-        let _ = EvtClose(enum_handle);
-    }
-
-    debug!(
-        message = "Enumerated Windows Event Log channels",
-        channel_count = channels.len()
-    );
-
-    Ok(channels)
-}
-
-/// Expand channel patterns (e.g., "Microsoft-Windows-*") to actual channel names
-#[cfg(windows)]
-fn expand_channel_patterns(patterns: &[String]) -> Result<Vec<String>, WindowsEventLogError> {
-    use glob::Pattern;
-
-    let mut matched_channels = Vec::new();
-    let mut has_patterns = false;
-
-    // Check if any patterns need expansion
-    for pattern in patterns {
-        if is_channel_pattern(pattern) {
-            has_patterns = true;
-            break;
-        }
-    }
-
-    // If no patterns, return the original list (will be validated later)
-    if !has_patterns {
-        return Ok(patterns.to_vec());
-    }
-
-    // Enumerate all channels for pattern matching
-    let all_channels = enumerate_all_channels()?;
-
-    for pattern_str in patterns {
-        if is_channel_pattern(pattern_str) {
-            // Compile glob pattern (case-insensitive for Windows)
-            let pattern =
-                Pattern::new(pattern_str).map_err(|e| WindowsEventLogError::ConfigError {
-                    message: format!("Invalid channel pattern '{}': {}", pattern_str, e),
-                })?;
-
-            let mut pattern_matched = false;
-            for channel in &all_channels {
-                // Case-insensitive matching
-                if pattern.matches(&channel.to_lowercase()) || pattern.matches(channel) {
-                    matched_channels.push(channel.clone());
-                    pattern_matched = true;
-                }
-            }
-
-            if !pattern_matched {
-                warn!(
-                    message = "Channel pattern matched no channels",
-                    pattern = %pattern_str
-                );
-            }
-        } else {
-            // Exact channel name - include as-is (will be validated later)
-            matched_channels.push(pattern_str.clone());
-        }
-    }
-
-    // Deduplicate while preserving order
-    let mut seen = std::collections::HashSet::new();
-    matched_channels.retain(|c| seen.insert(c.clone()));
-
-    if matched_channels.is_empty() {
-        return Err(WindowsEventLogError::ConfigError {
-            message: "No channels matched any of the specified patterns".into(),
-        });
-    }
-
-    info!(
-        message = "Expanded channel patterns",
-        patterns = ?patterns,
-        matched_channels = matched_channels.len()
-    );
-
-    Ok(matched_channels)
-}
-
-/// Non-Windows stub for pattern expansion
-#[cfg(not(windows))]
-fn expand_channel_patterns(patterns: &[String]) -> Result<Vec<String>, WindowsEventLogError> {
-    // On non-Windows, just return patterns as-is (they'll fail at subscription time anyway)
-    Ok(patterns.to_vec())
-}
-
-/// Format event message using Windows EvtFormatMessage API
-///
-/// This provides properly localized, parameter-substituted messages like
-/// "An account was successfully logged on" instead of raw event data.
-/// Returns None on any failure (graceful fallback to XML-based extraction).
-#[cfg(windows)]
-fn format_event_message(
-    event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
-    provider_name: &str,
-) -> Option<String> {
-    use windows::Win32::System::EventLog::{
-        EvtClose, EvtFormatMessage, EvtFormatMessageEvent, EvtOpenPublisherMetadata,
-    };
-    use windows::core::HSTRING;
-
-    const MAX_MESSAGE_SIZE: usize = 64 * 1024; // 64KB max for messages
-
-    // Open publisher metadata to get message templates
-    let provider_hstring = HSTRING::from(provider_name);
-    let metadata_handle = unsafe {
-        match EvtOpenPublisherMetadata(None, &provider_hstring, None, 0, 0) {
-            Ok(handle) => handle,
-            Err(_) => return None, // Provider not found - graceful fallback
-        }
-    };
-
-    // Two-pass buffer allocation for EvtFormatMessage
-    // First call with None buffer to get required size
-    let mut buffer_used: u32 = 0;
-    let _ = unsafe {
-        EvtFormatMessage(
-            metadata_handle,
-            event_handle,
-            0,
-            None,
-            EvtFormatMessageEvent.0,
-            None,
-            &mut buffer_used,
-        )
-    };
-
-    // Check if we got a valid size
-    if buffer_used == 0 || buffer_used as usize > MAX_MESSAGE_SIZE {
-        unsafe {
-            let _ = EvtClose(metadata_handle);
-        }
-        return None;
-    }
-
-    // Allocate buffer and get the formatted message
-    let mut buffer = vec![0u16; buffer_used as usize];
-    let mut actual_used: u32 = 0;
-
-    let result = unsafe {
-        EvtFormatMessage(
-            metadata_handle,
-            event_handle,
-            0,
-            None,
-            EvtFormatMessageEvent.0,
-            Some(&mut buffer),
-            &mut actual_used,
-        )
-    };
-
-    // Close metadata handle regardless of result
-    unsafe {
-        let _ = EvtClose(metadata_handle);
-    }
-
-    if result.is_err() {
-        return None;
-    }
-
-    // Convert UTF-16 to String, trimming null terminator
-    let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
-    let message = String::from_utf16_lossy(&buffer[..len]);
-
-    if message.is_empty() {
-        None
-    } else {
-        Some(message)
-    }
-}
-
 // Windows Event Log subscription callback function
 #[cfg(windows)]
 unsafe extern "system" fn event_subscription_callback(
@@ -1475,12 +1222,16 @@ unsafe extern "system" fn event_subscription_callback(
     }
 
     // Retrieve the callback context from user_context parameter
-    // Clone the Arc to increment ref count, then immediately forget it to not drop
-    let ctx = unsafe {
-        let arc = CallbackContext::from_raw(user_context);
-        let cloned = Arc::clone(&arc);
-        std::mem::forget(arc); // Don't drop - Windows still owns this
-        cloned
+    // SAFETY: We must increment the strong count BEFORE calling from_raw, because
+    // multiple callbacks can run concurrently on different threads. Without this,
+    // each callback would call from_raw() thinking it has sole ownership, leading
+    // to double-free and heap corruption (STATUS_HEAP_CORRUPTION / 0xC0000374).
+    // See: https://stackoverflow.com/questions/70587003/safely-call-arcfrom-raw-multiple-times
+    let ctx: Arc<CallbackContext> = unsafe {
+        // First, increment the reference count while the pointer is still valid
+        Arc::increment_strong_count(user_context as *const CallbackContext);
+        // Now it's safe to create an Arc - we've accounted for this reference
+        Arc::from_raw(user_context as *const CallbackContext)
     };
 
     // Track in-flight callbacks to prevent use-after-free during cleanup
@@ -1698,7 +1449,7 @@ fn process_callback_event(
     };
 
     // Remove null terminator if present
-    let xml_len = if u16_slice.len() > 0 && u16_slice[u16_slice.len() - 1] == 0 {
+    let xml_len = if !u16_slice.is_empty() && u16_slice[u16_slice.len() - 1] == 0 {
         u16_slice.len() - 1
     } else {
         u16_slice.len()
@@ -1715,15 +1466,9 @@ fn process_callback_event(
     let channel = EventLogSubscription::extract_xml_value(&xml, "Channel")
         .unwrap_or_else(|| "Unknown".to_string());
 
-    // Extract provider name and get properly formatted message via EvtFormatMessage
-    let provider_name = EventLogSubscription::extract_provider_name(&xml);
-    let rendered_message = provider_name
-        .as_ref()
-        .and_then(|name| format_event_message(event_handle, name));
-
     // Parse the XML to extract event data
     if let Ok(Some(event)) =
-        EventLogSubscription::parse_event_xml(xml, &channel, &ctx.config, rendered_message)
+        EventLogSubscription::parse_event_xml(xml, &channel, &ctx.config)
     {
         let event_channel = event.channel.clone();
 
@@ -1994,10 +1739,6 @@ mod tests {
             config.max_event_data_length, 0,
             "Event data truncation should be disabled by default"
         );
-        assert_eq!(
-            config.max_message_field_length, 0,
-            "Message field truncation should be disabled by default"
-        );
     }
 
     #[test]
@@ -2063,83 +1804,6 @@ mod tests {
         assert!(
             long_value.contains("disabled by setting max_event_data_length to 0"),
             "Full text should be present"
-        );
-    }
-
-    #[test]
-    fn test_message_field_truncation_when_enabled() {
-        let xml = r#"
-        <Event>
-            <System>
-                <Provider Name="TestProvider"/>
-                <EventID>1000</EventID>
-                <Computer>TestComputer</Computer>
-            </System>
-            <EventData>
-                <Data Name="Field1">This is a very long field value that will be truncated in the message summary</Data>
-            </EventData>
-        </Event>
-        "#;
-
-        let mut config = WindowsEventLogConfig::default();
-        config.max_message_field_length = 20;
-
-        let message = EventLogSubscription::extract_message_from_xml(
-            xml,
-            1000,
-            "TestProvider",
-            "TestComputer",
-            &config,
-        )
-        .unwrap();
-
-        // Message should contain truncated values
-        assert!(
-            message.contains("..."),
-            "Message should contain truncation indicator"
-        );
-    }
-
-    #[test]
-    fn test_message_field_no_truncation_when_disabled() {
-        let xml = r#"
-        <Event>
-            <System>
-                <Provider Name="VeryLongProviderNameThatExceedsSixtyFourCharactersAndShouldNotBeTruncated"/>
-                <EventID>1000</EventID>
-                <Computer>VeryLongComputerNameThatShouldAlsoNotBeTruncatedWhenLimitIsZero</Computer>
-            </System>
-            <EventData>
-                <Data Name="Field1">VeryLongValueThatShouldNotBeTruncated</Data>
-            </EventData>
-        </Event>
-        "#;
-
-        let config = WindowsEventLogConfig::default();
-        assert_eq!(
-            config.max_message_field_length, 0,
-            "Default should be no truncation"
-        );
-
-        let message = EventLogSubscription::extract_message_from_xml(
-            xml,
-            1000,
-            "VeryLongProviderNameThatExceedsSixtyFourCharactersAndShouldNotBeTruncated",
-            "VeryLongComputerNameThatShouldAlsoNotBeTruncatedWhenLimitIsZero",
-            &config,
-        )
-        .unwrap();
-
-        // Message should contain full values
-        assert!(
-            message.contains(
-                "VeryLongProviderNameThatExceedsSixtyFourCharactersAndShouldNotBeTruncated"
-            )
-        );
-        assert!(message.contains("VeryLongValueThatShouldNotBeTruncated"));
-        assert!(
-            !message.contains("..."),
-            "Message should not contain truncation when limit is 0"
         );
     }
 
@@ -2548,44 +2212,9 @@ mod tests {
         );
     }
 
-    /// Test that parse_event_xml uses pre-rendered message when provided
+    /// Test that parse_event_xml extracts message from XML
     #[test]
-    fn test_parse_event_xml_uses_pre_rendered_message() {
-        let xml = r#"
-        <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
-            <System>
-                <Provider Name="TestProvider"/>
-                <EventID>1000</EventID>
-                <Level>4</Level>
-                <EventRecordID>12345</EventRecordID>
-                <TimeCreated SystemTime="2025-01-01T00:00:00.000000Z"/>
-                <Channel>Application</Channel>
-                <Computer>TEST-PC</Computer>
-            </System>
-        </Event>
-        "#;
-
-        let config = WindowsEventLogConfig::default();
-        let pre_rendered = Some("Pre-rendered message from EvtFormatMessage".to_string());
-
-        let result = EventLogSubscription::parse_event_xml(
-            xml.to_string(),
-            "Application",
-            &config,
-            pre_rendered,
-        );
-
-        let event = result.unwrap().unwrap();
-        assert_eq!(
-            event.rendered_message,
-            Some("Pre-rendered message from EvtFormatMessage".to_string()),
-            "Should use pre-rendered message when provided"
-        );
-    }
-
-    /// Test that parse_event_xml falls back to XML extraction when no pre-rendered message
-    #[test]
-    fn test_parse_event_xml_fallback_without_pre_rendered() {
+    fn test_parse_event_xml_extracts_message() {
         let xml = r#"
         <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
             <System>
@@ -2603,164 +2232,17 @@ mod tests {
         let config = WindowsEventLogConfig::default();
 
         let result =
-            EventLogSubscription::parse_event_xml(xml.to_string(), "Application", &config, None);
+            EventLogSubscription::parse_event_xml(xml.to_string(), "Application", &config);
 
         let event = result.unwrap().unwrap();
         assert!(
             event.rendered_message.is_some(),
-            "Should fall back to XML-based message extraction"
+            "Should extract message from XML"
         );
         assert!(
             event.rendered_message.as_ref().unwrap().contains("1000"),
-            "Fallback message should contain event ID"
+            "Message should contain event ID"
         );
     }
 
-    /// Integration test: Verify EvtFormatMessage produces meaningful messages
-    /// for real Windows events (Application channel typically has events)
-    #[cfg(windows)]
-    #[tokio::test]
-    async fn test_evt_format_message_produces_real_messages() {
-        use tokio::time::Duration;
-
-        let mut config = WindowsEventLogConfig::default();
-        config.channels = vec!["Application".to_string()];
-        config.read_existing_events = true; // Read historical events
-        config.event_timeout_ms = 2000;
-
-        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
-
-        let mut subscription = EventLogSubscription::new(&config, checkpointer)
-            .await
-            .expect("Subscription should succeed");
-
-        tokio::time::sleep(Duration::from_millis(500)).await;
-
-        let result = subscription.next_events(50).await;
-        assert!(result.is_ok(), "Should get events: {:?}", result);
-
-        let events = result.unwrap();
-        if events.is_empty() {
-            // Skip test if no events available (unlikely but possible)
-            return;
-        }
-
-        // Check that at least some events have properly formatted messages
-        // (not just "Event ID X from Y on Z" fallback pattern)
-        let has_formatted_message = events.iter().any(|e| {
-            e.rendered_message
-                .as_ref()
-                .map(|msg| {
-                    // Formatted messages typically don't follow our fallback pattern
-                    !msg.starts_with("Event ID ")
-                })
-                .unwrap_or(false)
-        });
-
-        // Note: This assertion may fail if all events come from providers
-        // without message tables, which is rare but possible
-        assert!(
-            has_formatted_message,
-            "Expected at least some events to have EvtFormatMessage-rendered messages. \
-             Got {} events, all with fallback messages. This may indicate EvtFormatMessage \
-             is not working correctly.",
-            events.len()
-        );
-    }
-
-    /// Test that exact channel names pass through expand_channel_patterns unchanged
-    #[test]
-    fn test_expand_channel_patterns_exact_names() {
-        let patterns = vec![
-            "System".to_string(),
-            "Application".to_string(),
-            "Security".to_string(),
-        ];
-
-        let result = expand_channel_patterns(&patterns);
-        assert!(result.is_ok());
-
-        let expanded = result.unwrap();
-        assert_eq!(
-            expanded, patterns,
-            "Exact names should pass through unchanged"
-        );
-    }
-
-    /// Integration test: Verify wildcard patterns expand to real channels
-    #[cfg(windows)]
-    #[test]
-    fn test_enumerate_all_channels_returns_channels() {
-        let result = enumerate_all_channels();
-        assert!(result.is_ok(), "Channel enumeration should succeed");
-
-        let channels = result.unwrap();
-        assert!(!channels.is_empty(), "Should find at least some channels");
-
-        // Common channels that should exist on any Windows system
-        let has_system = channels.iter().any(|c| c == "System");
-        let has_application = channels.iter().any(|c| c == "Application");
-
-        assert!(has_system, "System channel should exist");
-        assert!(has_application, "Application channel should exist");
-    }
-
-    /// Integration test: Verify wildcard pattern expansion works
-    #[cfg(windows)]
-    #[test]
-    fn test_expand_channel_patterns_with_wildcards() {
-        // Test with a pattern that should match multiple channels
-        let patterns = vec!["System".to_string(), "Microsoft-Windows-*".to_string()];
-
-        let result = expand_channel_patterns(&patterns);
-        assert!(result.is_ok(), "Pattern expansion should succeed");
-
-        let expanded = result.unwrap();
-
-        // Should include exact match
-        assert!(
-            expanded.contains(&"System".to_string()),
-            "Should include exact match 'System'"
-        );
-
-        // Should have expanded the wildcard to multiple channels
-        assert!(
-            expanded.len() > 2,
-            "Wildcard should expand to multiple channels, got {}",
-            expanded.len()
-        );
-
-        // All expanded channels starting with Microsoft-Windows- should exist
-        let ms_channels: Vec<_> = expanded
-            .iter()
-            .filter(|c| c.starts_with("Microsoft-Windows-"))
-            .collect();
-        assert!(
-            !ms_channels.is_empty(),
-            "Should have matched some Microsoft-Windows-* channels"
-        );
-    }
-
-    /// Integration test: Create subscription with wildcard patterns
-    #[cfg(windows)]
-    #[tokio::test]
-    async fn test_subscription_with_wildcard_patterns() {
-        let mut config = WindowsEventLogConfig::default();
-        // Use a pattern that will match System and Application
-        config.channels = vec![
-            "Sys*".to_string(), // Should match "System"
-            "Application".to_string(),
-        ];
-        config.read_existing_events = false;
-        config.event_timeout_ms = 1000;
-
-        let (checkpointer, _temp_dir) = create_test_checkpointer().await;
-
-        let result = EventLogSubscription::new(&config, checkpointer).await;
-        assert!(
-            result.is_ok(),
-            "Subscription with wildcard should succeed: {:?}",
-            result.err()
-        );
-    }
 }

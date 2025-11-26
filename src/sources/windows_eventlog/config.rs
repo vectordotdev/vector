@@ -157,16 +157,6 @@ pub struct WindowsEventLogConfig {
     #[configurable(metadata(docs::examples = 4096))]
     pub max_event_data_length: usize,
 
-    /// Maximum length for message summary field.
-    ///
-    /// The message field contains a human-readable summary with event data samples.
-    /// Individual event data values in the message will be truncated to this length.
-    /// Set to 0 for no limit (matches Winlogbeat behavior).
-    #[serde(default = "default_max_message_field_length")]
-    #[configurable(metadata(docs::examples = 256))]
-    #[configurable(metadata(docs::examples = 1024))]
-    pub max_message_field_length: usize,
-
     /// Controls how acknowledgements are handled for this source.
     ///
     /// When enabled, the source will wait for downstream sinks to acknowledge
@@ -269,7 +259,6 @@ impl Default for WindowsEventLogConfig {
             data_dir: None,
             events_per_second: default_events_per_second(),
             max_event_data_length: default_max_event_data_length(),
-            max_message_field_length: default_max_message_field_length(),
             acknowledgements: Default::default(),
         }
     }
@@ -328,11 +317,20 @@ impl WindowsEventLogConfig {
                 .into());
             }
 
+            // Reject wildcard patterns - they cause heap corruption issues with many channels
+            if is_channel_pattern(channel) {
+                return Err(format!(
+                    "Channel name '{}' contains wildcard characters (*, ?, [). \
+                     Wildcard patterns are not supported. Please specify exact channel names.",
+                    channel
+                )
+                .into());
+            }
+
             // Validate channel name contains only safe characters
-            // Allow *, ?, [ for glob pattern matching (e.g., "Microsoft-Windows-*")
             if !channel
                 .chars()
-                .all(|c| c.is_ascii_alphanumeric() || "-_ /\\*?[]".contains(c))
+                .all(|c| c.is_ascii_alphanumeric() || "-_ /\\".contains(c))
             {
                 return Err(
                     format!("Channel name '{}' contains invalid characters", channel).into(),
@@ -556,10 +554,6 @@ const fn default_max_event_data_length() -> usize {
     0 // 0 means no truncation (matches Winlogbeat)
 }
 
-const fn default_max_message_field_length() -> usize {
-    0 // 0 means no truncation (matches Winlogbeat)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -647,7 +641,6 @@ mod tests {
             data_dir: PathBuf::from("/test/data"),
             events_per_second: 1000,
             max_event_data_length: 0,
-            max_message_field_length: 0,
             acknowledgements: SourceAcknowledgementsConfig::from(true),
         };
 
@@ -691,23 +684,35 @@ mod tests {
     }
 
     #[test]
-    fn test_config_validation_allows_wildcards() {
+    fn test_config_validation_rejects_wildcards() {
         let mut config = WindowsEventLogConfig::default();
 
-        // Wildcard patterns should be allowed in channel names
+        // Asterisk wildcard should be rejected
+        config.channels = vec!["Microsoft-Windows-*".to_string()];
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("wildcard"));
+
+        // Single character wildcards should be rejected
+        config.channels = vec!["System?".to_string()];
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("wildcard"));
+
+        // Character classes should be rejected
+        config.channels = vec!["[Ss]ystem".to_string()];
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("wildcard"));
+
+        // Mixed valid and wildcard should be rejected
+        config.channels = vec!["System".to_string(), "Microsoft-Windows-*".to_string()];
+        let err = config.validate().unwrap_err();
+        assert!(err.to_string().contains("wildcard"));
+
+        // Exact channel names should still work
         config.channels = vec![
             "System".to_string(),
-            "Microsoft-Windows-*".to_string(),
-            "Microsoft-Windows-Sysmon/*".to_string(),
+            "Application".to_string(),
+            "Microsoft-Windows-Sysmon/Operational".to_string(),
         ];
-        assert!(config.validate().is_ok());
-
-        // Single character wildcards should work
-        config.channels = vec!["System?".to_string()];
-        assert!(config.validate().is_ok());
-
-        // Character classes should work
-        config.channels = vec!["[Ss]ystem".to_string()];
         assert!(config.validate().is_ok());
     }
 }

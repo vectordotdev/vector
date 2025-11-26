@@ -30,7 +30,6 @@ fn create_test_config() -> WindowsEventLogConfig {
         data_dir: None, // Use Vector's global data_dir
         events_per_second: 0,
         max_event_data_length: 0,
-        max_message_field_length: 0,
         acknowledgements: Default::default(),
     }
 }

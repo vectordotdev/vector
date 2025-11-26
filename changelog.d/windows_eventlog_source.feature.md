@@ -17,5 +17,4 @@ This Windows-specific source uses event-driven subscriptions to stream events in
 New configuration options:
 - `events_per_second`: Rate limit event processing (0 = unlimited)
 - `max_event_data_length`: Truncate event data values (0 = no truncation, Winlogbeat default)
-- `max_message_field_length`: Truncate message summary field (0 = no truncation, Winlogbeat default)
 - `data_dir`: Directory for checkpoint persistence
