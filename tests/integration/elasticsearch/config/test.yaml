@@ -13,7 +13,7 @@ env:
 matrix:
   image:
     - "docker.io/elasticsearch:7.13.1"
-    - "docker.io/opensearch:2.19.3"
+    - "opensearchproject/opensearch:2.19.4"
 
 # changes to these files/paths will invoke the integration test in CI
 # expressions are evaluated using https://github.com/micromatch/picomatch
