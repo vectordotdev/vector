@@ -30,7 +30,7 @@ use crate::{
     schema::Definition,
 };
 
-const UTILIZATION_METRIC_PREFIX: &str = "source_sender_buffer";
+const UTILIZATION_METRIC_PREFIX: &str = "source_buffer";
 
 /// UnsentEvents tracks the number of events yet to be sent in the buffer. This is used to
 /// increment the appropriate counters when a future is not polled to completion. Particularly,
