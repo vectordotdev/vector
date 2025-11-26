@@ -213,7 +213,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
     pub async fn send(&mut self, item: T) -> Result<(), SendError<T>> {
         // Calculate how many permits we need, and wait until we can acquire all of them.
         let (limit, count, permits_required) = self.calc_required_permits(&item);
-        let in_use = limit - self.available_capacity();
+        let in_use = limit.saturating_sub(self.available_capacity());
         match self
             .inner
             .limiter
@@ -245,7 +245,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
     pub fn try_send(&mut self, item: T) -> Result<(), TrySendError<T>> {
         // Calculate how many permits we need, and try to acquire them all without waiting.
         let (limit, count, permits_required) = self.calc_required_permits(&item);
-        let in_use = limit - self.available_capacity();
+        let in_use = limit.saturating_sub(self.available_capacity());
         match self
             .inner
             .limiter
@@ -257,10 +257,8 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
                 trace!("Attempt to send item succeeded.");
                 Ok(())
             }
-            Err(ae) => match ae {
-                TryAcquireError::NoPermits => Err(TrySendError::InsufficientCapacity(item)),
-                TryAcquireError::Closed => Err(TrySendError::Disconnected(item)),
-            },
+            Err(TryAcquireError::NoPermits) => Err(TrySendError::InsufficientCapacity(item)),
+            Err(TryAcquireError::Closed) => Err(TrySendError::Disconnected(item)),
         }
     }
 }

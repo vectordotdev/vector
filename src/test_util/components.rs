@@ -67,8 +67,8 @@ pub const AWS_SINK_TAGS: [&str; 2] = ["protocol", "region"];
 
 /// The list of source sender buffer metrics that must be emitted.
 const SOURCE_SENDER_BUFFER_METRICS: [&str; 2] = [
-    "source_sender_buffer_utilization",
-    "source_sender_buffer_utilization_level",
+    "source_buffer_utilization",
+    "source_buffer_utilization_level",
 ];
 
 /// This struct is used to describe a set of component tests.
