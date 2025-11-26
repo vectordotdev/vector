@@ -32,8 +32,8 @@ mod subscription;
 mod tests;
 
 // Integration tests are feature-gated to avoid requiring Windows Event Log service.
-// To run integration tests on Windows: cargo test --features sources-windows_eventlog-integration-tests
-#[cfg(all(test, feature = "sources-windows_eventlog-integration-tests"))]
+// To run integration tests on Windows: cargo test --features sources-windows_event_log-integration-tests
+#[cfg(all(test, feature = "sources-windows_event_log-integration-tests"))]
 mod integration_tests;
 
 pub use self::config::*;
@@ -186,7 +186,7 @@ impl WindowsEventLogSource {
         let parser = EventLogParser::new(&self.config);
 
         let events_received = register!(EventsReceived);
-        let bytes_received = register!(BytesReceived::from(Protocol::from("windows_eventlog")));
+        let bytes_received = register!(BytesReceived::from(Protocol::from("windows_event_log")));
 
         info!(
             message = "Starting Windows Event Log source",
@@ -302,7 +302,7 @@ impl WindowsEventLogSource {
 }
 
 #[async_trait]
-#[typetag::serde(name = "windows_eventlog")]
+#[typetag::serde(name = "windows_event_log")]
 impl SourceConfig for WindowsEventLogConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
         // Resolve data directory using Vector's global data_dir, creating a subdir for this source
@@ -385,9 +385,9 @@ use vector_config::component::SourceDescription;
 
 inventory::submit! {
     SourceDescription::new::<WindowsEventLogConfig>(
-        "windows_eventlog",
+        "windows_event_log",
         "Collect logs from Windows Event Log channels",
         "A Windows-specific source that subscribes to Windows Event Log channels and streams events in real-time using the Windows Event Log API.",
-        "https://vector.dev/docs/reference/configuration/sources/windows_eventlog/"
+        "https://vector.dev/docs/reference/configuration/sources/windows_event_log/"
     )
 }

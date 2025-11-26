@@ -14,7 +14,7 @@ use tracing::{debug, error, info, warn};
 
 use super::error::WindowsEventLogError;
 
-const CHECKPOINT_FILENAME: &str = "windows_eventlog_checkpoints.json";
+const CHECKPOINT_FILENAME: &str = "windows_event_log_checkpoints.json";
 
 /// Checkpoint data for a single Windows Event Log channel
 ///

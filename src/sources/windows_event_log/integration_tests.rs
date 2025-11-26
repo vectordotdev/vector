@@ -1,4 +1,4 @@
-#![cfg(feature = "sources-windows_eventlog-integration-tests")]
+#![cfg(feature = "sources-windows_event_log-integration-tests")]
 #![cfg(test)]
 
 use std::time::Duration;

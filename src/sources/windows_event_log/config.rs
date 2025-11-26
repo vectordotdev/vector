@@ -15,9 +15,9 @@ const MAX_CONNECTION_TIMEOUT_SECS: u64 = 3600;
 const MAX_EVENT_TIMEOUT_MS: u64 = 60000;
 const MAX_BATCH_SIZE: u32 = 10000;
 
-/// Configuration for the `windows_eventlog` source.
+/// Configuration for the `windows_event_log` source.
 #[configurable_component(source(
-    "windows_eventlog",
+    "windows_event_log",
     "Collect logs from Windows Event Log channels using the Windows Event Log API."
 ))]
 #[derive(Clone, Debug)]

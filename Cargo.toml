@@ -504,7 +504,7 @@ docs = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-d
 default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-windows_eventlog", "transforms", "secrets"]
+default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-windows_event_log", "transforms", "secrets"]
 default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
@@ -629,7 +629,7 @@ sources-logs = [
   "sources-syslog",
   "sources-vector",
   "sources-websocket",
-  "sources-windows_eventlog",
+  "sources-windows_event_log",
 ]
 sources-metrics = [
   "dep:prost",
@@ -716,8 +716,8 @@ sources-utils-net-tcp = ["listenfd", "dep:ipnet"]
 sources-utils-net-udp = ["listenfd"]
 sources-utils-net-unix = []
 sources-websocket = ["dep:tokio-tungstenite"]
-sources-windows_eventlog = ["dep:windows", "dep:quick-xml", "dep:governor"]
-sources-windows_eventlog-integration-tests = ["sources-windows_eventlog"]
+sources-windows_event_log = ["dep:windows", "dep:quick-xml", "dep:governor"]
+sources-windows_event_log-integration-tests = ["sources-windows_event_log"]
 
 sources-vector = ["dep:prost", "dep:tonic", "protobuf-build"]
 
