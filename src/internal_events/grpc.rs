@@ -3,11 +3,12 @@ use std::time::Duration;
 use http::response::Response;
 use metrics::{counter, histogram};
 use tonic::Code;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 const GRPC_STATUS_LABEL: &str = "grpc_status";
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct GrpcServerRequestReceived;
 
 impl InternalEvent for GrpcServerRequestReceived {
@@ -16,7 +17,7 @@ impl InternalEvent for GrpcServerRequestReceived {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct GrpcServerResponseSent<'a, B> {
     pub response: &'a Response<B>,
     pub latency: Duration,
@@ -38,7 +39,7 @@ impl<B> InternalEvent for GrpcServerResponseSent<'_, B> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct GrpcInvalidCompressionSchemeError<'a> {
     pub status: &'a tonic::Status,
 }
@@ -60,7 +61,7 @@ impl InternalEvent for GrpcInvalidCompressionSchemeError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct GrpcError<E> {
     pub error: E,
 }
