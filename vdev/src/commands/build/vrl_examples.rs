@@ -4,10 +4,12 @@ use std::fs;
 use std::path::Path;
 use std::str::FromStr;
 
-use anyhow::{Context, Result, ensure};
+use anyhow::{Context, Result, anyhow, ensure};
 use clap::Args;
 use itertools::Itertools;
 use serde_json::{Value, json};
+use vrl::compiler;
+use vrl::compiler::function::ArgumentList;
 use vrl::prelude::{NotNan, Parameter};
 use vrl::value;
 
@@ -180,6 +182,69 @@ fn args_from_kind(function_name: &str, p: &Parameter) -> Vec<vrl::value::Value> 
     args
 }
 
+/// Verify a function works by compiling test VRL code and return its type
+fn get_function_return_type(function_name: &str) -> Result<Option<String>> {
+    let test_code = match function_name {
+        "del" => "del(.test)",
+        "exists" => "exists(.test)",
+        "unnest" => ". = {\"events\": [1,2]}; . = unnest(.events)",
+        // Filter takes 2 closure parameters: key/index and value
+        "filter" => "filter([1,2]) -> |_index, _value| { true }",
+        // for_each takes 2 closure parameters: key/index and value
+        "for_each" => "for_each([1,2]) -> |_index, _value| { . = _value }",
+        // map_keys takes 1 closure parameter: key
+        "map_keys" => "map_keys({\"a\": 1}) -> |key| { key }",
+        // map_values takes 1 closure parameter: value
+        "map_values" => "map_values({\"a\": 1}) -> |value| { value }",
+        // replace_with takes 1 closure parameter: match object
+        "replace_with" => "replace_with(\"test\", r'test') -> |_match| { \"x\" }",
+        _ => return Ok(None),
+    };
+
+    let fns = vrl::stdlib::all();
+    let result = compiler::compile(test_code, &fns)
+        .map_err(|diagnostic_list| anyhow!("{diagnostic_list:?}"))
+        .with_context(|| {
+            format!("Failed to compile test code for {function_name}\nCode:\n{test_code}")
+        })?;
+    let type_info = result.program.final_type_info();
+    Ok(Some(type_info.result.to_string()))
+}
+
+/// Test result for special functions
+enum TestResult {
+    /// Return ArgumentList for normal testing
+    ArgumentLists(Vec<ArgumentList>),
+    /// Return types derived from compiling actual VRL code
+    DerivedTypes(Vec<String>),
+}
+
+/// Create arguments from parameter specification or derive types for special functions
+fn create_arguments_for_function(function_name: &str, params: &[Parameter]) -> Result<TestResult> {
+    // For query/closure functions, compile actual VRL code to derive return types
+    if let Some(return_type) = get_function_return_type(function_name)? {
+        return Ok(TestResult::DerivedTypes(vec![return_type]));
+    }
+
+    // Default: regular parameters
+    let required = params.iter().filter(|p| p.required).collect_vec();
+
+    let required_args = required
+        .iter()
+        .map(|p| std::iter::once(p.keyword).cartesian_product(args_from_kind(function_name, p)))
+        .multi_cartesian_product();
+
+    let arg_lists = required_args
+        .map(|args| {
+            let arguments: HashMap<&'static str, vrl::value::Value> =
+                HashMap::from_iter(args.into_iter());
+            arguments.into()
+        })
+        .collect();
+
+    Ok(TestResult::ArgumentLists(arg_lists))
+}
+
 impl Cli {
     pub fn exec(self) -> Result<()> {
         app::set_repo_dir()?;
@@ -225,25 +290,15 @@ impl Cli {
                 .sum::<usize>()
         );
 
+        // Functions whose return types cannot be validated
+        const SKIP_RETURN_TYPE_VALIDATION: [&str; 3] = [
+            "merge",        // parameter mismatch: "to" is marked optional but treated as required
+            "random_float", // strict compile-time validation with min < max constraint
+            "random_int",   // strict compile-time validation with min < max constraint
+        ];
+
         // Inject examples into docs.json
         for (function_name, function) in &functions_with_examples {
-            if function_name == "del"
-                || function_name == "exists"
-                || function_name == "filter"
-                || function_name == "for_each"
-                || function_name == "map_keys"
-                || function_name == "map_values"
-                /* BUG */
-                || function_name == "merge"
-                /* issue with Kind */
-                || function_name == "random_float"
-                || function_name == "random_int"
-                || function_name == "replace_with"
-                || function_name == "unnest"
-            {
-                // FIXME
-                continue;
-            }
             // Navigate to remap.functions.<function_name>
             let function_obj = docs
                 .get_mut("remap")
@@ -265,47 +320,46 @@ impl Cli {
                 .collect_vec();
             documented_return.sort();
 
-            let actual_return = {
+            let actual_return = if !SKIP_RETURN_TYPE_VALIDATION.contains(&function_name.as_str()) {
                 let mut return_type = HashSet::new();
 
-                let required = function
-                    .parameters()
-                    .iter()
-                    .filter(|p| p.required)
-                    .collect_vec();
+                // Create argument lists or derive types from VRL compilation
+                match create_arguments_for_function(function_name, function.parameters())? {
+                    TestResult::ArgumentLists(arg_lists) => {
+                        // Normal testing with ArgumentList
+                        for arguments in arg_lists {
+                            let state = vrl::compiler::state::TypeState::default();
+                            let config = vrl::compiler::CompileConfig::default();
+                            let ctx = &mut vrl::compiler::function::FunctionCompileContext::new(
+                                vrl::diagnostic::Span::new(0, 0),
+                                config,
+                            );
 
-                let required_args = required
-                    .iter()
-                    .map(|p| {
-                        std::iter::once(p.keyword)
-                            .cartesian_product(args_from_kind(function_name, p))
-                    })
-                    .multi_cartesian_product();
-
-                // TODO non required args
-
-                for args in required_args {
-                    let state = vrl::compiler::state::TypeState::default();
-                    let config = vrl::compiler::CompileConfig::default();
-                    let ctx = &mut vrl::compiler::function::FunctionCompileContext::new(
-                        vrl::diagnostic::Span::new(0, 0),
-                        config,
-                    );
-
-                    let arguments: HashMap<&'static str, vrl::value::Value> =
-                        HashMap::from_iter(args.into_iter());
-                    let compiled = function
-                        .compile(&state, ctx, arguments.into())
-                        .unwrap_or_else(|e| {
-                            panic!("function `{function_name}` failed to compile: {e:?}")
-                        });
-                    // return_type.insert(dbg!(compiled.type_def(&state).to_string()));
-                    return_type.insert(compiled.type_def(&state).to_string());
+                            let compiled =
+                                function
+                                    .compile(&state, ctx, arguments)
+                                    .unwrap_or_else(|e| {
+                                        panic!(
+                                            "function `{function_name}` failed to compile: {e:?}"
+                                        )
+                                    });
+                            return_type.insert(compiled.type_def(&state).to_string());
+                        }
+                    }
+                    TestResult::DerivedTypes(types) => {
+                        // Query/closure functions: types derived from VRL compilation
+                        for t in types {
+                            return_type.insert(t);
+                        }
+                    }
                 }
 
                 let mut return_type = return_type.into_iter().collect_vec();
                 return_type.sort();
                 return_type
+            } else {
+                // Skip return type validation for functions we can't handle
+                documented_return.iter().map(|s| s.to_string()).collect()
             };
 
             if documented_return != actual_return {
