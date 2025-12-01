@@ -360,14 +360,10 @@ pub fn udp(
             async move {
                 match frame {
                     Ok(((mut events, byte_size), received_from)) => {
-                        emit!(SocketBytesReceived {
-                            mode: SocketMode::Udp,
-                            byte_size,
-                        });
                         let count = events.len();
                         emit!(SocketEventsReceived {
                             mode: SocketMode::Udp,
-                            byte_size: events.estimated_json_encoded_size_of(),
+                            byte_size: events.byte_size(),
                             count,
                         });
                         let received_from = received_from.ip().to_string().into();
