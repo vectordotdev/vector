@@ -163,7 +163,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
-      - run: cd rust-doc && make docs
+      - run: cd rust-doc && make ci-docs-build
 
   test-vrl:
     name: VRL - Linux
