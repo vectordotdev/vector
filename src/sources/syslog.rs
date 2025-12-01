@@ -363,7 +363,7 @@ pub fn udp(
                         let count = events.len();
                         emit!(SocketEventsReceived {
                             mode: SocketMode::Udp,
-                            byte_size: events.byte_size(),
+                            byte_size: byte_size.into(),
                             count,
                         });
                         let received_from = received_from.ip().to_string().into();
