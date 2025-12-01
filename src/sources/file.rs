@@ -2126,6 +2126,9 @@ mod tests {
         let mut older = File::create(&older_path).unwrap();
         older.sync_all().unwrap();
 
+        // Sleep to ensure the creation timestamps are different
+        sleep_500_millis().await;
+
         let newer_path = dir.path().join("a_newer_file");
         let mut newer = File::create(&newer_path).unwrap();
         newer.sync_all().unwrap();
