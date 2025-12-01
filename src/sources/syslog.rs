@@ -15,6 +15,7 @@ use vector_lib::{
     },
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
     ipallowlist::IpAllowlistConfig,
     lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, path},
 };
@@ -343,6 +344,8 @@ pub fn udp(
             r#type = "udp"
         );
 
+        let bytes_received = register!(BytesReceived::from(Protocol::UDP));
+
         let mut stream = UdpFramed::new(
             socket,
             Decoder::new(
@@ -355,10 +358,12 @@ pub fn udp(
         .take_until(shutdown)
         .filter_map(|frame| {
             let host_key = host_key.clone();
+            let bytes_received = bytes_received.clone();
             async move {
                 match frame {
                     Ok(((mut events, byte_size), received_from)) => {
                         let count = events.len();
+                        bytes_received.emit(ByteSize(byte_size));
                         emit!(SocketEventsReceived {
                             mode: SocketMode::Udp,
                             byte_size: byte_size.into(),
