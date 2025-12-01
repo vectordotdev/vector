@@ -30,8 +30,7 @@ use crate::{
     },
     event::Event,
     internal_events::{
-        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError,
-        StreamClosedError,
+        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError, StreamClosedError,
     },
     net,
     shutdown::ShutdownSignal,
