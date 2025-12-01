@@ -649,6 +649,19 @@ generated: components: sinks: aws_cloudwatch_logs: configuration: {
 		required: false
 		type: string: {}
 	}
+	log_group_class: {
+		description: """
+			The [log group class][log_group_class] of the target log group.
+
+			Defaults to `standard` when creating the group without this optional configuration.
+
+			Allowed values are `standard` and `infrequent_access`.
+
+			[log_group_class]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch_Logs_Log_Classes.html
+			"""
+		required: false
+		type: string: {}
+	}
 	region: {
 		description: """
 			The [AWS region][aws_region] of the target service.
