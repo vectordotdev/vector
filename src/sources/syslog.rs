@@ -9,7 +9,6 @@ use listenfd::ListenFd;
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
     codecs::{
         BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
         decoding::{Deserializer, Framer},
@@ -31,7 +30,7 @@ use crate::{
     },
     event::Event,
     internal_events::{
-        SocketBindError, SocketBytesReceived, SocketEventsReceived, SocketMode, SocketReceiveError,
+        SocketBindError, SocketEventsReceived, SocketMode, SocketReceiveError,
         StreamClosedError,
     },
     net,
