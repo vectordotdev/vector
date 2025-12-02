@@ -395,7 +395,7 @@ openssl-probe = { version = "0.1.6", default-features = false }
 ordered-float.workspace = true
 percent-encoding = { version = "2.3.1", default-features = false }
 postgres-openssl = { version = "0.5.1", default-features = false, features = ["runtime"], optional = true }
-pulsar = { version = "6.3.1", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
+pulsar = { version = "6.5.0", default-features = false, features = ["tokio-runtime", "auth-oauth2", "flate2", "lz4", "snap", "zstd"], optional = true }
 quick-junit = { version = "0.5.1" }
 rand.workspace = true
 rand_distr.workspace = true
