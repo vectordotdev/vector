@@ -3560,7 +3560,6 @@ dependencies = [
  "prost-build 0.12.6",
  "snafu 0.8.9",
  "tracing 0.1.41",
- "vector-config",
  "vector-lib",
  "vrl",
 ]
