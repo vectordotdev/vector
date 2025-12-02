@@ -366,7 +366,7 @@ pub fn udp(
                         bytes_received.emit(ByteSize(byte_size));
                         emit!(SocketEventsReceived {
                             mode: SocketMode::Udp,
-                            byte_size: byte_size.into(),
+                            byte_size: events.estimated_json_encoded_size_of(),
                             count,
                         });
                         let received_from = received_from.ip().to_string().into();
