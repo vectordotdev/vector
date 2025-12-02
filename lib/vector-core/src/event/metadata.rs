@@ -40,7 +40,7 @@ pub(super) struct Inner {
     pub(crate) secrets: Secrets,
 
     #[serde(default, skip)]
-    finalizers: EventFinalizers,
+    pub(crate) finalizers: EventFinalizers,
 
     /// The id of the source
     pub(crate) source_id: Option<Arc<ComponentKey>>,
@@ -60,7 +60,7 @@ pub(super) struct Inner {
     ///
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
     #[serde(default = "default_schema_definition", skip)]
-    schema_definition: Arc<schema::Definition>,
+    pub(crate) schema_definition: Arc<schema::Definition>,
 
     /// A store of values that may be dropped during the encoding process but may be needed
     /// later on. The map is indexed by meaning.
@@ -68,7 +68,7 @@ pub(super) struct Inner {
     /// we need to ensure it is still available later on for emitting metrics tagged by the service.
     /// This field could almost be keyed by `&'static str`, but because it needs to be deserializable
     /// we have to use `String`.
-    dropped_fields: ObjectMap,
+    pub(crate) dropped_fields: ObjectMap,
 
     /// Metadata to track the origin of metrics. This is always `None` for log and trace events.
     /// Only a small set of Vector sources and transforms explicitly set this field.
@@ -264,7 +264,7 @@ impl Default for EventMetadata {
     }
 }
 
-fn default_schema_definition() -> Arc<schema::Definition> {
+pub(super) fn default_schema_definition() -> Arc<schema::Definition> {
     Arc::new(schema::Definition::new_with_default_metadata(
         Kind::any(),
         [LogNamespace::Legacy, LogNamespace::Vector],
