@@ -9,6 +9,7 @@ use listenfd::ListenFd;
 use smallvec::SmallVec;
 use tokio_util::udp::UdpFramed;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     codecs::{
         BytesDecoder, OctetCountingDecoder, SyslogDeserializerConfig,
         decoding::{Deserializer, Framer},
