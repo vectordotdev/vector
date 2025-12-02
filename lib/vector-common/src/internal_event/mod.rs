@@ -47,32 +47,6 @@ pub trait InternalEventHandle: Sized {
     fn emit(&self, data: Self::Data);
 }
 
-// Sets the name of an event if it doesn't have one
-pub struct DefaultName<E> {
-    pub name: &'static str,
-    pub event: E,
-}
-
-impl<E: InternalEvent> InternalEvent for DefaultName<E> {
-    fn emit(self) {
-        self.event.emit();
-    }
-}
-
-impl<E: NamedInternalEvent> NamedInternalEvent for DefaultName<E> {
-    fn name(&self) -> &'static str {
-        self.event.name()
-    }
-}
-
-impl<E: RegisterInternalEvent> RegisterInternalEvent for DefaultName<E> {
-    type Handle = E::Handle;
-
-    fn register(self) -> Self::Handle {
-        self.event.register()
-    }
-}
-
 #[cfg(any(test, feature = "test"))]
 pub fn emit(event: impl InternalEvent) {
     super::event_test_util::record_internal_event(event.name());
