@@ -30,6 +30,8 @@ use crate::{
     schema::Definition,
 };
 
+const UTILIZATION_METRIC_PREFIX: &str = "source_buffer";
+
 /// UnsentEvents tracks the number of events yet to be sent in the buffer. This is used to
 /// increment the appropriate counters when a future is not polled to completion. Particularly,
 /// this is known to happen in a Warp server when a client sends a new HTTP request on a TCP
@@ -114,7 +116,8 @@ impl Output {
         output_id: OutputId,
         timeout: Option<Duration>,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
-        let (tx, rx) = channel::limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap()));
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap());
+        let (tx, rx) = channel::limited(limit, Some((UTILIZATION_METRIC_PREFIX, &output)));
         (
             Self {
                 sender: tx,

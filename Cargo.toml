@@ -385,7 +385,7 @@ k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26
 kube = { version = "0.93.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
 lru = { version = "0.16.0", default-features = false }
-maxminddb = { version = "0.26.0", default-features = false, optional = true, features = ["simdutf8"] }
+maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.3.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
 async-nats = { version = "0.42.0", default-features = false, optional = true, features = ["ring"] }
