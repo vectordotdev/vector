@@ -21,24 +21,42 @@ mod s3 {
     use crate::sources::aws_s3::sqs::ProcessingError;
 
     #[derive(Debug)]
-    pub struct S3ObjectProcessingCompleted<'a> {
+    pub struct S3ObjectProcessingSucceeded<'a> {
         pub bucket: &'a str,
         pub duration: Duration,
-        pub status: &'static str,
     }
 
-    impl InternalEvent for S3ObjectProcessingCompleted<'_> {
+    impl InternalEvent for S3ObjectProcessingSucceeded<'_> {
         fn emit(self) {
             debug!(
-                message = "S3 object processing completed.",
+                message = "S3 object processing succeeded.",
                 bucket = %self.bucket,
                 duration_ms = %self.duration.as_millis(),
-                status = %self.status,
             );
             histogram!(
-                "s3_object_processing_duration_seconds",
+                "s3_object_processing_succeeded_duration_seconds",
                 "bucket" => self.bucket.to_owned(),
-                "status" => self.status,
+            )
+            .record(self.duration);
+        }
+    }
+
+    #[derive(Debug)]
+    pub struct S3ObjectProcessingFailed<'a> {
+        pub bucket: &'a str,
+        pub duration: Duration,
+    }
+
+    impl InternalEvent for S3ObjectProcessingFailed<'_> {
+        fn emit(self) {
+            debug!(
+                message = "S3 object processing failed.",
+                bucket = %self.bucket,
+                duration_ms = %self.duration.as_millis(),
+            );
+            histogram!(
+                "s3_object_processing_failed_duration_seconds",
+                "bucket" => self.bucket.to_owned(),
             )
             .record(self.duration);
         }

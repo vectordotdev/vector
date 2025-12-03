@@ -730,6 +730,28 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		s3_object_processing_failed_duration_seconds: {
+			description:       "The time taken to process an S3 object that failed, in seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				bucket: {
+					description: "The name of the S3 bucket."
+					required:    true
+				}
+			}
+		}
+		s3_object_processing_succeeded_duration_seconds: {
+			description:       "The time taken to process an S3 object that succeeded, in seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				bucket: {
+					description: "The name of the S3 bucket."
+					required:    true
+				}
+			}
+		}
 		sqs_message_delete_succeeded_total: {
 			description:       "The total number of successful deletions of SQS messages."
 			type:              "counter"

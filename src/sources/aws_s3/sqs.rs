@@ -49,11 +49,11 @@ use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
-        EventsReceived, S3ObjectProcessingCompleted, SqsMessageDeleteBatchError,
-        SqsMessageDeletePartialError, SqsMessageDeleteSucceeded, SqsMessageProcessingError,
-        SqsMessageProcessingSucceeded, SqsMessageReceiveError, SqsMessageReceiveSucceeded,
-        SqsMessageSendBatchError, SqsMessageSentPartialError, SqsMessageSentSucceeded,
-        SqsS3EventRecordInvalidEventIgnored, StreamClosedError,
+        EventsReceived, S3ObjectProcessingFailed, S3ObjectProcessingSucceeded,
+        SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
+        SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
+        SqsMessageReceiveSucceeded, SqsMessageSendBatchError, SqsMessageSentPartialError,
+        SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -796,16 +796,17 @@ impl IngestorProcess {
         // so we explicitly drop it so that we can again utilize `read_error` below.
         drop(stream);
 
-        let processing_status = if read_error.is_some() {
-            "error"
+        if read_error.is_some() {
+            emit!(S3ObjectProcessingFailed {
+                bucket: &s3_event.s3.bucket.name,
+                duration: download_start.elapsed(),
+            });
         } else {
-            "success"
-        };
-        emit!(S3ObjectProcessingCompleted {
-            bucket: &s3_event.s3.bucket.name,
-            duration: download_start.elapsed(),
-            status: processing_status,
-        });
+            emit!(S3ObjectProcessingSucceeded {
+                bucket: &s3_event.s3.bucket.name,
+                duration: download_start.elapsed(),
+            });
+        }
 
         // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
         // reference must be dropped before the status of the batch is sent to the channel.
