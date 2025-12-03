@@ -1,16 +1,18 @@
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 
 use bytes::BytesMut;
 use serde::Serialize;
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
-    EstimatedJsonEncodedSizeOf, config::telemetry, request_metadata::GroupedCountByteSize,
+    EstimatedJsonEncodedSizeOf, config::telemetry, event::Value,
+    request_metadata::GroupedCountByteSize,
 };
 
 use super::sink::HecProcessedEvent;
 use crate::{
     codecs::Transformer,
-    event::{Event, LogEvent},
+    event::Event,
     internal_events::SplunkEventEncodeError,
     sinks::{splunk_hec::common::EndpointTarget, util::encoding::Encoder},
 };
@@ -27,7 +29,7 @@ pub enum HecEvent<'a> {
 pub struct HecData<'a> {
     #[serde(flatten)]
     pub event: HecEvent<'a>,
-    pub fields: LogEvent,
+    pub fields: BTreeMap<String, Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub time: Option<f64>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -41,7 +43,11 @@ pub struct HecData<'a> {
 }
 
 impl<'a> HecData<'a> {
-    pub const fn new(event: HecEvent<'a>, fields: LogEvent, time: Option<f64>) -> Self {
+    pub const fn new(
+        event: HecEvent<'a>,
+        fields: BTreeMap<String, Value>,
+        time: Option<f64>,
+    ) -> Self {
         Self {
             event,
             fields,
