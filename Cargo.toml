@@ -725,6 +725,7 @@ transforms-logs = [
   "transforms-lua",
   "transforms-metric_to_log",
   "transforms-reduce",
+  "transforms-redis",
   "transforms-remap",
   "transforms-route",
   "transforms-exclusive-route",
@@ -754,6 +755,7 @@ transforms-log_to_metric = []
 transforms-lua = ["dep:mlua", "vector-lib/lua"]
 transforms-metric_to_log = []
 transforms-reduce = ["transforms-impl-reduce"]
+transforms-redis = ["dep:redis"]
 transforms-remap = []
 transforms-route = []
 transforms-exclusive-route = []

@@ -32,3 +32,43 @@ impl InternalEvent for RedisReceiveEventError {
         .increment(1);
     }
 }
+
+#[derive(Debug)]
+pub struct RedisTransformLookupError {
+    pub error: String,
+}
+
+impl InternalEvent for RedisTransformLookupError {
+    fn emit(self) {
+        error!(
+            message = "Redis lookup failed.",
+            error = %self.error,
+            error_type = error_type::REQUEST_FAILED,
+            stage = error_stage::PROCESSING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_type" => error_type::REQUEST_FAILED,
+            "stage" => error_stage::PROCESSING,
+        )
+        .increment(1);
+    }
+}
+
+#[derive(Debug)]
+pub struct RedisTransformLruCacheHit;
+
+impl InternalEvent for RedisTransformLruCacheHit {
+    fn emit(self) {
+        counter!("component_cache_hits_total", "cache" => "redis_transform").increment(1);
+    }
+}
+
+#[derive(Debug)]
+pub struct RedisTransformLruCacheMiss;
+
+impl InternalEvent for RedisTransformLruCacheMiss {
+    fn emit(self) {
+        counter!("component_cache_misses_total", "cache" => "redis_transform").increment(1);
+    }
+}
