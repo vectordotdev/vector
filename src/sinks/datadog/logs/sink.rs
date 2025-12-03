@@ -23,9 +23,10 @@ pub struct EventPartitioner;
 impl Partitioner for EventPartitioner {
     type Item = Event;
     type Key = Option<Arc<str>>;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.metadata().datadog_api_key()
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+        Ok(item.metadata().datadog_api_key())
     }
 }
 
@@ -386,10 +387,15 @@ where
             conforms_as_agent: self.conforms_as_agent,
         });
 
-        let input = input.batched_partitioned(partitioner, || {
-            batch_settings.as_item_size_config(HttpJsonBatchSizer)
-        });
         input
+            .batched_partitioned(partitioner, || {
+                batch_settings.as_item_size_config(HttpJsonBatchSizer)
+            })
+            .filter_map(|result| async move {
+                result
+                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                    .ok()
+            })
             .concurrent_map(default_request_builder_concurrency_limit(), move |input| {
                 let builder = Arc::clone(&builder);
 

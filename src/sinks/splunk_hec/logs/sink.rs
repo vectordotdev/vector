@@ -88,6 +88,11 @@ where
                 },
                 || batch_settings.as_byte_size_config(),
             )
+            .filter_map(|result| async move {
+                result
+                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                    .ok()
+            })
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -155,9 +160,10 @@ impl EventPartitioner {
 
 impl Partitioner for EventPartitioner {
     type Item = HecProcessedEvent;
-    type Key = Option<Partitioned>;
+    type Key = Partitioned;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
         let emit_err = |error, field| {
             emit!(TemplateRenderingError {
                 error,
@@ -166,26 +172,35 @@ impl Partitioner for EventPartitioner {
             })
         };
 
-        let source = self.source.as_ref().and_then(|source| {
-            source
-                .render_string(&item.event)
-                .map_err(|error| emit_err(error, SOURCE_FIELD))
-                .ok()
-        });
+        let source = self
+            .source
+            .as_ref()
+            .map(|source| {
+                source
+                    .render_string(&item.event)
+                    .inspect_err(|error| emit_err(error.clone(), SOURCE_FIELD))
+            })
+            .transpose()?;
 
-        let sourcetype = self.sourcetype.as_ref().and_then(|sourcetype| {
-            sourcetype
-                .render_string(&item.event)
-                .map_err(|error| emit_err(error, SOURCETYPE_FIELD))
-                .ok()
-        });
+        let sourcetype = self
+            .sourcetype
+            .as_ref()
+            .map(|sourcetype| {
+                sourcetype
+                    .render_string(&item.event)
+                    .inspect_err(|error| emit_err(error.clone(), SOURCETYPE_FIELD))
+            })
+            .transpose()?;
 
-        let index = self.index.as_ref().and_then(|index| {
-            index
-                .render_string(&item.event)
-                .map_err(|error| emit_err(error, INDEX_FIELD))
-                .ok()
-        });
+        let index = self
+            .index
+            .as_ref()
+            .map(|index| {
+                index
+                    .render_string(&item.event)
+                    .inspect_err(|error| emit_err(error.clone(), INDEX_FIELD))
+            })
+            .transpose()?;
 
         let host = user_or_namespaced_path(
             &item.event,
@@ -196,7 +211,7 @@ impl Partitioner for EventPartitioner {
         .and_then(|path| item.event.get(&path))
         .and_then(|value| value.as_str().map(|s| s.to_string()));
 
-        Some(Partitioned {
+        Ok(Partitioned {
             token: item.event.metadata().splunk_hec_token(),
             source,
             sourcetype,

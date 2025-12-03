@@ -22,9 +22,10 @@ impl KeyPartitioner {
 
 impl Partitioner for KeyPartitioner {
     type Item = Event;
-    type Key = Option<String>;
+    type Key = String;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
         self.key_prefix_template
             .render_string(item)
             .or_else(|error| {
@@ -36,13 +37,13 @@ impl Partitioner for KeyPartitioner {
                     });
                     Ok(dead_letter_key_prefix.clone())
                 } else {
-                    Err(emit!(TemplateRenderingError {
-                        error,
+                    emit!(TemplateRenderingError {
+                        error: error.clone(),
                         field: Some("key_prefix"),
                         drop_event: true,
-                    }))
+                    });
+                    Err(error)
                 }
             })
-            .ok()
     }
 }

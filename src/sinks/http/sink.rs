@@ -46,7 +46,15 @@ where
             .batched_partitioned(KeyPartitioner::new(self.uri, self.headers), || {
                 self.batch_settings.as_item_size_config(batch_sizer.clone())
             })
-            .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .filter_map(|result| async move {
+                match result {
+                    Ok((key, batch)) => Some((key, batch)),
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
+                        None
+                    }
+                }
+            })
             // Build requests with default concurrency limit.
             .request_builder(
                 default_request_builder_concurrency_limit(),
@@ -105,36 +113,30 @@ impl KeyPartitioner {
 
 impl Partitioner for KeyPartitioner {
     type Item = Event;
-    type Key = Option<PartitionKey>;
+    type Key = PartitionKey;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, event: &Event) -> Self::Key {
-        let uri = self
-            .uri
-            .render_string(event)
-            .map_err(|error| {
-                emit!(TemplateRenderingError {
-                    error,
-                    field: Some("uri"),
-                    drop_event: true,
-                });
-            })
-            .ok()?;
+    fn partition(&self, event: &Event) -> Result<Self::Key, Self::Error> {
+        let uri = self.uri.render_string(event).inspect_err(|error| {
+            emit!(TemplateRenderingError {
+                error: error.clone(),
+                field: Some("uri"),
+                drop_event: true,
+            });
+        })?;
 
         let mut headers = BTreeMap::new();
         for (name, template) in &self.headers {
-            let value = template
-                .render_string(event)
-                .map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("headers"),
-                        drop_event: true,
-                    });
-                })
-                .ok()?;
+            let value = template.render_string(event).inspect_err(|error| {
+                emit!(TemplateRenderingError {
+                    error: error.clone(),
+                    field: Some("headers"),
+                    drop_event: true,
+                });
+            })?;
             headers.insert(name.clone(), value);
         }
 
-        Some(PartitionKey { uri, headers })
+        Ok(PartitionKey { uri, headers })
     }
 }

@@ -54,6 +54,11 @@ where
                 ))
             })
             .batched_partitioned(EventPartitioner, || batch_settings.as_byte_size_config())
+            .filter_map(|result| async move {
+                result
+                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                    .ok()
+            })
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -92,9 +97,10 @@ struct EventPartitioner;
 impl Partitioner for EventPartitioner {
     type Item = HecProcessedEvent;
     type Key = Option<Arc<str>>;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.event.metadata().splunk_hec_token()
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+        Ok(item.event.metadata().splunk_hec_token())
     }
 }
 

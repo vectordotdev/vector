@@ -55,11 +55,12 @@ pub(super) struct PrometheusTenantIdPartitioner;
 impl Partitioner for PrometheusTenantIdPartitioner {
     type Item = RemoteWriteMetric;
     type Key = PartitionKey;
+    type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        PartitionKey {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+        Ok(PartitionKey {
             tenant_id: item.tenant_id.clone(),
-        }
+        })
     }
 }
 
@@ -179,12 +180,20 @@ where
         input
             .filter_map(|event| future::ready(event.try_into_metric()))
             .normalized_with_ttl::<PrometheusMetricNormalize>(expire_metrics_secs)
-            .filter_map(move |event| {
-                future::ready(make_remote_write_event(tenant_id.as_ref(), event))
+            .map(move |event| make_remote_write_event(tenant_id.as_ref(), event))
+            .filter_map(|result| async move {
+                result
+                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                    .ok()
             })
             .batched_partitioned(PrometheusTenantIdPartitioner, || {
                 batch_settings
                     .as_reducer_config(ByteSizeOfItemSize, EventCollection::new(self.aggregate))
+            })
+            .filter_map(|result| async move {
+                result
+                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                    .ok()
             })
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
@@ -218,19 +227,18 @@ where
 fn make_remote_write_event(
     tenant_id: Option<&Template>,
     metric: Metric,
-) -> Option<RemoteWriteMetric> {
-    let tenant_id = tenant_id.and_then(|template| {
-        template
-            .render_string(&metric)
-            .map_err(|error| {
+) -> Result<RemoteWriteMetric, crate::template::TemplateRenderingError> {
+    let tenant_id = tenant_id
+        .map(|template| {
+            template.render_string(&metric).inspect_err(|error| {
                 emit!(TemplateRenderingError {
-                    error,
+                    error: error.clone(),
                     field: Some("tenant_id"),
                     drop_event: true,
                 })
             })
-            .ok()
-    });
+        })
+        .transpose()?;
 
-    Some(RemoteWriteMetric { metric, tenant_id })
+    Ok(RemoteWriteMetric { metric, tenant_id })
 }

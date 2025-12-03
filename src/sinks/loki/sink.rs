@@ -1,7 +1,7 @@
 use std::{collections::HashMap, num::NonZeroUsize};
 
 use bytes::{Bytes, BytesMut};
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
 use vrl::path::parse_target_path;
 
@@ -32,19 +32,21 @@ impl KeyPartitioner {
 impl Partitioner for KeyPartitioner {
     type Item = Event;
     type Key = Option<String>;
+    type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        self.0.as_ref().and_then(|t| {
-            t.render_string(item)
-                .map_err(|error| {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+        self.0
+            .as_ref()
+            .map(|t| {
+                t.render_string(item).inspect_err(|error| {
                     emit!(TemplateRenderingError {
-                        error,
+                        error: error.clone(),
                         field: Some("tenant_id"),
                         drop_event: false,
                     })
                 })
-                .ok()
-        })
+            })
+            .transpose()
     }
 }
 
@@ -55,8 +57,12 @@ impl Partitioner for RecordPartitioner {
     type Item = Option<FilteredRecord>;
     type Key = Option<PartitionKey>;
 
-    fn partition(&self, item: &Self::Item) -> Self::Key {
-        item.as_ref().map(|inner| inner.partition())
+    // NOTE: should this ever be able to return an actual error, the .expect should be
+    // removed and the code should properly handle partitioning errors
+    type Error = std::convert::Infallible;
+
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+        Ok(item.as_ref().map(|inner| inner.partition()))
     }
 }
 
@@ -70,6 +76,19 @@ pub struct LokiRequestBuilder {
 pub enum RequestBuildError {
     #[snafu(display("Failed to build payload with error: {}", error))]
     Io { error: std::io::Error },
+
+    #[snafu(display("Log event has no timestamp"))]
+    LogMissingTimestamp,
+
+    #[snafu(display("Failed to partition"))]
+    Partitioning {
+        source: crate::template::TemplateRenderingError,
+    },
+
+    #[snafu(display("Failed to encode event"))]
+    Encoding {
+        source: vector_lib::codecs::encoding::Error,
+    },
 }
 
 impl From<std::io::Error> for RequestBuildError {
@@ -293,8 +312,14 @@ impl EventEncoder {
         }
     }
 
-    pub(super) fn encode_event(&mut self, mut event: Event) -> Option<LokiRecord> {
-        let tenant_id = self.key_partitioner.partition(&event);
+    pub(super) fn encode_event(
+        &mut self,
+        mut event: Event,
+    ) -> Result<LokiRecord, RequestBuildError> {
+        let tenant_id = self
+            .key_partitioner
+            .partition(&event)
+            .context(PartitioningSnafu)?;
         let finalizers = event.take_finalizers();
         let json_byte_size = event.estimated_json_encoded_size_of();
         let mut labels: Vec<(String, String)> = self.build_labels(&event);
@@ -308,7 +333,7 @@ impl EventEncoder {
                 None => {
                     finalizers.update_status(EventStatus::Errored);
                     emit!(LokiTimestampNonParsableEventsDropped);
-                    return None;
+                    return Err(RequestBuildError::LogMissingTimestamp);
                 }
             },
             _ => chrono::Utc::now()
@@ -324,7 +349,9 @@ impl EventEncoder {
 
         self.transformer.transform(&mut event);
         let mut bytes = BytesMut::new();
-        self.encoder.encode(event, &mut bytes).ok();
+        self.encoder
+            .encode(event, &mut bytes)
+            .context(EncodingSnafu)?;
 
         // If no labels are provided we set our own default
         // `{agent="vector"}` label. This can happen if the only
@@ -336,7 +363,7 @@ impl EventEncoder {
 
         let partition = PartitionKey { tenant_id };
 
-        Some(LokiRecord {
+        Ok(LokiRecord {
             labels,
             event: LokiEvent {
                 timestamp,
@@ -496,7 +523,7 @@ impl LokiSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let mut encoder = self.encoder.clone();
+        let encoder = self.encoder.clone();
         let mut filter = RecordFilter::new(self.out_of_order_action);
 
         // out_of_order_action's that require a complete ordering are limited to building 1 request
@@ -510,10 +537,21 @@ impl LokiSink {
         let batch_settings = self.batch_settings;
 
         input
-            .map(|event| encoder.encode_event(event))
-            .filter_map(|event| async { event })
+            .filter_map(|event| {
+                let mut encoder = encoder.clone();
+                async move {
+                    match encoder.encode_event(event) {
+                        Ok(record) => Some(record),
+                        Err(error) => {
+                            emit!(SinkRequestBuildError { error });
+                            None
+                        }
+                    }
+                }
+            })
             .map(|record| filter.filter_record(record))
             .batched_partitioned(RecordPartitioner, || batch_settings.as_byte_size_config())
+            .map(|partition| partition.expect("RecordPartitioner::partitioner failed"))
             .filter_map(|(partition, batch)| async {
                 if let Some(partition) = partition {
                     let mut count: usize = 0;
@@ -953,7 +991,7 @@ mod tests {
             .collect::<Vec<_>>();
         let mut filter = RecordFilter::new(OutOfOrderAction::Drop);
         let stream = futures::stream::iter(events)
-            .map(|event| encoder.encode_event(event))
+            .map(|event| encoder.encode_event(event).ok())
             .filter_map(|event| async { event })
             .filter_map(|event| {
                 let res = filter.filter_record(event);
