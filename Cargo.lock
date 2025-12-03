@@ -12443,6 +12443,7 @@ dependencies = [
  "tempfile",
  "toml 0.9.8",
  "toml_edit 0.22.27",
+ "vrl",
 ]
 
 [[package]]
