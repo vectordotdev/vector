@@ -417,5 +417,9 @@ components: sources: [Name=string]: {
 		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 		source_lag_time_seconds:              components.sources.internal_metrics.output.metrics.source_lag_time_seconds
+		source_buffer_max_byte_size:          components.sources.internal_metrics.output.metrics.source_buffer_max_byte_size
+		source_buffer_max_event_size:         components.sources.internal_metrics.output.metrics.source_buffer_max_event_size
+		source_buffer_utilization:            components.sources.internal_metrics.output.metrics.source_buffer_utilization
+		source_buffer_utilization_level:      components.sources.internal_metrics.output.metrics.source_buffer_utilization_level
 	}
 }

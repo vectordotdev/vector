@@ -11,6 +11,7 @@ use std::{
 use async_stream::stream;
 use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
+use metrics::{Gauge, Histogram, gauge, histogram};
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
 
 use crate::{InMemoryBufferable, config::MemoryBufferSize};
@@ -88,12 +89,47 @@ where
     }
 }
 
+#[derive(Clone, Debug)]
+struct Metrics {
+    histogram: Histogram,
+    gauge: Gauge,
+    // We hold a handle to the max gauge to avoid it being dropped by the metrics collector, but
+    // since the value is static, we never need to update it. The compiler detects this as an unused
+    // field, so we need to suppress the warning here.
+    #[expect(dead_code)]
+    max_gauge: Gauge,
+}
+
+impl Metrics {
+    #[expect(clippy::cast_precision_loss)] // We have to convert buffer sizes for a gauge, it's okay to lose precision here.
+    fn new(limit: MemoryBufferSize, prefix: &'static str, output: &str) -> Self {
+        let (gauge_suffix, max_value) = match limit {
+            MemoryBufferSize::MaxEvents(max_events) => ("_max_event_size", max_events.get() as f64),
+            MemoryBufferSize::MaxSize(max_bytes) => ("_max_byte_size", max_bytes.get() as f64),
+        };
+        let max_gauge = gauge!(format!("{prefix}{gauge_suffix}"), "output" => output.to_string());
+        max_gauge.set(max_value);
+        Self {
+            histogram: histogram!(format!("{prefix}_utilization"), "output" => output.to_string()),
+            gauge: gauge!(format!("{prefix}_utilization_level"), "output" => output.to_string()),
+            max_gauge,
+        }
+    }
+
+    #[expect(clippy::cast_precision_loss)]
+    fn record(&self, value: usize) {
+        self.histogram.record(value as f64);
+        self.gauge.set(value as f64);
+    }
+}
+
 #[derive(Debug)]
 struct Inner<T> {
     data: Arc<dyn QueueImpl<(OwnedSemaphorePermit, T)>>,
     limit: MemoryBufferSize,
     limiter: Arc<Semaphore>,
     read_waker: Arc<Notify>,
+    metrics: Option<Metrics>,
 }
 
 impl<T> Clone for Inner<T> {
@@ -103,6 +139,42 @@ impl<T> Clone for Inner<T> {
             limit: self.limit,
             limiter: self.limiter.clone(),
             read_waker: self.read_waker.clone(),
+            metrics: self.metrics.clone(),
+        }
+    }
+}
+
+impl<T: InMemoryBufferable> Inner<T> {
+    fn new(limit: MemoryBufferSize, metric_name_output: Option<(&'static str, &str)>) -> Self {
+        let read_waker = Arc::new(Notify::new());
+        let metrics =
+            metric_name_output.map(|(prefix, output)| Metrics::new(limit, prefix, output));
+        match limit {
+            MemoryBufferSize::MaxEvents(max_events) => Inner {
+                data: Arc::new(ArrayQueue::new(max_events.get())),
+                limit,
+                limiter: Arc::new(Semaphore::new(max_events.get())),
+                read_waker,
+                metrics,
+            },
+            MemoryBufferSize::MaxSize(max_bytes) => Inner {
+                data: Arc::new(SegQueue::new()),
+                limit,
+                limiter: Arc::new(Semaphore::new(max_bytes.get())),
+                read_waker,
+                metrics,
+            },
+        }
+    }
+
+    fn send_with_permit(&mut self, total: usize, permits: OwnedSemaphorePermit, item: T) {
+        self.data.push((permits, item));
+        self.read_waker.notify_one();
+        // Due to the race between getting the available capacity, acquiring the permits, and the
+        // above push, the total may be inaccurate. Record it anyways as the histogram totals will
+        // _eventually_ converge on a true picture of the buffer utilization.
+        if let Some(metrics) = self.metrics.as_ref() {
+            metrics.record(total);
         }
     }
 }
@@ -115,7 +187,7 @@ pub struct LimitedSender<T> {
 
 impl<T: InMemoryBufferable> LimitedSender<T> {
     #[allow(clippy::cast_possible_truncation)]
-    fn get_required_permits_for_item(&self, item: &T) -> u32 {
+    fn calc_required_permits(&self, item: &T) -> (usize, usize, u32) {
         // We have to limit the number of permits we ask for to the overall limit since we're always
         // willing to store more items than the limit if the queue is entirely empty, because
         // otherwise we might deadlock ourselves by not being able to send a single item.
@@ -123,7 +195,8 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
             MemoryBufferSize::MaxSize(max_size) => (max_size, item.allocated_bytes()),
             MemoryBufferSize::MaxEvents(max_events) => (max_events, item.event_count()),
         };
-        cmp::min(limit.get(), value) as u32
+        let limit = limit.get();
+        (limit, value, cmp::min(limit, value) as u32)
     }
 
     /// Gets the number of items that this channel could accept.
@@ -139,23 +212,22 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
     /// with the given `item`.
     pub async fn send(&mut self, item: T) -> Result<(), SendError<T>> {
         // Calculate how many permits we need, and wait until we can acquire all of them.
-        let permits_required = self.get_required_permits_for_item(&item);
-        let Ok(permits) = self
+        let (limit, count, permits_required) = self.calc_required_permits(&item);
+        let in_use = limit.saturating_sub(self.available_capacity());
+        match self
             .inner
             .limiter
             .clone()
             .acquire_many_owned(permits_required)
             .await
-        else {
-            return Err(SendError(item));
-        };
-
-        self.inner.data.push((permits, item));
-        self.inner.read_waker.notify_one();
-
-        trace!("Sent item.");
-
-        Ok(())
+        {
+            Ok(permits) => {
+                self.inner.send_with_permit(in_use + count, permits, item);
+                trace!("Sent item.");
+                Ok(())
+            }
+            Err(_) => Err(SendError(item)),
+        }
     }
 
     /// Attempts to send an item into the channel.
@@ -172,28 +244,22 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
     /// Will panic if adding ack amount overflows.
     pub fn try_send(&mut self, item: T) -> Result<(), TrySendError<T>> {
         // Calculate how many permits we need, and try to acquire them all without waiting.
-        let permits_required = self.get_required_permits_for_item(&item);
-        let permits = match self
+        let (limit, count, permits_required) = self.calc_required_permits(&item);
+        let in_use = limit.saturating_sub(self.available_capacity());
+        match self
             .inner
             .limiter
             .clone()
             .try_acquire_many_owned(permits_required)
         {
-            Ok(permits) => permits,
-            Err(ae) => {
-                return match ae {
-                    TryAcquireError::NoPermits => Err(TrySendError::InsufficientCapacity(item)),
-                    TryAcquireError::Closed => Err(TrySendError::Disconnected(item)),
-                };
+            Ok(permits) => {
+                self.inner.send_with_permit(in_use + count, permits, item);
+                trace!("Attempt to send item succeeded.");
+                Ok(())
             }
-        };
-
-        self.inner.data.push((permits, item));
-        self.inner.read_waker.notify_one();
-
-        trace!("Attempt to send item succeeded.");
-
-        Ok(())
+            Err(TryAcquireError::NoPermits) => Err(TrySendError::InsufficientCapacity(item)),
+            Err(TryAcquireError::Closed) => Err(TrySendError::Disconnected(item)),
+        }
     }
 }
 
@@ -269,21 +335,9 @@ impl<T> Drop for LimitedReceiver<T> {
 
 pub fn limited<T: InMemoryBufferable + fmt::Debug>(
     limit: MemoryBufferSize,
+    metric_name_output: Option<(&'static str, &str)>,
 ) -> (LimitedSender<T>, LimitedReceiver<T>) {
-    let inner = match limit {
-        MemoryBufferSize::MaxEvents(max_events) => Inner {
-            data: Arc::new(ArrayQueue::new(max_events.get())),
-            limit,
-            limiter: Arc::new(Semaphore::new(max_events.get())),
-            read_waker: Arc::new(Notify::new()),
-        },
-        MemoryBufferSize::MaxSize(max_size) => Inner {
-            data: Arc::new(SegQueue::new()),
-            limit,
-            limiter: Arc::new(Semaphore::new(max_size.get())),
-            read_waker: Arc::new(Notify::new()),
-        },
-    };
+    let inner = Inner::new(limit, metric_name_output);
 
     let sender = LimitedSender {
         inner: inner.clone(),
@@ -310,7 +364,8 @@ mod tests {
 
     #[tokio::test]
     async fn send_receive() {
-        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap()));
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
+        let (mut tx, mut rx) = limited(limit, None);
 
         assert_eq!(2, tx.available_capacity());
 
@@ -344,9 +399,8 @@ mod tests {
         let max_allowed_bytes = msg_size * max_elements;
 
         // With this configuration a maximum of exactly 10 messages can fit in the channel
-        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxSize(
-            NonZeroUsize::new(max_allowed_bytes).unwrap(),
-        ));
+        let limit = MemoryBufferSize::MaxSize(NonZeroUsize::new(max_allowed_bytes).unwrap());
+        let (mut tx, mut rx) = limited(limit, None);
 
         assert_eq!(max_allowed_bytes, tx.available_capacity());
 
@@ -379,7 +433,8 @@ mod tests {
 
     #[test]
     fn sender_waits_for_more_capacity_when_none_available() {
-        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()));
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap());
+        let (mut tx, mut rx) = limited(limit, None);
 
         assert_eq!(1, tx.available_capacity());
 
@@ -440,7 +495,8 @@ mod tests {
 
     #[test]
     fn sender_waits_for_more_capacity_when_partial_available() {
-        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(7).unwrap()));
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(7).unwrap());
+        let (mut tx, mut rx) = limited(limit, None);
 
         assert_eq!(7, tx.available_capacity());
 
@@ -528,7 +584,8 @@ mod tests {
 
     #[test]
     fn empty_receiver_returns_none_when_last_sender_drops() {
-        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()));
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap());
+        let (mut tx, mut rx) = limited(limit, None);
 
         assert_eq!(1, tx.available_capacity());
 
@@ -570,8 +627,8 @@ mod tests {
 
     #[test]
     fn receiver_returns_none_once_empty_when_last_sender_drops() {
-        let (tx, mut rx) =
-            limited::<Sample>(MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()));
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap());
+        let (tx, mut rx) = limited::<Sample>(limit, None);
 
         assert_eq!(1, tx.available_capacity());
 
@@ -600,7 +657,8 @@ mod tests {
 
     #[test]
     fn oversized_send_allowed_when_empty() {
-        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap()));
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(1).unwrap());
+        let (mut tx, mut rx) = limited(limit, None);
 
         assert_eq!(1, tx.available_capacity());
 
@@ -632,7 +690,8 @@ mod tests {
 
     #[test]
     fn oversized_send_allowed_when_partial_capacity() {
-        let (mut tx, mut rx) = limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap()));
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
+        let (mut tx, mut rx) = limited(limit, None);
 
         assert_eq!(2, tx.available_capacity());
 

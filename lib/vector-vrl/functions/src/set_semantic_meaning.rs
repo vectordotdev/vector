@@ -50,11 +50,11 @@ impl Function for SetSemanticMeaning {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "Sets custom field semantic meaning",
             source: r#"set_semantic_meaning(.foo, "bar")"#,
             result: Ok("null"),
-        }]
+        )]
     }
 
     fn compile(

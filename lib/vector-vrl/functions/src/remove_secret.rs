@@ -23,11 +23,11 @@ impl Function for RemoveSecret {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "Remove the datadog api key",
             source: r#"remove_secret("datadog_api_key")"#,
             result: Ok("null"),
-        }]
+        )]
     }
 
     fn compile(

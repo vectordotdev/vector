@@ -26,11 +26,11 @@ impl Function for GetSecret {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "Get the datadog api key",
             source: r#"get_secret("datadog_api_key")"#,
             result: Ok("secret value"),
-        }]
+        )]
     }
 
     fn compile(
