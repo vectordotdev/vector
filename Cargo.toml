@@ -401,7 +401,7 @@ pulsar = { version = "6.3.1", default-features = false, features = ["tokio-runti
 quick-junit = { version = "0.5.1" }
 rand.workspace = true
 rand_distr.workspace = true
-rdkafka = { version = "0.37.0", default-features = false, features = ["curl-static", "tokio", "libz", "ssl", "zstd"], optional = true }
+rdkafka = { version = "0.37.0", default-features = false, features = ["tokio", "libz", "ssl", "zstd"], optional = true }
 redis = { version = "0.32.4", default-features = false, features = ["connection-manager", "sentinel", "tokio-comp", "tokio-native-tls-comp"], optional = true }
 regex.workspace = true
 roaring = { version = "0.11.2", default-features = false, features = ["std"], optional = true }
@@ -529,6 +529,10 @@ target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build",
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
 allocation-tracing = ["vector-lib/allocation-tracing"]
+
+# rdkafka curl linking selection
+rdkafka-curl-static = ["rdkafka/curl-static"]
+rdkafka-curl-dynamic = ["rdkafka/curl"]
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
@@ -669,7 +673,7 @@ sources-internal_logs = []
 sources-internal_metrics = []
 sources-static_metrics = []
 sources-journald = []
-sources-kafka = ["dep:rdkafka"]
+sources-kafka = ["dep:rdkafka", "rdkafka-curl-static"]
 sources-kubernetes_logs = ["vector-lib/file-source", "kubernetes", "transforms-reduce"]
 sources-logstash = ["sources-utils-net-tcp", "tokio-util/net"]
 sources-mongodb_metrics = ["dep:mongodb"]
@@ -868,7 +872,7 @@ sinks-honeycomb = []
 sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
-sinks-kafka = ["dep:rdkafka"]
+sinks-kafka = ["dep:rdkafka", "rdkafka-curl-static"]
 sinks-keep = []
 sinks-mezmo = []
 sinks-loki = ["loki-logproto"]
