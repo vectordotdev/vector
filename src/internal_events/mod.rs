@@ -50,6 +50,12 @@ mod encoding_transcode;
 mod eventstoredb_metrics;
 #[cfg(feature = "sources-exec")]
 mod exec;
+#[cfg(any(
+    feature = "sources-file",
+    feature = "sources-kubernetes_logs",
+    feature = "sinks-file",
+))]
+mod file;
 #[cfg(any(feature = "sources-file_descriptor", feature = "sources-stdin"))]
 mod file_descriptor;
 #[cfg(feature = "transforms-filter")]
@@ -143,12 +149,6 @@ mod websocket_server;
 mod window;
 #[cfg(all(windows, feature = "sources-windows_event_log"))]
 mod windows_event_log;
-#[cfg(any(
-    feature = "sources-file",
-    feature = "sources-kubernetes_logs",
-    feature = "sinks-file",
-))]
-mod file;
 
 #[cfg(windows)]
 mod windows;

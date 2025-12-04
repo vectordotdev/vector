@@ -64,13 +64,6 @@ pub struct WindowsEventLogConfig {
     #[configurable(metadata(docs::examples = 100))]
     pub batch_size: u32,
 
-    /// Whether to render the event message.
-    ///
-    /// When enabled, the source will attempt to render the full event message
-    /// using the event's provider message file.
-    #[serde(default = "default_render_message")]
-    pub render_message: bool,
-
     /// Whether to include raw XML data in the output.
     ///
     /// When enabled, the raw XML representation of the event is included
@@ -156,6 +149,20 @@ pub struct WindowsEventLogConfig {
     #[configurable(metadata(docs::examples = 1024))]
     #[configurable(metadata(docs::examples = 4096))]
     pub max_event_data_length: usize,
+
+    /// Whether to render human-readable event messages.
+    ///
+    /// When enabled, Vector will use the Windows EvtFormatMessage API to render
+    /// localized, human-readable event messages with parameter substitution.
+    /// This matches the behavior of tools like Windows Event Viewer, Winlogbeat,
+    /// and Splunk Universal Forwarder.
+    ///
+    /// Note: This requires loading provider DLLs from disk, which may impact
+    /// performance for high-volume event sources. When disabled (default),
+    /// the message field will contain either raw event data or a generic
+    /// placeholder like "Event ID 1234 from Provider on Computer".
+    #[serde(default = "default_render_message")]
+    pub render_message: bool,
 
     /// Controls how acknowledgements are handled for this source.
     ///
@@ -247,7 +254,6 @@ impl Default for WindowsEventLogConfig {
             connection_timeout_secs: default_connection_timeout_secs(),
             read_existing_events: default_read_existing_events(),
             batch_size: default_batch_size(),
-            render_message: default_render_message(),
             include_xml: default_include_xml(),
             event_data_format: HashMap::new(),
             ignore_event_ids: Vec::new(),
@@ -259,6 +265,7 @@ impl Default for WindowsEventLogConfig {
             data_dir: None,
             events_per_second: default_events_per_second(),
             max_event_data_length: default_max_event_data_length(),
+            render_message: default_render_message(),
             acknowledgements: Default::default(),
         }
     }
@@ -526,10 +533,6 @@ const fn default_batch_size() -> u32 {
     10
 }
 
-const fn default_render_message() -> bool {
-    true
-}
-
 const fn default_include_xml() -> bool {
     false
 }
@@ -554,6 +557,10 @@ const fn default_max_event_data_length() -> usize {
     0 // 0 means no truncation (matches Winlogbeat)
 }
 
+const fn default_render_message() -> bool {
+    false // Disabled by default for performance
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -566,8 +573,8 @@ mod tests {
         assert_eq!(config.event_timeout_ms, 5000);
         assert!(!config.read_existing_events);
         assert_eq!(config.batch_size, 10);
-        assert!(config.render_message);
         assert!(!config.include_xml);
+        assert!(!config.render_message); // Disabled by default for performance
     }
 
     #[test]
@@ -629,7 +636,6 @@ mod tests {
             connection_timeout_secs: 30,
             read_existing_events: true,
             batch_size: 50,
-            render_message: false,
             include_xml: true,
             event_data_format: HashMap::new(),
             ignore_event_ids: vec![4624, 4625],
@@ -641,6 +647,7 @@ mod tests {
             data_dir: PathBuf::from("/test/data"),
             events_per_second: 1000,
             max_event_data_length: 0,
+            render_message: true,
             acknowledgements: SourceAcknowledgementsConfig::from(true),
         };
 
@@ -660,6 +667,7 @@ mod tests {
             deserialized.read_existing_events
         );
         assert_eq!(config.batch_size, deserialized.batch_size);
+        assert_eq!(config.render_message, deserialized.render_message);
     }
 
     #[test]

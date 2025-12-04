@@ -1055,56 +1055,11 @@ impl EventLogSubscription {
         }
     }
 
-    fn extract_message_from_xml(
-        xml: &str,
-        event_id: u32,
-        provider_name: &str,
-        computer: &str,
-        config: &WindowsEventLogConfig,
-    ) -> Option<String> {
-        let event_data_result = Self::extract_event_data(xml, config);
-        let event_data = &event_data_result.structured_data;
-
-        match event_id {
-            6009 => {
-                if let (Some(version), Some(build)) =
-                    (event_data.get("Data_0"), event_data.get("Data_1"))
-                {
-                    return Some(format!(
-                        "Microsoft Windows kernel version {} build {} started",
-                        version, build
-                    ));
-                }
-            }
-            _ => {
-                if !event_data.is_empty() {
-                    let data_summary: Vec<String> = event_data
-                        .iter()
-                        .take(3)
-                        .map(|(k, v)| format!("{}={}", k, v))
-                        .collect();
-                    if !data_summary.is_empty() {
-                        return Some(format!(
-                            "Event ID {} from {} ({})",
-                            event_id,
-                            provider_name,
-                            data_summary.join(", ")
-                        ));
-                    }
-                }
-            }
-        }
-
-        Some(format!(
-            "Event ID {} from {} on {}",
-            event_id, provider_name, computer
-        ))
-    }
-
     fn parse_event_xml(
         xml: String,
         channel: &str,
         config: &WindowsEventLogConfig,
+        rendered_message: Option<String>,
     ) -> Result<Option<WindowsEvent>, WindowsEventLogError> {
         // Extract basic event information with validation
         let record_id = Self::extract_xml_attribute(&xml, "EventRecordID")
@@ -1168,15 +1123,6 @@ impl EventLogSubscription {
         let system_fields = Self::extract_system_fields(&xml);
         let event_data_result = Self::extract_event_data(&xml, config);
 
-        // Extract message from XML event data
-        let rendered_message = Self::extract_message_from_xml(
-            &xml,
-            system_fields.event_id,
-            &system_fields.provider_name,
-            &system_fields.computer,
-            config,
-        );
-
         let event = WindowsEvent {
             record_id: system_fields.record_id,
             event_id: system_fields.event_id,
@@ -1194,6 +1140,8 @@ impl EventLogSubscription {
             thread_id: system_fields.thread_id,
             activity_id: system_fields.activity_id,
             related_activity_id: system_fields.related_activity_id,
+            // Use rendered message from EvtFormatMessage if available
+            rendered_message,
             raw_xml: if config.include_xml {
                 // Limit XML size for security
                 if xml.len() > 32768 {
@@ -1206,7 +1154,6 @@ impl EventLogSubscription {
             } else {
                 String::new()
             },
-            rendered_message,
             event_data: event_data_result.structured_data,
             user_data: event_data_result.user_data,
             // New fields for FluentBit compatibility
@@ -1220,6 +1167,99 @@ impl EventLogSubscription {
 }
 
 // CallbackContext cleanup is handled in SubscriptionHandle::drop via Arc::from_raw
+
+/// Renders a human-readable event message using the Windows EvtFormatMessage API.
+///
+/// This function looks up the provider's message catalog (typically in a DLL) and
+/// substitutes event-specific parameters to produce a localized, human-readable message.
+/// This matches the behavior of Windows Event Viewer, Winlogbeat, and Splunk UF.
+///
+/// Returns `None` if:
+/// - The provider metadata cannot be found (third-party apps without registered providers)
+/// - The message template is not available for this event
+/// - The formatted message is empty
+///
+/// # Safety
+/// This function uses unsafe FFI calls to Windows APIs. The event_handle must be valid.
+#[cfg(windows)]
+fn format_event_message(
+    event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
+    provider_name: &str,
+) -> Option<String> {
+    use windows::Win32::System::EventLog::{
+        EvtClose, EvtFormatMessage, EvtFormatMessageEvent, EvtOpenPublisherMetadata,
+    };
+    use windows::core::HSTRING;
+
+    const MAX_MESSAGE_SIZE: usize = 64 * 1024; // 64KB max for messages
+
+    // Open publisher metadata to get message templates
+    let provider_hstring = HSTRING::from(provider_name);
+    let metadata_handle = unsafe {
+        match EvtOpenPublisherMetadata(None, &provider_hstring, None, 0, 0) {
+            Ok(handle) => handle,
+            Err(_) => return None, // Provider not found - graceful fallback
+        }
+    };
+
+    // Two-pass buffer allocation for EvtFormatMessage
+    // First call with None buffer to get required size
+    let mut buffer_used: u32 = 0;
+    let _ = unsafe {
+        EvtFormatMessage(
+            metadata_handle,
+            event_handle,
+            0,
+            None,
+            EvtFormatMessageEvent.0,
+            None,
+            &mut buffer_used,
+        )
+    };
+
+    // Check if we got a valid size
+    if buffer_used == 0 || buffer_used as usize > MAX_MESSAGE_SIZE {
+        unsafe {
+            let _ = EvtClose(metadata_handle);
+        }
+        return None;
+    }
+
+    // Allocate buffer and get the formatted message
+    let mut buffer = vec![0u16; buffer_used as usize];
+    let mut actual_used: u32 = 0;
+
+    let result = unsafe {
+        EvtFormatMessage(
+            metadata_handle,
+            event_handle,
+            0,
+            None,
+            EvtFormatMessageEvent.0,
+            Some(&mut buffer),
+            &mut actual_used,
+        )
+    };
+
+    // Close metadata handle regardless of result
+    unsafe {
+        let _ = EvtClose(metadata_handle);
+    }
+
+    if result.is_err() {
+        return None;
+    }
+
+    // Convert UTF-16 to String, trimming null terminator
+    let len = buffer.iter().position(|&c| c == 0).unwrap_or(buffer.len());
+    let message = String::from_utf16_lossy(&buffer[..len]);
+
+    if message.is_empty() {
+        None
+    } else {
+        Some(message)
+    }
+}
 
 // Windows Event Log subscription callback function
 #[cfg(windows)]
@@ -1481,8 +1521,24 @@ fn process_callback_event(
     let channel = EventLogSubscription::extract_xml_value(&xml, "Channel")
         .unwrap_or_else(|| "Unknown".to_string());
 
+    // Render message if enabled - must be done BEFORE parse_event_xml
+    // because we need the event_handle which is only valid in this callback
+    let rendered_message = if ctx.config.render_message {
+        // Extract provider name for message rendering
+        let provider_name = EventLogSubscription::extract_provider_name(&xml).unwrap_or_default();
+        if !provider_name.is_empty() {
+            format_event_message(event_handle, &provider_name)
+        } else {
+            None
+        }
+    } else {
+        None
+    };
+
     // Parse the XML to extract event data
-    if let Ok(Some(event)) = EventLogSubscription::parse_event_xml(xml, &channel, &ctx.config) {
+    if let Ok(Some(event)) =
+        EventLogSubscription::parse_event_xml(xml, &channel, &ctx.config, rendered_message)
+    {
         let event_channel = event.channel.clone();
 
         if let Err(e) = ctx.event_sender.send(event) {
@@ -2225,9 +2281,9 @@ mod tests {
         );
     }
 
-    /// Test that parse_event_xml extracts message from XML
+    /// Test that parse_event_xml parses basic event structure
     #[test]
-    fn test_parse_event_xml_extracts_message() {
+    fn test_parse_event_xml_basic() {
         let xml = r#"
         <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
             <System>
@@ -2244,16 +2300,54 @@ mod tests {
 
         let config = WindowsEventLogConfig::default();
 
-        let result = EventLogSubscription::parse_event_xml(xml.to_string(), "Application", &config);
+        let result =
+            EventLogSubscription::parse_event_xml(xml.to_string(), "Application", &config, None);
 
         let event = result.unwrap().unwrap();
+        assert_eq!(event.event_id, 1000);
+        assert_eq!(event.record_id, 12345);
+        assert_eq!(event.provider_name, "TestProvider");
+        assert_eq!(event.channel, "Application");
+        assert_eq!(event.computer, "TEST-PC");
+        // rendered_message is None when not passed
         assert!(
-            event.rendered_message.is_some(),
-            "Should extract message from XML"
+            event.rendered_message.is_none(),
+            "rendered_message should be None when not provided"
         );
-        assert!(
-            event.rendered_message.as_ref().unwrap().contains("1000"),
-            "Message should contain event ID"
+    }
+
+    /// Test that parse_event_xml correctly uses provided rendered_message
+    #[test]
+    fn test_parse_event_xml_with_rendered_message() {
+        let xml = r#"
+        <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+            <System>
+                <Provider Name="TestProvider"/>
+                <EventID>1000</EventID>
+                <Level>4</Level>
+                <EventRecordID>12345</EventRecordID>
+                <TimeCreated SystemTime="2025-01-01T00:00:00.000000Z"/>
+                <Channel>Application</Channel>
+                <Computer>TEST-PC</Computer>
+            </System>
+        </Event>
+        "#;
+
+        let config = WindowsEventLogConfig::default();
+        let rendered_msg = Some("The application started successfully.".to_string());
+
+        let result = EventLogSubscription::parse_event_xml(
+            xml.to_string(),
+            "Application",
+            &config,
+            rendered_msg,
+        );
+
+        let event = result.unwrap().unwrap();
+        assert_eq!(event.event_id, 1000);
+        assert_eq!(
+            event.rendered_message,
+            Some("The application started successfully.".to_string())
         );
     }
 }
