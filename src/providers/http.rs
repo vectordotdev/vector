@@ -9,7 +9,7 @@ use vector_lib::configurable::configurable_component;
 
 use super::BuildResult;
 use crate::{
-    config::{self, Format, ProxyConfig, provider::ProviderConfig},
+    config::{self, interpolate, Format, ProxyConfig, provider::ProviderConfig},
     http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},
@@ -56,6 +56,9 @@ pub struct HttpConfig {
     /// Which config format expected to be loaded
     #[configurable(derived)]
     config_format: Format,
+
+    /// Enable environment variable interpolation
+    interpolate_env: bool,
 }
 
 impl Default for HttpConfig {
@@ -67,6 +70,7 @@ impl Default for HttpConfig {
             tls_options: None,
             proxy: Default::default(),
             config_format: Format::default(),
+            interpolate_env: false,
         }
     }
 }
@@ -131,12 +135,30 @@ async fn http_request_to_config_builder(
     headers: &IndexMap<String, String>,
     proxy: &ProxyConfig,
     config_format: &Format,
+    interpolate_env: bool,
 ) -> BuildResult {
     let config_str = http_request(url, tls_options, headers, proxy)
         .await
         .map_err(|e| vec![e.to_owned()])?;
 
-    config::load(config_str.chunk(), *config_format)
+    if !interpolate_env {
+        return config::load(config_str.chunk(), *config_format);
+    }
+
+    let env_vars = std::env::vars_os()
+        .map(|(k, v)| {
+            (
+                k.into_string().unwrap_or_default(),
+                v.into_string().unwrap_or_default(),
+            )
+        })
+        .collect::<std::collections::HashMap<String, String>>();
+
+    let config_str = interpolate(std::str::from_utf8(&config_str)
+        .map_err(|e| vec![e.to_string()])?,
+        &env_vars)?;
+
+    config::load(config_str.as_bytes().chunk(), *config_format)
 }
 
 /// Polls the HTTP endpoint after/every `poll_interval_secs`, returning a stream of `ConfigBuilder`.
@@ -147,6 +169,7 @@ fn poll_http(
     headers: IndexMap<String, String>,
     proxy: ProxyConfig,
     config_format: Format,
+    interpolate_env: bool,
 ) -> impl Stream<Item = signal::SignalTo> {
     let duration = time::Duration::from_secs(poll_interval_secs);
     let mut interval = time::interval_at(time::Instant::now() + duration, duration);
@@ -155,7 +178,7 @@ fn poll_http(
         loop {
             interval.tick().await;
 
-            match http_request_to_config_builder(&url, tls_options.as_ref(), &headers, &proxy, &config_format).await {
+            match http_request_to_config_builder(&url, tls_options.as_ref(), &headers, &proxy, &config_format, interpolate_env).await {
                 Ok(config_builder) => yield signal::SignalTo::ReloadFromConfigBuilder(config_builder),
                 Err(_) => {},
             };
@@ -187,6 +210,7 @@ impl ProviderConfig for HttpConfig {
             &request.headers,
             &proxy,
             &config_format,
+            self.interpolate_env,
         )
         .await?;
 
@@ -198,6 +222,7 @@ impl ProviderConfig for HttpConfig {
             request.headers.clone(),
             proxy.clone(),
             config_format,
+            self.interpolate_env,
         ));
 
         Ok(config_builder)
