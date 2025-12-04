@@ -85,6 +85,19 @@ pub struct RedisTransformConfig {
     #[configurable(metadata(docs::examples = 300000, docs::examples = 3600000))]
     #[configurable(metadata(docs::type_unit = "milliseconds"))]
     pub cache_ttl: Option<Duration>,
+
+    /// Maximum number of concurrent Redis lookups.
+    ///
+    /// This limits the number of Redis lookups that can be in-flight simultaneously.
+    /// Higher values allow more parallelism but may increase Redis connection pressure.
+    ///
+    /// Defaults to 100 if not specified.
+    #[configurable(metadata(docs::examples = 50, docs::examples = 200))]
+    pub concurrency_limit: Option<NonZeroUsize>,
+}
+
+fn default_concurrency_limit() -> NonZeroUsize {
+    NonZeroUsize::new(100).expect("concurrency limit must be at least 1")
 }
 
 impl GenerateConfig for RedisTransformConfig {
@@ -125,6 +138,7 @@ impl TransformConfig for RedisTransformConfig {
                 self.default_value.clone(),
                 self.cache_max_size,
                 self.cache_ttl,
+                self.concurrency_limit.unwrap_or_else(default_concurrency_limit),
             ),
         ))
     }

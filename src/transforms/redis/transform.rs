@@ -30,6 +30,7 @@ pub struct RedisTransform {
     default_value: Option<String>,
     cache: Option<Arc<Mutex<LruCache<String, (Option<String>, Instant)>>>>,
     cache_ttl: Option<Duration>,
+    concurrency_limit: NonZeroUsize,
 }
 
 impl RedisTransform {
@@ -40,6 +41,7 @@ impl RedisTransform {
         default_value: Option<String>,
         cache_max_size: Option<NonZeroUsize>,
         cache_ttl: Option<Duration>,
+        concurrency_limit: NonZeroUsize,
     ) -> Self {
         let cache = cache_max_size.map(|max_size| Arc::new(Mutex::new(LruCache::new(max_size))));
 
@@ -50,6 +52,7 @@ impl RedisTransform {
             default_value,
             cache,
             cache_ttl,
+            concurrency_limit,
         }
     }
 
@@ -151,9 +154,7 @@ impl TaskTransform<Event> for RedisTransform {
         let default_value = self.default_value;
         let cache = self.cache.clone();
         let cache_ttl = self.cache_ttl;
-
-        let concurrency_limit =
-            NonZeroUsize::new(100).expect("concurrency limit must be at least 1");
+        let concurrency_limit = self.concurrency_limit;
 
         Box::pin(ConcurrentMap::new(
             input_rx,
