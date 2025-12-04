@@ -143,7 +143,6 @@ mod websocket_server;
 mod window;
 #[cfg(all(windows, feature = "sources-windows_event_log"))]
 mod windows_event_log;
-
 #[cfg(any(
     feature = "sources-file",
     feature = "sources-kubernetes_logs",
@@ -299,5 +298,3 @@ pub use self::{
     adaptive_concurrency::*, batch::*, common::*, conditions::*, encoding_transcode::*,
     heartbeat::*, http::*, open::*, process::*, socket::*, tcp::*, template::*, udp::*,
 };
-
-pub use vector_lib::internal_event::EventsReceived;
