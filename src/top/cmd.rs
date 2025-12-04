@@ -57,7 +57,7 @@ pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> e
     // Channel for shutdown signal
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
-    let connection = tokio::spawn(subscription(opts.clone(), client, tx, shutdown_tx));
+    let connection = tokio::spawn(subscription(opts.clone(), client, tx.clone(), shutdown_tx));
 
     // Initialize the dashboard
     match init_dashboard(
@@ -65,6 +65,7 @@ pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> e
         opts.url().as_str(),
         opts.interval,
         opts.human_metrics,
+        tx,
         state_rx,
         shutdown_rx,
     )

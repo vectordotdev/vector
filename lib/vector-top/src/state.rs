@@ -5,6 +5,7 @@ use std::{
 
 use chrono::{DateTime, Local};
 use ratatui::{
+    layout::Size,
     style::{Color, Style},
     text::Span,
 };
@@ -45,6 +46,17 @@ pub enum EventType {
     ComponentAdded(ComponentRow),
     ComponentRemoved(ComponentKey),
     ConnectionUpdated(ConnectionStatus),
+    Ui(UiEventType),
+}
+
+#[derive(Debug)]
+pub enum UiEventType {
+    // Scroll up (-) or down (+). Also passes the window size for correct max scroll calculation.
+    ScrollEvent(isize, Size),
+    // Scroll up (-) or down (+) by a whole page. Also passes the window size for page size and max scroll calculation.
+    ScrollPageEvent(isize, Size),
+    // Toggles help window
+    ToggleHelp,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -82,6 +94,60 @@ pub struct State {
     pub connection_status: ConnectionStatus,
     pub uptime: Duration,
     pub components: BTreeMap<ComponentKey, ComponentRow>,
+    pub ui: UiState,
+}
+
+#[derive(Debug, Clone)]
+pub struct UiState {
+    pub scroll: usize,
+    pub help_visible: bool,
+}
+
+impl Default for UiState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl UiState {
+    pub const fn new() -> Self {
+        Self {
+            scroll: 0,
+            help_visible: false,
+        }
+    }
+
+    /// Returns the height of components display box in rows, based on provided [`Size`].
+    /// Calculates by deducting rows used for header and footer.
+    pub fn components_box_height(area: Size) -> u16 {
+        // Currently hardcoded (10 is the number of rows the header and footer take up)
+        area.height.saturating_sub(10)
+    }
+
+    /// Returns the maximum scroll value
+    pub fn max_scroll(area: Size, components_count: usize) -> usize {
+        components_count.saturating_sub(Self::components_box_height(area).into())
+    }
+
+    /// Changes current scroll by provided diff in rows. Uses [`Size`] to limit scroll,
+    /// so that scrolling down is possible until the last component is visible.
+    pub fn scroll(&mut self, diff: isize, area: Size, components_count: usize) {
+        let max_scroll = Self::max_scroll(area, components_count);
+        self.scroll = self.scroll.saturating_add_signed(diff);
+        if self.scroll > max_scroll {
+            self.scroll = max_scroll;
+        }
+    }
+
+    /// Changes current scroll by provided diff in pages. Uses [`Size`] to limit scroll,
+    /// and to calculate number of rows a page contains.
+    pub fn scroll_page(&mut self, diff: isize, area: Size, components_count: usize) {
+        self.scroll(
+            diff * (Self::components_box_height(area) as isize),
+            area,
+            components_count,
+        );
+    }
 }
 
 impl State {
@@ -90,6 +156,7 @@ impl State {
             connection_status: ConnectionStatus::Pending,
             uptime: Duration::from_secs(0),
             components,
+            ui: UiState::new(),
         }
     }
 }
@@ -253,6 +320,15 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                 EventType::UptimeChanged(uptime) => {
                     state.uptime = Duration::from_secs_f64(uptime);
                 }
+                EventType::Ui(ui_event_type) => match ui_event_type {
+                    UiEventType::ScrollEvent(diff, area) => {
+                        state.ui.scroll(diff, area, state.components.len());
+                    }
+                    UiEventType::ScrollPageEvent(diff, area) => {
+                        state.ui.scroll_page(diff, area, state.components.len());
+                    }
+                    UiEventType::ToggleHelp => state.ui.help_visible = !state.ui.help_visible,
+                },
             }
 
             // Send updated map to listeners

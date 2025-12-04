@@ -3,7 +3,7 @@ use std::{io::stdout, time::Duration};
 use crossterm::{
     ExecutableCommand,
     cursor::Show,
-    event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
+    event::{DisableMouseCapture, EnableMouseCapture, KeyCode, KeyModifiers},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     tty::IsTty,
@@ -12,13 +12,18 @@ use num_format::{Locale, ToFormattedString};
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Layout, Rect},
+    layout::{Alignment, Constraint, Flex, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
+    widgets::{
+        Block, Borders, Cell, Clear, Paragraph, Row, Scrollbar, ScrollbarOrientation,
+        ScrollbarState, Table, TableState, Wrap,
+    },
 };
 use tokio::sync::oneshot;
 use unit_prefix::NumberPrefix;
+
+use crate::state::{EventType, UiEventType};
 
 use super::{
     events::capture_key_press,
@@ -310,7 +315,34 @@ impl<'a> Widgets<'a> {
             .header(Row::new(header).bottom_margin(1))
             .block(Block::default().borders(Borders::ALL).title("Components"))
             .column_spacing(2);
-        f.render_widget(w, area);
+        f.render_stateful_widget(
+            w,
+            area,
+            // We don't need selection, so just create a table state for the scroll
+            &mut TableState::new().with_offset(state.ui.scroll),
+        );
+        // Skip the border + header row + 1 row of padding as well as the bottom border
+        let scrollbar_area = Rect::new(area.x, area.y + 3, area.width, area.height - 4);
+        f.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(Some("↑"))
+                .end_symbol(Some("↓")),
+            scrollbar_area,
+            &mut ScrollbarState::new(
+                // Maximum allowed scroll value
+                // We calculate it like this, because scrollbar usually accounts for full
+                // overscroll, but we want scrolling to stop when last available item is visible and
+                // at the bottom of the table.
+                state
+                    .components
+                    .len()
+                    .saturating_sub(scrollbar_area.height.into())
+                    // 1 is also added, because ScrollBar removes 1, to ensure last item is visible
+                    // when overscrolling - we avoid overscroll, so this is useless to us.
+                    .saturating_add(1),
+            )
+            .position(state.ui.scroll),
+        );
     }
 
     /// Alerts the user to resize the window to view columns
@@ -323,9 +355,37 @@ impl<'a> Widgets<'a> {
         f.render_widget(w, area);
     }
 
+    /// Renders a box showing instructions on how to use `vector top`.
+    fn help_box(&self, f: &mut Frame, area: Rect) {
+        let text = vec![
+            Line::from("ESC, q => quit"),
+            Line::from("↓, j => scroll down by 1 row"),
+            Line::from("↑, k => scroll up by 1 row"),
+            Line::from("→, PageDown, CTRL+f => scroll down by 1 page"),
+            Line::from("←, PageUp, CTRL+b => scroll up by 1 page"),
+            Line::from("End, G => scroll to bottom"),
+            Line::from("Home, g => scroll to top"),
+            Line::from("F1, ? => toggle this help window"),
+        ];
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default().fg(Color::Gray))
+            .title("Help");
+        let w = Paragraph::new(text)
+            .block(block)
+            .style(Style::default().fg(Color::Gray))
+            .alignment(Alignment::Left);
+
+        f.render_widget(Clear, area);
+        f.render_widget(w, area);
+    }
+
     /// Renders a box showing instructions on how to exit from `vector top`.
     fn quit_box(&self, f: &mut Frame, area: Rect) {
-        let text = vec![Line::from("To quit, press ESC or 'q'")];
+        let text = vec![Line::from(
+            "To quit, press ESC or 'q'; Press F1 or '?' for help",
+        )];
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -355,6 +415,17 @@ impl<'a> Widgets<'a> {
         }
 
         self.quit_box(f, rects[2]);
+
+        // Render help over other items
+        if state.ui.help_visible {
+            let [area] = Layout::horizontal([Constraint::Length(64)])
+                .flex(Flex::Center)
+                .areas(size);
+            let [area] = Layout::vertical([Constraint::Length(32)])
+                .flex(Flex::Center)
+                .areas(area);
+            self.help_box(f, area);
+        }
     }
 }
 
@@ -372,6 +443,7 @@ pub async fn init_dashboard<'a>(
     url: &'a str,
     interval: u32,
     human_metrics: bool,
+    event_tx: state::EventTx,
     mut state_rx: state::StateRx,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -402,9 +474,40 @@ pub async fn init_dashboard<'a>(
                 terminal.draw(|f| widgets.draw(f, state))?;
             },
             k = key_press_rx.recv() => {
-                if let KeyCode::Esc | KeyCode::Char('q') = k.unwrap() {
-                    _ = key_press_kill_tx.send(());
-                    break
+                let k = k.unwrap();
+                match k.code {
+                    KeyCode::Esc | KeyCode::Char('q') => {
+                        _ = key_press_kill_tx.send(());
+                        break
+                    },
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        let _ = event_tx.send(EventType::Ui(UiEventType::ScrollEvent(-1, terminal.size().unwrap_or_default()))).await;
+                    },
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        let _ = event_tx.send(EventType::Ui(UiEventType::ScrollEvent(1, terminal.size().unwrap_or_default()))).await;
+                    },
+                    KeyCode::End | KeyCode::Char('G') => {
+                        let _ = event_tx.send(EventType::Ui(UiEventType::ScrollEvent(isize::MAX, terminal.size().unwrap_or_default()))).await;
+                    },
+                    KeyCode::Home | KeyCode::Char('g') => {
+                        let _ = event_tx.send(EventType::Ui(UiEventType::ScrollEvent(isize::MIN, terminal.size().unwrap_or_default()))).await;
+                    },
+                    KeyCode::Left | KeyCode::PageUp => {
+                        let _ = event_tx.send(EventType::Ui(UiEventType::ScrollPageEvent(-1, terminal.size().unwrap_or_default()))).await;
+                    },
+                    KeyCode::Char('b') if k.modifiers.intersects(KeyModifiers::CONTROL) => {
+                        let _ = event_tx.send(EventType::Ui(UiEventType::ScrollPageEvent(-1, terminal.size().unwrap_or_default()))).await;
+                    },
+                    KeyCode::Right | KeyCode::PageDown => {
+                        let _ = event_tx.send(EventType::Ui(UiEventType::ScrollPageEvent(1, terminal.size().unwrap_or_default()))).await;
+                    },
+                    KeyCode::Char('f') if k.modifiers.intersects(KeyModifiers::CONTROL) => {
+                        let _ = event_tx.send(EventType::Ui(UiEventType::ScrollPageEvent(1, terminal.size().unwrap_or_default()))).await;
+                    },
+                    KeyCode::Char('?') | KeyCode::F(1) => {
+                        let _ = event_tx.send(EventType::Ui(UiEventType::ToggleHelp)).await;
+                    },
+                    _ => ()
                 }
             }
             _ = &mut shutdown_rx => {
