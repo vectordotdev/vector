@@ -12728,6 +12728,7 @@ dependencies = [
  "derivative",
  "futures 0.3.31",
  "indexmap 2.12.0",
+ "itertools 0.14.0",
  "metrics",
  "paste",
  "pin-project",
@@ -12737,8 +12738,18 @@ dependencies = [
  "stream-cancel",
  "tokio",
  "tracing 0.1.41",
+ "vector-common-macros",
  "vector-config",
  "vrl",
+]
+
+[[package]]
+name = "vector-common-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2 1.0.101",
+ "quote 1.0.40",
+ "syn 2.0.106",
 ]
 
 [[package]]
