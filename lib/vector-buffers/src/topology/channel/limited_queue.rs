@@ -125,34 +125,30 @@ impl Metrics {
             MemoryBufferSize::MaxEvents(max_events) => ("_max_event_size", max_events.get() as f64),
             MemoryBufferSize::MaxSize(max_bytes) => ("_max_byte_size", max_bytes.get() as f64),
         };
+        let max_gauge_name = format!("{prefix}{gauge_suffix}");
+        let histogram_name = format!("{prefix}_utilization");
+        let gauge_name = format!("{prefix}_utilization_level");
+        #[cfg(test)]
+        let recorded_values = Arc::new(Mutex::new(Vec::new()));
         if let Some(label_value) = output {
-            let max_gauge = gauge!(
-                format!("{prefix}{gauge_suffix}"),
-                "output" => label_value.clone()
-            );
+            let max_gauge = gauge!(max_gauge_name, "output" => label_value.clone());
             max_gauge.set(max_value);
             Self {
-                histogram: histogram!(
-                    format!("{prefix}_utilization"),
-                    "output" => label_value.clone()
-                ),
-                gauge: gauge!(
-                    format!("{prefix}_utilization_level"),
-                    "output" => label_value
-                ),
+                histogram: histogram!(histogram_name, "output" => label_value.clone()),
+                gauge: gauge!(gauge_name, "output" => label_value.clone()),
                 max_gauge,
                 #[cfg(test)]
-                recorded_values: Arc::new(Mutex::new(Vec::new())),
+                recorded_values,
             }
         } else {
-            let max_gauge = gauge!(format!("{prefix}{gauge_suffix}"));
+            let max_gauge = gauge!(max_gauge_name);
             max_gauge.set(max_value);
             Self {
-                histogram: histogram!(format!("{prefix}_utilization")),
-                gauge: gauge!(format!("{prefix}_utilization_level")),
+                histogram: histogram!(histogram_name),
+                gauge: gauge!(gauge_name),
                 max_gauge,
                 #[cfg(test)]
-                recorded_values: Arc::new(Mutex::new(Vec::new())),
+                recorded_values,
             }
         }
     }
