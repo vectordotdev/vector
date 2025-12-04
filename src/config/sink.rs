@@ -16,6 +16,7 @@ use vector_lib::{
     id::Inputs,
     sink::VectorSink,
 };
+use vector_vrl_metrics::MetricsStorage;
 
 use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
 use crate::{
@@ -276,6 +277,7 @@ pub struct SinkContext {
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
     pub enrichment_tables: vector_lib::enrichment::TableRegistry,
+    pub metrics_storage: MetricsStorage,
     pub proxy: ProxyConfig,
     pub schema: schema::Options,
     pub app_name: String,
@@ -292,6 +294,7 @@ impl Default for SinkContext {
             healthcheck: Default::default(),
             globals: Default::default(),
             enrichment_tables: Default::default(),
+            metrics_storage: Default::default(),
             proxy: Default::default(),
             schema: Default::default(),
             app_name: crate::get_app_name().to_string(),
