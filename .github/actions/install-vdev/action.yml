@@ -23,3 +23,8 @@ runs:
       run: |
         echo "Building vdev from source (cache miss)"
         cargo install --path vdev --locked --force
+
+    - name: Set VDEV environment variable
+      shell: bash
+      run: |
+        echo "VDEV=$(which vdev)" >> "$GITHUB_ENV"
