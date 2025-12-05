@@ -57,6 +57,7 @@ impl MetaDescriptive for PulsarRequest {
     }
 }
 
+#[derive(Clone)]
 pub struct PulsarService<Exe: Executor> {
     // NOTE: the reason for the Mutex here is because the `Producer` from the pulsar crate
     // needs to be `mut`, and the `Service::call()` returns a Future.
@@ -80,6 +81,10 @@ impl<Exe: Executor> PulsarService<Exe> {
         PulsarService {
             producer: Arc::new(Mutex::new(producer)),
         }
+    }
+
+    pub(crate) fn get_producer(&self) -> Arc<Mutex<MultiTopicProducer<Exe>>> {
+        Arc::clone(&self.producer)
     }
 }
 
