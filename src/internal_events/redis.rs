@@ -34,7 +34,7 @@ impl InternalEvent for RedisReceiveEventError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct RedisTransformLookupError {
     pub error: String,
 }
@@ -56,7 +56,7 @@ impl InternalEvent for RedisTransformLookupError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct RedisTransformLruCacheHit;
 
 impl InternalEvent for RedisTransformLruCacheHit {
@@ -65,7 +65,7 @@ impl InternalEvent for RedisTransformLruCacheHit {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct RedisTransformLruCacheMiss;
 
 impl InternalEvent for RedisTransformLruCacheMiss {
