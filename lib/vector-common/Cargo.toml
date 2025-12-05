@@ -41,6 +41,7 @@ crossbeam-utils.workspace = true
 derivative.workspace = true
 futures.workspace = true
 indexmap.workspace = true
+itertools.workspace = true
 metrics.workspace = true
 paste.workspace = true
 pin-project.workspace = true
@@ -51,7 +52,8 @@ stream-cancel = { version = "0.8.2", default-features = false }
 tokio = { workspace = true, features = ["macros", "time"] }
 tracing.workspace = true
 vrl.workspace = true
-vector-config = { path = "../vector-config" }
+vector-config.workspace = true
+vector-common-macros.workspace = true
 
 [dev-dependencies]
 futures = { version = "0.3.31", default-features = false, features = ["async-await"] }

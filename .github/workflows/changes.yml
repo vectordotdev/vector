@@ -32,6 +32,8 @@ on:
         value: ${{ jobs.source.outputs.source }}
       dependencies:
         value: ${{ jobs.source.outputs.dependencies }}
+      deny:
+        value: ${{ jobs.source.outputs.deny }}
       internal_events:
         value: ${{ jobs.source.outputs.internal_events }}
       cue:
@@ -160,6 +162,7 @@ jobs:
     outputs:
       source: ${{ steps.filter.outputs.source }}
       dependencies: ${{ steps.filter.outputs.dependencies }}
+      deny: ${{ steps.filter.outputs.deny }}
       internal_events: ${{ steps.filter.outputs.internal_events }}
       cue: ${{ steps.filter.outputs.cue }}
       component_docs: ${{ steps.filter.outputs.component_docs }}
@@ -209,6 +212,10 @@ jobs:
             - 'scripts/cross/**'
             - "vdev/**"
             - ".github/workflows/changes.yml"
+          deny:
+            - '**/Cargo.toml'
+            - 'Cargo.lock'
+            - ".github/workflows/deny.yml"
           cue:
             - 'website/cue/**'
             - "vdev/**"
