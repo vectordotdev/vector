@@ -110,11 +110,11 @@ pub struct RedisTransformConfig {
     pub connection_timeout: Duration,
 }
 
-fn default_concurrency_limit() -> NonZeroUsize {
+const fn default_concurrency_limit() -> NonZeroUsize {
     NonZeroUsize::new(100).expect("concurrency limit must be at least 1")
 }
 
-fn default_connection_timeout() -> Duration {
+const fn default_connection_timeout() -> Duration {
     Duration::from_secs(5)
 }
 

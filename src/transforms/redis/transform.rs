@@ -115,8 +115,8 @@ impl RedisTransform {
     ) -> Event {
         let value_to_insert = value.or_else(|| default_value.clone());
 
-        if let Some(value_str) = value_to_insert {
-            if let Some(path) = output_field.path.as_ref() {
+        if let Some(value_str) = value_to_insert
+            && let Some(path) = output_field.path.as_ref() {
                 match &mut event {
                     Event::Log(log) => {
                         log.insert(&OwnedTargetPath::event(path.clone()), value_str);
@@ -128,14 +128,13 @@ impl RedisTransform {
                         let path_str = path.to_string();
                         let tag_name = path_str
                             .split('.')
-                            .last()
+                            .next_back()
                             .unwrap_or("redis_data")
                             .to_string();
                         metric.replace_tag(tag_name, value_str);
                     }
                 }
             }
-        }
         event
     }
 }

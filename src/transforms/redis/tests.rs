@@ -5,6 +5,7 @@ use std::sync::Arc;
 use tokio::sync::mpsc;
 #[cfg(feature = "redis-integration-tests")]
 use tokio_stream::wrappers::ReceiverStream;
+use std::time::Duration;
 use vector_lib::lookup::{lookup_v2::OptionalValuePath, owned_value_path};
 
 use super::*;
@@ -31,6 +32,8 @@ fn redis_transform_config_creation() {
         default_value: None,
         cache_max_size: None,
         cache_ttl: None,
+        concurrency_limit: None,
+        connection_timeout: Duration::from_secs(5),
     };
 
     assert_eq!(config.url, "redis://127.0.0.1:6379/0");
@@ -45,6 +48,8 @@ fn redis_transform_with_default_value() {
         default_value: Some("default_session".to_string()),
         cache_max_size: None,
         cache_ttl: None,
+        concurrency_limit: None,
+        connection_timeout: Duration::from_secs(5),
     };
 
     assert_eq!(config.default_value, Some("default_session".to_string()));
@@ -94,6 +99,8 @@ async fn redis_transform_integration() {
             default_value: None,
             cache_max_size: None,
             cache_ttl: None,
+            concurrency_limit: None,
+            connection_timeout: Duration::from_secs(5),
         };
 
         let (tx, rx) = mpsc::channel(1);
@@ -141,6 +148,8 @@ async fn redis_transform_missing_key_with_default() {
             default_value: Some("not_found".to_string()),
             cache_max_size: None,
             cache_ttl: None,
+            concurrency_limit: None,
+            connection_timeout: Duration::from_secs(5),
         };
 
         let (tx, rx) = mpsc::channel(1);
@@ -198,6 +207,8 @@ async fn redis_transform_cache() {
             default_value: None,
             cache_max_size: NonZeroUsize::new(100),
             cache_ttl: None,
+            concurrency_limit: None,
+            connection_timeout: Duration::from_secs(5),
         };
 
         let (tx, rx) = mpsc::channel(10);
@@ -277,6 +288,8 @@ async fn redis_transform_cache_ttl_expiration() {
             default_value: None,
             cache_max_size: NonZeroUsize::new(100),
             cache_ttl: Some(Duration::from_secs(1)),
+            concurrency_limit: None,
+            connection_timeout: Duration::from_secs(5),
         };
 
         let (tx, rx) = mpsc::channel(10);
@@ -365,6 +378,8 @@ async fn redis_transform_missing_key_no_default() {
             default_value: None,
             cache_max_size: None,
             cache_ttl: None,
+            concurrency_limit: None,
+            connection_timeout: Duration::from_secs(5),
         };
 
         let (tx, rx) = mpsc::channel(1);
@@ -420,6 +435,8 @@ async fn redis_transform_metric_event() {
             default_value: None,
             cache_max_size: None,
             cache_ttl: None,
+            concurrency_limit: None,
+            connection_timeout: Duration::from_secs(5),
         };
 
         let (tx, rx) = mpsc::channel(1);
@@ -490,6 +507,8 @@ async fn redis_transform_trace_event() {
             default_value: None,
             cache_max_size: None,
             cache_ttl: None,
+            concurrency_limit: None,
+            connection_timeout: Duration::from_secs(5),
         };
 
         let (tx, rx) = mpsc::channel(1);
