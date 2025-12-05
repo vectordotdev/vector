@@ -175,7 +175,9 @@ components: transforms: aggregate: {
 				aggregated into a single `incremental` `counter` with a value of 23. Two `absolute` `gauge` metrics with
 				values 93 and 95 would result in a single `absolute` `gauge` with the value of 95. More complex
 				types like `distribution`, `histogram`, `set`, and `summary` behave similarly with `incremental`
-				values being combined in a manner that makes sense based on their type.
+				values being combined in a manner that makes sense based on their type. When using distribution as the
+				aggregation mode, the individual samples are collected and their values are combined into a single
+				sorted distribution representation.
 				"""
 		}
 
