@@ -263,4 +263,6 @@ runs:
         [[ "${{ inputs.datadog-ci }}" == "true" ]] && mods+=("datadog-ci")
         csm=$(IFS=,; echo "${mods[*]}")
 
-        [[ "$csm" != "" ]] && ./scripts/environment/prepare.sh --modules="${csm}"
+        if [[ "$csm" != "" ]]; then
+          ./scripts/environment/prepare.sh --modules="${csm}"
+        fi
