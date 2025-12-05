@@ -253,7 +253,7 @@ impl Default for Inner {
             upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
-            source_event_id: Some(Uuid::now_v7()),
+            source_event_id: Some(Uuid::new_v4()),
         }
     }
 }
