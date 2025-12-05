@@ -1,4 +1,4 @@
-use std::{error::Error, num::NonZeroUsize};
+use std::error::Error;
 
 use async_trait::async_trait;
 
@@ -21,7 +21,8 @@ impl MemoryBuffer {
         MemoryBuffer { capacity }
     }
 
-    pub fn with_max_events(n: NonZeroUsize) -> Self {
+    #[cfg(test)]
+    pub fn with_max_events(n: std::num::NonZeroUsize) -> Self {
         Self {
             capacity: MemoryBufferSize::MaxEvents(n),
         }
