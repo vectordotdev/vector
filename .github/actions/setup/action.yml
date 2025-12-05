@@ -60,7 +60,7 @@ inputs:
     description: "Install wasm-pack for Rust to WASM bridge."
   vdev:
     required: false
-    default: false
+    default: true
     description: "Install vdev CLI tool (cached by vdev/ directory changes)."
 
   # prepare.sh - npm
@@ -76,13 +76,24 @@ inputs:
 runs:
   using: "composite"
   steps:
+    - name: Check vdev cache status
+      id: check-vdev-cache
+      if: ${{ inputs.vdev == 'true' }}
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: ~/.cargo/bin/vdev
+        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'Cargo.toml', 'Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vdev-
+        lookup-only: true
+
     - id: needs
       name: Compute if rust is needed
       shell: bash
       run: |
         rust="false"
 
-        # If any rust-related inputs are true, enable cache regardless
+        # If any rust-related inputs are true (excluding vdev), enable rust
         for val in "${{ inputs.mold }}" \
                    "${{ inputs.rust }}" \
                    "${{ inputs.cargo-deb }}" \
@@ -91,15 +102,22 @@ runs:
                    "${{ inputs.cargo-deny }}" \
                    "${{ inputs.cargo-msrv }}" \
                    "${{ inputs.dd-rust-license-tool }}" \
-                   "${{ inputs.wasm-pack }}" \
-                   "${{ inputs.vdev }}"; do
+                   "${{ inputs.wasm-pack }}"; do
           if [[ "$val" == "true" ]]; then
             rust="true"
             break
           fi
         done
 
+        # If vdev needs compilation (cache miss), enable rust
+        vdev_needs_compile="false"
+        if [[ "${{ inputs.vdev }}" == "true" && "${{ steps.check-vdev-cache.outputs.cache-hit }}" != "true" ]]; then
+          rust="true"
+          vdev_needs_compile="true"
+        fi
+
         echo "NEEDS_RUST=$rust" >> "$GITHUB_ENV"
+        echo "VDEV_NEEDS_COMPILE=$vdev_needs_compile" >> "$GITHUB_ENV"
 
         if [[ "$rust" == "true" ]]; then
           echo "RUST_BACKTRACE=full" >> "$GITHUB_ENV"
@@ -125,7 +143,7 @@ runs:
       shell: bash
 
     - name: Cache Cargo registry, index, and git DB
-      if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' }}
+      if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
       uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
       with:
         path: |
@@ -137,7 +155,7 @@ runs:
           ${{ runner.os }}-cargo-
 
     - name: Install mold
-      if: ${{ inputs.mold == 'true' }}
+      if: ${{ inputs.mold == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
       shell: bash
       run: |
         echo "Installing mold"
@@ -208,6 +226,8 @@ runs:
     - name: Install vdev
       if: ${{ inputs.vdev == 'true' }}
       uses: ./.github/actions/install-vdev
+      with:
+        skip-cache: ${{ env.VDEV_NEEDS_COMPILE == 'true' }}
 
     - name: Cache prepare.sh binaries
       id: cache-prepare-binaries
