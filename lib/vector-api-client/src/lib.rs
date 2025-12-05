@@ -1,23 +1,42 @@
-//! Vector GraphQL client library, for the Vector GraphQL API server.
+//! Vector gRPC API client library
 //!
-//! Contains:
+//! This library provides a Rust client for the Vector gRPC observability API.
+//! It replaces the previous GraphQL-based client with a more efficient gRPC implementation.
 //!
-//! 1. A GraphQL query client, for queries/mutations over HTTP(s)
-//! 2. A GraphQL subscription client, for long-lived, multiplexed subscriptions over WebSockets
-//! 3. GraphQL queries/mutations/subscriptions, defined in `graphql/**/*.graphql` files
-//! 4. Extension methods for each client, for executing queries/subscriptions, and returning
-//!    deserialized JSON responses
+//! # Example
 //!
+//! ```no_run
+//! use vector_api_client::Client;
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let mut client = Client::new("http://localhost:9999").await?;
+//! client.connect().await?;
+//!
+//! // Check health
+//! let health = client.health().await?;
+//! println!("Healthy: {}", health.healthy);
+//!
+//! // Get components
+//! let components = client.get_components(0).await?;
+//! for component in components.components {
+//!     println!("Component: {}", component.component_id);
+//! }
+//! # Ok(())
+//! # }
+//! ```
 
 #![deny(warnings)]
-#![deny(missing_debug_implementations, missing_copy_implementations)]
-#![allow(async_fn_in_trait)]
+#![deny(missing_debug_implementations)]
 
 mod client;
-/// GraphQL queries
-pub mod gql;
-mod subscription;
-pub mod test;
+mod error;
 
-pub use client::*;
-pub use subscription::*;
+pub use client::GrpcClient;
+// Export GrpcClient as Client for cleaner API
+pub use client::GrpcClient as Client;
+pub use error::{Error, Result};
+
+/// Re-export generated protobuf types
+pub mod proto {
+    tonic::include_proto!("vector.observability");
+}
