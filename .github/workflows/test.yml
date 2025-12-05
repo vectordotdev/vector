@@ -84,6 +84,11 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: ./.github/actions/setup
+        with:
+          cargo-cache: false
+          mold: false
+          vdev: true
       - run: make check-scripts
 
   check-events:
@@ -95,7 +100,9 @@ jobs:
       - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
       - uses: ./.github/actions/setup
         with:
-          rust: true
+          cargo-cache: false
+          mold: false
+          vdev: true
       - run: make check-events
 
   check-licenses:
@@ -109,6 +116,7 @@ jobs:
         with:
           cargo-cache: false
           mold: false
+          vdev: true
           dd-rust-license-tool: true
       - run: make check-licenses
 
