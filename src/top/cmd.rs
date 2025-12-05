@@ -3,7 +3,7 @@ use std::time::Duration;
 use chrono::Local;
 use futures_util::future::join_all;
 use tokio::sync::{mpsc, oneshot};
-use vector_lib::api_client::{Client, connect_subscription_client};
+use vector_lib::api_client::Client;
 
 use vector_lib::top::{
     dashboard::{init_dashboard, is_tty},
@@ -15,7 +15,7 @@ use vector_lib::top::{
 const RECONNECT_DELAY: u64 = 5000;
 
 /// CLI command func for displaying Vector components, and communicating with a local/remote
-/// Vector API server via HTTP/WebSockets
+/// Vector API server via gRPC
 pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     // Exit early if the terminal is not a teletype
     if !is_tty() {
@@ -27,10 +27,21 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
     }
 
     let url = opts.url();
+
     // Create a new API client for connecting to the local/remote Vector instance.
-    let client = Client::new(url.clone());
+    let mut client = match Client::new(url.as_str()).await {
+        Ok(c) => c,
+        Err(err) => {
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Failed to create API client: {}", err);
+            }
+            return exitcode::UNAVAILABLE;
+        }
+    };
+
     #[allow(clippy::print_stderr)]
-    if client.healthcheck().await.is_err() {
+    if client.connect().await.is_err() || client.health().await.is_err() {
         eprintln!(
             indoc::indoc! {"
             Vector API server isn't reachable ({}).
@@ -46,18 +57,18 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
         return exitcode::UNAVAILABLE;
     }
 
-    top(opts, client, "Vector").await
+    top(opts, url.to_string(), "Vector").await
 }
 
 /// General monitoring
-pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> exitcode::ExitCode {
+pub async fn top(opts: &super::Opts, url: String, dashboard_title: &str) -> exitcode::ExitCode {
     // Channel for updating state via event messages
     let (tx, rx) = tokio::sync::mpsc::channel(20);
     let state_rx = state::updater(rx).await;
     // Channel for shutdown signal
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
-    let connection = tokio::spawn(subscription(opts.clone(), client, tx, shutdown_tx));
+    let connection = tokio::spawn(subscription(opts.clone(), url, tx, shutdown_tx));
 
     // Initialize the dashboard
     match init_dashboard(
@@ -85,21 +96,19 @@ pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> e
     }
 }
 
-// This task handles reconnecting the subscription client and all
-// subscriptions in the case of a web socket disconnect
+// This task handles reconnecting the gRPC client and all
+// subscriptions in the case of a connection failure
 async fn subscription(
     opts: super::Opts,
-    client: Client,
+    url: String,
     tx: mpsc::Sender<EventType>,
     shutdown_tx: oneshot::Sender<()>,
 ) {
-    let ws_url = opts.web_socket_url();
-
     loop {
         // Initialize state. On future reconnects, we re-initialize state in
         // order to accurately capture added, removed, and edited
         // components.
-        let state = match metrics::init_components(&client, &opts.components).await {
+        let state = match metrics::init_components(&url, &opts.components).await {
             Ok(state) => state,
             Err(_) => {
                 tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
@@ -108,37 +117,38 @@ async fn subscription(
         };
         _ = tx.send(EventType::InitializeState(state)).await;
 
-        let subscription_client = match connect_subscription_client(ws_url.clone()).await {
-            Ok(c) => c,
+        // Subscribe to updated metrics via gRPC streaming
+        let handles = match metrics::subscribe(
+            url.clone(),
+            tx.clone(),
+            opts.interval as i64,
+            opts.components.clone(),
+        )
+        .await
+        {
+            Ok(handles) => handles,
             Err(_) => {
                 tokio::time::sleep(Duration::from_millis(RECONNECT_DELAY)).await;
                 continue;
             }
         };
 
-        // Subscribe to updated metrics
-        let finished = metrics::subscribe(
-            subscription_client,
-            tx.clone(),
-            opts.interval as i64,
-            opts.components.clone(),
-        );
-
         _ = tx
             .send(EventType::ConnectionUpdated(ConnectionStatus::Connected(
                 Local::now(),
             )))
             .await;
-        // Tasks spawned in metrics::subscribe finish when the subscription
-        // streams have completed. Currently, subscription streams only
-        // complete when the underlying web socket connection to the GraphQL
-        // server drops.
-        _ = join_all(finished).await;
+
+        // Tasks spawned in metrics::subscribe finish when the gRPC
+        // streams complete or encounter errors
+        _ = join_all(handles).await;
+
         _ = tx
             .send(EventType::ConnectionUpdated(
                 ConnectionStatus::Disconnected(RECONNECT_DELAY),
             ))
             .await;
+
         if opts.no_reconnect {
             _ = shutdown_tx.send(());
             break;

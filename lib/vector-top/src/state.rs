@@ -15,7 +15,7 @@ use vector_common::config::ComponentKey;
 
 type IdentifiedMetric = (ComponentKey, i64);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SentEventsMetric {
     pub key: ComponentKey,
     pub total: i64,

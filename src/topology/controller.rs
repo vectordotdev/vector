@@ -39,7 +39,7 @@ pub struct TopologyController {
     pub config_paths: Vec<config::ConfigPath>,
     pub require_healthy: Option<bool>,
     #[cfg(feature = "api")]
-    pub api_server: Option<api::Server>,
+    pub api_server: Option<api::GrpcServer>,
     pub extra_context: ExtraContext,
 }
 
@@ -70,37 +70,26 @@ impl TopologyController {
         #[cfg(feature = "api")]
         if !new_config.api.enabled {
             if let Some(server) = self.api_server.take() {
-                debug!("Dropping api server.");
-                drop(server)
+                debug!("Stopping gRPC API server.");
+                drop(server);
             }
         } else if self.api_server.is_none() {
-            use std::sync::atomic::AtomicBool;
+            debug!("Starting gRPC API server.");
 
-            use tokio::runtime::Handle;
-
-            use crate::internal_events::ApiStarted;
-
-            debug!("Starting api server.");
-
-            self.api_server = match api::Server::start(
-                self.topology.config(),
-                self.topology.watch(),
-                Arc::<AtomicBool>::clone(&self.topology.running),
-                &Handle::current(),
-            ) {
+            match api::GrpcServer::start(self.topology.config(), self.topology.watch()).await {
                 Ok(api_server) => {
-                    emit!(ApiStarted {
-                        addr: new_config.api.address.unwrap(),
-                        playground: new_config.api.playground,
-                        graphql: new_config.api.graphql,
-                    });
-
-                    Some(api_server)
+                    let addr = api_server.addr();
+                    info!(
+                        message = "GRPC API server started.",
+                        addr = %addr,
+                    );
+                    self.api_server = Some(api_server);
                 }
                 Err(error) => {
-                    let error = error.to_string();
-                    error!("An error occurred that Vector couldn't handle: {}.", error);
-                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed { error });
+                    error!(
+                        message = "Failed to start gRPC API server.",
+                        %error,
+                    );
                 }
             }
         }
@@ -111,12 +100,6 @@ impl TopologyController {
             .await
         {
             Ok(()) => {
-                #[cfg(feature = "api")]
-                // Pass the new config to the API server.
-                if let Some(ref api_server) = self.api_server {
-                    api_server.update_config(self.topology.config());
-                }
-
                 emit!(VectorReloaded {
                     config_paths: &self.config_paths
                 });
