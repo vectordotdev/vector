@@ -5,9 +5,9 @@ use clap::Parser;
 pub(crate) use cmd::cmd;
 pub use cmd::tap;
 use url::Url;
-use vector_lib::api_client::gql::TapEncodingFormat;
+use vector_lib::tap::TapEncodingFormat;
 
-use crate::config::api::default_graphql_url;
+use crate::config::api::default_grpc_url;
 
 /// Tap options
 #[derive(Parser, Debug, Clone)]
@@ -17,7 +17,7 @@ pub struct Opts {
     #[arg(default_value = "500", short = 'i', long)]
     interval: u32,
 
-    /// GraphQL API server endpoint
+    /// gRPC API server endpoint
     #[arg(short, long)]
     url: Option<Url>,
 
@@ -77,21 +77,9 @@ impl Opts {
         }
     }
 
-    /// Use the provided URL as the Vector GraphQL API server, or default to the local port
+    /// Use the provided URL as the Vector gRPC API server, or default to the local port
     /// provided by the API config.
     pub fn url(&self) -> Url {
-        self.url.clone().unwrap_or_else(default_graphql_url)
-    }
-
-    /// URL with scheme set to WebSockets
-    pub fn web_socket_url(&self) -> Url {
-        let mut url = self.url();
-        url.set_scheme(match url.scheme() {
-            "https" => "wss",
-            _ => "ws",
-        })
-        .expect("Couldn't build WebSocket URL. Please report.");
-
-        url
+        self.url.clone().unwrap_or_else(default_grpc_url)
     }
 }
