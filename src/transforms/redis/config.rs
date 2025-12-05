@@ -26,6 +26,8 @@ enum BuildError {
     Client { source: redis::RedisError },
     #[snafu(display("Failed to create connection: {}", source))]
     Connection { source: RedisError },
+    #[snafu(display("Connection to Redis timed out after {} seconds", timeout_secs))]
+    ConnectionTimeout { timeout_secs: u64 },
 }
 
 /// Configuration for the `redis` transform.
@@ -94,10 +96,26 @@ pub struct RedisTransformConfig {
     /// Defaults to 100 if not specified.
     #[configurable(metadata(docs::examples = 50, docs::examples = 200))]
     pub concurrency_limit: Option<NonZeroUsize>,
+
+    /// Timeout for establishing connection to Redis and verifying connectivity during startup.
+    ///
+    /// If Redis is unavailable or doesn't respond within this timeout, Vector will fail to start.
+    /// This ensures Vector fails fast during startup rather than starting and failing later when events need to be enriched.
+    ///
+    /// Defaults to 5 seconds if not specified.
+    #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
+    #[configurable(metadata(docs::examples = 5000, docs::examples = 10000))]
+    #[configurable(metadata(docs::type_unit = "milliseconds"))]
+    #[serde(default = "default_connection_timeout")]
+    pub connection_timeout: Duration,
 }
 
 fn default_concurrency_limit() -> NonZeroUsize {
     NonZeroUsize::new(100).expect("concurrency limit must be at least 1")
+}
+
+fn default_connection_timeout() -> Duration {
+    Duration::from_secs(5)
 }
 
 impl GenerateConfig for RedisTransformConfig {
@@ -122,13 +140,22 @@ impl TransformConfig for RedisTransformConfig {
     ) -> crate::Result<crate::transforms::Transform> {
         let redis_client = redis::Client::open(self.url.as_str()).context(ClientSnafu {})?;
 
-        let mut conn = redis_client
-            .get_connection_manager()
+        // Establish connection with timeout to fail fast if Redis is unavailable
+        let connection_timeout = self.connection_timeout;
+        let mut conn = tokio::time::timeout(connection_timeout, redis_client.get_connection_manager())
             .await
+            .map_err(|_| BuildError::ConnectionTimeout {
+                timeout_secs: connection_timeout.as_secs(),
+            })?
             .context(ConnectionSnafu {})?;
 
-        // Test the connection with a ping
-        conn.ping().await.context(ConnectionSnafu {})?;
+        // Test the connection with a ping, also with timeout
+        tokio::time::timeout(connection_timeout, conn.ping())
+            .await
+            .map_err(|_| BuildError::ConnectionTimeout {
+                timeout_secs: connection_timeout.as_secs(),
+            })?
+            .context(ConnectionSnafu {})?;
 
         Ok(crate::transforms::Transform::event_task(
             RedisTransform::new(
@@ -138,7 +165,8 @@ impl TransformConfig for RedisTransformConfig {
                 self.default_value.clone(),
                 self.cache_max_size,
                 self.cache_ttl,
-                self.concurrency_limit.unwrap_or_else(default_concurrency_limit),
+                self.concurrency_limit
+                    .unwrap_or_else(default_concurrency_limit),
             ),
         ))
     }
