@@ -1,9 +1,10 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DecoderFramingError<E> {
     pub error: E,
 }
@@ -16,7 +17,6 @@ impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
             error_code = "decoder_frame",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -28,7 +28,7 @@ impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DecoderDeserializeError<'a> {
     pub error: &'a crate::Error,
 }
@@ -41,7 +41,6 @@ impl InternalEvent for DecoderDeserializeError<'_> {
             error_code = "decoder_deserialize",
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -53,7 +52,7 @@ impl InternalEvent for DecoderDeserializeError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct EncoderFramingError<'a> {
     pub error: &'a vector_lib::codecs::encoding::BoxedFramingError,
 }
@@ -67,7 +66,6 @@ impl InternalEvent for EncoderFramingError<'_> {
             error_code = "encoder_frame",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -80,21 +78,20 @@ impl InternalEvent for EncoderFramingError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct EncoderSerializeError<'a> {
     pub error: &'a crate::Error,
 }
 
 impl InternalEvent for EncoderSerializeError<'_> {
     fn emit(self) {
-        let reason = "Failed serializing frame.";
+        const SERIALIZE_REASON: &str = "Failed serializing frame.";
         error!(
-            message = reason,
+            message = SERIALIZE_REASON,
             error = %self.error,
             error_code = "encoder_serialize",
             error_type = error_type::ENCODER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -103,11 +100,14 @@ impl InternalEvent for EncoderSerializeError<'_> {
             "stage" => error_stage::SENDING,
         )
         .increment(1);
-        emit!(ComponentEventsDropped::<UNINTENTIONAL> { count: 1, reason });
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: SERIALIZE_REASON
+        });
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct EncoderWriteError<'a, E> {
     pub error: &'a E,
     pub count: usize,
@@ -121,7 +121,6 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
             error = %self.error,
             error_type = error_type::IO_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -135,5 +134,36 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
                 reason,
             });
         }
+    }
+}
+
+#[cfg(feature = "codecs-arrow")]
+#[derive(Debug, NamedInternalEvent)]
+pub struct EncoderNullConstraintError<'a> {
+    pub error: &'a crate::Error,
+}
+
+#[cfg(feature = "codecs-arrow")]
+impl InternalEvent for EncoderNullConstraintError<'_> {
+    fn emit(self) {
+        const CONSTRAINT_REASON: &str = "Schema constraint violation.";
+        error!(
+            message = CONSTRAINT_REASON,
+            error = %self.error,
+            error_code = "encoding_null_constraint",
+            error_type = error_type::ENCODER_FAILED,
+            stage = error_stage::SENDING,
+        );
+        counter!(
+            "component_errors_total",
+            "error_code" => "encoding_null_constraint",
+            "error_type" => error_type::ENCODER_FAILED,
+            "stage" => error_stage::SENDING,
+        )
+        .increment(1);
+        emit!(ComponentEventsDropped::<UNINTENTIONAL> {
+            count: 1,
+            reason: CONSTRAINT_REASON
+        });
     }
 }

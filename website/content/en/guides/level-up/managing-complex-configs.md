@@ -1,7 +1,8 @@
 ---
+date: "2021-08-12"
 title: Building and Managing Complex Configs
 description: Strategies for building and managing complex Vector configs
-author_github: https://github.com/Jeffail
+authors: ["Jeffail"]
 domain: config
 weight: 3
 tags: ["configuration", "config", "level up", "guides", "guide"]

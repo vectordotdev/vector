@@ -1,9 +1,10 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, INTENTIONAL, InternalEvent, error_stage, error_type,
 };
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct LokiEventUnlabeledError;
 
 impl InternalEvent for LokiEventUnlabeledError {
@@ -13,7 +14,6 @@ impl InternalEvent for LokiEventUnlabeledError {
             error_code = "unlabeled_event",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
 
         counter!(
@@ -26,7 +26,7 @@ impl InternalEvent for LokiEventUnlabeledError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct LokiOutOfOrderEventDroppedError {
     pub count: usize,
 }
@@ -40,7 +40,6 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
             error_code = "out_of_order",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
 
         emit!(ComponentEventsDropped::<INTENTIONAL> {
@@ -58,7 +57,7 @@ impl InternalEvent for LokiOutOfOrderEventDroppedError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct LokiOutOfOrderEventRewritten {
     pub count: usize,
 }
@@ -69,13 +68,12 @@ impl InternalEvent for LokiOutOfOrderEventRewritten {
             message = "Timestamps rewritten.",
             count = self.count,
             reason = "out_of_order",
-            internal_log_rate_limit = true,
         );
         counter!("rewritten_timestamp_events_total").increment(self.count as u64);
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct LokiTimestampNonParsableEventsDropped;
 
 impl InternalEvent for LokiTimestampNonParsableEventsDropped {
@@ -87,7 +85,6 @@ impl InternalEvent for LokiTimestampNonParsableEventsDropped {
             error_code = "non-parsable_timestamp",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
 
         emit!(ComponentEventsDropped::<INTENTIONAL> { count: 1, reason });

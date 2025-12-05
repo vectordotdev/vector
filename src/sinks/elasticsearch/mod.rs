@@ -22,7 +22,8 @@ pub use encoder::ElasticsearchEncoder;
 use http::{Request, uri::InvalidUri};
 use snafu::Snafu;
 use vector_lib::{
-    configurable::configurable_component, internal_event, sensitive_string::SensitiveString,
+    NamedInternalEvent, configurable::configurable_component, internal_event::InternalEvent,
+    sensitive_string::SensitiveString,
 };
 
 use crate::{
@@ -61,9 +62,11 @@ pub enum ElasticsearchAuthConfig {
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ElasticsearchMode {
     /// Ingests documents in bulk, using the bulk API `index` action.
     #[serde(alias = "normal")]
+    #[default]
     Bulk,
 
     /// Ingests documents in bulk, using the bulk API `create` action.
@@ -73,12 +76,6 @@ pub enum ElasticsearchMode {
     /// If the mode is set to `data_stream` and a `timestamp` field is present in a message,
     /// Vector renames this field to the expected `@timestamp` to comply with the Elastic Common Schema.
     DataStream,
-}
-
-impl Default for ElasticsearchMode {
-    fn default() -> Self {
-        Self::Bulk
-    }
 }
 
 /// Bulk API actions.
@@ -181,11 +178,12 @@ pub enum ElasticsearchCommonMode {
     DataStream(DataStreamConfig),
 }
 
+#[derive(NamedInternalEvent)]
 struct VersionValueParseError<'a> {
     value: &'a str,
 }
 
-impl internal_event::InternalEvent for VersionValueParseError<'_> {
+impl InternalEvent for VersionValueParseError<'_> {
     fn emit(self) {
         warn!("{self}")
     }
@@ -295,6 +293,7 @@ impl ElasticsearchCommonMode {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[cfg_attr(feature = "proptest", derive(proptest_derive::Arbitrary))]
 #[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derive(Default)]
 pub enum ElasticsearchApiVersion {
     /// Auto-detect the API version.
     ///
@@ -305,6 +304,7 @@ pub enum ElasticsearchApiVersion {
     /// incorrect API calls.
     ///
     /// [es_version]: https://www.elastic.co/guide/en/elasticsearch/reference/current/cluster-state.html#cluster-state-api-path-params
+    #[default]
     Auto,
     /// Use the Elasticsearch 6.x API.
     V6,
@@ -312,12 +312,6 @@ pub enum ElasticsearchApiVersion {
     V7,
     /// Use the Elasticsearch 8.x API.
     V8,
-}
-
-impl Default for ElasticsearchApiVersion {
-    fn default() -> Self {
-        Self::Auto
-    }
 }
 
 #[derive(Debug, Snafu)]

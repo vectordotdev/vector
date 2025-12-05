@@ -17,12 +17,10 @@ use vector_lib::{
     event::EventContainer,
     schema::Definition,
     source::Source,
-};
-
-use crate::{
-    config::{SourceConfig, SourceContext},
     source_sender::SourceSenderItem,
 };
+
+use crate::config::{SourceConfig, SourceContext};
 
 /// Configuration for the `test_basic` source.
 #[configurable_component(source("test_basic", "Test (basic)."))]
@@ -47,9 +45,8 @@ pub struct BasicSourceConfig {
 
 impl Default for BasicSourceConfig {
     fn default() -> Self {
-        let (_, receiver) = limited(MemoryBufferSize::MaxEvents(
-            NonZeroUsize::new(1000).unwrap(),
-        ));
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(1000).unwrap());
+        let (_, receiver) = limited(limit, None);
         Self {
             receiver: Arc::new(Mutex::new(Some(receiver))),
             event_counter: None,

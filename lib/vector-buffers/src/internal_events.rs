@@ -1,11 +1,13 @@
 use std::time::Duration;
 
 use metrics::{Histogram, counter, gauge, histogram};
+use vector_common::NamedInternalEvent;
 use vector_common::{
     internal_event::{InternalEvent, error_type},
     registered_event,
 };
 
+#[derive(NamedInternalEvent)]
 pub struct BufferCreated {
     pub buffer_id: String,
     pub idx: usize,
@@ -35,6 +37,7 @@ impl InternalEvent for BufferCreated {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct BufferEventsReceived {
     pub buffer_id: String,
     pub idx: usize,
@@ -75,6 +78,7 @@ impl InternalEvent for BufferEventsReceived {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct BufferEventsSent {
     pub buffer_id: String,
     pub idx: usize,
@@ -114,6 +118,7 @@ impl InternalEvent for BufferEventsSent {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct BufferEventsDropped {
     pub buffer_id: String,
     pub idx: usize,
@@ -180,6 +185,7 @@ impl InternalEvent for BufferEventsDropped {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct BufferReadError {
     pub error_code: &'static str,
     pub error: String,
@@ -193,7 +199,6 @@ impl InternalEvent for BufferReadError {
             error_code = self.error_code,
             error_type = error_type::READER_FAILED,
             stage = "processing",
-            internal_log_rate_limit = true,
         );
         counter!(
             "buffer_errors_total", "error_code" => self.error_code,

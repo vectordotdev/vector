@@ -2,13 +2,14 @@
 
 use metrics::counter;
 use vector_lib::{
+    NamedInternalEvent,
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
 use super::prelude::http_error_code;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpClientEventsReceived {
     pub byte_size: JsonSize,
     pub count: usize,
@@ -36,7 +37,7 @@ impl InternalEvent for HttpClientEventsReceived {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpClientHttpResponseError {
     pub code: hyper::StatusCode,
     pub url: String,
@@ -50,7 +51,6 @@ impl InternalEvent for HttpClientHttpResponseError {
             stage = error_stage::RECEIVING,
             error_type = error_type::REQUEST_FAILED,
             error_code = %http_error_code(self.code.as_u16()),
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -63,7 +63,7 @@ impl InternalEvent for HttpClientHttpResponseError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpClientHttpError {
     pub error: crate::Error,
     pub url: String,
@@ -77,7 +77,6 @@ impl InternalEvent for HttpClientHttpError {
             error = ?self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

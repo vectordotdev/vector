@@ -1,7 +1,8 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WindowsServiceStart<'a> {
     pub already_started: bool,
     pub name: &'a str,
@@ -22,7 +23,7 @@ impl InternalEvent for WindowsServiceStart<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WindowsServiceStop<'a> {
     pub already_stopped: bool,
     pub name: &'a str,
@@ -43,7 +44,7 @@ impl InternalEvent for WindowsServiceStop<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WindowsServiceRestart<'a> {
     pub name: &'a str,
 }
@@ -58,7 +59,7 @@ impl InternalEvent for WindowsServiceRestart<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WindowsServiceInstall<'a> {
     pub name: &'a str,
 }
@@ -73,7 +74,7 @@ impl InternalEvent for WindowsServiceInstall<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WindowsServiceUninstall<'a> {
     pub name: &'a str,
 }
@@ -88,7 +89,7 @@ impl InternalEvent for WindowsServiceUninstall<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WindowsServiceDoesNotExistError<'a> {
     pub name: &'a str,
 }
@@ -101,7 +102,6 @@ impl InternalEvent for WindowsServiceDoesNotExistError<'_> {
             error_code = "service_missing",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

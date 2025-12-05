@@ -20,6 +20,10 @@ components: transforms: [Name=string]: {
 		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		transform_buffer_max_event_size:      components.sources.internal_metrics.output.metrics.transform_buffer_max_event_size
+		transform_buffer_max_byte_size:       components.sources.internal_metrics.output.metrics.transform_buffer_max_byte_size
+		transform_buffer_utilization:         components.sources.internal_metrics.output.metrics.transform_buffer_utilization
+		transform_buffer_utilization_level:   components.sources.internal_metrics.output.metrics.transform_buffer_utilization_level
 		utilization:                          components.sources.internal_metrics.output.metrics.utilization
 	}
 }

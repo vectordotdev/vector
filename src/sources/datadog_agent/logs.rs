@@ -15,20 +15,15 @@ use vector_lib::{
 use vrl::core::Value;
 use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
 
+use super::{ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg, RequestHandler};
 use crate::{
-    SourceSender,
     common::{datadog::DDTAGS, http::ErrorMessage},
     event::Event,
     internal_events::DatadogAgentJsonParseError,
-    sources::datadog_agent::{
-        ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg, handle_request,
-    },
 };
 
-pub(crate) fn build_warp_filter(
-    acknowledgements: bool,
-    multiple_outputs: bool,
-    out: SourceSender,
+pub(super) fn build_warp_filter(
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
@@ -58,9 +53,7 @@ pub(crate) fn build_warp_filter(
                             &source,
                         )
                     });
-
-                let output = multiple_outputs.then_some(super::LOGS);
-                handle_request(events, acknowledgements, out.clone(), output)
+                handler.clone().handle_request(events, super::LOGS)
             },
         )
         .boxed()
@@ -74,10 +67,7 @@ pub(crate) fn decode_log_body(
     if body.is_empty() || body.as_ref() == b"{}" {
         // The datadog agent may send an empty payload as a keep alive
         // https://github.com/DataDog/datadog-agent/blob/5a6c5dd75a2233fbf954e38ddcc1484df4c21a35/pkg/logs/client/http/destination.go#L52
-        debug!(
-            message = "Empty payload ignored.",
-            internal_log_rate_limit = true
-        );
+        debug!(message = "Empty payload ignored.");
         return Ok(Vec::new());
     }
 
