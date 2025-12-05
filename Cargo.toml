@@ -118,6 +118,7 @@ members = [
   "lib/vector-api-client",
   "lib/vector-buffers",
   "lib/vector-common",
+  "lib/vector-common-macros",
   "lib/vector-config",
   "lib/vector-config-common",
   "lib/vector-config-macros",
@@ -197,6 +198,7 @@ uuid = { version = "1.18.1", features = ["v4", "v7", "serde"] }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
+vector-common-macros = { path = "lib/vector-common-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 mock_instant = { version = "0.6" }
