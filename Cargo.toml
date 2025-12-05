@@ -193,7 +193,7 @@ tonic-build = { version = "0.11", default-features = false, features = ["transpo
 tracing = { version = "0.1.34", default-features = false }
 tracing-subscriber = { version = "0.3.20", default-features = false, features = ["fmt"]  }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
-uuid = { version = "1.18.1", features = ["v4", "v7", "serde", "fast-rng"] }
+uuid = { version = "1.18.1", features = ["v4", "serde", "fast-rng"] }
 vector-config = { path = "lib/vector-config" }
 vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
