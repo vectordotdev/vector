@@ -7,7 +7,7 @@ use glob::Pattern;
 pub use cmd::{cmd, top};
 use url::Url;
 
-use crate::config::api::default_graphql_url;
+use crate::config::api::default_grpc_url;
 
 /// Top options
 #[derive(Parser, Debug, Clone)]
@@ -17,7 +17,7 @@ pub struct Opts {
     #[arg(default_value = "1000", short = 'i', long)]
     interval: u32,
 
-    /// GraphQL API server endpoint
+    /// gRPC API server endpoint
     #[arg(short, long)]
     url: Option<Url>,
 
@@ -37,21 +37,9 @@ pub struct Opts {
 }
 
 impl Opts {
-    /// Use the provided URL as the Vector GraphQL API server, or default to the local port
+    /// Use the provided URL as the Vector gRPC API server, or default to the local port
     /// provided by the API config.
     pub fn url(&self) -> Url {
-        self.url.clone().unwrap_or_else(default_graphql_url)
-    }
-
-    /// URL with scheme set to WebSockets
-    pub fn web_socket_url(&self) -> Url {
-        let mut url = self.url();
-        url.set_scheme(match url.scheme() {
-            "https" => "wss",
-            _ => "ws",
-        })
-        .expect("Couldn't build WebSocket URL. Please report.");
-
-        url
+        self.url.clone().unwrap_or_else(default_grpc_url)
     }
 }

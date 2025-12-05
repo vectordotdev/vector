@@ -16,9 +16,30 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
     let url = opts.url();
     // Return early with instructions for enabling the API if the endpoint isn't reachable
     // via a healthcheck.
-    let client = Client::new(url.clone());
+    let mut client = match Client::new(url.as_str()).await {
+        Ok(c) => c,
+        Err(_) => {
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!(
+                    indoc::indoc! {"
+                    Vector API server isn't reachable ({}).
+
+                    Have you enabled the API?
+
+                    To enable the API, add the following to your Vector config file:
+
+                    [api]
+                        enabled = true"},
+                    url
+                );
+            }
+            return exitcode::UNAVAILABLE;
+        }
+    };
+
     #[allow(clippy::print_stderr)]
-    if client.healthcheck().await.is_err() {
+    if client.connect().await.is_err() || client.health().await.is_err() {
         eprintln!(
             indoc::indoc! {"
             Vector API server isn't reachable ({}).
@@ -39,10 +60,10 @@ pub(crate) async fn cmd(opts: &super::Opts, signal_rx: SignalRx) -> exitcode::Ex
 
 /// Observe event flow from specified components
 pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitCode {
-    let subscription_url = opts.web_socket_url();
+    let url = opts.url();
     let output_channel = OutputChannel::Stdout(EventFormatter::new(opts.meta, opts.format));
     let tap_runner = TapRunner::new(
-        &subscription_url,
+        &url,
         opts.inputs_of.clone(),
         opts.outputs_patterns().clone(),
         &output_channel,

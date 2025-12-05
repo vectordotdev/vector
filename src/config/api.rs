@@ -68,10 +68,10 @@ pub fn default_address() -> Option<SocketAddr> {
     Some(SocketAddr::new(Ipv4Addr::LOCALHOST.into(), 8686))
 }
 
-/// Default GraphQL API address
-pub fn default_graphql_url() -> Url {
+/// Default gRPC API address for `vector top` and other API clients
+pub fn default_grpc_url() -> Url {
     let addr = default_address().unwrap();
-    Url::parse(&format!("http://{addr}/graphql"))
+    Url::parse(&format!("http://{addr}"))
         .expect("Couldn't parse default API URL. Please report this.")
 }
 
