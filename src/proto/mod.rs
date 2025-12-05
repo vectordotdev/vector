@@ -4,6 +4,9 @@ use crate::event::proto as event;
 #[cfg(any(feature = "sources-vector", feature = "sinks-vector"))]
 pub mod vector;
 
+#[cfg(feature = "api")]
+pub mod observability;
+
 #[cfg(feature = "sinks-datadog_metrics")]
 pub mod fds {
     use std::sync::OnceLock;
