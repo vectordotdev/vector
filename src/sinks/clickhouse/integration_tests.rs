@@ -392,6 +392,65 @@ async fn templated_table() {
     }
 }
 
+#[tokio::test]
+async fn insert_events_unix_timestamps_using_dns_resolution() {
+    trace_init();
+
+    let table = random_table_name();
+    let host = clickhouse_address();
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        auto_resolve_dns: true,
+        table: table.clone().try_into().unwrap(),
+        compression: Compression::None,
+        encoding: Transformer::new(None, None, Some(TimestampFormat::Unix)).unwrap(),
+        batch,
+        request: TowerRequestConfig {
+            retry_attempts: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let client = ClickhouseClient::new(host);
+    client
+        .create_table(
+            &table,
+            "host String, timestamp DateTime('UTC'), message String",
+        )
+        .await;
+
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    let (mut input_event, _receiver) = make_event();
+
+    run_and_assert_sink_compliance(sink, stream::once(ready(input_event.clone())), &SINK_TAGS)
+        .await;
+
+    let output = client.select_all(&table).await;
+    assert_eq!(1, output.rows);
+
+    let exp_event = input_event.as_mut_log();
+    exp_event.insert(
+        (PathPrefix::Event, log_schema().timestamp_key().unwrap()),
+        format!(
+            "{}",
+            exp_event
+                .get_timestamp()
+                .unwrap()
+                .as_timestamp()
+                .unwrap()
+                .format("%Y-%m-%d %H:%M:%S")
+        ),
+    );
+
+    let expected = serde_json::to_value(exp_event).unwrap();
+    assert_eq!(expected, output.data[0]);
+}
+
 fn make_event() -> (Event, BatchStatusReceiver) {
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let mut event = LogEvent::from("raw log line").with_batch_notifier(&batch);
