@@ -3,7 +3,7 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 use std::task::{Context, Poll};
 
-use azure_core::auth::TokenCredential;
+use azure_core::credentials::TokenCredential;
 
 use bytes::Bytes;
 use http::{
@@ -118,8 +118,9 @@ impl AzureLogsIngestionService {
         let mut request = Request::post(&self.endpoint).body(Body::from(body))?;
 
         // TODO: make this an option, for soverign clouds
-        let access_token = executor::block_on(self.credential.get_token(&[&self.token_scope]))
-            .expect("failed to get access token from credential");
+        let access_token = executor::block_on(
+            self.credential.get_token(&[&self.token_scope], None)
+        ).expect("failed to get access token from credential");
 
         let bearer = format!("Bearer {}", access_token.token.secret());
 
