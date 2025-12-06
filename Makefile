@@ -236,6 +236,10 @@ build-arm-unknown-linux-gnueabi: target/arm-unknown-linux-gnueabi/release/vector
 build-arm-unknown-linux-musleabi: target/arm-unknown-linux-musleabi/release/vector ## Build a release binary for the arm-unknown-linux-musleabi triple.
 	@echo "Output to ${<}"
 
+.PHONY: build-s390x-unknown-linux-gnu
+build-s390x-unknown-linux-gnu: target/s390x-unknown-linux-gnu/release/vector ## Build a release binary for the s390x-unknown-linux-gnu triple.
+	@echo "Output to ${<}"
+
 .PHONY: build-graphql-schema
 build-graphql-schema: ## Generate the `schema.json` for Vector's GraphQL API
 	${MAYBE_ENVIRONMENT_EXEC} cargo run --bin graphql-schema --no-default-features --features=default-no-api-client
@@ -542,6 +546,9 @@ package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf
 .PHONY: package-arm-unknown-linux-gnueabi-all
 package-arm-unknown-linux-gnueabi-all: package-arm-unknown-linux-gnueabi package-deb-arm-gnu  # Build all arm-unknown-linux-gnueabihf GNU packages
 
+.PHONY: package-s390x-unknown-linux-gnu-all
+package-s390x-unknown-linux-gnu-all: package-s390x-unknown-linux-gnu package-deb-s390x package-rpm-s390x # Build all s390x GNU packages
+
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
 	@echo "Output to ${<}."
@@ -574,6 +581,10 @@ package-arm-unknown-linux-gnueabi: target/artifacts/vector-${VERSION}-arm-unknow
 package-arm-unknown-linux-musleabi: target/artifacts/vector-${VERSION}-arm-unknown-linux-musleabi.tar.gz ## Build an archive suitable for the `arm-unknown-linux-musleabi` triple.
 	@echo "Output to ${<}."
 
+.PHONY: package-s390x-unknown-linux-gnu
+package-s390x-unknown-linux-gnu: target/artifacts/vector-${VERSION}-s390x-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `s390x-unknown-linux-gnu` triple.
+	@echo "Output to ${<}."
+
 # debs
 
 .PHONY: package-deb-x86_64-unknown-linux-gnu
@@ -596,6 +607,10 @@ package-deb-armv7-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7-
 package-deb-arm-gnu: package-arm-unknown-linux-gnueabi ## Build the arm-unknown-linux-gnueabi deb package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=arm-unknown-linux-gnueabi -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
 
+.PHONY: package-deb-s390x
+package-deb-s390x: package-s390x-unknown-linux-gnu ## Build the s390x deb package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=s390x-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package deb
+
 # rpms
 
 .PHONY: package-rpm-x86_64-unknown-linux-gnu
@@ -613,6 +628,10 @@ package-rpm-aarch64: package-aarch64-unknown-linux-gnu ## Build the aarch64 rpm 
 .PHONY: package-rpm-armv7hl-gnu
 package-rpm-armv7hl-gnu: package-armv7-unknown-linux-gnueabihf ## Build the armv7hl-unknown-linux-gnueabihf rpm package
 	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=armv7-unknown-linux-gnueabihf -e ARCH=armv7hl -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
+
+.PHONY: package-rpm-s390x
+package-rpm-s390x: package-s390x-unknown-linux-gnu ## Build the s390x rpm package
+	$(CONTAINER_TOOL) run -v  $(PWD):/git/vectordotdev/vector/ -e TARGET=s390x-unknown-linux-gnu -e VECTOR_VERSION $(ENVIRONMENT_UPSTREAM) cargo vdev package rpm
 
 ##@ Releasing
 
