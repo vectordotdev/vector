@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use azure_core::auth::TokenCredential;
+use azure_core::credentials::TokenCredential;
+use azure_identity::ClientSecretCredential;
 use vector_lib::configurable::configurable_component;
 use vector_lib::schema;
 use vrl::value::Kind;
@@ -57,6 +58,18 @@ pub struct AzureLogsIngestionConfig {
     #[configurable(metadata(docs::examples = "Custom-MyTable"))]
     pub stream_name: String,
 
+    /// The [Azure Tenant ID][azure_tenant_id].
+    #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+    pub azure_tenant_id: String,
+
+    /// The [Azure Client ID][azure_client_id].
+    #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+    pub azure_client_id: String,
+
+    /// The [Azure Client Secret][azure_client_secret].
+    #[configurable(metadata(docs::examples = "00-00~000000-0000000~0000000000000000000"))]
+    pub azure_client_secret: String,
+
     /// [Token scope][token_scope] for dedicated Azure regions.
     ///
     /// [token_scope]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
@@ -106,6 +119,9 @@ impl Default for AzureLogsIngestionConfig {
             endpoint: Default::default(),
             dcr_immutable_id: Default::default(),
             stream_name: Default::default(),
+            azure_tenant_id: Default::default(),
+            azure_client_id: Default::default(),
+            azure_client_secret: Default::default(),
             token_scope: default_scope(),
             timestamp_field: default_timestamp_field(),
             encoding: Default::default(),
@@ -124,6 +140,7 @@ impl AzureLogsIngestionConfig {
         endpoint: UriSerde,
         dcr_immutable_id: String,
         stream_name: String,
+        credential: Arc<dyn TokenCredential>,
         token_scope: String,
         timestamp_field: String,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
@@ -135,8 +152,6 @@ impl AzureLogsIngestionConfig {
             .validate()?
             .limit_max_bytes(MAX_BATCH_SIZE)?
             .into_batcher_settings()?;
-
-        let credential: Arc<dyn TokenCredential> = azure_identity::create_credential()?;
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
         let client = HttpClient::new(Some(tls_settings), &cx.proxy)?;
@@ -177,11 +192,20 @@ impl_generate_config_from_default!(AzureLogsIngestionConfig);
 impl SinkConfig for AzureLogsIngestionConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint: UriSerde = self.endpoint.parse()?;
+
+        let credential: Arc<dyn TokenCredential> = ClientSecretCredential::new(
+            &self.azure_tenant_id.clone(),
+            self.azure_client_id.clone(),
+            self.azure_client_secret.clone().into(),
+            None,
+        )?;
+
         self.build_inner(
             cx,
             endpoint,
             self.dcr_immutable_id.clone(),
             self.stream_name.clone(),
+            credential,
             self.token_scope.clone(),
             self.timestamp_field.clone(),
         )
