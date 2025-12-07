@@ -875,25 +875,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "async-process"
-version = "2.3.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "63255f1dc2381611000436537bbedfe83183faa303a5a0edaf191edef06526bb"
-dependencies = [
- "async-channel 2.3.1",
- "async-io 2.1.0",
- "async-lock 3.4.0",
- "async-signal",
- "async-task",
- "blocking",
- "cfg-if",
- "event-listener 5.3.1",
- "futures-lite 2.4.0",
- "rustix 0.38.37",
- "tracing 0.1.40",
-]
-
-[[package]]
 name = "async-reactor-trait"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1720,7 +1701,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f35444aeeb91e29ca82d04dbb8ad904570f837c82093454dc1989c64a33554a7"
 dependencies = [
  "async-lock 3.4.0",
- "async-process 2.3.0",
  "async-trait",
  "azure_core_macros",
  "bytes 1.10.1",
@@ -10484,7 +10464,7 @@ dependencies = [
  "async-io 1.13.0",
  "async-lock 2.8.0",
  "async-net",
- "async-process 1.8.1",
+ "async-process",
  "blocking",
  "futures-lite 1.13.0",
 ]
