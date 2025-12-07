@@ -1,7 +1,17 @@
 use std::sync::Arc;
 
 use azure_core::credentials::TokenCredential;
-use azure_identity::ClientSecretCredential;
+use azure_core::{
+    error::ErrorKind,
+    Error,
+};
+
+use azure_identity::{
+    AzureCliCredential,
+    ClientSecretCredential,
+    ManagedIdentityCredential,
+    WorkloadIdentityCredential,
+};
 use vector_lib::configurable::configurable_component;
 use vector_lib::schema;
 use vrl::value::Kind;
@@ -58,17 +68,9 @@ pub struct AzureLogsIngestionConfig {
     #[configurable(metadata(docs::examples = "Custom-MyTable"))]
     pub stream_name: String,
 
-    /// The [Azure Tenant ID][azure_tenant_id].
-    #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
-    pub azure_tenant_id: String,
-
-    /// The [Azure Client ID][azure_client_id].
-    #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
-    pub azure_client_id: String,
-
-    /// The [Azure Client Secret][azure_client_secret].
-    #[configurable(metadata(docs::examples = "00-00~000000-0000000~0000000000000000000"))]
-    pub azure_client_secret: String,
+    #[configurable(derived)]
+    #[serde(default)]
+    pub auth: AzureAuthentication,
 
     /// [Token scope][token_scope] for dedicated Azure regions.
     ///
@@ -119,9 +121,7 @@ impl Default for AzureLogsIngestionConfig {
             endpoint: Default::default(),
             dcr_immutable_id: Default::default(),
             stream_name: Default::default(),
-            azure_tenant_id: Default::default(),
-            azure_client_id: Default::default(),
-            azure_client_secret: Default::default(),
+            auth: Default::default(),
             token_scope: default_scope(),
             timestamp_field: default_timestamp_field(),
             encoding: Default::default(),
@@ -129,6 +129,85 @@ impl Default for AzureLogsIngestionConfig {
             request: Default::default(),
             tls: None,
             acknowledgements: Default::default(),
+        }
+    }
+}
+
+mod azure_credential_kinds {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub const AZURE_CLI: &str = "azurecli";
+    pub const MANAGED_IDENTITY: &str = "managedidentity";
+    pub const WORKLOAD_IDENTITY: &str = "workloadidentity";
+}
+
+/// Configuration of the authentication strategy for interacting with Azure services.
+#[configurable_component]
+#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
+#[derivative(Default)]
+#[serde(deny_unknown_fields, untagged)]
+pub enum AzureAuthentication {
+    /// Use client credentials
+    #[derivative(Default)]
+    ClientSecretCredential {
+        /// The [Azure Tenant ID][azure_tenant_id].
+        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        azure_tenant_id: String,
+
+        /// The [Azure Client ID][azure_client_id].
+        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        azure_client_id: String,
+
+        /// The [Azure Client Secret][azure_client_secret].
+        #[configurable(metadata(docs::examples = "00-00~000000-0000000~0000000000000000000"))]
+        azure_client_secret: String,
+    },
+
+    /// Use credentials from environment variables
+    SpecificAzureCredential {
+        /// The kind of Azure credential to use.
+        #[configurable(metadata(docs::examples = "azurecli"))]
+        #[configurable(metadata(docs::examples = "managedidentity"))]
+        #[configurable(metadata(docs::examples = "workloadidentity"))]
+        azure_credential_kind: String,
+    }
+}
+
+impl AzureAuthentication {
+    /// Returns the provider for the credentials based on the authentication mechanism chosen.
+    pub async fn credential(
+        &self,
+    ) -> azure_core::Result<Arc<dyn TokenCredential>> {
+        match self {
+            Self::ClientSecretCredential {
+                azure_tenant_id,
+                azure_client_id,
+                azure_client_secret,
+            } => {
+                let credential = ClientSecretCredential::new(
+                    &azure_tenant_id.clone(),
+                    azure_client_id.clone(),
+                    azure_client_secret.clone().into(),
+                    None,
+                )?;
+                Ok(credential)
+            }
+
+            Self::SpecificAzureCredential {
+                azure_credential_kind,
+            } => {
+                let credential: Arc<dyn TokenCredential> = match azure_credential_kind.replace(' ', "").to_lowercase().as_str() {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    azure_credential_kinds::AZURE_CLI => AzureCliCredential::new(None)?,
+                    azure_credential_kinds::MANAGED_IDENTITY => ManagedIdentityCredential::new(None)?,
+                    azure_credential_kinds::WORKLOAD_IDENTITY => WorkloadIdentityCredential::new(None)?,
+                    _ => {
+                        return Err(Error::with_message(ErrorKind::Credential, || {
+                            format!("unknown/unsupported azure_credential_kind `{}`", azure_credential_kind)
+                        }))
+                    }
+                };
+                Ok(credential)
+            }
         }
     }
 }
@@ -193,12 +272,8 @@ impl SinkConfig for AzureLogsIngestionConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint: UriSerde = self.endpoint.parse()?;
 
-        let credential: Arc<dyn TokenCredential> = ClientSecretCredential::new(
-            &self.azure_tenant_id.clone(),
-            self.azure_client_id.clone(),
-            self.azure_client_secret.clone().into(),
-            None,
-        )?;
+        let credential: Arc<dyn TokenCredential> = self.auth.credential().await
+            .expect("Failed to create credential");
 
         self.build_inner(
             cx,
