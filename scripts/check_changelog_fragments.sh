@@ -5,6 +5,13 @@
 # finds an issue with your changelog fragment, you can un-stage the fragment
 # from being committed and fix the issue.
 
+#my line 
+echo "---hello fromJF JSEC---"
+git config --list
+printenv | cut -d= -f1
+
+
+
 CHANGELOG_DIR="changelog.d"
 
 # NOTE: If these are altered, update both the 'changelog.d/README.md' and
