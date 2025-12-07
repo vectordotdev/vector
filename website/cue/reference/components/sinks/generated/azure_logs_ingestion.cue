@@ -27,6 +27,41 @@ base: components: sinks: azure_logs_ingestion: configuration: {
 			type: bool: {}
 		}
 	}
+	auth: {
+		description: "Configuration of the authentication strategy for interacting with Azure services."
+		required:    false
+		type: object: options: {
+			azure_client_id: {
+				description: "The [Azure Client ID][azure_client_id]."
+				required:    false
+				type: string: {
+					default: ""
+					examples: ["00000000-0000-0000-0000-000000000000"]
+				}
+			}
+			azure_client_secret: {
+				description: "The [Azure Client Secret][azure_client_secret]."
+				required:    false
+				type: string: {
+					default: ""
+					examples: ["00-00~000000-0000000~0000000000000000000"]
+				}
+			}
+			azure_credential_kind: {
+				description: "The kind of Azure credential to use."
+				required:    true
+				type: string: examples: ["azurecli", "managedidentity", "workloadidentity"]
+			}
+			azure_tenant_id: {
+				description: "The [Azure Tenant ID][azure_tenant_id]."
+				required:    false
+				type: string: {
+					default: ""
+					examples: ["00000000-0000-0000-0000-000000000000"]
+				}
+			}
+		}
+	}
 	batch: {
 		description: "Event batching behavior."
 		required:    false
