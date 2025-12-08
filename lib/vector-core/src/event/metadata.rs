@@ -348,14 +348,8 @@ impl EventMetadata {
         inner.secrets.merge(other.secrets);
 
         // Update `source_event_id` if necessary.
-        match (inner.source_event_id, other.source_event_id) {
-            (None, Some(id)) => {
-                inner.source_event_id = Some(id);
-            }
-            (Some(uuid1), Some(uuid2)) if uuid2 < uuid1 => {
-                inner.source_event_id = Some(uuid2);
-            }
-            _ => {} // Keep the existing value.
+        if inner.source_event_id.is_none() {
+            inner.source_event_id = other.source_event_id;
         }
     }
 
