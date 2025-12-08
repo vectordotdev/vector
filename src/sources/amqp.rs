@@ -7,8 +7,7 @@ use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
-use lapin::{Channel, acker::Acker, message::Delivery};
-use lapin::options::BasicQosOptions;
+use lapin::{Channel, acker::Acker, message::Delivery, options::BasicQosOptions};
 use snafu::Snafu;
 use tokio_util::codec::FramedRead;
 use vector_lib::{
@@ -102,13 +101,13 @@ pub struct AmqpSourceConfig {
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub(crate) acknowledgements: SourceAcknowledgementsConfig,
 
-	/// Maximum number of unacknowledged messages the broker will deliver to this consumer.
-	///
-	/// This controls flow control via AMQP QoS prefetch. Lower values limit memory usage and
-	/// prevent overwhelming slow consumers, but may reduce throughput. Higher values increase
-	/// throughput but consume more memory.
-	///
-	/// If not set, the broker/client default applies (often unlimited).
+    /// Maximum number of unacknowledged messages the broker will deliver to this consumer.
+    ///
+    /// This controls flow control via AMQP QoS prefetch. Lower values limit memory usage and
+    /// prevent overwhelming slow consumers, but may reduce throughput. Higher values increase
+    /// throughput but consume more memory.
+    ///
+    /// If not set, the broker/client default applies (often unlimited).
     #[serde(default)]
     #[configurable(metadata(docs::examples = 100))]
     pub(crate) prefetch_count: Option<u16>,
