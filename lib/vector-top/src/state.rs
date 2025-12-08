@@ -8,6 +8,7 @@ use ratatui::{
     layout::Size,
     style::{Color, Style},
     text::Span,
+    widgets::ListState,
 };
 use tokio::sync::mpsc;
 use vector_common::internal_event::DEFAULT_OUTPUT;
@@ -52,11 +53,21 @@ pub enum EventType {
 #[derive(Debug)]
 pub enum UiEventType {
     // Scroll up (-) or down (+). Also passes the window size for correct max scroll calculation.
-    ScrollEvent(isize, Size),
+    Scroll(isize, Size),
     // Scroll up (-) or down (+) by a whole page. Also passes the window size for page size and max scroll calculation.
-    ScrollPageEvent(isize, Size),
-    // Toggles help window
+    ScrollPage(isize, Size),
+    // Toggles help window. Also closes other windows.
     ToggleHelp,
+    // Toggles sort menu. Also closes other windows.
+    ToggleSortMenu,
+    // Toggles sort direction.
+    ToggleSortDirection,
+    // Change sort selection up (-) or down (+).
+    SortSelection(isize),
+    // Change sort selection to a specific column.
+    SortByColumn(SortColumn),
+    // Confirms current sort selection.
+    SortConfirmation,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -94,29 +105,100 @@ pub struct State {
     pub connection_status: ConnectionStatus,
     pub uptime: Duration,
     pub components: BTreeMap<ComponentKey, ComponentRow>,
+    pub sort_state: SortState,
     pub ui: UiState,
 }
 
-#[derive(Debug, Clone)]
-pub struct UiState {
-    pub scroll: usize,
-    pub help_visible: bool,
+#[derive(Debug, Clone, Copy)]
+pub enum SortColumn {
+    Id = 0,
+    Kind = 1,
+    Type = 2,
+    EventsIn = 3,
+    EventsInTotal = 4,
+    BytesIn = 5,
+    BytesInTotal = 6,
+    EventsOut = 7,
+    EventsOutTotal = 8,
+    BytesOut = 9,
+    BytesOutTotal = 10,
+    Errors = 11,
+    #[cfg(feature = "allocation-tracing")]
+    MemoryUsed = 12,
 }
 
-impl Default for UiState {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl UiState {
-    pub const fn new() -> Self {
-        Self {
-            scroll: 0,
-            help_visible: false,
+impl SortColumn {
+    pub fn matches_header(&self, header: &str) -> bool {
+        match self {
+            SortColumn::Id => header == "ID",
+            SortColumn::Kind => header == "Kind",
+            SortColumn::Type => header == "Type",
+            SortColumn::EventsIn | SortColumn::EventsInTotal => header == "Events In",
+            SortColumn::BytesIn | SortColumn::BytesInTotal => header == "Bytes In",
+            SortColumn::EventsOut | SortColumn::EventsOutTotal => header == "Events Out",
+            SortColumn::BytesOut | SortColumn::BytesOutTotal => header == "Bytes Out",
+            SortColumn::Errors => header == "Errors",
+            #[cfg(feature = "allocation-tracing")]
+            SortColumn::MemoryUsed => header == "Memory Used",
         }
     }
 
+    pub fn items() -> Vec<&'static str> {
+        vec![
+            "ID",
+            "Kind",
+            "Type",
+            "Events In",
+            "Events In Total",
+            "Bytes In",
+            "Bytes In Total",
+            "Events Out",
+            "Events Out Total",
+            "Bytes Out",
+            "Bytes Out Total",
+            "Errors",
+            #[cfg(feature = "allocation-tracing")]
+            "Memory Used",
+        ]
+    }
+}
+
+impl From<usize> for SortColumn {
+    fn from(value: usize) -> Self {
+        match value {
+            1 => SortColumn::Kind,
+            2 => SortColumn::Type,
+            3 => SortColumn::EventsIn,
+            4 => SortColumn::EventsInTotal,
+            5 => SortColumn::BytesIn,
+            6 => SortColumn::BytesInTotal,
+            7 => SortColumn::EventsOut,
+            8 => SortColumn::EventsOutTotal,
+            9 => SortColumn::BytesOut,
+            10 => SortColumn::BytesOutTotal,
+            11 => SortColumn::Errors,
+            #[cfg(feature = "allocation-tracing")]
+            12 => SortColumn::MemoryUsed,
+            _ => SortColumn::Id,
+        }
+    }
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct SortState {
+    pub column: Option<SortColumn>,
+    pub reverse: bool,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct UiState {
+    pub scroll: usize,
+    pub help_visible: bool,
+    pub sort_visible: bool,
+    pub sort_menu_state: ListState,
+}
+
+impl UiState {
     /// Returns the height of components display box in rows, based on provided [`Size`].
     /// Calculates by deducting rows used for header and footer.
     pub fn components_box_height(area: Size) -> u16 {
@@ -151,12 +233,13 @@ impl UiState {
 }
 
 impl State {
-    pub const fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
+    pub fn new(components: BTreeMap<ComponentKey, ComponentRow>) -> Self {
         Self {
             connection_status: ConnectionStatus::Pending,
             uptime: Duration::from_secs(0),
             components,
-            ui: UiState::new(),
+            ui: UiState::default(),
+            sort_state: SortState::default(),
         }
     }
 }
@@ -321,13 +404,45 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                     state.uptime = Duration::from_secs_f64(uptime);
                 }
                 EventType::Ui(ui_event_type) => match ui_event_type {
-                    UiEventType::ScrollEvent(diff, area) => {
+                    UiEventType::Scroll(diff, area) => {
                         state.ui.scroll(diff, area, state.components.len());
                     }
-                    UiEventType::ScrollPageEvent(diff, area) => {
+                    UiEventType::ScrollPage(diff, area) => {
                         state.ui.scroll_page(diff, area, state.components.len());
                     }
-                    UiEventType::ToggleHelp => state.ui.help_visible = !state.ui.help_visible,
+                    UiEventType::ToggleHelp => {
+                        state.ui.help_visible = !state.ui.help_visible;
+                        if state.ui.help_visible {
+                            state.ui.sort_visible = false;
+                        }
+                    }
+                    UiEventType::ToggleSortMenu => {
+                        state.ui.sort_visible = !state.ui.sort_visible;
+                        state
+                            .ui
+                            .sort_menu_state
+                            .select(state.sort_state.column.map(|c| c as usize));
+                        if state.ui.sort_visible {
+                            state.ui.help_visible = false;
+                        }
+                    }
+                    UiEventType::ToggleSortDirection => {
+                        state.sort_state.reverse = !state.sort_state.reverse
+                    }
+                    UiEventType::SortSelection(diff) => {
+                        let next = state.ui.sort_menu_state.selected().map_or(0, |s| {
+                            s.saturating_add_signed(diff)
+                                .min(SortColumn::items().len() - 1)
+                        });
+                        state.ui.sort_menu_state.select(Some(next));
+                    }
+                    UiEventType::SortByColumn(col) => state.sort_state.column = Some(col),
+                    UiEventType::SortConfirmation => {
+                        if let Some(selected) = state.ui.sort_menu_state.selected() {
+                            state.sort_state.column = Some(selected.into())
+                        }
+                        state.ui.sort_visible = false;
+                    }
                 },
             }
 
