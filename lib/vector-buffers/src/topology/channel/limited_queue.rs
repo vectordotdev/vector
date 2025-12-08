@@ -8,6 +8,9 @@ use std::{
     },
 };
 
+#[cfg(test)]
+use std::sync::Mutex;
+
 use async_stream::stream;
 use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
@@ -90,6 +93,18 @@ where
 }
 
 #[derive(Clone, Debug)]
+pub struct ChannelMetricMetadata {
+    prefix: &'static str,
+    output: Option<String>,
+}
+
+impl ChannelMetricMetadata {
+    pub fn new(prefix: &'static str, output: Option<String>) -> Self {
+        Self { prefix, output }
+    }
+}
+
+#[derive(Clone, Debug)]
 struct Metrics {
     histogram: Histogram,
     gauge: Gauge,
@@ -98,21 +113,43 @@ struct Metrics {
     // field, so we need to suppress the warning here.
     #[expect(dead_code)]
     max_gauge: Gauge,
+    #[cfg(test)]
+    recorded_values: Arc<Mutex<Vec<usize>>>,
 }
 
 impl Metrics {
     #[expect(clippy::cast_precision_loss)] // We have to convert buffer sizes for a gauge, it's okay to lose precision here.
-    fn new(limit: MemoryBufferSize, prefix: &'static str, output: &str) -> Self {
+    fn new(limit: MemoryBufferSize, metadata: ChannelMetricMetadata) -> Self {
+        let ChannelMetricMetadata { prefix, output } = metadata;
         let (gauge_suffix, max_value) = match limit {
             MemoryBufferSize::MaxEvents(max_events) => ("_max_event_size", max_events.get() as f64),
             MemoryBufferSize::MaxSize(max_bytes) => ("_max_byte_size", max_bytes.get() as f64),
         };
-        let max_gauge = gauge!(format!("{prefix}{gauge_suffix}"), "output" => output.to_string());
-        max_gauge.set(max_value);
-        Self {
-            histogram: histogram!(format!("{prefix}_utilization"), "output" => output.to_string()),
-            gauge: gauge!(format!("{prefix}_utilization_level"), "output" => output.to_string()),
-            max_gauge,
+        let max_gauge_name = format!("{prefix}{gauge_suffix}");
+        let histogram_name = format!("{prefix}_utilization");
+        let gauge_name = format!("{prefix}_utilization_level");
+        #[cfg(test)]
+        let recorded_values = Arc::new(Mutex::new(Vec::new()));
+        if let Some(label_value) = output {
+            let max_gauge = gauge!(max_gauge_name, "output" => label_value.clone());
+            max_gauge.set(max_value);
+            Self {
+                histogram: histogram!(histogram_name, "output" => label_value.clone()),
+                gauge: gauge!(gauge_name, "output" => label_value.clone()),
+                max_gauge,
+                #[cfg(test)]
+                recorded_values,
+            }
+        } else {
+            let max_gauge = gauge!(max_gauge_name);
+            max_gauge.set(max_value);
+            Self {
+                histogram: histogram!(histogram_name),
+                gauge: gauge!(gauge_name),
+                max_gauge,
+                #[cfg(test)]
+                recorded_values,
+            }
         }
     }
 
@@ -120,6 +157,10 @@ impl Metrics {
     fn record(&self, value: usize) {
         self.histogram.record(value as f64);
         self.gauge.set(value as f64);
+        #[cfg(test)]
+        if let Ok(mut recorded) = self.recorded_values.lock() {
+            recorded.push(value);
+        }
     }
 }
 
@@ -145,10 +186,9 @@ impl<T> Clone for Inner<T> {
 }
 
 impl<T: InMemoryBufferable> Inner<T> {
-    fn new(limit: MemoryBufferSize, metric_name_output: Option<(&'static str, &str)>) -> Self {
+    fn new(limit: MemoryBufferSize, metric_metadata: Option<ChannelMetricMetadata>) -> Self {
         let read_waker = Arc::new(Notify::new());
-        let metrics =
-            metric_name_output.map(|(prefix, output)| Metrics::new(limit, prefix, output));
+        let metrics = metric_metadata.map(|metadata| Metrics::new(limit, metadata));
         match limit {
             MemoryBufferSize::MaxEvents(max_events) => Inner {
                 data: Arc::new(ArrayQueue::new(max_events.get())),
@@ -167,6 +207,11 @@ impl<T: InMemoryBufferable> Inner<T> {
         }
     }
 
+    /// Records a send after acquiring all required permits.
+    ///
+    /// The `total` value represents the channel utilization after this send completes.  It may be
+    /// greater than the configured limit because the channel intentionally allows a single
+    /// oversized payload to flow through rather than forcing the sender to split it.
     fn send_with_permit(&mut self, total: usize, permits: OwnedSemaphorePermit, item: T) {
         self.data.push((permits, item));
         self.read_waker.notify_one();
@@ -335,9 +380,9 @@ impl<T> Drop for LimitedReceiver<T> {
 
 pub fn limited<T: InMemoryBufferable + fmt::Debug>(
     limit: MemoryBufferSize,
-    metric_name_output: Option<(&'static str, &str)>,
+    metric_metadata: Option<ChannelMetricMetadata>,
 ) -> (LimitedSender<T>, LimitedReceiver<T>) {
-    let inner = Inner::new(limit, metric_name_output);
+    let inner = Inner::new(limit, metric_metadata);
 
     let sender = LimitedSender {
         inner: inner.clone(),
@@ -355,7 +400,7 @@ mod tests {
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use vector_common::byte_size_of::ByteSizeOf;
 
-    use super::limited;
+    use super::{ChannelMetricMetadata, limited};
     use crate::{
         MemoryBufferSize,
         test::MultiEventRecord,
@@ -389,6 +434,22 @@ mod tests {
         // Now our receive should have been woken up, and should immediately be ready.
         assert!(recv.is_woken());
         assert_eq!(Some(Sample::new(42)), assert_ready!(recv.poll()));
+    }
+
+    #[tokio::test]
+    async fn records_utilization_on_send() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
+        let (mut tx, mut rx) = limited(
+            limit,
+            Some(ChannelMetricMetadata::new("test_channel", None)),
+        );
+
+        let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
+
+        tx.send(Sample::new(1)).await.expect("send should succeed");
+        assert_eq!(metrics.lock().unwrap().last().copied(), Some(1));
+
+        let _ = rx.next().await;
     }
 
     #[test]
