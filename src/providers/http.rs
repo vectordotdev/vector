@@ -112,7 +112,9 @@ async fn http_request(
 
     info!(message = "Response received.", url = ?url.as_str());
 
-    response.into_body().collect()
+    response
+        .into_body()
+        .collect()
         .await
         .map(Collected::to_bytes)
         .map_err(|err| {

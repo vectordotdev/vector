@@ -244,7 +244,9 @@ impl HecAckClient {
 
         let status = response.status();
         if status.is_success() {
-            let response_body = response.into_body().collect()
+            let response_body = response
+                .into_body()
+                .collect()
                 .await
                 .map(Collected::to_bytes)
                 .map_err(|_| HecAckApiError::ClientParseResponse)?;

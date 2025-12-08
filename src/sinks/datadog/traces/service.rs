@@ -157,7 +157,8 @@ impl Service<TraceApiRequest> for TraceApiService {
 
             let response = client.send(http_request).await?;
             let (parts, body) = response.into_parts();
-            let mut body = body.collect()
+            let mut body = body
+                .collect()
                 .await
                 .map(Collected::aggregate)
                 .context(CallRequestSnafu)?;

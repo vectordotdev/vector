@@ -297,7 +297,8 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
         .context(GetImplicitTokenSnafu)?;
 
     let body = res.into_body();
-    let bytes = body.collect()
+    let bytes = body
+        .collect()
         .await
         .map(Collected::to_bytes)
         .context(GetTokenBytesSnafu)?;

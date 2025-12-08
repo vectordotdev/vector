@@ -194,7 +194,10 @@ async fn aws_ecs_metrics(
 
         match http_client.send(request).await {
             Ok(response) if response.status() == hyper::StatusCode::OK => {
-                match http_body::Body::collect(response.into_body()).await.map(Collected::to_bytes) {
+                match http_body::Body::collect(response.into_body())
+                    .await
+                    .map(Collected::to_bytes)
+                {
                     Ok(body) => {
                         bytes_received.emit(ByteSize(body.len()));
 
