@@ -12,8 +12,11 @@ use azure_identity::{
     ManagedIdentityCredential,
     WorkloadIdentityCredential,
 };
-use vector_lib::configurable::configurable_component;
-use vector_lib::schema;
+use vector_lib::{
+    schema,
+    configurable::configurable_component,
+    sensitive_string::SensitiveString,
+};
 use vrl::value::Kind;
 
 use crate::{
@@ -159,7 +162,7 @@ pub enum AzureAuthentication {
 
         /// The [Azure Client Secret][azure_client_secret].
         #[configurable(metadata(docs::examples = "00-00~000000-0000000~0000000000000000000"))]
-        azure_client_secret: String,
+        azure_client_secret: SensitiveString,
     },
 
     /// Use credentials from environment variables
@@ -183,10 +186,11 @@ impl AzureAuthentication {
                 azure_client_id,
                 azure_client_secret,
             } => {
+                let secret: String = azure_client_secret.inner().into();
                 let credential = ClientSecretCredential::new(
                     &azure_tenant_id.clone(),
                     azure_client_id.clone(),
-                    azure_client_secret.clone().into(),
+                    secret.into(),
                     None,
                 )?;
                 Ok(credential)
