@@ -555,6 +555,7 @@ mod test {
         let m1 = EventMetadata::default();
         let m2 = EventMetadata::default();
 
+        // Always maintain the original source event id when merging, similar to how we handle other metadata.
         {
             let mut merged = m1.clone();
             merged.merge(m2.clone());
@@ -564,7 +565,7 @@ mod test {
         {
             let mut merged = m2.clone();
             merged.merge(m1.clone());
-            assert_eq!(merged.source_event_id(), m1.source_event_id());
+            assert_eq!(merged.source_event_id(), m2.source_event_id());
         }
     }
 }
