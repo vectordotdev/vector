@@ -11,7 +11,7 @@ use metrics::Histogram;
 use tracing::Span;
 use vector_buffers::{
     config::MemoryBufferSize,
-    topology::channel::{self, LimitedReceiver, LimitedSender},
+    topology::channel::{self, ChannelMetricMetadata, LimitedReceiver, LimitedSender},
 };
 use vector_common::{
     byte_size_of::ByteSizeOf,
@@ -117,7 +117,8 @@ impl Output {
         timeout: Option<Duration>,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap());
-        let (tx, rx) = channel::limited(limit, Some((UTILIZATION_METRIC_PREFIX, &output)));
+        let metrics = ChannelMetricMetadata::new(UTILIZATION_METRIC_PREFIX, Some(output.clone()));
+        let (tx, rx) = channel::limited(limit, Some(metrics));
         (
             Self {
                 sender: tx,
