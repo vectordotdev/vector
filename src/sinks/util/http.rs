@@ -6,6 +6,7 @@ use bytes::{Buf, Bytes};
 use futures::{Sink, future::BoxFuture};
 use headers::HeaderName;
 use http::{HeaderValue, Request, Response, StatusCode, header};
+use http_body::Body as _;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedHeaderName(HeaderName);
@@ -49,7 +50,7 @@ use std::{
     time::Duration,
 };
 
-use hyper::{Body, body};
+use hyper::Body;
 use pin_project::pin_project;
 use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
@@ -519,7 +520,7 @@ where
             }
 
             let (parts, body) = response.into_parts();
-            let mut body = body::aggregate(body).await?;
+            let mut body = body.collect().await?.aggregate();
             Ok(hyper::Response::from_parts(
                 parts,
                 body.copy_to_bytes(body.remaining()),

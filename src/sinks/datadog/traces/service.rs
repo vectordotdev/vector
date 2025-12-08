@@ -6,6 +6,7 @@ use std::{
 use bytes::{Buf, Bytes};
 use futures::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
+use http_body::{Body as _, Collected};
 use hyper::Body;
 use snafu::ResultExt;
 use tower::Service;
@@ -156,8 +157,9 @@ impl Service<TraceApiRequest> for TraceApiService {
 
             let response = client.send(http_request).await?;
             let (parts, body) = response.into_parts();
-            let mut body = hyper::body::aggregate(body)
+            let mut body = body.collect()
                 .await
+                .map(Collected::aggregate)
                 .context(CallRequestSnafu)?;
             let body = body.copy_to_bytes(body.remaining());
 
