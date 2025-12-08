@@ -37,8 +37,9 @@ pub mod pubsub;
 pub enum Compression {
     /// Automatically attempt to determine the compression scheme.
     ///
-    /// The compression scheme of the object is determined from its `Content-Encoding` and
-    /// `Content-Type` metadata, as well as the key suffix (for example, `.gz`).
+    /// The compression scheme of the object is determined in priority order
+    /// from its `Content-Encoding`, `Content-Type` metadata, and finally
+    /// fall back to the key suffix (for example, `.gz` will result in Gzip).
     ///
     /// It is set to `none` if the compression scheme cannot be determined.
     #[derivative(Default)]
