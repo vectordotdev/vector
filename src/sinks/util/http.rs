@@ -998,13 +998,14 @@ mod test {
         let new_service = make_service_fn(move |_| {
             let tx = tx.clone();
 
-            let svc = service_fn(move |req| {
+            let svc = service_fn(move |req: http::Request<Body>| {
                 let mut tx = tx.clone();
 
                 async move {
-                    let mut body = hyper::body::aggregate(req.into_body())
+                    let mut body = http_body::Body::collect(req.into_body())
                         .await
-                        .map_err(|error| format!("error: {error}"))?;
+                        .map_err(|error| format!("error: {error}"))?
+                        .aggregate();
                     let string = String::from_utf8(body.copy_to_bytes(body.remaining()).to_vec())
                         .map_err(|_| "Wasn't UTF-8".to_string())?;
                     tx.try_send(string).map_err(|_| "Send error".to_string())?;
