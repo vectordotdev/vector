@@ -1,9 +1,11 @@
-use futures::executor;
 use std::sync::Arc;
 use std::sync::LazyLock;
 use std::task::{Context, Poll};
 
-use azure_core::credentials::TokenCredential;
+use azure_core::credentials::{
+    AccessToken,
+    TokenCredential,
+};
 
 use bytes::Bytes;
 use http::{
@@ -114,13 +116,15 @@ impl AzureLogsIngestionService {
         })
     }
 
-    fn build_request(&self, body: Bytes) -> crate::Result<Request<Body>> {
+    async fn build_request(&self, body: Bytes) -> crate::Result<Request<Body>> {
         let mut request = Request::post(&self.endpoint).body(Body::from(body))?;
 
-        // TODO: make this an option, for soverign clouds
-        let access_token = executor::block_on(
-            self.credential.get_token(&[&self.token_scope], None)
-        ).expect("failed to get access token from credential");
+        // TODO: make this an option, for sovereign clouds
+        let access_token: AccessToken = self
+            .credential
+            .get_token(&[&self.token_scope], None)
+            .await
+            .expect("failed to get access token from credential");
 
         let bearer = format!("Bearer {}", access_token.token.secret());
 
@@ -134,10 +138,10 @@ impl AzureLogsIngestionService {
     }
 
     pub fn healthcheck(&self) -> Healthcheck {
-        let mut client = self.client.clone();
-        let request = self.build_request(Bytes::from("[]"));
+        let service = self.clone();
+        let mut client = service.client.clone();
         Box::pin(async move {
-            let request = request?;
+            let request = service.build_request(Bytes::from("[]")).await?;
             let res = client.call(request).in_current_span().await?;
 
             if res.status().is_server_error() {
@@ -180,10 +184,10 @@ impl Service<AzureLogsIngestionRequest> for AzureLogsIngestionService {
 
     // Emission of Error internal event is handled upstream by the caller.
     fn call(&mut self, request: AzureLogsIngestionRequest) -> Self::Future {
-        let mut client = self.client.clone();
-        let http_request = self.build_request(request.body);
+        let service = self.clone();
+        let mut client = service.client.clone();
         Box::pin(async move {
-            let http_request = http_request?;
+            let http_request = service.build_request(request.body).await?;
             let response = client.call(http_request).in_current_span().await?;
             Ok(AzureLogsIngestionResponse {
                 http_status: response.status(),
