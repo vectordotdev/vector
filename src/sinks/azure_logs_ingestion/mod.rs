@@ -7,7 +7,7 @@
 mod config;
 mod service;
 mod sink;
-// #[cfg(test)]
-// mod tests;
+#[cfg(test)]
+mod tests;
 
 pub use config::AzureLogsIngestionConfig;
