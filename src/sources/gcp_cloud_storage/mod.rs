@@ -648,15 +648,4 @@ mod integration_tests {
             }
         }
     }
-
-    // TODO: Add more comprehensive integration tests that would require:
-    // - Mock GCS server for testing HTTP interactions
-    // - Mock Pub/Sub server for testing notification handling
-    // - End-to-end tests with real GCS buckets (optional, for full integration)
-    //
-    // These would test:
-    // - URL encoding in GCS API calls
-    // - Authentication with service accounts
-    // - Pub/Sub notification parsing
-    // - Complete source workflow
 }
