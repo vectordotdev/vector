@@ -571,7 +571,7 @@ generated: components: sources: amqp: configuration: {
 			"""
 		required: false
 		type: uint: examples: [
-			"100",
+			100,
 		]
 	}
 	queue: {

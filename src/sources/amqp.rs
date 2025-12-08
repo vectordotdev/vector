@@ -110,7 +110,7 @@ pub struct AmqpSourceConfig {
 	///
 	/// If not set, the broker/client default applies (often unlimited).
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "100"))]
+    #[configurable(metadata(docs::examples = 100))]
     pub(crate) prefetch_count: Option<u16>,
 }
 
