@@ -12974,6 +12974,7 @@ dependencies = [
  "indoc",
  "num-format",
  "ratatui",
+ "regex",
  "tokio",
  "tokio-stream",
  "unit-prefix",

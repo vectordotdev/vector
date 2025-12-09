@@ -23,7 +23,7 @@ pub(crate) async fn handle_input<B: Backend>(
     match mode {
         InputMode::Top => handle_top_input(key_event, event_tx, terminal).await,
         InputMode::HelpMenu => handle_help_input(key_event, event_tx, terminal).await,
-        InputMode::FilterInput => todo!(),
+        InputMode::FilterInput => handle_filter_input(key_event, event_tx, terminal).await,
         InputMode::SortMenu => handle_sort_input(key_event, event_tx, terminal).await,
     }
 }
@@ -132,6 +132,11 @@ async fn handle_top_input<B: Backend>(
                 .send(EventType::Ui(UiEventType::SortByColumn(col)))
                 .await;
         }
+        KeyCode::F(4) | KeyCode::Char('f') | KeyCode::Char('/') => {
+            let _ = event_tx
+                .send(EventType::Ui(UiEventType::ToggleFilterMenu))
+                .await;
+        }
         _ => (),
     }
     false
@@ -175,6 +180,47 @@ async fn handle_sort_input<B: Backend>(
         KeyCode::Enter => {
             let _ = event_tx
                 .send(EventType::Ui(UiEventType::SortConfirmation))
+                .await;
+        }
+        _ => return handle_top_input(key_event, event_tx, terminal).await,
+    }
+    false
+}
+
+async fn handle_filter_input<B: Backend>(
+    key_event: KeyEvent,
+    event_tx: &state::EventTx,
+    terminal: &Terminal<B>,
+) -> bool {
+    match key_event.code {
+        KeyCode::Esc => {
+            let _ = event_tx
+                .send(EventType::Ui(UiEventType::ToggleFilterMenu))
+                .await;
+        }
+        KeyCode::BackTab | KeyCode::Up => {
+            let _ = event_tx
+                .send(EventType::Ui(UiEventType::FilterColumnSelection(-1)))
+                .await;
+        }
+        KeyCode::Tab | KeyCode::Down => {
+            let _ = event_tx
+                .send(EventType::Ui(UiEventType::FilterColumnSelection(1)))
+                .await;
+        }
+        KeyCode::Backspace => {
+            let _ = event_tx
+                .send(EventType::Ui(UiEventType::FilterBackspace))
+                .await;
+        }
+        KeyCode::Enter => {
+            let _ = event_tx
+                .send(EventType::Ui(UiEventType::FilterConfirmation))
+                .await;
+        }
+        KeyCode::Char(any) => {
+            let _ = event_tx
+                .send(EventType::Ui(UiEventType::FilterInput(any)))
                 .await;
         }
         _ => return handle_top_input(key_event, event_tx, terminal).await,

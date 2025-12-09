@@ -1,8 +1,4 @@
-use std::{
-    cmp::{Ordering, Reverse},
-    io::stdout,
-    time::Duration,
-};
+use std::{io::stdout, time::Duration};
 
 use crossterm::{
     ExecutableCommand,
@@ -16,7 +12,7 @@ use num_format::{Locale, ToFormattedString};
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Flex, Layout, Rect},
+    layout::{Alignment, Constraint, Flex, Layout, Position, Rect},
     style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
     widgets::{
@@ -29,7 +25,7 @@ use unit_prefix::NumberPrefix;
 
 use crate::{
     input::{InputMode, handle_input},
-    state::{ComponentRow, SortColumn},
+    state::{ComponentRow, FilterColumn, FilterMenuState, SortColumn},
 };
 
 use super::{
@@ -287,7 +283,25 @@ impl<'a> Widgets<'a> {
             }
         }
 
-        for (_, r) in sorted {
+        for (_, r) in sorted.into_iter().filter(|(_, r)| {
+            let column = state.filter_state.column;
+            if let Some(regex) = &state.filter_state.pattern {
+                match column {
+                    FilterColumn::Id => {
+                        regex.is_match(r.key.id()) || r.key.id().contains(regex.as_str())
+                    }
+                    FilterColumn::Kind => {
+                        regex.is_match(&r.kind) || r.kind.contains(regex.as_str())
+                    }
+                    FilterColumn::Type => {
+                        regex.is_match(&r.component_type)
+                            || r.component_type.contains(regex.as_str())
+                    }
+                }
+            } else {
+                true
+            }
+        }) {
             let mut data = vec![
                 r.key.id().to_string(),
                 if !r.has_displayable_outputs() {
@@ -437,12 +451,19 @@ impl<'a> Widgets<'a> {
             Line::from("1-9 => sort by column"),
             Line::from("F6, s => toggle sort menu"),
             Line::from("F7, r => toggle ascending/descending sort"),
-            Line::from(""),
+            Line::from("F4, f, / => toggle filter menu"),
+            Line::default(),
             Line::from("Sort menu").bold(),
             Line::from("↑, k => move sort column selection up"),
             Line::from("↓, j => move sort column selection down"),
             Line::from("Enter => confirm sort selection"),
             Line::from("F6, s => toggle sort menu"),
+            Line::default(),
+            Line::from("Filter menu").bold(),
+            Line::from("Shift+Tab, ↑ => move filter column selection up"),
+            Line::from("Tab, ↓ => move filter column selection down"),
+            Line::from("Enter => confirm filter selection"),
+            Line::from("F4 => toggle sort menu"),
         ];
 
         let block = Block::default()
@@ -475,6 +496,42 @@ impl<'a> Widgets<'a> {
         )
         .highlight_style(Style::new().reversed());
         f.render_stateful_widget(w, area, &mut list_state);
+    }
+
+    /// Renders a box with filtering options.
+    fn filter_box(&self, f: &mut Frame, area: Rect, filter_menu_state: &FilterMenuState) {
+        f.render_widget(Clear, area);
+        let w = List::new(
+            FilterColumn::items()
+                .into_iter()
+                .map(|h| ListItem::new(Line::from(h))),
+        )
+        .block(Block::default().borders(Borders::ALL).title("Filter by"))
+        .highlight_style(Style::new().reversed());
+        let (top, bottom) = {
+            (
+                Rect::new(area.x, area.y, area.width, area.height / 2),
+                Rect::new(
+                    area.x,
+                    area.y + area.height / 2,
+                    area.width,
+                    area.height / 2,
+                ),
+            )
+        };
+        f.render_stateful_widget(w, top, &mut filter_menu_state.column_selection.clone());
+        f.render_widget(
+            Paragraph::new(filter_menu_state.input.clone()).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Filter pattern"),
+            ),
+            bottom,
+        );
+        f.set_cursor_position(Position::new(
+            bottom.x + 1 + filter_menu_state.input.len() as u16,
+            bottom.y + 1,
+        ));
     }
 
     /// Renders a box showing instructions on how to exit from `vector top`.
@@ -512,7 +569,7 @@ impl<'a> Widgets<'a> {
 
         self.quit_box(f, rects[2]);
 
-        // Render help over other items
+        // Render help, sort and filter over other items
         if state.ui.help_visible {
             let [area] = Layout::horizontal([Constraint::Length(64)])
                 .flex(Flex::Center)
@@ -531,6 +588,16 @@ impl<'a> Widgets<'a> {
                 .flex(Flex::Center)
                 .areas(area);
             self.sort_box(f, area, state.ui.sort_menu_state);
+        }
+
+        if state.ui.filter_visible {
+            let [area] = Layout::horizontal([Constraint::Length(64)])
+                .flex(Flex::Center)
+                .areas(size);
+            let [area] = Layout::vertical([Constraint::Length(12)])
+                .flex(Flex::Center)
+                .areas(area);
+            self.filter_box(f, area, &state.ui.filter_menu_state);
         }
     }
 }
@@ -578,7 +645,9 @@ pub async fn init_dashboard<'a>(
     loop {
         tokio::select! {
             Some(state) = state_rx.recv() => {
-                if state.ui.sort_visible {
+                if state.ui.filter_visible {
+                    input_mode = InputMode::FilterInput;
+                } else if state.ui.sort_visible {
                     input_mode = InputMode::SortMenu;
                 } else if state.ui.help_visible {
                     input_mode = InputMode::HelpMenu;

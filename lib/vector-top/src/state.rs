@@ -10,6 +10,7 @@ use ratatui::{
     text::Span,
     widgets::ListState,
 };
+use regex::Regex;
 use tokio::sync::mpsc;
 use vector_common::internal_event::DEFAULT_OUTPUT;
 
@@ -68,6 +69,16 @@ pub enum UiEventType {
     SortByColumn(SortColumn),
     // Confirms current sort selection.
     SortConfirmation,
+    // Toggles filter menu. Also closes other windows.
+    ToggleFilterMenu,
+    // Change filter column selection left (-) or right (+).
+    FilterColumnSelection(isize),
+    // Adds input to filter string.
+    FilterInput(char),
+    // Removes a character from the end of the filter string.
+    FilterBackspace,
+    // Confirms current filter selection.
+    FilterConfirmation,
 }
 
 #[derive(Debug, Copy, Clone)]
@@ -106,6 +117,7 @@ pub struct State {
     pub uptime: Duration,
     pub components: BTreeMap<ComponentKey, ComponentRow>,
     pub sort_state: SortState,
+    pub filter_state: FilterState,
     pub ui: UiState,
 }
 
@@ -125,6 +137,14 @@ pub enum SortColumn {
     Errors = 11,
     #[cfg(feature = "allocation-tracing")]
     MemoryUsed = 12,
+}
+
+#[derive(Debug, Default, Clone, Copy)]
+pub enum FilterColumn {
+    #[default]
+    Id = 0,
+    Kind = 1,
+    Type = 2,
 }
 
 impl SortColumn {
@@ -184,10 +204,32 @@ impl From<usize> for SortColumn {
     }
 }
 
+impl From<usize> for FilterColumn {
+    fn from(value: usize) -> Self {
+        match value {
+            1 => FilterColumn::Kind,
+            2 => FilterColumn::Type,
+            _ => FilterColumn::Id,
+        }
+    }
+}
+
+impl FilterColumn {
+    pub fn items() -> Vec<&'static str> {
+        vec!["ID", "Kind", "Type"]
+    }
+}
+
 #[derive(Debug, Default, Clone)]
 pub struct SortState {
     pub column: Option<SortColumn>,
     pub reverse: bool,
+}
+
+#[derive(Debug, Default, Clone)]
+pub struct FilterState {
+    pub column: FilterColumn,
+    pub pattern: Option<Regex>,
 }
 
 #[derive(Debug, Default, Clone)]
@@ -196,6 +238,23 @@ pub struct UiState {
     pub help_visible: bool,
     pub sort_visible: bool,
     pub sort_menu_state: ListState,
+    pub filter_visible: bool,
+    pub filter_menu_state: FilterMenuState,
+}
+
+#[derive(Debug, Clone)]
+pub struct FilterMenuState {
+    pub input: String,
+    pub column_selection: ListState,
+}
+
+impl Default for FilterMenuState {
+    fn default() -> Self {
+        Self {
+            input: Default::default(),
+            column_selection: ListState::default().with_selected(Some(0)),
+        }
+    }
 }
 
 impl UiState {
@@ -240,6 +299,7 @@ impl State {
             components,
             ui: UiState::default(),
             sort_state: SortState::default(),
+            filter_state: FilterState::default(),
         }
     }
 }
@@ -403,47 +463,7 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
                 EventType::UptimeChanged(uptime) => {
                     state.uptime = Duration::from_secs_f64(uptime);
                 }
-                EventType::Ui(ui_event_type) => match ui_event_type {
-                    UiEventType::Scroll(diff, area) => {
-                        state.ui.scroll(diff, area, state.components.len());
-                    }
-                    UiEventType::ScrollPage(diff, area) => {
-                        state.ui.scroll_page(diff, area, state.components.len());
-                    }
-                    UiEventType::ToggleHelp => {
-                        state.ui.help_visible = !state.ui.help_visible;
-                        if state.ui.help_visible {
-                            state.ui.sort_visible = false;
-                        }
-                    }
-                    UiEventType::ToggleSortMenu => {
-                        state.ui.sort_visible = !state.ui.sort_visible;
-                        state
-                            .ui
-                            .sort_menu_state
-                            .select(state.sort_state.column.map(|c| c as usize));
-                        if state.ui.sort_visible {
-                            state.ui.help_visible = false;
-                        }
-                    }
-                    UiEventType::ToggleSortDirection => {
-                        state.sort_state.reverse = !state.sort_state.reverse
-                    }
-                    UiEventType::SortSelection(diff) => {
-                        let next = state.ui.sort_menu_state.selected().map_or(0, |s| {
-                            s.saturating_add_signed(diff)
-                                .min(SortColumn::items().len() - 1)
-                        });
-                        state.ui.sort_menu_state.select(Some(next));
-                    }
-                    UiEventType::SortByColumn(col) => state.sort_state.column = Some(col),
-                    UiEventType::SortConfirmation => {
-                        if let Some(selected) = state.ui.sort_menu_state.selected() {
-                            state.sort_state.column = Some(selected.into())
-                        }
-                        state.ui.sort_visible = false;
-                    }
-                },
+                EventType::Ui(ui_event_type) => handle_ui_event(ui_event_type, &mut state),
             }
 
             // Send updated map to listeners
@@ -452,4 +472,89 @@ pub async fn updater(mut event_rx: EventRx) -> StateRx {
     });
 
     rx
+}
+
+fn handle_ui_event(event: UiEventType, state: &mut State) {
+    match event {
+        UiEventType::Scroll(diff, area) => {
+            state.ui.scroll(diff, area, state.components.len());
+        }
+        UiEventType::ScrollPage(diff, area) => {
+            state.ui.scroll_page(diff, area, state.components.len());
+        }
+        UiEventType::ToggleHelp => {
+            state.ui.help_visible = !state.ui.help_visible;
+            if state.ui.help_visible {
+                state.ui.sort_visible = false;
+                state.ui.filter_visible = false;
+            }
+        }
+        UiEventType::ToggleSortMenu => {
+            state.ui.sort_visible = !state.ui.sort_visible;
+            state
+                .ui
+                .sort_menu_state
+                .select(state.sort_state.column.map(|c| c as usize));
+            if state.ui.sort_visible {
+                state.ui.help_visible = false;
+                state.ui.filter_visible = false;
+            }
+        }
+        UiEventType::ToggleSortDirection => state.sort_state.reverse = !state.sort_state.reverse,
+        UiEventType::SortSelection(diff) => {
+            let next = state.ui.sort_menu_state.selected().map_or(0, |s| {
+                s.saturating_add_signed(diff)
+                    .min(SortColumn::items().len() - 1)
+            });
+            state.ui.sort_menu_state.select(Some(next));
+        }
+        UiEventType::SortByColumn(col) => state.sort_state.column = Some(col),
+        UiEventType::SortConfirmation => {
+            if let Some(selected) = state.ui.sort_menu_state.selected() {
+                state.sort_state.column = Some(selected.into())
+            }
+            state.ui.sort_visible = false;
+        }
+        UiEventType::ToggleFilterMenu => {
+            state.ui.filter_visible = !state.ui.filter_visible;
+            if state.ui.filter_visible {
+                state.ui.help_visible = false;
+                state.ui.sort_visible = false;
+            }
+        }
+        UiEventType::FilterColumnSelection(diff) => {
+            let next = state
+                .ui
+                .filter_menu_state
+                .column_selection
+                .selected()
+                .map_or(0, |s| {
+                    s.saturating_add_signed(diff)
+                        .min(FilterColumn::items().len() - 1)
+                });
+            state
+                .ui
+                .filter_menu_state
+                .column_selection
+                .select(Some(next));
+        }
+        UiEventType::FilterInput(c) => {
+            state.ui.filter_menu_state.input.push(c);
+        }
+        UiEventType::FilterBackspace => {
+            let _ = state.ui.filter_menu_state.input.pop();
+        }
+        UiEventType::FilterConfirmation => {
+            if state.ui.filter_menu_state.input.is_empty() {
+                state.filter_state.pattern = None;
+            } else {
+                // display errors?
+                state.filter_state.pattern = Regex::new(&state.ui.filter_menu_state.input).ok();
+            }
+            if let Some(selected) = state.ui.filter_menu_state.column_selection.selected() {
+                state.filter_state.column = selected.into()
+            }
+            state.ui.filter_visible = false;
+        }
+    }
 }
