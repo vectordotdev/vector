@@ -10,7 +10,7 @@ use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{Request, StatusCode, Uri, uri::PathAndQuery};
-use hyper::{Body, body::to_bytes as body_to_bytes};
+use hyper::Body;
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
@@ -433,7 +433,7 @@ impl MetadataClient {
                 .into()),
             })?;
 
-        let token = body_to_bytes(res.into_body()).await?;
+        let token = http_body::Body::collect(res.into_body()).await?.to_bytes();
 
         let next_refresh = Instant::now() + Duration::from_secs(21600);
         self.token = Some((token.clone(), next_refresh));
@@ -619,7 +619,7 @@ impl MetadataClient {
                 .into()),
             })? {
             Some(res) => {
-                let body = body_to_bytes(res.into_body()).await?;
+                let body = http_body::Body::collect(res.into_body()).await?.to_bytes();
                 Ok(Some(body))
             }
             None => Ok(None),
