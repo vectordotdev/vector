@@ -137,7 +137,7 @@ impl error::Error for BasicError {}
 /// If `mode` is set to `WhenFull::Overflow`, then the buffer will be set to overflow mode, with
 /// another in-memory channel buffer being used as the overflow buffer.  The overflow buffer will
 /// also use the same capacity as the outer buffer.
-pub(crate) async fn build_buffer(
+pub(crate) fn build_buffer(
     capacity: usize,
     mode: WhenFull,
     overflow_mode: Option<WhenFull>,
@@ -154,27 +154,25 @@ pub(crate) async fn build_buffer(
                 NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
                 overflow_mode,
                 handle.clone(),
-            )
-            .await;
+                None,
+            );
             let (mut base_sender, mut base_receiver) = TopologyBuilder::standalone_memory_test(
                 NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
                 WhenFull::Overflow,
                 handle.clone(),
-            )
-            .await;
+                None,
+            );
             base_sender.switch_to_overflow(overflow_sender);
             base_receiver.switch_to_overflow(overflow_receiver);
 
             (base_sender, base_receiver)
         }
-        m => {
-            TopologyBuilder::standalone_memory_test(
-                NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
-                m,
-                handle.clone(),
-            )
-            .await
-        }
+        m => TopologyBuilder::standalone_memory_test(
+            NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
+            m,
+            handle.clone(),
+            None,
+        ),
     };
 
     (tx, rx, handle)
