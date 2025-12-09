@@ -251,8 +251,8 @@ impl Aggregate {
 
     fn flush_into(&mut self, output: &mut Vec<Event>) {
         let map = std::mem::take(&mut self.map);
-        for (series, entry) in map.clone().into_iter() {
-            let mut metric = Metric::from_parts(series, entry.0, entry.1);
+        for (series, entry) in &map {
+            let mut metric = Metric::from_parts(series.clone(), entry.0.clone(), entry.1.clone());
             if matches!(self.mode, AggregationMode::Diff)
                 && let Some(prev_entry) = self.prev_map.get(metric.series())
                 && metric.data().kind == prev_entry.0.kind
@@ -317,7 +317,16 @@ impl Aggregate {
             }
         }
 
-        self.prev_map = map;
+        // Only keep prev_map entries that are still in the current map (for Diff mode)
+        // This prevents unbounded memory growth with high-cardinality metrics
+        if matches!(self.mode, AggregationMode::Diff) {
+            self.prev_map.retain(|series, _| map.contains_key(series));
+            // Merge new entries into prev_map
+            self.prev_map.extend(map);
+        } else {
+            // For non-Diff modes, we don't need prev_map at all
+            self.prev_map.clear();
+        }
         emit!(AggregateFlushed);
     }
 }
