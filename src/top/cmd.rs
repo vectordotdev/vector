@@ -1,14 +1,16 @@
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use chrono::Local;
 use futures_util::future::join_all;
+use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
 use vector_lib::api_client::{Client, connect_subscription_client};
 
 use vector_lib::top::{
     dashboard::{init_dashboard, is_tty},
     metrics,
-    state::{self, ConnectionStatus, EventType},
+    state::{self, ConnectionStatus, EventType, State},
 };
 
 /// Delay (in milliseconds) before attempting to reconnect to the Vector API
@@ -53,7 +55,19 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
 pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> exitcode::ExitCode {
     // Channel for updating state via event messages
     let (tx, rx) = tokio::sync::mpsc::channel(20);
-    let state_rx = state::updater(rx).await;
+    let mut starting_state = State::new(BTreeMap::new());
+    starting_state.sort_state.column = opts.sort_field;
+    starting_state.sort_state.reverse = opts.sort_desc;
+    starting_state.filter_state.column = opts.filter_field;
+    starting_state.filter_state.pattern = opts
+        .filter_value
+        .as_deref()
+        .map(Regex::new)
+        .and_then(Result::ok);
+    // Apply changes to sort and filter state to the UI state too, so that filter and sort menus are
+    // prepopulated with selected values
+    starting_state.sync_to_ui_state();
+    let state_rx = state::updater(rx, starting_state).await;
     // Channel for shutdown signal
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 

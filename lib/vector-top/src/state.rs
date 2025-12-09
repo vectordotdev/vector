@@ -1,5 +1,6 @@
 use std::{
     collections::{BTreeMap, HashMap},
+    str::FromStr,
     time::Duration,
 };
 
@@ -121,6 +122,26 @@ pub struct State {
     pub ui: UiState,
 }
 
+impl State {
+    /// Syncs current state to the UI state, so that all the menus match the current state
+    /// (sorting, filters).
+    pub fn sync_to_ui_state(&mut self) {
+        self.ui
+            .sort_menu_state
+            .select(self.sort_state.column.map(|c| c as usize));
+        self.ui
+            .filter_menu_state
+            .column_selection
+            .select(Some(self.filter_state.column as usize));
+        self.ui.filter_menu_state.input = self
+            .filter_state
+            .pattern
+            .as_ref()
+            .map(|r| r.as_str().to_string())
+            .unwrap_or("".to_string());
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 pub enum SortColumn {
     Id = 0,
@@ -183,6 +204,12 @@ impl SortColumn {
     }
 }
 
+impl FilterColumn {
+    pub fn items() -> Vec<&'static str> {
+        vec!["ID", "Kind", "Type"]
+    }
+}
+
 impl From<usize> for SortColumn {
     fn from(value: usize) -> Self {
         match value {
@@ -214,9 +241,35 @@ impl From<usize> for FilterColumn {
     }
 }
 
-impl FilterColumn {
-    pub fn items() -> Vec<&'static str> {
-        vec!["ID", "Kind", "Type"]
+impl FromStr for SortColumn {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some((index, _)) = Self::items()
+            .iter()
+            .enumerate()
+            .find(|(_, item)| item.eq_ignore_ascii_case(s))
+        {
+            Ok(index.into())
+        } else {
+            Err("Unknown sort field".to_string())
+        }
+    }
+}
+
+impl FromStr for FilterColumn {
+    type Err = String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if let Some((index, _)) = Self::items()
+            .iter()
+            .enumerate()
+            .find(|(_, item)| item.eq_ignore_ascii_case(s))
+        {
+            Ok(index.into())
+        } else {
+            Err("Unknown filter field".to_string())
+        }
     }
 }
 
@@ -353,15 +406,19 @@ impl ComponentRow {
 /// Takes the receiver `EventRx` channel, and returns a `StateRx` state receiver. This
 /// represents the single destination for handling subscriptions and returning 'immutable' state
 /// for re-rendering the dashboard. This approach uses channels vs. mutexes.
-pub async fn updater(mut event_rx: EventRx) -> StateRx {
+pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
     let (tx, rx) = mpsc::channel(20);
 
-    let mut state = State::new(BTreeMap::new());
     tokio::spawn(async move {
         while let Some(event_type) = event_rx.recv().await {
             match event_type {
                 EventType::InitializeState(new_state) => {
+                    let old_state = state;
                     state = new_state;
+                    // Keep filters, sort and UI states
+                    state.filter_state = old_state.filter_state;
+                    state.sort_state = old_state.sort_state;
+                    state.ui = old_state.ui;
                 }
                 EventType::ReceivedBytesTotals(rows) => {
                     for (key, v) in rows {
