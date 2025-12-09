@@ -253,7 +253,7 @@ impl Default for Inner {
             upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
-            source_event_id: Some(Uuid::now_v7()),
+            source_event_id: Some(Uuid::new_v4()),
         }
     }
 }
@@ -348,14 +348,8 @@ impl EventMetadata {
         inner.secrets.merge(other.secrets);
 
         // Update `source_event_id` if necessary.
-        match (inner.source_event_id, other.source_event_id) {
-            (None, Some(id)) => {
-                inner.source_event_id = Some(id);
-            }
-            (Some(uuid1), Some(uuid2)) if uuid2 < uuid1 => {
-                inner.source_event_id = Some(uuid2);
-            }
-            _ => {} // Keep the existing value.
+        if inner.source_event_id.is_none() {
+            inner.source_event_id = other.source_event_id;
         }
     }
 
@@ -561,6 +555,7 @@ mod test {
         let m1 = EventMetadata::default();
         let m2 = EventMetadata::default();
 
+        // Always maintain the original source event id when merging, similar to how we handle other metadata.
         {
             let mut merged = m1.clone();
             merged.merge(m2.clone());
@@ -570,7 +565,7 @@ mod test {
         {
             let mut merged = m2.clone();
             merged.merge(m1.clone());
-            assert_eq!(merged.source_event_id(), m1.source_event_id());
+            assert_eq!(merged.source_event_id(), m2.source_event_id());
         }
     }
 }
