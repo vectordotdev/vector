@@ -6637,9 +6637,9 @@ dependencies = [
 
 [[package]]
 name = "maxminddb"
-version = "0.26.0"
+version = "0.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a197e44322788858682406c74b0b59bf8d9b4954fe1f224d9a25147f1880bba"
+checksum = "7ef0551fc3e7345a6c854c1026b0ddada1e443e51f4fb4cdcf86cc1a71d4b337"
 dependencies = [
  "ipnetwork",
  "log",
@@ -7452,12 +7452,6 @@ checksum = "2819ce041d2ee131036f4fc9d6ae7ae125a3a40e97ba64d04fe799ad9dabbb44"
 dependencies = [
  "libc",
 ]
-
-[[package]]
-name = "number_prefix"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "830b246a0e5f20af87141b25c173cd1b609bd7779a4617d6ec582abaf90870f3"
 
 [[package]]
 name = "oauth2"
@@ -12288,9 +12282,9 @@ checksum = "f962df74c8c05a667b5ee8bcf162993134c104e96440b663c8daa176dc772d8c"
 
 [[package]]
 name = "unit-prefix"
-version = "0.5.1"
+version = "0.5.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "323402cff2dd658f39ca17c789b502021b3f18707c91cdf22e3838e1b4023817"
+checksum = "81e544489bf3d8ef66c953931f56617f423cd4b5494be343d9b9d3dda037b9a3"
 
 [[package]]
 name = "universal-hash"
@@ -12734,6 +12728,7 @@ dependencies = [
  "derivative",
  "futures 0.3.31",
  "indexmap 2.12.0",
+ "itertools 0.14.0",
  "metrics",
  "paste",
  "pin-project",
@@ -12743,8 +12738,18 @@ dependencies = [
  "stream-cancel",
  "tokio",
  "tracing 0.1.41",
+ "vector-common-macros",
  "vector-config",
  "vrl",
+]
+
+[[package]]
+name = "vector-common-macros"
+version = "0.1.0"
+dependencies = [
+ "proc-macro2 1.0.101",
+ "quote 1.0.40",
+ "syn 2.0.106",
 ]
 
 [[package]]
@@ -12968,10 +12973,10 @@ dependencies = [
  "humantime",
  "indoc",
  "num-format",
- "number_prefix",
  "ratatui",
  "tokio",
  "tokio-stream",
+ "unit-prefix",
  "url",
  "vector-api-client",
  "vector-common",
@@ -13039,8 +13044,8 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vrl"
-version = "0.28.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#1f0d8a50df5c5cc8a45454bf992261a332013f59"
+version = "0.28.1"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#5eafcc03be7fd864e51fe86dfc719e941de8e432"
 dependencies = [
  "aes",
  "aes-siv",
