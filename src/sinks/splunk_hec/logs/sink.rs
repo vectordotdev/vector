@@ -1,7 +1,9 @@
+use std::collections::BTreeMap;
 use std::{fmt, sync::Arc};
 
 use vector_lib::{
     config::{LogNamespace, log_schema},
+    event::Value,
     lookup::{OwnedValuePath, PathPrefix, event_path, lookup_v2::OptionalTargetPath},
     schema::meaning,
 };
@@ -213,7 +215,7 @@ pub struct HecLogsProcessedEventMetadata {
     pub index: Option<String>,
     pub host: Option<Value>,
     pub timestamp: Option<f64>,
-    pub fields: LogEvent,
+    pub fields: BTreeMap<String, Value>,
     pub endpoint_target: EndpointTarget,
 }
 
@@ -310,14 +312,12 @@ pub fn process_log(event: Event, data: &HecLogData) -> HecProcessedEvent {
         None
     };
 
-    let fields = data
-        .indexed_fields
-        .iter()
-        .filter_map(|field| {
-            log.get((PathPrefix::Event, field))
-                .map(|value| (field.to_string(), value.clone()))
-        })
-        .collect::<LogEvent>();
+    let mut fields = BTreeMap::new();
+    for field in data.indexed_fields.iter() {
+        if let Some(value) = log.get((PathPrefix::Event, field)) {
+            flatten_field(&field.to_string(), value, &mut fields);
+        }
+    }
 
     let metadata = HecLogsProcessedEventMetadata {
         sourcetype,
@@ -339,5 +339,51 @@ impl EventCount for HecProcessedEvent {
     fn event_count(&self) -> usize {
         // A HecProcessedEvent is mapped one-to-one with an event.
         1
+    }
+}
+
+// Fields must be flat
+// https://help.splunk.com/en/splunk-enterprise/get-started/get-data-in/10.0/get-data-with-http-event-collector/automate-indexed-field-extractions-with-http-event-collector#add-a-fields-property-at-the-top-json-level-0
+fn flatten_field(path: &str, value: &Value, fields: &mut BTreeMap<String, Value>) {
+    match value {
+        Value::Object(map) => {
+            for (k, v) in map {
+                flatten_field(&format!("{}.{}", path, k), v, fields);
+            }
+        }
+        Value::Array(arr) => {
+            // Flat arrays are permitted
+            if arr.iter().all(|v| !v.is_object() && !v.is_array()) {
+                fields.insert(
+                    path.to_string(),
+                    arr.iter()
+                        .filter_map(|v| to_splunk_compatible_value(v))
+                        .collect(),
+                );
+                return;
+            }
+
+            for (i, v) in arr.iter().enumerate() {
+                let child = &format!("{}.{}", path, i);
+                if let Some(v) = to_splunk_compatible_value(v) {
+                    fields.insert(child.to_string(), v);
+                } else {
+                    flatten_field(child, v, fields);
+                }
+            }
+        }
+        _ => {
+            if let Some(v) = to_splunk_compatible_value(value) {
+                fields.insert(path.to_string(), v);
+            }
+        }
+    }
+}
+
+fn to_splunk_compatible_value(value: &Value) -> Option<Value> {
+    match value {
+        Value::Object(_) | Value::Array(_) => None,
+        Value::Boolean(_) | Value::Null | Value::Float(_) => Some(value.clone()),
+        _ => Some(Value::Bytes(value.coerce_to_bytes())),
     }
 }
