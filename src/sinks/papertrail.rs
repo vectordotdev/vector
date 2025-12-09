@@ -1,5 +1,7 @@
 use bytes::{BufMut, BytesMut};
-use syslog::{Facility, Formatter3164, LogFormat, Severity};
+use fasyslog::format::SyslogContext;
+use fasyslog::{Facility, Severity};
+use std::fmt::Write;
 use vector_lib::configurable::configurable_component;
 use vrl::value::Kind;
 
@@ -133,35 +135,31 @@ struct PapertrailEncoder {
 impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
     type Error = vector_lib::codecs::encoding::Error;
 
-    fn encode(
-        &mut self,
-        mut event: Event,
-        buffer: &mut bytes::BytesMut,
-    ) -> Result<(), Self::Error> {
-        let host = event
+    fn encode(&mut self, mut event: Event, buffer: &mut BytesMut) -> Result<(), Self::Error> {
+        let mut context = SyslogContext::const_new();
+
+        if let Some(host) = event
             .as_mut_log()
             .get_host()
-            .map(|host| host.to_string_lossy().into_owned());
+            .map(|host| host.to_string_lossy().into_owned())
+        {
+            context.hostname(host);
+        }
 
-        let process = self
-            .process
-            .render_string(&event)
-            .map_err(|error| {
-                emit!(TemplateRenderingError {
-                    error,
-                    field: Some("process"),
-                    drop_event: false,
-                })
+        if let Ok(process) = self.process.render_string(&event).map_err(|error| {
+            emit!(TemplateRenderingError {
+                error,
+                field: Some("process"),
+                drop_event: false,
             })
-            .ok()
-            .unwrap_or_else(|| String::from("vector"));
+        }) {
+            context.appname(process);
+        } else {
+            context.appname("vector");
+        }
 
-        let formatter = Formatter3164 {
-            facility: Facility::LOG_USER,
-            hostname: host,
-            process,
-            pid: self.pid,
-        };
+        context.procid(self.pid.to_string());
+        context.facility(Facility::USER);
 
         self.transformer.transform(&mut event);
 
@@ -169,10 +167,9 @@ impl tokio_util::codec::Encoder<Event> for PapertrailEncoder {
         self.encoder.encode(event, &mut bytes)?;
 
         let message = String::from_utf8_lossy(&bytes);
-
-        formatter
-            .format(&mut buffer.writer(), Severity::LOG_INFO, message)
-            .map_err(|error| Self::Error::SerializingError(format!("{error}").into()))?;
+        let format = context.format_rfc3164(Severity::INFORMATIONAL, Some(message));
+        write!(buffer, "{format}")
+            .map_err(|error| Self::Error::SerializingError(format!("{}", error).into()))?;
 
         buffer.put_u8(b'\n');
 
