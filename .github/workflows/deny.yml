@@ -43,6 +43,7 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
+          mold: false
           cargo-deny: true
 
       - name: Check cargo deny advisories/licenses
