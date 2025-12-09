@@ -167,12 +167,12 @@ async fn handle_sort_input<B: Backend>(
                 .send(EventType::Ui(UiEventType::ToggleSortMenu))
                 .await;
         }
-        KeyCode::Up | KeyCode::Char('k') => {
+        KeyCode::Up | KeyCode::BackTab | KeyCode::Char('k') => {
             let _ = event_tx
                 .send(EventType::Ui(UiEventType::SortSelection(-1)))
                 .await;
         }
-        KeyCode::Down | KeyCode::Char('j') => {
+        KeyCode::Down | KeyCode::Tab | KeyCode::Char('j') => {
             let _ = event_tx
                 .send(EventType::Ui(UiEventType::SortSelection(1)))
                 .await;
