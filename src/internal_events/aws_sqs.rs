@@ -20,7 +20,7 @@ mod s3 {
     use super::*;
     use crate::sources::aws_s3::sqs::ProcessingError;
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct S3ObjectProcessingSucceeded<'a> {
         pub bucket: &'a str,
         pub duration: Duration,
@@ -41,7 +41,7 @@ mod s3 {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct S3ObjectProcessingFailed<'a> {
         pub bucket: &'a str,
         pub duration: Duration,
