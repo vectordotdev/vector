@@ -796,16 +796,13 @@ impl IngestorProcess {
         // so we explicitly drop it so that we can again utilize `read_error` below.
         drop(stream);
 
+        let bucket = &s3_event.s3.bucket.name;
+        let duration = download_start.elapsed();
+
         if read_error.is_some() {
-            emit!(S3ObjectProcessingFailed {
-                bucket: &s3_event.s3.bucket.name,
-                duration: download_start.elapsed(),
-            });
+            emit!(S3ObjectProcessingFailed { bucket, duration });
         } else {
-            emit!(S3ObjectProcessingSucceeded {
-                bucket: &s3_event.s3.bucket.name,
-                duration: download_start.elapsed(),
-            });
+            emit!(S3ObjectProcessingSucceeded { bucket, duration });
         }
 
         // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
