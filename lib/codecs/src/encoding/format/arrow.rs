@@ -199,7 +199,7 @@ pub fn encode_events_to_arrow_ipc_stream(
 
     let schema_ref = schema.ok_or(ArrowEncodingError::NoSchemaProvided)?;
 
-    let record_batch = build_record_batch(schema_ref.clone(), events)?;
+    let record_batch = build_record_batch(schema_ref, events)?;
 
     let ipc_err = |source| ArrowEncodingError::IpcWrite { source };
 
