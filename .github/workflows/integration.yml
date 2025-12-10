@@ -46,15 +46,15 @@ jobs:
 
   build-test-runner:
     needs: changes
-    if: |
-      ${{
-        github.event_name == 'workflow_dispatch' ||
-        (github.event_name == 'merge_group' &&
-         (needs.changes.outputs.dependencies == 'true' ||
-          needs.changes.outputs.integration-yml == 'true' ||
-          needs.changes.outputs.int-tests-any == 'true' ||
-          needs.changes.outputs.e2e-tests-any == 'true'))
-      }}
+    if: ${{
+      github.event_name == 'workflow_dispatch' ||
+      (github.event_name == 'merge_group' &&
+       (needs.changes.outputs.dependencies == 'true' ||
+        needs.changes.outputs.integration-yml == 'true' ||
+        needs.changes.outputs.int-tests-any == 'true' ||
+        needs.changes.outputs.e2e-tests-any == 'true'))
+     }}
+
     uses: ./.github/workflows/build-test-runner.yml
     with:
       commit_sha: ${{ github.sha }}
@@ -65,7 +65,7 @@ jobs:
       - changes
       - build-test-runner
 
-    if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ !failure() && !cancelled() && needs.build-test-runner.result == 'success' && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
@@ -79,12 +79,12 @@ jobs:
         ]
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           submodules: "recursive"
 
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         if: github.event_name == 'merge_group'
         with:
           name: int_tests_changes
@@ -133,19 +133,19 @@ jobs:
     needs:
       - changes
       - build-test-runner
-    if: ${{ !failure() && !cancelled() && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ !failure() && !cancelled() && needs.build-test-runner.result == 'success' && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
         service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics" ]
     timeout-minutes: 90
 
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           submodules: "recursive"
 
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@634f93cb2916e3fdff6788551b99b062d0335ce0 # v5.0.0
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
         if: github.event_name == 'merge_group'
         with:
           name: e2e_tests_changes

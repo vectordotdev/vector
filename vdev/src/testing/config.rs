@@ -10,7 +10,10 @@ use itertools::{self, Itertools};
 use serde::{Deserialize, Serialize};
 use serde_yaml::Value;
 
-use crate::{app, environment::Environment, util};
+use crate::{
+    app,
+    utils::{environment::Environment, paths},
+};
 
 const FILE_NAME: &str = "test.yaml";
 const CONFIG_SUBDIR: &str = "config";
@@ -246,7 +249,7 @@ impl ComposeTestConfig {
                 } else {
                     [entry.path().to_str().unwrap(), FILE_NAME].iter().collect()
                 };
-                if util::exists(&config_file)? {
+                if paths::exists(&config_file)? {
                     let config = Self::parse_file(&config_file)?;
                     configs.insert(entry.file_name().into_string().unwrap(), config);
                 }

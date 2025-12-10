@@ -4,7 +4,7 @@ use std::{
     num::NonZeroUsize,
     panic,
     sync::{Arc, LazyLock},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
@@ -38,6 +38,7 @@ use vector_lib::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol, Registered,
     },
     lookup::{PathPrefix, metadata_path, path},
+    source_sender::SendError,
 };
 
 use crate::{
@@ -48,11 +49,11 @@ use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
-        EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
-        SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
-        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsMessageSendBatchError,
-        SqsMessageSentPartialError, SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored,
-        StreamClosedError,
+        EventsReceived, S3ObjectProcessingFailed, S3ObjectProcessingSucceeded,
+        SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
+        SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
+        SqsMessageReceiveSucceeded, SqsMessageSendBatchError, SqsMessageSentPartialError,
+        SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -232,7 +233,7 @@ pub enum ProcessingError {
     },
     #[snafu(display("Failed to flush all of s3://{}/{}: {}", bucket, key, source))]
     PipelineSend {
-        source: crate::source_sender::ClosedError,
+        source: vector_lib::source_sender::SendError,
         bucket: String,
         key: String,
     },
@@ -402,9 +403,7 @@ impl IngestorProcess {
             log_namespace,
             bytes_received: register!(BytesReceived::from(Protocol::HTTP)),
             events_received: register!(EventsReceived),
-            backoff: ExponentialBackoff::from_millis(2)
-                .factor(250)
-                .max_delay(Duration::from_secs(30)),
+            backoff: ExponentialBackoff::default().max_delay(Duration::from_secs(30)),
         }
     }
 
@@ -671,6 +670,8 @@ impl IngestorProcess {
             }
         }
 
+        let download_start = Instant::now();
+
         let object_result = self
             .state
             .s3_client
@@ -783,16 +784,26 @@ impl IngestorProcess {
 
         let send_error = match self.out.send_event_stream(&mut stream).await {
             Ok(_) => None,
-            Err(_) => {
+            Err(SendError::Closed) => {
                 let (count, _) = stream.size_hint();
                 emit!(StreamClosedError { count });
-                Some(crate::source_sender::ClosedError)
+                Some(SendError::Closed)
             }
+            Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
         };
 
         // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
         // so we explicitly drop it so that we can again utilize `read_error` below.
         drop(stream);
+
+        let bucket = &s3_event.s3.bucket.name;
+        let duration = download_start.elapsed();
+
+        if read_error.is_some() {
+            emit!(S3ObjectProcessingFailed { bucket, duration });
+        } else {
+            emit!(S3ObjectProcessingSucceeded { bucket, duration });
+        }
 
         // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
         // reference must be dropped before the status of the batch is sent to the channel.
