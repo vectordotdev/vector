@@ -122,7 +122,6 @@ customise
 customizability
 CVS
 cwl
-D8plds_v6
 daschl
 dataflows
 datafuselabs
@@ -431,6 +430,7 @@ pgo
 PIDs
 PII
 plainify
+plds
 ple
 podspec
 Ponge
