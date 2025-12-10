@@ -20,7 +20,9 @@ use aws_config::{
 };
 use aws_credential_types::provider::{ProvideCredentials, SharedCredentialsProvider};
 use aws_sigv4::{
-    http_request::{PayloadChecksumKind, SignableBody, SignableRequest, SigningSettings},
+    http_request::{
+        PayloadChecksumKind, SignableBody, SignableRequest, SigningInstructions, SigningSettings,
+    },
     sign::v4,
 };
 use aws_smithy_async::rt::sleep::TokioSleep;
@@ -38,7 +40,7 @@ use aws_smithy_types::body::SdkBody;
 use aws_types::sdk_config::SharedHttpClient;
 use bytes::Bytes;
 use futures_util::FutureExt;
-use http::HeaderMap;
+use http::{HeaderMap, Request};
 use http_body::{Body, combinators::BoxBody};
 use pin_project::pin_project;
 use regex::RegexSet;
@@ -268,13 +270,65 @@ enum SigningError {
 /// The signature is added to the provided `request`.
 pub async fn sign_request(
     service_name: &str,
-    request: &mut http::Request<Bytes>,
+    request: &mut Request<Bytes>,
     credentials_provider: &SharedCredentialsProvider,
     region: Option<&Region>,
     payload_checksum_sha256: bool,
 ) -> crate::Result<()> {
-    let headers = request
-        .headers()
+    let method = request.method().clone();
+    let uri = request.uri().clone();
+    let headers = get_headers(request.headers())?.into_iter();
+    let signable_request = SignableRequest::new(
+        method.as_str(),
+        uri.to_string(),
+        headers,
+        SignableBody::empty(),
+    )?;
+
+    sign_signable_request(
+        service_name,
+        request,
+        signable_request,
+        credentials_provider,
+        region,
+        payload_checksum_sha256,
+    )
+    .await
+}
+
+/// Sign the empty request prior to sending to AWS.
+/// The signature is added to the provided `request`.
+pub async fn sign_request_with_empty_body<T>(
+    service_name: &str,
+    request: &mut Request<T>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
+) -> crate::Result<()> {
+    let method = request.method().clone();
+    let uri = request.uri().clone();
+    let headers = request.headers().clone();
+    let headers = get_headers(&headers)?.into_iter();
+    let signable_request = SignableRequest::new(
+        method.as_str(),
+        uri.to_string(),
+        headers,
+        SignableBody::empty(),
+    )?;
+
+    sign_signable_request(
+        service_name,
+        request,
+        signable_request,
+        credentials_provider,
+        region,
+        payload_checksum_sha256,
+    )
+    .await
+}
+
+fn get_headers(headers: &HeaderMap) -> Result<Vec<(&str, &str)>, SigningError> {
+    headers
         .iter()
         .map(|(k, v)| {
             Ok((
@@ -282,15 +336,38 @@ pub async fn sign_request(
                 std::str::from_utf8(v.as_bytes()).map_err(|_| SigningError::NotUTF8Header)?,
             ))
         })
-        .collect::<Result<Vec<_>, SigningError>>()?;
+        .collect::<Result<Vec<_>, SigningError>>()
+}
 
-    let signable_request = SignableRequest::new(
-        request.method().as_str(),
-        request.uri().to_string(),
-        headers.into_iter(),
-        SignableBody::Bytes(request.body().as_ref()),
-    )?;
+async fn sign_signable_request<T>(
+    service_name: &str,
+    request: &mut Request<T>,
+    signable_request: SignableRequest<'_>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
+) -> crate::Result<()> {
+    let signing_instructions = create_signing_instructions(
+        service_name,
+        signable_request,
+        credentials_provider,
+        region,
+        payload_checksum_sha256,
+    )
+    .await?;
+    signing_instructions.apply_to_request_http0x(request);
 
+    Ok(())
+}
+
+/// Create the signing instructions for a request.
+pub async fn create_signing_instructions(
+    service_name: &str,
+    signable_request: SignableRequest<'_>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
+) -> crate::Result<SigningInstructions> {
     let credentials = credentials_provider.provide_credentials().await?;
     let identity = Identity::new(credentials, None);
 
@@ -315,9 +392,8 @@ pub async fn sign_request(
 
     let (signing_instructions, _signature) =
         aws_sigv4::http_request::sign(signable_request, &signing_params.into())?.into_parts();
-    signing_instructions.apply_to_request_http0x(request);
 
-    Ok(())
+    Ok(signing_instructions)
 }
 
 #[derive(Debug)]
