@@ -1,11 +1,12 @@
 use metrics::{Counter, counter};
 
 use super::{Count, InternalEvent, InternalEventHandle, RegisterInternalEvent};
+use crate::NamedInternalEvent;
 
 pub const INTENTIONAL: bool = true;
 pub const UNINTENTIONAL: bool = false;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ComponentEventsDropped<'a, const INTENTIONAL: bool> {
     pub count: usize,
     pub reason: &'a str,
@@ -15,10 +16,6 @@ impl<const INTENTIONAL: bool> InternalEvent for ComponentEventsDropped<'_, INTEN
     fn emit(self) {
         let count = self.count;
         self.register().emit(Count(count));
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("ComponentEventsDropped")
     }
 }
 
