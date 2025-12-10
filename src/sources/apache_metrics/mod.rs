@@ -173,7 +173,7 @@ fn apache_metrics(
                     .map_err(crate::Error::from)
                     .and_then(|response| async {
                         let (header, body) = response.into_parts();
-                        let body = hyper::body::to_bytes(body).await?;
+                        let body = http_body::Body::collect(body).await?.to_bytes();
                         Ok((header, body))
                     })
                     .into_stream()
