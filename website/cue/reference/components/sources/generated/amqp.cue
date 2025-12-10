@@ -559,6 +559,21 @@ generated: components: sources: amqp: configuration: {
 		required:    false
 		type: string: default: "offset"
 	}
+	prefetch_count: {
+		description: """
+			Maximum number of unacknowledged messages the broker will deliver to this consumer.
+
+			This controls flow control via AMQP QoS prefetch. Lower values limit memory usage and
+			prevent overwhelming slow consumers, but may reduce throughput. Higher values increase
+			throughput but consume more memory.
+
+			If not set, the broker/client default applies (often unlimited).
+			"""
+		required: false
+		type: uint: examples: [
+			100,
+		]
+	}
 	queue: {
 		description: "The name of the queue to consume."
 		required:    false

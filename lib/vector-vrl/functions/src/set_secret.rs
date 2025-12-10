@@ -37,11 +37,11 @@ impl Function for SetSecret {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "Set the datadog api key",
             source: r#"set_secret("datadog_api_key", "secret-value")"#,
             result: Ok("null"),
-        }]
+        )]
     }
 
     fn compile(
