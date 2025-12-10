@@ -21,7 +21,7 @@ jobs:
         if: github.event_name == 'merge_group'
         run: echo "CLA verification not needed for merge queue - already checked on PR"
 
-      - uses: DataDog/dd-octo-sts-action@08f2144903ced3254a3dafec2592563409ba2aa0 # v1.0.1
+      - uses: DataDog/dd-octo-sts-action@acaa02eee7e3bb0839e4272dacb37b8f3b58ba80 # v1.0.3
         if: github.event_name != 'merge_group'
         id: octo-sts
         with:
