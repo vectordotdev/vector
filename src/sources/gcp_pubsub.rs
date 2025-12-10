@@ -1140,7 +1140,10 @@ mod integration_tests {
                 .unwrap();
             let response = self.client.send(request).await.unwrap();
             assert_eq!(response.status(), StatusCode::OK);
-            let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+            let body = http_body::Body::collect(response.into_body())
+                .await
+                .unwrap()
+                .to_bytes();
             serde_json::from_str(core::str::from_utf8(&body).unwrap()).unwrap()
         }
 

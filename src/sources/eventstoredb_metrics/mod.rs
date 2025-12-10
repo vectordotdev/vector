@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use futures::{FutureExt, StreamExt};
 use http::Uri;
+use http_body::Collected;
 use hyper::{Body, Request};
 use serde_with::serde_as;
 use tokio_stream::wrappers::IntervalStream;
@@ -113,7 +114,10 @@ fn eventstoredb(
                     }
 
                     Ok(resp) => {
-                        let bytes = match hyper::body::to_bytes(resp.into_body()).await {
+                        let bytes = match http_body::Body::collect(resp.into_body())
+                            .await
+                            .map(Collected::to_bytes)
+                        {
                             Ok(b) => b,
                             Err(error) => {
                                 emit!(EventStoreDbMetricsHttpError {
