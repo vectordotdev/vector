@@ -1,8 +1,8 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{NamedInternalEvent, internal_event::InternalEvent};
 
 /// Emitted when rows are successfully loaded into Doris.
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DorisRowsLoaded {
     pub loaded_rows: i64,
     pub load_bytes: i64,
@@ -26,7 +26,7 @@ impl InternalEvent for DorisRowsLoaded {
 }
 
 /// Emitted when rows are filtered by Doris during loading.
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DorisRowsFiltered {
     pub filtered_rows: i64,
 }
