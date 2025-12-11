@@ -6,6 +6,29 @@ releases: "0.52.0": {
 
 	whats_next: []
 
+	description: """
+		The Vector team is excited to announce version `0.52.0`!
+
+		## Release highlights
+
+		- Enhanced Vector's observability with new buffer utilization metrics for sources and
+		  transforms
+		  ([source_buffer_*](\(urls.vector_internal_metrics)/#source_buffer_max_byte_size)
+		  and [transform_buffer_*](\(urls.vector_internal_metrics)/#transform_buffer_max_byte_size) metrics), providing visibility into
+		  buffer capacity, usage and historical usage levels.
+		- Introduced `trace_to_log` transform that allows converting traces to logs.
+		- The blackhole sink now implements end-to-end acknowledgements.
+		- The GELF decoder now supports a `validation` option with two modes: `strict` (default)
+		  and `relaxed`. When set to `relaxed`, the decoder will parse GELF messages from sources
+		  that don't strictly follow the GELF specification.
+		- The `docker_logs` source now retries Docker daemon communication failures with exponential backoff.
+
+
+		## Breaking Changes
+
+		- The `mongodb_metrics` source now requires MongoDB Server 4.2 or later. MongoDB Server 4.0, the previously supported minimum version, reached end-of-life on April 30, 2022.
+		"""
+
 	changelog: [
 		{
 			type: "fix"
