@@ -2,12 +2,13 @@
 
 use metrics::{counter, gauge};
 use vector_lib::{
+    NamedInternalEvent,
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 use vrl::path::OwnedTargetPath;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct KafkaBytesReceived<'a> {
     pub byte_size: usize,
     pub protocol: &'static str,
@@ -34,7 +35,7 @@ impl InternalEvent for KafkaBytesReceived<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct KafkaEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub count: usize,
@@ -66,7 +67,7 @@ impl InternalEvent for KafkaEventsReceived<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct KafkaOffsetUpdateError {
     pub error: rdkafka::error::KafkaError,
 }
@@ -90,7 +91,7 @@ impl InternalEvent for KafkaOffsetUpdateError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct KafkaReadError {
     pub error: rdkafka::error::KafkaError,
 }
@@ -114,7 +115,7 @@ impl InternalEvent for KafkaReadError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct KafkaStatisticsReceived<'a> {
     pub statistics: &'a rdkafka::Statistics,
     pub expose_lag_metrics: bool,
@@ -150,6 +151,7 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct KafkaHeaderExtractionError<'a> {
     pub header_field: &'a OwnedTargetPath,
 }

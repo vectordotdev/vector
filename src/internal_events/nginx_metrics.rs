@@ -1,12 +1,13 @@
 use metrics::counter;
 use vector_lib::{
+    NamedInternalEvent,
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
 use crate::sources::nginx_metrics::parser::ParseError;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct NginxMetricsEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub count: usize,
@@ -34,6 +35,7 @@ impl InternalEvent for NginxMetricsEventsReceived<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct NginxMetricsRequestError<'a> {
     pub error: crate::Error,
     pub endpoint: &'a str,
@@ -58,6 +60,7 @@ impl InternalEvent for NginxMetricsRequestError<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub(crate) struct NginxMetricsStubStatusParseError<'a> {
     pub error: ParseError,
     pub endpoint: &'a str,

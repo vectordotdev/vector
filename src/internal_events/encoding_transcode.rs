@@ -1,7 +1,8 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::InternalEvent;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DecoderBomRemoval {
     pub from_encoding: &'static str,
 }
@@ -16,7 +17,7 @@ impl InternalEvent for DecoderBomRemoval {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DecoderMalformedReplacement {
     pub from_encoding: &'static str,
 }
@@ -33,7 +34,7 @@ impl InternalEvent for DecoderMalformedReplacement {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct EncoderUnmappableReplacement {
     pub to_encoding: &'static str,
 }

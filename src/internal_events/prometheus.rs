@@ -4,6 +4,7 @@
 use std::borrow::Cow;
 
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
@@ -11,7 +12,7 @@ use vector_lib::internal_event::{
 use vector_lib::prometheus::parser::ParserError;
 
 #[cfg(feature = "sources-prometheus-scrape")]
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusParseError<'a> {
     pub error: ParserError,
     pub url: http::Uri,
@@ -42,7 +43,7 @@ impl InternalEvent for PrometheusParseError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusRemoteWriteParseError {
     pub error: prost::DecodeError,
 }
@@ -64,7 +65,7 @@ impl InternalEvent for PrometheusRemoteWriteParseError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct PrometheusNormalizationError;
 
 impl InternalEvent for PrometheusNormalizationError {

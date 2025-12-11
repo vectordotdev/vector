@@ -2,6 +2,7 @@ use std::net::Ipv4Addr;
 
 use metrics::{counter, histogram};
 use vector_lib::{
+    NamedInternalEvent,
     internal_event::{
         ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     },
@@ -25,7 +26,8 @@ impl SocketMode {
         }
     }
 }
-#[derive(Debug)]
+
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketBytesReceived {
     pub mode: SocketMode,
     pub byte_size: usize,
@@ -48,7 +50,7 @@ impl InternalEvent for SocketBytesReceived {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketEventsReceived {
     pub mode: SocketMode,
     pub byte_size: JsonSize,
@@ -71,7 +73,7 @@ impl InternalEvent for SocketEventsReceived {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketBytesSent {
     pub mode: SocketMode,
     pub byte_size: usize,
@@ -93,7 +95,7 @@ impl InternalEvent for SocketBytesSent {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketEventsSent {
     pub mode: SocketMode,
     pub count: u64,
@@ -109,7 +111,7 @@ impl InternalEvent for SocketEventsSent {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketBindError<E> {
     pub mode: SocketMode,
     pub error: E,
@@ -137,7 +139,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketBindError<E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketMulticastGroupJoinError<E> {
     pub error: E,
     pub group_addr: Ipv4Addr,
@@ -174,7 +176,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketMulticastGroupJoinError<E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketReceiveError<E> {
     pub mode: SocketMode,
     pub error: E,
@@ -202,7 +204,7 @@ impl<E: std::fmt::Display> InternalEvent for SocketReceiveError<E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketSendError<E> {
     pub mode: SocketMode,
     pub error: E,

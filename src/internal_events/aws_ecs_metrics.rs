@@ -2,11 +2,12 @@ use std::borrow::Cow;
 
 use metrics::counter;
 use vector_lib::{
+    NamedInternalEvent,
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AwsEcsMetricsEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub count: usize,
@@ -35,7 +36,7 @@ impl InternalEvent for AwsEcsMetricsEventsReceived<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AwsEcsMetricsParseError<'a> {
     pub error: serde_json::Error,
     pub endpoint: &'a str,

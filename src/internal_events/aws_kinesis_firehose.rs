@@ -1,10 +1,11 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 use super::prelude::{http_error_code, io_error_code};
 use crate::sources::aws_kinesis_firehose::Compression;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AwsKinesisFirehoseRequestReceived<'a> {
     pub request_id: Option<&'a str>,
     pub source_arn: Option<&'a str>,
@@ -20,7 +21,7 @@ impl InternalEvent for AwsKinesisFirehoseRequestReceived<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AwsKinesisFirehoseRequestError<'a> {
     request_id: Option<&'a str>,
     error_code: String,
@@ -57,7 +58,7 @@ impl InternalEvent for AwsKinesisFirehoseRequestError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AwsKinesisFirehoseAutomaticRecordDecodeError {
     pub compression: Compression,
     pub error: std::io::Error,

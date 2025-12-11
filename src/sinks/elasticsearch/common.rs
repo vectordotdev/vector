@@ -1,6 +1,7 @@
 use bytes::{Buf, Bytes};
 use http::{Response, StatusCode, Uri};
-use hyper::{Body, body};
+use http_body::Body as _;
+use hyper::Body;
 use serde::Deserialize;
 use snafu::ResultExt;
 use vector_lib::config::{LogNamespace, proxy::ProxyConfig};
@@ -401,7 +402,7 @@ async fn get_version(
     .map_err(|error| format!("Failed to get Elasticsearch API version: {error}"))?;
 
     let (_, body) = response.into_parts();
-    let mut body = body::aggregate(body).await?;
+    let mut body = body.collect().await?.aggregate();
     let body = body.copy_to_bytes(body.remaining());
     let ResponsePayload { version } = serde_json::from_slice(&body)?;
     if let Some(version) = version

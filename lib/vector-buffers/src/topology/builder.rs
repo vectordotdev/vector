@@ -4,12 +4,12 @@ use async_trait::async_trait;
 use snafu::{ResultExt, Snafu};
 use tracing::Span;
 
-use super::channel::{ReceiverAdapter, SenderAdapter};
+use super::channel::{ChannelMetricMetadata, ReceiverAdapter, SenderAdapter};
 use crate::{
     Bufferable, WhenFull,
     buffer_usage_data::{BufferUsage, BufferUsageHandle},
-    topology::channel::{BufferReceiver, BufferSender},
-    variants::MemoryBuffer,
+    config::MemoryBufferSize,
+    topology::channel::{BufferReceiver, BufferSender, limited},
 };
 
 /// Value that can be used as a stage in a buffer topology.
@@ -186,26 +186,25 @@ impl<T: Bufferable> TopologyBuilder<T> {
     /// create the stage, installing buffer usage metrics that aren't required, and so on.
     ///
     #[allow(clippy::print_stderr)]
-    pub async fn standalone_memory(
+    pub fn standalone_memory(
         max_events: NonZeroUsize,
         when_full: WhenFull,
         receiver_span: &Span,
+        metadata: Option<ChannelMetricMetadata>,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
         let usage_handle = BufferUsageHandle::noop();
+        usage_handle.set_buffer_limits(None, Some(max_events.get()));
 
-        let memory_buffer = Box::new(MemoryBuffer::with_max_events(max_events));
-        let (sender, receiver) = memory_buffer
-            .into_buffer_parts(usage_handle.clone())
-            .await
-            .unwrap_or_else(|_| unreachable!("should not fail to directly create a memory buffer"));
+        let limit = MemoryBufferSize::MaxEvents(max_events);
+        let (sender, receiver) = limited(limit, metadata);
 
         let mode = match when_full {
             WhenFull::Overflow => WhenFull::Block,
             m => m,
         };
-        let mut sender = BufferSender::new(sender, mode);
+        let mut sender = BufferSender::new(sender.into(), mode);
         sender.with_send_duration_instrumentation(0, receiver_span);
-        let receiver = BufferReceiver::new(receiver);
+        let receiver = BufferReceiver::new(receiver.into());
 
         (sender, receiver)
     }
@@ -224,23 +223,23 @@ impl<T: Bufferable> TopologyBuilder<T> {
     /// can simplifying needing to require callers to do all the boilerplate to create the builder,
     /// create the stage, installing buffer usage metrics that aren't required, and so on.
     #[cfg(test)]
-    pub async fn standalone_memory_test(
+    pub fn standalone_memory_test(
         max_events: NonZeroUsize,
         when_full: WhenFull,
         usage_handle: BufferUsageHandle,
+        metadata: Option<ChannelMetricMetadata>,
     ) -> (BufferSender<T>, BufferReceiver<T>) {
-        let memory_buffer = Box::new(MemoryBuffer::with_max_events(max_events));
-        let (sender, receiver) = memory_buffer
-            .into_buffer_parts(usage_handle.clone())
-            .await
-            .unwrap_or_else(|_| unreachable!("should not fail to directly create a memory buffer"));
+        usage_handle.set_buffer_limits(None, Some(max_events.get()));
+
+        let limit = MemoryBufferSize::MaxEvents(max_events);
+        let (sender, receiver) = limited(limit, metadata);
 
         let mode = match when_full {
             WhenFull::Overflow => WhenFull::Block,
             m => m,
         };
-        let mut sender = BufferSender::new(sender, mode);
-        let mut receiver = BufferReceiver::new(receiver);
+        let mut sender = BufferSender::new(sender.into(), mode);
+        let mut receiver = BufferReceiver::new(receiver.into());
 
         sender.with_usage_instrumentation(usage_handle.clone());
         receiver.with_usage_instrumentation(usage_handle);

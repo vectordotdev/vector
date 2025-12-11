@@ -318,6 +318,7 @@ impl HttpClientContext for PrometheusScrapeContext {
 
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
+    use http_body::Body as _;
     use hyper::{
         Body, Client, Response, Server,
         service::{make_service_fn, service_fn},
@@ -717,7 +718,7 @@ mod test {
             .unwrap();
 
         assert!(response.status().is_success());
-        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+        let body = response.into_body().collect().await.unwrap().to_bytes();
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()

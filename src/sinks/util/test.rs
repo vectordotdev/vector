@@ -93,7 +93,7 @@ where
                     let response = responder();
                     if response.status().is_success() {
                         tokio::spawn(async move {
-                            let bytes = hyper::body::to_bytes(body).await.unwrap();
+                            let bytes = http_body::Body::collect(body).await.unwrap().to_bytes();
                             tx.send((parts, bytes)).await.unwrap();
                         });
                     }

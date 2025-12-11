@@ -2,13 +2,14 @@
 
 use metrics::counter;
 use vector_lib::{
+    NamedInternalEvent,
     internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
 use super::prelude::http_error_code;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpClientEventsReceived {
     pub byte_size: JsonSize,
     pub count: usize,
@@ -36,7 +37,7 @@ impl InternalEvent for HttpClientEventsReceived {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpClientHttpResponseError {
     pub code: hyper::StatusCode,
     pub url: String,
@@ -62,7 +63,7 @@ impl InternalEvent for HttpClientHttpResponseError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct HttpClientHttpError {
     pub error: crate::Error,
     pub url: String,
