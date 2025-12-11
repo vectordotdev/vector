@@ -11,11 +11,11 @@ releases: "0.52.0": {
 			type: "fix"
 			description: """
 				The `syslog` source in UDP mode now emits the standard "received" metrics, aligning behavior with TCP and the Component Specification:
-				
+
 				- `component_received_events_total`
 				- `component_received_event_bytes_total`
 				- `component_received_bytes_total`
-				
+
 				This makes internal telemetry consistent and restores compliance checks for UDP syslog.
 				"""
 			contributors: ["sghall"]
@@ -24,9 +24,9 @@ releases: "0.52.0": {
 			type: "fix"
 			description: """
 				The `journald` source now correctly respects the `current_boot_only: false` setting on systemd versions >= 258.
-				
+
 				Compatibility notes:
-				
+
 				- **systemd < 250**: Both `current_boot_only: true` and `false` work correctly
 				- **systemd 250-257**: Due to systemd limitations, `current_boot_only: false` will not work. An error will be raised on startup.
 				- **systemd >= 258**: Both settings work correctly
@@ -53,12 +53,12 @@ releases: "0.52.0": {
 			type: "enhancement"
 			description: """
 				The GELF decoder now supports a `validation` option with two modes: `strict` (default) and `relaxed`. When set to `relaxed`, the decoder will accept:
-				
+
 				- GELF versions other than 1.1
 				- Additional fields without underscore prefixes
 				- Additional field names with special characters
 				- Additional field values of any type (not just strings/numbers)
-				
+
 				This allows Vector to parse GELF messages from sources that don't strictly follow the GELF specification.
 				"""
 			contributors: ["ds-hystax"]
@@ -171,7 +171,7 @@ releases: "0.52.0": {
 			type: "enhancement"
 			description: """
 				Added support for configurable request timeouts to the `datadog_agent` source.
-				
+
 				    This change also introduces two new internal metrics:
 				    - `component_timed_out_events_total` - Counter tracking the number of events that timed out
 				    - `component_timed_out_requests_total` - Counter tracking the number of requests that timed out
@@ -192,7 +192,7 @@ releases: "0.52.0": {
 			description: """
 				Added the following metrics to record the utilization level of the buffer that
 				all sources send into:
-				
+
 				- `source_buffer_max_byte_size`
 				- `source_buffer_max_event_size`
 				- `source_buffer_utilization`
@@ -204,7 +204,7 @@ releases: "0.52.0": {
 			type: "enhancement"
 			description: """
 				Added metrics to record the utilization level of the buffers that each transform receives from:
-				
+
 				- `transform_buffer_max_byte_size`
 				- `transform_buffer_max_event_size`
 				- `transform_buffer_utilization`
@@ -216,25 +216,25 @@ releases: "0.52.0": {
 
 	vrl_changelog: """
 		### [0.29.0 (2025-12-11)]
-		
+
 		#### Breaking Changes & Upgrade Guide
-		
+
 		- Added required `line` and `file` fields to `vrl::compiler::function::Example`. Also added the
 		`example!` macro to automatically populate those fields.
-		
+
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1557)
-		
+
 		#### Fixes
-		
+
 		- Fixed handling of OR conjunctions in the datadog search query parser (https://github.com/vectordotdev/vrl/pull/1542)
 		- Fixed a bug where VRL would crash if `merge` were called without a `to` argument.
-		
+
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1563)
 		- Fixed a bug where a stack overflow would happen in validate_json_schema if the schema had an empty $ref.
-		
+
 		authors: jlambatl (https://github.com/vectordotdev/vrl/pull/1577)
-		
-		
+
+
 		### [0.28.1 (2025-11-07)]
 		"""
 
