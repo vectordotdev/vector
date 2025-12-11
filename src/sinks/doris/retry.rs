@@ -56,15 +56,32 @@ impl RetryLogic for DorisRetryLogic {
                 return RetryAction::Retry(
                     format!("Doris error: {} - {}", doris_resp.status, message).into(),
                 );
+            } else {
+                // HTTP success but failed to parse response
+                // Don't retry to avoid data duplication, but log the response for debugging
+                error!(
+                    message = "Failed to parse Doris response, not retrying to avoid data duplication.",
+                    status_code = %status,
+                    body = %body_str
+                );
+                return RetryAction::DontRetry("Failed to parse Doris response".into());
             }
         }
 
-        // Retry for all other cases
+        // Retry only for server errors (5xx)
+        if status.is_server_error() {
+            error!(
+                message = "Server error encountered, will retry.",
+                status_code = %status
+            );
+            return RetryAction::Retry(format!("Server error from Doris: {}", status).into());
+        }
+
+        // Don't retry for client errors (4xx) and other cases
         error!(
-            message = "Error encountered, will retry.",
+            message = "Client error encountered, not retrying.",
             status_code = %status
         );
-
-        RetryAction::Retry("Error response from Doris, will retry.".into())
+        RetryAction::DontRetry(format!("Client error from Doris: {}", status).into())
     }
 }

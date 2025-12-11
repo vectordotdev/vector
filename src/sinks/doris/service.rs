@@ -33,10 +33,7 @@ impl DorisService {
             log_request,
         }
     }
-    pub(crate) async fn reporter_run(
-        &self,
-        response: DorisStreamLoadResponse,
-    ) -> Result<(), crate::Error> {
+    pub(crate) async fn reporter_run(&self, response: DorisStreamLoadResponse) {
         let stream_load_status = response.stream_load_status;
         let http_status_code = response.http_status_code;
         let response_json = response.response_json;
@@ -61,16 +58,13 @@ impl DorisService {
         }
         if http_status_code.is_success() && stream_load_status == StreamLoadStatus::Successful {
             // Emit metrics for successfully loaded data
-            let load_bytes = response_json
-                .get("LoadBytes")
-                .and_then(|b| b.as_i64())
-                .unwrap_or(0);
+            let load_bytes = response_json.get("LoadBytes").and_then(|b| b.as_i64());
             let loaded_rows = response_json
                 .get("NumberLoadedRows")
-                .and_then(|r| r.as_i64())
-                .unwrap_or(0);
-
-            if loaded_rows > 0 || load_bytes > 0 {
+                .and_then(|r| r.as_i64());
+            if let Some(loaded_rows) = loaded_rows
+                && let Some(load_bytes) = load_bytes
+            {
                 emit!(DorisRowsLoaded {
                     loaded_rows,
                     load_bytes,
@@ -86,7 +80,6 @@ impl DorisService {
                 emit!(DorisRowsFiltered { filtered_rows });
             }
         }
-        Ok(())
     }
 }
 #[derive(Debug, Snafu)]
@@ -131,7 +124,7 @@ impl Service<HttpRequest<DorisPartitionKey>> for DorisService {
                 .send_stream_load(database, table, request.take_payload())
                 .await?;
             let report_response = doris_response.clone();
-            let _ = service.reporter_run(report_response).await;
+            service.reporter_run(report_response).await;
 
             let event_status = if doris_response.stream_load_status == StreamLoadStatus::Successful
             {

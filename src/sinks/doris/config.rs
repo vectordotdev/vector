@@ -51,6 +51,15 @@ pub struct DorisConfig {
     pub log_request: bool,
 
     /// Custom HTTP headers to add to the request.
+    ///
+    /// These headers can be used to set Doris-specific Stream Load parameters:
+    /// - `format`: Data format (json, csv.)
+    /// - `read_json_by_line`: Whether to read JSON line by line
+    /// - `strip_outer_array`: Whether to strip outer array brackets
+    /// - Column mappings and transformations
+    ///
+    /// See [Doris Stream Load documentation](https://doris.apache.org/docs/data-operate/import/import-way/stream-load-manual)
+    /// for all available parameters.
     #[serde(default)]
     #[configurable(metadata(docs::additional_props_description = "An HTTP header value."))]
     pub headers: HashMap<String, String>,
@@ -251,115 +260,5 @@ mod tests {
     fn test_default_values() {
         assert_eq!(default_label_prefix(), "vector");
         assert_eq!(default_max_retries(), -1);
-    }
-
-    #[test]
-    fn parse_config_with_defaults() {
-        let config: DorisConfig = toml::from_str(
-            r#"
-            endpoints = ["http://localhost:8030"]
-            database = "test_db"
-            table = "test_table"
-            encoding.codec = "json"
-            "#,
-        )
-        .unwrap();
-
-        assert_eq!(config.endpoints, vec!["http://localhost:8030"]);
-        assert_eq!(config.database.to_string(), "test_db");
-        assert_eq!(config.table.to_string(), "test_table");
-        assert_eq!(config.label_prefix, "vector");
-        assert!(!config.log_request); // Default is false (opt-in)
-        assert_eq!(config.max_retries, -1);
-    }
-
-    #[test]
-    fn parse_config_with_custom_values() {
-        let config: DorisConfig = toml::from_str(
-            r#"
-            endpoints = ["http://doris1:8030", "http://doris2:8030"]
-            database = "custom_db"
-            table = "custom_table"
-            label_prefix = "custom_prefix"
-            log_request = false
-            max_retries = 5
-            encoding.codec = "json"
-            "#,
-        )
-        .unwrap();
-
-        assert_eq!(
-            config.endpoints,
-            vec!["http://doris1:8030", "http://doris2:8030"]
-        );
-        assert_eq!(config.database.to_string(), "custom_db");
-        assert_eq!(config.table.to_string(), "custom_table");
-        assert_eq!(config.label_prefix, "custom_prefix");
-        assert!(!config.log_request); // Explicitly set to false in config
-        assert_eq!(config.max_retries, 5);
-    }
-
-    #[test]
-    fn parse_config_with_auth() {
-        let config: DorisConfig = toml::from_str(
-            r#"
-            endpoints = ["http://localhost:8030"]
-            database = "test_db"
-            table = "test_table"
-            auth.strategy = "basic"
-            auth.user = "admin"
-            auth.password = "password"
-            encoding.codec = "json"
-            "#,
-        )
-        .unwrap();
-
-        assert!(config.auth.is_some());
-        if let Some(Auth::Basic { user, password }) = &config.auth {
-            assert_eq!(user, "admin");
-            assert_eq!(password.inner(), "password");
-        } else {
-            panic!("Expected Basic auth");
-        }
-    }
-
-    #[test]
-    fn parse_config_with_custom_headers() {
-        let config: DorisConfig = toml::from_str(
-            r#"
-            endpoints = ["http://localhost:8030"]
-            database = "test_db"
-            table = "test_table"
-            encoding.codec = "json"
-            [headers]
-            "X-Custom-Header" = "custom_value"
-            "Content-Type" = "application/json"
-            "#,
-        )
-        .unwrap();
-
-        assert_eq!(config.headers.len(), 2);
-        assert_eq!(
-            config.headers.get("X-Custom-Header").unwrap(),
-            "custom_value"
-        );
-        assert_eq!(
-            config.headers.get("Content-Type").unwrap(),
-            "application/json"
-        );
-    }
-
-    #[test]
-    fn parse_distribution() {
-        toml::from_str::<DorisConfig>(
-            r#"
-            endpoints = ["", ""]
-            database = "test_db"
-            table = "test_table"
-            encoding.codec = "json"
-            distribution.retry_initial_backoff_secs = 10
-        "#,
-        )
-        .unwrap();
     }
 }

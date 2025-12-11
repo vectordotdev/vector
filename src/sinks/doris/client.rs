@@ -6,10 +6,12 @@ use crate::{
 use bytes::Bytes;
 use http::{
     Method, Response, StatusCode, Uri,
-    header::{CONTENT_LENGTH, CONTENT_TYPE},
+    header::{CONTENT_LENGTH, CONTENT_TYPE, EXPECT},
 };
+use http_body::{Body as _, Collected};
 use hyper::{Body, Request};
 use serde_json::Value;
+use snafu::Snafu;
 use std::{
     collections::{HashMap, HashSet},
     sync::Arc,
@@ -17,6 +19,15 @@ use std::{
 };
 use tracing::debug;
 use uuid::Uuid;
+
+/// Content-Type header value for Doris Stream Load requests.
+/// Doris expects plain text with UTF-8 encoding for JSON data.
+const DORIS_CONTENT_TYPE: &str = "text/plain;charset=utf-8";
+
+/// Expect header value for Doris Stream Load requests.
+/// The "100-continue" mechanism allows the client to wait for server acknowledgment
+/// before sending the request body, which is required by Doris Stream Load protocol.
+const DORIS_EXPECT_HEADER: &str = "100-continue";
 
 /// Thread-safe version of the DorisSinkClient, wrapped in an Arc
 pub type ThreadSafeDorisSinkClient = Arc<DorisSinkClient>;
@@ -26,17 +37,12 @@ pub type ThreadSafeDorisSinkClient = Arc<DorisSinkClient>;
 #[derive(Clone, Debug)]
 pub struct DorisSinkClient {
     http_client: HttpClient,
-    base_url: String, // http://10.16.10.6:8630
+    base_url: String,
     auth: Option<Auth>,
     compression: Compression,
     label_prefix: String,
     headers: Arc<HashMap<String, String>>,
 }
-
-// Explicitly implement Send and Sync for DorisSinkClient
-// This is safe because all internal fields implement Send + Sync
-unsafe impl Send for DorisSinkClient {}
-unsafe impl Sync for DorisSinkClient {}
 
 impl DorisSinkClient {
     pub async fn new(
@@ -47,19 +53,9 @@ impl DorisSinkClient {
         label_prefix: String,
         req_headers: HashMap<String, String>,
     ) -> Self {
-        // Create and set headers
-        let mut headers = HashMap::new();
-        // Basic headers
-        headers.insert("Expect".to_string(), "100-continue".to_string());
-        headers.insert(
-            "Content-Type".to_string(),
-            "text/plain;charset=utf-8".to_string(),
-        );
-
-        // Add custom headers
-        for (k, v) in &req_headers {
-            headers.insert(k.clone(), v.clone());
-        }
+        // Store custom headers (basic headers like Content-Type and Expect
+        // are set directly in the request builder)
+        let headers = req_headers;
 
         Self {
             http_client,
@@ -102,45 +98,38 @@ impl DorisSinkClient {
         let label = self.generate_label(database, table);
 
         let uri = if let Some(redirect_url) = redirect_url {
-            debug!(
-                message = "Using redirect URL.",
-                redirect_url = %redirect_url
-            );
-            redirect_url.parse::<Uri>().map_err(|error| {
+            debug!(%redirect_url, "Using redirect URL.");
+            redirect_url.parse::<Uri>().map_err(|source| {
                 debug!(
                     message = "Failed to parse redirect URI.",
-                    %error,
-                    redirect_url = %redirect_url
+                    %source,
+                    %redirect_url
                 );
-                crate::Error::from(format!("Invalid redirect URI: {}", error))
+                StreamLoadError::InvalidRedirectUri { source }
             })?
         } else {
             // Build original URL
             let stream_load_url =
                 format!("{}/api/{}/{}/_stream_load", self.base_url, database, table);
 
-            stream_load_url.parse::<Uri>().map_err(|error| {
+            stream_load_url.parse::<Uri>().map_err(|source| {
                 debug!(
                     message = "Failed to parse URI.",
-                    %error,
+                    %source,
                     url = %stream_load_url
                 );
-                crate::Error::from(format!("Invalid URI: {}", error))
+                StreamLoadError::InvalidStreamLoadUri { source }
             })?
         };
 
-        debug!(
-            message = "Building request.",
-            uri = %uri,
-            label = %label
-        );
+        debug!(%uri, %label, "Building request.");
 
         let mut builder = Request::builder()
             .method(Method::PUT)
             .uri(uri.clone())
             .header(CONTENT_LENGTH, payload.len())
-            .header(CONTENT_TYPE, "text/plain;charset=utf-8")
-            .header("Expect", "100-continue")
+            .header(CONTENT_TYPE, DORIS_CONTENT_TYPE)
+            .header(EXPECT, DORIS_EXPECT_HEADER)
             .header("label", &label);
 
         // Add compression headers if needed
@@ -158,13 +147,13 @@ impl DorisSinkClient {
         }
 
         let body = Body::from(payload.clone());
-        let mut request = builder.body(body).map_err(|error| {
+        let mut request = builder.body(body).map_err(|source| {
             debug!(
                 message = "Failed to build HTTP request.",
-                %error,
+                %source,
                 uri = %uri
             );
-            crate::Error::from(format!("Failed to build request: {}", error))
+            StreamLoadError::BuildRequest { source }
         })?;
 
         if let Some(auth) = &self.auth {
@@ -192,6 +181,8 @@ impl DorisSinkClient {
         // Track visited URLs to prevent redirect loops
         let mut visited_urls = HashSet::new();
         let mut redirect_count = 0;
+        // Doris Stream Load typically redirects once (FE -> BE), but we allow up to 3
+        // redirects to handle potential multi-hop scenarios while preventing infinite loops.
         const MAX_REDIRECTS: u8 = 3;
 
         let payload_ref = &payload;
@@ -231,7 +222,7 @@ impl DorisSinkClient {
 
                     // Check for redirect loop
                     if !visited_urls.insert(location_str.to_string()) {
-                        return Err(crate::Error::from("Detected redirect loop"));
+                        return Err(StreamLoadError::RedirectLoop.into());
                     }
 
                     // Build and send redirect request
@@ -251,23 +242,16 @@ impl DorisSinkClient {
                         redirect_count = redirect_count
                     );
                 } else {
-                    return Err(crate::Error::from(
-                        "Invalid Location header in redirect response",
-                    ));
+                    return Err(StreamLoadError::InvalidLocationHeader.into());
                 }
             } else {
-                return Err(crate::Error::from(
-                    "Missing Location header in redirect response",
-                ));
+                return Err(StreamLoadError::MissingLocationHeader.into());
             }
         }
 
         // Check if maximum redirects exceeded
         if redirect_count >= MAX_REDIRECTS {
-            return Err(crate::Error::from(format!(
-                "Exceeded maximum number of redirects ({})",
-                MAX_REDIRECTS
-            )));
+            return Err(StreamLoadError::MaxRedirectsExceeded { max: MAX_REDIRECTS }.into());
         }
 
         // Log endpoint bytes sent metric
@@ -279,14 +263,16 @@ impl DorisSinkClient {
 
         // Extract response body
         let (parts, body) = response.into_parts();
-        let body_bytes = hyper::body::to_bytes(body)
+        let body_bytes = body
+            .collect()
             .await
-            .map_err(|e| format!("Failed to read response body: {}", e))?;
+            .map(Collected::to_bytes)
+            .map_err(|source| StreamLoadError::ReadResponseBody { source })?;
 
         let status = parts.status;
 
         let response_json = serde_json::from_slice::<Value>(&body_bytes)
-            .map_err(|e| format!("Failed to parse response JSON: {}", e))?;
+            .map_err(|source| StreamLoadError::ParseResponseJson { source })?;
 
         let stream_load_status =
             if let Some(status_str) = response_json.get("Status").and_then(|v| v.as_str()) {
@@ -313,13 +299,13 @@ impl DorisSinkClient {
         let endpoint_str = endpoint.trim_end_matches('/');
         let uri_str = format!("{}{}", endpoint_str, query_path);
 
-        let uri = uri_str.parse::<Uri>().map_err(|e| {
+        let uri = uri_str.parse::<Uri>().map_err(|source| {
             debug!(
                 message = "Failed to parse health check URI.",
-                %e,
+                %source,
                 url = %uri_str
             );
-            format!("Invalid health check URI: {}", e)
+            HealthCheckError::InvalidUri { source }
         })?;
 
         debug!(
@@ -331,7 +317,7 @@ impl DorisSinkClient {
             .method(Method::GET)
             .uri(uri)
             .body(Body::empty())
-            .map_err(|e| format!("Failed to build health check request: {}", e))?;
+            .map_err(|source| HealthCheckError::HealthCheckBuildRequest { source })?;
 
         if let Some(auth) = &self.auth {
             auth.apply(&mut request);
@@ -341,9 +327,11 @@ impl DorisSinkClient {
         let status = response.status();
 
         let (_, body) = response.into_parts();
-        let body_bytes = hyper::body::to_bytes(body)
+        let body_bytes = body
+            .collect()
             .await
-            .map_err(|e| format!("Failed to read health check response body: {}", e))?;
+            .map(Collected::to_bytes)
+            .map_err(|source| HealthCheckError::HealthCheckReadResponseBody { source })?;
 
         if status.is_success() {
             // Parse the response JSON
@@ -363,12 +351,15 @@ impl DorisSinkClient {
                                 node = %endpoint,
                                 message = %msg
                             );
-                            return Err(format!("Doris node health check failed: {}", msg).into());
+                            return Err(HealthCheckError::HealthCheckFailed {
+                                message: msg.to_string(),
+                            }
+                            .into());
                         }
                     }
                 }
-                Err(e) => {
-                    return Err(format!("Failed to parse health check response: {}", e).into());
+                Err(source) => {
+                    return Err(HealthCheckError::HealthCheckParseResponse { source }.into());
                 }
             }
         }
@@ -379,7 +370,10 @@ impl DorisSinkClient {
             status = %status
         );
 
-        Err(format!("Doris node health check failed with status: {}", status).into())
+        Err(HealthCheckError::HealthCheckFailed {
+            message: format!("HTTP status: {}", status),
+        }
+        .into())
     }
 }
 
@@ -434,4 +428,54 @@ impl From<StreamLoadStatus> for vector_common::finalization::EventStatus {
             StreamLoadStatus::Failure => vector_common::finalization::EventStatus::Errored,
         }
     }
+}
+
+/// Errors that can occur during Doris Stream Load operations.
+#[derive(Debug, Snafu)]
+pub enum StreamLoadError {
+    #[snafu(display("Invalid redirect URI: {}", source))]
+    InvalidRedirectUri { source: http::uri::InvalidUri },
+
+    #[snafu(display("Invalid stream load URI: {}", source))]
+    InvalidStreamLoadUri { source: http::uri::InvalidUri },
+
+    #[snafu(display("Detected redirect loop"))]
+    RedirectLoop,
+
+    #[snafu(display("Invalid Location header in redirect response"))]
+    InvalidLocationHeader,
+
+    #[snafu(display("Missing Location header in redirect response"))]
+    MissingLocationHeader,
+
+    #[snafu(display("Exceeded maximum number of redirects ({})", max))]
+    MaxRedirectsExceeded { max: u8 },
+
+    #[snafu(display("Failed to build request: {}", source))]
+    BuildRequest { source: http::Error },
+
+    #[snafu(display("Failed to read response body: {}", source))]
+    ReadResponseBody { source: hyper::Error },
+
+    #[snafu(display("Failed to parse response JSON: {}", source))]
+    ParseResponseJson { source: serde_json::Error },
+}
+
+/// Errors that can occur during Doris health check operations.
+#[derive(Debug, Snafu)]
+pub enum HealthCheckError {
+    #[snafu(display("Invalid health check URI: {}", source))]
+    InvalidUri { source: http::uri::InvalidUri },
+
+    #[snafu(display("Failed to build health check request: {}", source))]
+    HealthCheckBuildRequest { source: http::Error },
+
+    #[snafu(display("Failed to read health check response body: {}", source))]
+    HealthCheckReadResponseBody { source: hyper::Error },
+
+    #[snafu(display("Failed to parse health check response: {}", source))]
+    HealthCheckParseResponse { source: serde_json::Error },
+
+    #[snafu(display("Doris health check failed: {}", message))]
+    HealthCheckFailed { message: String },
 }

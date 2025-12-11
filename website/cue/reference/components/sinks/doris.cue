@@ -160,20 +160,8 @@ components: sinks: doris: {
 				as a JSON object, and multiple events are sent as newline-delimited JSON (NDJSON).
 
 				The data format can be customized using the `headers` configuration to set
-				Doris-specific Stream Load parameters such as:
-
-				- `format`: Data format (json, csv, etc.)
-				- `read_json_by_line`: Whether to read JSON line by line
-				- `strip_outer_array`: Whether to strip outer array brackets
-				- Column mappings and transformations
-
-				Example headers configuration:
-				```yaml
-				headers:
-				  format: "json"
-				  read_json_by_line: "true"
-				  strip_outer_array: "false"
-				```
+				Doris-specific Stream Load parameters. See the `headers` configuration option
+				for available parameters.
 				"""
 		}
 

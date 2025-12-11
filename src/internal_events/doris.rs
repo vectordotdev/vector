@@ -13,8 +13,7 @@ impl InternalEvent for DorisRowsLoaded {
         trace!(
             message = "Doris rows loaded successfully.",
             loaded_rows = %self.loaded_rows,
-            load_bytes = %self.load_bytes,
-            internal_log_rate_limit = true
+            load_bytes = %self.load_bytes
         );
 
         // Record the number of rows loaded
@@ -35,8 +34,7 @@ impl InternalEvent for DorisRowsFiltered {
     fn emit(self) {
         warn!(
             message = "Doris rows filtered during loading.",
-            filtered_rows = %self.filtered_rows,
-            internal_log_rate_limit = true
+            filtered_rows = %self.filtered_rows
         );
 
         counter!("doris_rows_filtered_total").increment(self.filtered_rows as u64);
