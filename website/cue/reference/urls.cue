@@ -19,6 +19,7 @@ urls: {
 	apache_extended_status:                     "\(apache)/docs/current/mod/core.html#extendedstatus"
 	apache_install:                             "\(apache)/docs/current/install.html"
 	apache_mod_status:                          "http://httpd.apache.org/docs/current/mod/mod_status.html"
+	apache_parquet:                             "https://parquet.apache.org/"
 	apt:                                        "\(wikipedia)/wiki/APT_(software)"
 	arm:                                        "\(wikipedia)/wiki/ARM_architecture"
 	aws_access_keys:                            "\(aws_docs)/IAM/latest/UserGuide/id_credentials_access-keys.html"

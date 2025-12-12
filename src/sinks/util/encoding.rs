@@ -8,7 +8,7 @@ use vector_lib::{
     request_metadata::GroupedCountByteSize,
 };
 
-#[cfg(feature = "codecs-arrow")]
+#[cfg(any(feature = "codecs-arrow", feature = "codecs-parquet"))]
 use crate::internal_events::EncoderNullConstraintError;
 use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
 
@@ -99,7 +99,7 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
     }
 }
 
-#[cfg(feature = "codecs-arrow")]
+#[cfg(any(feature = "codecs-arrow", feature = "codecs-parquet"))]
 impl Encoder<Vec<Event>> for (Transformer, crate::codecs::BatchEncoder) {
     fn encode_input(
         &self,
@@ -150,7 +150,7 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::EncoderKind) {
             crate::codecs::EncoderKind::Framed(encoder) => {
                 (self.0.clone(), *encoder.clone()).encode_input(events, writer)
             }
-            #[cfg(feature = "codecs-arrow")]
+            #[cfg(any(feature = "codecs-arrow", feature = "codecs-parquet"))]
             crate::codecs::EncoderKind::Batch(encoder) => {
                 (self.0.clone(), encoder.clone()).encode_input(events, writer)
             }

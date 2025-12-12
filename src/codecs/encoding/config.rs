@@ -1,4 +1,8 @@
+#[cfg(any(feature = "codecs-arrow", feature = "codecs-parquet"))]
+use crate::codecs::{BatchEncoder, BatchSerializer};
 use crate::codecs::{Encoder, EncoderKind, Transformer};
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::encoding::ParquetSerializer;
 use vector_lib::{
     codecs::{
         CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
@@ -141,9 +145,22 @@ impl EncodingConfigWithFraming {
 
     /// Build the `Transformer` and `EncoderKind` for this config.
     pub fn build_encoder(&self, sink_type: SinkType) -> crate::Result<(Transformer, EncoderKind)> {
-        let (framer, serializer) = self.build(sink_type)?;
-        let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(framer, serializer)));
-        Ok((self.transformer(), encoder))
+        match &self.encoding.encoding {
+            #[cfg(feature = "codecs-parquet")]
+            SerializerConfig::Parquet(parquet_config) => {
+                let serializer = ParquetSerializer::new(parquet_config.clone())?;
+                let encoder = EncoderKind::Batch(BatchEncoder::new(BatchSerializer::Parquet(
+                    serializer,
+                )));
+                Ok((self.transformer(), encoder))
+            }
+            _ => {
+                let (framer, serializer) = self.build(sink_type)?;
+                let encoder =
+                    EncoderKind::Framed(Box::new(Encoder::<Framer>::new(framer, serializer)));
+                Ok((self.transformer(), encoder))
+            }
+        }
     }
 }
 

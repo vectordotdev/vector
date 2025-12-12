@@ -2,6 +2,8 @@ use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
 #[cfg(feature = "codecs-arrow")]
 use vector_lib::codecs::encoding::ArrowStreamSerializer;
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::encoding::ParquetSerializer;
 use vector_lib::codecs::{
     CharacterDelimitedEncoder, NewlineDelimitedEncoder, TextSerializerConfig,
     encoding::{Error, Framer, Serializer},
@@ -18,6 +20,9 @@ pub enum BatchSerializer {
     /// Arrow IPC stream format serializer.
     #[cfg(feature = "codecs-arrow")]
     Arrow(ArrowStreamSerializer),
+    /// Parquet columnar format serializer.
+    #[cfg(feature = "codecs-parquet")]
+    Parquet(ParquetSerializer),
 }
 
 /// An encoder that encodes batches of events.
@@ -38,10 +43,13 @@ impl BatchEncoder {
     }
 
     /// Get the HTTP content type.
-    #[cfg(feature = "codecs-arrow")]
+    #[cfg(any(feature = "codecs-arrow", feature = "codecs-parquet"))]
     pub const fn content_type(&self) -> &'static str {
         match &self.serializer {
+            #[cfg(feature = "codecs-arrow")]
             BatchSerializer::Arrow(_) => "application/vnd.apache.arrow.stream",
+            #[cfg(feature = "codecs-parquet")]
+            BatchSerializer::Parquet(_) => "application/vnd.apache.parquet",
         }
     }
 }
@@ -65,6 +73,24 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
                     }
                 })
             }
+            #[cfg(feature = "codecs-parquet")]
+            BatchSerializer::Parquet(serializer) => {
+                serializer.encode(events, buffer).map_err(|err| {
+                    use vector_lib::codecs::encoding::ParquetEncodingError;
+                    match err {
+                        ParquetEncodingError::RecordBatchCreation { source } => {
+                            use vector_lib::codecs::encoding::ArrowEncodingError;
+                            match source {
+                                ArrowEncodingError::NullConstraint { .. } => {
+                                    Error::SchemaConstraintViolation(Box::new(err))
+                                }
+                                _ => Error::SerializingError(Box::new(err)),
+                            }
+                        }
+                        _ => Error::SerializingError(Box::new(err)),
+                    }
+                })
+            }
             _ => unreachable!("BatchSerializer cannot be constructed without encode()"),
         }
     }
@@ -76,7 +102,7 @@ pub enum EncoderKind {
     /// Uses framing to encode individual events
     Framed(Box<Encoder<Framer>>),
     /// Encodes events in batches without framing
-    #[cfg(feature = "codecs-arrow")]
+    #[cfg(any(feature = "codecs-arrow", feature = "codecs-parquet"))]
     Batch(BatchEncoder),
 }
 

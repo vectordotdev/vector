@@ -2,10 +2,7 @@ use aws_sdk_s3::Client as S3Client;
 use tower::ServiceBuilder;
 use vector_lib::{
     TimeZone,
-    codecs::{
-        TextSerializerConfig,
-        encoding::{Framer, FramingConfig},
-    },
+    codecs::{TextSerializerConfig, encoding::FramingConfig},
     configurable::configurable_component,
     sink::VectorSink,
 };
@@ -13,7 +10,7 @@ use vector_lib::{
 use super::sink::S3RequestOptions;
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint},
-    codecs::{Encoder, EncodingConfigWithFraming, SinkType},
+    codecs::{EncodingConfigWithFraming, SinkType},
     config::{AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext},
     sinks::{
         Healthcheck,
@@ -245,9 +242,7 @@ impl S3SinkConfig {
 
         let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id, None);
 
-        let transformer = self.encoding.transformer();
-        let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+        let (transformer, encoder) = self.encoding.build_encoder(SinkType::MessageBased)?;
 
         let request_options = S3RequestOptions {
             bucket: self.bucket.clone(),

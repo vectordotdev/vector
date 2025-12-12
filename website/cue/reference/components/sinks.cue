@@ -188,6 +188,20 @@ components: sinks: [Name=string]: {
 														[apache_avro]: https://avro.apache.org/
 														"""
 												}
+												if codec == "parquet" {
+													parquet: """
+														Encodes events in [Apache Parquet][apache_parquet] columnar format.
+
+														Parquet is a columnar storage format optimized for analytics workloads. It provides
+														efficient compression and encoding schemes, making it ideal for long-term storage and
+														query performance with tools like AWS Athena, Apache Spark, and Presto.
+
+														This is a batch encoder that encodes multiple events at once into a single Parquet file.
+														Each batch of events becomes one Parquet file with proper metadata and footers.
+
+														[apache_parquet]: https://parquet.apache.org/
+														"""
+												}
 											}
 										}
 									}
@@ -212,6 +226,55 @@ components: sinks: [Name=string]: {
 																""",
 															]
 														}
+													}
+												}
+											}
+										}
+										if codec == "parquet" {
+											parquet: {
+												description:   "Apache Parquet-specific encoder options."
+												required:      false
+												relevant_when: "codec = `parquet`"
+												type: object: options: {
+													compression: {
+														description: "Compression algorithm for Parquet columns."
+														required:    false
+														type: string: {
+															default: "snappy"
+															enum: {
+																snappy:       "Snappy compression (fast, moderate compression ratio)"
+																gzip:         "GZIP compression (balanced, good for AWS Athena)"
+																zstd:         "ZSTD compression (best compression ratio)"
+																lz4:          "LZ4 compression (very fast)"
+																brotli:       "Brotli compression (good compression)"
+																uncompressed: "No compression"
+															}
+														}
+													}
+													row_group_size: {
+														description: """
+															Number of rows per row group.
+
+															Row groups are Parquet's unit of parallelization. Larger row groups can improve
+															compression but increase memory usage during encoding. If not specified, defaults
+															to the batch size.
+															"""
+														required: false
+														type: uint: {
+															default: null
+															examples: [100000, 1000000]
+														}
+													}
+													allow_nullable_fields: {
+														description: """
+															Allow null values for non-nullable fields in the schema.
+
+															When enabled, missing or incompatible values will be encoded as null even for fields
+															marked as non-nullable in the schema. This is useful when working with downstream
+															systems that can handle null values through defaults or computed columns.
+															"""
+														required: false
+														type: bool: default: false
 													}
 												}
 											}

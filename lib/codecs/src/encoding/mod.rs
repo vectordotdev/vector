@@ -17,6 +17,8 @@ pub use format::{
     ProtobufSerializerOptions, RawMessageSerializer, RawMessageSerializerConfig, TextSerializer,
     TextSerializerConfig,
 };
+#[cfg(feature = "parquet")]
+pub use format::{ParquetCompression, ParquetEncodingError, ParquetSerializer, ParquetSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpSerializer, OtlpSerializerConfig};
 pub use framing::{
@@ -26,7 +28,7 @@ pub use framing::{
     NewlineDelimitedEncoderConfig, VarintLengthDelimitedEncoder,
     VarintLengthDelimitedEncoderConfig,
 };
-#[cfg(feature = "arrow")]
+#[cfg(any(feature = "arrow", feature = "parquet"))]
 pub use serializer::BatchSerializerConfig;
 pub use serializer::{Serializer, SerializerConfig};
 

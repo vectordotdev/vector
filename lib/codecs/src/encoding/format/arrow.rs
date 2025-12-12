@@ -213,7 +213,7 @@ pub fn encode_events_to_arrow_ipc_stream(
 }
 
 /// Recursively makes a Field and all its nested fields nullable
-fn make_field_nullable(field: &arrow::datatypes::Field) -> arrow::datatypes::Field {
+pub fn make_field_nullable(field: &arrow::datatypes::Field) -> arrow::datatypes::Field {
     let new_data_type = match field.data_type() {
         DataType::List(inner_field) => DataType::List(Arc::new(make_field_nullable(inner_field))),
         DataType::Struct(fields) => {
@@ -232,7 +232,7 @@ fn make_field_nullable(field: &arrow::datatypes::Field) -> arrow::datatypes::Fie
 }
 
 /// Builds an Arrow RecordBatch from events
-fn build_record_batch(
+pub fn build_record_batch(
     schema: Arc<Schema>,
     events: &[Event],
 ) -> Result<RecordBatch, ArrowEncodingError> {

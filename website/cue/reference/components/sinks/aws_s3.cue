@@ -34,7 +34,7 @@ components: sinks: aws_s3: components._aws & {
 				codec: {
 					enabled: true
 					framing: true
-					enum: ["json", "text"]
+					enum: ["json", "text", "parquet"]
 				}
 			}
 			proxy: enabled: true
@@ -100,6 +100,60 @@ components: sinks: aws_s3: components._aws & {
 				[full tutorial](\(urls.aws_s3_cross_account_tutorial)) for this use case. If
 				don't know the bucket owner's canonical ID you can find it by following
 				[this tutorial](\(urls.aws_canonical_user_id)).
+				"""
+		}
+
+		parquet_encoding: {
+			title: "Parquet encoding"
+			body:  """
+				The AWS S3 sink supports encoding events in [Apache Parquet](\(urls.apache_parquet))
+				format, which is a columnar storage format optimized for analytics workloads. Parquet
+				provides efficient compression and encoding schemes, making it ideal for long-term
+				storage and query performance with tools like AWS Athena, Apache Spark, and Presto.
+
+				When using Parquet encoding, you must specify a schema that defines the structure and
+				types of the Parquet file columns. Vector events are converted to Arrow RecordBatches
+				and then written as Parquet files.
+
+				**Supported Parquet compression algorithms:**
+				- `snappy` (default): Fast compression with moderate compression ratio
+				- `gzip`: Balanced compression, good for AWS Athena compatibility
+				- `zstd`: Best compression ratio, ideal for cold storage
+				- `lz4`: Very fast compression, good for high-throughput scenarios
+				- `brotli`: Good compression, web-optimized
+				- `uncompressed`: No compression
+
+				**Example configuration:**
+
+				```yaml
+				encoding:
+				  codec: parquet
+				  schema:
+				    timestamp: timestamp_micros
+				    user_id: utf8
+				    action: utf8
+				    value: int64
+				    duration_ms: float64
+				  compression: snappy
+				  row_group_size: 100000
+				  allow_nullable_fields: true
+				```
+
+				**Supported data types:**
+				- Strings: `utf8`
+				- Integers: `int8`, `int16`, `int32`, `int64`
+				- Unsigned integers: `uint8`, `uint16`, `uint32`, `uint64`
+				- Floats: `float32`, `float64`
+				- Timestamps: `timestamp_second`, `timestamp_millisecond`, `timestamp_microsecond`, `timestamp_nanosecond`
+				- Boolean: `boolean`
+				- Binary: `binary`
+				- Decimals: `decimal128`, `decimal256`
+
+				**Note:** When using Parquet encoding, set `compression: none` at the sink level since
+				Parquet handles compression internally through its columnar compression algorithms.
+
+				Each batch of events becomes one Parquet file in S3, with the batch size controlled by
+				the `batch.max_events`, `batch.max_bytes`, and `batch.timeout_secs` settings.
 				"""
 		}
 

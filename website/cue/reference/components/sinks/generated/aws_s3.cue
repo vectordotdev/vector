@@ -497,6 +497,17 @@ generated: components: sinks: aws_s3: configuration: {
 
 						[otlp]: https://opentelemetry.io/docs/specs/otlp/
 						"""
+					parquet: """
+						Encodes events in [Apache Parquet][apache_parquet] columnar format.
+
+						Parquet is a columnar storage format optimized for analytics workloads. It provides
+						efficient compression and encoding schemes, making it ideal for long-term storage and
+						query performance with tools like AWS Athena, Apache Spark, and Presto.
+
+						This is a batch encoder that writes one Parquet file per batch with proper metadata and footers.
+
+						[apache_parquet]: https://parquet.apache.org/
+						"""
 					protobuf: """
 						Encodes an event as a [Protobuf][protobuf] message.
 
@@ -660,6 +671,53 @@ generated: components: sinks: aws_s3: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			parquet: {
+				description:   "Apache Parquet-specific encoder options."
+				relevant_when: "codec = \"parquet\""
+				required:      false
+				type: object: options: {
+					compression: {
+						description: "Compression algorithm for Parquet columns."
+						required:    false
+						type: string: {
+							default: "snappy"
+							enum: {
+								snappy:       "Snappy compression (fast, moderate compression ratio)"
+								gzip:         "GZIP compression (balanced, good for AWS Athena)"
+								zstd:         "ZSTD compression (best compression ratio)"
+								lz4:          "LZ4 compression (very fast)"
+								brotli:       "Brotli compression (good compression)"
+								uncompressed: "No compression"
+							}
+						}
+					}
+					row_group_size: {
+						description: """
+							Number of rows per row group.
+
+							Row groups are Parquet's unit of parallelization. Larger row groups can improve
+							compression but increase memory usage during encoding. If not specified, defaults
+							to the batch size.
+							"""
+						required: false
+						type: uint: {
+							default: null
+							examples: [100000, 1000000]
+						}
+					}
+					allow_nullable_fields: {
+						description: """
+							Allow null values for non-nullable fields in the schema.
+
+							When enabled, missing or incompatible values will be encoded as null even for fields
+							marked as non-nullable in the schema. This is useful when working with downstream
+							systems that can handle null values through defaults or computed columns.
+							"""
+						required: false
+						type: bool: default: false
+					}
+				}
+			}
 			protobuf: {
 				description:   "Options for the Protobuf serializer."
 				relevant_when: "codec = \"protobuf\""
@@ -738,6 +796,7 @@ generated: components: sinks: aws_s3: configuration: {
 		required: false
 		type: string: examples: [
 			"json",
+			"parquet",
 		]
 	}
 	filename_time_format: {
