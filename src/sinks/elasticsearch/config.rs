@@ -552,11 +552,10 @@ impl SinkConfig for ElasticsearchConfig {
 
         let services = commons
             .iter()
-            .cloned()
             .map(|common| {
                 let endpoint = common.base_url.clone();
 
-                let http_request_builder = HttpRequestBuilder::new(&common, self);
+                let http_request_builder = HttpRequestBuilder::new(common, self);
                 let service = ElasticsearchService::new(client.clone(), http_request_builder);
 
                 (endpoint, service)
