@@ -20,6 +20,8 @@ mod otlp;
 mod parquet;
 mod protobuf;
 mod raw_message;
+#[cfg(any(feature = "arrow", feature = "parquet"))]
+mod schema_definition;
 mod text;
 
 use std::fmt::Debug;
@@ -40,6 +42,8 @@ pub use otlp::{OtlpSerializer, OtlpSerializerConfig};
 pub use parquet::{ParquetCompression, ParquetEncodingError, ParquetSerializer, ParquetSerializerConfig};
 pub use protobuf::{ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
+#[cfg(any(feature = "arrow", feature = "parquet"))]
+pub use schema_definition::{SchemaDefinition, SchemaDefinitionError};
 pub use text::{TextSerializer, TextSerializerConfig};
 use vector_core::event::Event;
 

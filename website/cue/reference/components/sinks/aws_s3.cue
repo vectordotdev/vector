@@ -111,49 +111,135 @@ components: sinks: aws_s3: components._aws & {
 				provides efficient compression and encoding schemes, making it ideal for long-term
 				storage and query performance with tools like AWS Athena, Apache Spark, and Presto.
 
-				When using Parquet encoding, you must specify a schema that defines the structure and
-				types of the Parquet file columns. Vector events are converted to Arrow RecordBatches
-				and then written as Parquet files.
+				## Schema Configuration
 
-				**Supported Parquet compression algorithms:**
+				When using Parquet encoding, you **must** specify a schema that defines the structure and
+				types of the Parquet file columns. The schema is defined as a simple map of field names to
+				data types. Vector events are converted to Arrow RecordBatches and then written as Parquet files.
+
+				All fields defined in the schema are nullable by default, meaning missing fields will be encoded
+				as NULL values in the Parquet file.
+
+				**Example configuration:**
+
+				```yaml
+				sinks:
+				  s3:
+				    type: aws_s3
+				    bucket: my-bucket
+				    compression: none  # Parquet handles compression internally
+				    batch:
+				      max_events: 50000
+				      timeout_secs: 60
+				    encoding:
+				      codec: parquet
+				      schema:
+				        # Timestamps
+				        timestamp: timestamp_microsecond
+				        created_at: timestamp_millisecond
+
+				        # String fields
+				        user_id: utf8
+				        event_name: utf8
+				        message: utf8
+
+				        # Numeric fields
+				        team_id: int64
+				        duration_ms: float64
+				        count: int32
+
+				        # Boolean
+				        is_active: boolean
+
+				      parquet:
+				        compression: zstd
+				        row_group_size: 50000  # Should be <= batch.max_events
+				        allow_nullable_fields: true
+				```
+
+				## Supported Data Types
+
+				The following data types are supported for Parquet schema fields:
+
+				**String types:**
+				- `utf8` or `string`: UTF-8 encoded strings
+				- `large_utf8` or `large_string`: Large UTF-8 strings (>2GB)
+
+				**Integer types:**
+				- `int8`, `int16`, `int32`, `int64`: Signed integers
+				- `uint8`, `uint16`, `uint32`, `uint64`: Unsigned integers
+
+				**Floating point types:**
+				- `float32` or `float`: 32-bit floating point
+				- `float64` or `double`: 64-bit floating point
+
+				**Timestamp types:**
+				- `timestamp_second` or `timestamp_s`: Seconds since Unix epoch
+				- `timestamp_millisecond`, `timestamp_ms`, or `timestamp_millis`: Milliseconds since Unix epoch
+				- `timestamp_microsecond`, `timestamp_us`, or `timestamp_micros`: Microseconds since Unix epoch
+				- `timestamp_nanosecond`, `timestamp_ns`, or `timestamp_nanos`: Nanoseconds since Unix epoch
+
+				**Date types:**
+				- `date32` or `date`: Days since Unix epoch (32-bit)
+				- `date64`: Milliseconds since Unix epoch (64-bit)
+
+				**Other types:**
+				- `boolean` or `bool`: Boolean values
+				- `binary`: Arbitrary binary data
+				- `large_binary`: Large binary data (>2GB)
+				- `decimal128`: 128-bit decimal with default precision
+				- `decimal256`: 256-bit decimal with default precision
+
+				## Parquet Configuration Options
+
+				### compression
+
+				Compression algorithm applied to Parquet column data:
 				- `snappy` (default): Fast compression with moderate compression ratio
-				- `gzip`: Balanced compression, good for AWS Athena compatibility
+				- `gzip`: Balanced compression, excellent AWS Athena compatibility
 				- `zstd`: Best compression ratio, ideal for cold storage
 				- `lz4`: Very fast compression, good for high-throughput scenarios
 				- `brotli`: Good compression, web-optimized
 				- `uncompressed`: No compression
 
-				**Example configuration:**
+				### row_group_size
 
-				```yaml
-				encoding:
-				  codec: parquet
-				  schema:
-				    timestamp: timestamp_micros
-				    user_id: utf8
-				    action: utf8
-				    value: int64
-				    duration_ms: float64
-				  compression: snappy
-				  row_group_size: 100000
-				  allow_nullable_fields: true
-				```
+				Number of rows per row group in the Parquet file. Row groups are Parquet's unit of
+				parallelization - query engines can read different row groups in parallel.
 
-				**Supported data types:**
-				- Strings: `utf8`
-				- Integers: `int8`, `int16`, `int32`, `int64`
-				- Unsigned integers: `uint8`, `uint16`, `uint32`, `uint64`
-				- Floats: `float32`, `float64`
-				- Timestamps: `timestamp_second`, `timestamp_millisecond`, `timestamp_microsecond`, `timestamp_nanosecond`
-				- Boolean: `boolean`
-				- Binary: `binary`
-				- Decimals: `decimal128`, `decimal256`
+				**Important:** Since each batch becomes a separate Parquet file, `row_group_size` should
+				be less than or equal to `batch.max_events`. Row groups cannot span multiple files.
+				If omitted, defaults to the batch size.
 
-				**Note:** When using Parquet encoding, set `compression: none` at the sink level since
-				Parquet handles compression internally through its columnar compression algorithms.
+				**Trade-offs:**
+				- **Larger row groups** (500K-1M rows): Better compression, less query parallelism
+				- **Smaller row groups** (50K-100K rows): More query parallelism, slightly worse compression
 
-				Each batch of events becomes one Parquet file in S3, with the batch size controlled by
-				the `batch.max_events`, `batch.max_bytes`, and `batch.timeout_secs` settings.
+				For AWS Athena, row groups of 128-256 MB (uncompressed) are often recommended.
+
+				### allow_nullable_fields
+
+				When enabled, missing or incompatible values will be encoded as NULL even for fields that
+				would normally be non-nullable. This is useful when working with downstream systems that
+				can handle NULL values through defaults or computed columns.
+
+				## Batching Behavior
+
+				Each batch of events becomes **one Parquet file** in S3. The batch size is controlled by:
+				- `batch.max_events`: Maximum number of events per file
+				- `batch.max_bytes`: Maximum bytes per file
+				- `batch.timeout_secs`: Maximum time to wait before flushing
+
+				Example: With `max_events: 50000`, each Parquet file will contain up to 50,000 rows.
+
+				## Important Notes
+
+				- **Sink-level compression**: Set `compression: none` at the sink level since Parquet
+				  handles compression internally through its `parquet.compression` setting
+				- **All fields nullable**: Fields defined in the schema are nullable by default, allowing
+				  for missing values
+				- **Schema required**: The schema cannot be inferred and must be explicitly configured
+				- **AWS Athena compatibility**: Use `gzip` compression for best Athena compatibility
 				"""
 		}
 

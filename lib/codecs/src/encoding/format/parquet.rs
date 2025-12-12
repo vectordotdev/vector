@@ -19,6 +19,7 @@ use vector_core::event::Event;
 
 // Reuse the Arrow encoder's record batch building logic
 use super::arrow::{build_record_batch, ArrowEncodingError};
+use super::schema_definition::SchemaDefinition;
 
 /// Compression algorithm for Parquet files
 #[configurable_component]
@@ -57,12 +58,17 @@ impl From<ParquetCompression> for Compression {
 #[configurable_component]
 #[derive(Clone, Default)]
 pub struct ParquetSerializerConfig {
-    /// The Arrow schema to use for encoding
+    /// The Arrow schema definition to use for encoding
     ///
     /// This schema defines the structure and types of the Parquet file columns.
-    #[serde(skip)]
-    #[configurable(derived)]
-    pub schema: Option<Arc<Schema>>,
+    /// Specified as a map of field names to data types.
+    ///
+    /// Supported types: utf8, int8, int16, int32, int64, uint8, uint16, uint32, uint64,
+    /// float32, float64, boolean, binary, timestamp_second, timestamp_millisecond,
+    /// timestamp_microsecond, timestamp_nanosecond, date32, date64, and more.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "schema_example()"))]
+    pub schema: Option<SchemaDefinition>,
 
     /// Compression algorithm to use for Parquet columns
     ///
@@ -78,6 +84,9 @@ pub struct ParquetSerializerConfig {
     ///
     /// Row groups are Parquet's unit of parallelization. Larger row groups
     /// can improve compression but increase memory usage during encoding.
+    ///
+    /// Since each batch becomes a separate Parquet file, this value
+    /// should be <= the batch max_events setting. Row groups cannot span multiple files.
     /// If not specified, defaults to the batch size.
     #[serde(default)]
     #[configurable(metadata(docs::examples = 100000))]
@@ -97,16 +106,18 @@ pub struct ParquetSerializerConfig {
     pub allow_nullable_fields: bool,
 }
 
+fn schema_example() -> std::collections::BTreeMap<String, String> {
+    let mut map = std::collections::BTreeMap::new();
+    map.insert("id".to_string(), "int64".to_string());
+    map.insert("name".to_string(), "utf8".to_string());
+    map.insert("timestamp".to_string(), "timestamp_microsecond".to_string());
+    map
+}
+
 impl std::fmt::Debug for ParquetSerializerConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ParquetSerializerConfig")
-            .field(
-                "schema",
-                &self
-                    .schema
-                    .as_ref()
-                    .map(|s| format!("{} fields", s.fields().len())),
-            )
+            .field("schema", &self.schema.is_some())
             .field("compression", &self.compression)
             .field("row_group_size", &self.row_group_size)
             .field("allow_nullable_fields", &self.allow_nullable_fields)
@@ -115,8 +126,8 @@ impl std::fmt::Debug for ParquetSerializerConfig {
 }
 
 impl ParquetSerializerConfig {
-    /// Create a new ParquetSerializerConfig with a schema
-    pub fn new(schema: Arc<Schema>) -> Self {
+    /// Create a new ParquetSerializerConfig with a schema definition
+    pub fn new(schema: SchemaDefinition) -> Self {
         Self {
             schema: Some(schema),
             compression: ParquetCompression::default(),
@@ -146,11 +157,16 @@ pub struct ParquetSerializer {
 impl ParquetSerializer {
     /// Create a new ParquetSerializer with the given configuration
     pub fn new(config: ParquetSerializerConfig) -> Result<Self, vector_common::Error> {
-        let mut schema = config.schema.ok_or_else(|| {
+        let schema_def = config.schema.ok_or_else(|| {
             vector_common::Error::from(
-                "Parquet serializer requires a schema. Pass a schema or fetch from provider before creating serializer."
+                "Parquet serializer requires a schema. Specify 'schema' in the configuration."
             )
         })?;
+
+        // Convert SchemaDefinition to Arrow Schema
+        let mut schema = schema_def
+            .to_arrow_schema()
+            .map_err(|e| vector_common::Error::from(e.to_string()))?;
 
         // If allow_nullable_fields is enabled, transform the schema once here
         // instead of on every batch encoding
@@ -512,14 +528,13 @@ mod tests {
 
     #[test]
     fn test_parquet_serializer_config() {
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "field",
-            DataType::Int64,
-            true,
-        )]));
+        use std::collections::BTreeMap;
+
+        let mut schema_map = BTreeMap::new();
+        schema_map.insert("field".to_string(), "int64".to_string());
 
         let config = ParquetSerializerConfig {
-            schema: Some(schema),
+            schema: Some(SchemaDefinition::Simple(schema_map)),
             compression: ParquetCompression::Zstd,
             row_group_size: Some(1000),
             allow_nullable_fields: false,
@@ -544,14 +559,14 @@ mod tests {
 
     #[test]
     fn test_encoder_trait_implementation() {
+        use std::collections::BTreeMap;
         use tokio_util::codec::Encoder;
 
-        let schema = Arc::new(Schema::new(vec![
-            Field::new("id", DataType::Int64, true),
-            Field::new("name", DataType::Utf8, true),
-        ]));
+        let mut schema_map = BTreeMap::new();
+        schema_map.insert("id".to_string(), "int64".to_string());
+        schema_map.insert("name".to_string(), "utf8".to_string());
 
-        let config = ParquetSerializerConfig::new(schema);
+        let config = ParquetSerializerConfig::new(SchemaDefinition::Simple(schema_map));
         let mut serializer = ParquetSerializer::new(config).unwrap();
 
         let mut log = LogEvent::default();
@@ -609,13 +624,11 @@ mod tests {
 
     #[test]
     fn test_allow_nullable_fields_config() {
+        use std::collections::BTreeMap;
         use tokio_util::codec::Encoder;
 
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "required_field",
-            DataType::Int64,
-            false, // Non-nullable
-        )]));
+        let mut schema_map = BTreeMap::new();
+        schema_map.insert("required_field".to_string(), "int64".to_string());
 
         let mut log1 = LogEvent::default();
         log1.insert("required_field", 42);
@@ -625,8 +638,9 @@ mod tests {
 
         let events = vec![Event::Log(log1), Event::Log(log2)];
 
-        // With allow_nullable_fields = true, should succeed
-        let mut config = ParquetSerializerConfig::new(Arc::clone(&schema));
+        // Note: SchemaDefinition creates nullable fields by default
+        // This test verifies that the allow_nullable_fields flag works
+        let mut config = ParquetSerializerConfig::new(SchemaDefinition::Simple(schema_map));
         config.allow_nullable_fields = true;
 
         let mut serializer = ParquetSerializer::new(config).unwrap();

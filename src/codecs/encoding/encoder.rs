@@ -77,7 +77,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
             BatchSerializer::Parquet(serializer) => {
                 serializer.encode(events, buffer).map_err(|err| {
                     use vector_lib::codecs::encoding::ParquetEncodingError;
-                    match err {
+                    match &err {
                         ParquetEncodingError::RecordBatchCreation { source } => {
                             use vector_lib::codecs::encoding::ArrowEncodingError;
                             match source {

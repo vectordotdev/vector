@@ -21,6 +21,8 @@ pub use format::{
 pub use format::{ParquetCompression, ParquetEncodingError, ParquetSerializer, ParquetSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(any(feature = "arrow", feature = "parquet"))]
+pub use format::{SchemaDefinition, SchemaDefinitionError};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, Framer, FramingConfig,

@@ -278,7 +278,7 @@ impl S3SinkConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::S3SinkConfig;
+    use super::*;
 
     #[test]
     fn generate_config() {
