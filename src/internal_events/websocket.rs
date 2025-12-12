@@ -42,6 +42,7 @@ impl InternalEvent for WebSocketConnectionFailedError {
         );
         counter!(
             "component_errors_total",
+            "protocol" => PROTOCOL,
             "error_code" => "websocket_connection_failed",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::SENDING,
@@ -209,6 +210,7 @@ impl InternalEvent for WebSocketSendError<'_> {
         );
         counter!(
             "component_errors_total",
+            "protocol" => PROTOCOL,
             "error_code" => "websocket_send_error",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::PROCESSING,
