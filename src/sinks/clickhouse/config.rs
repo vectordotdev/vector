@@ -1,17 +1,18 @@
 //! Configuration for the `Clickhouse` sink.
 
-use std::fmt;
-
+use futures_util::TryFutureExt;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
+use std::fmt;
 use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
 
 use super::{
     request_builder::ClickhouseRequestBuilder,
-    service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
+    service::{ClickhouseHealthLogic, ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
     sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
+    dns,
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
         prelude::*,
@@ -60,6 +61,13 @@ pub struct ClickhouseConfig {
     #[serde(alias = "host")]
     #[configurable(metadata(docs::examples = "http://localhost:8123"))]
     pub endpoint: UriSerde,
+
+    /// Automatically resolve hostnames to all available IP addresses.
+    ///
+    /// When enabled, the hostname in the endpoint will be resolved to all its IP addresses,
+    /// and Vector will load balance across all resolved IPs.
+    #[serde(default)]
+    pub auto_resolve_dns: bool,
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
@@ -176,36 +184,133 @@ pub struct AsyncInsertSettingsConfig {
 
 impl_generate_config_from_default!(ClickhouseConfig);
 
+#[derive(Debug, Clone)]
+pub struct ClickhouseCommon {
+    pub endpoint: Uri,
+    pub auth: Option<Auth>,
+    pub tls_settings: TlsSettings,
+    service_request_builder: ClickhouseServiceRequestBuilder,
+}
+
+impl ClickhouseCommon {
+    pub async fn parse_config(
+        config: &ClickhouseConfig,
+        endpoint_str: &str,
+    ) -> crate::Result<Self> {
+        let endpoint = endpoint_str.parse::<UriSerde>()?;
+        let endpoint_uri = endpoint.with_default_parts().uri;
+
+        let auth = config.auth.choose_one(&endpoint.auth)?;
+        let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
+
+        let service_request_builder = ClickhouseServiceRequestBuilder {
+            auth: auth.clone(),
+            endpoint: endpoint_uri.clone(),
+            skip_unknown_fields: config.skip_unknown_fields,
+            date_time_best_effort: config.date_time_best_effort,
+            insert_random_shard: config.insert_random_shard,
+            compression: config.compression,
+            query_settings: config.query_settings,
+        };
+
+        Ok(Self {
+            endpoint: endpoint_uri,
+            auth,
+            tls_settings,
+            service_request_builder,
+        })
+    }
+
+    pub async fn parse_many(config: &ClickhouseConfig) -> crate::Result<Vec<Self>> {
+        let endpoint_str = config.endpoint.with_default_parts().uri.to_string();
+
+        let all_endpoints = if config.auto_resolve_dns {
+            Self::resolve_endpoint_to_ips(&endpoint_str).await?
+        } else {
+            vec![endpoint_str]
+        };
+
+        if all_endpoints.is_empty() {
+            return Err("No endpoints available after DNS resolution".into());
+        }
+
+        let mut commons = Vec::new();
+        for endpoint_str in all_endpoints {
+            commons.push(Self::parse_config(config, &endpoint_str).await?);
+        }
+        Ok(commons)
+    }
+
+    async fn resolve_endpoint_to_ips(endpoint_str: &str) -> crate::Result<Vec<String>> {
+        let uri: Uri = endpoint_str.parse()?;
+
+        let host = uri.host().ok_or("URI must contain a host")?;
+
+        // Resolve hostname to all IP addresses
+        let ips: Vec<_> = dns::Resolver.lookup_ip(host.to_string()).await?.collect();
+
+        if ips.is_empty() {
+            return Err("No IP addresses found for hostname".into());
+        }
+
+        let mut resolved_endpoints = Vec::new();
+        for ip in ips {
+            let new_endpoint = uri.to_string().replace(host, &ip.to_string());
+            resolved_endpoints.push(new_endpoint);
+        }
+
+        Ok(resolved_endpoints)
+    }
+
+    pub(super) const fn get_service_request_builder(&self) -> &ClickhouseServiceRequestBuilder {
+        &self.service_request_builder
+    }
+
+    pub async fn healthcheck(self, client: HttpClient) -> crate::Result<()> {
+        let uri = get_healthcheck_uri(&self.endpoint);
+        let mut request = Request::get(uri).body(Body::empty()).unwrap();
+
+        if let Some(auth) = self.auth {
+            auth.apply(&mut request);
+        }
+
+        let response = client.send(request).await?;
+
+        match response.status() {
+            StatusCode::OK => Ok(()),
+            status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
+        }
+    }
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = self.endpoint.with_default_parts().uri;
+        let commons = ClickhouseCommon::parse_many(self).await?;
+        let common = commons[0].clone();
 
-        let auth = self.auth.choose_one(&self.endpoint.auth)?;
-
-        let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-
-        let client = HttpClient::new(tls_settings, &cx.proxy)?;
-
-        let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
-            auth: auth.clone(),
-            endpoint: endpoint.clone(),
-            skip_unknown_fields: self.skip_unknown_fields,
-            date_time_best_effort: self.date_time_best_effort,
-            insert_random_shard: self.insert_random_shard,
-            compression: self.compression,
-            query_settings: self.query_settings,
-        };
-
-        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
-            HttpService::new(client.clone(), clickhouse_service_request_builder);
+        let client = HttpClient::new(common.tls_settings.clone(), &cx.proxy)?;
 
         let request_limits = self.request.into_settings();
 
-        let service = ServiceBuilder::new()
-            .settings(request_limits, ClickhouseRetryLogic::default())
-            .service(service);
+        let services = commons
+            .iter()
+            .map(|common| {
+                let endpoint = common.endpoint.to_string();
+                let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
+                    HttpService::new(client.clone(), common.get_service_request_builder().clone());
+                (endpoint, service)
+            })
+            .collect::<Vec<_>>();
+
+        let service = request_limits.distributed_service(
+            ClickhouseRetryLogic::default(),
+            services,
+            Default::default(),
+            ClickhouseHealthLogic,
+            1,
+        );
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -235,7 +340,13 @@ impl SinkConfig for ClickhouseConfig {
             request_builder,
         );
 
-        let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
+        let healthcheck = futures::future::select_ok(
+            commons
+                .into_iter()
+                .map(move |common| common.healthcheck(client.clone()).boxed()),
+        )
+        .map_ok(|((), _)| ())
+        .boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -256,22 +367,6 @@ fn get_healthcheck_uri(endpoint: &Uri) -> String {
     }
     uri.push_str("?query=SELECT%201");
     uri
-}
-
-async fn healthcheck(client: HttpClient, endpoint: Uri, auth: Option<Auth>) -> crate::Result<()> {
-    let uri = get_healthcheck_uri(&endpoint);
-    let mut request = Request::get(uri).body(Body::empty()).unwrap();
-
-    if let Some(auth) = auth {
-        auth.apply(&mut request);
-    }
-
-    let response = client.send(request).await?;
-
-    match response.status() {
-        StatusCode::OK => Ok(()),
-        status => Err(HealthcheckError::UnexpectedStatus { status }.into()),
-    }
 }
 
 #[cfg(test)]
@@ -297,5 +392,26 @@ mod tests {
             get_healthcheck_uri(&"http://localhost:8123/path/".parse().unwrap()),
             "http://localhost:8123/path/?query=SELECT%201"
         );
+    }
+
+    #[tokio::test]
+    async fn test_auto_resolve_dns_enabled() {
+        let config = ClickhouseConfig {
+            endpoint: "http://localhost:8123".parse().unwrap(),
+            auto_resolve_dns: true, // Enabled
+            table: "test_table".try_into().unwrap(),
+            ..Default::default()
+        };
+
+        let commons = ClickhouseCommon::parse_many(&config).await.unwrap();
+        assert!(!commons.is_empty());
+
+        // All resolved endpoints should be IP addresses, not hostnames
+        for common in &commons {
+            let endpoint_str = common.endpoint.to_string();
+            assert!(!endpoint_str.contains("localhost"));
+            // Should contain either IPv4 or IPv6 addresses
+            assert!(endpoint_str.contains("127.0.0.1") || endpoint_str.contains("::1"));
+        }
     }
 }
