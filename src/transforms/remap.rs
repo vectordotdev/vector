@@ -497,8 +497,7 @@ where
         let message = error
             .notes()
             .iter()
-            .filter(|note| matches!(note, Note::UserErrorMessage(_)))
-            .next_back()
+            .rfind(|note| matches!(note, Note::UserErrorMessage(_)))
             .map(|note| note.to_string())
             .unwrap_or_else(|| error.to_string());
         serde_json::json!({
