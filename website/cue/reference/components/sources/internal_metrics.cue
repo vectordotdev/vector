@@ -235,6 +235,24 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		doris_bytes_loaded_total: {
+			description:       "The total number of bytes loaded into Doris."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		doris_rows_filtered_total: {
+			description:       "The total number of rows filtered by Doris during stream load."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		doris_rows_loaded_total: {
+			description:       "The total number of rows successfully loaded into Doris."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		k8s_format_picker_edge_cases_total: {
 			description:       "The total number of edge cases encountered while picking format of the Kubernetes log message."
 			type:              "counter"
