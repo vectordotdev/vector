@@ -779,6 +779,8 @@ impl AgentDDSketch {
     /// ## Errors
     ///
     /// Returns an error if a bucket size is greater that `u32::MAX`.
+    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::cast_precision_loss)]
     pub fn transform_to_sketch(mut metric: Metric) -> Result<Metric, &'static str> {
         let sketch = match metric.data_mut().value_mut() {
             MetricValue::Distribution { samples, .. } => {
@@ -788,10 +790,24 @@ impl AgentDDSketch {
                 }
                 Some(sketch)
             }
-            MetricValue::AggregatedHistogram { buckets, .. } => {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                sum,
+                count,
+                ..
+            } => {
                 let delta_buckets = mem::take(buckets);
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_interpolate_buckets(delta_buckets)?;
+
+                let orig_sum = *sum;
+                let orig_count = *count;
+                if orig_count > 0 {
+                    sketch.sum = orig_sum;
+                    sketch.count = orig_count as u32;
+                    sketch.avg = orig_sum / orig_count as f64;
+                }
+
                 Some(sketch)
             }
             // We can't convert from any other metric value.
