@@ -2,18 +2,17 @@
 
 use azure_core::credentials::TokenCredential;
 use azure_core_for_storage::error::{Error, ErrorKind};
-use azure_identity::DefaultAzureCredential;
 use std::sync::Arc;
 
 #[derive(Clone, Debug)]
 pub(crate) struct TokenCredentialInterop {
     // Credential
-    credential: Arc<DefaultAzureCredential>,
+    credential: Arc<dyn TokenCredential>,
 }
 
 impl TokenCredentialInterop {
     /// Create a new `TokenCredentialInterop` from a `DefaultAzureCredential`
-    pub fn new(credential: Arc<DefaultAzureCredential>) -> Self {
+    pub fn new(credential: Arc<dyn TokenCredential>) -> Self {
         Self { credential }
     }
 }

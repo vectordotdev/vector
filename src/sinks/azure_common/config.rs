@@ -2,7 +2,6 @@ use std::sync::Arc;
 
 use azure_core::error::HttpError;
 use azure_core_for_storage::RetryOptions;
-use azure_identity::DefaultAzureCredentialBuilder;
 use azure_storage::{CloudLocation, ConnectionString, StorageCredentials};
 use azure_storage_blobs::{blob::operations::PutBlockBlobResponse, prelude::*};
 use bytes::Bytes;
@@ -17,7 +16,7 @@ use vector_lib::{
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    sinks::{Healthcheck, util::retries::RetryLogic},
+    sinks::{Healthcheck, util::retries::RetryLogic, azure_common::environment_credentials::EnvironmentCredential},
 };
 
 use super::azure_credential_interop::TokenCredentialInterop;
@@ -162,9 +161,9 @@ pub fn build_client(
             .container_client(container_name)
         }
         (None, Some(storage_account_p)) => {
-            let default_credential = DefaultAzureCredentialBuilder::new().build()?;
-            let creds = std::sync::Arc::new(TokenCredentialInterop::new(default_credential));
-            let storage_credentials = StorageCredentials::token_credential(creds);
+            let environment_credential = EnvironmentCredential::default();
+            let creds = TokenCredentialInterop::new(Arc::new(environment_credential));
+            let storage_credentials = StorageCredentials::token_credential(Arc::new(creds));
 
             match endpoint {
                 // If a blob_endpoint is provided in the configuration, use it with a Custom
