@@ -165,8 +165,8 @@ pub struct FileConfig {
     /// The maximum interval between checks for new content in inactive files.
     ///
     /// Files are considered inactive when no new data has been read. Such files are then checked
-    /// less frequently for new data. This sets the upper limit for the delay before attempting to
-    /// read such files again, improving performance while still eventually detecting new content.
+    /// less frequently for new data. This setting defines the upper limit on how long to wait
+    /// before rechecking, improving performance while still detecting changes.
     #[serde(default = "default_max_read_backoff_ms")]
     #[serde_as(as = "serde_with::DurationMilliSeconds<u64>")]
     #[configurable(metadata(docs::type_unit = "milliseconds"))]
