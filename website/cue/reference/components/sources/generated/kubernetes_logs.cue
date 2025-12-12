@@ -220,8 +220,8 @@ generated: components: sources: kubernetes_logs: configuration: {
 			The maximum interval between checks for new content in inactive files.
 
 			Files are considered inactive when no new data has been read. Such files are then checked
-			less frequently for new data. This sets the upper limit for the delay before attempting to
-			read such files again, improving performance while still eventually detecting new content.
+			less frequently for new data. This setting defines the upper limit on how long to wait
+			before rechecking, improving performance while still detecting changes.
 			"""
 		required: false
 		type: uint: {
