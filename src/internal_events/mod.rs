@@ -67,6 +67,8 @@ mod http;
 pub mod http_client;
 #[cfg(feature = "sources-utils-http-client")]
 mod http_client_source;
+#[cfg(feature = "transforms-incremental_to_absolute")]
+pub(crate) mod incremental_to_absolute;
 #[cfg(feature = "sinks-influxdb")]
 mod influxdb;
 #[cfg(feature = "sources-internal_logs")]
