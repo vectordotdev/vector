@@ -112,6 +112,7 @@ mod prometheus;
 #[cfg(any(feature = "sinks-pulsar", feature = "sources-pulsar"))]
 mod pulsar;
 #[cfg(feature = "sources-redis")]
+#[cfg(any(feature = "sources-redis", feature = "transforms-redis"))]
 mod redis;
 #[cfg(feature = "transforms-impl-reduce")]
 mod reduce;
@@ -263,7 +264,7 @@ pub(crate) use self::postgresql_metrics::*;
 pub(crate) use self::prometheus::*;
 #[cfg(any(feature = "sinks-pulsar", feature = "sources-pulsar"))]
 pub(crate) use self::pulsar::*;
-#[cfg(feature = "sources-redis")]
+#[cfg(any(feature = "sources-redis", feature = "transforms-redis"))]
 pub(crate) use self::redis::*;
 #[cfg(feature = "transforms-impl-reduce")]
 pub(crate) use self::reduce::*;
