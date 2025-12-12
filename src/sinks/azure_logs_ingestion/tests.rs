@@ -5,8 +5,13 @@ use hyper::body;
 use tokio::time::timeout;
 use vector_lib::config::log_schema;
 
-use azure_core::credentials::TokenCredential;
-use azure_identity::{ClientSecretCredential, ClientSecretCredentialOptions, TokenCredentialOptions};
+use azure_core::credentials::{AccessToken, TokenCredential};
+use azure_core::date::OffsetDateTime;
+use azure_identity::{
+    ClientSecretCredential,
+    ClientSecretCredentialOptions,
+    TokenCredentialOptions,
+};
 
 use super::config::AzureLogsIngestionConfig;
 
@@ -14,7 +19,10 @@ use crate::{
     event::LogEvent,
     sinks::prelude::*,
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{
+            run_and_assert_sink_compliance,
+            SINK_TAGS,
+        },
         http::spawn_blackhole_http_server,
     },
 };
@@ -78,7 +86,7 @@ fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
 #[tokio::test]
 async fn correct_request() {
 
-    // We need to run our own mock OAuth endpoint as well
+    // Other tests can use `create_mock_credential`, we're going to run this end-to-end test with our own mock OAuth endpoint as well
     let (authority_tx, mut _authority_rx) = tokio::sync::mpsc::channel(1);
     let mock_token_authority = spawn_blackhole_http_server(move |request| {
         let authority_tx = authority_tx.clone();
@@ -115,14 +123,6 @@ async fn correct_request() {
     .expect("failed to create ClientSecretCredential");
 
     println!("Created ClientSecretCredential");
-
-    println!("Initial access token: {:?}", 
-        credential.get_token(
-            &["https://monitor.azure.com/.default"],
-            None
-        ).await
-        .expect("failed to get initial access token")
-    );
 
     let config: AzureLogsIngestionConfig = toml::from_str(
         r#"
@@ -201,4 +201,83 @@ async fn correct_request() {
         "/dataCollectionRules/dcr-00000000000000000000000000000000/streams/Custom-UnitTest?api-version=2023-01-01"
     );
 
+}
+
+fn create_mock_credential() -> impl TokenCredential {
+    #[derive(Debug)]
+    struct MockCredential;
+
+    #[async_trait::async_trait]
+    impl TokenCredential for MockCredential {
+        async fn get_token(
+            &self,
+            _scopes: &[&str],
+            _options: Option<azure_core::credentials::TokenRequestOptions>,
+        ) -> azure_core::Result<AccessToken> {
+            Ok(AccessToken::new(
+                "mock-access-token".to_string(),
+                OffsetDateTime::now_utc() + Duration::from_hours(1),
+            ))
+        }
+    }
+
+    MockCredential
+}
+
+#[tokio::test]
+async fn mock_healthcheck_with_403_response() {
+
+    let config: AzureLogsIngestionConfig = toml::from_str(
+        r#"
+            endpoint = "http://localhost:9001"
+            dcr_immutable_id = "dcr-00000000000000000000000000000000"
+            stream_name = "Custom-UnitTest"
+
+            [auth]
+            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
+            azure_client_id = "mock-client-id"
+            azure_client_secret = "mock-client-secret"
+        "#)
+        .unwrap();
+
+    let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
+    let (_timestamp_key1, _timestamp_value1) = insert_timestamp_kv(&mut log1);
+
+    let (endpoint_tx, _endpoint_rx) = tokio::sync::mpsc::channel(1);
+    let mock_endpoint = spawn_blackhole_http_server(move |request| {
+        let endpoint_tx = endpoint_tx.clone();
+        async move {
+            endpoint_tx.send(request).await.unwrap();
+            let body = serde_json::json!({
+                "error": "bla",
+            }).to_string();
+
+            Ok(Response::builder()
+            .status(403)
+            .header("Content-Type", "application/json")
+            .body(body.into())
+            .unwrap())
+        }
+    })
+    .await;
+
+    let context = SinkContext::default();
+    let credential = std::sync::Arc::new(create_mock_credential());
+
+    let (_sink, healthcheck) = config
+        .build_inner(
+            context,
+            mock_endpoint.into(),
+            config.dcr_immutable_id.clone(),
+            config.stream_name.clone(),
+            credential,
+            config.token_scope.clone(),
+            config.timestamp_field.clone(),
+        )
+        .await
+        .unwrap();
+
+    let hc_err = healthcheck.await.unwrap_err();
+    let err_str = hc_err.to_string();
+    assert!(err_str.contains("Forbidden"), "Healthcheck error does not contain 'Forbidden': {}", err_str);
 }
