@@ -637,6 +637,7 @@ urls: {
 	vector_socket_source:                       "/docs/reference/configuration/sources/socket"
 	vector_source:                              "/docs/reference/configuration/sources/vector"
 	vector_sources:                             "/docs/reference/configuration/sources"
+	vector_internal_metrics:                    "\(vector_sources)/internal_metrics"
 	vector_stars:                               "\(vector_repo)/stargazers"
 	vector_stdin_source:                        "/docs/reference/configuration/sources/stdin"
 	vector_systemd_file:                        "\(vector_repo)/blob/master/distribution/systemd/vector.service"
