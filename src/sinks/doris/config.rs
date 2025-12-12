@@ -11,7 +11,7 @@ use crate::{
             retry::DorisRetryLogic, service::DorisService,
         },
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, service::HealthConfig},
+        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, service::HealthConfig},
     },
 };
 use futures;
@@ -30,7 +30,7 @@ pub struct DorisConfig {
     /// hostname or IP address and port.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "http://127.0.0.1:8030"))]
-    pub endpoints: Vec<String>,
+    pub endpoints: Vec<UriSerde>,
 
     /// The database that contains the table data will be inserted into.
     #[configurable(metadata(docs::examples = "mydatabase"))]

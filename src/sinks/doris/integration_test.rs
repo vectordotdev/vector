@@ -121,7 +121,7 @@ async fn insert_events() {
     batch.max_events = Some(1);
 
     let config = DorisConfig {
-        endpoints: vec![doris_address()],
+        endpoints: vec![doris_address().parse().unwrap()],
         database: database.clone().try_into().unwrap(),
         table: table.clone().try_into().unwrap(),
         label_prefix: "vector_test".to_string(),

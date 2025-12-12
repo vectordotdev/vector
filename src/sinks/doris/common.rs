@@ -10,21 +10,7 @@ use crate::{
     },
     tls::TlsSettings,
 };
-use http::Uri;
-use snafu::prelude::*;
 use vector_lib::codecs::encoding::Framer;
-
-#[derive(Debug, Snafu)]
-pub enum ParseError {
-    #[snafu(display("Invalid host: {}, host must include hostname", host))]
-    HostMustIncludeHostname { host: String },
-}
-
-#[derive(Debug, Snafu)]
-pub struct InvalidHostError {
-    host: String,
-    source: http::uri::InvalidUri,
-}
 
 #[derive(Debug, Clone)]
 pub struct DorisCommon {
@@ -35,22 +21,16 @@ pub struct DorisCommon {
 }
 
 impl DorisCommon {
-    pub async fn parse_config(config: &DorisConfig, endpoint: &str) -> crate::Result<Self> {
-        let uri = format!("{}/_test", endpoint);
-        let uri = uri
-            .parse::<Uri>()
-            .context(InvalidHostSnafu { host: endpoint })?;
-        if uri.host().is_none() {
-            return Err(ParseError::HostMustIncludeHostname {
-                host: endpoint.to_string(),
-            }
-            .into());
+    pub async fn parse_config(config: &DorisConfig, endpoint: &UriSerde) -> crate::Result<Self> {
+        if endpoint.uri.host().is_none() {
+            return Err(
+                format!("Invalid host: {}, host must include hostname", endpoint.uri).into(),
+            );
         }
-        let uri = endpoint.parse::<UriSerde>()?;
 
         // basic auth must be some for now
-        let auth = config.auth.choose_one(&uri.auth)?;
-        let base_url = uri.uri.to_string().trim_end_matches('/').to_owned();
+        let auth = config.auth.choose_one(&endpoint.auth)?;
+        let base_url = endpoint.uri.to_string().trim_end_matches('/').to_owned();
         let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
 
         // Build encoder from the encoding configuration
