@@ -20,7 +20,8 @@ use tokio::{
 use tokio_stream::wrappers::UnboundedReceiverStream;
 
 #[cfg(feature = "api")]
-use crate::{api, internal_events::ApiStarted};
+use crate::api;
+// use crate::internal_events::ApiStarted; // Temporarily disabled with GraphQL
 use crate::{
     cli::{LogFormat, Opts, RootOpts, WatchConfigMethod, handle_config_errors},
     config::{self, ComponentConfig, ComponentType, Config, ConfigPath},
@@ -129,32 +130,23 @@ impl ApplicationConfig {
         Ok(())
     }
 
-    /// Configure the API server, if applicable
+    /// Configure the gRPC API server, if applicable
     #[cfg(feature = "api")]
-    pub fn setup_api(&self, handle: &Handle) -> Option<api::Server> {
+    pub fn setup_api(&self, handle: &Handle) -> Option<api::GrpcServer> {
         if self.api.enabled {
-            match api::Server::start(
+            // Start gRPC server
+            let api_server = handle.block_on(api::GrpcServer::start(
                 self.topology.config(),
                 self.topology.watch(),
-                std::sync::Arc::clone(&self.topology.running),
-                handle,
-            ) {
-                Ok(api_server) => {
-                    emit!(ApiStarted {
-                        addr: self.api.address.unwrap(),
-                        playground: self.api.playground,
-                        graphql: self.api.graphql
-                    });
-
-                    Some(api_server)
+            ));
+            match api_server {
+                Ok(server) => {
+                    info!("GRPC API server started successfully.");
+                    Some(server)
                 }
                 Err(error) => {
                     let error = error.to_string();
-                    error!(message = "An error occurred that Vector couldn't handle.", %error, internal_log_rate_limit = false);
-                    _ = self
-                        .topology
-                        .abort_tx
-                        .send(crate::signal::ShutdownError::ApiFailed { error });
+                    error!(message = "Failed to start gRPC API server.", %error);
                     None
                 }
             }
@@ -256,9 +248,12 @@ impl Application {
             signals,
         } = self;
 
+        #[cfg(feature = "api")]
+        let api_server = config.setup_api(handle);
+
         let topology_controller = SharedTopologyController::new(TopologyController {
             #[cfg(feature = "api")]
-            api_server: config.setup_api(handle),
+            api_server,
             topology: config.topology,
             config_paths: config.config_paths.clone(),
             require_healthy: root_opts.require_healthy,
