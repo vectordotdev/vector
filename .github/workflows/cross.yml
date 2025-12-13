@@ -24,6 +24,7 @@ jobs:
           - armv7-unknown-linux-musleabihf
           - arm-unknown-linux-gnueabi
           - arm-unknown-linux-musleabi
+          - s390x-unknown-linux-gnu
     steps:
       - name: (PR review) Set latest commit status as pending
         if: ${{ github.event_name == 'pull_request_review' }}
