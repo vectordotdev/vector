@@ -54,8 +54,6 @@ pub struct UnixConfig {
     /// The maximum buffer size of incoming messages, in bytes.
     ///
     /// Messages larger than this are truncated.
-    ///
-    /// Relevant when `socket_type` is set to `datagram`.
     #[serde(default = "default_max_length")]
     #[configurable(metadata(docs::type_unit = "bytes"))]
     pub max_length: usize,
