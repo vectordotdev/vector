@@ -16,6 +16,64 @@ const DECIMAL64_PRECISION: u8 = 18;
 const DECIMAL128_PRECISION: u8 = 38;
 const DECIMAL256_PRECISION: u8 = 76;
 
+/// Represents a ClickHouse type with its modifiers and nested structure.
+#[derive(Debug, PartialEq, Clone)]
+pub enum ClickHouseType<'a> {
+    /// A primitive type like String, Int64, DateTime, etc.
+    Primitive(&'a str),
+    /// Nullable(T)
+    Nullable(Box<ClickHouseType<'a>>),
+    /// LowCardinality(T)
+    LowCardinality(Box<ClickHouseType<'a>>),
+}
+
+impl<'a> ClickHouseType<'a> {
+    /// Returns true if this type or any of its nested types is Nullable.
+    pub fn is_nullable(&self) -> bool {
+        match self {
+            ClickHouseType::Nullable(_) => true,
+            ClickHouseType::LowCardinality(inner) => inner.is_nullable(),
+            _ => false,
+        }
+    }
+
+    /// Returns the innermost base type, unwrapping all modifiers.
+    /// For example: LowCardinality(Nullable(String)) -> Primitive("String")
+    pub fn base_type(&self) -> &ClickHouseType<'a> {
+        match self {
+            ClickHouseType::Nullable(inner) | ClickHouseType::LowCardinality(inner) => {
+                inner.base_type()
+            }
+            _ => self,
+        }
+    }
+}
+
+/// Parses a ClickHouse type string into a structured representation.
+pub fn parse_ch_type(ty: &str) -> ClickHouseType<'_> {
+    let ty = ty.trim();
+
+    // Recursively strip and parse type modifiers
+    if let Some(inner) = strip_wrapper(ty, "Nullable") {
+        return ClickHouseType::Nullable(Box::new(parse_ch_type(inner)));
+    }
+    if let Some(inner) = strip_wrapper(ty, "LowCardinality") {
+        return ClickHouseType::LowCardinality(Box::new(parse_ch_type(inner)));
+    }
+
+    // Base case: return primitive type for anything without modifiers
+    ClickHouseType::Primitive(ty)
+}
+
+/// Helper function to strip a wrapper from a type string.
+/// Returns the inner content if the type matches the wrapper pattern.
+fn strip_wrapper<'a>(ty: &'a str, wrapper_name: &str) -> Option<&'a str> {
+    ty.strip_prefix(wrapper_name)?
+        .trim_start()
+        .strip_prefix('(')?
+        .strip_suffix(')')
+}
+
 #[derive(Debug, Deserialize)]
 struct ColumnInfo {
     name: String,
@@ -102,23 +160,15 @@ fn parse_schema_from_response(response: &str) -> crate::Result<Arc<Schema>> {
 
 /// Unwraps ClickHouse type modifiers like Nullable() and LowCardinality().
 /// Returns a tuple of (base_type, is_nullable).
-/// For example: "Nullable(LowCardinality(String))" -> ("String", true)
+/// For example: "LowCardinality(Nullable(String))" -> ("String", true)
 fn unwrap_type_modifiers(ch_type: &str) -> (&str, bool) {
-    let mut base = ch_type;
-    let mut is_nullable = false;
+    let parsed = parse_ch_type(ch_type);
+    let is_nullable = parsed.is_nullable();
 
-    // Check for Nullable wrapper
-    if let Some(inner) = base.strip_prefix("Nullable(") {
-        is_nullable = true;
-        base = inner.strip_suffix(')').unwrap_or(inner);
+    match parsed.base_type() {
+        ClickHouseType::Primitive(base) => (base, is_nullable),
+        _ => (ch_type, is_nullable),
     }
-
-    // Check for LowCardinality wrapper
-    if let Some(inner) = base.strip_prefix("LowCardinality(") {
-        base = inner.strip_suffix(')').unwrap_or(inner);
-    }
-
-    (base, is_nullable)
 }
 
 fn unsupported(ch_type: &str, kind: &str) -> String {
@@ -509,7 +559,7 @@ mod tests {
         );
         // Nullable + LowCardinality
         assert_eq!(
-            convert_type_no_metadata("Nullable(LowCardinality(String))")
+            convert_type_no_metadata("LowCardinality(Nullable(String))")
                 .expect("Failed to convert ClickHouse type to Arrow"),
             (DataType::Utf8, true)
         );
@@ -770,5 +820,61 @@ mod tests {
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.contains("Unknown ClickHouse type"));
+    }
+
+    #[test]
+    fn test_parse_ch_type_primitives() {
+        assert_eq!(parse_ch_type("String"), ClickHouseType::Primitive("String"));
+        assert_eq!(parse_ch_type("Int64"), ClickHouseType::Primitive("Int64"));
+        assert_eq!(
+            parse_ch_type("DateTime64(3)"),
+            ClickHouseType::Primitive("DateTime64(3)")
+        );
+    }
+
+    #[test]
+    fn test_parse_ch_type_nullable() {
+        assert_eq!(
+            parse_ch_type("Nullable(String)"),
+            ClickHouseType::Nullable(Box::new(ClickHouseType::Primitive("String")))
+        );
+        assert_eq!(
+            parse_ch_type("Nullable(Int64)"),
+            ClickHouseType::Nullable(Box::new(ClickHouseType::Primitive("Int64")))
+        );
+    }
+
+    #[test]
+    fn test_parse_ch_type_lowcardinality() {
+        assert_eq!(
+            parse_ch_type("LowCardinality(String)"),
+            ClickHouseType::LowCardinality(Box::new(ClickHouseType::Primitive("String")))
+        );
+        assert_eq!(
+            parse_ch_type("LowCardinality(Nullable(String))"),
+            ClickHouseType::LowCardinality(Box::new(ClickHouseType::Nullable(Box::new(
+                ClickHouseType::Primitive("String")
+            ))))
+        );
+    }
+
+    #[test]
+    fn test_parse_ch_type_is_nullable() {
+        assert!(!parse_ch_type("String").is_nullable());
+        assert!(parse_ch_type("Nullable(String)").is_nullable());
+        assert!(parse_ch_type("LowCardinality(Nullable(String))").is_nullable());
+        assert!(!parse_ch_type("LowCardinality(String)").is_nullable());
+    }
+
+    #[test]
+    fn test_parse_ch_type_base_type() {
+        let parsed = parse_ch_type("LowCardinality(Nullable(String))");
+        assert_eq!(parsed.base_type(), &ClickHouseType::Primitive("String"));
+
+        let parsed = parse_ch_type("Nullable(Int64)");
+        assert_eq!(parsed.base_type(), &ClickHouseType::Primitive("Int64"));
+
+        let parsed = parse_ch_type("String");
+        assert_eq!(parsed.base_type(), &ClickHouseType::Primitive("String"));
     }
 }
