@@ -283,14 +283,8 @@ impl ClickhouseConfig {
             // Validate that batch_encoding is only compatible with ArrowStream format
             if self.format != Format::ArrowStream {
                 return Err(format!(
-                    "'batch_encoding' is only compatible with 'format: arrow_stream'. \
-                         Found 'format: {}'.",
-                    match self.format {
-                        Format::JsonEachRow => "json_each_row",
-                        Format::JsonAsObject => "json_as_object",
-                        Format::JsonAsString => "json_as_string",
-                        Format::ArrowStream => "arrow_stream",
-                    }
+                    "'batch_encoding' is only compatible with 'format: arrow_stream'. Found 'format: {}'.",
+                    self.format
                 )
                 .into());
             }
