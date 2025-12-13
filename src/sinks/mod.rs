@@ -28,6 +28,8 @@ pub mod axiom;
 pub mod azure_blob;
 #[cfg(feature = "sinks-azure_blob")]
 pub mod azure_common;
+#[cfg(feature = "sinks-azure_logs_ingestion")]
+pub mod azure_logs_ingestion;
 #[cfg(feature = "sinks-azure_monitor_logs")]
 pub mod azure_monitor_logs;
 #[cfg(feature = "sinks-blackhole")]
