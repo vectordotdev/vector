@@ -1,4 +1,6 @@
-use http::Uri;
+use std::{collections::BTreeMap, sync::Arc};
+
+use http::{HeaderValue, Uri};
 use snafu::prelude::*;
 
 #[cfg(feature = "aws-core")]
@@ -13,7 +15,11 @@ use crate::{
         UriParseSnafu,
         prelude::*,
         prometheus::PrometheusRemoteWriteAuth,
-        util::{auth::Auth, http::http_response_retry_logic},
+        util::{
+            auth::Auth,
+            http::{OrderedHeaderName, http_response_retry_logic},
+            service::TowerRequestConfig,
+        },
     },
 };
 
@@ -79,7 +85,7 @@ pub struct RemoteWriteConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub request: RemoteWriteRequestConfig,
 
     /// The tenant ID to send.
     ///
@@ -131,6 +137,41 @@ const fn default_compression() -> Compression {
 
 impl_generate_config_from_default!(RemoteWriteConfig);
 
+/// Outbound HTTP request settings for the Prometheus remote write sink.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(default)]
+pub struct RemoteWriteRequestConfig {
+    #[serde(flatten)]
+    pub tower: TowerRequestConfig,
+
+    /// Additional HTTP headers to add to every HTTP request.
+    ///
+    /// Values are applied verbatim; template expansion is not supported.
+    #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and its static value."
+    ))]
+    #[configurable(metadata(docs::examples = "remote_write_headers_examples()"))]
+    pub headers: BTreeMap<String, String>,
+}
+
+impl Default for RemoteWriteRequestConfig {
+    fn default() -> Self {
+        Self {
+            tower: TowerRequestConfig::default(),
+            headers: BTreeMap::new(),
+        }
+    }
+}
+
+fn remote_write_headers_examples() -> BTreeMap<String, String> {
+    BTreeMap::from([
+        ("Accept".to_string(), "text/plain".to_string()),
+        ("X-My-Custom-Header".to_string(), "A-Value".to_string()),
+    ])
+}
+
 #[async_trait::async_trait]
 #[typetag::serde(name = "prometheus_remote_write")]
 impl SinkConfig for RemoteWriteConfig {
@@ -141,7 +182,10 @@ impl SinkConfig for RemoteWriteConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint = self.endpoint.parse::<Uri>().context(UriParseSnafu)?;
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let request_settings = self.request.into_settings();
+        let request_settings = self.request.tower.into_settings();
+        let validated_headers = Arc::new(crate::sinks::util::http::validate_headers(
+            &self.request.headers,
+        )?);
         let buckets = self.buckets.clone();
         let quantiles = self.quantiles.clone();
         let default_namespace = self.default_namespace.clone();
@@ -183,6 +227,7 @@ impl SinkConfig for RemoteWriteConfig {
             endpoint.clone(),
             self.compression,
             auth.clone(),
+            Arc::clone(&validated_headers),
         )
         .boxed();
 
@@ -191,6 +236,7 @@ impl SinkConfig for RemoteWriteConfig {
             client,
             auth,
             compression: self.compression,
+            headers: validated_headers,
         };
         let service = ServiceBuilder::new()
             .settings(request_settings, http_response_retry_logic())
@@ -225,10 +271,19 @@ async fn healthcheck(
     endpoint: Uri,
     compression: Compression,
     auth: Option<Auth>,
+    headers: Arc<BTreeMap<OrderedHeaderName, HeaderValue>>,
 ) -> crate::Result<()> {
     let body = bytes::Bytes::new();
-    let request =
-        build_request(http::Method::GET, &endpoint, compression, body, None, auth).await?;
+    let request = build_request(
+        http::Method::GET,
+        &endpoint,
+        compression,
+        body,
+        None,
+        auth,
+        headers,
+    )
+    .await?;
     let response = client.send(request).await?;
 
     match response.status() {
