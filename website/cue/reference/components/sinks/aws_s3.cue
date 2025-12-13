@@ -156,6 +156,9 @@ components: sinks: aws_s3: components._aws & {
 				        row_group_size: 50000  # Should be <= batch.max_events
 				        allow_nullable_fields: true
 				        estimated_output_size: 10485760  # 10MB - tune based on your data
+				        enable_bloom_filters: true  # Enable for better query performance
+				        bloom_filter_fpp: 0.05  # 5% false positive rate
+				        bloom_filter_ndv: 1000000  # Expected distinct values
 				```
 
 				## Supported Data Types
@@ -245,6 +248,60 @@ components: sinks: aws_s3: components._aws & {
 				- **Too small**: Minimal benefit, will still require reallocations
 				- **Too large**: Wastes memory by over-allocating
 				- **Just right**: Optimal memory usage with minimal reallocations
+
+				### enable_bloom_filters
+
+				Enable Bloom filters for all columns in the Parquet file. Bloom filters are probabilistic
+				data structures that can significantly improve query performance by allowing query engines
+				(like AWS Athena, Apache Spark, and Presto) to skip entire row groups when searching for
+				specific values without reading the actual data.
+
+				**When to enable:**
+				- High-cardinality columns: UUIDs, user IDs, session IDs, transaction IDs
+				- String columns frequently used in WHERE clauses: URLs, emails, tags, names
+				- Point queries: `WHERE user_id = 'abc123'`
+				- IN clause queries: `WHERE id IN ('x', 'y', 'z')`
+
+				**Trade-offs:**
+				- **Pros**: Significantly faster queries, better row group pruning, reduced I/O
+				- **Cons**: Slightly larger file sizes (typically 1-5% overhead), minimal write overhead
+
+				**Default**: `false` (disabled)
+
+				### bloom_filter_fpp
+
+				False positive probability (FPP) for Bloom filters. This controls the trade-off between
+				Bloom filter size and accuracy. Lower values produce larger but more accurate filters.
+
+				- **Default**: `0.05` (5% false positive rate)
+				- **Range**: Must be between 0.0 and 1.0 (exclusive)
+				- **Recommended values**:
+				  - `0.05` (5%): Good balance for general use
+				  - `0.01` (1%): Better for high-selectivity queries where precision matters
+				  - `0.10` (10%): Smaller filters when storage is a concern
+
+				A false positive means the Bloom filter indicates a value *might* be in a row group when it
+				actually isn't, requiring the engine to read and filter that row group. Lower FPP means fewer
+				unnecessary reads.
+
+				Only takes effect when `enable_bloom_filters` is `true`.
+
+				### bloom_filter_ndv
+
+				Estimated number of distinct values (NDV) for Bloom filter sizing. This should match the
+				expected cardinality of your columns. Higher values result in larger Bloom filters.
+
+				- **Default**: `1,000,000`
+				- **Recommendation**: Analyze your data to determine actual cardinality
+				  - Low cardinality (countries, states): `1,000` - `100,000`
+				  - Medium cardinality (cities, products): `100,000` - `1,000,000`
+				  - High cardinality (user IDs, UUIDs): `10,000,000+`
+
+				**Important**: If your actual distinct value count significantly exceeds this number, the
+				false positive rate may increase beyond the configured `bloom_filter_fpp`, reducing query
+				performance gains.
+
+				Only takes effect when `enable_bloom_filters` is `true`.
 
 				## Batching Behavior
 

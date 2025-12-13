@@ -736,6 +736,68 @@ generated: components: sinks: aws_s3: configuration: {
 							examples: [10485760, 52428800]
 						}
 					}
+					enable_bloom_filters: {
+						description: """
+							Enable Bloom filters for all columns.
+
+							Bloom filters are probabilistic data structures that can significantly improve
+							query performance by allowing query engines to skip entire row groups when
+							searching for specific values. They are especially effective for:
+							- High-cardinality columns (UUIDs, user IDs, session IDs)
+							- String columns (URLs, emails, tags)
+							- Point queries (WHERE column = 'value')
+							- IN clauses (WHERE column IN (...))
+
+							Trade-offs:
+							- Pros: Faster queries, better row group pruning in engines like Athena/Spark
+							- Cons: Slightly larger file sizes (typically 1-5% overhead), minimal write overhead
+
+							When disabled (default), no Bloom filters are written.
+							"""
+						required: false
+						type: bool: {
+							default: false
+							examples: [true, false]
+						}
+					}
+					bloom_filter_fpp: {
+						description: """
+							False positive probability for Bloom filters.
+
+							This controls the trade-off between Bloom filter size and accuracy.
+							Lower values produce larger but more accurate filters.
+
+							- Default: 0.05 (5% false positive rate)
+							- Range: Must be between 0.0 and 1.0 (exclusive)
+							- Recommended: 0.01 (1%) for high-selectivity queries, 0.05 (5%) for general use
+
+							Only takes effect when enable_bloom_filters is true.
+							"""
+						required: false
+						type: float: {
+							default: 0.05
+							examples: [0.05, 0.01]
+						}
+					}
+					bloom_filter_ndv: {
+						description: """
+							Estimated number of distinct values for Bloom filter sizing.
+
+							This should match the expected cardinality of your columns. Higher values
+							result in larger Bloom filters. If your actual distinct value count significantly
+							exceeds this number, the false positive rate may increase.
+
+							- Default: 1,000,000
+							- Recommended: Set based on your data's actual cardinality
+
+							Only takes effect when enable_bloom_filters is true.
+							"""
+						required: false
+						type: uint: {
+							default: 1000000
+							examples: [1000000, 10000000]
+						}
+					}
 				}
 			}
 			protobuf: {

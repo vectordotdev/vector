@@ -120,6 +120,64 @@ pub struct ParquetSerializerConfig {
     #[configurable(metadata(docs::examples = 10485760))]  // 10MB
     #[configurable(metadata(docs::examples = 52428800))]  // 50MB
     pub estimated_output_size: Option<usize>,
+
+    /// Enable Bloom filters for all columns.
+    ///
+    /// Bloom filters are probabilistic data structures that can significantly improve
+    /// query performance by allowing query engines to skip entire row groups when
+    /// searching for specific values. They are especially effective for:
+    /// - High-cardinality columns (UUIDs, user IDs, session IDs)
+    /// - String columns (URLs, emails, tags)
+    /// - Point queries (WHERE column = 'value')
+    /// - IN clauses (WHERE column IN (...))
+    ///
+    /// Trade-offs:
+    /// - Pros: Faster queries, better row group pruning in engines like Athena/Spark
+    /// - Cons: Slightly larger file sizes (typically 1-5% overhead), minimal write overhead
+    ///
+    /// When disabled (default), no Bloom filters are written.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = true))]
+    #[configurable(metadata(docs::examples = false))]
+    pub enable_bloom_filters: bool,
+
+    /// False positive probability for Bloom filters.
+    ///
+    /// This controls the trade-off between Bloom filter size and accuracy.
+    /// Lower values produce larger but more accurate filters.
+    ///
+    /// - Default: 0.05 (5% false positive rate)
+    /// - Range: Must be between 0.0 and 1.0 (exclusive)
+    /// - Recommended: 0.01 (1%) for high-selectivity queries, 0.05 (5%) for general use
+    ///
+    /// Only takes effect when enable_bloom_filters is true.
+    #[serde(default = "default_bloom_fpp")]
+    #[configurable(metadata(docs::examples = 0.05))]
+    #[configurable(metadata(docs::examples = 0.01))]
+    pub bloom_filter_fpp: f64,
+
+    /// Estimated number of distinct values for Bloom filter sizing.
+    ///
+    /// This should match the expected cardinality of your columns. Higher values
+    /// result in larger Bloom filters. If your actual distinct value count significantly
+    /// exceeds this number, the false positive rate may increase.
+    ///
+    /// - Default: 1,000,000
+    /// - Recommended: Set based on your data's actual cardinality
+    ///
+    /// Only takes effect when enable_bloom_filters is true.
+    #[serde(default = "default_bloom_ndv")]
+    #[configurable(metadata(docs::examples = 1000000))]
+    #[configurable(metadata(docs::examples = 10000000))]
+    pub bloom_filter_ndv: u64,
+}
+
+fn default_bloom_fpp() -> f64 {
+    0.05
+}
+
+fn default_bloom_ndv() -> u64 {
+    1_000_000
 }
 
 fn schema_example() -> std::collections::BTreeMap<String, String> {
@@ -138,6 +196,9 @@ impl std::fmt::Debug for ParquetSerializerConfig {
             .field("row_group_size", &self.row_group_size)
             .field("allow_nullable_fields", &self.allow_nullable_fields)
             .field("estimated_output_size", &self.estimated_output_size)
+            .field("enable_bloom_filters", &self.enable_bloom_filters)
+            .field("bloom_filter_fpp", &self.bloom_filter_fpp)
+            .field("bloom_filter_ndv", &self.bloom_filter_ndv)
             .finish()
     }
 }
@@ -151,6 +212,9 @@ impl ParquetSerializerConfig {
             row_group_size: None,
             allow_nullable_fields: false,
             estimated_output_size: None,
+            enable_bloom_filters: false,
+            bloom_filter_fpp: default_bloom_fpp(),
+            bloom_filter_ndv: default_bloom_ndv(),
         }
     }
 
@@ -206,6 +270,14 @@ impl ParquetSerializer {
 
         if let Some(row_group_size) = config.row_group_size {
             props_builder = props_builder.set_max_row_group_size(row_group_size);
+        }
+
+        // Enable Bloom filters if configured
+        if config.enable_bloom_filters {
+            props_builder = props_builder
+                .set_bloom_filter_enabled(true)
+                .set_bloom_filter_fpp(config.bloom_filter_fpp)
+                .set_bloom_filter_ndv(config.bloom_filter_ndv);
         }
 
         let writer_properties = props_builder.build();
@@ -589,6 +661,9 @@ mod tests {
             row_group_size: Some(1000),
             allow_nullable_fields: false,
             estimated_output_size: None,
+            enable_bloom_filters: false,
+            bloom_filter_fpp: default_bloom_fpp(),
+            bloom_filter_ndv: default_bloom_ndv(),
         };
 
         let serializer = ParquetSerializer::new(config);
@@ -603,6 +678,9 @@ mod tests {
             row_group_size: None,
             allow_nullable_fields: false,
             estimated_output_size: None,
+            enable_bloom_filters: false,
+            bloom_filter_fpp: default_bloom_fpp(),
+            bloom_filter_ndv: default_bloom_ndv(),
         };
 
         let result = ParquetSerializer::new(config);
