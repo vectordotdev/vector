@@ -51,7 +51,7 @@ pub struct UnixConfig {
     #[configurable(derived)]
     pub socket_type: UnixSocketType,
 
-    /// The maximum buffer size of incoming messages, in bytes.
+    /// The maximum buffer size of incoming messages.
     ///
     /// Messages larger than this are truncated.
     #[serde(default = "default_max_length")]

@@ -41,7 +41,7 @@ generated: components: sources: statsd: configuration: {
 	}
 	max_length: {
 		description: """
-			The maximum buffer size of incoming messages, in bytes.
+			The maximum buffer size of incoming messages.
 
 			Messages larger than this are truncated.
 			"""
