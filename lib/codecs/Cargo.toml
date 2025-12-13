@@ -18,7 +18,7 @@ arrow = { version = "56.2.0", default-features = false, features = ["ipc"] }
 async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
-rust_decimal = { version = "1.37", default-features = false, features = ["std"] }
+rust_decimal.workspace = true
 csv-core = { version = "0.1.12", default-features = false }
 derivative.workspace = true
 dyn-clone = { version = "1", default-features = false }
