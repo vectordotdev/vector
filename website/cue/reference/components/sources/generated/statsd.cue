@@ -44,8 +44,6 @@ generated: components: sources: statsd: configuration: {
 			The maximum buffer size of incoming messages, in bytes.
 
 			Messages larger than this are truncated.
-
-			Relevant when `socket_type` is set to `datagram`.
 			"""
 		relevant_when: "mode = \"unix\""
 		required:      false
