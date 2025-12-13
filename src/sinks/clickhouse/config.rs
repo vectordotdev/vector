@@ -1,6 +1,6 @@
 //! Configuration for the `Clickhouse` sink.
 
-use std::{fmt, sync::Arc};
+use std::fmt;
 
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
@@ -290,21 +290,20 @@ impl ClickhouseConfig {
                 .into());
             }
 
-            let base_arrow_config = match batch_encoding {
+            let mut arrow_config = match batch_encoding {
                 BatchSerializerConfig::ArrowStream(config) => config.clone(),
             };
 
-            let resolved_config = self
-                .resolve_arrow_schema(
-                    client,
-                    endpoint.to_string(),
-                    database,
-                    auth,
-                    base_arrow_config,
-                )
-                .await?;
+            self.resolve_arrow_schema(
+                client,
+                endpoint.to_string(),
+                database,
+                auth,
+                &mut arrow_config,
+            )
+            .await?;
 
-            let resolved_batch_config = BatchSerializerConfig::ArrowStream(resolved_config);
+            let resolved_batch_config = BatchSerializerConfig::ArrowStream(arrow_config);
             let arrow_serializer = resolved_batch_config.build()?;
             let batch_serializer = BatchSerializer::Arrow(arrow_serializer);
             let encoder = EncoderKind::Batch(BatchEncoder::new(batch_serializer));
@@ -326,8 +325,8 @@ impl ClickhouseConfig {
         endpoint: String,
         database: &Template,
         auth: Option<&Auth>,
-        base_config: ArrowStreamSerializerConfig,
-    ) -> crate::Result<ArrowStreamSerializerConfig> {
+        config: &mut ArrowStreamSerializerConfig,
+    ) -> crate::Result<()> {
         use super::arrow;
 
         if self.table.is_dynamic() || database.is_dynamic() {
@@ -345,16 +344,15 @@ impl ClickhouseConfig {
             database_str, table_str
         );
 
-        let provider = Arc::new(arrow::ClickHouseSchemaProvider::new(
+        let provider = arrow::ClickHouseSchemaProvider::new(
             client.clone(),
             endpoint,
             database_str.to_string(),
             table_str.to_string(),
             auth.cloned(),
-        ));
+        );
 
-        let mut arrow_config = base_config.with_provider(provider);
-        arrow_config.resolve().await.map_err(|e| {
+        config.resolve_with_provider(&provider).await.map_err(|e| {
             format!(
                 "Failed to fetch schema for {}.{}: {}.",
                 database_str, table_str, e
@@ -363,14 +361,14 @@ impl ClickhouseConfig {
 
         debug!(
             "Successfully fetched Arrow schema with {} fields",
-            arrow_config
+            config
                 .schema
                 .as_ref()
                 .map(|s| s.fields().len())
                 .unwrap_or(0)
         );
 
-        Ok(arrow_config)
+        Ok(())
     }
 }
 

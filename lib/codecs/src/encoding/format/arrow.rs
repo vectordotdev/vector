@@ -55,10 +55,6 @@ pub struct ArrowStreamSerializerConfig {
     #[serde(default)]
     #[configurable(metadata(docs::examples = true))]
     pub allow_nullable_fields: bool,
-
-    /// Schema provider for lazy schema loading.
-    #[serde(skip)]
-    schema_provider: Option<Arc<dyn SchemaProvider>>,
 }
 
 impl std::fmt::Debug for ArrowStreamSerializerConfig {
@@ -72,10 +68,6 @@ impl std::fmt::Debug for ArrowStreamSerializerConfig {
                     .map(|s| format!("{} fields", s.fields().len())),
             )
             .field("allow_nullable_fields", &self.allow_nullable_fields)
-            .field(
-                "schema_provider",
-                &self.schema_provider.as_ref().map(|_| "<provider>"),
-            )
             .finish()
     }
 }
@@ -86,37 +78,20 @@ impl ArrowStreamSerializerConfig {
         Self {
             schema: Some(schema),
             allow_nullable_fields: false,
-            schema_provider: None,
         }
     }
 
-    /// Create a new ArrowStreamSerializerConfig with a schema provider
-    pub fn with_provider(mut self, provider: Arc<dyn SchemaProvider>) -> Self {
-        self.schema = None;
-        self.schema_provider = Some(provider);
-        self
-    }
-
-    /// Get the schema provider if one was configured
-    pub fn provider(&self) -> Option<&Arc<dyn SchemaProvider>> {
-        self.schema_provider.as_ref()
-    }
-
-    /// Resolve the schema from the provider if present.
-    pub async fn resolve(&mut self) -> Result<(), ArrowEncodingError> {
-        // If schema already exists, nothing to do
-        if self.schema.is_some() {
-            return Ok(());
-        }
-
-        // Fetch from provider if available
-        if let Some(provider) = &self.schema_provider {
-            let schema = provider.get_schema().await?;
-            self.schema = Some(schema);
-            Ok(())
-        } else {
-            Err(ArrowEncodingError::NoSchemaProvided)
-        }
+    /// Resolve the schema from a provider.
+    ///
+    /// This fetches the schema from the provider and stores it in this config,
+    /// preserving all other configuration fields (like `allow_nullable_fields`).
+    pub async fn resolve_with_provider(
+        &mut self,
+        provider: &dyn SchemaProvider,
+    ) -> Result<(), ArrowEncodingError> {
+        let schema = provider.get_schema().await?;
+        self.schema = Some(schema);
+        Ok(())
     }
 
     /// The data type of events that are accepted by `ArrowStreamEncoder`.
