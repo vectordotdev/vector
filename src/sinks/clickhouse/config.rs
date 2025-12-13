@@ -352,9 +352,7 @@ impl ClickhouseConfig {
             auth.cloned(),
         ));
 
-        let mut arrow_config = ArrowStreamSerializerConfig::with_provider(provider);
-        // Preserve allow_nullable_fields setting from the user's config
-        arrow_config.allow_nullable_fields = base_config.allow_nullable_fields;
+        let mut arrow_config = base_config.with_provider(provider);
         arrow_config.resolve().await.map_err(|e| {
             format!(
                 "Failed to fetch schema for {}.{}: {}.",

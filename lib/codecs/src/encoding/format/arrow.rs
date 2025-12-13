@@ -91,12 +91,10 @@ impl ArrowStreamSerializerConfig {
     }
 
     /// Create a new ArrowStreamSerializerConfig with a schema provider
-    pub fn with_provider(provider: Arc<dyn SchemaProvider>) -> Self {
-        Self {
-            schema: None,
-            schema_provider: Some(provider),
-            allow_nullable_fields: false,
-        }
+    pub fn with_provider(mut self, provider: Arc<dyn SchemaProvider>) -> Self {
+        self.schema = None;
+        self.schema_provider = Some(provider);
+        self
     }
 
     /// Get the schema provider if one was configured
