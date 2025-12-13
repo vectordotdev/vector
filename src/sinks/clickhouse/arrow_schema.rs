@@ -23,6 +23,11 @@ struct ColumnInfo {
     column_type: String,
 }
 
+/// URL-encodes a string for use in HTTP query parameters.
+fn url_encode(s: &str) -> String {
+    percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
+}
+
 /// Fetches the schema for a ClickHouse table and converts it to an Arrow schema.
 pub async fn fetch_table_schema(
     client: &HttpClient,
@@ -31,18 +36,20 @@ pub async fn fetch_table_schema(
     table: &str,
     auth: Option<&Auth>,
 ) -> crate::Result<Arc<Schema>> {
-    // Query to get table schema
-    let query = format!(
-        "SELECT name, type \
-         FROM system.columns WHERE database = '{}' AND table = '{}' \
-         ORDER BY position FORMAT JSONEachRow",
-        database, table
-    );
+    let query = "SELECT name, type \
+                 FROM system.columns \
+                 WHERE database = {db:String} AND table = {tbl:String} \
+                 ORDER BY position \
+                 FORMAT JSONEachRow";
 
-    let encoded_query =
-        percent_encoding::utf8_percent_encode(&query, percent_encoding::NON_ALPHANUMERIC)
-            .to_string();
-    let uri = format!("{}?query={}", endpoint, encoded_query);
+    // Build URI with query and parameters
+    let uri = format!(
+        "{}?query={}&param_db={}&param_tbl={}",
+        endpoint,
+        url_encode(query),
+        url_encode(database),
+        url_encode(table)
+    );
     let mut request = Request::get(&uri).body(Body::empty()).unwrap();
 
     if let Some(auth) = auth {
