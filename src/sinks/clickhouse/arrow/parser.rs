@@ -239,12 +239,7 @@ fn parse_decimal_type(ch_type: &str) -> Result<DataType, String> {
                 DataType::Decimal256(precision, scale)
             }
         })
-        .ok_or_else(|| {
-            format!(
-                "Could not parse Decimal type '{}'. Valid formats: Decimal(P,S), Decimal32(S), Decimal64(S), Decimal128(S), Decimal256(S)",
-                ch_type
-            )
-        })
+        .ok_or_else(|| format!("Could not parse Decimal type '{}'.", ch_type))
 }
 
 /// Parses DateTime64 precision and returns the appropriate Arrow timestamp type.
