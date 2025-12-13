@@ -327,7 +327,7 @@ impl ClickhouseConfig {
         auth: Option<&Auth>,
         base_config: ArrowStreamSerializerConfig,
     ) -> crate::Result<ArrowStreamSerializerConfig> {
-        use super::arrow_schema;
+        use super::arrow;
 
         if self.table.is_dynamic() || database.is_dynamic() {
             return Err(
@@ -344,7 +344,7 @@ impl ClickhouseConfig {
             database_str, table_str
         );
 
-        let provider = Arc::new(arrow_schema::ClickHouseSchemaProvider::new(
+        let provider = Arc::new(arrow::ClickHouseSchemaProvider::new(
             client.clone(),
             endpoint,
             database_str.to_string(),
