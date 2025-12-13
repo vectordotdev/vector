@@ -3,7 +3,7 @@ use std::{io::stdout, time::Duration};
 use crossterm::{
     ExecutableCommand,
     cursor::Show,
-    event::{DisableMouseCapture, EnableMouseCapture, KeyCode},
+    event::{DisableMouseCapture, EnableMouseCapture},
     execute,
     terminal::{EnterAlternateScreen, LeaveAlternateScreen, disable_raw_mode, enable_raw_mode},
     tty::IsTty,
@@ -12,13 +12,21 @@ use num_format::{Locale, ToFormattedString};
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
-    layout::{Alignment, Constraint, Layout, Rect},
-    style::{Color, Modifier, Style},
+    layout::{Alignment, Constraint, Flex, Layout, Position, Rect},
+    style::{Color, Modifier, Style, Stylize},
     text::{Line, Span},
-    widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
+    widgets::{
+        Block, Borders, Cell, Clear, List, ListItem, ListState, Padding, Paragraph, Row, Scrollbar,
+        ScrollbarOrientation, ScrollbarState, Table, TableState, Wrap,
+    },
 };
 use tokio::sync::oneshot;
 use unit_prefix::NumberPrefix;
+
+use crate::{
+    input::{InputMode, handle_input},
+    state::{ComponentRow, FilterColumn, FilterMenuState, SortColumn},
+};
 
 use super::{
     events::capture_key_press,
@@ -210,12 +218,90 @@ impl<'a> Widgets<'a> {
         // Header columns
         let header = HEADER
             .iter()
-            .map(|s| Cell::from(*s).style(Style::default().add_modifier(Modifier::BOLD)))
+            .map(|s| {
+                let mut c = Cell::from(*s).style(Style::default().add_modifier(Modifier::BOLD));
+                if state
+                    .sort_state
+                    .column
+                    .map(|c| c.matches_header(s))
+                    .unwrap_or_default()
+                {
+                    c = c.add_modifier(Modifier::REVERSED);
+                }
+                c
+            })
             .collect::<Vec<_>>();
 
         // Data columns
         let mut items = Vec::new();
-        for (_, r) in state.components.iter() {
+        let mut sorted = state.components.iter().collect::<Vec<_>>();
+        if let Some(column) = state.sort_state.column {
+            let sort_fn = match column {
+                SortColumn::Id => |l: &ComponentRow, r: &ComponentRow| l.key.cmp(&r.key),
+                SortColumn::Kind => |l: &ComponentRow, r: &ComponentRow| l.kind.cmp(&r.kind),
+                SortColumn::Type => {
+                    |l: &ComponentRow, r: &ComponentRow| l.component_type.cmp(&r.component_type)
+                }
+                SortColumn::EventsIn => |l: &ComponentRow, r: &ComponentRow| {
+                    l.received_events_throughput_sec
+                        .cmp(&r.received_events_throughput_sec)
+                },
+                SortColumn::EventsInTotal => |l: &ComponentRow, r: &ComponentRow| {
+                    l.received_events_total.cmp(&r.received_events_total)
+                },
+                SortColumn::BytesIn => |l: &ComponentRow, r: &ComponentRow| {
+                    l.received_bytes_throughput_sec
+                        .cmp(&r.received_bytes_throughput_sec)
+                },
+                SortColumn::BytesInTotal => |l: &ComponentRow, r: &ComponentRow| {
+                    l.received_bytes_total.cmp(&r.received_bytes_total)
+                },
+                SortColumn::EventsOut => |l: &ComponentRow, r: &ComponentRow| {
+                    l.sent_events_throughput_sec
+                        .cmp(&r.sent_events_throughput_sec)
+                },
+                SortColumn::EventsOutTotal => |l: &ComponentRow, r: &ComponentRow| {
+                    l.sent_events_total.cmp(&r.sent_events_total)
+                },
+                SortColumn::BytesOut => |l: &ComponentRow, r: &ComponentRow| {
+                    l.sent_bytes_throughput_sec
+                        .cmp(&r.sent_bytes_throughput_sec)
+                },
+                SortColumn::BytesOutTotal => {
+                    |l: &ComponentRow, r: &ComponentRow| l.sent_bytes_total.cmp(&r.sent_bytes_total)
+                }
+                SortColumn::Errors => |l: &ComponentRow, r: &ComponentRow| l.errors.cmp(&r.errors),
+                #[cfg(feature = "allocation-tracing")]
+                SortColumn::MemoryUsed => {
+                    |l: &ComponentRow, r: &ComponentRow| l.allocated_bytes.cmp(&r.allocated_bytes)
+                }
+            };
+            if state.sort_state.reverse {
+                sorted.sort_by(|a, b| sort_fn(a.1, b.1).reverse())
+            } else {
+                sorted.sort_by(|a, b| sort_fn(a.1, b.1));
+            }
+        }
+
+        for (_, r) in sorted.into_iter().filter(|(_, r)| {
+            let column = state.filter_state.column;
+            if let Some(regex) = &state.filter_state.pattern {
+                match column {
+                    FilterColumn::Id => {
+                        regex.is_match(r.key.id()) || r.key.id().contains(regex.as_str())
+                    }
+                    FilterColumn::Kind => {
+                        regex.is_match(&r.kind) || r.kind.contains(regex.as_str())
+                    }
+                    FilterColumn::Type => {
+                        regex.is_match(&r.component_type)
+                            || r.component_type.contains(regex.as_str())
+                    }
+                }
+            } else {
+                true
+            }
+        }) {
             let mut data = vec![
                 r.key.id().to_string(),
                 if !r.has_displayable_outputs() {
@@ -310,7 +396,34 @@ impl<'a> Widgets<'a> {
             .header(Row::new(header).bottom_margin(1))
             .block(Block::default().borders(Borders::ALL).title("Components"))
             .column_spacing(2);
-        f.render_widget(w, area);
+        f.render_stateful_widget(
+            w,
+            area,
+            // We don't need selection, so just create a table state for the scroll
+            &mut TableState::new().with_offset(state.ui.scroll),
+        );
+        // Skip the border + header row + 1 row of padding as well as the bottom border
+        let scrollbar_area = Rect::new(area.x, area.y + 3, area.width, area.height - 4);
+        f.render_stateful_widget(
+            Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .begin_symbol(Some("↑"))
+                .end_symbol(Some("↓")),
+            scrollbar_area,
+            &mut ScrollbarState::new(
+                // Maximum allowed scroll value
+                // We calculate it like this, because scrollbar usually accounts for full
+                // overscroll, but we want scrolling to stop when last available item is visible and
+                // at the bottom of the table.
+                state
+                    .components
+                    .len()
+                    .saturating_sub(scrollbar_area.height.into())
+                    // 1 is also added, because ScrollBar removes 1, to ensure last item is visible
+                    // when overscrolling - we avoid overscroll, so this is useless to us.
+                    .saturating_add(1),
+            )
+            .position(state.ui.scroll),
+        );
     }
 
     /// Alerts the user to resize the window to view columns
@@ -323,9 +436,109 @@ impl<'a> Widgets<'a> {
         f.render_widget(w, area);
     }
 
+    /// Renders a box showing instructions on how to use `vector top`.
+    fn help_box(&self, f: &mut Frame, area: Rect) {
+        let text = vec![
+            Line::from("General").bold(),
+            Line::from("ESC, q => quit (or close window)"),
+            Line::from("↓, j => scroll down by 1 row"),
+            Line::from("↑, k => scroll up by 1 row"),
+            Line::from("→, PageDown, CTRL+f => scroll down by 1 page"),
+            Line::from("←, PageUp, CTRL+b => scroll up by 1 page"),
+            Line::from("End, G => scroll to bottom"),
+            Line::from("Home, g => scroll to top"),
+            Line::from("F1, ? => toggle this help window"),
+            Line::from("1-9 => sort by column"),
+            Line::from("F6, s => toggle sort menu"),
+            Line::from("F7, r => toggle ascending/descending sort"),
+            Line::from("F4, f, / => toggle filter menu"),
+            Line::default(),
+            Line::from("Sort menu").bold(),
+            Line::from("↑, Shift+Tab, k => move sort column selection up"),
+            Line::from("↓, Tab, j => move sort column selection down"),
+            Line::from("Enter => confirm sort selection"),
+            Line::from("F6, s => toggle sort menu"),
+            Line::default(),
+            Line::from("Filter menu").bold(),
+            Line::from("↑, Shift+Tab => move filter column selection up"),
+            Line::from("↓, Tab => move filter column selection down"),
+            Line::from("Enter => confirm filter selection"),
+            Line::from("F4 => toggle sort menu"),
+        ];
+
+        let block = Block::default()
+            .borders(Borders::ALL)
+            .border_style(Style::default())
+            .padding(Padding::proportional(2))
+            .title("Help");
+        let w = Paragraph::new(text)
+            .block(block)
+            .style(Style::default().fg(Color::Gray))
+            .alignment(Alignment::Left);
+
+        f.render_widget(Clear, area);
+        f.render_widget(w, area);
+    }
+
+    /// Renders a box with sorting options.
+    fn sort_box(&self, f: &mut Frame, area: Rect, mut list_state: ListState) {
+        f.render_widget(Clear, area);
+        let w = List::new(
+            SortColumn::items()
+                .into_iter()
+                .map(|h| ListItem::new(Line::from(h))),
+        )
+        .block(
+            Block::default()
+                .padding(Padding::proportional(2))
+                .borders(Borders::ALL)
+                .title("Sort by"),
+        )
+        .highlight_style(Style::new().reversed());
+        f.render_stateful_widget(w, area, &mut list_state);
+    }
+
+    /// Renders a box with filtering options.
+    fn filter_box(&self, f: &mut Frame, area: Rect, filter_menu_state: &FilterMenuState) {
+        f.render_widget(Clear, area);
+        let w = List::new(
+            FilterColumn::items()
+                .into_iter()
+                .map(|h| ListItem::new(Line::from(h))),
+        )
+        .block(Block::default().borders(Borders::ALL).title("Filter by"))
+        .highlight_style(Style::new().reversed());
+        let (top, bottom) = {
+            (
+                Rect::new(area.x, area.y, area.width, area.height / 2),
+                Rect::new(
+                    area.x,
+                    area.y + area.height / 2,
+                    area.width,
+                    area.height / 2,
+                ),
+            )
+        };
+        f.render_stateful_widget(w, top, &mut filter_menu_state.column_selection.clone());
+        f.render_widget(
+            Paragraph::new(filter_menu_state.input.clone()).block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("Filter pattern"),
+            ),
+            bottom,
+        );
+        f.set_cursor_position(Position::new(
+            bottom.x + 1 + filter_menu_state.input.len() as u16,
+            bottom.y + 1,
+        ));
+    }
+
     /// Renders a box showing instructions on how to exit from `vector top`.
     fn quit_box(&self, f: &mut Frame, area: Rect) {
-        let text = vec![Line::from("To quit, press ESC or 'q'")];
+        let text = vec![Line::from(
+            "To quit, press ESC or 'q'; Press F1 or '?' for help",
+        )];
 
         let block = Block::default()
             .borders(Borders::ALL)
@@ -355,6 +568,37 @@ impl<'a> Widgets<'a> {
         }
 
         self.quit_box(f, rects[2]);
+
+        // Render help, sort and filter over other items
+        if state.ui.help_visible {
+            let [area] = Layout::horizontal([Constraint::Length(64)])
+                .flex(Flex::Center)
+                .areas(size);
+            let [area] = Layout::vertical([Constraint::Length(32)])
+                .flex(Flex::Center)
+                .areas(area);
+            self.help_box(f, area);
+        }
+
+        if state.ui.sort_visible {
+            let [area] = Layout::horizontal([Constraint::Length(64)])
+                .flex(Flex::Center)
+                .areas(size);
+            let [area] = Layout::vertical([Constraint::Length(32)])
+                .flex(Flex::Center)
+                .areas(area);
+            self.sort_box(f, area, state.ui.sort_menu_state);
+        }
+
+        if state.ui.filter_visible {
+            let [area] = Layout::horizontal([Constraint::Length(64)])
+                .flex(Flex::Center)
+                .areas(size);
+            let [area] = Layout::vertical([Constraint::Length(12)])
+                .flex(Flex::Center)
+                .areas(area);
+            self.filter_box(f, area, &state.ui.filter_menu_state);
+        }
     }
 }
 
@@ -372,6 +616,7 @@ pub async fn init_dashboard<'a>(
     url: &'a str,
     interval: u32,
     human_metrics: bool,
+    event_tx: state::EventTx,
     mut state_rx: state::StateRx,
     mut shutdown_rx: oneshot::Receiver<()>,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -395,16 +640,27 @@ pub async fn init_dashboard<'a>(
     terminal.clear()?;
 
     let widgets = Widgets::new(title, url, interval, human_metrics);
+    let mut input_mode = InputMode::Top;
 
     loop {
         tokio::select! {
             Some(state) = state_rx.recv() => {
+                if state.ui.filter_visible {
+                    input_mode = InputMode::FilterInput;
+                } else if state.ui.sort_visible {
+                    input_mode = InputMode::SortMenu;
+                } else if state.ui.help_visible {
+                    input_mode = InputMode::HelpMenu;
+                } else {
+                    input_mode = InputMode::Top;
+                }
                 terminal.draw(|f| widgets.draw(f, state))?;
             },
             k = key_press_rx.recv() => {
-                if let KeyCode::Esc | KeyCode::Char('q') = k.unwrap() {
+                let k = k.unwrap();
+                if handle_input(input_mode, k, &event_tx, &terminal).await {
                     _ = key_press_kill_tx.send(());
-                    break
+                    break;
                 }
             }
             _ = &mut shutdown_rx => {

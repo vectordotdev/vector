@@ -21,6 +21,7 @@ crossterm = { version = "0.29.0", default-features = false, features = ["event-s
 unit-prefix = { version = "0.5.2", default-features = false, features = ["std"] }
 num-format = { version = "0.4.4", default-features = false, features = ["with-num-bigint"] }
 ratatui = { version = "0.29.0", default-features = false, features = ["crossterm"] }
+regex.workspace = true
 vector-common = { path = "../vector-common" }
 vector-api-client = { path = "../vector-api-client" }
 
