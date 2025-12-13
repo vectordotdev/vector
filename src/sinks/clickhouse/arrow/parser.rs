@@ -89,13 +89,10 @@ fn unsupported(ch_type: &str, kind: &str) -> String {
 /// Returns a tuple of (DataType, is_nullable).
 pub fn clickhouse_type_to_arrow(ch_type: &str) -> Result<(DataType, bool), String> {
     let (base_type, is_nullable) = unwrap_type_modifiers(ch_type);
+    let (type_name, _) = extract_identifier(base_type);
 
-    let data_type = match base_type {
-        // String types
-        "String" => DataType::Utf8,
-        _ if base_type.starts_with("FixedString") => DataType::Utf8,
-
-        // Integer types
+    let data_type = match type_name {
+        // Numeric
         "Int8" => DataType::Int8,
         "Int16" => DataType::Int16,
         "Int32" => DataType::Int32,
@@ -104,38 +101,31 @@ pub fn clickhouse_type_to_arrow(ch_type: &str) -> Result<(DataType, bool), Strin
         "UInt16" => DataType::UInt16,
         "UInt32" => DataType::UInt32,
         "UInt64" => DataType::UInt64,
-
-        // Floating point types
         "Float32" => DataType::Float32,
         "Float64" => DataType::Float64,
-
-        // Boolean
         "Bool" => DataType::Boolean,
+        "Decimal" | "Decimal32" | "Decimal64" | "Decimal128" | "Decimal256" => {
+            parse_decimal_type(base_type)?
+        }
+
+        // Strings
+        "String" | "FixedString" => DataType::Utf8,
 
         // Date and time types (timezones not currently handled, defaults to UTC)
         "Date" | "Date32" => DataType::Date32,
         "DateTime" => DataType::Timestamp(TimeUnit::Second, None),
-        _ if base_type.starts_with("DateTime64") => parse_datetime64_precision(base_type)?,
+        "DateTime64" => parse_datetime64_precision(base_type)?,
 
-        // Decimal types
-        _ if base_type.starts_with("Decimal") => parse_decimal_type(base_type)?,
+        // Unsupported
+        "Array" => return Err(unsupported(ch_type, "Array")),
+        "Tuple" => return Err(unsupported(ch_type, "Tuple")),
+        "Map" => return Err(unsupported(ch_type, "Map")),
 
-        // Complex types
-        _ if base_type.starts_with("Array") => {
-            return Err(unsupported(ch_type, "Array"));
-        }
-        _ if base_type.starts_with("Tuple") => {
-            return Err(unsupported(ch_type, "Tuple"));
-        }
-        _ if base_type.starts_with("Map") => {
-            return Err(unsupported(ch_type, "Map"));
-        }
-
-        // Unknown types
+        // Unknown
         _ => {
             return Err(format!(
-                "Unknown ClickHouse type '{}'. This type cannot be automatically converted to Arrow format.",
-                ch_type
+                "Unknown ClickHouse type '{}'. This type cannot be automatically converted.",
+                type_name
             ));
         }
     };
