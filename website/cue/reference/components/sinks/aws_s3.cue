@@ -155,6 +155,7 @@ components: sinks: aws_s3: components._aws & {
 				        compression: zstd
 				        row_group_size: 50000  # Should be <= batch.max_events
 				        allow_nullable_fields: true
+				        estimated_output_size: 10485760  # 10MB - tune based on your data
 				```
 
 				## Supported Data Types
@@ -222,6 +223,28 @@ components: sinks: aws_s3: components._aws & {
 				When enabled, missing or incompatible values will be encoded as NULL even for fields that
 				would normally be non-nullable. This is useful when working with downstream systems that
 				can handle NULL values through defaults or computed columns.
+
+				### estimated_output_size
+
+				Estimated compressed output size in bytes for buffer pre-allocation. This is an optional
+				performance tuning parameter that can significantly reduce memory overhead by pre-allocating
+				the output buffer to an appropriate size, avoiding repeated reallocations during encoding.
+
+				**How to set this value:**
+				1. Monitor actual compressed Parquet file sizes in production
+				2. Set to approximately 1.2x your average observed compressed size for headroom
+				3. ZSTD compression typically achieves 3-10x compression on JSON/log data
+
+				**Example:** If your batches are 100MB uncompressed and compress to 10MB on average,
+				set `estimated_output_size: 12582912` (12MB) to provide some headroom.
+
+				If not specified, Vector uses a heuristic based on estimated uncompressed size
+				(approximately 2KB per event, capped at 128MB).
+
+				**Trade-offs:**
+				- **Too small**: Minimal benefit, will still require reallocations
+				- **Too large**: Wastes memory by over-allocating
+				- **Just right**: Optimal memory usage with minimal reallocations
 
 				## Batching Behavior
 

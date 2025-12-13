@@ -716,6 +716,26 @@ generated: components: sinks: aws_s3: configuration: {
 						required: false
 						type: bool: default: false
 					}
+					estimated_output_size: {
+						description: """
+							Estimated compressed output size in bytes for buffer pre-allocation.
+
+							Pre-allocating the output buffer based on expected compressed size significantly
+							reduces memory overhead by avoiding repeated reallocations during encoding.
+							If not specified, defaults to a heuristic based on estimated uncompressed size.
+
+							Guidelines for setting this value:
+							- Monitor actual compressed output sizes in production
+							- Set to ~1.2x your average observed compressed size for headroom
+							- ZSTD typically achieves 3-10x compression on JSON data
+							- Example: If batches are 100MB uncompressed and compress to 10MB, set to ~12MB
+							"""
+						required: false
+						type: uint: {
+							default: null
+							examples: [10485760, 52428800]
+						}
+					}
 				}
 			}
 			protobuf: {

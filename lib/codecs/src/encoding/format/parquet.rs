@@ -5,7 +5,7 @@
 //! suitable for long-term storage and analytics workloads.
 
 use arrow::datatypes::Schema;
-use bytes::{Bytes, BytesMut};
+use bytes::{Bytes, BytesMut, BufMut};
 use parquet::{
     arrow::ArrowWriter,
     basic::{Compression, ZstdLevel},
@@ -104,6 +104,22 @@ pub struct ParquetSerializerConfig {
     #[serde(default)]
     #[configurable(metadata(docs::examples = true))]
     pub allow_nullable_fields: bool,
+
+    /// Estimated compressed output size in bytes for buffer pre-allocation.
+    ///
+    /// Pre-allocating the output buffer based on expected compressed size significantly
+    /// reduces memory overhead by avoiding repeated reallocations during encoding.
+    /// If not specified, defaults to a heuristic based on estimated uncompressed size.
+    ///
+    /// Guidelines for setting this value:
+    /// - Monitor actual compressed output sizes in production
+    /// - Set to ~1.2x your average observed compressed size for headroom
+    /// - ZSTD typically achieves 3-10x compression on JSON data
+    /// - Example: If batches are 100MB uncompressed and compress to 10MB, set to ~12MB
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = 10485760))]  // 10MB
+    #[configurable(metadata(docs::examples = 52428800))]  // 50MB
+    pub estimated_output_size: Option<usize>,
 }
 
 fn schema_example() -> std::collections::BTreeMap<String, String> {
@@ -121,6 +137,7 @@ impl std::fmt::Debug for ParquetSerializerConfig {
             .field("compression", &self.compression)
             .field("row_group_size", &self.row_group_size)
             .field("allow_nullable_fields", &self.allow_nullable_fields)
+            .field("estimated_output_size", &self.estimated_output_size)
             .finish()
     }
 }
@@ -133,6 +150,7 @@ impl ParquetSerializerConfig {
             compression: ParquetCompression::default(),
             row_group_size: None,
             allow_nullable_fields: false,
+            estimated_output_size: None,
         }
     }
 
@@ -152,6 +170,7 @@ impl ParquetSerializerConfig {
 pub struct ParquetSerializer {
     schema: Arc<Schema>,
     writer_properties: WriterProperties,
+    estimated_output_size: Option<usize>,
 }
 
 impl ParquetSerializer {
@@ -194,6 +213,7 @@ impl ParquetSerializer {
         Ok(Self {
             schema,
             writer_properties,
+            estimated_output_size: config.estimated_output_size,
         })
     }
 }
@@ -206,9 +226,15 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             return Err(ParquetEncodingError::NoEvents);
         }
 
-        let bytes = encode_events_to_parquet(&events, Arc::clone(&self.schema), &self.writer_properties)?;
+        let bytes = encode_events_to_parquet(
+            &events,
+            Arc::clone(&self.schema),
+            &self.writer_properties,
+            self.estimated_output_size,
+        )?;
 
-        buffer.extend_from_slice(&bytes);
+        // Use put() instead of extend_from_slice to avoid copying when possible
+        buffer.put(bytes);
         Ok(())
     }
 }
@@ -269,6 +295,7 @@ pub fn encode_events_to_parquet(
     events: &[Event],
     schema: Arc<Schema>,
     writer_properties: &WriterProperties,
+    estimated_output_size: Option<usize>,
 ) -> Result<Bytes, ParquetEncodingError> {
     if events.is_empty() {
         return Err(ParquetEncodingError::NoEvents);
@@ -277,18 +304,41 @@ pub fn encode_events_to_parquet(
     // Build Arrow RecordBatch from events (reuses Arrow encoder logic)
     let record_batch = build_record_batch(schema, events)?;
 
-    // Write RecordBatch to Parquet format in memory
-    let mut buffer = Vec::new();
+    // Get batch metadata before we move into writer scope
+    let batch_schema = record_batch.schema();
+
+    // Calculate buffer capacity to avoid reallocations
+    // This is critical for memory efficiency with large batches
+    let buffer_capacity = estimated_output_size.unwrap_or_else(|| {
+        // Heuristic: Estimate based on number of events and fields
+        // Assuming average 2KB per event after compression (conservative estimate)
+        // Users should tune estimated_output_size based on actual data for best results
+        let estimated_size = events.len() * 2048;
+
+        // Cap at reasonable maximum to avoid over-allocation for small batches
+        estimated_size.min(128 * 1024 * 1024) // Cap at 128MB
+    });
+
+    // Write RecordBatch to Parquet format in memory with pre-allocated buffer
+    let mut buffer = Vec::with_capacity(buffer_capacity);
     {
         let mut writer = ArrowWriter::try_new(
             &mut buffer,
-            record_batch.schema(),
+            batch_schema,
             Some(writer_properties.clone()),
         )?;
 
         writer.write(&record_batch)?;
+
+        // Explicitly drop RecordBatch to release Arrow array memory immediately
+        drop(record_batch);
+
+        // close() consumes the writer, releasing compression buffers
         writer.close()?;
     }
+
+    // Shrink buffer to actual size to free excess pre-allocated capacity
+    buffer.shrink_to_fit();
 
     Ok(Bytes::from(buffer))
 }
@@ -337,7 +387,7 @@ mod tests {
             .set_compression(Compression::SNAPPY)
             .build();
 
-        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props);
+        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props, None);
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -441,7 +491,7 @@ mod tests {
 
         let props = WriterProperties::builder().build();
 
-        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props);
+        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props, None);
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -481,7 +531,7 @@ mod tests {
             true,
         )]));
         let props = WriterProperties::builder().build();
-        let result = encode_events_to_parquet(&events, schema, &props);
+        let result = encode_events_to_parquet(&events, schema, &props, None);
         assert!(result.is_err());
         assert!(matches!(result.unwrap_err(), ParquetEncodingError::NoEvents));
     }
@@ -511,7 +561,7 @@ mod tests {
                 .set_compression(compression.into())
                 .build();
 
-            let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props);
+            let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props, None);
             assert!(result.is_ok(), "Failed with compression: {:?}", compression);
 
             // Verify we can read it back
@@ -538,6 +588,7 @@ mod tests {
             compression: ParquetCompression::Zstd,
             row_group_size: Some(1000),
             allow_nullable_fields: false,
+            estimated_output_size: None,
         };
 
         let serializer = ParquetSerializer::new(config);
@@ -551,6 +602,7 @@ mod tests {
             compression: ParquetCompression::default(),
             row_group_size: None,
             allow_nullable_fields: false,
+            estimated_output_size: None,
         };
 
         let result = ParquetSerializer::new(config);
@@ -608,7 +660,7 @@ mod tests {
             .set_max_row_group_size(5000) // 2 row groups
             .build();
 
-        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props);
+        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props, None);
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
