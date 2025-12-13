@@ -40,7 +40,8 @@ pub enum Format {
     /// JSONAsString.
     JsonAsString,
 
-    /// ArrowStream.
+    /// ArrowStream (beta).
+    #[configurable(metadata(status = "beta"))]
     ArrowStream,
 }
 
