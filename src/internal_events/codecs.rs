@@ -137,13 +137,13 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
     }
 }
 
-#[cfg(feature = "codecs-arrow")]
+#[cfg(any(feature = "codecs-arrow", feature = "codecs-parquet"))]
 #[derive(Debug, NamedInternalEvent)]
 pub struct EncoderNullConstraintError<'a> {
     pub error: &'a crate::Error,
 }
 
-#[cfg(feature = "codecs-arrow")]
+#[cfg(any(feature = "codecs-arrow", feature = "codecs-parquet"))]
 impl InternalEvent for EncoderNullConstraintError<'_> {
     fn emit(self) {
         const CONSTRAINT_REASON: &str = "Schema constraint violation.";
