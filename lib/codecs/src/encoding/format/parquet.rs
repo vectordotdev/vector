@@ -8,8 +8,9 @@ use arrow::datatypes::Schema;
 use bytes::{Bytes, BytesMut, BufMut};
 use parquet::{
     arrow::ArrowWriter,
-    basic::{Compression, ZstdLevel},
-    file::properties::WriterProperties,
+    basic::{Compression, ZstdLevel, GzipLevel, BrotliLevel},
+    file::properties::{WriterProperties, WriterVersion},
+    schema::types::ColumnPath,
 };
 use snafu::Snafu;
 use std::sync::Arc;
@@ -41,15 +42,58 @@ pub enum ParquetCompression {
     Zstd,
 }
 
+impl ParquetCompression {
+    /// Convert to parquet Compression with optional level override
+    fn to_compression(&self, level: Option<i32>) -> Result<Compression, String> {
+        match (self, level) {
+            (ParquetCompression::Uncompressed, _) => Ok(Compression::UNCOMPRESSED),
+            (ParquetCompression::Snappy, _) => Ok(Compression::SNAPPY),
+            (ParquetCompression::Lz4, _) => Ok(Compression::LZ4),
+            (ParquetCompression::Gzip, Some(lvl)) => {
+                GzipLevel::try_new(lvl as u32)
+                    .map(Compression::GZIP)
+                    .map_err(|e| format!("Invalid GZIP compression level: {}", e))
+            }
+            (ParquetCompression::Gzip, None) => Ok(Compression::GZIP(Default::default())),
+            (ParquetCompression::Brotli, Some(lvl)) => {
+                BrotliLevel::try_new(lvl as u32)
+                    .map(Compression::BROTLI)
+                    .map_err(|e| format!("Invalid Brotli compression level: {}", e))
+            }
+            (ParquetCompression::Brotli, None) => Ok(Compression::BROTLI(Default::default())),
+            (ParquetCompression::Zstd, Some(lvl)) => {
+                ZstdLevel::try_new(lvl)
+                    .map(Compression::ZSTD)
+                    .map_err(|e| format!("Invalid ZSTD compression level: {}", e))
+            }
+            (ParquetCompression::Zstd, None) => Ok(Compression::ZSTD(ZstdLevel::default())),
+        }
+    }
+}
+
 impl From<ParquetCompression> for Compression {
     fn from(compression: ParquetCompression) -> Self {
-        match compression {
-            ParquetCompression::Uncompressed => Compression::UNCOMPRESSED,
-            ParquetCompression::Snappy => Compression::SNAPPY,
-            ParquetCompression::Gzip => Compression::GZIP(Default::default()),
-            ParquetCompression::Brotli => Compression::BROTLI(Default::default()),
-            ParquetCompression::Lz4 => Compression::LZ4,
-            ParquetCompression::Zstd => Compression::ZSTD(ZstdLevel::default()),
+        compression.to_compression(None).expect("Default compression should always be valid")
+    }
+}
+
+/// Parquet writer version
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "lowercase")]
+pub enum ParquetWriterVersion {
+    /// Parquet format version 1.0 (maximum compatibility)
+    V1,
+    /// Parquet format version 2.0 (modern format with better encoding)
+    #[default]
+    V2,
+}
+
+impl From<ParquetWriterVersion> for WriterVersion {
+    fn from(version: ParquetWriterVersion) -> Self {
+        match version {
+            ParquetWriterVersion::V1 => WriterVersion::PARQUET_1_0,
+            ParquetWriterVersion::V2 => WriterVersion::PARQUET_2_0,
         }
     }
 }
@@ -63,12 +107,63 @@ pub struct ParquetSerializerConfig {
     /// This schema defines the structure and types of the Parquet file columns.
     /// Specified as a map of field names to data types.
     ///
+    /// Mutually exclusive with `infer_schema`. Must specify either `schema` or `infer_schema: true`.
+    ///
     /// Supported types: utf8, int8, int16, int32, int64, uint8, uint16, uint32, uint64,
     /// float32, float64, boolean, binary, timestamp_second, timestamp_millisecond,
     /// timestamp_microsecond, timestamp_nanosecond, date32, date64, and more.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "schema_example()"))]
     pub schema: Option<SchemaDefinition>,
+
+    /// Automatically infer schema from event data
+    ///
+    /// When enabled, the schema is inferred from each batch of events independently.
+    /// The schema is determined by examining the types of values in the events.
+    ///
+    /// **Type mapping:**
+    /// - String values → `utf8`
+    /// - Integer values → `int64`
+    /// - Float values → `float64`
+    /// - Boolean values → `boolean`
+    /// - Timestamp values → `timestamp_microsecond`
+    /// - Arrays/Objects → `utf8` (serialized as JSON)
+    ///
+    /// **Type conflicts:** If a field has different types across events in the same batch,
+    /// it will be encoded as `utf8` (string) and all values will be converted to strings.
+    ///
+    /// **Important:** Schema consistency across batches is the operator's responsibility.
+    /// Use VRL transforms to ensure consistent types if needed. Each batch may produce
+    /// a different schema if event structure varies.
+    ///
+    /// **Bloom filters:** Not supported with inferred schemas. Use explicit schema for Bloom filters.
+    ///
+    /// Mutually exclusive with `schema`. Must specify either `schema` or `infer_schema: true`.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = true))]
+    pub infer_schema: bool,
+
+    /// Column names to exclude from Parquet encoding
+    ///
+    /// These columns will be completely excluded from the Parquet file.
+    /// Useful for filtering out metadata, internal fields, or temporary data.
+    ///
+    /// Only applies when `infer_schema` is enabled. Ignored when using explicit schema.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "vec![\"_metadata\".to_string(), \"internal_id\".to_string()]"))]
+    pub exclude_columns: Option<Vec<String>>,
+
+    /// Maximum number of columns to encode
+    ///
+    /// Limits the number of columns in the Parquet file. Additional columns beyond
+    /// this limit will be silently dropped. Columns are selected in the order they
+    /// appear in the first event.
+    ///
+    /// Only applies when `infer_schema` is enabled. Ignored when using explicit schema.
+    #[serde(default = "default_max_columns")]
+    #[configurable(metadata(docs::examples = 500))]
+    #[configurable(metadata(docs::examples = 1000))]
+    pub max_columns: usize,
 
     /// Compression algorithm to use for Parquet columns
     ///
@@ -79,6 +174,53 @@ pub struct ParquetSerializerConfig {
     #[configurable(metadata(docs::examples = "gzip"))]
     #[configurable(metadata(docs::examples = "zstd"))]
     pub compression: ParquetCompression,
+
+    /// Compression level for algorithms that support it.
+    ///
+    /// Only applies to ZSTD, GZIP, and Brotli compression. Ignored for other algorithms.
+    ///
+    /// **ZSTD levels** (1-22):
+    /// - 1-3: Fastest, moderate compression (level 3 is default)
+    /// - 4-9: Good balance of speed and compression
+    /// - 10-15: Better compression, slower encoding
+    /// - 16-22: Maximum compression, slowest (good for cold storage)
+    ///
+    /// **GZIP levels** (1-9):
+    /// - 1-3: Faster, less compression
+    /// - 6: Default balance (recommended)
+    /// - 9: Maximum compression, slowest
+    ///
+    /// **Brotli levels** (0-11):
+    /// - 0-4: Faster encoding
+    /// - 1: Default (recommended)
+    /// - 5-11: Better compression, slower
+    ///
+    /// Higher levels typically produce 20-50% smaller files but take 2-5x longer to encode.
+    /// Recommended: Use level 3-6 for hot data, 10-15 for cold storage.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = 3))]
+    #[configurable(metadata(docs::examples = 6))]
+    #[configurable(metadata(docs::examples = 10))]
+    pub compression_level: Option<i32>,
+
+    /// Parquet format writer version.
+    ///
+    /// Controls which Parquet format version to write:
+    /// - **v1** (PARQUET_1_0): Original format, maximum compatibility (default)
+    /// - **v2** (PARQUET_2_0): Modern format with improved encoding and statistics
+    ///
+    /// Version 2 benefits:
+    /// - More efficient encoding for certain data types (10-20% smaller files)
+    /// - Better statistics for query optimization
+    /// - Improved data page format
+    /// - Required for some advanced features
+    ///
+    /// Use v1 for maximum compatibility with older readers (pre-2018 tools).
+    /// Use v2 for better performance with modern query engines (Athena, Spark, Presto).
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "v1"))]
+    #[configurable(metadata(docs::examples = "v2"))]
+    pub writer_version: ParquetWriterVersion,
 
     /// Number of rows per row group
     ///
@@ -105,100 +247,111 @@ pub struct ParquetSerializerConfig {
     #[configurable(metadata(docs::examples = true))]
     pub allow_nullable_fields: bool,
 
-    /// Estimated compressed output size in bytes for buffer pre-allocation.
+    /// Sorting order for rows within row groups.
     ///
-    /// Pre-allocating the output buffer based on expected compressed size significantly
-    /// reduces memory overhead by avoiding repeated reallocations during encoding.
-    /// If not specified, defaults to a heuristic based on estimated uncompressed size.
+    /// Pre-sorting rows by specified columns before writing can significantly improve both
+    /// compression ratios and query performance. This is especially valuable for time-series
+    /// data and event logs.
     ///
-    /// Guidelines for setting this value:
-    /// - Monitor actual compressed output sizes in production
-    /// - Set to ~1.2x your average observed compressed size for headroom
-    /// - ZSTD typically achieves 3-10x compression on JSON data
-    /// - Example: If batches are 100MB uncompressed and compress to 10MB, set to ~12MB
+    /// **Benefits:**
+    /// - **Better compression** (20-40% smaller files): Similar values are grouped together
+    /// - **Faster queries**: More effective min/max statistics enable better row group skipping
+    /// - **Improved caching**: Query engines can more efficiently cache sorted data
+    ///
+    /// **Common patterns:**
+    /// - Time-series: Sort by timestamp descending (most recent first)
+    /// - Multi-tenant: Sort by tenant_id, then timestamp
+    /// - User analytics: Sort by user_id, then event_time
+    ///
+    /// **Trade-offs:**
+    /// - Adds sorting overhead during encoding (typically 10-30% slower writes)
+    /// - Requires buffering entire batch in memory for sorting
+    /// - Most beneficial when queries frequently filter on sorted columns
+    ///
+    /// **Example:**
+    /// ```yaml
+    /// sorting_columns:
+    ///   - column: timestamp
+    ///     descending: true
+    ///   - column: user_id
+    ///     descending: false
+    /// ```
+    ///
+    /// If not specified, rows are written in the order they appear in the batch.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = 10485760))]  // 10MB
-    #[configurable(metadata(docs::examples = 52428800))]  // 50MB
-    pub estimated_output_size: Option<usize>,
+    pub sorting_columns: Option<Vec<SortingColumnConfig>>,
+}
 
-    /// Enable Bloom filters for all columns.
+/// Column sorting configuration
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct SortingColumnConfig {
+    /// Name of the column to sort by
+    #[configurable(metadata(docs::examples = "timestamp"))]
+    #[configurable(metadata(docs::examples = "user_id"))]
+    pub column: String,
+
+    /// Sort in descending order (true) or ascending order (false)
     ///
-    /// Bloom filters are probabilistic data structures that can significantly improve
-    /// query performance by allowing query engines to skip entire row groups when
-    /// searching for specific values. They are especially effective for:
-    /// - High-cardinality columns (UUIDs, user IDs, session IDs)
-    /// - String columns (URLs, emails, tags)
-    /// - Point queries (WHERE column = 'value')
-    /// - IN clauses (WHERE column IN (...))
-    ///
-    /// Trade-offs:
-    /// - Pros: Faster queries, better row group pruning in engines like Athena/Spark
-    /// - Cons: Slightly larger file sizes (typically 1-5% overhead), minimal write overhead
-    ///
-    /// When disabled (default), no Bloom filters are written.
+    /// - `true`: Descending (Z-A, 9-0, newest-oldest)
+    /// - `false`: Ascending (A-Z, 0-9, oldest-newest)
     #[serde(default)]
     #[configurable(metadata(docs::examples = true))]
-    #[configurable(metadata(docs::examples = false))]
-    pub enable_bloom_filters: bool,
-
-    /// False positive probability for Bloom filters.
-    ///
-    /// This controls the trade-off between Bloom filter size and accuracy.
-    /// Lower values produce larger but more accurate filters.
-    ///
-    /// - Default: 0.05 (5% false positive rate)
-    /// - Range: Must be between 0.0 and 1.0 (exclusive)
-    /// - Recommended: 0.01 (1%) for high-selectivity queries, 0.05 (5%) for general use
-    ///
-    /// Only takes effect when enable_bloom_filters is true.
-    #[serde(default = "default_bloom_fpp")]
-    #[configurable(metadata(docs::examples = 0.05))]
-    #[configurable(metadata(docs::examples = 0.01))]
-    pub bloom_filter_fpp: f64,
-
-    /// Estimated number of distinct values for Bloom filter sizing.
-    ///
-    /// This should match the expected cardinality of your columns. Higher values
-    /// result in larger Bloom filters. If your actual distinct value count significantly
-    /// exceeds this number, the false positive rate may increase.
-    ///
-    /// - Default: 1,000,000
-    /// - Recommended: Set based on your data's actual cardinality
-    ///
-    /// Only takes effect when enable_bloom_filters is true.
-    #[serde(default = "default_bloom_ndv")]
-    #[configurable(metadata(docs::examples = 1000000))]
-    #[configurable(metadata(docs::examples = 10000000))]
-    pub bloom_filter_ndv: u64,
+    pub descending: bool,
 }
 
-fn default_bloom_fpp() -> f64 {
-    0.05
+fn default_max_columns() -> usize {
+    1000
 }
 
-fn default_bloom_ndv() -> u64 {
-    1_000_000
-}
+fn schema_example() -> SchemaDefinition {
+    use std::collections::BTreeMap;
+    use super::schema_definition::FieldDefinition;
 
-fn schema_example() -> std::collections::BTreeMap<String, String> {
-    let mut map = std::collections::BTreeMap::new();
-    map.insert("id".to_string(), "int64".to_string());
-    map.insert("name".to_string(), "utf8".to_string());
-    map.insert("timestamp".to_string(), "timestamp_microsecond".to_string());
-    map
+    let mut fields = BTreeMap::new();
+    fields.insert(
+        "id".to_string(),
+        FieldDefinition {
+            r#type: "int64".to_string(),
+            bloom_filter: false,
+            bloom_filter_num_distinct_values: None,
+            bloom_filter_false_positive_pct: None,
+        },
+    );
+    fields.insert(
+        "name".to_string(),
+        FieldDefinition {
+            r#type: "utf8".to_string(),
+            bloom_filter: true,  // Example: enable for high-cardinality string field
+            bloom_filter_num_distinct_values: Some(1_000_000),
+            bloom_filter_false_positive_pct: Some(0.01),
+        },
+    );
+    fields.insert(
+        "timestamp".to_string(),
+        FieldDefinition {
+            r#type: "timestamp_microsecond".to_string(),
+            bloom_filter: false,
+            bloom_filter_num_distinct_values: None,
+            bloom_filter_false_positive_pct: None,
+        },
+    );
+    SchemaDefinition { fields }
 }
 
 impl std::fmt::Debug for ParquetSerializerConfig {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ParquetSerializerConfig")
             .field("schema", &self.schema.is_some())
+            .field("infer_schema", &self.infer_schema)
+            .field("exclude_columns", &self.exclude_columns)
+            .field("max_columns", &self.max_columns)
             .field("compression", &self.compression)
+            .field("compression_level", &self.compression_level)
+            .field("writer_version", &self.writer_version)
             .field("row_group_size", &self.row_group_size)
             .field("allow_nullable_fields", &self.allow_nullable_fields)
-            .field("estimated_output_size", &self.estimated_output_size)
-            .field("enable_bloom_filters", &self.enable_bloom_filters)
-            .field("bloom_filter_fpp", &self.bloom_filter_fpp)
-            .field("bloom_filter_ndv", &self.bloom_filter_ndv)
+            .field("sorting_columns", &self.sorting_columns)
             .finish()
     }
 }
@@ -208,13 +361,25 @@ impl ParquetSerializerConfig {
     pub fn new(schema: SchemaDefinition) -> Self {
         Self {
             schema: Some(schema),
+            infer_schema: false,
+            exclude_columns: None,
+            max_columns: default_max_columns(),
             compression: ParquetCompression::default(),
+            compression_level: None,
+            writer_version: ParquetWriterVersion::default(),
             row_group_size: None,
             allow_nullable_fields: false,
-            estimated_output_size: None,
-            enable_bloom_filters: false,
-            bloom_filter_fpp: default_bloom_fpp(),
-            bloom_filter_ndv: default_bloom_ndv(),
+            sorting_columns: None,
+        }
+    }
+
+    /// Validate the configuration
+    fn validate(&self) -> Result<(), String> {
+        // Must specify exactly one schema method
+        match (self.schema.is_some(), self.infer_schema) {
+            (true, true) => Err("Cannot use both 'schema' and 'infer_schema: true'. Choose one.".to_string()),
+            (false, false) => Err("Must specify either 'schema' or 'infer_schema: true'".to_string()),
+            _ => Ok(())
         }
     }
 
@@ -229,63 +394,151 @@ impl ParquetSerializerConfig {
     }
 }
 
+/// Schema mode for Parquet serialization
+#[derive(Clone, Debug)]
+enum SchemaMode {
+    /// Use pre-defined explicit schema
+    Explicit {
+        schema: Arc<Schema>,
+    },
+    /// Infer schema from each batch
+    Inferred {
+        exclude_columns: std::collections::BTreeSet<String>,
+        max_columns: usize,
+    },
+}
+
 /// Parquet batch serializer that holds the schema and writer configuration
 #[derive(Clone, Debug)]
 pub struct ParquetSerializer {
-    schema: Arc<Schema>,
+    schema_mode: SchemaMode,
     writer_properties: WriterProperties,
-    estimated_output_size: Option<usize>,
 }
 
 impl ParquetSerializer {
     /// Create a new ParquetSerializer with the given configuration
     pub fn new(config: ParquetSerializerConfig) -> Result<Self, vector_common::Error> {
-        let schema_def = config.schema.ok_or_else(|| {
-            vector_common::Error::from(
-                "Parquet serializer requires a schema. Specify 'schema' in the configuration."
-            )
-        })?;
+        // Validate configuration
+        config.validate()
+            .map_err(|e| vector_common::Error::from(e))?;
 
-        // Convert SchemaDefinition to Arrow Schema
-        let mut schema = schema_def
-            .to_arrow_schema()
-            .map_err(|e| vector_common::Error::from(e.to_string()))?;
+        // Keep a copy of schema_def for later use with Bloom filters
+        let schema_def_opt = config.schema.clone();
 
-        // If allow_nullable_fields is enabled, transform the schema once here
-        // instead of on every batch encoding
-        if config.allow_nullable_fields {
-            schema = Arc::new(Schema::new_with_metadata(
-                schema
-                    .fields()
-                    .iter()
-                    .map(|f| Arc::new(super::arrow::make_field_nullable(f)))
-                    .collect::<Vec<_>>(),
-                schema.metadata().clone(),
-            ));
-        }
+        // Determine schema mode
+        let schema_mode = if config.infer_schema {
+            SchemaMode::Inferred {
+                exclude_columns: config.exclude_columns
+                    .unwrap_or_default()
+                    .into_iter()
+                    .collect(),
+                max_columns: config.max_columns,
+            }
+        } else {
+            let schema_def = config.schema.ok_or_else(|| {
+                vector_common::Error::from("Schema required when infer_schema is false")
+            })?;
+
+            // Convert SchemaDefinition to Arrow Schema
+            let mut schema = schema_def
+                .to_arrow_schema()
+                .map_err(|e| vector_common::Error::from(e.to_string()))?;
+
+            // If allow_nullable_fields is enabled, transform the schema once here
+            if config.allow_nullable_fields {
+                schema = Arc::new(Schema::new_with_metadata(
+                    schema
+                        .fields()
+                        .iter()
+                        .map(|f| Arc::new(super::arrow::make_field_nullable(f)))
+                        .collect::<Vec<_>>(),
+                    schema.metadata().clone(),
+                ));
+            }
+
+            SchemaMode::Explicit { schema }
+        };
 
         // Build writer properties
+        let compression = config.compression.to_compression(config.compression_level)
+            .map_err(|e| vector_common::Error::from(e))?;
+
+        tracing::debug!(
+            compression = ?config.compression,
+            compression_level = ?config.compression_level,
+            writer_version = ?config.writer_version,
+            infer_schema = config.infer_schema,
+            "Configuring Parquet writer properties"
+        );
+
         let mut props_builder = WriterProperties::builder()
-            .set_compression(config.compression.into());
+            .set_compression(compression)
+            .set_writer_version(config.writer_version.into());
 
         if let Some(row_group_size) = config.row_group_size {
             props_builder = props_builder.set_max_row_group_size(row_group_size);
         }
 
-        // Enable Bloom filters if configured
-        if config.enable_bloom_filters {
-            props_builder = props_builder
-                .set_bloom_filter_enabled(true)
-                .set_bloom_filter_fpp(config.bloom_filter_fpp)
-                .set_bloom_filter_ndv(config.bloom_filter_ndv);
+        // Only apply Bloom filters and sorting for explicit schema mode
+        if let (SchemaMode::Explicit { schema }, Some(schema_def)) = (&schema_mode, &schema_def_opt) {
+
+            // Apply per-column Bloom filter settings from schema
+            let bloom_filter_configs = schema_def.extract_bloom_filter_configs();
+            for bloom_config in bloom_filter_configs {
+                if let Some(col_idx) = schema
+                    .fields()
+                    .iter()
+                    .position(|f| f.name() == &bloom_config.column_name)
+                {
+                    // Use field-specific settings or sensible defaults
+                    let fpp = bloom_config.fpp.unwrap_or(0.05); // Default 5% false positive rate
+                    let mut ndv = bloom_config.ndv.unwrap_or(1_000_000); // Default 1M distinct values
+
+                    // Cap NDV to row group size (can't have more distinct values than total rows)
+                    if let Some(row_group_size) = config.row_group_size {
+                        ndv = ndv.min(row_group_size as u64);
+                    }
+
+                    let column_path = ColumnPath::from(schema.field(col_idx).name().as_str());
+                    props_builder = props_builder
+                        .set_column_bloom_filter_enabled(column_path.clone(), true)
+                        .set_column_bloom_filter_fpp(column_path.clone(), fpp)
+                        .set_column_bloom_filter_ndv(column_path, ndv);
+                }
+            }
+
+            // Set sorting columns if configured
+            if let Some(sorting_cols) = &config.sorting_columns {
+                use parquet::format::SortingColumn;
+
+                let parquet_sorting_cols: Vec<SortingColumn> = sorting_cols
+                    .iter()
+                    .map(|col| {
+                        let col_idx = schema
+                            .fields()
+                            .iter()
+                            .position(|f| f.name() == &col.column)
+                            .ok_or_else(|| {
+                                vector_common::Error::from(format!(
+                                    "Sorting column '{}' not found in schema",
+                                    col.column
+                                ))
+                            })?;
+
+                        Ok(SortingColumn::new(col_idx as i32, col.descending, false))
+                    })
+                    .collect::<Result<Vec<_>, vector_common::Error>>()?;
+
+                props_builder = props_builder.set_sorting_columns(Some(parquet_sorting_cols));
+            }
         }
+        // Note: Bloom filters and sorting are NOT applied for inferred schemas
 
         let writer_properties = props_builder.build();
 
         Ok(Self {
-            schema,
+            schema_mode,
             writer_properties,
-            estimated_output_size: config.estimated_output_size,
         })
     }
 }
@@ -298,12 +551,16 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             return Err(ParquetEncodingError::NoEvents);
         }
 
-        let bytes = encode_events_to_parquet(
-            &events,
-            Arc::clone(&self.schema),
-            &self.writer_properties,
-            self.estimated_output_size,
-        )?;
+        // Determine schema based on mode
+        let schema = match &self.schema_mode {
+            SchemaMode::Explicit { schema } => Arc::clone(schema),
+            SchemaMode::Inferred {
+                exclude_columns,
+                max_columns,
+            } => infer_schema_from_events(&events, exclude_columns, *max_columns)?,
+        };
+
+        let bytes = encode_events_to_parquet(&events, schema, &self.writer_properties)?;
 
         // Use put() instead of extend_from_slice to avoid copying when possible
         buffer.put(bytes);
@@ -336,6 +593,21 @@ pub enum ParquetEncodingError {
     #[snafu(display("Schema must be provided before encoding"))]
     NoSchemaProvided,
 
+    /// No fields could be inferred from events
+    #[snafu(display("No fields could be inferred from events (all fields excluded or only null values)"))]
+    NoFieldsInferred,
+
+    /// Invalid event type (not a log event)
+    #[snafu(display("Invalid event type, expected log event"))]
+    InvalidEventType,
+
+    /// JSON serialization error for nested types
+    #[snafu(display("Failed to serialize nested type as JSON: {}", source))]
+    JsonSerialization {
+        /// The underlying JSON error
+        source: serde_json::Error,
+    },
+
     /// IO error during encoding
     #[snafu(display("IO error: {}", source))]
     Io {
@@ -362,12 +634,123 @@ impl From<parquet::errors::ParquetError> for ParquetEncodingError {
     }
 }
 
+impl From<serde_json::Error> for ParquetEncodingError {
+    fn from(error: serde_json::Error) -> Self {
+        Self::JsonSerialization { source: error }
+    }
+}
+
+/// Infer Arrow DataType from a Vector Value
+fn infer_arrow_type(value: &vector_core::event::Value) -> arrow::datatypes::DataType {
+    use vector_core::event::Value;
+    use arrow::datatypes::{DataType, TimeUnit};
+
+    match value {
+        Value::Bytes(_) => DataType::Utf8,
+        Value::Integer(_) => DataType::Int64,
+        Value::Float(_) => DataType::Float64,
+        Value::Boolean(_) => DataType::Boolean,
+        Value::Timestamp(_) => DataType::Timestamp(TimeUnit::Microsecond, None),
+        // Nested types and regex are always serialized as strings
+        Value::Array(_) | Value::Object(_) | Value::Regex(_) => DataType::Utf8,
+        // Null doesn't determine type, default to Utf8
+        Value::Null => DataType::Utf8,
+    }
+}
+
+/// Infer schema from a batch of events
+fn infer_schema_from_events(
+    events: &[Event],
+    exclude_columns: &std::collections::BTreeSet<String>,
+    max_columns: usize,
+) -> Result<Arc<Schema>, ParquetEncodingError> {
+    use std::collections::BTreeMap;
+    use arrow::datatypes::{DataType, Field};
+    use vector_core::event::Value;
+
+    let mut field_types: BTreeMap<String, DataType> = BTreeMap::new();
+    let mut type_conflicts: BTreeMap<String, Vec<DataType>> = BTreeMap::new();
+
+    for event in events {
+        // Only process log events
+        let log = match event {
+            Event::Log(log) => log,
+            _ => return Err(ParquetEncodingError::InvalidEventType),
+        };
+
+        let fields_iter = log.all_event_fields().ok_or(ParquetEncodingError::InvalidEventType)?;
+
+        for (key, value) in fields_iter {
+            let key_str = key.to_string();
+
+            // Skip excluded columns
+            if exclude_columns.contains(&key_str) {
+                continue;
+            }
+
+            // Skip Value::Null (doesn't determine type)
+            if matches!(value, Value::Null) {
+                continue;
+            }
+
+            // Enforce max columns (skip new fields after limit)
+            if field_types.len() >= max_columns && !field_types.contains_key(&key_str) {
+                tracing::debug!(
+                    column = %key_str,
+                    max_columns = max_columns,
+                    "Skipping column: max_columns limit reached"
+                );
+                continue;
+            }
+
+            let inferred_type = infer_arrow_type(&value);
+
+            match field_types.get(&key_str) {
+                None => {
+                    // First occurrence of this field
+                    field_types.insert(key_str, inferred_type);
+                }
+                Some(existing_type) if existing_type != &inferred_type => {
+                    // Type conflict detected - fallback to Utf8
+                    tracing::warn!(
+                        column = %key_str,
+                        existing_type = ?existing_type,
+                        new_type = ?inferred_type,
+                        "Type conflict detected, encoding as Utf8"
+                    );
+
+                    type_conflicts
+                        .entry(key_str.clone())
+                        .or_insert_with(|| vec![existing_type.clone()])
+                        .push(inferred_type);
+
+                    field_types.insert(key_str, DataType::Utf8);
+                }
+                Some(_) => {
+                    // Same type, no action needed
+                }
+            }
+        }
+    }
+
+    if field_types.is_empty() {
+        return Err(ParquetEncodingError::NoFieldsInferred);
+    }
+
+    // Build Arrow schema (all fields nullable)
+    let arrow_fields: Vec<Arc<Field>> = field_types
+        .into_iter()
+        .map(|(name, dtype)| Arc::new(Field::new(name, dtype, true)))
+        .collect();
+
+    Ok(Arc::new(Schema::new(arrow_fields)))
+}
+
 /// Encodes a batch of events into Parquet format
 pub fn encode_events_to_parquet(
     events: &[Event],
     schema: Arc<Schema>,
     writer_properties: &WriterProperties,
-    estimated_output_size: Option<usize>,
 ) -> Result<Bytes, ParquetEncodingError> {
     if events.is_empty() {
         return Err(ParquetEncodingError::NoEvents);
@@ -379,20 +762,8 @@ pub fn encode_events_to_parquet(
     // Get batch metadata before we move into writer scope
     let batch_schema = record_batch.schema();
 
-    // Calculate buffer capacity to avoid reallocations
-    // This is critical for memory efficiency with large batches
-    let buffer_capacity = estimated_output_size.unwrap_or_else(|| {
-        // Heuristic: Estimate based on number of events and fields
-        // Assuming average 2KB per event after compression (conservative estimate)
-        // Users should tune estimated_output_size based on actual data for best results
-        let estimated_size = events.len() * 2048;
-
-        // Cap at reasonable maximum to avoid over-allocation for small batches
-        estimated_size.min(128 * 1024 * 1024) // Cap at 128MB
-    });
-
-    // Write RecordBatch to Parquet format in memory with pre-allocated buffer
-    let mut buffer = Vec::with_capacity(buffer_capacity);
+    // Write RecordBatch to Parquet format in memory
+    let mut buffer = Vec::new();
     {
         let mut writer = ArrowWriter::try_new(
             &mut buffer,
@@ -401,16 +772,8 @@ pub fn encode_events_to_parquet(
         )?;
 
         writer.write(&record_batch)?;
-
-        // Explicitly drop RecordBatch to release Arrow array memory immediately
-        drop(record_batch);
-
-        // close() consumes the writer, releasing compression buffers
         writer.close()?;
     }
-
-    // Shrink buffer to actual size to free excess pre-allocated capacity
-    buffer.shrink_to_fit();
 
     Ok(Bytes::from(buffer))
 }
@@ -651,19 +1014,30 @@ mod tests {
     #[test]
     fn test_parquet_serializer_config() {
         use std::collections::BTreeMap;
+        use super::schema_definition::FieldDefinition;
 
-        let mut schema_map = BTreeMap::new();
-        schema_map.insert("field".to_string(), "int64".to_string());
+        let mut fields = BTreeMap::new();
+        fields.insert(
+            "field".to_string(),
+            FieldDefinition {
+                r#type: "int64".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
 
         let config = ParquetSerializerConfig {
-            schema: Some(SchemaDefinition::Simple(schema_map)),
+            schema: Some(SchemaDefinition { fields }),
+            infer_schema: false,
+            exclude_columns: None,
+            max_columns: default_max_columns(),
             compression: ParquetCompression::Zstd,
+            compression_level: None,
+            writer_version: ParquetWriterVersion::default(),
             row_group_size: Some(1000),
             allow_nullable_fields: false,
-            estimated_output_size: None,
-            enable_bloom_filters: false,
-            bloom_filter_fpp: default_bloom_fpp(),
-            bloom_filter_ndv: default_bloom_ndv(),
+            sorting_columns: None,
         };
 
         let serializer = ParquetSerializer::new(config);
@@ -674,13 +1048,15 @@ mod tests {
     fn test_parquet_serializer_no_schema_fails() {
         let config = ParquetSerializerConfig {
             schema: None,
+            infer_schema: false,
+            exclude_columns: None,
+            max_columns: default_max_columns(),
             compression: ParquetCompression::default(),
+            compression_level: None,
+            writer_version: ParquetWriterVersion::default(),
             row_group_size: None,
             allow_nullable_fields: false,
-            estimated_output_size: None,
-            enable_bloom_filters: false,
-            bloom_filter_fpp: default_bloom_fpp(),
-            bloom_filter_ndv: default_bloom_ndv(),
+            sorting_columns: None,
         };
 
         let result = ParquetSerializer::new(config);
@@ -691,12 +1067,29 @@ mod tests {
     fn test_encoder_trait_implementation() {
         use std::collections::BTreeMap;
         use tokio_util::codec::Encoder;
+        use super::schema_definition::FieldDefinition;
 
-        let mut schema_map = BTreeMap::new();
-        schema_map.insert("id".to_string(), "int64".to_string());
-        schema_map.insert("name".to_string(), "utf8".to_string());
+        let mut fields = BTreeMap::new();
+        fields.insert(
+            "id".to_string(),
+            FieldDefinition {
+                r#type: "int64".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
+        fields.insert(
+            "name".to_string(),
+            FieldDefinition {
+                r#type: "utf8".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
 
-        let config = ParquetSerializerConfig::new(SchemaDefinition::Simple(schema_map));
+        let config = ParquetSerializerConfig::new(SchemaDefinition { fields });
         let mut serializer = ParquetSerializer::new(config).unwrap();
 
         let mut log = LogEvent::default();
@@ -756,9 +1149,18 @@ mod tests {
     fn test_allow_nullable_fields_config() {
         use std::collections::BTreeMap;
         use tokio_util::codec::Encoder;
+        use super::schema_definition::FieldDefinition;
 
-        let mut schema_map = BTreeMap::new();
-        schema_map.insert("required_field".to_string(), "int64".to_string());
+        let mut fields = BTreeMap::new();
+        fields.insert(
+            "required_field".to_string(),
+            FieldDefinition {
+                r#type: "int64".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
 
         let mut log1 = LogEvent::default();
         log1.insert("required_field", 42);
@@ -770,7 +1172,7 @@ mod tests {
 
         // Note: SchemaDefinition creates nullable fields by default
         // This test verifies that the allow_nullable_fields flag works
-        let mut config = ParquetSerializerConfig::new(SchemaDefinition::Simple(schema_map));
+        let mut config = ParquetSerializerConfig::new(SchemaDefinition { fields });
         config.allow_nullable_fields = true;
 
         let mut serializer = ParquetSerializer::new(config).unwrap();

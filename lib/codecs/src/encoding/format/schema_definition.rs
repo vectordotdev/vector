@@ -21,32 +21,106 @@ pub enum SchemaDefinitionError {
     },
 }
 
+/// Per-column configuration including type and Bloom filter settings
+#[configurable_component]
+#[derive(Debug, Clone)]
+pub struct FieldDefinition {
+    /// Data type for this field
+    #[configurable(metadata(docs::examples = "utf8"))]
+    #[configurable(metadata(docs::examples = "int64"))]
+    #[configurable(metadata(docs::examples = "timestamp_ms"))]
+    pub r#type: String,
+
+    /// Enable Bloom filter for this specific column
+    ///
+    /// When enabled, a Bloom filter will be created for this column to improve
+    /// query performance for point lookups and IN clauses. Only enable for
+    /// high-cardinality columns (UUIDs, user IDs, etc.) to avoid overhead.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = true))]
+    pub bloom_filter: bool,
+
+    /// Number of distinct values expected for this column's Bloom filter
+    ///
+    /// This controls the size of the Bloom filter. Should match the actual
+    /// cardinality of the column. Will be automatically capped to the batch size.
+    ///
+    /// - Low cardinality (countries, states): 1,000 - 100,000
+    /// - Medium cardinality (cities, products): 100,000 - 1,000,000
+    /// - High cardinality (UUIDs, user IDs): 10,000,000+
+    #[serde(default, alias = "bloom_filter_ndv")]
+    #[configurable(metadata(docs::examples = 1000000))]
+    #[configurable(metadata(docs::examples = 10000000))]
+    pub bloom_filter_num_distinct_values: Option<u64>,
+
+    /// False positive probability for this column's Bloom filter (as a percentage)
+    ///
+    /// Lower values create larger but more accurate filters.
+    ///
+    /// - 0.05 (5%): Good balance for general use
+    /// - 0.01 (1%): Better for high-selectivity queries
+    #[serde(default, alias = "bloom_filter_fpp")]
+    #[configurable(metadata(docs::examples = 0.05))]
+    #[configurable(metadata(docs::examples = 0.01))]
+    pub bloom_filter_false_positive_pct: Option<f64>,
+}
+
+/// Bloom filter configuration for a specific column
+#[derive(Debug, Clone)]
+pub struct ColumnBloomFilterConfig {
+    /// Column name
+    pub column_name: String,
+    /// Whether Bloom filter is enabled for this column
+    pub enabled: bool,
+    /// Number of distinct values (if specified)
+    pub ndv: Option<u64>,
+    /// False positive probability (if specified)
+    pub fpp: Option<f64>,
+}
+
 /// A schema definition that can be deserialized from configuration
 #[configurable_component]
 #[derive(Debug, Clone)]
-#[serde(untagged)]
-pub enum SchemaDefinition {
-    /// Simple map of field names to type names
-    Simple(BTreeMap<String, String>),
+pub struct SchemaDefinition {
+    /// Map of field names to their type and Bloom filter configuration
+    #[serde(flatten)]
+    #[configurable(metadata(docs::additional_props_description = "A field definition specifying the data type and optional Bloom filter configuration."))]
+    pub fields: BTreeMap<String, FieldDefinition>,
 }
 
 impl SchemaDefinition {
     /// Convert the schema definition to an Arrow Schema
     pub fn to_arrow_schema(&self) -> Result<Arc<Schema>, SchemaDefinitionError> {
-        match self {
-            SchemaDefinition::Simple(fields) => {
-                let arrow_fields: Result<Vec<_>, _> = fields
-                    .iter()
-                    .map(|(name, type_str)| {
-                        let data_type = parse_data_type(type_str, name)?;
-                        // All fields are nullable by default when defined in config
-                        Ok(Arc::new(Field::new(name, data_type, true)))
-                    })
-                    .collect();
+        let arrow_fields: Result<Vec<_>, _> = self
+            .fields
+            .iter()
+            .map(|(name, field_def)| {
+                let data_type = parse_data_type(&field_def.r#type, name)?;
+                // All fields are nullable by default when defined in config
+                Ok(Arc::new(Field::new(name, data_type, true)))
+            })
+            .collect();
 
-                Ok(Arc::new(Schema::new(arrow_fields?)))
-            }
-        }
+        Ok(Arc::new(Schema::new(arrow_fields?)))
+    }
+
+    /// Extract per-column Bloom filter configurations
+    pub fn extract_bloom_filter_configs(&self) -> Vec<ColumnBloomFilterConfig> {
+        self.fields
+            .iter()
+            .filter_map(|(name, field_def)| {
+                if field_def.bloom_filter {
+                    Some(ColumnBloomFilterConfig {
+                        column_name: name.clone(),
+                        enabled: true,
+                        ndv: field_def.bloom_filter_num_distinct_values,
+                        fpp: field_def.bloom_filter_false_positive_pct,
+                    })
+                } else {
+                    None
+                }
+            })
+            .collect()
     }
 }
 
@@ -136,11 +210,35 @@ mod tests {
     #[test]
     fn test_simple_schema_definition() {
         let mut fields = BTreeMap::new();
-        fields.insert("id".to_string(), "int64".to_string());
-        fields.insert("name".to_string(), "utf8".to_string());
-        fields.insert("value".to_string(), "float64".to_string());
+        fields.insert(
+            "id".to_string(),
+            FieldDefinition {
+                r#type: "int64".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
+        fields.insert(
+            "name".to_string(),
+            FieldDefinition {
+                r#type: "utf8".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
+        fields.insert(
+            "value".to_string(),
+            FieldDefinition {
+                r#type: "float64".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
 
-        let schema_def = SchemaDefinition::Simple(fields);
+        let schema_def = SchemaDefinition { fields };
         let schema = schema_def.to_arrow_schema().unwrap();
 
         assert_eq!(schema.fields().len(), 3);
@@ -159,12 +257,44 @@ mod tests {
     #[test]
     fn test_timestamp_types() {
         let mut fields = BTreeMap::new();
-        fields.insert("ts_s".to_string(), "timestamp_second".to_string());
-        fields.insert("ts_ms".to_string(), "timestamp_millisecond".to_string());
-        fields.insert("ts_us".to_string(), "timestamp_microsecond".to_string());
-        fields.insert("ts_ns".to_string(), "timestamp_nanosecond".to_string());
+        fields.insert(
+            "ts_s".to_string(),
+            FieldDefinition {
+                r#type: "timestamp_second".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
+        fields.insert(
+            "ts_ms".to_string(),
+            FieldDefinition {
+                r#type: "timestamp_millisecond".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
+        fields.insert(
+            "ts_us".to_string(),
+            FieldDefinition {
+                r#type: "timestamp_microsecond".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
+        fields.insert(
+            "ts_ns".to_string(),
+            FieldDefinition {
+                r#type: "timestamp_nanosecond".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
 
-        let schema_def = SchemaDefinition::Simple(fields);
+        let schema_def = SchemaDefinition { fields };
         let schema = schema_def.to_arrow_schema().unwrap();
 
         assert_eq!(
@@ -188,14 +318,77 @@ mod tests {
     #[test]
     fn test_unknown_data_type() {
         let mut fields = BTreeMap::new();
-        fields.insert("bad_field".to_string(), "unknown_type".to_string());
+        fields.insert(
+            "bad_field".to_string(),
+            FieldDefinition {
+                r#type: "unknown_type".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
 
-        let schema_def = SchemaDefinition::Simple(fields);
+        let schema_def = SchemaDefinition { fields };
         let result = schema_def.to_arrow_schema();
 
         assert!(result.is_err());
         let err = result.unwrap_err();
         assert!(err.to_string().contains("unknown_type"));
+    }
+
+    #[test]
+    fn test_bloom_filter_extraction() {
+        let mut fields = BTreeMap::new();
+        fields.insert(
+            "id".to_string(),
+            FieldDefinition {
+                r#type: "int64".to_string(),
+                bloom_filter: false,
+                bloom_filter_num_distinct_values: None,
+                bloom_filter_false_positive_pct: None,
+            },
+        );
+        fields.insert(
+            "user_id".to_string(),
+            FieldDefinition {
+                r#type: "utf8".to_string(),
+                bloom_filter: true,
+                bloom_filter_num_distinct_values: Some(10_000_000),
+                bloom_filter_false_positive_pct: Some(0.01),
+            },
+        );
+        fields.insert(
+            "request_id".to_string(),
+            FieldDefinition {
+                r#type: "utf8".to_string(),
+                bloom_filter: true,
+                bloom_filter_num_distinct_values: None, // Will use global default
+                bloom_filter_false_positive_pct: None,
+            },
+        );
+
+        let schema_def = SchemaDefinition { fields };
+        let bloom_configs = schema_def.extract_bloom_filter_configs();
+
+        assert_eq!(bloom_configs.len(), 2);
+
+        // Check user_id config
+        let user_id_config = bloom_configs
+            .iter()
+            .find(|c| c.column_name == "user_id")
+            .unwrap();
+        assert!(user_id_config.enabled);
+        assert_eq!(user_id_config.ndv, Some(10_000_000));
+        assert_eq!(user_id_config.fpp, Some(0.01));
+
+        // Check request_id config
+        let request_id_config = bloom_configs
+            .iter()
+            .find(|c| c.column_name == "request_id")
+            .unwrap();
+        assert!(request_id_config.enabled);
+        assert_eq!(request_id_config.ndv, None);
+        assert_eq!(request_id_config.fpp, None);
     }
 
 }

@@ -285,6 +285,15 @@ generated: components: sinks: gcp_chronicle_unstructured: configuration: {
 
 						[otlp]: https://opentelemetry.io/docs/specs/otlp/
 						"""
+					parquet: """
+						Encodes events in [Apache Parquet][apache_parquet] columnar format.
+
+						Parquet is a columnar storage format optimized for analytics workloads.
+						It provides efficient compression and encoding schemes, making it ideal
+						for long-term storage and query performance.
+
+						[apache_parquet]: https://parquet.apache.org/
+						"""
 					protobuf: """
 						Encodes an event as a [Protobuf][protobuf] message.
 
@@ -447,6 +456,324 @@ generated: components: sinks: gcp_chronicle_unstructured: configuration: {
 				description: "List of fields that are included in the encoded event."
 				required:    false
 				type: array: items: type: string: {}
+			}
+			parquet: {
+				description:   "Apache Parquet-specific encoder options."
+				relevant_when: "codec = \"parquet\""
+				required:      true
+				type: object: options: {
+					allow_nullable_fields: {
+						description: """
+																Allow null values for non-nullable fields in the schema.
+
+																When enabled, missing or incompatible values will be encoded as null even for fields
+																marked as non-nullable in the Arrow schema. This is useful when working with downstream
+																systems that can handle null values through defaults, computed columns, or other mechanisms.
+
+																When disabled (default), missing values for non-nullable fields will cause encoding errors,
+																ensuring all required data is present before writing to Parquet.
+																"""
+						required: false
+						type: bool: {
+							default: false
+							examples: [true]
+						}
+					}
+					compression: {
+						description: """
+																Compression algorithm to use for Parquet columns
+
+																Compression is applied to all columns in the Parquet file.
+																Snappy provides a good balance of speed and compression ratio.
+																"""
+						required: false
+						type: string: {
+							default: "snappy"
+							enum: {
+								brotli:       "Brotli compression"
+								gzip:         "GZIP compression (slower, better compression ratio)"
+								lz4:          "LZ4 compression (very fast, moderate compression)"
+								snappy:       "Snappy compression (fast, moderate compression ratio)"
+								uncompressed: "No compression"
+								zstd:         "ZSTD compression (good balance of speed and compression)"
+							}
+							examples: ["snappy", "gzip", "zstd"]
+						}
+					}
+					compression_level: {
+						description: """
+																Compression level for algorithms that support it.
+
+																Only applies to ZSTD, GZIP, and Brotli compression. Ignored for other algorithms.
+
+																**ZSTD levels** (1-22):
+																- 1-3: Fastest, moderate compression (level 3 is default)
+																- 4-9: Good balance of speed and compression
+																- 10-15: Better compression, slower encoding
+																- 16-22: Maximum compression, slowest (good for cold storage)
+
+																**GZIP levels** (1-9):
+																- 1-3: Faster, less compression
+																- 6: Default balance (recommended)
+																- 9: Maximum compression, slowest
+
+																**Brotli levels** (0-11):
+																- 0-4: Faster encoding
+																- 1: Default (recommended)
+																- 5-11: Better compression, slower
+
+																Higher levels typically produce 20-50% smaller files but take 2-5x longer to encode.
+																Recommended: Use level 3-6 for hot data, 10-15 for cold storage.
+																"""
+						required: false
+						type: int: examples: [3, 6, 10]
+					}
+					exclude_columns: {
+						description: """
+																Column names to exclude from Parquet encoding
+
+																These columns will be completely excluded from the Parquet file.
+																Useful for filtering out metadata, internal fields, or temporary data.
+
+																Only applies when `infer_schema` is enabled. Ignored when using explicit schema.
+																"""
+						required: false
+						type: array: items: type: string: examples: ["vec![\"_metadata\".to_string(), \"internal_id\".to_string()]"]
+					}
+					infer_schema: {
+						description: """
+																Automatically infer schema from event data
+
+																When enabled, the schema is inferred from each batch of events independently.
+																The schema is determined by examining the types of values in the events.
+
+																**Type mapping:**
+																- String values → `utf8`
+																- Integer values → `int64`
+																- Float values → `float64`
+																- Boolean values → `boolean`
+																- Timestamp values → `timestamp_microsecond`
+																- Arrays/Objects → `utf8` (serialized as JSON)
+
+																**Type conflicts:** If a field has different types across events in the same batch,
+																it will be encoded as `utf8` (string) and all values will be converted to strings.
+
+																**Important:** Schema consistency across batches is the operator's responsibility.
+																Use VRL transforms to ensure consistent types if needed. Each batch may produce
+																a different schema if event structure varies.
+
+																**Bloom filters:** Not supported with inferred schemas. Use explicit schema for Bloom filters.
+
+																Mutually exclusive with `schema`. Must specify either `schema` or `infer_schema: true`.
+																"""
+						required: false
+						type: bool: {
+							default: false
+							examples: [true]
+						}
+					}
+					max_columns: {
+						description: """
+																Maximum number of columns to encode
+
+																Limits the number of columns in the Parquet file. Additional columns beyond
+																this limit will be silently dropped. Columns are selected in the order they
+																appear in the first event.
+
+																Only applies when `infer_schema` is enabled. Ignored when using explicit schema.
+																"""
+						required: false
+						type: uint: {
+							default: 1000
+							examples: [500, 1000]
+						}
+					}
+					row_group_size: {
+						description: """
+																Number of rows per row group
+
+																Row groups are Parquet's unit of parallelization. Larger row groups
+																can improve compression but increase memory usage during encoding.
+
+																Since each batch becomes a separate Parquet file, this value
+																should be <= the batch max_events setting. Row groups cannot span multiple files.
+																If not specified, defaults to the batch size.
+																"""
+						required: false
+						type: uint: examples: [100000, 1000000]
+					}
+					schema: {
+						description: """
+																The Arrow schema definition to use for encoding
+
+																This schema defines the structure and types of the Parquet file columns.
+																Specified as a map of field names to data types.
+
+																Mutually exclusive with `infer_schema`. Must specify either `schema` or `infer_schema: true`.
+
+																Supported types: utf8, int8, int16, int32, int64, uint8, uint16, uint32, uint64,
+																float32, float64, boolean, binary, timestamp_second, timestamp_millisecond,
+																timestamp_microsecond, timestamp_nanosecond, date32, date64, and more.
+																"""
+						required: false
+						type: object: {
+							examples: [{
+								id: {
+									bloom_filter:     false
+									bloom_filter_fpp: null
+									bloom_filter_ndv: null
+									type:             "int64"
+								}
+								name: {
+									bloom_filter:     true
+									bloom_filter_fpp: 0.01
+									bloom_filter_ndv: 1000000
+									type:             "utf8"
+								}
+								timestamp: {
+									bloom_filter:     false
+									bloom_filter_fpp: null
+									bloom_filter_ndv: null
+									type:             "timestamp_microsecond"
+								}
+							}]
+							options: "*": {
+								description: "A field definition specifying the data type and optional Bloom filter configuration."
+								required:    true
+								type: object: options: {
+									bloom_filter: {
+										description: """
+																								Enable Bloom filter for this specific column
+
+																								When enabled, a Bloom filter will be created for this column to improve
+																								query performance for point lookups and IN clauses. Only enable for
+																								high-cardinality columns (UUIDs, user IDs, etc.) to avoid overhead.
+																								"""
+										required: false
+										type: bool: {
+											default: false
+											examples: [true]
+										}
+									}
+									bloom_filter_fpp: {
+										description: """
+																								False positive probability for this column's Bloom filter
+
+																								Lower values create larger but more accurate filters.
+
+																								- 0.05 (5%): Good balance for general use
+																								- 0.01 (1%): Better for high-selectivity queries
+																								"""
+										required: false
+										type: float: examples: [0.05, 0.01]
+									}
+									bloom_filter_ndv: {
+										description: """
+																								Number of distinct values expected for this column's Bloom filter
+
+																								This controls the size of the Bloom filter. Should match the actual
+																								cardinality of the column. Will be automatically capped to the batch size.
+
+																								- Low cardinality (countries, states): 1,000 - 100,000
+																								- Medium cardinality (cities, products): 100,000 - 1,000,000
+																								- High cardinality (UUIDs, user IDs): 10,000,000+
+																								"""
+										required: false
+										type: uint: examples: [1000000, 10000000]
+									}
+									type: {
+										description: "Data type for this field"
+										required:    true
+										type: string: examples: ["utf8", "int64", "timestamp_ms"]
+									}
+								}
+							}
+						}
+					}
+					sorting_columns: {
+						description: """
+																Sorting order for rows within row groups.
+
+																Pre-sorting rows by specified columns before writing can significantly improve both
+																compression ratios and query performance. This is especially valuable for time-series
+																data and event logs.
+
+																**Benefits:**
+																- **Better compression** (20-40% smaller files): Similar values are grouped together
+																- **Faster queries**: More effective min/max statistics enable better row group skipping
+																- **Improved caching**: Query engines can more efficiently cache sorted data
+
+																**Common patterns:**
+																- Time-series: Sort by timestamp descending (most recent first)
+																- Multi-tenant: Sort by tenant_id, then timestamp
+																- User analytics: Sort by user_id, then event_time
+
+																**Trade-offs:**
+																- Adds sorting overhead during encoding (typically 10-30% slower writes)
+																- Requires buffering entire batch in memory for sorting
+																- Most beneficial when queries frequently filter on sorted columns
+
+																**Example:**
+																```yaml
+																sorting_columns:
+																  - column: timestamp
+																    descending: true
+																  - column: user_id
+																    descending: false
+																```
+
+																If not specified, rows are written in the order they appear in the batch.
+																"""
+						required: false
+						type: array: items: type: object: options: {
+							column: {
+								description: "Name of the column to sort by"
+								required:    true
+								type: string: examples: ["timestamp", "user_id"]
+							}
+							descending: {
+								description: """
+																							Sort in descending order (true) or ascending order (false)
+
+																							- `true`: Descending (Z-A, 9-0, newest-oldest)
+																							- `false`: Ascending (A-Z, 0-9, oldest-newest)
+																							"""
+								required: false
+								type: bool: {
+									default: false
+									examples: [true]
+								}
+							}
+						}
+					}
+					writer_version: {
+						description: """
+																Parquet format writer version.
+
+																Controls which Parquet format version to write:
+																- **v1** (PARQUET_1_0): Original format, maximum compatibility (default)
+																- **v2** (PARQUET_2_0): Modern format with improved encoding and statistics
+
+																Version 2 benefits:
+																- More efficient encoding for certain data types (10-20% smaller files)
+																- Better statistics for query optimization
+																- Improved data page format
+																- Required for some advanced features
+
+																Use v1 for maximum compatibility with older readers (pre-2018 tools).
+																Use v2 for better performance with modern query engines (Athena, Spark, Presto).
+																"""
+						required: false
+						type: string: {
+							default: "v2"
+							enum: {
+								v1: "Parquet format version 1.0 (maximum compatibility)"
+								v2: "Parquet format version 2.0 (modern format with better encoding)"
+							}
+							examples: ["v1", "v2"]
+						}
+					}
+				}
 			}
 			protobuf: {
 				description:   "Options for the Protobuf serializer."

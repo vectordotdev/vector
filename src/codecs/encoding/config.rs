@@ -147,8 +147,8 @@ impl EncodingConfigWithFraming {
     pub fn build_encoder(&self, sink_type: SinkType) -> crate::Result<(Transformer, EncoderKind)> {
         match &self.encoding.encoding {
             #[cfg(feature = "codecs-parquet")]
-            SerializerConfig::Parquet(parquet_config) => {
-                let serializer = ParquetSerializer::new(parquet_config.clone())?;
+            SerializerConfig::Parquet { parquet } => {
+                let serializer = ParquetSerializer::new(parquet.clone())?;
                 let encoder = EncoderKind::Batch(BatchEncoder::new(BatchSerializer::Parquet(
                     serializer,
                 )));

@@ -122,7 +122,10 @@ pub enum SerializerConfig {
     ///
     /// [apache_parquet]: https://parquet.apache.org/
     #[cfg(feature = "parquet")]
-    Parquet(ParquetSerializerConfig),
+    Parquet {
+        /// Apache Parquet-specific encoder options.
+        parquet: ParquetSerializerConfig,
+    },
 
     /// No encoding.
     ///
@@ -176,7 +179,10 @@ pub enum BatchSerializerConfig {
     ///
     /// [apache_parquet]: https://parquet.apache.org/
     #[cfg(feature = "parquet")]
-    Parquet(ParquetSerializerConfig),
+    Parquet {
+        /// Apache Parquet-specific encoder options.
+        parquet: ParquetSerializerConfig,
+    },
 }
 
 #[cfg(any(feature = "arrow", feature = "parquet"))]
@@ -187,7 +193,7 @@ impl BatchSerializerConfig {
             #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
             #[cfg(feature = "parquet")]
-            BatchSerializerConfig::Parquet(parquet_config) => parquet_config.input_type(),
+            BatchSerializerConfig::Parquet { parquet } => parquet.input_type(),
         }
     }
 
@@ -197,7 +203,7 @@ impl BatchSerializerConfig {
             #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
             #[cfg(feature = "parquet")]
-            BatchSerializerConfig::Parquet(parquet_config) => parquet_config.schema_requirement(),
+            BatchSerializerConfig::Parquet { parquet } => parquet.schema_requirement(),
         }
     }
 }
@@ -301,7 +307,7 @@ impl SerializerConfig {
             }
             SerializerConfig::Text(config) => Ok(Serializer::Text(config.build())),
             #[cfg(feature = "parquet")]
-            SerializerConfig::Parquet(_) => Err(
+            SerializerConfig::Parquet { .. } => Err(
                 VectorError::from(
                     "Parquet codec is available only for batch encoding and cannot be built as a framed serializer.",
                 )
@@ -343,7 +349,7 @@ impl SerializerConfig {
                 FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
             }
             #[cfg(feature = "parquet")]
-            SerializerConfig::Parquet(_) => FramingConfig::NewlineDelimited,
+            SerializerConfig::Parquet { .. } => FramingConfig::NewlineDelimited,
         }
     }
 
@@ -364,7 +370,7 @@ impl SerializerConfig {
         SerializerConfig::Otlp => OtlpSerializerConfig::default().input_type(),
         SerializerConfig::Protobuf(config) => config.input_type(),
         #[cfg(feature = "parquet")]
-        SerializerConfig::Parquet(config) => config.input_type(),
+        SerializerConfig::Parquet { parquet } => parquet.input_type(),
         SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
         SerializerConfig::Text(config) => config.input_type(),
     }
@@ -387,7 +393,7 @@ impl SerializerConfig {
         SerializerConfig::Otlp => OtlpSerializerConfig::default().schema_requirement(),
         SerializerConfig::Protobuf(config) => config.schema_requirement(),
         #[cfg(feature = "parquet")]
-        SerializerConfig::Parquet(config) => config.schema_requirement(),
+        SerializerConfig::Parquet { parquet } => parquet.schema_requirement(),
         SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
         SerializerConfig::Text(config) => config.schema_requirement(),
     }
