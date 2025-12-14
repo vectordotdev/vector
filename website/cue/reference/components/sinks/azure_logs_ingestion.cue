@@ -6,9 +6,11 @@ components: sinks: azure_logs_ingestion: {
 	description: """
 		This sink uses the Azure Monitor Logs Ingestion API to send log events to a Log Analytics Workspace.
 
-		The `azure_identity` crate is used for authentication, which supports the standard Azure authentication types
-		(Workload Identity, Managed Identity, Azure CLI, Service Principal with Certificate or Secret, etc.) through
-		environment variables.
+		The `azure_identity` crate is used for authentication, which supports standard Azure authentication types
+		(Service Principal, Managed Identity, Workload Identity, Azure CLI, etc.). However, because this crate
+		implements `DefaultAzureCredential` differently to other language SDKs, the authentication type must be
+		explicitly configured: either using `azure_tenant_id`, `azure_client_id`, `azure_client_secret`, or selecting
+		one of the `azure_credential_kind` options.
 		"""
 
 	classes: {
