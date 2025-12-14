@@ -50,7 +50,7 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 			azure_credential_kind: {
 				description: "The kind of Azure credential to use."
 				required:    true
-				type: string: examples: ["azurecli", "managedidentity", "workloadidentity"]
+				type: string: examples: ["azurecli", "managedidentity", "managedidentityclientassertion", "workloadidentity"]
 			}
 			azure_tenant_id: {
 				description: "The [Azure Tenant ID][azure_tenant_id]."
@@ -59,6 +59,21 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 					default: ""
 					examples: ["00000000-0000-0000-0000-000000000000"]
 				}
+			}
+			client_assertion_client_id: {
+				description: "The target Client ID to use. Only applicable when `azure_credential_kind` is `managedidentityclientassertion`."
+				required:    false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+			client_assertion_tenant_id: {
+				description: "The target Tenant ID to use. Only applicable when `azure_credential_kind` is `managedidentityclientassertion`."
+				required:    false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+			user_assigned_managed_identity_id: {
+				description: "The User Assigned Managed Identity (Client ID) to use. Only applicable when `azure_credential_kind` is `managedidentity` or `managedidentityclientassertion`."
+				required:    false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
 			}
 		}
 	}
