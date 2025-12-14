@@ -16,6 +16,7 @@ use arrow::{
     ipc::writer::StreamWriter,
     record_batch::RecordBatch,
 };
+use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
@@ -24,6 +25,18 @@ use std::sync::Arc;
 use vector_config::configurable_component;
 
 use vector_core::event::{Event, Value};
+
+/// Provides Arrow schema for encoding.
+///
+/// Sinks can implement this trait to provide custom schema fetching logic.
+#[async_trait]
+pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
+    /// Fetch the Arrow schema from the data store.
+    ///
+    /// This is called during sink configuration build phase to fetch
+    /// the schema once at startup, rather than at runtime.
+    async fn get_schema(&self) -> Result<Arc<Schema>, ArrowEncodingError>;
+}
 
 /// Configuration for Arrow IPC stream serialization
 #[configurable_component]
@@ -91,11 +104,9 @@ pub struct ArrowStreamSerializer {
 impl ArrowStreamSerializer {
     /// Create a new ArrowStreamSerializer with the given configuration
     pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, vector_common::Error> {
-        let mut schema = config.schema.ok_or_else(|| {
-            vector_common::Error::from(
-                "Arrow serializer requires a schema. Pass a schema or fetch from provider before creating serializer."
-            )
-        })?;
+        let mut schema = config
+            .schema
+            .ok_or_else(|| vector_common::Error::from("Arrow serializer requires a schema."))?;
 
         // If allow_nullable_fields is enabled, transform the schema once here
         // instead of on every batch encoding
@@ -153,6 +164,13 @@ pub enum ArrowEncodingError {
     /// Schema must be provided before encoding
     #[snafu(display("Schema must be provided before encoding"))]
     NoSchemaProvided,
+
+    /// Failed to fetch schema from provider
+    #[snafu(display("Failed to fetch schema from provider: {}", message))]
+    SchemaFetchError {
+        /// Error message from the provider
+        message: String,
+    },
 
     /// Unsupported Arrow data type for field
     #[snafu(display(

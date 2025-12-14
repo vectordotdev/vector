@@ -243,6 +243,53 @@ generated: components: sinks: clickhouse: configuration: {
 			}
 		}
 	}
+	batch_encoding: {
+		description: """
+			The batch encoding configuration for encoding events in batches.
+
+			When specified, events are encoded together as a single batch
+			This is mutually exclusive with per-event encoding based on the `format` field.
+			"""
+		required: false
+		type: object: options: {
+			allow_nullable_fields: {
+				description: """
+					Allow null values for non-nullable fields in the schema.
+
+					When enabled, missing or incompatible values will be encoded as null even for fields
+					marked as non-nullable in the Arrow schema. This is useful when working with downstream
+					systems that can handle null values through defaults, computed columns, or other mechanisms.
+
+					When disabled (default), missing values for non-nullable fields will cause encoding errors,
+					ensuring all required data is present before sending to the sink.
+					"""
+				required: false
+				type: bool: {
+					default: false
+					examples: [true]
+				}
+			}
+			codec: {
+				description: """
+					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
+
+					This is the streaming variant of the Arrow IPC format, which writes
+					a continuous stream of record batches.
+
+					[apache_arrow]: https://arrow.apache.org/
+					"""
+				required: true
+				type: string: enum: arrow_stream: """
+					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
+
+					This is the streaming variant of the Arrow IPC format, which writes
+					a continuous stream of record batches.
+
+					[apache_arrow]: https://arrow.apache.org/
+					"""
+			}
+		}
+	}
 	compression: {
 		description: """
 			Compression configuration.
@@ -333,6 +380,7 @@ generated: components: sinks: clickhouse: configuration: {
 		type: string: {
 			default: "json_each_row"
 			enum: {
+				arrow_stream:   "ArrowStream."
 				json_as_object: "JSONAsObject."
 				json_as_string: "JSONAsString."
 				json_each_row:  "JSONEachRow."
