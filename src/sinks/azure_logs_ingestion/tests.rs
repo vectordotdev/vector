@@ -33,6 +33,52 @@ fn generate_config() {
     crate::test_util::test_generate_config::<AzureLogsIngestionConfig>();
 }
 
+#[tokio::test]
+async fn basic_config_error_with_no_auth() {
+    let config: AzureLogsIngestionConfig = toml::from_str::<AzureLogsIngestionConfig>(
+        r#"
+            endpoint = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+            dcr_immutable_id = "dcr-00000000000000000000000000000000"
+            stream_name = "Custom-UnitTest"
+        "#)
+        .expect("Config parsing failed");
+    
+    assert_eq!(config.endpoint, "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com");
+    assert_eq!(config.dcr_immutable_id, "dcr-00000000000000000000000000000000");
+    assert_eq!(config.stream_name, "Custom-UnitTest");
+    assert_eq!(config.token_scope, "https://monitor.azure.com/.default");
+    assert_eq!(config.timestamp_field, "TimeGenerated");
+
+    match &config.auth {
+        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::ClientSecretCredential {
+            azure_tenant_id,
+            azure_client_id,
+            azure_client_secret,
+        } => {
+            assert_eq!(azure_tenant_id, "");
+            assert_eq!(azure_client_id, "");
+            let secret: String = azure_client_secret.inner().into();
+            assert_eq!(secret, "");
+        }
+        _ => panic!("Expected ClientSecretCredential variant"),
+    }
+
+    let cx = SinkContext::default();
+    let sink = config.build(cx).await;
+    match sink {
+        Ok(_) => panic!("Config build should have errored due to missing auth info"),
+        Err(e) => {
+            let err_str = e.to_string();
+            assert!(
+                err_str.contains("`auth.azure_tenant_id` is blank"),
+                "Config build did not complain about azure_tenant_id being blank: {}",
+                err_str
+            );
+        }
+    }
+
+}
+
 #[test]
 fn basic_config_with_client_credentials() {
     let config: AzureLogsIngestionConfig = toml::from_str::<AzureLogsIngestionConfig>(
@@ -66,6 +112,35 @@ fn basic_config_with_client_credentials() {
             assert_eq!(secret, "mock-client-secret");
         }
         _ => panic!("Expected ClientSecretCredential variant"),
+    }
+}
+
+#[test]
+fn basic_config_with_managed_identity() {
+    let config: AzureLogsIngestionConfig = toml::from_str::<AzureLogsIngestionConfig>(
+        r#"
+            endpoint = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+            dcr_immutable_id = "dcr-00000000000000000000000000000000"
+            stream_name = "Custom-UnitTest"
+            
+            [auth]
+            azure_credential_kind = "managedidentity"
+        "#)
+        .expect("Config parsing failed");
+    
+    assert_eq!(config.endpoint, "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com");
+    assert_eq!(config.dcr_immutable_id, "dcr-00000000000000000000000000000000");
+    assert_eq!(config.stream_name, "Custom-UnitTest");
+    assert_eq!(config.token_scope, "https://monitor.azure.com/.default");
+    assert_eq!(config.timestamp_field, "TimeGenerated");
+
+    match &config.auth {
+        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::SpecificAzureCredential {
+            azure_credential_kind,
+        } => {
+            assert_eq!(azure_credential_kind, "managedidentity");
+        }
+        _ => panic!("Expected SpecificAzureCredential variant"),
     }
 }
 
