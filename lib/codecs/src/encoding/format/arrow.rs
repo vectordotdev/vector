@@ -31,7 +31,10 @@ use vector_core::event::{Event, Value};
 /// Sinks can implement this trait to provide custom schema fetching logic.
 #[async_trait]
 pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
-    /// Get the Arrow schema for encoding events.
+    /// Fetch the Arrow schema from the data store.
+    ///
+    /// This is called during sink configuration build phase to fetch
+    /// the schema once at startup, rather than at runtime.
     async fn get_schema(&self) -> Result<Arc<Schema>, ArrowEncodingError>;
 }
 
@@ -81,19 +84,6 @@ impl ArrowStreamSerializerConfig {
         }
     }
 
-    /// Resolve the schema from a provider.
-    ///
-    /// This fetches the schema from the provider and stores it in this config,
-    /// preserving all other configuration fields (like `allow_nullable_fields`).
-    pub async fn resolve_with_provider(
-        &mut self,
-        provider: &dyn SchemaProvider,
-    ) -> Result<(), ArrowEncodingError> {
-        let schema = provider.get_schema().await?;
-        self.schema = Some(schema);
-        Ok(())
-    }
-
     /// The data type of events that are accepted by `ArrowStreamEncoder`.
     pub fn input_type(&self) -> vector_core::config::DataType {
         vector_core::config::DataType::Log
@@ -114,11 +104,9 @@ pub struct ArrowStreamSerializer {
 impl ArrowStreamSerializer {
     /// Create a new ArrowStreamSerializer with the given configuration
     pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, vector_common::Error> {
-        let mut schema = config.schema.ok_or_else(|| {
-            vector_common::Error::from(
-                "Arrow serializer requires a schema. Pass a schema or fetch from provider before creating serializer."
-            )
-        })?;
+        let mut schema = config
+            .schema
+            .ok_or_else(|| vector_common::Error::from("Arrow serializer requires a schema."))?;
 
         // If allow_nullable_fields is enabled, transform the schema once here
         // instead of on every batch encoding

@@ -98,8 +98,6 @@ fn parse_schema_from_response(response: &str) -> crate::Result<Arc<Schema>> {
 }
 
 /// Schema provider implementation for ClickHouse tables.
-///
-/// Fetches the table schema from ClickHouse at runtime using the system.columns table.
 #[derive(Clone, Debug)]
 pub struct ClickHouseSchemaProvider {
     client: HttpClient,

@@ -4,6 +4,7 @@ use std::fmt;
 
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
+use vector_lib::codecs::encoding::format::SchemaProvider;
 use vector_lib::codecs::encoding::{ArrowStreamSerializerConfig, BatchSerializerConfig};
 
 use super::{
@@ -352,12 +353,14 @@ impl ClickhouseConfig {
             auth.cloned(),
         );
 
-        config.resolve_with_provider(&provider).await.map_err(|e| {
+        let schema = provider.get_schema().await.map_err(|e| {
             format!(
                 "Failed to fetch schema for {}.{}: {}.",
                 database_str, table_str, e
             )
         })?;
+
+        config.schema = Some(schema);
 
         debug!(
             "Successfully fetched Arrow schema with {} fields",
