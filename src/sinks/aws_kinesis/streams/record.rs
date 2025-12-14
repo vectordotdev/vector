@@ -62,11 +62,6 @@ impl SendRecord for KinesisStreamClient {
         records: Vec<Self::T>,
         stream_name: String,
     ) -> Result<KinesisResponse, SdkError<Self::E, HttpResponse>> {
-        let rec_count = records.len();
-        let total_size = records
-            .iter()
-            .fold(0, |acc, record| acc + record.data().as_ref().len());
-
         self.client
             .put_records()
             .set_records(Some(records))
@@ -74,10 +69,13 @@ impl SendRecord for KinesisStreamClient {
             .send()
             .instrument(info_span!("request").or_current())
             .await
-            .map(|output: PutRecordsOutput| KinesisResponse {
-                failed_records: extract_failed_records(&output),
-                failure_count: output.failed_record_count().unwrap_or(0) as usize,
-                events_byte_size: CountByteSize(rec_count, JsonSize::new(total_size)).into(),
+            .map(|output: PutRecordsOutput| {
+                KinesisResponse {
+                    failed_records: extract_failed_records(&output),
+                    failure_count: output.failed_record_count().unwrap_or(0) as usize,
+                    // Placeholder - will be overwritten in service layer
+                    events_byte_size: GroupedCountByteSize::default(),
+                }
             })
     }
 }

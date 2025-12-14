@@ -197,15 +197,69 @@ impl RetryLogic for KinesisRetryLogic {
     fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
         if response.failure_count > 0 && self.retry_partial && !response.failed_records.is_empty() {
             let failed_records = response.failed_records.clone();
+
             RetryAction::RetryPartial(Box::new(move |original_request| {
                 let failed_events: Vec<_> = failed_records
                     .iter()
                     .filter_map(|r| original_request.events.get(r.index).cloned())
                     .collect();
 
-                let metadata = RequestMetadata::from_batch(
+                let mut metadata = RequestMetadata::from_batch(
                     failed_events.iter().map(|req| req.get_metadata().clone()),
                 );
+
+                // Preserve accumulated counters from the original request
+                metadata.accumulate_success(
+                    original_request.metadata.accumulated_successful_events(),
+                    original_request.metadata.accumulated_successful_bytes(),
+                );
+
+                // Calculate successful events byte size from the original request
+                // Use failed_records indices to determine which events succeeded
+                let successful_size: usize = if failed_records.is_empty() {
+                    // Fast path: all succeeded (shouldn't happen here, but handle it)
+                    original_request
+                        .events
+                        .iter()
+                        .map(|req| {
+                            match req.get_metadata().events_estimated_json_encoded_byte_size() {
+                                GroupedCountByteSize::Untagged { size } => size.1.get(),
+                                GroupedCountByteSize::Tagged { .. } => 0,
+                            }
+                        })
+                        .sum()
+                } else {
+                    // Build a HashSet of failed indices for O(1) lookup
+                    use std::collections::HashSet;
+                    let failed_indices: HashSet<usize> =
+                        failed_records.iter().map(|fr| fr.index).collect();
+
+                    // Sum sizes for successful events only
+                    original_request
+                        .events
+                        .iter()
+                        .enumerate()
+                        .filter_map(|(index, req)| {
+                            if failed_indices.contains(&index) {
+                                None
+                            } else {
+                                let size = match req
+                                    .get_metadata()
+                                    .events_estimated_json_encoded_byte_size()
+                                {
+                                    GroupedCountByteSize::Untagged { size } => size.1.get(),
+                                    GroupedCountByteSize::Tagged { .. } => 0,
+                                };
+                                Some(size)
+                            }
+                        })
+                        .sum()
+                };
+
+                let successful_count = original_request.events.len() - failed_records.len();
+
+                // Accumulate the successful events from this attempt into the retry metadata
+                metadata.accumulate_success(successful_count, successful_size);
 
                 BatchKinesisRequest {
                     events: failed_events,
@@ -220,10 +274,224 @@ impl RetryLogic for KinesisRetryLogic {
 
 #[cfg(test)]
 mod tests {
-    use super::KinesisStreamsSinkConfig;
+    use super::*;
+    use crate::sinks::{
+        aws_kinesis::{
+            request_builder::{KinesisMetadata, KinesisRequest, KinesisRequestBuilder},
+            service::RecordResult,
+        },
+        util::{Compression, request_builder::EncodeResult},
+    };
+    use std::marker::PhantomData;
+    use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<KinesisStreamsSinkConfig>();
+    }
+
+    // Helper function to create a KinesisRequest for testing
+    fn create_test_kinesis_request(
+        index: usize,
+        byte_size: usize,
+    ) -> KinesisRequest<KinesisStreamRecord> {
+        let metadata = RequestMetadata::new(
+            1,
+            byte_size,
+            byte_size,
+            byte_size,
+            CountByteSize(1, JsonSize::new(byte_size)).into(),
+        );
+
+        // Use the KinesisRequestBuilder approach to construct properly
+        KinesisRequestBuilder::<KinesisStreamRecord> {
+            compression: Compression::None,
+            encoder: (Default::default(), Default::default()),
+            _phantom: PhantomData,
+        }
+        .build_request(
+            KinesisMetadata {
+                finalizers: Default::default(),
+                partition_key: format!("key-{}", index),
+            },
+            metadata,
+            EncodeResult::uncompressed(
+                bytes::Bytes::from(vec![index as u8; byte_size]),
+                CountByteSize(1, JsonSize::new(byte_size)).into(),
+            ),
+        )
+    }
+
+    #[test]
+    fn test_accumulated_counters_preserved_during_retries() {
+        // This test verifies that when partial failures occur and retries happen,
+        // the successful event counts and byte sizes from previous attempts are
+        // accumulated correctly in the retry request metadata.
+        //
+        // Scenario:
+        // - Initial request: 10 events (1000 bytes total, 100 bytes each)
+        // - First attempt: 7 succeed, 3 fail (indices 2, 5, 8)
+        // - Retry request should:
+        //   1. Only contain the 3 failed events
+        //   2. Accumulate 7 successful events (700 bytes) in metadata
+        // - Second attempt: 2 succeed, 1 fails (index 1 of retry, which is original index 5)
+        // - Second retry request should:
+        //   1. Only contain the 1 failed event
+        //   2. Accumulate 9 successful events (900 bytes) total
+
+        let retry_logic = KinesisRetryLogic {
+            retry_partial: true,
+        };
+
+        // Create initial request with 10 events (100 bytes each)
+        let initial_events: Vec<KinesisRequest<KinesisStreamRecord>> = (0..10)
+            .map(|i| create_test_kinesis_request(i, 100))
+            .collect();
+
+        let initial_metadata = RequestMetadata::from_batch(
+            initial_events.iter().map(|req| req.get_metadata().clone()),
+        );
+
+        let initial_request = BatchKinesisRequest {
+            events: initial_events,
+            metadata: initial_metadata,
+        };
+
+        // Verify initial request has no accumulated counters
+        assert_eq!(
+            initial_request.metadata.accumulated_successful_events(),
+            0,
+            "Initial request should have no accumulated successful events"
+        );
+        assert_eq!(
+            initial_request.metadata.accumulated_successful_bytes(),
+            0,
+            "Initial request should have no accumulated successful bytes"
+        );
+
+        // First response: 7 succeed, 3 fail (indices 2, 5, 8 fail)
+        let first_response = KinesisResponse {
+            failure_count: 3,
+            events_byte_size: CountByteSize(7, JsonSize::new(700)).into(),
+            failed_records: vec![
+                RecordResult {
+                    index: 2,
+                    success: false,
+                    error_code: Some("ProvisionedThroughputExceededException".to_string()),
+                    error_message: Some("Rate exceeded".to_string()),
+                },
+                RecordResult {
+                    index: 5,
+                    success: false,
+                    error_code: Some("ProvisionedThroughputExceededException".to_string()),
+                    error_message: Some("Rate exceeded".to_string()),
+                },
+                RecordResult {
+                    index: 8,
+                    success: false,
+                    error_code: Some("InternalFailure".to_string()),
+                    error_message: Some("Internal error".to_string()),
+                },
+            ],
+        };
+
+        // Get retry action for first attempt
+        let retry_action = retry_logic.should_retry_response(&first_response);
+
+        match retry_action {
+            RetryAction::RetryPartial(retry_fn) => {
+                let first_retry_request = retry_fn(initial_request);
+
+                // Verify first retry request contains only 3 failed events
+                assert_eq!(
+                    first_retry_request.events.len(),
+                    3,
+                    "First retry should contain 3 failed events"
+                );
+
+                // Verify accumulated counters from first attempt
+                assert_eq!(
+                    first_retry_request.metadata.accumulated_successful_events(),
+                    7,
+                    "First retry should accumulate 7 successful events from first attempt"
+                );
+                assert_eq!(
+                    first_retry_request.metadata.accumulated_successful_bytes(),
+                    700,
+                    "First retry should accumulate 700 bytes from first attempt"
+                );
+
+                // Verify the retry request has the correct failed events (indices 2, 5, 8)
+                let retry_partition_keys: Vec<String> = first_retry_request
+                    .events
+                    .iter()
+                    .map(|req| req.key.partition_key.clone())
+                    .collect();
+                assert_eq!(
+                    retry_partition_keys,
+                    vec!["key-2", "key-5", "key-8"],
+                    "First retry should contain events at original indices 2, 5, 8"
+                );
+
+                // Second response: 2 succeed, 1 fails (index 1 of the retry, which is original index 5)
+                let second_response = KinesisResponse {
+                    failure_count: 1,
+                    events_byte_size: CountByteSize(2, JsonSize::new(200)).into(),
+                    failed_records: vec![RecordResult {
+                        index: 1, // This is index 1 in the retry request (original index 5)
+                        success: false,
+                        error_code: Some("ProvisionedThroughputExceededException".to_string()),
+                        error_message: Some("Rate still exceeded".to_string()),
+                    }],
+                };
+
+                // Get retry action for second attempt
+                let second_retry_action = retry_logic.should_retry_response(&second_response);
+
+                match second_retry_action {
+                    RetryAction::RetryPartial(second_retry_fn) => {
+                        let second_retry_request = second_retry_fn(first_retry_request);
+
+                        // Verify second retry request contains only 1 failed event
+                        assert_eq!(
+                            second_retry_request.events.len(),
+                            1,
+                            "Second retry should contain 1 failed event"
+                        );
+
+                        // Verify accumulated counters now include both attempts
+                        // First attempt: 7 successful
+                        // Second attempt: 2 successful
+                        // Total: 9 successful events, 900 bytes
+                        assert_eq!(
+                            second_retry_request
+                                .metadata
+                                .accumulated_successful_events(),
+                            9,
+                            "Second retry should accumulate 9 successful events total (7 from first + 2 from second)"
+                        );
+                        assert_eq!(
+                            second_retry_request.metadata.accumulated_successful_bytes(),
+                            900,
+                            "Second retry should accumulate 900 bytes total (700 from first + 200 from second)"
+                        );
+
+                        // Verify the second retry request has the correct failed event (original index 5)
+                        let second_retry_partition_keys: Vec<String> = second_retry_request
+                            .events
+                            .iter()
+                            .map(|req| req.key.partition_key.clone())
+                            .collect();
+                        assert_eq!(
+                            second_retry_partition_keys,
+                            vec!["key-5"],
+                            "Second retry should contain event at original index 5"
+                        );
+                    }
+                    _ => panic!("Expected RetryPartial action for second attempt"),
+                }
+            }
+            _ => panic!("Expected RetryPartial action for first attempt"),
+        }
     }
 }
