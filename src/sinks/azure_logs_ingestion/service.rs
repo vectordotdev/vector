@@ -123,8 +123,7 @@ impl AzureLogsIngestionService {
         let access_token: AccessToken = self
             .credential
             .get_token(&[&self.token_scope], None)
-            .await
-            .expect("failed to get access token from credential");
+            .await?;
 
         let bearer = format!("Bearer {}", access_token.token.secret());
 
@@ -157,7 +156,7 @@ impl AzureLogsIngestionService {
             }
 
             if res.status() == StatusCode::NOT_FOUND {
-                return Err("Azure returned 404 Not Found. Either the URL provided is incorrect, or the request is too large".into());
+                return Err("Azure returned 404 Not Found. Either the URL provided is incorrect, or the request is too large.".into());
             }
 
             if res.status() == StatusCode::BAD_REQUEST {
