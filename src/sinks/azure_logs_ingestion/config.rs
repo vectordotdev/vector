@@ -186,6 +186,21 @@ impl AzureAuthentication {
                 azure_client_id,
                 azure_client_secret,
             } => {
+                if azure_tenant_id == "" {
+                    return Err(Error::with_message(ErrorKind::Credential, || {
+                        format!("`auth.azure_tenant_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.")
+                    }))
+                }
+                if azure_client_id == "" {
+                    return Err(Error::with_message(ErrorKind::Credential, || {
+                        format!("`auth.azure_client_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.")
+                    }))
+                }
+                if azure_client_secret.inner() == "" {
+                    return Err(Error::with_message(ErrorKind::Credential, || {
+                        format!("`auth.azure_client_secret` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.")
+                    }))
+                }
                 let secret: String = azure_client_secret.inner().into();
                 let credential = ClientSecretCredential::new(
                     &azure_tenant_id.clone(),
@@ -206,7 +221,7 @@ impl AzureAuthentication {
                     azure_credential_kinds::WORKLOAD_IDENTITY => WorkloadIdentityCredential::new(None)?,
                     _ => {
                         return Err(Error::with_message(ErrorKind::Credential, || {
-                            format!("unknown/unsupported azure_credential_kind `{}`", azure_credential_kind)
+                            format!("`auth.azure_credential_kind` `{azure_credential_kind}` is unknown/unsupported")
                         }))
                     }
                 };
@@ -276,8 +291,7 @@ impl SinkConfig for AzureLogsIngestionConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let endpoint: UriSerde = self.endpoint.parse()?;
 
-        let credential: Arc<dyn TokenCredential> = self.auth.credential().await
-            .expect("Failed to create credential");
+        let credential: Arc<dyn TokenCredential> = self.auth.credential().await?;
 
         self.build_inner(
             cx,
