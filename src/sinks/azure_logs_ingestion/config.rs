@@ -10,7 +10,9 @@ use azure_identity::{
     AzureCliCredential,
     ClientSecretCredential,
     ManagedIdentityCredential,
-    WorkloadIdentityCredential,
+    ManagedIdentityCredentialOptions,
+    UserAssignedId,
+    WorkloadIdentityCredential
 };
 use vector_lib::{
     schema,
@@ -172,6 +174,11 @@ pub enum AzureAuthentication {
         #[configurable(metadata(docs::examples = "managedidentity"))]
         #[configurable(metadata(docs::examples = "workloadidentity"))]
         azure_credential_kind: String,
+
+        /// The User Assigned Managed Identity (Client ID) to use. Only applicable when `azure_credential_kind` is `managedidentity`.
+        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        user_assigned_managed_identity_id: Option<String>,
     }
 }
 
@@ -213,11 +220,19 @@ impl AzureAuthentication {
 
             Self::SpecificAzureCredential {
                 azure_credential_kind,
+                user_assigned_managed_identity_id,
             } => {
                 let credential: Arc<dyn TokenCredential> = match azure_credential_kind.replace(' ', "").to_lowercase().as_str() {
                     #[cfg(not(target_arch = "wasm32"))]
                     azure_credential_kinds::AZURE_CLI => AzureCliCredential::new(None)?,
-                    azure_credential_kinds::MANAGED_IDENTITY => ManagedIdentityCredential::new(None)?,
+                    azure_credential_kinds::MANAGED_IDENTITY => {
+                        let mut options = ManagedIdentityCredentialOptions::default();
+                        if user_assigned_managed_identity_id.is_some() {
+                            options.user_assigned_id = Some(UserAssignedId::ClientId(user_assigned_managed_identity_id.clone().unwrap()));
+                        }
+                        
+                        ManagedIdentityCredential::new(Some(options))?
+                    }
                     azure_credential_kinds::WORKLOAD_IDENTITY => WorkloadIdentityCredential::new(None)?,
                     _ => {
                         return Err(Error::with_message(ErrorKind::Credential, || {

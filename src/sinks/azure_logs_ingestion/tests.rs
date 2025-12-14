@@ -137,6 +137,7 @@ fn basic_config_with_managed_identity() {
     match &config.auth {
         crate::sinks::azure_logs_ingestion::config::AzureAuthentication::SpecificAzureCredential {
             azure_credential_kind,
+            user_assigned_managed_identity_id: _,
         } => {
             assert_eq!(azure_credential_kind, "managedidentity");
         }
