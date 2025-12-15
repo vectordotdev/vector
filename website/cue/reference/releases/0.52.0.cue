@@ -75,6 +75,13 @@ releases: "0.52.0": {
 		{
 			type: "enhancement"
 			description: """
+				The `http_client` source now supports the `body` parameter. VRL is also supported in the body which allows a dynamic request body to be generated.
+				"""
+			contributors: ["benjamin-awd"]
+		},
+		{
+			type: "enhancement"
+			description: """
 				The GELF decoder now supports a `validation` option with two modes: `strict` (default) and `relaxed`. When set to `relaxed`, the decoder will accept:
 
 				- GELF versions other than 1.1
@@ -354,5 +361,12 @@ releases: "0.52.0": {
 		{sha: "0f998497b88393ba33ee90d6775f0848237e32a3", date: "2025-12-10 23:04:15 UTC", description: "bump aws-actions/configure-aws-credentials from 5.0.0 to 5.1.1", pr_number: 24323, scopes: ["ci"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 1, insertions_count: 6, deletions_count: 6},
 		{sha: "a053a2e62dc6c1490af2f9eacb7efafdcad0ab26", date: "2025-12-11 12:31:40 UTC", description: "reconnect indefinitely when connection fails", pr_number: 24069, scopes: ["websocket source"], type: "fix", breaking_change: false, author: "Benjamin Dornel", files_count: 4, insertions_count: 50, deletions_count: 20},
 		{sha: "3f48cae746dfaa7d75b110e94cbe3cfedb6ebf82", date: "2025-12-11 12:53:32 UTC", description: "allow configurable null handling in Arrow encoder", pr_number: 24288, scopes: ["codecs"], type: "enhancement", breaking_change: false, author: "Benjamin Dornel", files_count: 2, insertions_count: 217, deletions_count: 3},
+		{sha: "d2771c3f5639e9d87ba103a0492d0db05451df86", date: "2025-12-12 14:42:57 UTC", description: "clean up some `allow` statements", pr_number: 24366, scopes: ["dev"], type: "chore", breaking_change: false, author: "WaterWhisperer", files_count: 2, insertions_count: 0, deletions_count: 2},
+		{sha: "b9cbce345499d42a691a8d485025068dd1cab3b0", date: "2025-12-12 22:43:29 UTC", description: "README e2e badge", pr_number: 24375, scopes: ["internal docs"], type: "docs", breaking_change: false, author: "Thomas", files_count: 1, insertions_count: 1, deletions_count: 1},
+		{sha: "feb33ce7f08ec6799963d94ac8f627a2e131cbbe", date: "2025-12-13 03:05:00 UTC", description: "bump VRL to use 0.29.0 sha", pr_number: 24378, scopes: ["deps"], type: "chore", breaking_change: false, author: "Thomas", files_count: 2, insertions_count: 48, deletions_count: 36},
+		{sha: "3921ecb5c14a6b48f89747907af08c7ddb08b207", date: "2025-12-15 19:45:23 UTC", description: "bump github/codeql-action from 3.30.6 to 4.31.6", pr_number: 24324, scopes: ["ci"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 1, insertions_count: 1, deletions_count: 1},
+		{sha: "faa2c21fcdbac813e8433afec24fe7849556b197", date: "2025-12-15 19:54:46 UTC", description: "bump docker/metadata-action from 5.9.0 to 5.10.0", pr_number: 24326, scopes: ["ci"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 1, insertions_count: 1, deletions_count: 1},
+		{sha: "eae0be26759331ca19fe5d77ecee78cd329e3133", date: "2025-12-15 19:55:09 UTC", description: "bump DataDog/dd-octo-sts-action from 1.0.1 to 1.0.3", pr_number: 24325, scopes: ["ci"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 1, insertions_count: 1, deletions_count: 1},
+		{sha: "e6397f3fdba0306fb0def6d602c9f3d4053fa109", date: "2025-12-16 12:39:24 UTC", description: "add support for request body", pr_number: 24170, scopes: ["http_client source"], type: "enhancement", breaking_change: false, author: "Benjamin Dornel", files_count: 10, insertions_count: 489, deletions_count: 92},
 	]
 }
