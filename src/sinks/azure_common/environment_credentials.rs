@@ -9,6 +9,8 @@ const AZURE_CLIENT_ID_ENV_KEY: &str = "AZURE_CLIENT_ID";
 const AZURE_FEDERATED_TOKEN_FILE: &str = "AZURE_FEDERATED_TOKEN_FILE";
 const AZURE_CLIENT_SECRET_ENV_KEY: &str = "AZURE_CLIENT_SECRET";
 
+// Modified from https://docs.rs/azure_identity/0.17.0/src/azure_identity/token_credentials/environment_credentials.rs.html to work with version 0.25.0 of Azure Rust SDK
+
 /// Enables authentication with Workflows Identity if either `AZURE_FEDERATED_TOKEN` or `AZURE_FEDERATED_TOKEN_FILE` is set,
 /// otherwise enables authentication to Azure Active Directory using client secret, or a username and password.
 ///
@@ -23,9 +25,9 @@ const AZURE_CLIENT_SECRET_ENV_KEY: &str = "AZURE_CLIENT_SECRET";
 /// | `AZURE_FEDERATED_TOKEN_FILE`        | Path to an federated token file. Variable is present in pods with aks workload identities. |
 /// | `AZURE_AUTHORITY_HOST`              | Url for the identity provider to exchange to federated token for an `access_token`. Variable is present in pods with aks workload identities. |
 ///
-/// This credential ultimately uses a or `WorkloadIdentityCredential` a`ClientSecretCredential` to perform the authentication using
+/// This credential ultimately uses a `WorkloadIdentityCredential` or a `ClientSecretCredential` to perform the authentication using
 /// these details.
-/// Please consult the documentation of that class for more details.
+/// Please consult the documentation of those classes for more details.
 #[derive(Clone, Debug)]
 pub struct EnvironmentCredential {
     options: TokenCredentialOptions,
@@ -64,22 +66,6 @@ impl TokenCredential for EnvironmentCredential {
 
         let federated_token_file = std::env::var(AZURE_FEDERATED_TOKEN_FILE);
         let client_secret = std::env::var(AZURE_CLIENT_SECRET_ENV_KEY);
-
-        /*
-        pub struct WorkloadIdentityCredentialOptions {
-    /// Options for the [`ClientAssertionCredential`] used by the [`WorkloadIdentityCredential`].
-    pub credential_options: ClientAssertionCredentialOptions,
-
-    /// Client ID of the Entra identity. Defaults to the value of the environment variable `AZURE_CLIENT_ID`.
-    pub client_id: Option<String>,
-
-    /// Tenant ID of the Entra identity. Defaults to the value of the environment variable `AZURE_TENANT_ID`.
-    pub tenant_id: Option<String>,
-
-    /// Path of a file containing a Kubernetes service account token. Defaults to the value of the environment
-    /// variable `AZURE_FEDERATED_TOKEN_FILE`.
-    pub token_file_path: Option<PathBuf>,
-} */
 
        if let Ok(file) = federated_token_file {
             if let Ok(credential) = WorkloadIdentityCredential::new(
