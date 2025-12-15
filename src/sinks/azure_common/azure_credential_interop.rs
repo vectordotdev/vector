@@ -1,4 +1,5 @@
 // Interop module for Azure Credentials
+// Copied from https://github.com/Metaswitch/apt-transport-blob/pull/77/files
 
 use azure_core::credentials::TokenCredential;
 use azure_core_for_storage::error::{Error, ErrorKind};
