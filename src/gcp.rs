@@ -12,6 +12,7 @@ use goauth::{
     credentials::Credentials,
 };
 use http::{Uri, uri::PathAndQuery};
+use http_body::{Body as _, Collected};
 use hyper::header::AUTHORIZATION;
 use smpl_jwt::Jwt;
 use snafu::{ResultExt, Snafu};
@@ -296,8 +297,10 @@ async fn get_token_implicit() -> Result<Token, GcpError> {
         .context(GetImplicitTokenSnafu)?;
 
     let body = res.into_body();
-    let bytes = hyper::body::to_bytes(body)
+    let bytes = body
+        .collect()
         .await
+        .map(Collected::to_bytes)
         .context(GetTokenBytesSnafu)?;
 
     // Token::from_str is irresponsible and may panic!
