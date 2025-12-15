@@ -1,9 +1,10 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 use crate::{built_info, config};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct VectorStarted;
 
 impl InternalEvent for VectorStarted {
@@ -20,7 +21,7 @@ impl InternalEvent for VectorStarted {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct VectorReloaded<'a> {
     pub config_paths: &'a [config::ConfigPath],
 }
@@ -37,7 +38,7 @@ impl InternalEvent for VectorReloaded<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct VectorStopped;
 
 impl InternalEvent for VectorStopped {
@@ -50,7 +51,7 @@ impl InternalEvent for VectorStopped {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct VectorQuit;
 
 impl InternalEvent for VectorQuit {
@@ -63,7 +64,7 @@ impl InternalEvent for VectorQuit {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct VectorReloadError {
     pub reason: &'static str,
 }
@@ -89,7 +90,7 @@ impl InternalEvent for VectorReloadError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct VectorConfigLoadError;
 
 impl InternalEvent for VectorConfigLoadError {
@@ -111,7 +112,7 @@ impl InternalEvent for VectorConfigLoadError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct VectorRecoveryError;
 
 impl InternalEvent for VectorRecoveryError {

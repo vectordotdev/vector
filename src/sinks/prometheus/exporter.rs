@@ -323,6 +323,7 @@ fn authorized<T: HttpBody>(req: &Request<T>, auth: &Option<Auth>) -> bool {
                 Auth::Bearer { token } => Some(HeaderValue::from_str(
                     format!("Bearer {}", token.inner()).as_str(),
                 )),
+                Auth::Custom { value } => Some(HeaderValue::from_str(value)),
                 #[cfg(feature = "aws-core")]
                 _ => None,
             };
@@ -961,9 +962,10 @@ mod tests {
         }
 
         let body = result.into_body();
-        let bytes = hyper::body::to_bytes(body)
+        let bytes = http_body::Body::collect(body)
             .await
-            .expect("Reading body failed");
+            .expect("Reading body failed")
+            .to_bytes();
 
         sink_handle.await.unwrap();
 
@@ -1040,9 +1042,10 @@ mod tests {
         }
 
         let body = result.into_body();
-        let bytes = hyper::body::to_bytes(body)
+        let bytes = http_body::Body::collect(body)
             .await
-            .expect("Reading body failed");
+            .expect("Reading body failed")
+            .to_bytes();
         let result = String::from_utf8(bytes.to_vec()).unwrap();
 
         sink_handle.await.unwrap();
@@ -1494,9 +1497,10 @@ mod integration_tests {
             .send(request)
             .await
             .expect("Could not send request");
-        let result = hyper::body::to_bytes(result.into_body())
+        let result = http_body::Body::collect(result.into_body())
             .await
-            .expect("Error fetching body");
+            .expect("Error fetching body")
+            .to_bytes();
         String::from_utf8_lossy(&result).to_string()
     }
 
@@ -1515,9 +1519,10 @@ mod integration_tests {
             .send(request)
             .await
             .expect("Could not fetch query");
-        let result = hyper::body::to_bytes(result.into_body())
+        let result = http_body::Body::collect(result.into_body())
             .await
-            .expect("Error fetching body");
+            .expect("Error fetching body")
+            .to_bytes();
         let result = String::from_utf8_lossy(&result);
         serde_json::from_str(result.as_ref()).expect("Invalid JSON from prometheus")
     }

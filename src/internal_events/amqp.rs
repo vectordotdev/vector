@@ -1,9 +1,10 @@
 #[cfg(feature = "sources-amqp")]
 pub mod source {
     use metrics::counter;
+    use vector_lib::NamedInternalEvent;
     use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct AmqpBytesReceived {
         pub byte_size: usize,
         pub protocol: &'static str,
@@ -24,7 +25,7 @@ pub mod source {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct AmqpEventError {
         pub error: lapin::Error,
     }
@@ -45,7 +46,7 @@ pub mod source {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct AmqpAckError {
         pub error: lapin::Error,
     }
@@ -66,7 +67,7 @@ pub mod source {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct AmqpRejectError {
         pub error: lapin::Error,
     }
