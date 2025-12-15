@@ -328,6 +328,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           vdev: true
+          mold: false
+          cargo-cache: false
 
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which
@@ -417,6 +419,8 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           vdev: true
+          mold: false
+          cargo-cache: false
 
       # creates a yaml file that contains the filters for each test,
       # extracted from the output of the `vdev int ci-paths` command, which
