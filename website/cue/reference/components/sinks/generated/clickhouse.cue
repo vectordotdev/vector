@@ -264,10 +264,7 @@ generated: components: sinks: clickhouse: configuration: {
 					ensuring all required data is present before sending to the sink.
 					"""
 				required: false
-				type: bool: {
-					default: false
-					examples: [true]
-				}
+				type: bool: default: false
 			}
 			codec: {
 				description: """

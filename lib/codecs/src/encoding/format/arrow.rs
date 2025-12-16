@@ -56,7 +56,7 @@ pub struct ArrowStreamSerializerConfig {
     /// When disabled (default), missing values for non-nullable fields will cause encoding errors,
     /// ensuring all required data is present before sending to the sink.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = true))]
+    #[configurable(derived)]
     pub allow_nullable_fields: bool,
 }
 
