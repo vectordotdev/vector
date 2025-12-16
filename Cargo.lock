@@ -12508,7 +12508,7 @@ dependencies = [
 
 [[package]]
 name = "vector"
-version = "0.52.0"
+version = "0.53.0"
 dependencies = [
  "apache-avro 0.16.0",
  "approx",
@@ -13106,7 +13106,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.29.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#195f1ed6a334978a8b5d318030b606a902973351"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#53f01dfa6226fb3f4093d1bf838319c522f2dcad"
 dependencies = [
  "aes",
  "aes-siv",
