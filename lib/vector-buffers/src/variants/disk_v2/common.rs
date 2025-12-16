@@ -208,7 +208,6 @@ where
     ///
     /// Defaults to `usize::MAX`, or effectively no limit.  Due to the internal design of the
     /// buffer, the effective maximum limit is around `max_data_file_size` * 2^16.
-    #[allow(dead_code)]
     pub fn max_buffer_size(mut self, amount: u64) -> Self {
         self.max_buffer_size = Some(amount);
         self
