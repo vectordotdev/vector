@@ -184,8 +184,6 @@ async fn correct_request() {
     })
     .await;
 
-    println!("Mock token authority running at {}", mock_token_authority.to_string());
-
     let mut credential_options = TokenCredentialOptions::default();
     //credential_options.set_authority_host("http://127.0.0.1:9001".into());
     credential_options.set_authority_host(mock_token_authority.to_string());
@@ -195,12 +193,10 @@ async fn correct_request() {
         "mock-client-id".into(),
         "mock-client-secret".into(),
         Some(ClientSecretCredentialOptions {
-            credential_options: credential_options,
+            credential_options,
         }),
     )
     .expect("failed to create ClientSecretCredential");
-
-    println!("Created ClientSecretCredential");
 
     let config: AzureLogsIngestionConfig = toml::from_str(
         r#"
