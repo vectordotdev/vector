@@ -341,7 +341,7 @@ impl ClickhouseConfig {
         let database_str = database.get_ref();
 
         debug!(
-            "Fetching schema for table {}.{} at startup",
+            "Fetching schema for table {}.{} at startup.",
             database_str, table_str
         );
 
@@ -363,7 +363,7 @@ impl ClickhouseConfig {
         config.schema = Some(schema);
 
         debug!(
-            "Successfully fetched Arrow schema with {} fields",
+            "Successfully fetched Arrow schema with {} fields.",
             config
                 .schema
                 .as_ref()
