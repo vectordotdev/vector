@@ -121,6 +121,7 @@ impl WebSocketConnector {
         Ok(ws_stream)
     }
 
+    #[cfg(feature = "sinks-websocket")]
     pub(crate) async fn connect_backoff(&self) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
         let mut backoff = ExponentialBackoff::default();
 
@@ -142,6 +143,7 @@ impl WebSocketConnector {
 
     /// Connects with exponential backoff, applying a timeout to each individual connection attempt.
     /// This will retry forever until a connection is established.
+    #[cfg(feature = "sources-websocket")]
     pub(crate) async fn connect_backoff_with_timeout(
         &self,
         timeout_duration: Duration,
