@@ -98,8 +98,8 @@ components: sinks: clickhouse: {
 				clickhouse:
 					type: clickhouse
 					endpoint: http://localhost:8123
-					database: mydatabase
-					table: mytable
+					database: my_database
+					table: my_table
 					format: json_each_row  # default
 				```
 
@@ -120,8 +120,8 @@ components: sinks: clickhouse: {
 				clickhouse:
 					type: clickhouse
 					endpoint: http://localhost:8123
-					database: mydatabase
-					table: mytable
+					database: my_database
+					table: my_table
 					format: arrow_stream
 					batch_encoding:
 						codec: arrow_stream
