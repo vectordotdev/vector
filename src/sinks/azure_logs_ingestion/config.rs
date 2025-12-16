@@ -220,19 +220,19 @@ impl AzureAuthentication {
                 azure_client_id,
                 azure_client_secret,
             } => {
-                if azure_tenant_id == "" {
+                if azure_tenant_id.is_empty() {
                     return Err(Error::with_message(ErrorKind::Credential, || {
-                        format!("`auth.azure_tenant_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.")
+                        "`auth.azure_tenant_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
                     }))
                 }
-                if azure_client_id == "" {
+                if azure_client_id.is_empty() {
                     return Err(Error::with_message(ErrorKind::Credential, || {
-                        format!("`auth.azure_client_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.")
+                        "`auth.azure_client_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
                     }))
                 }
-                if azure_client_secret.inner() == "" {
+                if azure_client_secret.inner().is_empty() {
                     return Err(Error::with_message(ErrorKind::Credential, || {
-                        format!("`auth.azure_client_secret` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.")
+                        "`auth.azure_client_secret` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
                     }))
                 }
                 let secret: String = azure_client_secret.inner().into();
@@ -265,7 +265,7 @@ impl AzureAuthentication {
                     azure_credential_kinds::MANAGED_IDENTITY_CLIENT_ASSERTION => {
                         if client_assertion_tenant_id.is_none() || client_assertion_client_id.is_none() {
                             return Err(Error::with_message(ErrorKind::Credential, || {
-                                format!("`auth.client_assertion_tenant_id` and `auth.client_assertion_client_id` must be set when using `auth.azure_credential_kind` of `managedidentityclientassertion`")
+                                "`auth.client_assertion_tenant_id` and `auth.client_assertion_client_id` must be set when using `auth.azure_credential_kind` of `managedidentityclientassertion`".to_string()
                             }))
                         }
 
@@ -301,6 +301,7 @@ impl AzureAuthentication {
 }
 
 impl AzureLogsIngestionConfig {
+    #[allow(clippy::too_many_arguments)]
     pub(super) async fn build_inner(
         &self,
         cx: SinkContext,
