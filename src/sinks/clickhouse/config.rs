@@ -103,7 +103,7 @@ pub struct ClickhouseConfig {
 
     /// The batch encoding configuration for encoding events in batches.
     ///
-    /// When specified, events are encoded together as a single batch
+    /// When specified, events are encoded together as a single batch.
     /// This is mutually exclusive with per-event encoding based on the `format` field.
     #[configurable(derived)]
     #[serde(default)]

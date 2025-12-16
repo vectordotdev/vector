@@ -152,8 +152,8 @@ components: sinks: clickhouse: {
 
 				#### Unsupported Arrow Types
 
-				Based on [ClickHouse's Arrow format documentation](\(urls.clickhouse_arrow)), ClickHouse does not
-				support the following types:
+				Based on [ClickHouse's Arrow format documentation](\(urls.clickhouse_arrow)), the following
+				types are unsupported:
 				- `FIXED_SIZE_BINARY`
 				- `JSON`
 				- `UUID`
