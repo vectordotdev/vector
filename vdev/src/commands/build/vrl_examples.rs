@@ -120,13 +120,14 @@ fn args_from_kind(function_name: &str, p: &Parameter) -> Vec<vrl::value::Value> 
                 ]),
             ),
             (
+                "random_int",
+                HashMap::from([("max", vec![vrl::value::Value::Integer(1)])]),
+            ),
+            (
                 "random_float",
                 HashMap::from([(
                     "max",
-                    vec![
-                        vrl::value::Value::Float(NotNan::try_from(1.0).unwrap()),
-                        vrl::value::Value::Integer(1),
-                    ],
+                    vec![vrl::value::Value::Float(NotNan::try_from(1.0).unwrap())],
                 )]),
             ),
         ])
@@ -290,13 +291,6 @@ impl Cli {
                 .sum::<usize>()
         );
 
-        // Functions whose return types cannot be validated
-        const SKIP_RETURN_TYPE_VALIDATION: [&str; 3] = [
-            "merge",        // parameter mismatch: "to" is marked optional but treated as required
-            "random_float", // strict compile-time validation with min < max constraint
-            "random_int",   // strict compile-time validation with min < max constraint
-        ];
-
         // Inject examples into docs.json
         for (function_name, function) in &functions_with_examples {
             // Navigate to remap.functions.<function_name>
@@ -320,7 +314,7 @@ impl Cli {
                 .collect_vec();
             documented_return.sort();
 
-            let actual_return = if !SKIP_RETURN_TYPE_VALIDATION.contains(&function_name.as_str()) {
+            let actual_return = {
                 let mut return_type = HashSet::new();
 
                 // Create argument lists or derive types from VRL compilation
@@ -357,9 +351,6 @@ impl Cli {
                 let mut return_type = return_type.into_iter().collect_vec();
                 return_type.sort();
                 return_type
-            } else {
-                // Skip return type validation for functions we can't handle
-                documented_return.iter().map(|s| s.to_string()).collect()
             };
 
             if documented_return != actual_return {
