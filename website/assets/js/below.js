@@ -1,4 +1,4 @@
-import 'tocbot/dist/tocbot';
+import 'tocbot';
 
 // Table of contents for documentation pages
 const tableOfContents = () => {
