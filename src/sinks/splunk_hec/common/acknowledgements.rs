@@ -1,8 +1,9 @@
+use http_body::{Body as _, Collected};
 use hyper::Body;
 use serde::{Deserialize, Serialize};
-use std::io::Write;
 use std::{
     collections::HashMap,
+    io::Write,
     num::{NonZeroU8, NonZeroU64},
     sync::Arc,
     time::Duration,
@@ -11,7 +12,6 @@ use tokio::sync::{mpsc::Receiver, oneshot::Sender};
 use vector_lib::{configurable::configurable_component, event::EventStatus};
 
 use super::service::{HttpRequestBuilder, MetadataFields};
-use crate::sinks::util::Compressor;
 use crate::{
     config::AcknowledgementsConfig,
     http::HttpClient,
@@ -19,6 +19,7 @@ use crate::{
         SplunkIndexerAcknowledgementAPIError, SplunkIndexerAcknowledgementAckAdded,
         SplunkIndexerAcknowledgementAcksRemoved,
     },
+    sinks::util::Compressor,
 };
 
 /// Splunk HEC acknowledgement configuration.
@@ -243,8 +244,11 @@ impl HecAckClient {
 
         let status = response.status();
         if status.is_success() {
-            let response_body = hyper::body::to_bytes(response.into_body())
+            let response_body = response
+                .into_body()
+                .collect()
                 .await
+                .map(Collected::to_bytes)
                 .map_err(|_| HecAckApiError::ClientParseResponse)?;
             serde_json::from_slice::<HecAckStatusResponse>(&response_body)
                 .map_err(|_| HecAckApiError::ClientParseResponse)

@@ -1,5 +1,6 @@
 use chrono::{DateTime, Duration, Utc};
 use rand::{Rng, rng};
+use std::time::{Duration as StdDuration, Instant};
 use tokio::time::timeout;
 use vrl::event_path;
 
@@ -97,7 +98,7 @@ async fn emit_and_test(make_event: impl FnOnce(DateTime<Utc>) -> Event) {
 #[tokio::test]
 async fn emits_component_discarded_events_total_for_send_event() {
     metrics::init_test();
-    let (mut sender, _recv) = SourceSender::new_test_sender_with_buffer(1);
+    let (mut sender, _recv) = SourceSender::new_test_sender_with_options(1, None);
 
     let event = Event::Metric(Metric::new(
         "name",
@@ -138,7 +139,7 @@ async fn emits_component_discarded_events_total_for_send_event() {
 #[expect(clippy::cast_precision_loss)]
 async fn emits_component_discarded_events_total_for_send_batch() {
     metrics::init_test();
-    let (mut sender, _recv) = SourceSender::new_test_sender_with_buffer(1);
+    let (mut sender, _recv) = SourceSender::new_test_sender_with_options(1, None);
 
     let expected_drop = 100;
     let events: Vec<Event> = (0..(CHUNK_SIZE + expected_drop))
@@ -159,18 +160,134 @@ async fn emits_component_discarded_events_total_for_send_batch() {
     .await;
     assert!(res.is_err(), "Send should have timed out.");
 
-    let component_discarded_events_total = Controller::get()
+    let metrics = get_component_metrics();
+    assert_no_metric(&metrics, "component_timed_out_events_total");
+    assert_no_metric(&metrics, "component_timed_out_requests_total");
+    assert_counter_metric(
+        &metrics,
+        "component_discarded_events_total",
+        expected_drop as f64,
+    );
+}
+
+#[tokio::test]
+async fn times_out_send_event_with_timeout() {
+    metrics::init_test();
+
+    let timeout_duration = StdDuration::from_millis(10);
+    let (mut sender, _recv) = SourceSender::new_test_sender_with_options(1, Some(timeout_duration));
+
+    let event = Event::Metric(Metric::new(
+        "name",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 123.4 },
+    ));
+
+    sender
+        .send_event(event.clone())
+        .await
+        .expect("First send should succeed");
+
+    let start = Instant::now();
+    let result = sender.send_event(event).await;
+    let elapsed = start.elapsed();
+
+    assert!(
+        matches!(result, Err(SendError::Timeout)),
+        "Send should return a timeout error."
+    );
+    assert!(
+        elapsed >= timeout_duration,
+        "Send did not wait for the configured timeout"
+    );
+    assert!(elapsed <= timeout_duration * 2, "Send waited too long");
+
+    let metrics = get_component_metrics();
+    assert_no_metric(&metrics, "component_discarded_events_total");
+    assert_counter_metric(&metrics, "component_timed_out_events_total", 1.0);
+    assert_counter_metric(&metrics, "component_timed_out_requests_total", 1.0);
+}
+
+fn get_component_metrics() -> Vec<Metric> {
+    Controller::get()
         .expect("There must be a controller")
         .capture_metrics()
         .into_iter()
-        .filter(|metric| metric.name() == "component_discarded_events_total")
-        .collect::<Vec<_>>();
-    assert_eq!(component_discarded_events_total.len(), 1);
+        .filter(|metric| metric.name().starts_with("component_"))
+        .collect()
+}
 
-    let component_discarded_events_total = &component_discarded_events_total[0];
-    let MetricValue::Counter { value } = component_discarded_events_total.value() else {
-        panic!("component_discarded_events_total has invalid type")
+fn assert_no_metric(metrics: &[Metric], name: &str) {
+    assert!(
+        !metrics.iter().any(|metric| metric.name() == name),
+        "Metric {name} should not be present"
+    );
+}
+
+fn assert_counter_metric(metrics: &[Metric], name: &str, expected: f64) {
+    let mut filter = metrics.iter().filter(|metric| metric.name() == name);
+    let Some(metric) = filter.next() else {
+        panic!("Metric {name} should be present");
+    };
+    let MetricValue::Counter { value } = metric.value() else {
+        panic!("Metric {name} should be a counter");
+    };
+    assert_eq!(*value, expected);
+    assert!(
+        filter.next().is_none(),
+        "Only one {name} metric should be present"
+    );
+}
+
+#[tokio::test]
+#[expect(clippy::cast_precision_loss)]
+async fn emits_buffer_utilization_histogram_on_send_and_receive() {
+    metrics::init_test();
+    let buffer_size = 2;
+    let (mut sender, mut recv) = SourceSender::new_test_sender_with_options(buffer_size, None);
+
+    let event = Event::Log(LogEvent::from("test event"));
+    sender
+        .send_event(event.clone())
+        .await
+        .expect("first send succeeds");
+    sender
+        .send_event(event)
+        .await
+        .expect("second send succeeds");
+
+    // Drain the channel so both the send and receive paths are exercised.
+    assert!(recv.next().await.is_some());
+    assert!(recv.next().await.is_some());
+
+    let metrics: Vec<_> = Controller::get()
+        .expect("metrics controller available")
+        .capture_metrics()
+        .into_iter()
+        .filter(|metric| metric.name().starts_with("source_buffer_"))
+        .collect();
+    assert_eq!(metrics.len(), 3, "expected 3 utilization metrics");
+
+    let find_metric = |name: &str| {
+        metrics
+            .iter()
+            .find(|m| m.name() == name)
+            .unwrap_or_else(|| panic!("missing metric: {name}"))
     };
 
-    assert_eq!(*value, expected_drop as f64,);
+    let metric = find_metric("source_buffer_utilization");
+    let tags = metric.tags().expect("utilization histogram has tags");
+    assert_eq!(tags.get("output"), Some("_default"));
+
+    let metric = find_metric("source_buffer_utilization_level");
+    let MetricValue::Gauge { value } = metric.value() else {
+        panic!("source_buffer_utilization_level should be a gauge");
+    };
+    assert_eq!(*value, 2.0);
+
+    let metric = find_metric("source_buffer_max_event_size");
+    let MetricValue::Gauge { value } = metric.value() else {
+        panic!("source_buffer_max_event_size should be a gauge");
+    };
+    assert_eq!(*value, buffer_size as f64);
 }

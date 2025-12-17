@@ -973,7 +973,7 @@ mod test {
         event::{Event, LogEvent},
         shutdown::SourceShutdownCoordinator,
         sources::util::net::SocketListenAddr,
-        test_util::{collect_n, collect_n_stream, next_addr},
+        test_util::{addr::next_addr, collect_n, collect_n_stream},
     };
 
     #[derive(Clone)]
@@ -1475,7 +1475,7 @@ mod test {
     async fn blocked_framestream_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1499,7 +1499,7 @@ mod test {
     async fn normal_framestream_singlethreaded_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1542,7 +1542,7 @@ mod test {
     async fn normal_framestream_multithreaded_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1585,7 +1585,7 @@ mod test {
     async fn multiple_content_types_tcp() {
         let source_name = "test_source";
         let (tx, _) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,

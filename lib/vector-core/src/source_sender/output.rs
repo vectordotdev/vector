@@ -1,4 +1,9 @@
-use std::{fmt, num::NonZeroUsize, sync::Arc, time::Instant};
+use std::{
+    fmt,
+    num::NonZeroUsize,
+    sync::Arc,
+    time::{Duration, Instant},
+};
 
 use chrono::Utc;
 use futures::{Stream, StreamExt as _};
@@ -6,24 +11,26 @@ use metrics::Histogram;
 use tracing::Span;
 use vector_buffers::{
     config::MemoryBufferSize,
-    topology::channel::{self, LimitedReceiver, LimitedSender},
+    topology::channel::{self, ChannelMetricMetadata, LimitedReceiver, LimitedSender},
 };
 use vector_common::{
     byte_size_of::ByteSizeOf,
     internal_event::{
-        self, ComponentEventsDropped, CountByteSize, EventsSent, InternalEventHandle as _,
-        Registered, UNINTENTIONAL,
+        self, ComponentEventsDropped, ComponentEventsTimedOut, Count, CountByteSize, EventsSent,
+        InternalEventHandle as _, RegisterInternalEvent as _, Registered, UNINTENTIONAL,
     },
 };
 use vrl::value::Value;
 
-use super::{CHUNK_SIZE, ClosedError, SourceSenderItem};
+use super::{CHUNK_SIZE, SendError, SourceSenderItem};
 use crate::{
     EstimatedJsonEncodedSizeOf,
     config::{OutputId, log_schema},
     event::{Event, EventArray, EventContainer as _, EventRef, array},
     schema::Definition,
 };
+
+const UTILIZATION_METRIC_PREFIX: &str = "source_buffer";
 
 /// UnsentEvents tracks the number of events yet to be sent in the buffer. This is used to
 /// increment the appropriate counters when a future is not polled to completion. Particularly,
@@ -52,6 +59,15 @@ impl UnsentEventCount {
     const fn discard(&mut self) {
         self.count = 0;
     }
+
+    fn timed_out(&mut self) {
+        ComponentEventsTimedOut {
+            reason: "Source send timed out.",
+        }
+        .register()
+        .emit(Count(self.count));
+        self.count = 0;
+    }
 }
 
 impl Drop for UnsentEventCount {
@@ -76,6 +92,7 @@ pub(super) struct Output {
     /// The OutputId related to this source sender. This is set as the `upstream_id` in
     /// `EventMetadata` for all event sent through here.
     id: Arc<OutputId>,
+    timeout: Option<Duration>,
 }
 
 #[expect(clippy::missing_fields_in_debug)]
@@ -84,6 +101,7 @@ impl fmt::Debug for Output {
         fmt.debug_struct("Output")
             .field("sender", &self.sender)
             .field("output_id", &self.id)
+            .field("timeout", &self.timeout)
             // `metrics::Histogram` is missing `impl Debug`
             .finish()
     }
@@ -96,8 +114,11 @@ impl Output {
         lag_time: Option<Histogram>,
         log_definition: Option<Arc<Definition>>,
         output_id: OutputId,
+        timeout: Option<Duration>,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
-        let (tx, rx) = channel::limited(MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap()));
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap());
+        let metrics = ChannelMetricMetadata::new(UTILIZATION_METRIC_PREFIX, Some(output.clone()));
+        let (tx, rx) = channel::limited(limit, Some(metrics));
         (
             Self {
                 sender: tx,
@@ -107,6 +128,7 @@ impl Output {
                 ))),
                 log_definition,
                 id: Arc::new(output_id),
+                timeout,
             },
             rx,
         )
@@ -116,7 +138,7 @@ impl Output {
         &mut self,
         mut events: EventArray,
         unsent_event_count: &mut UnsentEventCount,
-    ) -> Result<(), ClosedError> {
+    ) -> Result<(), SendError> {
         let send_reference = Instant::now();
         let reference = Utc::now().timestamp_millis();
         events
@@ -133,31 +155,51 @@ impl Output {
 
         let byte_size = events.estimated_json_encoded_size_of();
         let count = events.len();
-        self.sender
-            .send(SourceSenderItem {
-                events,
-                send_reference,
-            })
-            .await
-            .map_err(|_| ClosedError)?;
+        self.send_with_timeout(events, send_reference).await?;
         self.events_sent.emit(CountByteSize(count, byte_size));
         unsent_event_count.decr(count);
         Ok(())
     }
 
+    async fn send_with_timeout(
+        &mut self,
+        events: EventArray,
+        send_reference: Instant,
+    ) -> Result<(), SendError> {
+        let item = SourceSenderItem {
+            events,
+            send_reference,
+        };
+        if let Some(timeout) = self.timeout {
+            match tokio::time::timeout(timeout, self.sender.send(item)).await {
+                Ok(Ok(())) => Ok(()),
+                Ok(Err(error)) => Err(error.into()),
+                Err(_elapsed) => Err(SendError::Timeout),
+            }
+        } else {
+            self.sender.send(item).await.map_err(Into::into)
+        }
+    }
+
     pub(super) async fn send_event(
         &mut self,
         event: impl Into<EventArray>,
-    ) -> Result<(), ClosedError> {
+    ) -> Result<(), SendError> {
         let event: EventArray = event.into();
         // It's possible that the caller stops polling this future while it is blocked waiting
         // on `self.send()`. When that happens, we use `UnsentEventCount` to correctly emit
         // `ComponentEventsDropped` events.
         let mut unsent_event_count = UnsentEventCount::new(event.len());
-        self.send(event, &mut unsent_event_count).await
+        self.send(event, &mut unsent_event_count)
+            .await
+            .inspect_err(|error| {
+                if let SendError::Timeout = error {
+                    unsent_event_count.timed_out();
+                }
+            })
     }
 
-    pub(super) async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), ClosedError>
+    pub(super) async fn send_event_stream<S, E>(&mut self, events: S) -> Result<(), SendError>
     where
         S: Stream<Item = E> + Unpin,
         E: Into<Event> + ByteSizeOf,
@@ -169,7 +211,7 @@ impl Output {
         Ok(())
     }
 
-    pub(super) async fn send_batch<I, E>(&mut self, events: I) -> Result<(), ClosedError>
+    pub(super) async fn send_batch<I, E>(&mut self, events: I) -> Result<(), SendError>
     where
         E: Into<Event> + ByteSizeOf,
         I: IntoIterator<Item = E>,
@@ -183,10 +225,15 @@ impl Output {
         for events in array::events_into_arrays(events, Some(CHUNK_SIZE)) {
             self.send(events, &mut unsent_event_count)
                 .await
-                .inspect_err(|_| {
-                    // The unsent event count is discarded here because the callee emits the
-                    // `StreamClosedError`.
-                    unsent_event_count.discard();
+                .inspect_err(|error| match error {
+                    SendError::Timeout => {
+                        unsent_event_count.timed_out();
+                    }
+                    SendError::Closed => {
+                        // The unsent event count is discarded here because the callee emits the
+                        // `StreamClosedError`.
+                        unsent_event_count.discard();
+                    }
                 })?;
         }
         Ok(())

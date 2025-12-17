@@ -2,9 +2,11 @@ use anyhow::Result;
 use chrono::prelude::*;
 
 use crate::utils::{cargo, git};
-use std::env;
-use std::fs::OpenOptions;
-use std::io::{self, Write};
+use std::{
+    env,
+    fs::OpenOptions,
+    io::{self, Write},
+};
 
 /// Setting necessary metadata for our publish workflow in CI.
 ///
