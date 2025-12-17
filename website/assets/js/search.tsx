@@ -2,7 +2,6 @@ import { autocomplete } from '@algolia/autocomplete-js'
 import Typesense from 'typesense'
 import React, { createElement, Fragment, useEffect, useRef } from 'react'
 import { createRoot } from 'react-dom/client'
-import { flushSync } from 'react-dom'
 
 // // Algolia search
 // const appId = process.env.ALGOLIA_APP_ID
