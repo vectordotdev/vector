@@ -2,7 +2,7 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tokio::time::interval;
 use tokio_stream::{wrappers::IntervalStream, StreamExt};
 use vector_common::shutdown::ShutdownSignal;
-use vrl::{diagnostic::Label, prelude::*};
+use vrl::{diagnostic::Label, prelude::*, value};
 
 use arc_swap::ArcSwap;
 use vector_core::{event::Metric, metrics::Controller};
@@ -117,56 +117,46 @@ pub(crate) fn metrics_vrl_typedef() -> BTreeMap<Field, Kind> {
 }
 
 pub(crate) fn metric_into_vrl(value: &Metric) -> Value {
-    Value::Object(BTreeMap::from([
-        ("name".into(), Value::Bytes(value.name().to_string().into())),
-        (
-            "tags".into(),
-            Value::Object(BTreeMap::from_iter(
+    value!({
+        name: { value.name() },
+        tags: {
+            BTreeMap::from_iter(
                 value
-                    .tags()
-                    .map(|t| {
-                        t.iter_sets()
-                            .map(|(k, v)| {
-                                (
-                                    k.into(),
-                                    Value::Array(
-                                        v.iter()
-                                            .filter_map(|v| {
-                                                v.map(ToString::to_string)
-                                                    .map(Into::into)
-                                                    .map(Value::Bytes)
-                                            })
-                                            .collect(),
-                                    ),
-                                )
-                            })
-                            .collect::<Vec<_>>()
-                    })
-                    .unwrap_or_default(),
-            )),
-        ),
-        ("type".into(), Value::Bytes(value.value().as_name().into())),
-        (
-            "kind".into(),
-            Value::Bytes(
-                match value.kind() {
-                    vector_core::event::MetricKind::Incremental => "incremental",
-                    vector_core::event::MetricKind::Absolute => "absolute",
-                }
-                .into(),
-            ),
-        ),
-        (
-            "value".into(),
+                .tags()
+                .map(|t| {
+                    t.iter_sets()
+                        .map(|(k, v)| {
+                            (
+                                k.into(),
+                                Value::Array(
+                                    v.iter()
+                                    .filter_map(|v| {
+                                        v.map(ToString::to_string).map(Into::into).map(Value::Bytes)
+                                    })
+                                    .collect(),
+                                ),
+                            )
+                        })
+                    .collect::<Vec<_>>()
+                })
+                .unwrap_or_default(),
+            )
+        },
+        "type": { value.value().as_name() },
+        kind: {
+            match value.kind() {
+                vector_core::event::MetricKind::Incremental => "incremental",
+                vector_core::event::MetricKind::Absolute => "absolute",
+            }
+        },
+        value: {
             match value.value() {
                 vector_core::event::MetricValue::Counter { value }
-                | vector_core::event::MetricValue::Gauge { value } => {
-                    NotNan::new(*value).map_or(Value::Null, Value::Float)
-                }
-                _ => Value::Null,
-            },
-        ),
-    ]))
+                | vector_core::event::MetricValue::Gauge { value } => NotNan::new(*value).ok(),
+                _ => None,
+            };
+        }
+    })
 }
 
 // Tests are defined here to simplify them - enabling access to `MetricsStorage`
