@@ -24,7 +24,7 @@ impl std::error::Error for Error {}
 
 impl DiagnosticMessage for Error {
     fn code(&self) -> usize {
-        111
+        112
     }
 
     fn labels(&self) -> Vec<Label> {
