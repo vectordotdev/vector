@@ -2,7 +2,9 @@ use std::collections::BTreeMap;
 
 use vrl::prelude::{expression::Expr, *};
 
-use crate::common::{metric_into_vrl, metrics_vrl_typedef, Error, MetricsStorage};
+use crate::common::{
+    metric_into_vrl, metrics_vrl_typedef, resolve_tags, validate_tags, Error, MetricsStorage,
+};
 
 fn get_metric(
     metrics_storage: &MetricsStorage,
@@ -71,16 +73,8 @@ impl Function for GetVectorMetric {
             .clone();
         let key = arguments.required("key");
         let tags = arguments.optional_object("tags")?.unwrap_or_default();
+        validate_tags(state, &tags)?;
 
-        for v in tags.values() {
-            if *v.type_def(state).kind() != Kind::bytes() {
-                return Err(Box::new(vrl::compiler::function::Error::InvalidArgument {
-                    keyword: "tags.value",
-                    value: v.resolve_constant(state).unwrap_or(Value::Null),
-                    error: "Tag values must be strings",
-                }));
-            }
-        }
         Ok(GetVectorMetricFn { metrics, key, tags }.as_expr())
     }
 }
@@ -95,19 +89,7 @@ struct GetVectorMetricFn {
 impl FunctionExpression for GetVectorMetricFn {
     fn resolve(&self, ctx: &mut Context) -> Resolved {
         let key = self.key.resolve(ctx)?;
-        let tags = self
-            .tags
-            .iter()
-            .map(|(k, v)| {
-                v.resolve(ctx).and_then(|v| {
-                    Ok((
-                        k.clone().into(),
-                        v.as_str().ok_or("Tag must be a string")?.into_owned(),
-                    ))
-                })
-            })
-            .collect::<Result<_, _>>()?;
-        get_metric(&self.metrics, key, tags)
+        get_metric(&self.metrics, key, resolve_tags(ctx, &self.tags)?)
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {

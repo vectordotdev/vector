@@ -2,7 +2,11 @@ use std::{collections::BTreeMap, sync::Arc, time::Duration};
 use tokio::time::interval;
 use tokio_stream::{wrappers::IntervalStream, StreamExt};
 use vector_common::shutdown::ShutdownSignal;
-use vrl::{diagnostic::Label, prelude::*, value};
+use vrl::{
+    diagnostic::Label,
+    prelude::{expression::Expr, *},
+    value,
+};
 
 use arc_swap::ArcSwap;
 use vector_core::{event::Metric, metrics::Controller};
@@ -157,6 +161,38 @@ pub(crate) fn metric_into_vrl(value: &Metric) -> Value {
             };
         }
     })
+}
+
+pub(crate) fn validate_tags(
+    state: &TypeState,
+    tags: &BTreeMap<KeyString, Expr>,
+) -> Result<(), Box<dyn DiagnosticMessage>> {
+    for v in tags.values() {
+        if *v.type_def(state).kind() != Kind::bytes() {
+            return Err(Box::new(vrl::compiler::function::Error::InvalidArgument {
+                keyword: "tags.value",
+                value: v.resolve_constant(state).unwrap_or(Value::Null),
+                error: "Tag values must be strings",
+            }));
+        }
+    }
+    Ok(())
+}
+
+pub(crate) fn resolve_tags(
+    ctx: &mut Context,
+    tags: &BTreeMap<KeyString, Expr>,
+) -> Result<BTreeMap<String, String>, ExpressionError> {
+    tags.iter()
+        .map(|(k, v)| {
+            v.resolve(ctx).and_then(|v| {
+                Ok((
+                    k.clone().into(),
+                    v.as_str().ok_or("Tag must be a string")?.into_owned(),
+                ))
+            })
+        })
+        .collect::<Result<_, _>>()
 }
 
 // Tests are defined here to simplify them - enabling access to `MetricsStorage`
