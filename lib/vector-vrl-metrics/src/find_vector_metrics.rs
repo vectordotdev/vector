@@ -45,14 +45,14 @@ impl Function for FindVectorMetrics {
 
     fn examples(&self) -> &'static [Example] {
         &[
-            Example {
+            example! {
                 title: "Find vector internal metrics matching the name",
                 source: r#"find_vector_metrics("utilization")"#,
                 result: Ok(
                     indoc! { r#"[{"name": "utilization", "tags": {}, "type": "gauge", "kind": "absolute", "value": 0.5}]"# },
                 ),
             },
-            Example {
+            example! {
                 title: "Find vector internal metrics matching the name and tags",
                 source: r#"find_vector_metrics("utilization", tags: {"component_id": "test"}})"#,
                 result: Ok(

@@ -42,14 +42,14 @@ impl Function for GetVectorMetric {
 
     fn examples(&self) -> &'static [Example] {
         &[
-            Example {
+            example! {
                 title: "Get a vector internal metric matching the name",
                 source: r#"get_vector_metrics("utilization")"#,
                 result: Ok(
                     indoc! { r#"{"name": "utilization", "tags": {}, "type": "gauge", "kind": "absolute", "value": 0.5}"# },
                 ),
             },
-            Example {
+            example! {
                 title: "Get a vector internal metric matching the name and tags",
                 source: r#"get_vector_metrics("utilization", tags: {"component_id": "test"}})"#,
                 result: Ok(

@@ -67,27 +67,27 @@ impl Function for AggregateVectorMetrics {
 
     fn examples(&self) -> &'static [Example] {
         &[
-            Example {
+            example! {
                 title: "Sum vector internal metrics matching the name",
                 source: r#"aggregate_vector_metrics("sum", "utilization")"#,
                 result: Ok("0.0"),
             },
-            Example {
+            example! {
                 title: "Sum vector internal metrics matching the name and tags",
                 source: r#"aggregate_vector_metrics("sum", "utilization", tags: {"component_id": "test"})"#,
                 result: Ok("0.0"),
             },
-            Example {
+            example! {
                 title: "Average of vector internal metrics matching the name",
                 source: r#"aggregate_vector_metrics("avg", "utilization")"#,
                 result: Ok("0.0"),
             },
-            Example {
+            example! {
                 title: "Max of vector internal metrics matching the name",
                 source: r#"aggregate_vector_metrics("max", "utilization")"#,
                 result: Ok("0.0"),
             },
-            Example {
+            example! {
                 title: "Min of vector internal metrics matching the name",
                 source: r#"aggregate_vector_metrics("max", "utilization")"#,
                 result: Ok("0.0"),
