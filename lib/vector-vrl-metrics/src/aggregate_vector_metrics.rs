@@ -111,6 +111,18 @@ impl Function for AggregateVectorMetrics {
             .expect("aggregation function not bytes");
         let key = arguments.required("key");
         let tags = arguments.optional_object("tags")?.unwrap_or_default();
+
+        for v in tags.values() {
+            if *v.type_def(state).kind() != Kind::bytes() {
+                return Err(Box::new(
+                    vrl::compiler::function::Error::UnexpectedExpression {
+                        keyword: "tags.value",
+                        expected: "string",
+                        expr: v.clone(),
+                    },
+                ));
+            }
+        }
         Ok(AggregateVectorMetricsFn {
             metrics,
             function,
@@ -148,6 +160,6 @@ impl FunctionExpression for AggregateVectorMetricsFn {
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
-        TypeDef::float().or_null().fallible()
+        TypeDef::float().or_null().infallible()
     }
 }

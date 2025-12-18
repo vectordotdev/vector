@@ -64,7 +64,7 @@ impl Function for FindVectorMetrics {
 
     fn compile(
         &self,
-        _state: &TypeState,
+        state: &TypeState,
         ctx: &mut FunctionCompileContext,
         arguments: ArgumentList,
     ) -> Compiled {
@@ -74,6 +74,18 @@ impl Function for FindVectorMetrics {
             .clone();
         let key = arguments.required("key");
         let tags = arguments.optional_object("tags")?.unwrap_or_default();
+
+        for v in tags.values() {
+            if *v.type_def(state).kind() != Kind::bytes() {
+                return Err(Box::new(
+                    vrl::compiler::function::Error::UnexpectedExpression {
+                        keyword: "tags.value",
+                        expected: "string",
+                        expr: v.clone(),
+                    },
+                ));
+            }
+        }
         Ok(FindVectorMetricsFn { metrics, key, tags }.as_expr())
     }
 }
@@ -107,6 +119,6 @@ impl FunctionExpression for FindVectorMetricsFn {
         TypeDef::object(Collection::from_unknown(
             Kind::object(metrics_vrl_typedef()),
         ))
-        .fallible()
+        .infallible()
     }
 }
