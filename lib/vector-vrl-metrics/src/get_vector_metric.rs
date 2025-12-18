@@ -89,11 +89,11 @@ impl FunctionExpression for GetVectorMetricFn {
             .tags
             .iter()
             .map(|(k, v)| {
-                v.resolve(ctx).map(|v| {
-                    (
+                v.resolve(ctx).and_then(|v| {
+                    Ok((
                         k.clone().into(),
-                        v.as_str().expect("tag must be a string").into_owned(),
-                    )
+                        v.as_str().ok_or("Tag must be a string")?.into_owned(),
+                    ))
                 })
             })
             .collect::<Result<_, _>>()?;
@@ -101,8 +101,6 @@ impl FunctionExpression for GetVectorMetricFn {
     }
 
     fn type_def(&self, _: &state::TypeState) -> TypeDef {
-        TypeDef::object(metrics_vrl_typedef())
-            .or_null()
-            .infallible()
+        TypeDef::object(metrics_vrl_typedef()).or_null().fallible()
     }
 }

@@ -92,11 +92,11 @@ impl FunctionExpression for FindVectorMetricsFn {
             .tags
             .iter()
             .map(|(k, v)| {
-                v.resolve(ctx).map(|v| {
-                    (
+                v.resolve(ctx).and_then(|v| {
+                    Ok((
                         k.clone().into(),
-                        v.as_str().expect("tag must be a string").into_owned(),
-                    )
+                        v.as_str().ok_or("Tag must be a string")?.into_owned(),
+                    ))
                 })
             })
             .collect::<Result<_, _>>()?;
@@ -107,6 +107,6 @@ impl FunctionExpression for FindVectorMetricsFn {
         TypeDef::object(Collection::from_unknown(
             Kind::object(metrics_vrl_typedef()),
         ))
-        .infallible()
+        .fallible()
     }
 }
