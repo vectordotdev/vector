@@ -1270,9 +1270,9 @@ mod test {
             ),
             // negate OR of two values
             (
-                "-@field:value1 OR -@field:value2",
-                log_event!["field" => "value"],
-                log_event!["field" => "value2"],
+                "-@field1:value1 OR -@field2:value2",
+                log_event!["field1" => "value1"],
+                log_event!["field1" => "value1", "field2" => "value2"],
             ),
             // default AND of two values
             (

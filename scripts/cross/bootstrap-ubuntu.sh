@@ -20,8 +20,10 @@ wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key| apt-key add -
 
 apt-get update
 
-# needed by onig_sys
+# unzip is needed for protoc
+# clang/llvm is needed due to bindgen (zstd-sys/onig_sys)
 apt-get install -y \
       libclang1-9 \
       llvm-9 \
+      clang \
       unzip

@@ -21,7 +21,7 @@ use vector_lib::{
 };
 
 use crate::{
-    event::{EventArray, EventContainer},
+    event::{EventArray, EventContainer, EventStatus, Finalizable},
     sinks::{blackhole::config::BlackholeConfig, util::StreamSink},
 };
 
@@ -82,7 +82,7 @@ impl StreamSink<EventArray> for BlackholeSink {
             });
         }
 
-        while let Some(events) = input.next().await {
+        while let Some(mut events) = input.next().await {
             if let Some(rate) = self.config.rate {
                 let factor: f32 = 1.0 / rate as f32;
                 let secs: f32 = factor * (events.len() as f32);
@@ -97,6 +97,9 @@ impl StreamSink<EventArray> for BlackholeSink {
             _ = self
                 .total_raw_bytes
                 .fetch_add(message_len.get(), Ordering::AcqRel);
+
+            let finalizers = events.take_finalizers();
+            finalizers.update_status(EventStatus::Delivered);
 
             events_sent.emit(CountByteSize(events.len(), message_len));
             bytes_sent.emit(ByteSize(message_len.get()));
