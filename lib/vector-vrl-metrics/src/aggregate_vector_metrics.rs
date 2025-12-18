@@ -114,13 +114,11 @@ impl Function for AggregateVectorMetrics {
 
         for v in tags.values() {
             if *v.type_def(state).kind() != Kind::bytes() {
-                return Err(Box::new(
-                    vrl::compiler::function::Error::UnexpectedExpression {
-                        keyword: "tags.value",
-                        expected: "string",
-                        expr: v.clone(),
-                    },
-                ));
+                return Err(Box::new(vrl::compiler::function::Error::InvalidArgument {
+                    keyword: "tags.value",
+                    value: v.resolve_constant(state).unwrap_or(Value::Null),
+                    error: "Tag values must be strings",
+                }));
             }
         }
         Ok(AggregateVectorMetricsFn {
