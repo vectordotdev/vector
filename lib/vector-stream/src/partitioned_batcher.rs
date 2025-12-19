@@ -351,6 +351,9 @@ where
 #[allow(clippy::cast_sign_loss)]
 #[cfg(test)]
 mod test {
+
+    use crate::partitioned_batcher::ByteSizeOfItemSize;
+    use crate::sinks::prelude::*;
     use std::{
         collections::{HashMap, HashSet},
         num::{NonZeroU8, NonZeroUsize},
@@ -359,7 +362,7 @@ mod test {
         time::Duration,
     };
 
-    use futures::{Stream, stream};
+    use futures::{Stream, StreamExt, stream};
     use pin_project::pin_project;
     use proptest::prelude::*;
     use tokio::{pin, time::advance};
@@ -367,6 +370,7 @@ mod test {
 
     use crate::{
         BatcherSettings,
+        batcher::BatchConfig,
         partitioned_batcher::{ExpirationQueue, PartitionedBatcher},
     };
 
@@ -701,6 +705,56 @@ mod test {
         assert_eq!(0, expiration_queue.len());
         let result = single_poll(|cx| expiration_queue.poll_expired(cx));
         assert_eq!(result, Poll::Ready(None));
+    }
+
+    #[tokio::test]
+    async fn partition_error_handling() {
+        // Test that partition errors are properly propagated
+        #[derive(Debug, Clone, PartialEq, Eq)]
+        struct TestError;
+
+        impl std::fmt::Display for TestError {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                write!(f, "Test partition error")
+            }
+        }
+
+        impl std::error::Error for TestError {}
+
+        struct FailingPartitioner;
+
+        impl Partitioner for FailingPartitioner {
+            type Item = u64;
+            type Key = u8;
+            type Error = TestError;
+
+            fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+                if *item % 2 == 0 {
+                    Ok((*item % 10) as u8)
+                } else {
+                    Err(TestError)
+                }
+            }
+        }
+
+        let items = vec![0, 1, 2, 3, 4];
+        let stream = Pin::new(Box::new(futures::stream::iter(items)));
+
+        let mut batched = SinkBuilderExt::batched_partitioned(stream, FailingPartitioner, || {
+            BatchConfig::default().as_item_size_config(ByteSizeOfItemSize)
+        });
+
+        let mut results = Vec::new();
+        while let Some(result) = batched.next().await {
+            results.push(result);
+        }
+
+        // Should have 2 successful batches (for items 0, 2, 4) and 2 errors (for items 1, 3)
+        let successes: Vec<_> = results.iter().filter_map(|r| r.as_ref().ok()).collect();
+        let errors: Vec<_> = results.iter().filter_map(|r| r.as_ref().err()).collect();
+
+        assert_eq!(errors.len(), 2, "Expected 2 partition errors");
+        assert_eq!(successes.len(), 3, "Expected 3 partition successes");
     }
 
     fn single_poll<T, F>(mut f: F) -> Poll<T>
