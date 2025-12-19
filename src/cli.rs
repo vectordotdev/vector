@@ -369,7 +369,7 @@ impl SubCommand {
             #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
             Self::Validate(v) => validate::validate(v, color).await,
-            Self::Vrl(s) => vrl::cli::cmd::cmd(s, crate::all_vrl_functions()),
+            Self::Vrl(s) => vrl::cli::cmd::cmd(s, vector_vrl_all::all_vrl_functions()),
         }
     }
 }

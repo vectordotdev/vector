@@ -96,10 +96,7 @@ fn main() {
         timezone: cmd.timezone(),
     };
 
-    let mut functions = vrl::stdlib::all();
-    functions.extend(vector_vrl_functions::all());
-    functions.extend(dnstap_parser::vrl_functions());
-    functions.extend(enrichment::vrl_functions());
+    let functions = vector_vrl_all::all_vrl_functions();
 
     run_tests(
         tests,
@@ -130,13 +127,7 @@ fn get_tests(cmd: &Cmd) -> Vec<Test> {
             Some(Test::from_path(&path))
         })
         .chain(docs::tests(cmd.ignore_cue))
-        .chain(get_tests_from_functions(
-            vector_vrl_functions::all()
-                .into_iter()
-                .chain(enrichment::vrl_functions())
-                .chain(dnstap_parser::vrl_functions())
-                .collect(),
-        ))
+        .chain(get_tests_from_functions(vector_vrl_all::all_vrl_functions()))
         .filter(|test| {
             should_run(
                 &format!("{}/{}", test.category, test.name),
