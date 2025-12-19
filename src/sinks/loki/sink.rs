@@ -313,11 +313,12 @@ impl EventEncoder {
         &mut self,
         mut event: Event,
     ) -> Result<LokiRecord, RequestBuildError> {
+        let finalizers = event.take_finalizers();
         let tenant_id = self
             .key_partitioner
             .partition(&event)
+            .inspect_err(|_| finalizers.update_status(EventStatus::Errored))
             .context(PartitioningSnafu)?;
-        let finalizers = event.take_finalizers();
         let json_byte_size = event.estimated_json_encoded_size_of();
         let mut labels: Vec<(String, String)> = self.build_labels(&event);
         self.remove_label_fields(&mut event);
