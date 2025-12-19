@@ -16,6 +16,7 @@ use arrow::{
     ipc::writer::StreamWriter,
     record_batch::RecordBatch,
 };
+use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use rust_decimal::Decimal;
@@ -25,6 +26,18 @@ use vector_config::configurable_component;
 
 use vector_core::event::{Event, Value};
 
+/// Provides Arrow schema for encoding.
+///
+/// Sinks can implement this trait to provide custom schema fetching logic.
+#[async_trait]
+pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
+    /// Fetch the Arrow schema from the data store.
+    ///
+    /// This is called during sink configuration build phase to fetch
+    /// the schema once at startup, rather than at runtime.
+    async fn get_schema(&self) -> Result<Schema, ArrowEncodingError>;
+}
+
 /// Configuration for Arrow IPC stream serialization
 #[configurable_component]
 #[derive(Clone, Default)]
@@ -32,7 +45,7 @@ pub struct ArrowStreamSerializerConfig {
     /// The Arrow schema to use for encoding
     #[serde(skip)]
     #[configurable(derived)]
-    pub schema: Option<Arc<arrow::datatypes::Schema>>,
+    pub schema: Option<arrow::datatypes::Schema>,
 
     /// Allow null values for non-nullable fields in the schema.
     ///
@@ -43,7 +56,7 @@ pub struct ArrowStreamSerializerConfig {
     /// When disabled (default), missing values for non-nullable fields will cause encoding errors,
     /// ensuring all required data is present before sending to the sink.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = true))]
+    #[configurable(derived)]
     pub allow_nullable_fields: bool,
 }
 
@@ -64,7 +77,7 @@ impl std::fmt::Debug for ArrowStreamSerializerConfig {
 
 impl ArrowStreamSerializerConfig {
     /// Create a new ArrowStreamSerializerConfig with a schema
-    pub fn new(schema: Arc<arrow::datatypes::Schema>) -> Self {
+    pub fn new(schema: arrow::datatypes::Schema) -> Self {
         Self {
             schema: Some(schema),
             allow_nullable_fields: false,
@@ -91,26 +104,28 @@ pub struct ArrowStreamSerializer {
 impl ArrowStreamSerializer {
     /// Create a new ArrowStreamSerializer with the given configuration
     pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, vector_common::Error> {
-        let mut schema = config.schema.ok_or_else(|| {
-            vector_common::Error::from(
-                "Arrow serializer requires a schema. Pass a schema or fetch from provider before creating serializer."
-            )
-        })?;
+        let schema = config
+            .schema
+            .ok_or_else(|| vector_common::Error::from("Arrow serializer requires a schema."))?;
 
         // If allow_nullable_fields is enabled, transform the schema once here
         // instead of on every batch encoding
-        if config.allow_nullable_fields {
-            schema = Arc::new(Schema::new_with_metadata(
+        let schema = if config.allow_nullable_fields {
+            Schema::new_with_metadata(
                 schema
                     .fields()
                     .iter()
                     .map(|f| Arc::new(make_field_nullable(f)))
                     .collect::<Vec<_>>(),
                 schema.metadata().clone(),
-            ));
-        }
+            )
+        } else {
+            schema
+        };
 
-        Ok(Self { schema })
+        Ok(Self {
+            schema: Arc::new(schema),
+        })
     }
 }
 
@@ -153,6 +168,13 @@ pub enum ArrowEncodingError {
     /// Schema must be provided before encoding
     #[snafu(display("Schema must be provided before encoding"))]
     NoSchemaProvided,
+
+    /// Failed to fetch schema from provider
+    #[snafu(display("Failed to fetch schema from provider: {}", message))]
+    SchemaFetchError {
+        /// Error message from the provider
+        message: String,
+    },
 
     /// Unsupported Arrow data type for field
     #[snafu(display(
@@ -1500,13 +1522,9 @@ mod tests {
         let log2 = LogEvent::default();
         let events = vec![Event::Log(log1), Event::Log(log2)];
 
-        let schema = Arc::new(Schema::new(vec![Field::new(
-            "strict_field",
-            DataType::Int64,
-            false,
-        )]));
+        let schema = Schema::new(vec![Field::new("strict_field", DataType::Int64, false)]);
 
-        let mut config = ArrowStreamSerializerConfig::new(Arc::clone(&schema));
+        let mut config = ArrowStreamSerializerConfig::new(schema);
         config.allow_nullable_fields = true;
 
         let mut serializer =
