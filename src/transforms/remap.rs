@@ -222,15 +222,20 @@ impl RemapConfig {
         config.set_custom(enrichment_tables.clone());
         config.set_custom(MeaningList::default());
 
-        let res = compile_vrl(&source, &vector_vrl_all::all_vrl_functions(), &state, config)
-            .map_err(|diagnostics| format_vrl_diagnostics(&source, diagnostics))
-            .map(|result| {
-                (
-                    result.program,
-                    format_vrl_diagnostics(&source, result.warnings),
-                    result.config.get_custom::<MeaningList>().unwrap().clone(),
-                )
-            });
+        let res = compile_vrl(
+            &source,
+            &vector_vrl_all::all_vrl_functions(),
+            &state,
+            config,
+        )
+        .map_err(|diagnostics| format_vrl_diagnostics(&source, diagnostics))
+        .map(|result| {
+            (
+                result.program,
+                format_vrl_diagnostics(&source, result.warnings),
+                result.config.get_custom::<MeaningList>().unwrap().clone(),
+            )
+        });
 
         self.cache
             .lock()
