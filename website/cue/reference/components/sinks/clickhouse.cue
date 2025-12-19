@@ -134,7 +134,7 @@ components: sinks: clickhouse: {
 
 		arrow_type_mappings: {
 			title: "Arrow Type Mappings"
-			body: """
+			body:  """
 				When using the `arrow_stream` format, Vector automatically converts ClickHouse types to Arrow types.
 				The sink fetches the table schema from ClickHouse and maps each column type accordingly.
 
