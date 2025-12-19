@@ -537,13 +537,10 @@ impl LokiSink {
             .filter_map(|event| {
                 let mut encoder = encoder.clone();
                 async move {
-                    match encoder.encode_event(event) {
-                        Ok(record) => Some(record),
-                        Err(error) => {
-                            emit!(SinkRequestBuildError { error });
-                            None
-                        }
-                    }
+                    encoder
+                        .encode_event(event)
+                        .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                        .ok()
                 }
             })
             .map(|record| filter.filter_record(record))

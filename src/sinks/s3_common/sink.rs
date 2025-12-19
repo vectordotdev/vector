@@ -49,13 +49,9 @@ where
         input
             .batched_partitioned(partitioner, || settings.as_byte_size_config())
             .filter_map(|result| async move {
-                match result {
-                    Ok((key, batch)) => Some((key, batch)),
-                    Err(error) => {
-                        emit!(SinkRequestBuildError { error });
-                        None
-                    }
-                }
+                result
+                    .inspect_err(|error| emit!(SinkRequestBuildError { error }))
+                    .ok()
             })
             .request_builder(default_request_builder_concurrency_limit(), request_builder)
             .filter_map(|request| async move {
