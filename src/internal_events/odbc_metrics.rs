@@ -1,7 +1,8 @@
 use metrics::counter;
 use vector_common::internal_event::{InternalEvent, error_type};
+use vector_lib::NamedInternalEvent;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct OdbcEventsReceived {
     pub count: usize,
 }
@@ -25,7 +26,7 @@ impl InternalEvent for OdbcEventsReceived {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct OdbcFailedError<'a> {
     pub statement: &'a str,
 }
@@ -46,7 +47,7 @@ impl InternalEvent for OdbcFailedError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct OdbcQueryExecuted<'a> {
     pub statement: &'a str,
     pub elapsed: u128,
