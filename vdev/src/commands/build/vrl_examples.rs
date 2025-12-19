@@ -10,6 +10,7 @@ use itertools::Itertools;
 use serde_json::{Value, json};
 use vrl::compiler;
 use vrl::compiler::function::ArgumentList;
+use vrl::parser::ast::{self, RootExpr};
 use vrl::prelude::{NotNan, Parameter};
 use vrl::value;
 
@@ -220,6 +221,211 @@ enum TestResult {
     DerivedTypes(Vec<String>),
 }
 
+/// Recursively find all function calls in an expression that match the given function name
+fn find_matching_function_calls(
+    expr: &ast::Expr,
+    function_name: &str,
+    source: &str,
+    return_types: &mut HashSet<String>,
+) {
+    match expr {
+        ast::Expr::FunctionCall(fc_node) => {
+            let fc = fc_node.inner();
+            // Check if this function call matches our target functionIfS
+            if fc.ident.inner().to_string() == function_name {
+                // Extract the source code for this function call using its span
+                let span = fc_node.span();
+                let function_source = &source[span.start()..span.end()];
+
+                // Compile just this function call
+                if let Ok(compiled) = vrl::compiler::compile(function_source, &vrl::stdlib::all()) {
+                    let type_info = compiled.program.final_type_info();
+                    let result = type_info.result;
+
+                    if result.is_object() || result.is_array() {
+                        if result.is_object() {
+                            return_types.insert("object".to_owned());
+                        }
+                        if result.is_array() {
+                            return_types.insert("array".to_owned());
+                        }
+                    } else {
+                        return_types.insert(result.to_string());
+                    }
+                }
+            }
+
+            // Recursively check arguments
+            for arg in &fc.arguments {
+                find_matching_function_calls(
+                    arg.inner().expr.inner(),
+                    function_name,
+                    source,
+                    return_types,
+                );
+            }
+
+            // Check closure if present
+            if let Some(closure) = &fc.closure {
+                // Block is a tuple struct: Block(pub Vec<Node<Expr>>)
+                for expr_node in &closure.inner().block.inner().0 {
+                    find_matching_function_calls(
+                        expr_node.inner(),
+                        function_name,
+                        source,
+                        return_types,
+                    );
+                }
+            }
+        }
+        ast::Expr::Op(op_node) => {
+            let op = op_node.inner();
+            // Op is a tuple: (Box<Node<Expr>>, Node<Opcode>, Box<Node<Expr>>)
+            find_matching_function_calls(op.0.inner(), function_name, source, return_types);
+            find_matching_function_calls(op.2.inner(), function_name, source, return_types);
+        }
+        ast::Expr::Assignment(assign_node) => {
+            let assign = assign_node.inner();
+            match assign {
+                ast::Assignment::Single { expr, .. } => {
+                    find_matching_function_calls(expr.inner(), function_name, source, return_types);
+                }
+                ast::Assignment::Infallible { expr, .. } => {
+                    find_matching_function_calls(expr.inner(), function_name, source, return_types);
+                }
+            }
+        }
+        ast::Expr::IfStatement(if_stmt_node) => {
+            let if_stmt = if_stmt_node.inner();
+            // Check predicate expression
+            if let ast::Predicate::One(pred_expr) = if_stmt.predicate.inner() {
+                find_matching_function_calls(
+                    pred_expr.inner(),
+                    function_name,
+                    source,
+                    return_types,
+                );
+            }
+
+            // Check if block - Block is a tuple struct: Block(pub Vec<Node<Expr>>)
+            for expr_node in &if_stmt.if_node.inner().0 {
+                find_matching_function_calls(
+                    expr_node.inner(),
+                    function_name,
+                    source,
+                    return_types,
+                );
+            }
+
+            // Check else block
+            if let Some(else_block) = &if_stmt.else_node {
+                for expr_node in &else_block.inner().0 {
+                    find_matching_function_calls(
+                        expr_node.inner(),
+                        function_name,
+                        source,
+                        return_types,
+                    );
+                }
+            }
+        }
+        ast::Expr::Container(container_node) => {
+            let container = container_node.inner();
+            match container {
+                ast::Container::Array(_) | ast::Container::Object(_) => {
+                    // Array and Object fields are private, skip for now
+                    // The function call will still be captured if it's at the top level
+                }
+                ast::Container::Block(block_node) => {
+                    // Block is a tuple struct: Block(pub Vec<Node<Expr>>)
+                    for expr_node in &block_node.inner().0 {
+                        find_matching_function_calls(
+                            expr_node.inner(),
+                            function_name,
+                            source,
+                            return_types,
+                        );
+                    }
+                }
+                ast::Container::Group(group_node) => {
+                    // Group is a tuple struct: Group(pub Node<Expr>)
+                    find_matching_function_calls(
+                        group_node.inner().0.inner(),
+                        function_name,
+                        source,
+                        return_types,
+                    );
+                }
+            }
+        }
+        ast::Expr::Unary(_) => {
+            // Unary::Not fields are private, can't access nested expr
+            // Skip for now - function calls in unary are rare
+        }
+        ast::Expr::Query(query_node) => {
+            let query = query_node.inner();
+            // QueryTarget can contain a FunctionCall or Container
+            // Process them by checking if they match our function
+            match query.target.inner() {
+                ast::QueryTarget::FunctionCall(fc) => {
+                    // Check if this function call matches our target function
+                    if fc.ident.inner().to_string() == function_name {
+                        // Extract the source code for the entire query using its span
+                        let span = query_node.span();
+                        let function_source = &source[span.start()..span.end()];
+
+                        // Compile just this query expression
+                        if let Ok(compiled) =
+                            vrl::compiler::compile(function_source, &vrl::stdlib::all())
+                        {
+                            let type_info = compiled.program.final_type_info();
+                            return_types.insert(type_info.result.to_string());
+                        }
+                    }
+                }
+                ast::QueryTarget::Container(container) => {
+                    // Recursively check container expressions
+                    match container {
+                        ast::Container::Block(block_node) => {
+                            for expr_node in &block_node.inner().0 {
+                                find_matching_function_calls(
+                                    expr_node.inner(),
+                                    function_name,
+                                    source,
+                                    return_types,
+                                );
+                            }
+                        }
+                        ast::Container::Group(group_node) => {
+                            find_matching_function_calls(
+                                group_node.inner().0.inner(),
+                                function_name,
+                                source,
+                                return_types,
+                            );
+                        }
+                        _ => {}
+                    }
+                }
+                _ => {}
+            }
+        }
+        ast::Expr::Abort(abort_node) => {
+            let abort = abort_node.inner();
+            if let Some(message) = &abort.message {
+                find_matching_function_calls(message.inner(), function_name, source, return_types);
+            }
+        }
+        ast::Expr::Return(ret_node) => {
+            let ret = ret_node.inner();
+            find_matching_function_calls(ret.expr.inner(), function_name, source, return_types);
+        }
+        ast::Expr::Literal(_) | ast::Expr::Variable(_) => {
+            // Base cases - no nested expressions
+        }
+    }
+}
+
 /// Create arguments from parameter specification or derive types for special functions
 fn create_arguments_for_function(function_name: &str, params: &[Parameter]) -> Result<TestResult> {
     // For query/closure functions, compile actual VRL code to derive return types
@@ -349,6 +555,28 @@ impl Cli {
                         // Query/closure functions: types derived from VRL compilation
                         for t in types {
                             return_type.insert(t);
+                        }
+                    }
+                }
+
+                for example in function.examples() {
+                    if function.identifier() == "encode_proto"
+                        || function.identifier() == "parse_proto"
+                    {
+                        continue;
+                    }
+                    let ast = vrl::parser::parse(example.source).expect("Invalid VRL AST");
+                    let root_exprs = ast.0;
+
+                    // Walk the AST to find all function calls matching the current function
+                    for root_expr in &root_exprs {
+                        if let RootExpr::Expr(expr_node) = &root_expr.inner() {
+                            find_matching_function_calls(
+                                &expr_node.inner(),
+                                function.identifier(),
+                                example.source,
+                                &mut return_type,
+                            );
                         }
                     }
                 }
