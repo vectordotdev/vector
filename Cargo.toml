@@ -229,7 +229,7 @@ vector-lib.workspace = true
 vector-config.workspace = true
 vector-config-common.workspace = true
 vector-config-macros.workspace = true
-vector-vrl-all = { path = "lib/vector-vrl/all" }
+vector-vrl-all.workspace = true
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
