@@ -20,7 +20,7 @@ use super::{
     request_builder::DatadogMetricsRequestBuilder, service::DatadogMetricsRequest,
 };
 use crate::{
-    internal_events::{DatadogMetricsEncodingError, SinkRequestBuildError},
+    internal_events::DatadogMetricsEncodingError,
     sinks::util::{
         SinkBuilderExt,
         buffer::metrics::{AggregatedSummarySplitter, MetricSplitter},

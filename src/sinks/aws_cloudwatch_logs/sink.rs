@@ -13,7 +13,6 @@ use vector_lib::{
 
 use crate::{
     event::{Event, EventFinalizers, Finalizable},
-    internal_events::SinkRequestBuildError,
     sinks::{
         aws_cloudwatch_logs::{
             CloudwatchKey,
