@@ -322,22 +322,27 @@ impl Cli {
                     TestResult::ArgumentLists(arg_lists) => {
                         // Normal testing with ArgumentList
                         for arguments in arg_lists {
-                            let state = vrl::compiler::state::TypeState::default();
-                            let config = vrl::compiler::CompileConfig::default();
                             let ctx = &mut vrl::compiler::function::FunctionCompileContext::new(
-                                vrl::diagnostic::Span::new(0, 0),
-                                config,
+                                Default::default(),
+                                Default::default(),
                             );
 
-                            let compiled =
-                                function
-                                    .compile(&state, ctx, arguments)
-                                    .unwrap_or_else(|e| {
-                                        panic!(
-                                            "function `{function_name}` failed to compile: {e:?}"
-                                        )
-                                    });
-                            return_type.insert(compiled.type_def(&state).to_string());
+                            let compiled = function
+                                .compile(&Default::default(), ctx, arguments)
+                                .unwrap_or_else(|e| {
+                                    panic!("function `{function_name}` failed to compile: {e:?}")
+                                });
+                            let kind = compiled.type_def(&Default::default());
+                            if kind.is_object() || kind.is_array() {
+                                if kind.is_object() {
+                                    return_type.insert("object".to_owned());
+                                }
+                                if kind.is_array() {
+                                    return_type.insert("array".to_owned());
+                                }
+                            } else {
+                                return_type.insert(kind.to_string());
+                            }
                         }
                     }
                     TestResult::DerivedTypes(types) => {
