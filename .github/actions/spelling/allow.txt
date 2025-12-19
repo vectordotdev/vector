@@ -309,6 +309,7 @@ Lifetouch
 linkerd
 localdomain
 localstack
+Logpush
 lookback
 lucene
 Lumia

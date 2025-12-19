@@ -533,7 +533,9 @@ impl SplunkSource {
                             if let Some(token) = token.filter(|_| store_hec_token) {
                                 let token: Arc<str> = token.into();
                                 for event in &mut events {
-                                    event.metadata_mut().set_splunk_hec_token(Arc::clone(&token));
+                                    event
+                                        .metadata_mut()
+                                        .set_splunk_hec_token(Arc::clone(&token));
                                 }
                             }
 
@@ -1503,7 +1505,14 @@ mod tests {
         SocketAddr,
         PortGuard,
     ) {
-        source_with_options(token, valid_tokens, acknowledgements, store_hec_token, false).await
+        source_with_options(
+            token,
+            valid_tokens,
+            acknowledgements,
+            store_hec_token,
+            false,
+        )
+        .await
     }
 
     async fn source_with_options(
