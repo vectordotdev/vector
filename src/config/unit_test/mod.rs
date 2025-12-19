@@ -611,8 +611,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
         },
         "vrl" => {
             if let Some(source) = &input.source {
-                let fns = vrl::stdlib::all();
-                let result = vrl::compiler::compile(source, &fns)
+                let result = vrl::compiler::compile(source, &crate::all_vrl_functions())
                     .map_err(|e| Formatter::new(source, e.clone()).to_string())?;
 
                 let mut target = TargetValue {

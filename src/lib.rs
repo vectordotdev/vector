@@ -270,3 +270,16 @@ pub fn num_threads() -> usize {
     };
     usize::from(count)
 }
+
+/// Getter for all VRL functions, including Vector-specfic VRL functions
+pub fn all_vrl_functions() -> Vec<Box<dyn vrl::compiler::Function>> {
+    let functions = vrl::stdlib::all()
+        .into_iter()
+        .chain(vector_vrl_functions::all())
+        .chain(vector_lib::enrichment::vrl_functions());
+
+    #[cfg(feature = "sources-dnstap")]
+    let functions = functions.chain(dnstap_parser::vrl_functions());
+
+    functions.collect()
+}
