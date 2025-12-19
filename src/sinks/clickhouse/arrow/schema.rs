@@ -1,7 +1,5 @@
 //! Schema fetching and Arrow schema construction for ClickHouse tables.
 
-use std::sync::Arc;
-
 use arrow::datatypes::{Field, Schema};
 use async_trait::async_trait;
 use http::{Request, StatusCode};
@@ -32,7 +30,7 @@ pub async fn fetch_table_schema(
     database: &str,
     table: &str,
     auth: Option<&Auth>,
-) -> crate::Result<Arc<Schema>> {
+) -> crate::Result<Schema> {
     let query = "SELECT name, type \
                  FROM system.columns \
                  WHERE database = {db:String} AND table = {tbl:String} \
@@ -70,7 +68,7 @@ pub async fn fetch_table_schema(
 }
 
 /// Parses the JSON response from ClickHouse and builds an Arrow schema.
-fn parse_schema_from_response(response: &str) -> crate::Result<Arc<Schema>> {
+fn parse_schema_from_response(response: &str) -> crate::Result<Schema> {
     let mut columns: Vec<ColumnInfo> = Vec::new();
 
     for line in response.lines() {
@@ -94,7 +92,7 @@ fn parse_schema_from_response(response: &str) -> crate::Result<Arc<Schema>> {
         fields.push(Field::new(&column.name, arrow_type, nullable));
     }
 
-    Ok(Arc::new(Schema::new(fields)))
+    Ok(Schema::new(fields))
 }
 
 /// Schema provider implementation for ClickHouse tables.
@@ -128,7 +126,7 @@ impl ClickHouseSchemaProvider {
 
 #[async_trait]
 impl SchemaProvider for ClickHouseSchemaProvider {
-    async fn get_schema(&self) -> Result<Arc<Schema>, ArrowEncodingError> {
+    async fn get_schema(&self) -> Result<Schema, ArrowEncodingError> {
         fetch_table_schema(
             &self.client,
             &self.endpoint,
