@@ -7,9 +7,10 @@
 //! - Enrichment table functions (`enrichment::vrl_functions`)
 //! - DNS tap parsing functions (optional, with `dnstap` feature)
 
-/// Returns all VRL functions available in Vector.
-#[allow(clippy::disallowed_methods)]
-pub fn all_vrl_functions() -> Vec<Box<dyn vrl::compiler::Function>> {
+use std::sync::LazyLock;
+
+static ALL_VRL_FUNCTIONS: LazyLock<Vec<Box<dyn vrl::compiler::Function>>> = LazyLock::new(|| {
+    #[allow(clippy::disallowed_methods)]
     let functions = vrl::stdlib::all()
         .into_iter()
         .chain(vector_vrl_functions::all())
@@ -19,4 +20,11 @@ pub fn all_vrl_functions() -> Vec<Box<dyn vrl::compiler::Function>> {
     let functions = functions.chain(dnstap_parser::vrl_functions());
 
     functions.collect()
+});
+
+/// Returns all VRL functions available in Vector.
+///
+/// This is initialized once on first call and cached for subsequent calls.
+pub fn all_vrl_functions() -> &'static [Box<dyn vrl::compiler::Function>] {
+    &ALL_VRL_FUNCTIONS
 }
