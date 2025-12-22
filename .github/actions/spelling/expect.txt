@@ -216,6 +216,7 @@ fns
 foobarfoobarfoo
 footgunning
 Forcepoint
+fpp
 freelist
 fuzzcheck
 GC'ing
@@ -380,6 +381,7 @@ myvalue
 Namazu
 nats
 ndjson
+ndv
 nearline
 nextest
 ngx
