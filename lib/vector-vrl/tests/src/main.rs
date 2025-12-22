@@ -4,7 +4,7 @@
 mod docs;
 mod test_enrichment;
 
-use std::{env, path::PathBuf};
+use std::{collections::HashSet, env, path::PathBuf};
 
 use chrono_tz::Tz;
 use clap::Parser;
@@ -96,12 +96,10 @@ fn main() {
         timezone: cmd.timezone(),
     };
 
-    let functions = vector_vrl_all::all_vrl_functions();
-
     run_tests(
         tests,
         &cfg,
-        &functions,
+        &vector_vrl_all::all_vrl_functions(),
         || {
             let mut config = CompileConfig::default();
             let enrichment_table = test_enrichment::test_enrichment_table();
@@ -120,6 +118,18 @@ fn test_glob_pattern() -> String {
     test_dir().join("**/*.vrl").to_str().unwrap().to_string()
 }
 fn get_tests(cmd: &Cmd) -> Vec<Test> {
+    // Don't test vrl stdlib functions examples since they are already tested in VRL and some will
+    // fail to compile since they are missing required source files such as proto definitions.
+    let ignore_examples_from_functions: HashSet<String> = vrl::stdlib::all()
+        .into_iter()
+        .map(|f| format!("functions/{}", f.identifier()))
+        .collect();
+
+    let tests_from_functions = get_tests_from_functions(vector_vrl_all::all_vrl_functions());
+    let tests_from_functions = tests_from_functions
+        .into_iter()
+        .filter(|test| !ignore_examples_from_functions.contains(&test.category));
+
     glob(test_glob_pattern().as_str())
         .expect("valid pattern")
         .filter_map(|entry| {
@@ -127,7 +137,7 @@ fn get_tests(cmd: &Cmd) -> Vec<Test> {
             Some(Test::from_path(&path))
         })
         .chain(docs::tests(cmd.ignore_cue))
-        .chain(get_tests_from_functions(vector_vrl_all::all_vrl_functions()))
+        .chain(tests_from_functions)
         .filter(|test| {
             should_run(
                 &format!("{}/{}", test.category, test.name),
