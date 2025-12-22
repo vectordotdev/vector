@@ -11,3 +11,8 @@ services:
       - "8040"
     environment:
       - SKIP_CHECK_ULIMIT=true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

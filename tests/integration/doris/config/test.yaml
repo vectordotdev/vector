@@ -1,7 +1,8 @@
 features:
 - sinks-doris
+- doris-integration-tests
 
-test_filter: '::doris::integration_test::'
+test_filter: 'sinks::doris::integration_test::'
 
 env:
   DORIS_ADDRESS: http://doris:8030
