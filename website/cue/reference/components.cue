@@ -222,7 +222,7 @@ components: {
 				uses_uri?: bool
 			}
 
-			exposes?:                      #FeaturesExpose
+			exposes?: #FeaturesExpose
 			send?: #FeaturesSend & {_args: Args}
 		}
 

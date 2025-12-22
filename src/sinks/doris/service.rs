@@ -43,7 +43,7 @@ impl DorisService {
                 Ok(pretty_json) => pretty_json,
                 Err(err) => {
                     // Log the error but continue with the original format
-                    warn!(message = "Failed to prettify JSON response.", error = %err, internal_log_rate_limit = true);
+                    warn!(message = "Failed to prettify JSON response.", error = %err);
                     response_json.to_string()
                 }
             };
@@ -53,7 +53,6 @@ impl DorisService {
                 status_code = %http_status_code,
                 stream_load_status = %stream_load_status,
                 response = %formatted_json,
-                internal_log_rate_limit = true
             );
         }
         if http_status_code.is_success() && stream_load_status == StreamLoadStatus::Successful {
