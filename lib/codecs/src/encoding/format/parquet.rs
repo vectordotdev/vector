@@ -5,10 +5,10 @@
 //! suitable for long-term storage and analytics workloads.
 
 use arrow::datatypes::Schema;
-use bytes::{Bytes, BytesMut, BufMut};
+use bytes::{BufMut, Bytes, BytesMut};
 use parquet::{
     arrow::ArrowWriter,
-    basic::{Compression, ZstdLevel, GzipLevel, BrotliLevel},
+    basic::{BrotliLevel, Compression, GzipLevel, ZstdLevel},
     file::properties::{WriterProperties, WriterVersion},
     schema::types::ColumnPath,
 };
@@ -19,7 +19,7 @@ use vector_config::configurable_component;
 use vector_core::event::Event;
 
 // Reuse the Arrow encoder's record batch building logic
-use super::arrow::{build_record_batch, ArrowEncodingError};
+use super::arrow::{ArrowEncodingError, build_record_batch};
 use super::schema_definition::SchemaDefinition;
 
 /// Compression algorithm for Parquet files
@@ -49,23 +49,17 @@ impl ParquetCompression {
             (ParquetCompression::Uncompressed, _) => Ok(Compression::UNCOMPRESSED),
             (ParquetCompression::Snappy, _) => Ok(Compression::SNAPPY),
             (ParquetCompression::Lz4, _) => Ok(Compression::LZ4),
-            (ParquetCompression::Gzip, Some(lvl)) => {
-                GzipLevel::try_new(lvl as u32)
-                    .map(Compression::GZIP)
-                    .map_err(|e| format!("Invalid GZIP compression level: {}", e))
-            }
+            (ParquetCompression::Gzip, Some(lvl)) => GzipLevel::try_new(lvl as u32)
+                .map(Compression::GZIP)
+                .map_err(|e| format!("Invalid GZIP compression level: {}", e)),
             (ParquetCompression::Gzip, None) => Ok(Compression::GZIP(Default::default())),
-            (ParquetCompression::Brotli, Some(lvl)) => {
-                BrotliLevel::try_new(lvl as u32)
-                    .map(Compression::BROTLI)
-                    .map_err(|e| format!("Invalid Brotli compression level: {}", e))
-            }
+            (ParquetCompression::Brotli, Some(lvl)) => BrotliLevel::try_new(lvl as u32)
+                .map(Compression::BROTLI)
+                .map_err(|e| format!("Invalid Brotli compression level: {}", e)),
             (ParquetCompression::Brotli, None) => Ok(Compression::BROTLI(Default::default())),
-            (ParquetCompression::Zstd, Some(lvl)) => {
-                ZstdLevel::try_new(lvl)
-                    .map(Compression::ZSTD)
-                    .map_err(|e| format!("Invalid ZSTD compression level: {}", e))
-            }
+            (ParquetCompression::Zstd, Some(lvl)) => ZstdLevel::try_new(lvl)
+                .map(Compression::ZSTD)
+                .map_err(|e| format!("Invalid ZSTD compression level: {}", e)),
             (ParquetCompression::Zstd, None) => Ok(Compression::ZSTD(ZstdLevel::default())),
         }
     }
@@ -73,7 +67,9 @@ impl ParquetCompression {
 
 impl From<ParquetCompression> for Compression {
     fn from(compression: ParquetCompression) -> Self {
-        compression.to_compression(None).expect("Default compression should always be valid")
+        compression
+            .to_compression(None)
+            .expect("Default compression should always be valid")
     }
 }
 
@@ -150,7 +146,9 @@ pub struct ParquetSerializerConfig {
     ///
     /// Only applies when `infer_schema` is enabled. Ignored when using explicit schema.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "vec![\"_metadata\".to_string(), \"internal_id\".to_string()]"))]
+    #[configurable(metadata(
+        docs::examples = "vec![\"_metadata\".to_string(), \"internal_id\".to_string()]"
+    ))]
     pub exclude_columns: Option<Vec<String>>,
 
     /// Maximum number of columns to encode
@@ -305,8 +303,8 @@ fn default_max_columns() -> usize {
 }
 
 fn schema_example() -> SchemaDefinition {
-    use std::collections::BTreeMap;
     use super::schema_definition::FieldDefinition;
+    use std::collections::BTreeMap;
 
     let mut fields = BTreeMap::new();
     fields.insert(
@@ -322,7 +320,7 @@ fn schema_example() -> SchemaDefinition {
         "name".to_string(),
         FieldDefinition {
             r#type: "utf8".to_string(),
-            bloom_filter: true,  // Example: enable for high-cardinality string field
+            bloom_filter: true, // Example: enable for high-cardinality string field
             bloom_filter_num_distinct_values: Some(1_000_000),
             bloom_filter_false_positive_pct: Some(0.01),
         },
@@ -377,9 +375,13 @@ impl ParquetSerializerConfig {
     fn validate(&self) -> Result<(), String> {
         // Must specify exactly one schema method
         match (self.schema.is_some(), self.infer_schema) {
-            (true, true) => Err("Cannot use both 'schema' and 'infer_schema: true'. Choose one.".to_string()),
-            (false, false) => Err("Must specify either 'schema' or 'infer_schema: true'".to_string()),
-            _ => Ok(())
+            (true, true) => {
+                Err("Cannot use both 'schema' and 'infer_schema: true'. Choose one.".to_string())
+            }
+            (false, false) => {
+                Err("Must specify either 'schema' or 'infer_schema: true'".to_string())
+            }
+            _ => Ok(()),
         }
     }
 
@@ -398,9 +400,7 @@ impl ParquetSerializerConfig {
 #[derive(Clone, Debug)]
 enum SchemaMode {
     /// Use pre-defined explicit schema
-    Explicit {
-        schema: Arc<Schema>,
-    },
+    Explicit { schema: Arc<Schema> },
     /// Infer schema from each batch
     Inferred {
         exclude_columns: std::collections::BTreeSet<String>,
@@ -419,7 +419,8 @@ impl ParquetSerializer {
     /// Create a new ParquetSerializer with the given configuration
     pub fn new(config: ParquetSerializerConfig) -> Result<Self, vector_common::Error> {
         // Validate configuration
-        config.validate()
+        config
+            .validate()
             .map_err(|e| vector_common::Error::from(e))?;
 
         // Keep a copy of schema_def for later use with Bloom filters
@@ -428,7 +429,8 @@ impl ParquetSerializer {
         // Determine schema mode
         let schema_mode = if config.infer_schema {
             SchemaMode::Inferred {
-                exclude_columns: config.exclude_columns
+                exclude_columns: config
+                    .exclude_columns
                     .unwrap_or_default()
                     .into_iter()
                     .collect(),
@@ -460,7 +462,9 @@ impl ParquetSerializer {
         };
 
         // Build writer properties
-        let compression = config.compression.to_compression(config.compression_level)
+        let compression = config
+            .compression
+            .to_compression(config.compression_level)
             .map_err(|e| vector_common::Error::from(e))?;
 
         tracing::debug!(
@@ -480,8 +484,8 @@ impl ParquetSerializer {
         }
 
         // Only apply Bloom filters and sorting for explicit schema mode
-        if let (SchemaMode::Explicit { schema }, Some(schema_def)) = (&schema_mode, &schema_def_opt) {
-
+        if let (SchemaMode::Explicit { schema }, Some(schema_def)) = (&schema_mode, &schema_def_opt)
+        {
             // Apply per-column Bloom filter settings from schema
             let bloom_filter_configs = schema_def.extract_bloom_filter_configs();
             for bloom_config in bloom_filter_configs {
@@ -594,7 +598,9 @@ pub enum ParquetEncodingError {
     NoSchemaProvided,
 
     /// No fields could be inferred from events
-    #[snafu(display("No fields could be inferred from events (all fields excluded or only null values)"))]
+    #[snafu(display(
+        "No fields could be inferred from events (all fields excluded or only null values)"
+    ))]
     NoFieldsInferred,
 
     /// Invalid event type (not a log event)
@@ -642,8 +648,8 @@ impl From<serde_json::Error> for ParquetEncodingError {
 
 /// Infer Arrow DataType from a Vector Value
 fn infer_arrow_type(value: &vector_core::event::Value) -> arrow::datatypes::DataType {
-    use vector_core::event::Value;
     use arrow::datatypes::{DataType, TimeUnit};
+    use vector_core::event::Value;
 
     match value {
         Value::Bytes(_) => DataType::Utf8,
@@ -664,8 +670,8 @@ fn infer_schema_from_events(
     exclude_columns: &std::collections::BTreeSet<String>,
     max_columns: usize,
 ) -> Result<Arc<Schema>, ParquetEncodingError> {
-    use std::collections::BTreeMap;
     use arrow::datatypes::{DataType, Field};
+    use std::collections::BTreeMap;
     use vector_core::event::Value;
 
     let mut field_types: BTreeMap<String, DataType> = BTreeMap::new();
@@ -678,7 +684,9 @@ fn infer_schema_from_events(
             _ => return Err(ParquetEncodingError::InvalidEventType),
         };
 
-        let fields_iter = log.all_event_fields().ok_or(ParquetEncodingError::InvalidEventType)?;
+        let fields_iter = log
+            .all_event_fields()
+            .ok_or(ParquetEncodingError::InvalidEventType)?;
 
         for (key, value) in fields_iter {
             let key_str = key.to_string();
@@ -765,11 +773,8 @@ pub fn encode_events_to_parquet(
     // Write RecordBatch to Parquet format in memory
     let mut buffer = Vec::new();
     {
-        let mut writer = ArrowWriter::try_new(
-            &mut buffer,
-            batch_schema,
-            Some(writer_properties.clone()),
-        )?;
+        let mut writer =
+            ArrowWriter::try_new(&mut buffer, batch_schema, Some(writer_properties.clone()))?;
 
         writer.write(&record_batch)?;
         writer.close()?;
@@ -968,7 +973,10 @@ mod tests {
         let props = WriterProperties::builder().build();
         let result = encode_events_to_parquet(&events, schema, &props, None);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ParquetEncodingError::NoEvents));
+        assert!(matches!(
+            result.unwrap_err(),
+            ParquetEncodingError::NoEvents
+        ));
     }
 
     #[test]
@@ -1013,8 +1021,8 @@ mod tests {
 
     #[test]
     fn test_parquet_serializer_config() {
-        use std::collections::BTreeMap;
         use super::schema_definition::FieldDefinition;
+        use std::collections::BTreeMap;
 
         let mut fields = BTreeMap::new();
         fields.insert(
@@ -1065,9 +1073,9 @@ mod tests {
 
     #[test]
     fn test_encoder_trait_implementation() {
+        use super::schema_definition::FieldDefinition;
         use std::collections::BTreeMap;
         use tokio_util::codec::Encoder;
-        use super::schema_definition::FieldDefinition;
 
         let mut fields = BTreeMap::new();
         fields.insert(
@@ -1147,9 +1155,9 @@ mod tests {
 
     #[test]
     fn test_allow_nullable_fields_config() {
+        use super::schema_definition::FieldDefinition;
         use std::collections::BTreeMap;
         use tokio_util::codec::Encoder;
-        use super::schema_definition::FieldDefinition;
 
         let mut fields = BTreeMap::new();
         fields.insert(

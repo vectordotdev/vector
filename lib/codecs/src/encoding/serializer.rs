@@ -8,10 +8,10 @@ use vector_core::{config::DataType, event::Event, schema};
 
 #[cfg(feature = "arrow")]
 use super::format::ArrowStreamSerializerConfig;
-#[cfg(feature = "opentelemetry")]
-use super::format::{OtlpSerializer, OtlpSerializerConfig};
 #[cfg(feature = "parquet")]
 use super::format::ParquetSerializerConfig;
+#[cfg(feature = "opentelemetry")]
+use super::format::{OtlpSerializer, OtlpSerializerConfig};
 use super::{
     chunking::Chunker,
     format::{
@@ -364,17 +364,17 @@ impl SerializerConfig {
             SerializerConfig::Gelf(config) => config.input_type(),
             SerializerConfig::Json(config) => config.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
-        SerializerConfig::Native => NativeSerializerConfig.input_type(),
-        SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
-        #[cfg(feature = "opentelemetry")]
-        SerializerConfig::Otlp => OtlpSerializerConfig::default().input_type(),
-        SerializerConfig::Protobuf(config) => config.input_type(),
-        #[cfg(feature = "parquet")]
-        SerializerConfig::Parquet { parquet } => parquet.input_type(),
-        SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
-        SerializerConfig::Text(config) => config.input_type(),
+            SerializerConfig::Native => NativeSerializerConfig.input_type(),
+            SerializerConfig::NativeJson => NativeJsonSerializerConfig.input_type(),
+            #[cfg(feature = "opentelemetry")]
+            SerializerConfig::Otlp => OtlpSerializerConfig::default().input_type(),
+            SerializerConfig::Protobuf(config) => config.input_type(),
+            #[cfg(feature = "parquet")]
+            SerializerConfig::Parquet { parquet } => parquet.input_type(),
+            SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
+            SerializerConfig::Text(config) => config.input_type(),
+        }
     }
-}
 
     /// The schema required by the serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
@@ -388,16 +388,16 @@ impl SerializerConfig {
             SerializerConfig::Json(config) => config.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
-        SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
-        #[cfg(feature = "opentelemetry")]
-        SerializerConfig::Otlp => OtlpSerializerConfig::default().schema_requirement(),
-        SerializerConfig::Protobuf(config) => config.schema_requirement(),
-        #[cfg(feature = "parquet")]
-        SerializerConfig::Parquet { parquet } => parquet.schema_requirement(),
-        SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
-        SerializerConfig::Text(config) => config.schema_requirement(),
+            SerializerConfig::NativeJson => NativeJsonSerializerConfig.schema_requirement(),
+            #[cfg(feature = "opentelemetry")]
+            SerializerConfig::Otlp => OtlpSerializerConfig::default().schema_requirement(),
+            SerializerConfig::Protobuf(config) => config.schema_requirement(),
+            #[cfg(feature = "parquet")]
+            SerializerConfig::Parquet { parquet } => parquet.schema_requirement(),
+            SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
+            SerializerConfig::Text(config) => config.schema_requirement(),
+        }
     }
-}
 }
 
 /// Serialize structured events as bytes.
@@ -456,11 +456,11 @@ impl Serializer {
     /// if you need to determine the capability to encode to JSON at runtime.
     pub fn to_json_value(&self, event: Event) -> Result<serde_json::Value, vector_common::Error> {
         match self {
-        Serializer::Gelf(serializer) => serializer.to_json_value(event),
-        Serializer::Json(serializer) => serializer.to_json_value(event),
-        Serializer::NativeJson(serializer) => serializer.to_json_value(event),
-        Serializer::Avro(_)
-        | Serializer::Cef(_)
+            Serializer::Gelf(serializer) => serializer.to_json_value(event),
+            Serializer::Json(serializer) => serializer.to_json_value(event),
+            Serializer::NativeJson(serializer) => serializer.to_json_value(event),
+            Serializer::Avro(_)
+            | Serializer::Cef(_)
             | Serializer::Csv(_)
             | Serializer::Logfmt(_)
             | Serializer::Text(_)

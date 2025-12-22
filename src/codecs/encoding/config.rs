@@ -149,9 +149,8 @@ impl EncodingConfigWithFraming {
             #[cfg(feature = "codecs-parquet")]
             SerializerConfig::Parquet { parquet } => {
                 let serializer = ParquetSerializer::new(parquet.clone())?;
-                let encoder = EncoderKind::Batch(BatchEncoder::new(BatchSerializer::Parquet(
-                    serializer,
-                )));
+                let encoder =
+                    EncoderKind::Batch(BatchEncoder::new(BatchSerializer::Parquet(serializer)));
                 Ok((self.transformer(), encoder))
             }
             _ => {

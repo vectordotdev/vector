@@ -84,7 +84,9 @@ pub struct ColumnBloomFilterConfig {
 pub struct SchemaDefinition {
     /// Map of field names to their type and Bloom filter configuration
     #[serde(flatten)]
-    #[configurable(metadata(docs::additional_props_description = "A field definition specifying the data type and optional Bloom filter configuration."))]
+    #[configurable(metadata(
+        docs::additional_props_description = "A field definition specifying the data type and optional Bloom filter configuration."
+    ))]
     pub fields: BTreeMap<String, FieldDefinition>,
 }
 
@@ -125,10 +127,7 @@ impl SchemaDefinition {
 }
 
 /// Parse a data type string into an Arrow DataType
-fn parse_data_type(
-    type_str: &str,
-    field_name: &str,
-) -> Result<DataType, SchemaDefinitionError> {
+fn parse_data_type(type_str: &str, field_name: &str) -> Result<DataType, SchemaDefinitionError> {
     let data_type = match type_str.to_lowercase().as_str() {
         // String types
         "utf8" | "string" => DataType::Utf8,
@@ -158,9 +157,7 @@ fn parse_data_type(
         "large_binary" => DataType::LargeBinary,
 
         // Timestamp types
-        "timestamp_second" | "timestamp_s" => {
-            DataType::Timestamp(TimeUnit::Second, None)
-        }
+        "timestamp_second" | "timestamp_s" => DataType::Timestamp(TimeUnit::Second, None),
         "timestamp_millisecond" | "timestamp_ms" | "timestamp_millis" => {
             DataType::Timestamp(TimeUnit::Millisecond, None)
         }
@@ -196,7 +193,7 @@ fn parse_data_type(
             return Err(SchemaDefinitionError::UnknownDataType {
                 field_name: field_name.to_string(),
                 data_type: type_str.to_string(),
-            })
+            });
         }
     };
 
@@ -390,5 +387,4 @@ mod tests {
         assert_eq!(request_id_config.ndv, None);
         assert_eq!(request_id_config.fpp, None);
     }
-
 }

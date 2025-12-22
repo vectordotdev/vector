@@ -41,7 +41,9 @@ pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 pub use otlp::{OtlpSerializer, OtlpSerializerConfig};
 #[cfg(feature = "parquet")]
-pub use parquet::{ParquetCompression, ParquetEncodingError, ParquetSerializer, ParquetSerializerConfig};
+pub use parquet::{
+    ParquetCompression, ParquetEncodingError, ParquetSerializer, ParquetSerializerConfig,
+};
 pub use protobuf::{ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
 #[cfg(any(feature = "arrow", feature = "parquet"))]
