@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS};
+use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
 use vector_lib::{
     config::{LegacyKey, LogNamespace},
     internal_event::EventsReceived,
@@ -16,9 +16,6 @@ use crate::{
     shutdown::ShutdownSignal,
     sources::{mqtt::MqttSourceConfig, util},
 };
-use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
-use vector_lib::config::LegacyKey;
-use vector_lib::lookup::path;
 
 pub struct MqttSource {
     connector: MqttConnector,

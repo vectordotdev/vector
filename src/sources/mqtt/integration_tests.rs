@@ -13,6 +13,7 @@ use crate::{
     config::{SourceConfig, SourceContext, log_schema},
     event::Event,
     serde::OneOrMany,
+    sources::mqtt::MqttSourceConfig,
     test_util::{
         components::{SOURCE_TAGS, assert_source_compliance},
         random_lines_with_stream, random_string, trace_init,
