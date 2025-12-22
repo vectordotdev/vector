@@ -265,7 +265,7 @@ pub struct Query {
 
 impl Query {
     pub fn new(params: &HashMap<String, QueryParameterValue>) -> Result<Self, sources::BuildError> {
-        let functions = vector_vrl_all::all_vrl_functions();
+        let functions = vector_vrl_functions::all();
 
         let mut compiled: HashMap<String, CompiledQueryParameterValue> = HashMap::new();
 
@@ -321,7 +321,7 @@ impl Query {
 impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let query = Query::new(&self.query)?;
-        let functions = vector_vrl_all::all_vrl_functions();
+        let functions = vector_vrl_functions::all();
 
         // Compile body if present
         let body = self

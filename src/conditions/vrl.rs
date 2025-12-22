@@ -44,7 +44,7 @@ impl ConditionalConfig for VrlConfig {
         //     },
         // };
 
-        let functions = vector_vrl_all::all_vrl_functions();
+        let functions = vector_vrl_functions::all();
 
         let state = TypeState::default();
 

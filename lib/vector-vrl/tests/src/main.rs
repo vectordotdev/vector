@@ -99,7 +99,7 @@ fn main() {
     run_tests(
         tests,
         &cfg,
-        &vector_vrl_all::all_vrl_functions(),
+        &vector_vrl_functions::all(),
         || {
             let mut config = CompileConfig::default();
             let enrichment_table = test_enrichment::test_enrichment_table();
@@ -125,7 +125,7 @@ fn get_tests(cmd: &Cmd) -> Vec<Test> {
         .map(|f| format!("functions/{}", f.identifier()))
         .collect();
 
-    let tests_from_functions = get_tests_from_functions(vector_vrl_all::all_vrl_functions());
+    let tests_from_functions = get_tests_from_functions(vector_vrl_functions::all());
     let tests_from_functions = tests_from_functions
         .into_iter()
         .filter(|test| !ignore_examples_from_functions.contains(&test.category));

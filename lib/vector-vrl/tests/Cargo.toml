@@ -7,7 +7,7 @@ publish = false
 
 [dependencies]
 chrono-tz.workspace = true
-vector-vrl-all = { workspace = true, features = ["dnstap"] }
+vector-vrl-functions = { workspace = true, features = ["dnstap"] }
 enrichment = { path = "../../enrichment" }
 vrl.workspace = true
 

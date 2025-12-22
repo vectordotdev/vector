@@ -154,7 +154,7 @@ impl HttpServerAuthConfig {
                     program,
                     warnings,
                     config: _,
-                } = compile_vrl(source, &vector_vrl_all::all_vrl_functions(), &state, config)
+                } = compile_vrl(source, &vector_vrl_functions::all(), &state, config)
                     .map_err(|diagnostics| format_vrl_diagnostics(source, diagnostics))?;
 
                 if !program.final_type_info().result.is_boolean() {

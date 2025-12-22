@@ -2631,7 +2631,7 @@ dependencies = [
  "vector-config-macros",
  "vector-core",
  "vector-lookup",
- "vector-vrl-all",
+ "vector-vrl-functions",
  "vrl",
 ]
 
@@ -12713,7 +12713,6 @@ dependencies = [
  "vector-config-common",
  "vector-config-macros",
  "vector-lib",
- "vector-vrl-all",
  "vector-vrl-functions",
  "vrl",
  "warp",
@@ -13051,21 +13050,11 @@ dependencies = [
 ]
 
 [[package]]
-name = "vector-vrl-all"
-version = "0.1.0"
-dependencies = [
- "dnstap-parser",
- "enrichment",
- "vector-vrl-functions",
- "vrl",
-]
-
-[[package]]
 name = "vector-vrl-cli"
 version = "0.1.0"
 dependencies = [
  "clap",
- "vector-vrl-all",
+ "vector-vrl-functions",
  "vrl",
 ]
 
@@ -13073,6 +13062,8 @@ dependencies = [
 name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
+ "dnstap-parser",
+ "enrichment",
  "vrl",
 ]
 
@@ -13088,7 +13079,7 @@ dependencies = [
  "serde_json",
  "tikv-jemallocator",
  "tracing-subscriber",
- "vector-vrl-all",
+ "vector-vrl-functions",
  "vrl",
 ]
 
@@ -13101,7 +13092,7 @@ dependencies = [
  "getrandom 0.2.15",
  "gloo-utils",
  "serde",
- "vector-vrl-all",
+ "vector-vrl-functions",
  "vrl",
  "wasm-bindgen",
  "web-sys",

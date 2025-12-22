@@ -77,7 +77,7 @@ fn compile(
     mut input: Input,
     tz_str: Option<String>,
 ) -> Result<VrlCompileResult, VrlDiagnosticResult> {
-    let functions = vector_vrl_all::all_vrl_functions();
+    let functions = vector_vrl_functions::all();
 
     let event = &mut input.event;
     let state = TypeState::default();

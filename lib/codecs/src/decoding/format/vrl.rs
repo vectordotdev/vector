@@ -59,7 +59,7 @@ impl VrlDeserializerConfig {
 
         match compile_vrl(
             &self.vrl.source,
-            &vector_vrl_all::all_vrl_functions(),
+            &vector_vrl_functions::all(),
             &state,
             CompileConfig::default(),
         ) {
