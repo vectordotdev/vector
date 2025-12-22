@@ -9,9 +9,9 @@ set -euo pipefail
 #
 # ENV VARS
 #
-#   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
+#   $TARGET         a target triple. ex: arm64-apple-darwin (no default)
 
-TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
+TARGET="${TARGET:?"You must specify a target triple, ex: arm64-apple-darwin"}"
 
 #
 # Local vars

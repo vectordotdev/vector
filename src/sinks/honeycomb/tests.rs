@@ -3,6 +3,7 @@
 use futures::{future::ready, stream};
 use serde::Deserialize;
 
+use super::config::HoneycombConfig;
 use crate::{
     sinks::prelude::*,
     test_util::{
@@ -10,8 +11,6 @@ use crate::{
         http::{always_200_response, spawn_blackhole_http_server},
     },
 };
-
-use super::config::HoneycombConfig;
 
 #[test]
 fn generate_config() {

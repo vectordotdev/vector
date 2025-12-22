@@ -2,10 +2,9 @@
 
 use std::path::PathBuf;
 
+use file_source_common::internal_events::FileSourceInternalEvents;
 pub use glob::MatchOptions;
 use glob::Pattern;
-
-use file_source_common::internal_events::FileSourceInternalEvents;
 
 /// Represents the ability to enumerate paths.
 ///

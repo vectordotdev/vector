@@ -3,8 +3,7 @@ use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 use itertools::Itertools;
 use snafu::Snafu;
 use vector_lib::{
-    event::ObjectMap,
-    event::Value,
+    event::{ObjectMap, Value},
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
@@ -200,7 +199,6 @@ pub fn position_reserved_attr_event_root(
                 message = "Semantic meaning is defined, but the event path already exists. Renaming to not overwrite.",
                 meaning = meaning,
                 renamed = &rename_attr,
-                internal_log_rate_limit = true,
             );
             log.rename_key(desired_path, rename_path);
         }

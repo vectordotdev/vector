@@ -1,9 +1,14 @@
-use crate::codecs::Transformer;
-use vector_lib::codecs::{
-    CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
-    encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
+use crate::codecs::{Encoder, EncoderKind, Transformer};
+use vector_lib::{
+    codecs::{
+        CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
+        encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
+    },
+    configurable::configurable_component,
 };
-use vector_lib::configurable::configurable_component;
+
+#[cfg(feature = "codecs-opentelemetry")]
+use vector_lib::codecs::BytesEncoder;
 
 /// Encoding configuration.
 #[configurable_component]
@@ -127,9 +132,18 @@ impl EncodingConfigWithFraming {
                 | Serializer::RawMessage(_)
                 | Serializer::Text(_),
             ) => NewlineDelimitedEncoder::default().into(),
+            #[cfg(feature = "codecs-opentelemetry")]
+            (None, Serializer::Otlp(_)) => BytesEncoder.into(),
         };
 
         Ok((framer, serializer))
+    }
+
+    /// Build the `Transformer` and `EncoderKind` for this config.
+    pub fn build_encoder(&self, sink_type: SinkType) -> crate::Result<(Transformer, EncoderKind)> {
+        let (framer, serializer) = self.build(sink_type)?;
+        let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(framer, serializer)));
+        Ok((self.transformer(), encoder))
     }
 }
 

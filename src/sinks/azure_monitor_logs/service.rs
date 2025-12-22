@@ -1,5 +1,7 @@
-use std::sync::LazyLock;
-use std::task::{Context, Poll};
+use std::{
+    sync::LazyLock,
+    task::{Context, Poll},
+};
 
 use bytes::Bytes;
 use http::{

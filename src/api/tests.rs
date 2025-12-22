@@ -1,22 +1,32 @@
-use std::collections::{HashMap, HashSet};
-use std::time::Duration;
+use std::{
+    collections::{HashMap, HashSet},
+    time::Duration,
+};
 
-use crate::api::schema::events::output::OutputEventsPayload;
-use crate::api::schema::events::{create_events_stream, log, metric};
-use crate::config::{Config, OutputId};
-use crate::event::{LogEvent, Metric, MetricKind, MetricValue};
-use crate::sinks::blackhole::BlackholeConfig;
-use crate::sources::demo_logs::{DemoLogsConfig, OutputFormat};
-use crate::test_util::{start_topology, trace_init};
-use crate::transforms::log_to_metric::{LogToMetricConfig, MetricConfig, MetricTypeConfig};
-use crate::transforms::remap::RemapConfig;
 use futures::StreamExt;
 use tokio::sync::{mpsc, watch};
-use vector_lib::config::ComponentKey;
-use vector_lib::fanout;
-use vector_lib::tap::controller::{TapController, TapPatterns, TapPayload};
-use vector_lib::tap::notification::{InvalidMatch, Matched, NotMatched, Notification};
-use vector_lib::tap::topology::{TapOutput, TapResource};
+use vector_lib::{
+    config::ComponentKey,
+    fanout,
+    tap::{
+        controller::{TapController, TapPatterns, TapPayload},
+        notification::{InvalidMatch, Matched, NotMatched, Notification},
+        topology::{TapOutput, TapResource},
+    },
+};
+
+use crate::{
+    api::schema::events::{create_events_stream, log, metric, output::OutputEventsPayload},
+    config::{Config, OutputId},
+    event::{LogEvent, Metric, MetricKind, MetricValue},
+    sinks::blackhole::BlackholeConfig,
+    sources::demo_logs::{DemoLogsConfig, OutputFormat},
+    test_util::{start_topology, trace_init},
+    transforms::{
+        log_to_metric::{LogToMetricConfig, MetricConfig, MetricTypeConfig},
+        remap::RemapConfig,
+    },
+};
 
 #[tokio::test]
 /// A tap sink should match a pattern, receive the correct notifications,

@@ -1,5 +1,7 @@
-use vector_lib::codecs::{CsvSerializerConfig, JsonSerializerConfig, encoding::SerializerConfig};
-use vector_lib::configurable::configurable_component;
+use vector_lib::{
+    codecs::{CsvSerializerConfig, JsonSerializerConfig, encoding::SerializerConfig},
+    configurable::configurable_component,
+};
 
 use crate::codecs::{EncodingConfig, Transformer};
 
@@ -73,11 +75,13 @@ impl DatabendEncodingConfig {
 #[derive(Clone, Debug)]
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 #[configurable(metadata(docs::enum_tag_description = "How to handle missing fields for NDJson."))]
+#[derive(Default)]
 pub enum DatabendMissingFieldAS {
     /// Generates an error if a missing field is encountered.
     Error,
 
     /// Interprets missing fields as NULL values. An error will be generated for non-nullable fields.
+    #[default]
     Null,
 
     /// Uses the default value of the field for missing fields.
@@ -85,12 +89,6 @@ pub enum DatabendMissingFieldAS {
 
     /// Uses the default value of the field's data type for missing fields.
     TypeDefault,
-}
-
-impl Default for DatabendMissingFieldAS {
-    fn default() -> Self {
-        Self::Null
-    }
 }
 
 impl DatabendMissingFieldAS {

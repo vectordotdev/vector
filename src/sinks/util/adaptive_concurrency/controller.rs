@@ -292,8 +292,7 @@ where
                 } else {
                     warn!(
                         message = "Unhandled error response.",
-                        %error,
-                        internal_log_rate_limit = true
+                        %error
                     );
                     false
                 }

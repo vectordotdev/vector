@@ -1,5 +1,4 @@
-use std::sync::Arc;
-use std::{collections::HashMap, fmt, num::NonZeroUsize};
+use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc};
 
 use bitmask_enum::bitmask;
 use bytes::Bytes;
@@ -12,7 +11,6 @@ pub mod output_id;
 pub mod proxy;
 mod telemetry;
 
-use crate::event::LogEvent;
 pub use global_options::{GlobalOptions, WildcardMatching};
 pub use log_schema::{LogSchema, init_log_schema, log_schema};
 use lookup::{PathPrefix, lookup_v2::ValuePath, path};
@@ -23,7 +21,7 @@ pub use vector_common::config::ComponentKey;
 use vector_config::configurable_component;
 use vrl::value::Value;
 
-use crate::schema;
+use crate::{event::LogEvent, schema};
 
 pub const MEMORY_BUFFER_DEFAULT_MAX_EVENTS: NonZeroUsize =
     vector_buffers::config::memory_buffer_default_max_events();
@@ -356,7 +354,7 @@ impl From<SourceAcknowledgementsConfig> for AcknowledgementsConfig {
 )]
 #[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 pub struct AcknowledgementsConfig {
-    /// Whether or not end-to-end acknowledgements are enabled.
+    /// Controls whether or not end-to-end acknowledgements are enabled.
     ///
     /// When enabled for a sink, any source that supports end-to-end
     /// acknowledgements that is connected to that sink waits for events
@@ -395,7 +393,7 @@ impl From<bool> for AcknowledgementsConfig {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq, Default)]
 pub enum LogNamespace {
     /// Vector native namespacing
     ///
@@ -407,6 +405,7 @@ pub enum LogNamespace {
     ///
     /// All data is set in the root of the event. Since this can lead
     /// to collisions, deserialized data has priority over metadata
+    #[default]
     Legacy,
 }
 
@@ -419,12 +418,6 @@ impl From<bool> for LogNamespace {
         } else {
             LogNamespace::Legacy
         }
-    }
-}
-
-impl Default for LogNamespace {
-    fn default() -> Self {
-        Self::Legacy
     }
 }
 
@@ -570,12 +563,13 @@ impl LogNamespace {
 
 #[cfg(test)]
 mod test {
-    use super::*;
-    use crate::event::LogEvent;
     use chrono::Utc;
     use lookup::{OwnedTargetPath, event_path, owned_value_path};
     use vector_common::btreemap;
     use vrl::value::Kind;
+
+    use super::*;
+    use crate::event::LogEvent;
 
     #[test]
     fn test_insert_standard_vector_source_metadata() {

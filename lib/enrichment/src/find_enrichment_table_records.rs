@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
+
 use vrl::prelude::*;
 
-use crate::vrl_util::is_case_sensitive;
 use crate::{
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
-    vrl_util::{self, add_index, evaluate_condition},
+    vrl_util::{self, add_index, evaluate_condition, is_case_sensitive},
 };
 
 fn find_enrichment_table_records(
@@ -82,7 +82,7 @@ impl Function for FindEnrichmentTableRecords {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "find records",
             source: r#"find_enrichment_table_records!("test", {"surname": "Smith"})"#,
             result: Ok(
@@ -90,7 +90,7 @@ impl Function for FindEnrichmentTableRecords {
                              {"id": 2, "firstname": "Fred", "surname": "Smith"}]"#,
                 },
             ),
-        }]
+        )]
     }
 
     fn compile(
@@ -194,11 +194,11 @@ impl FunctionExpression for FindEnrichmentTableRecordsFn {
 
 #[cfg(test)]
 mod tests {
-    use vrl::compiler::TargetValue;
-    use vrl::compiler::TimeZone;
-    use vrl::compiler::state::RuntimeState;
-    use vrl::value;
-    use vrl::value::Secrets;
+    use vrl::{
+        compiler::{TargetValue, TimeZone, state::RuntimeState},
+        value,
+        value::Secrets,
+    };
 
     use super::*;
     use crate::test_util::get_table_registry;

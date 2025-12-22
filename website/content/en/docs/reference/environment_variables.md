@@ -57,43 +57,36 @@ You can escape environment variables by prefacing them with a `$` character. For
 example `$${HOSTNAME}` or `$$HOSTNAME` is treated literally in the above
 environment variable example.
 
-## Interpolation Pitfalls
+## Security Restrictions
 
+Vector prevents security issues related to environment variable interpolation by rejecting environment variables that contain newline
+characters. This also prevents injection of multi-line configuration blocks.
 
-It is possible to inject multiline blocks.
+If you need to inject multi-line configuration blocks, use a config pre-processing step with a tool like `envsubst`.
+This approach gives you more control over the configuration and allows you to inspect the result before passing it to Vector:
 
-{{< warning >}}
-Support for block interpolation feature may be removed in the future.
-We do not recommend using this feature, as it can lead to unwanted injections.
-For example, a malicious actor could inject components that execute arbitrary code.
-Of course this assumes said actor penetrated the system and has write access to the environment variables.
-{{< /warning >}}
-
-For example, the following section of a config:
-
-```yaml
+```shell
+# config_template.yaml
 ${SOURCES_BLOCK}
+sinks:
+  console:
+    type: console
+    inputs: ["demo"]
+    encoding:
+      codec: json
 ```
 
-will be replaced by the following value:
-
 ```shell
-export SOURCES_BLOCK="sources:\"
+# Export multi-line block
+export SOURCES_BLOCK="sources:
   demo:
     type: demo_logs
     format: json
-    interval: 1
-```
+    interval: 1"
 
-A better approach is to introduce a config pre-processing step with a mature tool. This also has the benefit of giving the user
-more control over the configuration and the result can be inspected before it is passed to Vector. See the following example:
+# Process template and inspect result
+envsubst < config_template.yaml > config.yaml
 
-```shell
-envsubst < snippet_in.yaml > snippet_out.yaml
-cat snippet_out.yaml
-sources:"
-  demo:
-    type: demo_logs
-    format: json
-    interval: 1
+# Start Vector with processed config
+vector --config config.yaml
 ```

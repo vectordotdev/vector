@@ -1,17 +1,17 @@
 //! The sink for the `AMQP` sink that wires together the main stream that takes the
 //! event and sends it to `AMQP`.
-use crate::sinks::prelude::*;
 use lapin::BasicProperties;
 use serde::Serialize;
 
-use super::channel::AmqpSinkChannels;
 use super::{
     BuildError,
+    channel::AmqpSinkChannels,
     config::{AmqpPropertiesConfig, AmqpSinkConfig},
     encoder::AmqpEncoder,
     request_builder::AmqpRequestBuilder,
     service::AmqpService,
 };
+use crate::sinks::prelude::*;
 
 /// Stores the event together with the rendered exchange and routing_key values.
 /// This is passed into the `RequestBuilder` which then splits it out into the event

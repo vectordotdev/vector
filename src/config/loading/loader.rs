@@ -213,6 +213,17 @@ where
     /// Consumes Self, and returns the final, deserialized `T`.
     fn take(self) -> T;
 
+    fn load_from_str<R: std::io::Read>(
+        &mut self,
+        input: R,
+        format: Format,
+    ) -> Result<(), Vec<String>> {
+        if let Some(table) = self.load(input, format)? {
+            self.merge(table, None)?;
+        }
+        Ok(())
+    }
+
     /// Deserializes a file with the provided format, and makes the result available via `take`.
     /// Returns a vector of non-fatal warnings on success, or a vector of error strings on failure.
     fn load_from_file(&mut self, path: &Path, format: Format) -> Result<(), Vec<String>> {

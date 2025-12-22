@@ -4,12 +4,10 @@ use heim::net::os::linux::IoCountersExt;
 #[cfg(windows)]
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
-use vector_lib::configurable::configurable_component;
-use vector_lib::metric_tags;
-
-use crate::internal_events::HostMetricsScrapeDetailError;
+use vector_lib::{configurable::configurable_component, metric_tags};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
+use crate::internal_events::HostMetricsScrapeDetailError;
 
 /// Options for the network metrics collector.
 #[configurable_component]

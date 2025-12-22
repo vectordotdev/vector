@@ -8,11 +8,11 @@ use futures_util::{
     stream::{self, BoxStream},
 };
 use tower::Service;
-use vector_lib::stream::{BatcherSettings, DriverResponse};
 use vector_lib::{
     event::{Event, Metric, MetricValue},
     partition::Partitioner,
     sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse},
 };
 
 use super::{

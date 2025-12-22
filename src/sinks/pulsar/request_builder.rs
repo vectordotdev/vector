@@ -1,11 +1,13 @@
-use bytes::Bytes;
-use std::collections::HashMap;
-use std::io;
+use std::{collections::HashMap, io};
 
-use crate::event::KeyString;
-use crate::sinks::{
-    prelude::*,
-    pulsar::{encoder::PulsarEncoder, service::PulsarRequest, sink::PulsarEvent},
+use bytes::Bytes;
+
+use crate::{
+    event::KeyString,
+    sinks::{
+        prelude::*,
+        pulsar::{encoder::PulsarEncoder, service::PulsarRequest, sink::PulsarEvent},
+    },
 };
 
 #[derive(Clone)]

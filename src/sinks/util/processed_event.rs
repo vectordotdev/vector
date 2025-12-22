@@ -2,9 +2,9 @@ use serde::Serialize;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     event::{EventFinalizers, Finalizable, LogEvent, MaybeAsLogMut},
-};
-use vector_lib::{
-    internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
+    internal_event::TaggedEventsSent,
+    json_size::JsonSize,
+    request_metadata::GetEventCountTags,
 };
 
 /// An event alongside metadata from preprocessing. This is useful for sinks

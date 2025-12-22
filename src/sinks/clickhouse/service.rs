@@ -1,7 +1,13 @@
 //! Service implementation for the `Clickhouse` sink.
 
-use super::config::QuerySettingsConfig;
-use super::sink::PartitionKey;
+use bytes::Bytes;
+use http::{
+    Request, StatusCode, Uri,
+    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
+};
+use snafu::ResultExt;
+
+use super::{config::QuerySettingsConfig, sink::PartitionKey};
 use crate::{
     http::{Auth, HttpError},
     sinks::{
@@ -14,12 +20,6 @@ use crate::{
         },
     },
 };
-use bytes::Bytes;
-use http::{
-    Request, StatusCode, Uri,
-    header::{CONTENT_ENCODING, CONTENT_LENGTH, CONTENT_TYPE},
-};
-use snafu::ResultExt;
 
 #[derive(Debug, Default, Clone)]
 pub struct ClickhouseRetryLogic {
@@ -92,10 +92,18 @@ impl HttpServiceRequestBuilder<PartitionKey> for ClickhouseServiceRequestBuilder
 
         let auth: Option<Auth> = self.auth.clone();
 
+        // Extract format before taking payload to avoid borrow checker issues
+        let format = metadata.format;
         let payload = request.take_payload();
 
+        // Set content type based on format
+        let content_type = match format {
+            Format::ArrowStream => "application/vnd.apache.arrow.stream",
+            _ => "application/x-ndjson",
+        };
+
         let mut builder = Request::post(&uri)
-            .header(CONTENT_TYPE, "application/x-ndjson")
+            .header(CONTENT_TYPE, content_type)
             .header(CONTENT_LENGTH, payload.len());
         if let Some(ce) = self.compression.content_encoding() {
             builder = builder.header(CONTENT_ENCODING, ce);
@@ -200,8 +208,8 @@ fn set_uri_query(
 
 #[cfg(test)]
 mod tests {
+    use super::super::config::AsyncInsertSettingsConfig;
     use super::*;
-    use crate::sinks::clickhouse::config::*;
 
     #[test]
     fn encode_valid() {

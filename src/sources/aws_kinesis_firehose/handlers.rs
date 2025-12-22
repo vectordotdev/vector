@@ -8,18 +8,17 @@ use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::constants::GZIP_MAGIC;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::lookup::{PathPrefix, metadata_path, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::StreamDecodingError,
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
-};
-use vector_lib::{
     finalization::AddBatchNotifier,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
+    lookup::{PathPrefix, metadata_path, path},
+    source_sender::SendError,
 };
 use vrl::compiler::SecretTarget;
 use warp::reject;
@@ -145,13 +144,16 @@ pub(super) async fn firehose(
                     }
 
                     let count = events.len();
-                    if let Err(error) = context.out.send_batch(events).await {
-                        emit!(StreamClosedError { count });
-                        let error = RequestError::ShuttingDown {
-                            request_id: request_id.clone(),
-                            source: error,
-                        };
-                        warp::reject::custom(error);
+                    match context.out.send_batch(events).await {
+                        Ok(()) => (),
+                        Err(SendError::Closed) => {
+                            emit!(StreamClosedError { count });
+                            let error = RequestError::ShuttingDown {
+                                request_id: request_id.clone(),
+                            };
+                            warp::reject::custom(error);
+                        }
+                        Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
                     }
 
                     drop(batch);
@@ -257,8 +259,9 @@ fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
 
 #[cfg(test)]
 mod tests {
-    use flate2::{Compression, write::GzEncoder};
     use std::io::Write as _;
+
+    use flate2::{Compression, write::GzEncoder};
 
     use super::*;
 

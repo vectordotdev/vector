@@ -1,11 +1,10 @@
+use std::collections::HashMap;
+
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use futures::FutureExt;
 use serde::{Deserialize, Deserializer, de};
-use std::collections::HashMap;
 use tower::ServiceBuilder;
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::schema;
+use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use crate::{

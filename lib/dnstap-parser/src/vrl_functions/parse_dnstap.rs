@@ -1,9 +1,9 @@
-use crate::parser::DnstapParser;
-use crate::schema::DnstapEventSchema;
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
-use vector_lib::event::LogEvent;
+use vector_core::event::LogEvent;
 use vrl::prelude::*;
+
+use crate::{parser::DnstapParser, schema::DnstapEventSchema};
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseDnstap;
@@ -29,7 +29,7 @@ impl Function for ParseDnstap {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "Parse dnstap query message",
             source: r#"parse_dnstap!("ChVqYW1lcy1WaXJ0dWFsLU1hY2hpbmUSC0JJTkQgOS4xNi4zGgBy5wEIAxACGAEiEAAAAAAAAAAAAAAAAAAAAAAqECABBQJwlAAAAAAAAAAAADAw8+0CODVA7+zq9wVNMU3WNlI2kwIAAAABAAAAAAABCWZhY2Vib29rMQNjb20AAAEAAQAAKQIAAACAAAAMAAoACOxjCAG9zVgzWgUDY29tAGAAbQAAAAByZLM4AAAAAQAAAAAAAQJoNQdleGFtcGxlA2NvbQAABgABAAApBNABAUAAADkADwA1AAlubyBTRVAgbWF0Y2hpbmcgdGhlIERTIGZvdW5kIGZvciBkbnNzZWMtZmFpbGVkLm9yZy54AQ==")"#,
             result: Ok(indoc!(
@@ -135,7 +135,7 @@ impl Function for ParseDnstap {
                         "timestamp": "2020-06-30T03:50:07.920014129Z"
                     }"#
             )),
-        }]
+        )]
     }
 
     fn compile(
@@ -191,9 +191,10 @@ impl FunctionExpression for ParseDnstapFn {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, TimeZone, Utc};
     use vrl::value;
+
+    use super::*;
 
     test_function![
         parse_dnstap => ParseDnstap;

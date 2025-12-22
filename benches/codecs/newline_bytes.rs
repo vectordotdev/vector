@@ -7,7 +7,8 @@ use criterion::{
 };
 use tokio_util::codec::Decoder;
 use vector_lib::codecs::{
-    BytesDeserializer, NewlineDelimitedDecoder, decoding::Deserializer, decoding::Framer,
+    BytesDeserializer, NewlineDelimitedDecoder,
+    decoding::{Deserializer, Framer},
 };
 
 #[derive(Debug)]

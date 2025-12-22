@@ -1,21 +1,23 @@
+use std::time::Duration;
+
 use futures::TryFutureExt;
 use serde_with::serde_as;
 use snafu::ResultExt;
-use std::time::Duration;
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
+use vector_config::configurable_component;
+use vector_lib::{
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::{LogNamespace, SourceOutput},
+};
 
 use super::source::{WebSocketSource, WebSocketSourceParams};
-use crate::common::websocket::WebSocketCommonConfig;
 use crate::{
     codecs::DecodingConfig,
-    common::websocket::{ConnectSnafu, WebSocketConnector},
+    common::websocket::{ConnectSnafu, WebSocketCommonConfig, WebSocketConnector},
     config::{SourceConfig, SourceContext},
     serde::{default_decoding, default_framing_message_based},
     sources::Source,
     tls::MaybeTlsSettings,
 };
-use vector_config::configurable_component;
-use vector_lib::config::{LogNamespace, SourceOutput};
 
 /// Defines the different shapes the `pong_message` config can take.
 #[derive(Clone, Debug)]
@@ -201,11 +203,13 @@ impl SourceConfig for WebSocketConfig {
 
 #[cfg(test)]
 mod test {
+    use vector_lib::{config::LogNamespace, lookup::OwnedTargetPath, schema, schema::Definition};
+    use vrl::{
+        owned_value_path,
+        value::kind::{Collection, Kind},
+    };
+
     use super::*;
-    use vector_lib::schema::Definition;
-    use vector_lib::{config::LogNamespace, lookup::OwnedTargetPath, schema};
-    use vrl::owned_value_path;
-    use vrl::value::kind::{Collection, Kind};
 
     #[test]
     fn generate_config() {

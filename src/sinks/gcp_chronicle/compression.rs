@@ -1,21 +1,22 @@
-use serde::{de, ser};
-use serde_json::Value;
 use std::{cell::RefCell, collections::BTreeSet};
-use vector_lib::configurable::ToValue;
 
 use indexmap::IndexMap;
-use vector_lib::configurable::attributes::CustomAttribute;
+use serde::{de, ser};
+use serde_json::Value;
 use vector_lib::configurable::{
-    Configurable, GenerateError, Metadata,
+    Configurable, GenerateError, Metadata, ToValue,
+    attributes::CustomAttribute,
     schema::{
         SchemaGenerator, SchemaObject, apply_base_metadata, generate_one_of_schema,
         generate_struct_schema, get_or_generate_schema,
     },
 };
 
-use crate::sinks::util::Compression;
-use crate::sinks::util::buffer::compression::{
-    ALGORITHM_NAME, CompressionLevel, ENUM_TAGGING_MODE, LEVEL_NAME, generate_string_schema,
+use crate::sinks::util::{
+    Compression,
+    buffer::compression::{
+        ALGORITHM_NAME, CompressionLevel, ENUM_TAGGING_MODE, LEVEL_NAME, generate_string_schema,
+    },
 };
 
 /// Compression configuration.

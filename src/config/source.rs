@@ -1,11 +1,12 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, time::Duration};
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use vector_config::{Configurable, GenerateError, Metadata, NamedComponent};
-use vector_config_common::attributes::CustomAttribute;
-use vector_config_common::schema::{SchemaGenerator, SchemaObject};
+use vector_config_common::{
+    attributes::CustomAttribute,
+    schema::{SchemaGenerator, SchemaObject},
+};
 use vector_config_macros::configurable_component;
 use vector_lib::{
     config::{
@@ -119,6 +120,12 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
     /// well as emit contextual warnings when end-to-end acknowledgements are enabled, but the
     /// topology as configured does not actually support the use of end-to-end acknowledgements.
     fn can_acknowledge(&self) -> bool;
+
+    /// If this source supports timeout returns from the `SourceSender` and the configuration
+    /// provides a timeout value, return it here and the `out` channel will be configured with it.
+    fn send_timeout(&self) -> Option<Duration> {
+        None
+    }
 }
 
 dyn_clone::clone_trait_object!(SourceConfig);

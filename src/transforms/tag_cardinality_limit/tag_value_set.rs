@@ -1,8 +1,8 @@
-use crate::event::metric::TagValueSet;
-use crate::transforms::tag_cardinality_limit::config::Mode;
+use std::{collections::HashSet, fmt};
+
 use bloomy::BloomFilter;
-use std::collections::HashSet;
-use std::fmt;
+
+use crate::{event::metric::TagValueSet, transforms::tag_cardinality_limit::config::Mode};
 
 /// Container for storing the set of accepted values for a given tag key.
 #[derive(Debug)]
@@ -96,8 +96,7 @@ impl AcceptedTagValueSet {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::event::metric::TagValueSet;
-    use crate::transforms::tag_cardinality_limit::config::Mode;
+    use crate::{event::metric::TagValueSet, transforms::tag_cardinality_limit::config::Mode};
 
     #[test]
     fn test_accepted_tag_value_set_exact() {

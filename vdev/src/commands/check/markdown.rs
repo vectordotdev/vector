@@ -1,7 +1,6 @@
 use anyhow::Result;
 
-use crate::app;
-use crate::git::git_ls_files;
+use crate::{app, utils::git::git_ls_files};
 
 /// Check that markdown is styled properly
 #[derive(clap::Args, Debug)]
@@ -20,11 +19,11 @@ impl Cli {
             "scripts/.markdownlintrc",
             // We should fix these as well. Previously these files were not linted.
             "--ignore",
-            ".github"
+            ".github",
         ]
-            .into_iter()
-            .chain(files.iter().map(String::as_str))
-            .collect();
+        .into_iter()
+        .chain(files.iter().map(String::as_str))
+        .collect();
 
         app::exec("markdownlint", &args, true)
     }

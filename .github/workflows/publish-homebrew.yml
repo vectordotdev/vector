@@ -1,0 +1,33 @@
+name: Publish to Homebrew
+
+on:
+  workflow_dispatch:
+    inputs:
+      vector_version:
+        description: "Vector version to publish"
+        required: true
+        type: string
+
+  workflow_call:
+    inputs:
+      git_ref:
+        required: true
+        type: string
+      vector_version:
+        required: true
+        type: string
+
+jobs:
+  publish-homebrew:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    env:
+      GITHUB_TOKEN: ${{ secrets.HOMEBREW_PAT }}
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ inputs.git_ref || github.ref_name }}
+
+      - name: Publish update to Homebrew tap
+        run: make release-homebrew VECTOR_VERSION=${{ inputs.vector_version }}

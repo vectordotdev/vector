@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use goauth::scopes::Scope;
 use http::{Request, Uri, header::CONTENT_TYPE};
+use snafu::ResultExt;
 
 use super::{
     request_builder::{StackdriverMetricsEncoder, StackdriverMetricsRequestBuilder},
@@ -20,7 +21,6 @@ use crate::{
         },
     },
 };
-use snafu::ResultExt;
 
 #[derive(Clone, Copy, Debug)]
 pub struct StackdriverMetricsTowerRequestConfigDefaults;

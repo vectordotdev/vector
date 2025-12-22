@@ -3,9 +3,9 @@ use bytes::BytesMut;
 use futures::{StreamExt, stream::BoxStream};
 use tokio::{io, io::AsyncWriteExt};
 use tokio_util::codec::Encoder as _;
-use vector_lib::codecs::encoding::Framer;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::encoding::Framer,
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
@@ -46,7 +46,7 @@ where
                 Err(error) => {
                     // Error when writing to stdout/stderr is likely irrecoverable,
                     // so stop the sink.
-                    error!(message = "Error writing to output. Stopping sink.", %error);
+                    error!(message = "Error writing to output. Stopping sink.", %error, internal_log_rate_limit = false);
                     finalizers.update_status(EventStatus::Errored);
                     return Err(());
                 }
@@ -67,8 +67,10 @@ where
 mod test {
     use futures::future::ready;
     use futures_util::stream;
-    use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoder};
-    use vector_lib::sink::VectorSink;
+    use vector_lib::{
+        codecs::{JsonSerializerConfig, NewlineDelimitedEncoder},
+        sink::VectorSink,
+    };
 
     use super::*;
     use crate::{

@@ -1,5 +1,6 @@
 use futures::stream;
 use indoc::indoc;
+use vector_lib::event::{BatchNotifier, BatchStatus};
 
 use crate::{
     config::SinkConfig,
@@ -13,7 +14,6 @@ use crate::{
         map_event_batch_stream,
     },
 };
-use vector_lib::event::{BatchNotifier, BatchStatus};
 
 #[tokio::test]
 async fn to_real_traces_endpoint() {

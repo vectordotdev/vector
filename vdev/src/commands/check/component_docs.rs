@@ -1,4 +1,4 @@
-use crate::git;
+use crate::utils::git;
 use anyhow::{Ok, Result};
 
 /// Check that component documentation is up-to-date
@@ -11,7 +11,8 @@ impl Cli {
         let files: Vec<String> = git::get_modified_files()?;
         let dirty_component_files: Vec<String> = files
             .into_iter()
-            .filter(|file| file.starts_with("website/cue/reference/components"))
+            .filter(|file| file.starts_with("website/cue/reference"))
+            .filter(|file| file.contains("generated/"))
             .collect();
 
         // If it is not empty, there are out-of-sync component Cue files in the current branch.
@@ -20,7 +21,9 @@ impl Cli {
             for file in dirty_component_files {
                 println!(" - {file}");
             }
-            println!("Run `make generate-component-docs` locally to update your branch and commit/push the changes.");
+            println!(
+                "Run `make generate-component-docs` locally to update your branch and commit/push the changes."
+            );
             std::process::exit(1);
         }
 

@@ -12,7 +12,7 @@ pub struct JsonSerializerConfig {
     /// Controls how metric tag values are encoded.
     ///
     /// When set to `single`, only the last non-bare value of tags are displayed with the
-    /// metric.  When set to `full`, all metric tags are exposed as separate assignments.
+    /// metric. When set to `full`, all metric tags are exposed as separate assignments.
     #[serde(default, skip_serializing_if = "vector_core::serde::is_default")]
     pub metric_tag_values: MetricTagValues,
 
@@ -120,8 +120,10 @@ impl Encoder<Event> for JsonSerializer {
 mod tests {
     use bytes::{Bytes, BytesMut};
     use chrono::{TimeZone, Timelike, Utc};
-    use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
-    use vector_core::metric_tags;
+    use vector_core::{
+        event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value},
+        metric_tags,
+    };
     use vrl::btreemap;
 
     use super::*;
@@ -274,12 +276,15 @@ mod tests {
     }
 
     mod pretty_json {
-        use super::*;
         use bytes::{Bytes, BytesMut};
         use chrono::{TimeZone, Timelike, Utc};
-        use vector_core::event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value};
-        use vector_core::metric_tags;
+        use vector_core::{
+            event::{LogEvent, Metric, MetricKind, MetricValue, StatisticKind, Value},
+            metric_tags,
+        };
         use vrl::btreemap;
+
+        use super::*;
 
         fn get_pretty_json_config() -> JsonSerializerConfig {
             JsonSerializerConfig {

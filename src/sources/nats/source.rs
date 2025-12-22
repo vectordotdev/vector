@@ -1,11 +1,3 @@
-use crate::{
-    SourceSender,
-    codecs::Decoder,
-    event::Event,
-    internal_events::StreamClosedError,
-    shutdown::ShutdownSignal,
-    sources::nats::config::{BuildError, NatsSourceConfig, SubscribeSnafu},
-};
 use async_nats::jetstream::consumer::pull::Stream as PullConsumerStream;
 use chrono::Utc;
 use futures::StreamExt;
@@ -20,6 +12,15 @@ use vector_lib::{
         InternalEventHandle as _, Protocol,
     },
     lookup::owned_value_path,
+};
+
+use crate::{
+    SourceSender,
+    codecs::Decoder,
+    event::Event,
+    internal_events::StreamClosedError,
+    shutdown::ShutdownSignal,
+    sources::nats::config::{BuildError, NatsSourceConfig, SubscribeSnafu},
 };
 
 /// The outcome of processing a single NATS message.

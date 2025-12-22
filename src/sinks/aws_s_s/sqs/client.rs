@@ -1,8 +1,9 @@
-use super::{Client, SendMessageEntry, SendMessageResponse};
 use aws_sdk_sqs::operation::send_message::SendMessageError;
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::TryFutureExt;
 use tracing::Instrument;
+
+use super::{Client, SendMessageEntry, SendMessageResponse};
 
 #[derive(Clone, Debug)]
 pub(super) struct SqsMessagePublisher {

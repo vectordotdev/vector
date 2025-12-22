@@ -1,9 +1,8 @@
 use std::collections::{HashMap, HashSet};
+
 use tokio::sync::watch;
-use vector_common::config::ComponentKey;
-use vector_common::id::Inputs;
-use vector_core::config::OutputId;
-use vector_core::fanout;
+use vector_common::{config::ComponentKey, id::Inputs};
+use vector_core::{config::OutputId, fanout};
 
 /// A tappable output consisting of an output ID and associated metadata
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]

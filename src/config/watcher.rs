@@ -1,17 +1,16 @@
-use crate::config::{ComponentConfig, ComponentType};
-use std::collections::HashMap;
+use notify::{EventKind, RecursiveMode, recommended_watcher};
 use std::{
+    collections::{HashMap, HashSet},
     path::{Path, PathBuf},
-    time::Duration,
-};
-use std::{
     sync::mpsc::{Receiver, channel},
     thread,
+    time::Duration,
 };
 
-use notify::{EventKind, RecursiveMode, recommended_watcher};
-
-use crate::Error;
+use crate::{
+    Error,
+    config::{ComponentConfig, ComponentType},
+};
 
 /// Per notify own documentation, it's advised to have delay of more than 30 sec,
 /// so to avoid receiving repetitions of previous events on macOS.
@@ -42,7 +41,11 @@ enum Watcher {
 impl Watcher {
     fn add_paths(&mut self, config_paths: &[PathBuf]) -> Result<(), Error> {
         for path in config_paths {
-            self.watch(path, RecursiveMode::Recursive)?;
+            if path.exists() {
+                self.watch(path, RecursiveMode::Recursive)?;
+            } else {
+                debug!(message = "Skipping non-existent path.", path = ?path);
+            }
         }
         Ok(())
     }
@@ -99,15 +102,29 @@ pub fn spawn_thread<'a>(
                     ) {
                         debug!(message = "Configuration file change detected.", event = ?event);
 
-                        // Consume events until delay amount of time has passed since the latest event.
-                        while receiver.recv_timeout(delay).is_ok() {}
+                        // Collect paths from initial event
+                        let mut changed_paths: HashSet<PathBuf> = event.paths.into_iter().collect();
 
-                        debug!(message = "Consumed file change events for delay.", delay = ?delay);
+                        // Collect paths from subsequent events until delay amount of time has passed
+                        while let Ok(Ok(subseq_event)) = receiver.recv_timeout(delay) {
+                            if matches!(
+                                subseq_event.kind,
+                                EventKind::Create(_) | EventKind::Remove(_) | EventKind::Modify(_)
+                            ) {
+                                changed_paths.extend(subseq_event.paths);
+                            }
+                        }
+
+                        debug!(
+                            message = "Collected file change events during delay period.",
+                            paths = changed_paths.len(),
+                            delay = ?delay
+                        );
 
                         let changed_components: HashMap<_, _> = component_configs
                             .clone()
                             .into_iter()
-                            .flat_map(|p| p.contains(&event.paths))
+                            .flat_map(|p| p.contains(&changed_paths))
                             .collect();
 
                         // We need to read paths to resolve any inode changes that may have happened.
@@ -122,7 +139,6 @@ pub fn spawn_thread<'a>(
                         info!("Configuration file changed.");
                         if !changed_components.is_empty() {
                             info!(
-                                internal_log_rate_limit = true,
                                 "Component {:?} configuration changed.",
                                 changed_components.keys()
                             );
@@ -130,23 +146,39 @@ pub fn spawn_thread<'a>(
                                 .iter()
                                 .all(|(_, t)| *t == ComponentType::EnrichmentTable)
                             {
-                                info!(
-                                    internal_log_rate_limit = true,
-                                    "Only enrichment tables have changed."
-                                );
-                                _ = signal_tx.send(crate::signal::SignalTo::ReloadEnrichmentTables).map_err(|error| {
-                                error!(message = "Unable to reload enrichment tables.", cause = %error, internal_log_rate_limit = true)
-                            });
+                                info!("Only enrichment tables have changed.");
+                                _ = signal_tx
+                                    .send(crate::signal::SignalTo::ReloadEnrichmentTables)
+                                    .map_err(|error| {
+                                        error!(
+                                            message = "Unable to reload enrichment tables.",
+                                            cause = %error,
+                                            internal_log_rate_limit = false,
+                                        )
+                                    });
                             } else {
-                                _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(changed_components.into_keys().collect())).map_err(|error| {
-                                error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error, internal_log_rate_limit = true)
-                            });
+                                _ = signal_tx
+                                    .send(crate::signal::SignalTo::ReloadComponents(
+                                        changed_components.into_keys().collect(),
+                                    ))
+                                    .map_err(|error| {
+                                        error!(
+                                            message = "Unable to reload component configuration. Restart Vector to reload it.",
+                                            cause = %error,
+                                            internal_log_rate_limit = false,
+                                        )
+                                    });
                             }
                         } else {
-                            _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk)
-                            .map_err(|error| {
-                                error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error, internal_log_rate_limit = true)
-                            });
+                            _ = signal_tx
+                                .send(crate::signal::SignalTo::ReloadFromDisk)
+                                .map_err(|error| {
+                                    error!(
+                                        message = "Unable to reload configuration file. Restart Vector to reload it.",
+                                        cause = %error,
+                                        internal_log_rate_limit = false,
+                                    )
+                                });
                         }
                     } else {
                         debug!(message = "Ignoring event.", event = ?event)
@@ -200,14 +232,16 @@ fn create_watcher(
 
 #[cfg(all(test, unix, not(target_os = "macos")))] // https://github.com/vectordotdev/vector/issues/5000
 mod tests {
+    use std::{collections::HashSet, fs::File, io::Write, time::Duration};
+
+    use tokio::sync::broadcast;
+
     use super::*;
     use crate::{
         config::ComponentKey,
         signal::SignalRx,
         test_util::{temp_dir, temp_file, trace_init},
     };
-    use std::{collections::HashSet, fs::File, io::Write, time::Duration};
-    use tokio::sync::broadcast;
 
     async fn test_signal(
         file: &mut File,

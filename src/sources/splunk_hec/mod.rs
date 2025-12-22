@@ -13,8 +13,7 @@ use flate2::read::MultiGzDecoder;
 use futures::FutureExt;
 use http::StatusCode;
 use hyper::{Server, service::make_service_fn};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
+use serde::{Serialize, de::DeserializeOwned};
 use serde_json::{
     Deserializer, Value as JsonValue,
     de::{Read as JsonRead, StrRead},
@@ -23,21 +22,30 @@ use snafu::Snafu;
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
-use vector_lib::lookup::{self, event_path, owned_value_path};
-use vector_lib::sensitive_string::SensitiveString;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
     event::BatchNotifier,
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    lookup::{self, event_path, lookup_v2::OptionalValuePath, owned_value_path},
     schema::meaning,
+    sensitive_string::SensitiveString,
+    source_sender::SendError,
+    tls::MaybeTlsIncomingStream,
 };
-use vector_lib::{configurable::configurable_component, tls::MaybeTlsIncomingStream};
-use vrl::path::OwnedTargetPath;
-use vrl::value::{Kind, kind::Collection};
-use warp::http::header::{CONTENT_TYPE, HeaderValue};
-use warp::{Filter, Reply, filters::BoxedFilter, path, reject::Rejection, reply::Response};
+use vrl::{
+    path::OwnedTargetPath,
+    value::{Kind, kind::Collection},
+};
+use warp::{
+    Filter, Reply,
+    filters::BoxedFilter,
+    http::header::{CONTENT_TYPE, HeaderValue},
+    path,
+    reject::Rejection,
+    reply::Response,
+};
 
 use self::{
     acknowledgements::{
@@ -55,7 +63,6 @@ use crate::{
         EventsReceived, HttpBytesReceived, SplunkHecRequestBodyInvalidError, SplunkHecRequestError,
     },
     serde::bool_or_struct,
-    source_sender::ClosedError,
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -426,10 +433,16 @@ impl SplunkSource {
                             }
                         }
 
-                        if !events.is_empty()
-                            && let Err(ClosedError) = out.send_batch(events).await
-                        {
-                            return Err(Rejection::from(ApiError::ServerShutdown));
+                        if !events.is_empty() {
+                            match out.send_batch(events).await {
+                                Ok(()) => (),
+                                Err(SendError::Closed) => {
+                                    return Err(Rejection::from(ApiError::ServerShutdown));
+                                }
+                                Err(SendError::Timeout) => {
+                                    unreachable!("No timeout is configured for this source.")
+                                }
+                            }
                         }
 
                         if let Some(error) = error {
@@ -1295,12 +1308,15 @@ mod tests {
     use http::Uri;
     use reqwest::{RequestBuilder, Response};
     use serde::Deserialize;
-    use vector_lib::codecs::{
-        BytesDecoderConfig, JsonSerializerConfig, TextSerializerConfig,
-        decoding::DeserializerConfig,
+    use vector_lib::{
+        codecs::{
+            BytesDecoderConfig, JsonSerializerConfig, TextSerializerConfig,
+            decoding::DeserializerConfig,
+        },
+        event::EventStatus,
+        schema::Definition,
+        sensitive_string::SensitiveString,
     };
-    use vector_lib::sensitive_string::SensitiveString;
-    use vector_lib::{event::EventStatus, schema::Definition};
     use vrl::path::PathPrefix;
 
     use super::*;
@@ -1317,12 +1333,13 @@ mod tests {
         },
         sources::splunk_hec::acknowledgements::{HecAckStatusRequest, HecAckStatusResponse},
         test_util::{
+            addr::{PortGuard, next_addr},
             collect_n,
             components::{
                 COMPONENT_ERROR_TAGS, HTTP_PUSH_SOURCE_TAGS, assert_source_compliance,
                 assert_source_error,
             },
-            next_addr, wait_for_tcp,
+            wait_for_tcp,
         },
     };
 
@@ -1337,7 +1354,7 @@ mod tests {
 
     async fn source(
         acknowledgements: Option<HecAcknowledgementsConfig>,
-    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
         source_with(Some(TOKEN.to_owned().into()), None, acknowledgements, false).await
     }
 
@@ -1346,9 +1363,13 @@ mod tests {
         valid_tokens: Option<&[&str]>,
         acknowledgements: Option<HecAcknowledgementsConfig>,
         store_hec_token: bool,
-    ) -> (impl Stream<Item = Event> + Unpin + use<>, SocketAddr) {
+    ) -> (
+        impl Stream<Item = Event> + Unpin + use<>,
+        SocketAddr,
+        PortGuard,
+    ) {
         let (sender, recv) = SourceSender::new_test_finalize(EventStatus::Delivered);
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let valid_tokens =
             valid_tokens.map(|tokens| tokens.iter().map(|v| v.to_string().into()).collect());
         let cx = SourceContext::new_test(sender, None);
@@ -1370,7 +1391,7 @@ mod tests {
             .unwrap()
         });
         wait_for_tcp(address).await;
-        (recv, address)
+        (recv, address, _guard)
     }
 
     async fn sink(
@@ -1407,7 +1428,7 @@ mod tests {
         compression: Compression,
         acknowledgements: Option<HecAcknowledgementsConfig>,
     ) -> (VectorSink, impl Stream<Item = Event> + Unpin) {
-        let (source, address) = source(acknowledgements).await;
+        let (source, address, _guard) = source(acknowledgements).await;
         let (sink, health) = sink(address, encoding, compression).await;
         assert!(health.await.is_ok());
         (sink, source)
@@ -1708,7 +1729,7 @@ mod tests {
     async fn raw() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "raw";
-            let (source, address) = source(None).await;
+            let (source, address, _guard) = source(None).await;
 
             assert_eq!(200, post(address, "services/collector/raw", message).await);
 
@@ -1732,7 +1753,7 @@ mod tests {
     async fn root() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#"{ "event": { "message": "root"} }"#;
-            let (source, address) = source(None).await;
+            let (source, address, _guard) = source(None).await;
 
             assert_eq!(200, post(address, "services/collector", message).await);
 
@@ -1756,7 +1777,7 @@ mod tests {
     async fn channel_header() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "raw";
-            let (source, address) = source(None).await;
+            let (source, address, _guard) = source(None).await;
 
             let opts = SendWithOpts {
                 channel: Some(Channel::Header("guid")),
@@ -1778,7 +1799,7 @@ mod tests {
     async fn xff_header_raw() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "raw";
-            let (source, address) = source(None).await;
+            let (source, address, _guard) = source(None).await;
 
             let opts = SendWithOpts {
                 channel: Some(Channel::Header("guid")),
@@ -1804,7 +1825,7 @@ mod tests {
     async fn xff_header_event_with_host_field() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#"{"event":"first", "host": "10.1.0.2"}"#;
-            let (source, address) = source(None).await;
+            let (source, address, _guard) = source(None).await;
 
             let opts = SendWithOpts {
                 channel: Some(Channel::Header("guid")),
@@ -1830,7 +1851,7 @@ mod tests {
     async fn xff_header_event_without_host_field() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#"{"event":"first", "color": "blue"}"#;
-            let (source, address) = source(None).await;
+            let (source, address, _guard) = source(None).await;
 
             let opts = SendWithOpts {
                 channel: Some(Channel::Header("guid")),
@@ -1855,7 +1876,7 @@ mod tests {
     async fn channel_query_param() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "raw";
-            let (source, address) = source(None).await;
+            let (source, address, _guard) = source(None).await;
 
             let opts = SendWithOpts {
                 channel: Some(Channel::QueryParam("guid")),
@@ -1875,7 +1896,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_data() {
-        let (_source, address) = source(None).await;
+        let (_source, address, _guard) = source(None).await;
 
         assert_eq!(400, post(address, "services/collector/event", "").await);
     }
@@ -1883,7 +1904,7 @@ mod tests {
     #[tokio::test]
     async fn invalid_token() {
         assert_source_error(&COMPONENT_ERROR_TAGS, async {
-            let (_source, address) = source(None).await;
+            let (_source, address, _guard) = source(None).await;
             let opts = SendWithOpts {
                 channel: Some(Channel::Header("channel")),
                 forwarded_for: None,
@@ -1899,7 +1920,7 @@ mod tests {
 
     #[tokio::test]
     async fn health_ignores_token() {
-        let (_source, address) = source(None).await;
+        let (_source, address, _guard) = source(None).await;
 
         let res = reqwest::Client::new()
             .get(format!("http://{address}/services/collector/health"))
@@ -1913,7 +1934,7 @@ mod tests {
 
     #[tokio::test]
     async fn health() {
-        let (_source, address) = source(None).await;
+        let (_source, address, _guard) = source(None).await;
 
         let res = reqwest::Client::new()
             .get(format!("http://{address}/services/collector/health"))
@@ -1928,7 +1949,8 @@ mod tests {
     async fn secondary_token() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#"{"event":"first", "color": "blue"}"#;
-            let (_source, address) = source_with(None, Some(VALID_TOKENS), None, false).await;
+            let (_source, address, _guard) =
+                source_with(None, Some(VALID_TOKENS), None, false).await;
             let options = SendWithOpts {
                 channel: None,
                 forwarded_for: None,
@@ -1953,7 +1975,7 @@ mod tests {
     async fn event_service_token_passthrough_enabled() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "passthrough_token_enabled";
-            let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
+            let (source, address, _guard) = source_with(None, Some(VALID_TOKENS), None, true).await;
             let (sink, health) = sink(
                 address,
                 TextSerializerConfig::default().into(),
@@ -1980,7 +2002,7 @@ mod tests {
     async fn raw_service_token_passthrough_enabled() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "raw";
-            let (source, address) = source_with(None, Some(VALID_TOKENS), None, true).await;
+            let (source, address, _guard) = source_with(None, Some(VALID_TOKENS), None, true).await;
 
             assert_eq!(200, post(address, "services/collector/raw", message).await);
 
@@ -2007,7 +2029,7 @@ mod tests {
     async fn no_authorization() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "no_authorization";
-            let (source, address) = source_with(None, None, None, false).await;
+            let (source, address, _guard) = source_with(None, None, None, false).await;
             let (sink, health) = sink(
                 address,
                 TextSerializerConfig::default().into(),
@@ -2031,7 +2053,7 @@ mod tests {
     async fn no_authorization_token_passthrough_enabled() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = "no_authorization";
-            let (source, address) = source_with(None, None, None, true).await;
+            let (source, address, _guard) = source_with(None, None, None, true).await;
             let (sink, health) = sink(
                 address,
                 TextSerializerConfig::default().into(),
@@ -2058,7 +2080,7 @@ mod tests {
     async fn partial() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#"{"event":"first"}{"event":"second""#;
-            let (source, address) = source(None).await;
+            let (source, address, _guard) = source(None).await;
 
             assert_eq!(
                 400,
@@ -2085,7 +2107,7 @@ mod tests {
             let message = r#"
 {"event":"first"}
         "#;
-            let (source, address) = source(None).await;
+            let (source, address, _guard) = source(None).await;
 
             assert_eq!(
                 200,
@@ -2110,7 +2132,7 @@ mod tests {
     async fn handles_spaces() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let message = r#" {"event":"first"} "#;
-            let (source, address) = source(None).await;
+            let (source, address, _guard) = source(None).await;
 
             assert_eq!(
                 200,
@@ -2135,7 +2157,7 @@ mod tests {
     async fn handles_non_utf8() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
         let message = b" {\"event\": { \"non\": \"A non UTF8 character \xE4\", \"number\": 2, \"bool\": true } } ";
-        let (source, address) = source(None).await;
+        let (source, address, _guard) = source(None).await;
 
         let b = reqwest::Client::new()
             .post(format!(
@@ -2163,7 +2185,7 @@ mod tests {
     async fn default() {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
         let message = r#"{"event":"first","source":"main"}{"event":"second"}{"event":"third","source":"secondary"}"#;
-        let (source, address) = source(None).await;
+        let (source, address, _guard) = source(None).await;
 
         assert_eq!(
             200,
@@ -2276,7 +2298,7 @@ mod tests {
             enabled: Some(true),
             ..Default::default()
         };
-        let (source, address) = source(Some(ack_config)).await;
+        let (source, address, _guard) = source(Some(ack_config)).await;
         let event_message = r#"{"event":"first", "color": "blue"}{"event":"second"}"#;
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
@@ -2321,7 +2343,7 @@ mod tests {
             enabled: Some(true),
             ..Default::default()
         };
-        let (source, address) = source(Some(ack_config)).await;
+        let (source, address, _guard) = source(Some(ack_config)).await;
         let event_message = "raw event message";
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
@@ -2366,7 +2388,7 @@ mod tests {
             enabled: Some(true),
             ..Default::default()
         };
-        let (source, address) = source(Some(ack_config)).await;
+        let (source, address, _guard) = source(Some(ack_config)).await;
         let event_message = "raw event message";
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
@@ -2424,7 +2446,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (_source, address) = source(Some(ack_config)).await;
+        let (_source, address, _guard) = source(Some(ack_config)).await;
         let mut opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
             forwarded_for: None,
@@ -2460,7 +2482,7 @@ mod tests {
             ..Default::default()
         };
 
-        let (source, address) = source(Some(ack_config)).await;
+        let (source, address, _guard) = source(Some(ack_config)).await;
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
             forwarded_for: None,
@@ -2532,7 +2554,7 @@ mod tests {
             enabled: Some(true),
             ..Default::default()
         };
-        let (source, address) = source(Some(ack_config)).await;
+        let (source, address, _guard) = source(Some(ack_config)).await;
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),
             forwarded_for: None,
@@ -2578,7 +2600,7 @@ mod tests {
             enabled: Some(true),
             ..Default::default()
         };
-        let (_, address) = source(Some(ack_config)).await;
+        let (_, address, _guard) = source(Some(ack_config)).await;
 
         let opts = SendWithOpts {
             channel: None,
@@ -2594,7 +2616,7 @@ mod tests {
     #[tokio::test]
     async fn ack_service_acknowledgements_disabled() {
         let message = r#" {"acks":[0]} "#;
-        let (_, address) = source(None).await;
+        let (_, address, _guard) = source(None).await;
 
         let opts = SendWithOpts {
             channel: Some(Channel::Header("guid")),

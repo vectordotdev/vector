@@ -2,7 +2,6 @@ use std::{
     net::{Ipv4Addr, SocketAddr, SocketAddrV4},
     time::Duration,
 };
-use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use bytes::Bytes;
 use futures::{StreamExt, TryFutureExt};
@@ -10,13 +9,16 @@ use listenfd::ListenFd;
 use serde_with::serde_as;
 use smallvec::{SmallVec, smallvec};
 use tokio_util::udp::UdpFramed;
-use vector_lib::EstimatedJsonEncodedSizeOf;
-use vector_lib::codecs::{
-    NewlineDelimitedDecoder,
-    decoding::{self, Deserializer, Framer},
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::{
+        NewlineDelimitedDecoder,
+        decoding::{self, Deserializer, Framer},
+    },
+    configurable::configurable_component,
+    internal_event::{CountByteSize, InternalEventHandle as _, Registered},
+    ipallowlist::IpAllowlistConfig,
 };
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _, Registered};
 
 use self::parser::ParseError;
 use super::util::net::{SocketListenAddr, TcpNullAcker, TcpSource, try_bind_udp_socket};
@@ -40,7 +42,6 @@ pub mod parser;
 mod unix;
 
 use parser::Parser;
-
 #[cfg(unix)]
 use unix::{UnixConfig, statsd_unix};
 use vector_lib::config::LogNamespace;
@@ -417,16 +418,20 @@ mod test {
     };
 
     use super::*;
-    use crate::test_util::{
-        collect_limited,
-        components::{
-            COMPONENT_ERROR_TAGS, SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance,
-            assert_source_error,
+    use crate::{
+        series,
+        test_util::{
+            addr::next_addr,
+            collect_limited,
+            components::{
+                COMPONENT_ERROR_TAGS, SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance,
+                assert_source_error,
+            },
+            metrics::{
+                AbsoluteMetricState, assert_counter, assert_distribution, assert_gauge, assert_set,
+            },
         },
-        metrics::{assert_counter, assert_distribution, assert_gauge, assert_set},
-        next_addr,
     };
-    use crate::{series, test_util::metrics::AbsoluteMetricState};
 
     #[test]
     fn generate_config() {
@@ -436,11 +441,11 @@ mod test {
     #[tokio::test]
     async fn test_statsd_udp() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
             let config = StatsdConfig::Udp(UdpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
-                let bind_addr = next_addr();
+                let (_guard, bind_addr) = next_addr();
                 let socket = UdpSocket::bind(bind_addr).await.unwrap();
                 socket.connect(in_addr).await.unwrap();
                 while let Some(bytes) = receiver.next().await {
@@ -455,7 +460,7 @@ mod test {
     #[tokio::test]
     async fn test_statsd_tcp() {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
             let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
@@ -476,7 +481,7 @@ mod test {
     #[tokio::test]
     async fn test_statsd_error() {
         assert_source_error(&COMPONENT_ERROR_TAGS, async move {
-            let in_addr = next_addr();
+            let (_guard, in_addr) = next_addr();
             let config = StatsdConfig::Tcp(TcpConfig::from_address(in_addr.into()));
             let (sender, mut receiver) = mpsc::channel(200);
             tokio::spawn(async move {
@@ -522,14 +527,14 @@ mod test {
 
     #[tokio::test]
     async fn test_statsd_udp_conversion_disabled() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
         let mut config = UdpConfig::from_address(in_addr.into());
         config.convert_to = ConversionUnit::Milliseconds;
         let statsd_config = StatsdConfig::Udp(config);
         let (mut sender, mut receiver) = mpsc::channel(200);
 
         tokio::spawn(async move {
-            let bind_addr = next_addr();
+            let (_guard, bind_addr) = next_addr();
             let socket = UdpSocket::bind(bind_addr).await.unwrap();
             socket.connect(in_addr).await.unwrap();
             while let Some(bytes) = receiver.next().await {
@@ -538,7 +543,7 @@ mod test {
         });
 
         let component_key = ComponentKey::from("statsd_conversion_disabled");
-        let (tx, rx) = SourceSender::new_test_sender_with_buffer(4096);
+        let (tx, rx) = SourceSender::new_test_sender_with_options(4096, None);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)
@@ -575,7 +580,7 @@ mod test {
         // packet we send has a lot of metrics per packet.  We could technically count them all up
         // and have a more accurate number here, but honestly, who cares?  This is big enough.
         let component_key = ComponentKey::from("statsd");
-        let (tx, rx) = SourceSender::new_test_sender_with_buffer(4096);
+        let (tx, rx) = SourceSender::new_test_sender_with_options(4096, None);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)
@@ -669,7 +674,7 @@ mod test {
         // packet we send has a lot of metrics per packet.  We could technically count them all up
         // and have a more accurate number here, but honestly, who cares?  This is big enough.
         let component_key = ComponentKey::from("statsd");
-        let (tx, _rx) = SourceSender::new_test_sender_with_buffer(4096);
+        let (tx, _rx) = SourceSender::new_test_sender_with_options(4096, None);
         let (source_ctx, shutdown) = SourceContext::new_shutdown(&component_key, tx);
         let sink = statsd_config
             .build(source_ctx)

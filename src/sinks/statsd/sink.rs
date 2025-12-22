@@ -6,16 +6,18 @@ use futures_util::{
     stream::{self, BoxStream},
 };
 use tower::Service;
-use vector_lib::internal_event::Protocol;
-use vector_lib::stream::{BatcherSettings, DriverResponse};
-use vector_lib::{event::Event, sink::StreamSink};
-
-use crate::sinks::util::SinkBuilderExt;
+use vector_lib::{
+    event::Event,
+    internal_event::Protocol,
+    sink::StreamSink,
+    stream::{BatcherSettings, DriverResponse},
+};
 
 use super::{
     batch::StatsdBatchSizer, normalizer::StatsdNormalizer, request_builder::StatsdRequestBuilder,
     service::StatsdRequest,
 };
+use crate::sinks::util::SinkBuilderExt;
 
 pub(crate) struct StatsdSink<S> {
     service: S,

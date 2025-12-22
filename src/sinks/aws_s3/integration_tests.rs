@@ -19,8 +19,8 @@ use flate2::read::MultiGzDecoder;
 use futures::{Stream, stream};
 use similar_asserts::assert_eq;
 use tokio_stream::StreamExt;
-use vector_lib::codecs::{TextSerializerConfig, encoding::FramingConfig};
 use vector_lib::{
+    codecs::{TextSerializerConfig, encoding::FramingConfig},
     config::proxy::ProxyConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event, EventArray, LogEvent},
 };

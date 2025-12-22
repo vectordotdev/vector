@@ -1,17 +1,21 @@
-use super::common::{kv_list_into_value, to_hex};
-use super::proto::{
-    resource::v1::Resource,
-    trace::v1::{
-        ResourceSpans, Span, Status as SpanStatus,
-        span::{Event as SpanEvent, Link},
-    },
-};
-use chrono::{DateTime, TimeZone, Utc};
 use std::collections::BTreeMap;
+
+use chrono::{DateTime, TimeZone, Utc};
 use vector_core::event::{Event, TraceEvent};
 use vrl::{
     event_path,
     value::{KeyString, Value},
+};
+
+use super::{
+    common::{kv_list_into_value, to_hex},
+    proto::{
+        resource::v1::Resource,
+        trace::v1::{
+            ResourceSpans, Span, Status as SpanStatus,
+            span::{Event as SpanEvent, Link},
+        },
+    },
 };
 
 pub const TRACE_ID_KEY: &str = "trace_id";

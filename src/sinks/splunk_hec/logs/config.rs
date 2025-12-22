@@ -6,6 +6,7 @@ use vector_lib::{
     sensitive_string::SensitiveString,
 };
 
+use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
     http::HttpClient,
     sinks::{
@@ -19,8 +20,6 @@ use crate::{
         util::http::HttpRetryLogic,
     },
 };
-
-use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 
 /// Configuration for the `splunk_hec_logs` sink.
 #[configurable_component(sink(
@@ -283,12 +282,13 @@ impl HecLogsSinkConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::components::validation::prelude::*;
     use vector_lib::{
         codecs::{JsonSerializerConfig, MetricTagValues, encoding::format::JsonSerializerOptions},
         config::LogNamespace,
     };
+
+    use super::*;
+    use crate::components::validation::prelude::*;
 
     #[test]
     fn generate_config() {

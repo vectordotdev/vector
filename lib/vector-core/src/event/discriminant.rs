@@ -1,5 +1,7 @@
-use std::fmt;
-use std::hash::{Hash, Hasher};
+use std::{
+    fmt,
+    hash::{Hash, Hasher},
+};
 
 use super::{LogEvent, ObjectMap, Value};
 

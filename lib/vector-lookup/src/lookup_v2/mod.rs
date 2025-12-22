@@ -1,9 +1,9 @@
 mod optional_path;
 
-pub use optional_path::{OptionalTargetPath, OptionalValuePath};
 use std::fmt;
-use vector_config_macros::configurable_component;
 
+pub use optional_path::{OptionalTargetPath, OptionalValuePath};
+use vector_config_macros::configurable_component;
 pub use vrl::path::{
     BorrowedSegment, OwnedSegment, OwnedTargetPath, OwnedValuePath, PathConcat, PathParseError,
     PathPrefix, TargetPath, ValuePath, parse_target_path, parse_value_path,

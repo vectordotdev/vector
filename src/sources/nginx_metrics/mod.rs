@@ -7,13 +7,13 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{StreamExt, TryFutureExt, future::join_all};
 use http::{Request, StatusCode};
-use hyper::{Body, Uri, body::to_bytes as body_to_bytes};
+use http_body::Collected;
+use hyper::{Body, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::configurable::configurable_component;
-use vector_lib::{EstimatedJsonEncodedSizeOf, metric_tags};
+use vector_lib::{EstimatedJsonEncodedSizeOf, configurable::configurable_component, metric_tags};
 
 use crate::{
     config::{SourceConfig, SourceContext, SourceOutput},
@@ -252,7 +252,10 @@ impl NginxMetrics {
         let response = self.http_client.send(request).await?;
         let (parts, body) = response.into_parts();
         match parts.status {
-            StatusCode::OK => body_to_bytes(body).err_into().await,
+            StatusCode::OK => http_body::Body::collect(body)
+                .err_into()
+                .await
+                .map(Collected::to_bytes),
             status => Err(Box::new(NginxError::InvalidResponseStatus { status })),
         }
     }
@@ -277,12 +280,13 @@ mod tests {
 
 #[cfg(all(test, feature = "nginx-integration-tests"))]
 mod integration_tests {
+    use tokio::time::Duration;
+
     use super::*;
     use crate::{
         config::ProxyConfig,
         test_util::components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance_advanced},
     };
-    use tokio::time::Duration;
 
     fn nginx_proxy_address() -> String {
         std::env::var("NGINX_PROXY_ADDRESS").unwrap_or_else(|_| "http://nginx-proxy:8000".into())

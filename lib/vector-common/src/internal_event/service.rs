@@ -1,8 +1,9 @@
 use metrics::counter;
 
 use super::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL, emit, error_stage, error_type};
+use crate::NamedInternalEvent;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct PollReadyError<E> {
     pub error: E,
 }
@@ -14,7 +15,6 @@ impl<E: std::fmt::Debug> InternalEvent for PollReadyError<E> {
             error = ?self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -23,13 +23,9 @@ impl<E: std::fmt::Debug> InternalEvent for PollReadyError<E> {
         )
         .increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("ServicePollReadyError")
-    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct CallError<E> {
     pub error: E,
     pub request_id: usize,
@@ -45,7 +41,6 @@ impl<E: std::fmt::Debug> InternalEvent for CallError<E> {
             request_id = self.request_id,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -58,9 +53,5 @@ impl<E: std::fmt::Debug> InternalEvent for CallError<E> {
             reason,
             count: self.count,
         });
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("ServiceCallError")
     }
 }

@@ -1,20 +1,20 @@
 use async_stream::stream;
 use bytes::Buf;
 use futures::Stream;
+use http_body::{Body as _, Collected};
 use hyper::Body;
 use indexmap::IndexMap;
 use tokio::time;
 use url::Url;
 use vector_lib::configurable::configurable_component;
 
+use super::BuildResult;
 use crate::{
     config::{self, Format, ProxyConfig, provider::ProviderConfig},
     http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},
 };
-
-use super::BuildResult;
 
 /// Request settings.
 #[configurable_component]
@@ -112,8 +112,11 @@ async fn http_request(
 
     info!(message = "Response received.", url = ?url.as_str());
 
-    hyper::body::to_bytes(response.into_body())
+    response
+        .into_body()
+        .collect()
         .await
+        .map(Collected::to_bytes)
         .map_err(|err| {
             let message = "Error interpreting response.";
             let cause = err.into_cause();

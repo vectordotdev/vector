@@ -3,8 +3,7 @@ use futures::StreamExt;
 use http::HeaderMap;
 use indoc::indoc;
 use prost::Message;
-use vector_lib::metric_tags;
-use vector_lib::prometheus::parser::proto;
+use vector_lib::{metric_tags, prometheus::parser::proto};
 
 use super::*;
 use crate::{
@@ -231,7 +230,7 @@ async fn doesnt_aggregate_batches() {
 
 async fn send_request(config: &str, events: Vec<Event>) -> Vec<(HeaderMap, proto::WriteRequest)> {
     assert_sink_compliance(&HTTP_SINK_TAGS, async {
-        let addr = test_util::next_addr();
+        let (_guard, addr) = test_util::addr::next_addr();
         let (rx, trigger, server) = build_test_server(addr);
         tokio::spawn(server);
 

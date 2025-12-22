@@ -1,22 +1,25 @@
-use std::collections::HashMap;
-use std::num::NonZeroUsize;
-use std::time::Duration;
+use std::{collections::HashMap, num::NonZeroUsize, time::Duration};
 
 use indexmap::IndexMap;
 use serde_with::serde_as;
-use vrl::path::{PathPrefix, parse_target_path};
-use vrl::prelude::{Collection, KeyString, Kind};
-
 use vector_lib::configurable::configurable_component;
-
-use crate::conditions::AnyCondition;
-use crate::config::{
-    DataType, Input, LogNamespace, OutputId, TransformConfig, TransformContext, TransformOutput,
-    schema,
+use vrl::{
+    path::{PathPrefix, parse_target_path},
+    prelude::{Collection, KeyString, Kind},
 };
-use crate::schema::Definition;
-use crate::transforms::reduce::merge_strategy::MergeStrategy;
-use crate::transforms::{Transform, reduce::transform::Reduce};
+
+use crate::{
+    conditions::AnyCondition,
+    config::{
+        DataType, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
+        TransformOutput, schema,
+    },
+    schema::Definition,
+    transforms::{
+        Transform,
+        reduce::{merge_strategy::MergeStrategy, transform::Reduce},
+    },
+};
 
 /// Configuration for the `reduce` transform.
 #[serde_as]

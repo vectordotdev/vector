@@ -1,8 +1,10 @@
 use std::{
     fmt, io, mem,
     path::PathBuf,
-    sync::Arc,
-    sync::atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
+    sync::{
+        Arc,
+        atomic::{AtomicBool, AtomicU16, AtomicU64, Ordering},
+    },
     time::Instant,
 };
 
@@ -314,7 +316,6 @@ where
     ///
     /// This is purely a future-looking operation i.e. what would the file ID be if it was
     /// incremented from its current value.  It does not alter the current writer file ID.
-    #[cfg(test)]
     pub fn get_next_writer_file_id(&self) -> u16 {
         self.state().get_next_writer_file_id()
     }

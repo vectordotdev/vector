@@ -1,27 +1,36 @@
-use std::sync::{Arc, LazyLock};
-use std::{collections::HashSet, error, fmt, future::ready, pin::Pin};
+use std::{
+    collections::HashSet,
+    error, fmt,
+    future::ready,
+    pin::Pin,
+    sync::{Arc, LazyLock},
+};
 
 use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{Request, StatusCode, Uri, uri::PathAndQuery};
-use hyper::{Body, body::to_bytes as body_to_bytes};
+use hyper::Body;
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{Duration, Instant, sleep};
 use tracing::Instrument;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::OwnedTargetPath;
-use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OwnedSegment};
-use vector_lib::lookup::owned_value_path;
-use vrl::value::Kind;
-use vrl::value::kind::Collection;
+use vector_lib::{
+    config::LogNamespace,
+    configurable::configurable_component,
+    lookup::{
+        OwnedTargetPath,
+        lookup_v2::{OptionalTargetPath, OwnedSegment},
+        owned_value_path,
+    },
+};
+use vrl::value::{Kind, kind::Collection};
 
-use crate::config::OutputId;
 use crate::{
-    config::{DataType, Input, ProxyConfig, TransformConfig, TransformContext, TransformOutput},
+    config::{
+        DataType, Input, OutputId, ProxyConfig, TransformConfig, TransformContext, TransformOutput,
+    },
     event::Event,
     http::HttpClient,
     internal_events::{AwsEc2MetadataRefreshError, AwsEc2MetadataRefreshSuccessful},
@@ -424,7 +433,7 @@ impl MetadataClient {
                 .into()),
             })?;
 
-        let token = body_to_bytes(res.into_body()).await?;
+        let token = http_body::Body::collect(res.into_body()).await?.to_bytes();
 
         let next_refresh = Instant::now() + Duration::from_secs(21600);
         self.token = Some((token.clone(), next_refresh));
@@ -610,7 +619,7 @@ impl MetadataClient {
                 .into()),
             })? {
             Some(res) => {
-                let body = body_to_bytes(res.into_body()).await?;
+                let body = http_body::Body::collect(res.into_body()).await?.to_bytes();
                 Ok(Some(body))
             }
             None => Ok(None),
@@ -705,13 +714,13 @@ enum Ec2MetadataError {
 
 #[cfg(test)]
 mod test {
-    use crate::config::schema::Definition;
-    use crate::config::{LogNamespace, OutputId, TransformConfig};
-    use crate::transforms::aws_ec2_metadata::Ec2Metadata;
-    use vector_lib::enrichment::TableRegistry;
-    use vector_lib::lookup::OwnedTargetPath;
-    use vrl::owned_value_path;
-    use vrl::value::Kind;
+    use vector_lib::{enrichment::TableRegistry, lookup::OwnedTargetPath};
+    use vrl::{owned_value_path, value::Kind};
+
+    use crate::{
+        config::{LogNamespace, OutputId, TransformConfig, schema::Definition},
+        transforms::aws_ec2_metadata::Ec2Metadata,
+    };
 
     #[tokio::test]
     async fn schema_def_with_string_input() {
@@ -740,18 +749,22 @@ mod test {
 mod integration_tests {
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::lookup::lookup_v2::{OwnedSegment, OwnedValuePath};
-    use vector_lib::lookup::{PathPrefix, event_path};
+    use vector_lib::{
+        assert_event_data_eq,
+        lookup::{
+            PathPrefix, event_path,
+            lookup_v2::{OwnedSegment, OwnedValuePath},
+        },
+    };
+    use vrl::value::{ObjectMap, Value};
+    use warp::Filter;
 
     use super::*;
     use crate::{
         event::{LogEvent, Metric, metric},
-        test_util::{components::assert_transform_compliance, next_addr},
+        test_util::{addr::next_addr, components::assert_transform_compliance},
         transforms::test::create_topology,
     };
-    use vector_lib::assert_event_data_eq;
-    use vrl::value::{ObjectMap, Value};
-    use warp::Filter;
 
     fn ec2_metadata_address() -> String {
         std::env::var("EC2_METADATA_ADDRESS").unwrap_or_else(|_| "http://localhost:1338".into())
@@ -889,7 +902,7 @@ mod integration_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn timeout() {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
 
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
             tokio::time::sleep(Duration::from_secs(3)).await;
@@ -920,7 +933,7 @@ mod integration_tests {
     // validates the configuration setting 'required'=false allows vector to run
     #[tokio::test(flavor = "multi_thread")]
     async fn not_required() {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
 
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
             tokio::time::sleep(Duration::from_secs(3)).await;

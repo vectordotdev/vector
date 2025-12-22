@@ -13,11 +13,15 @@ use tracing::{Instrument, Span};
 use uuid::Uuid;
 use vector_buffers::{WhenFull, topology::builder::TopologyBuilder};
 use vector_common::config::ComponentKey;
-use vector_core::event::{EventArray, LogArray, MetricArray, TraceArray};
-use vector_core::fanout;
+use vector_core::{
+    event::{EventArray, LogArray, MetricArray, TraceArray},
+    fanout,
+};
 
-use crate::notification::{InvalidMatch, Matched, NotMatched, Notification};
-use crate::topology::{TapOutput, TapResource, WatchRx};
+use crate::{
+    notification::{InvalidMatch, Matched, NotMatched, Notification},
+    topology::{TapOutput, TapResource, WatchRx},
+};
 
 /// A tap sender is the control channel used to surface tap payloads to a client.
 type TapSender = tokio_mpsc::Sender<TapPayload>;
@@ -352,7 +356,12 @@ async fn tap_handler(
                             // target for the component, and spawn our transformer task which will
                             // wrap each event payload with the necessary metadata before forwarding
                             // it to our global tap receiver.
-                            let (tap_buffer_tx, mut tap_buffer_rx) = TopologyBuilder::standalone_memory(TAP_BUFFER_SIZE, WhenFull::DropNewest, &Span::current()).await;
+                            let (tap_buffer_tx, mut tap_buffer_rx) = TopologyBuilder::standalone_memory(
+                                TAP_BUFFER_SIZE,
+                                WhenFull::DropNewest,
+                                &Span::current(),
+                                None,
+                            );
                             let mut tap_transformer = TapTransformer::new(tx.clone(), output.clone());
 
                             tokio::spawn(async move {

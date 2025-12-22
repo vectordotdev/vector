@@ -1,21 +1,19 @@
 use std::marker::PhantomData;
-use vector_lib::lookup::lookup_v2::ConfigValuePath;
 
-use vector_lib::stream::BatcherSettings;
-
-use crate::{
-    aws::{AwsAuthentication, RegionOrEndpoint},
-    sinks::{
-        prelude::*,
-        util::{TowerRequestConfig, retries::RetryLogic},
-    },
-};
+use vector_lib::{lookup::lookup_v2::ConfigValuePath, stream::BatcherSettings};
 
 use super::{
     KinesisResponse, KinesisService,
     record::{Record, SendRecord},
     request_builder::KinesisRequestBuilder,
     sink::{BatchKinesisRequest, KinesisSink},
+};
+use crate::{
+    aws::{AwsAuthentication, RegionOrEndpoint},
+    sinks::{
+        prelude::*,
+        util::{TowerRequestConfig, retries::RetryLogic},
+    },
 };
 
 /// Base configuration for the `aws_kinesis_` sinks.

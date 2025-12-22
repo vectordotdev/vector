@@ -1,9 +1,9 @@
 use opendal::{Operator, layers::LoggingLayer, services::Webhdfs};
 use tower::ServiceBuilder;
-use vector_lib::codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer};
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
+    codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer},
     config::{AcknowledgementsConfig, DataType, Input},
+    configurable::configurable_component,
     sink::VectorSink,
 };
 

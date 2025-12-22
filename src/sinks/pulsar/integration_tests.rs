@@ -1,16 +1,23 @@
-use crate::sinks::pulsar::{config::PulsarSinkConfig, config::PulsarTlsOptions, sink::PulsarSink};
+use bytes::Bytes;
 use futures::StreamExt;
 use pulsar::SubType;
 
-use crate::event::{ObjectMap, Value};
-use crate::sinks::VectorSink;
-use crate::template::Template;
-use crate::test_util::{
-    components::{SINK_TAGS, assert_sink_compliance},
-    random_lines_with_stream, random_string, trace_init,
+use crate::{
+    event::{ObjectMap, Value},
+    sinks::{
+        VectorSink,
+        pulsar::{
+            config::{PulsarSinkConfig, PulsarTlsOptions},
+            sink::PulsarSink,
+        },
+    },
+    template::Template,
+    test_util::{
+        components::{SINK_TAGS, assert_sink_compliance},
+        random_lines_with_stream, random_string, trace_init,
+    },
+    tls::TEST_PEM_INTERMEDIATE_CA_PATH,
 };
-use crate::tls::TEST_PEM_INTERMEDIATE_CA_PATH;
-use bytes::Bytes;
 
 fn pulsar_host() -> String {
     std::env::var("PULSAR_HOST").unwrap_or_else(|_| "127.0.0.1".into())

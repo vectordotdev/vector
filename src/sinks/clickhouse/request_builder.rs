@@ -1,19 +1,21 @@
 //! `RequestBuilder` implementation for the `Clickhouse` sink.
 
-use super::sink::PartitionKey;
-use crate::sinks::{prelude::*, util::http::HttpRequest};
 use bytes::Bytes;
-use vector_lib::codecs::encoding::Framer;
+
+use super::sink::PartitionKey;
+use crate::codecs::EncoderKind;
+use crate::sinks::prelude::*;
+use crate::sinks::util::http::HttpRequest;
 
 pub(super) struct ClickhouseRequestBuilder {
     pub(super) compression: Compression,
-    pub(super) encoding: (Transformer, Encoder<Framer>),
+    pub(super) encoder: (Transformer, EncoderKind),
 }
 
 impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
     type Metadata = (PartitionKey, EventFinalizers);
     type Events = Vec<Event>;
-    type Encoder = (Transformer, Encoder<Framer>);
+    type Encoder = (Transformer, EncoderKind);
     type Payload = Bytes;
     type Request = HttpRequest<PartitionKey>;
     type Error = std::io::Error;
@@ -23,7 +25,7 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
     }
 
     fn encoder(&self) -> &Self::Encoder {
-        &self.encoding
+        &self.encoder
     }
 
     fn split_input(

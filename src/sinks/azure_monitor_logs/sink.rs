@@ -1,12 +1,13 @@
 use std::{fmt::Debug, io};
 
 use bytes::Bytes;
-use vector_lib::codecs::{CharacterDelimitedEncoder, JsonSerializerConfig, encoding::Framer};
-use vector_lib::lookup::{OwnedValuePath, PathPrefix};
-
-use crate::sinks::prelude::*;
+use vector_lib::{
+    codecs::{CharacterDelimitedEncoder, JsonSerializerConfig, encoding::Framer},
+    lookup::{OwnedValuePath, PathPrefix},
+};
 
 use super::service::AzureMonitorLogsRequest;
+use crate::sinks::prelude::*;
 
 pub struct AzureMonitorLogsSink<S> {
     batch_settings: BatcherSettings,

@@ -1,11 +1,9 @@
 use aws_sdk_elasticsearch::{Client as EsClient, types::DomainEndpointOptions};
 use aws_sdk_firehose::types::ElasticsearchDestinationConfiguration;
-use futures::StreamExt;
-use futures::TryFutureExt;
+use futures::{StreamExt, TryFutureExt};
 use serde_json::{Value, json};
 use tokio::time::{Duration, sleep};
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::lookup::lookup_v2::ConfigValuePath;
+use vector_lib::{codecs::JsonSerializerConfig, lookup::lookup_v2::ConfigValuePath};
 
 use super::{config::KinesisFirehoseClientBuilder, *};
 use crate::{

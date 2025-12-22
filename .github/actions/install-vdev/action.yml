@@ -1,0 +1,44 @@
+name: "Install vdev"
+description: "Install vdev CLI tool with caching based on source code changes"
+
+branding:
+  icon: tool
+  color: purple
+
+inputs:
+  skip-cache:
+    description: "Skip cache lookup and force compilation"
+    required: false
+    default: 'false'
+
+runs:
+  using: "composite"
+  steps:
+    - name: Cache vdev binary
+      id: cache-vdev
+      if: ${{ inputs.skip-cache != 'true' }}
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: ~/.cargo/bin/vdev
+        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'Cargo.toml', 'Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vdev-
+
+    - name: Build and install vdev
+      if: steps.cache-vdev.outputs.cache-hit != 'true'
+      shell: bash
+      run: |
+        echo "Building vdev from source (cache miss)"
+        cargo install --path vdev --locked --force
+
+    - name: Save vdev to cache
+      if: ${{ inputs.skip-cache == 'true' }}
+      uses: actions/cache/save@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: ~/.cargo/bin/vdev
+        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'Cargo.toml', 'Cargo.lock') }}
+
+    - name: Set VDEV environment variable
+      shell: bash
+      run: |
+        echo "VDEV=$(which vdev)" >> "$GITHUB_ENV"

@@ -1,6 +1,4 @@
-use std::collections::HashMap;
-use std::fmt::Write as _;
-use std::path::PathBuf;
+use std::{collections::HashMap, fmt::Write as _, path::PathBuf};
 
 use clap::Parser;
 use itertools::Itertools;
@@ -54,6 +52,14 @@ pub struct Opts {
     /// information on the `mermaid` format.
     #[arg(id = "format", long, default_value = "dot")]
     pub format: OutputFormat,
+
+    /// Disable interpolation of environment variables in configuration files.
+    #[arg(
+        long,
+        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub disable_env_var_interpolation: bool,
 }
 
 #[derive(clap::ValueEnum, Debug, Clone, Copy, PartialEq, Eq)]
@@ -95,7 +101,7 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
         None => return exitcode::CONFIG,
     };
 
-    let config = match config::load_from_paths(&paths) {
+    let config = match config::load_from_paths(&paths, !opts.disable_env_var_interpolation) {
         Ok(config) => config,
         Err(errs) => {
             #[allow(clippy::print_stderr)]

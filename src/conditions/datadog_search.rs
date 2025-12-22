@@ -1,12 +1,18 @@
 use std::{borrow::Cow, str::FromStr};
-use vrl::path::PathParseError;
 
 use bytes::Bytes;
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::{Event, LogEvent, Value};
-use vrl::datadog_filter::regex::{wildcard_regex, word_regex};
-use vrl::datadog_filter::{Filter, Matcher, Resolver, Run, build_matcher};
-use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode};
+use vector_lib::{
+    configurable::configurable_component,
+    event::{Event, EventRef, LogEvent, Value},
+};
+use vrl::{
+    datadog_filter::{
+        Filter, Matcher, Resolver, Run, build_matcher,
+        regex::{wildcard_regex, word_regex},
+    },
+    datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode},
+    path::PathParseError,
+};
 
 use super::{Condition, Conditional, ConditionalConfig};
 
@@ -27,8 +33,8 @@ impl Default for DatadogSearchConfig {
 }
 
 impl DatadogSearchConfig {
-    pub fn build_matcher(&self) -> crate::Result<Box<dyn Matcher<Event>>> {
-        Ok(as_log(build_matcher(&self.source, &EventFilter)?))
+    pub fn build_matcher(&self) -> crate::Result<Box<dyn Matcher<LogEvent>>> {
+        Ok(build_matcher(&self.source, &EventFilter)?)
     }
 }
 
@@ -51,7 +57,7 @@ impl_generate_config_from_default!(DatadogSearchConfig);
 /// a [Datadog Search Syntax query](https://docs.datadoghq.com/logs/explorer/search_syntax/).
 #[derive(Debug, Clone)]
 pub struct DatadogSearchRunner {
-    matcher: Box<dyn Matcher<Event>>,
+    matcher: Box<dyn Matcher<LogEvent>>,
 }
 
 impl TryFrom<&DatadogSearchConfig> for DatadogSearchRunner {
@@ -62,8 +68,11 @@ impl TryFrom<&DatadogSearchConfig> for DatadogSearchRunner {
 }
 
 impl DatadogSearchRunner {
-    pub fn matches(&self, event: &Event) -> bool {
-        self.matcher.run(event)
+    pub fn matches<'a>(&self, event: impl Into<EventRef<'a>>) -> bool {
+        match event.into() {
+            EventRef::Log(log) => self.matcher.run(log),
+            _ => false,
+        }
     }
 }
 
@@ -80,14 +89,6 @@ impl ConditionalConfig for DatadogSearchConfig {
     ) -> crate::Result<Condition> {
         Ok(Condition::DatadogSearch(self.try_into()?))
     }
-}
-
-/// Run the provided `Matcher` when we're dealing with `LogEvent`s. Otherwise, return false.
-fn as_log(matcher: Box<dyn Matcher<LogEvent>>) -> Box<dyn Matcher<Event>> {
-    Run::boxed(move |ev| match ev {
-        Event::Log(log) => matcher.run(log),
-        _ => false,
-    })
 }
 
 #[derive(Default, Clone)]
@@ -830,6 +831,18 @@ mod test {
             ),
             // Float attribute match (negate w/-).
             ("-@a:0.75", log_event!["a" => 0.74], log_event!["a" => 0.75]),
+            // Attribute match with dot in name
+            (
+                "@a.b:x",
+                log_event!["a" => serde_json::json!({"b": "x"})],
+                Event::Log(LogEvent::from(Value::from(serde_json::json!({"a.b": "x"})))),
+            ),
+            // Attribute with dot in name (flattened key) - requires escaped quotes.
+            (
+                r#"@\"a.b\":x"#,
+                Event::Log(LogEvent::from(Value::from(serde_json::json!({"a.b": "x"})))),
+                log_event!["a" => serde_json::json!({"b": "x"})],
+            ),
             // Wildcard prefix.
             (
                 "*bla",
@@ -1255,9 +1268,9 @@ mod test {
             ),
             // negate OR of two values
             (
-                "-@field:value1 OR -@field:value2",
-                log_event!["field" => "value"],
-                log_event!["field" => "value2"],
+                "-@field1:value1 OR -@field2:value2",
+                log_event!["field1" => "value1"],
+                log_event!["field1" => "value1", "field2" => "value2"],
             ),
             // default AND of two values
             (

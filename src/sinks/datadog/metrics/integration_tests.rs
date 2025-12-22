@@ -9,29 +9,28 @@ use hyper::StatusCode;
 use indoc::indoc;
 use prost::Message;
 use rand::{Rng, rng};
-
 use vector_lib::{
     config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, Metric, MetricKind, MetricValue},
     metric_tags,
 };
 
-use crate::{
-    config::SinkConfig,
-    sinks::util::test::{build_test_server_status, load_sink},
-    test_util::{
-        components::{
-            DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
-            assert_sink_compliance,
-        },
-        map_event_batch_stream, next_addr,
-    },
-};
-
 use super::{
     DatadogMetricsConfig,
     config::{SERIES_V1_PATH, SERIES_V2_PATH},
     encoder::{ORIGIN_CATEGORY_VALUE, ORIGIN_PRODUCT_VALUE},
+};
+use crate::{
+    config::SinkConfig,
+    sinks::util::test::{build_test_server_status, load_sink},
+    test_util::{
+        addr::next_addr,
+        components::{
+            DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
+            assert_sink_compliance,
+        },
+        map_event_batch_stream,
+    },
 };
 
 #[allow(warnings, clippy::pedantic, clippy::nursery)]
@@ -120,7 +119,7 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
     "#};
     let (mut config, cx) = load_sink::<DatadogMetricsConfig>(config).unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{addr}");

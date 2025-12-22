@@ -1,6 +1,8 @@
 use lookup::{OwnedTargetPath, owned_value_path};
-use vrl::compiler::{CompilationResult, CompileConfig, Function, TypeState, compile_with_state};
-use vrl::diagnostic::DiagnosticList;
+use vrl::{
+    compiler::{CompilationResult, CompileConfig, Function, TypeState, compile_with_state},
+    diagnostic::DiagnosticList,
+};
 
 /// Compiles a VRL program
 /// Vector metadata is set to read-only to prevent it from being mutated

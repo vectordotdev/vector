@@ -1,3 +1,11 @@
+use std::collections::HashMap;
+
+use vector_lib::{
+    codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer},
+    configurable::configurable_component,
+    sensitive_string::SensitiveString,
+};
+
 use crate::{
     http::{Auth, HttpClient},
     sinks::{
@@ -14,12 +22,6 @@ use crate::{
         prelude::*,
         util::http::HttpService,
     },
-};
-use std::collections::HashMap;
-use vector_lib::{
-    codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer},
-    configurable::configurable_component,
-    sensitive_string::SensitiveString,
 };
 
 fn extra_params_examples() -> HashMap<String, String> {

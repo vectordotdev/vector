@@ -13,23 +13,28 @@ use axum::{
 };
 use bytes::{BufMut as _, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
+use http_body::{Body as _, Collected};
 use hyper::{Body, Client, Server};
 use tokio::{
     select,
     sync::{Mutex, Notify, mpsc, oneshot},
 };
 use tokio_util::codec::Decoder;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::{
+        CharacterDelimitedEncoder,
+        encoding::{Framer, Serializer::Json},
+    },
+    config::LogNamespace,
+    event::Event,
+};
 
+use super::{ResourceCodec, ResourceDirection, TestEvent, encode_test_event};
 use crate::components::validation::{
     RunnerMetrics,
     sync::{Configuring, TaskCoordinator},
 };
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf, codecs::CharacterDelimitedEncoder, codecs::encoding::Framer,
-    codecs::encoding::Serializer::Json, config::LogNamespace, event::Event,
-};
-
-use super::{ResourceCodec, ResourceDirection, TestEvent, encode_test_event};
 
 /// An HTTP resource.
 #[derive(Clone)]
@@ -324,7 +329,7 @@ impl HttpResourceOutputContext<'_> {
                 let mut decoder = decoder.clone();
 
                 async move {
-                    match hyper::body::to_bytes(request.into_body()).await {
+                    match request.into_body().collect().await.map(Collected::to_bytes) {
                         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
                         Ok(body) => {
                             let byte_size = body.len();
@@ -336,14 +341,12 @@ impl HttpResourceOutputContext<'_> {
                                     Ok(Some((events, decoded_byte_size))) => {
                                         if should_reject {
                                             info!(
-                                                internal_log_rate_limit = true,
                                                 "HTTP server external output resource decoded {decoded_byte_size:?} bytes but test case configured to reject.",
                                             );
                                         } else {
                                             let mut output_runner_metrics =
                                                 output_runner_metrics.lock().await;
                                             info!(
-                                                internal_log_rate_limit = true,
                                                 "HTTP server external output resource decoded {decoded_byte_size:?} bytes."
                                             );
 

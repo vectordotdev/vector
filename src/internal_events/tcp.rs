@@ -1,11 +1,12 @@
 use std::net::SocketAddr;
 
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 use crate::{internal_events::SocketOutgoingConnectionError, tls::TlsError};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct TcpSocketConnectionEstablished {
     pub peer_addr: Option<SocketAddr>,
 }
@@ -21,7 +22,7 @@ impl InternalEvent for TcpSocketConnectionEstablished {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct TcpSocketOutgoingConnectionError<E> {
     pub error: E,
 }
@@ -34,7 +35,7 @@ impl<E: std::error::Error> InternalEvent for TcpSocketOutgoingConnectionError<E>
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct TcpSocketConnectionShutdown;
 
 impl InternalEvent for TcpSocketConnectionShutdown {
@@ -45,7 +46,7 @@ impl InternalEvent for TcpSocketConnectionShutdown {
 }
 
 #[cfg(all(unix, feature = "sources-dnstap"))]
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct TcpSocketError<'a, E> {
     pub(crate) error: &'a E,
     pub peer_addr: SocketAddr,
@@ -60,7 +61,6 @@ impl<E: std::fmt::Display> InternalEvent for TcpSocketError<'_, E> {
             peer_addr = ?self.peer_addr,
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -71,7 +71,7 @@ impl<E: std::fmt::Display> InternalEvent for TcpSocketError<'_, E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct TcpSocketTlsConnectionError {
     pub error: TlsError,
 }
@@ -89,7 +89,6 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                 debug!(
                     message = "Connection error, probably a healthcheck.",
                     error = %self.error,
-                    internal_log_rate_limit = true,
                 );
             }
             _ => {
@@ -99,7 +98,6 @@ impl InternalEvent for TcpSocketTlsConnectionError {
                     error_code = "connection_failed",
                     error_type = error_type::WRITER_FAILED,
                     stage = error_stage::SENDING,
-                    internal_log_rate_limit = true,
                 );
                 counter!(
                     "component_errors_total",
@@ -114,7 +112,7 @@ impl InternalEvent for TcpSocketTlsConnectionError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct TcpSendAckError {
     pub error: std::io::Error,
 }
@@ -127,7 +125,6 @@ impl InternalEvent for TcpSendAckError {
             error_code = "ack_failed",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -140,7 +137,7 @@ impl InternalEvent for TcpSendAckError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct TcpBytesReceived {
     pub byte_size: usize,
     pub peer_addr: SocketAddr,

@@ -5,15 +5,17 @@ use indoc::indoc;
 use snafu::ResultExt;
 use tokio::sync::oneshot::{Sender, channel};
 use tower::ServiceBuilder;
-use vector_lib::config::{AcknowledgementsConfig, proxy::ProxyConfig};
-use vector_lib::configurable::configurable_component;
+use vector_lib::{
+    config::{AcknowledgementsConfig, proxy::ProxyConfig},
+    configurable::configurable_component,
+};
 
 use super::{
     apm_stats::{Aggregator, flush_apm_stats_thread},
     service::TraceApiRetry,
 };
-use crate::common::datadog;
 use crate::{
+    common::datadog,
     config::{GenerateConfig, Input, SinkConfig, SinkContext},
     http::HttpClient,
     sinks::{

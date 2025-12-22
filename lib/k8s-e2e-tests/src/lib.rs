@@ -10,8 +10,10 @@ use k8s_openapi::{
 use k8s_test_framework::{
     CommandBuilder, Framework, Interface, Manager, Reader, test_pod, wait_for_resource::WaitFor,
 };
-use rand::distr::{Alphanumeric, SampleString};
-use rand::rng;
+use rand::{
+    distr::{Alphanumeric, SampleString},
+    rng,
+};
 use tracing::{debug, error, info};
 
 pub mod metrics;

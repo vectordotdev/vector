@@ -1,8 +1,9 @@
 ---
+date: "2025-01-31"
 title: Config Autocompletion Guide
 short: Config Autocompletion
 description: Learn how to generate the Vector schema and use it for IDE autocompletion.
-author_github: https://github.com/pront
+authors: ["pront"]
 domain: dev
 tags: [ "dev", "ide", "autocompletion", "config", "guides", "guide" ]
 aliases: [ "/docs/guides/developer/config-autocompletion.md" ]

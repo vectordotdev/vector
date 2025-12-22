@@ -2,12 +2,14 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup;
-use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath, OptionalValuePath};
-use vector_lib::sensitive_string::SensitiveString;
-use vector_lib::sink::StreamSink;
+use vector_lib::{
+    codecs::JsonSerializerConfig,
+    configurable::configurable_component,
+    lookup,
+    lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath, OptionalValuePath},
+    sensitive_string::SensitiveString,
+    sink::StreamSink,
+};
 
 use super::{
     config_host_key,
@@ -281,7 +283,7 @@ mod tests {
         "#})
         .unwrap();
 
-        let addr = test_util::next_addr();
+        let (_guard, addr) = test_util::addr::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
         config.endpoint = format!("http://{addr}");
@@ -347,7 +349,7 @@ mod tests {
         "#})
         .unwrap();
 
-        let addr = test_util::next_addr();
+        let (_guard, addr) = test_util::addr::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
         config.endpoint = format!("http://{addr}");

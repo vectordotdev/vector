@@ -8,7 +8,7 @@ release: "0.45.0"
 hide_on_release_notes: false
 badges:
   type: "new feature"
-  domains: [ "enrichment", "sinks" ]
+  domains: [ "enrichment", "table", "memory", "sinks" ]
 ---
 
 We are excited to announce the `memory` enrichment table!

@@ -1,5 +1,6 @@
 use std::{
     cmp,
+    future::Future,
     io::Write,
     mem,
     pin::Pin,
@@ -14,7 +15,6 @@ use hyper::{
     Body,
     body::{HttpBody, Sender},
 };
-use std::future::Future;
 use tokio::{pin, select};
 use tonic::{Status, body::BoxBody, metadata::AsciiMetadataValue};
 use tower::{Layer, Service};
@@ -66,16 +66,16 @@ impl CompressionScheme {
     }
 }
 
+#[derive(Default)]
 enum State {
+    #[default]
     WaitingForHeader,
-    Forward { overall_len: usize },
-    Decompress { remaining: usize },
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self::WaitingForHeader
-    }
+    Forward {
+        overall_len: usize,
+    },
+    Decompress {
+        remaining: usize,
+    },
 }
 
 fn new_decompressor() -> GzDecoder<Vec<u8>> {

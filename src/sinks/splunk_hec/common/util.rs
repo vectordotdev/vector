@@ -5,8 +5,11 @@ use futures_util::future::BoxFuture;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use snafu::{ResultExt, Snafu};
-use vector_lib::lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath};
-use vector_lib::{config::proxy::ProxyConfig, event::EventRef};
+use vector_lib::{
+    config::proxy::ProxyConfig,
+    event::EventRef,
+    lookup::lookup_v2::{OptionalTargetPath, OptionalValuePath},
+};
 
 use super::{
     EndpointTarget,

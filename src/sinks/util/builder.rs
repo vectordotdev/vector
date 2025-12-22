@@ -1,6 +1,3 @@
-use futures_util::{Stream, StreamExt, stream::Map};
-use pin_project::pin_project;
-use std::time::Duration;
 use std::{
     convert::Infallible,
     fmt,
@@ -10,17 +7,21 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    time::Duration,
 };
+
+use futures_util::{Stream, StreamExt, stream::Map};
+use pin_project::pin_project;
 use tower::Service;
 use tracing::Span;
-use vector_lib::stream::{
-    ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
-    batcher::{Batcher, config::BatchConfig},
-};
 use vector_lib::{
     ByteSizeOf,
     event::{Finalizable, Metric},
     partition::Partitioner,
+    stream::{
+        ConcurrentMap, Driver, DriverResponse, ExpirationQueue, PartitionedBatcher,
+        batcher::{Batcher, config::BatchConfig},
+    },
 };
 
 use super::{

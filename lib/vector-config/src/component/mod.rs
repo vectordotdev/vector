@@ -2,11 +2,13 @@ mod description;
 mod generate;
 mod marker;
 
-pub use self::description::{ComponentDescription, ExampleError};
-pub use self::generate::GenerateConfig;
-pub use self::marker::{
-    ApiComponent, ComponentMarker, EnrichmentTableComponent, GlobalOptionComponent,
-    ProviderComponent, SecretsComponent, SinkComponent, SourceComponent, TransformComponent,
+pub use self::{
+    description::{ComponentDescription, ExampleError},
+    generate::GenerateConfig,
+    marker::{
+        ApiComponent, ComponentMarker, EnrichmentTableComponent, GlobalOptionComponent,
+        ProviderComponent, SecretsComponent, SinkComponent, SourceComponent, TransformComponent,
+    },
 };
 
 // Create some type aliases for the component marker/description types, and collect (register,

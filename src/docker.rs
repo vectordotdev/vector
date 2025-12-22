@@ -77,7 +77,8 @@ pub fn docker(host: Option<String>, tls: Option<DockerTlsConfig>) -> crate::Resu
                     .map_err(Into::into)
                 }
                 Some("unix") | Some("npipe") | None => {
-                    Docker::connect_with_defaults().map_err(Into::into)
+                    Docker::connect_with_socket(&host, DEFAULT_TIMEOUT, API_DEFAULT_VERSION)
+                        .map_err(Into::into)
                 }
                 Some(scheme) => Err(format!("Unknown scheme: {scheme}").into()),
             }

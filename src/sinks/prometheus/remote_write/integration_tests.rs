@@ -6,8 +6,10 @@ use super::tests::*;
 use crate::{
     config::{SinkConfig, SinkContext},
     event::{Event, metric::MetricValue},
-    sinks::influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
-    sinks::prometheus::remote_write::config::RemoteWriteConfig,
+    sinks::{
+        influxdb::test_util::{cleanup_v1, format_timestamp, onboarding_v1, query_v1},
+        prometheus::remote_write::config::RemoteWriteConfig,
+    },
     test_util::components::{HTTP_SINK_TAGS, assert_sink_compliance},
     tls::{self, TlsConfig},
 };

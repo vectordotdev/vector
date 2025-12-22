@@ -8,10 +8,10 @@ use chrono::{
 };
 use regex::Regex;
 use snafu::Snafu;
-use vector_lib::configurable::{
-    ConfigurableNumber, ConfigurableString, NumberClass, configurable_component,
+use vector_lib::{
+    configurable::{ConfigurableNumber, ConfigurableString, NumberClass, configurable_component},
+    lookup::lookup_v2::parse_target_path,
 };
-use vector_lib::lookup::lookup_v2::parse_target_path;
 
 use crate::{
     config::log_schema,
@@ -618,9 +618,11 @@ fn render_timestamp(
 mod tests {
     use chrono::{Offset, TimeZone, Utc};
     use chrono_tz::Tz;
-    use vector_lib::config::LogNamespace;
-    use vector_lib::lookup::{PathPrefix, metadata_path};
-    use vector_lib::metric_tags;
+    use vector_lib::{
+        config::LogNamespace,
+        lookup::{PathPrefix, metadata_path},
+        metric_tags,
+    };
     use vrl::event_path;
 
     use super::*;

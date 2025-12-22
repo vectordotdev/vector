@@ -1,5 +1,4 @@
 use snafu::Snafu;
-
 use vector_lib::configurable::configurable_component;
 
 mod config;
@@ -50,19 +49,19 @@ mod tests {
         event::{BatchNotifier, BatchStatus},
     };
 
-    use super::config::with_default_scheme;
-    use super::*;
+    use super::{config::with_default_scheme, *};
     use crate::{
         config::{SinkConfig as _, SinkContext},
         event::Event,
         proto::vector as proto,
         sinks::util::test::build_test_server_generic,
         test_util::{
+            addr::next_addr,
             components::{
                 DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS, run_and_assert_data_volume_sink_compliance,
                 run_and_assert_sink_compliance,
             },
-            next_addr, random_lines_with_stream,
+            random_lines_with_stream,
         },
     };
 
@@ -82,7 +81,7 @@ mod tests {
     async fn run_sink_test(test_type: TestType) {
         let num_lines = 10;
 
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let config = format!(r#"address = "http://{in_addr}/""#);
         let config: VectorConfig = toml::from_str(&config).unwrap();
@@ -154,7 +153,7 @@ mod tests {
     async fn acknowledges_error() {
         let num_lines = 10;
 
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let config = format!(r#"address = "http://{in_addr}/""#);
         let config: VectorConfig = toml::from_str(&config).unwrap();

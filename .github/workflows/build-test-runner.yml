@@ -1,0 +1,52 @@
+# Reusable Workflow: Build Test Runner Image
+#
+# This workflow builds the integration test runner image and pushes it to GHCR.
+# It can be called from other workflows to avoid duplicating the build logic.
+
+name: Build Test Runner Image
+
+on:
+  workflow_call:
+    inputs:
+      commit_sha:
+        description: 'Commit SHA to use for image tag'
+        required: true
+        type: string
+      checkout_ref:
+        description: 'Git ref to checkout (defaults to commit_sha)'
+        required: false
+        type: string
+
+permissions:
+  packages: write
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ inputs.checkout_ref || inputs.commit_sha }}
+
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
+
+      - name: Login to GitHub Container Registry
+        uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push integration test runner image
+        run: |
+          # Build integration test runner image with all-integration-tests feature
+          vdev int build
+          # Get rust version from rust-toolchain.toml (same as vdev does)
+          RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
+          LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
+          REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ inputs.commit_sha }}"
+
+          docker tag "${LOCAL_IMAGE}" "${REMOTE_IMAGE}"
+          docker push "${REMOTE_IMAGE}"

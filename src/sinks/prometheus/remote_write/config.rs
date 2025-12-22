@@ -1,6 +1,12 @@
 use http::Uri;
 use snafu::prelude::*;
 
+#[cfg(feature = "aws-core")]
+use super::Errors;
+use super::{
+    service::{RemoteWriteService, build_request},
+    sink::{PrometheusRemoteWriteDefaultBatchSettings, RemoteWriteSink},
+};
 use crate::{
     http::HttpClient,
     sinks::{
@@ -10,14 +16,6 @@ use crate::{
         util::{auth::Auth, http::http_response_retry_logic},
     },
 };
-
-use super::{
-    service::{RemoteWriteService, build_request},
-    sink::{PrometheusRemoteWriteDefaultBatchSettings, RemoteWriteSink},
-};
-
-#[cfg(feature = "aws-core")]
-use super::Errors;
 
 /// The batch config for remote write.
 #[configurable_component]

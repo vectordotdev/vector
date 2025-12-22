@@ -3,21 +3,16 @@ use std::{collections::BTreeMap, sync::Arc};
 use chrono::{TimeZone, Utc};
 use futures_util::StreamExt;
 use serde::{Deserialize, de};
-use vector_lib::codecs::{JsonSerializerConfig, TextSerializerConfig};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::event::EventMetadata;
-use vector_lib::lookup::lookup_v2::OptionalTargetPath;
-use vector_lib::schema::{Definition, meaning};
 use vector_lib::{
-    config::log_schema,
-    event::{Event, LogEvent, Value},
+    codecs::{JsonSerializerConfig, TextSerializerConfig},
+    config::{LegacyKey, LogNamespace, log_schema},
+    event::{Event, EventMetadata, LogEvent, Value},
+    lookup::lookup_v2::OptionalTargetPath,
+    schema::{Definition, meaning},
 };
-use vrl::path::OwnedTargetPath;
-use vrl::value::Kind;
-use vrl::{event_path, metadata_path, owned_value_path};
+use vrl::{event_path, metadata_path, owned_value_path, path::OwnedTargetPath, value::Kind};
 
 use super::sink::{HecLogsProcessedEventMetadata, HecProcessedEvent};
-use crate::sinks::util::processed_event::ProcessedEvent;
 use crate::{
     codecs::{Encoder, EncodingConfig},
     config::{SinkConfig, SinkContext},
@@ -26,10 +21,13 @@ use crate::{
             common::EndpointTarget,
             logs::{config::HecLogsSinkConfig, encoder::HecLogsEncoder, sink::process_log},
         },
-        util::{Compression, encoding::Encoder as _, test::build_test_server},
+        util::{
+            Compression, encoding::Encoder as _, processed_event::ProcessedEvent,
+            test::build_test_server,
+        },
     },
     template::Template,
-    test_util::next_addr,
+    test_util::addr::next_addr,
 };
 
 #[derive(Deserialize, Debug)]
@@ -218,7 +216,7 @@ fn splunk_encode_log_event_text() {
 
 #[tokio::test]
 async fn splunk_passthrough_token() {
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     let config = HecLogsSinkConfig {
         default_token: "token".to_string().into(),
         endpoint: format!("http://{addr}"),

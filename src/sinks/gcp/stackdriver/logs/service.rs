@@ -2,6 +2,7 @@
 
 use bytes::Bytes;
 use http::{Request, Uri, header::CONTENT_TYPE};
+use snafu::ResultExt;
 
 use crate::{
     gcp::GcpAuthenticator,
@@ -10,7 +11,6 @@ use crate::{
         util::http::{HttpRequest, HttpServiceRequestBuilder},
     },
 };
-use snafu::ResultExt;
 
 #[derive(Debug, Clone)]
 pub(super) struct StackdriverLogsServiceRequestBuilder {

@@ -1,9 +1,9 @@
-use crate::components::validation::{
-    ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent, component_names::*,
-};
 use vector_lib::event::{Event, Metric, MetricKind};
 
 use super::{ComponentMetricType, Validator};
+use crate::components::validation::{
+    ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent, component_names::*,
+};
 
 /// Validates that the component meets the requirements of the [Component Specification][component_spec].
 ///

@@ -3,10 +3,13 @@ use std::io;
 use bytes::BytesMut;
 use itertools::{Itertools, Position};
 use tokio_util::codec::Encoder as _;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::{EstimatedJsonEncodedSizeOf, config::telemetry};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, codecs::encoding::Framer, config::telemetry,
+    request_metadata::GroupedCountByteSize,
+};
 
+#[cfg(feature = "codecs-arrow")]
+use crate::internal_events::EncoderNullConstraintError;
 use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
 
 pub trait Encoder<T> {
@@ -96,6 +99,65 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
     }
 }
 
+#[cfg(feature = "codecs-arrow")]
+impl Encoder<Vec<Event>> for (Transformer, crate::codecs::BatchEncoder) {
+    fn encode_input(
+        &self,
+        events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        use tokio_util::codec::Encoder as _;
+
+        let mut encoder = self.1.clone();
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        let n_events = events.len();
+        let mut transformed_events = Vec::with_capacity(n_events);
+
+        for mut event in events {
+            self.0.transform(&mut event);
+            byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+            transformed_events.push(event);
+        }
+
+        let mut bytes = BytesMut::new();
+        encoder
+            .encode(transformed_events, &mut bytes)
+            .map_err(|error| {
+                if let vector_lib::codecs::encoding::Error::SchemaConstraintViolation(
+                    ref constraint_error,
+                ) = error
+                {
+                    emit!(EncoderNullConstraintError {
+                        error: constraint_error
+                    });
+                }
+                io::Error::new(io::ErrorKind::InvalidData, error)
+            })?;
+
+        write_all(writer, n_events, &bytes)?;
+        Ok((bytes.len(), byte_size))
+    }
+}
+
+impl Encoder<Vec<Event>> for (Transformer, crate::codecs::EncoderKind) {
+    fn encode_input(
+        &self,
+        events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        // Delegate to the specific encoder implementation
+        match &self.1 {
+            crate::codecs::EncoderKind::Framed(encoder) => {
+                (self.0.clone(), *encoder.clone()).encode_input(events, writer)
+            }
+            #[cfg(feature = "codecs-arrow")]
+            crate::codecs::EncoderKind::Batch(encoder) => {
+                (self.0.clone(), encoder.clone()).encode_input(events, writer)
+            }
+        }
+    }
+}
+
 /// Write the buffer to the writer. If the operation fails, emit an internal event which complies with the
 /// instrumentation spec- as this necessitates both an Error and EventsDropped event.
 ///
@@ -147,18 +209,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-    use std::env;
-    use std::path::PathBuf;
+    use std::{collections::BTreeMap, env, path::PathBuf};
 
     use bytes::{BufMut, Bytes};
-    use vector_lib::codecs::encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions};
-    use vector_lib::codecs::{
-        CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
-        NewlineDelimitedEncoder, TextSerializerConfig,
+    use vector_lib::{
+        codecs::{
+            CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
+            NewlineDelimitedEncoder, TextSerializerConfig,
+            encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions},
+        },
+        event::LogEvent,
+        internal_event::CountByteSize,
+        json_size::JsonSize,
     };
-    use vector_lib::event::LogEvent;
-    use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
     use vrl::value::{KeyString, Value};
 
     use super::*;
@@ -404,6 +467,7 @@ mod tests {
             protobuf: ProtobufSerializerOptions {
                 desc_file: test_data_dir().join("test_proto.desc"),
                 message_type: "test_proto.User".to_string(),
+                use_json_names: false,
             },
         };
 
@@ -458,6 +522,7 @@ mod tests {
             protobuf: ProtobufSerializerOptions {
                 desc_file: test_data_dir().join("test_proto.desc"),
                 message_type: "test_proto.User".to_string(),
+                use_json_names: false,
             },
         };
 

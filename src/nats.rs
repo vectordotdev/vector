@@ -3,8 +3,7 @@
 
 use nkeys::error::Error as NKeysError;
 use snafu::{ResultExt, Snafu};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 use crate::tls::TlsEnableableConfig;
 
@@ -267,7 +266,7 @@ mod tests {
         parse_auth(
             r#"
             strategy = "credentials_file"
-            credentials_file.path = "tests/data/nats/nats.creds"
+            credentials_file.path = "tests/integration/nats/data/nats.creds"
         "#,
         )
         .unwrap();

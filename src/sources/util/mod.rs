@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 #[cfg(feature = "sources-http_server")]
 mod body_decoding;
+#[cfg(feature = "sources-file")]
 mod encoding_config;
 #[cfg(all(unix, feature = "sources-dnstap"))]
 pub mod framestream;
@@ -14,7 +15,11 @@ pub mod grpc;
     feature = "sources-utils-http-query"
 ))]
 pub mod http;
-#[cfg(any(feature = "sources-http_client", feature = "sources-prometheus-scrape",))]
+#[cfg(any(
+    feature = "sources-http_client",
+    feature = "sources-prometheus-scrape",
+    feature = "sources-okta"
+))]
 pub mod http_client;
 #[cfg(any(
     feature = "sources-aws_sqs",
@@ -63,7 +68,7 @@ pub use self::http::add_query_parameters;
     feature = "sources-prometheus-remote-write",
     feature = "sources-utils-http-encoding"
 ))]
-pub use self::http::decode;
+pub use self::http::decompress_body;
 #[cfg(any(
     feature = "sources-aws_sqs",
     feature = "sources-gcp_pubsub",

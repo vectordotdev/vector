@@ -9,7 +9,6 @@ pub(crate) fn exec(
     local_config: ComposeTestLocalConfig,
     integration: &str,
     environment: Option<&String>,
-    build_all: bool,
 ) -> Result<()> {
     let environment = if let Some(environment) = environment {
         environment.clone()
@@ -21,5 +20,5 @@ pub(crate) fn exec(
         env.clone()
     };
     debug!("Selected environment: {environment:#?}");
-    ComposeTest::generate(local_config, integration, environment, build_all, 0)?.start()
+    ComposeTest::generate(local_config, integration, environment, 0)?.start()
 }

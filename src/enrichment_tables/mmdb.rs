@@ -2,12 +2,13 @@
 //! Enrichment data is loaded from any database in [MaxMind][maxmind] format.
 //!
 //! [maxmind]: https://maxmind.com
-use std::path::PathBuf;
-use std::{fs, net::IpAddr, sync::Arc, time::SystemTime};
+use std::{fs, net::IpAddr, path::PathBuf, sync::Arc, time::SystemTime};
 
 use maxminddb::Reader;
-use vector_lib::configurable::configurable_component;
-use vector_lib::enrichment::{Case, Condition, IndexHandle, Table};
+use vector_lib::{
+    configurable::configurable_component,
+    enrichment::{Case, Condition, IndexHandle, Table},
+};
 use vrl::value::{ObjectMap, Value};
 
 use crate::config::{EnrichmentTableConfig, GenerateConfig};
@@ -55,7 +56,7 @@ impl Mmdb {
 
         // Check if we can read database with dummy Ip.
         let ip = IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
-        let result = dbreader.lookup::<ObjectMap>(ip).map(|_| ());
+        let result = dbreader.lookup(ip)?.decode::<ObjectMap>().map(|_| ());
 
         match result {
             Ok(_) => Ok(Mmdb {
@@ -68,7 +69,7 @@ impl Mmdb {
     }
 
     fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<ObjectMap> {
-        let data = self.dbreader.lookup::<ObjectMap>(ip).ok()??;
+        let data = self.dbreader.lookup(ip).ok()?.decode().ok()??;
 
         if let Some(fields) = select {
             let mut filtered = Value::from(ObjectMap::new());
@@ -173,8 +174,9 @@ impl std::fmt::Debug for Mmdb {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use vrl::value::Value;
+
+    use super::*;
 
     #[test]
     fn city_partial_lookup() {

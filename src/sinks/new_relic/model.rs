@@ -7,8 +7,11 @@ use std::{
 use chrono::Utc;
 use ordered_float::NotNan;
 use serde::Serialize;
-use vector_lib::internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
-use vector_lib::{config::log_schema, event::ObjectMap};
+use vector_lib::{
+    config::log_schema,
+    event::ObjectMap,
+    internal_event::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL},
+};
 use vrl::event_path;
 
 use super::NewRelicSinkError;

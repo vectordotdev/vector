@@ -5,7 +5,6 @@ use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr},
     sync::LazyLock,
 };
-use vector_lib::emit;
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
@@ -17,26 +16,14 @@ use hickory_proto::{
 };
 use prost::Message;
 use snafu::Snafu;
+use vector_common::{Error, Result, internal_event::emit};
+use vector_core::event::{LogEvent, Value};
 use vrl::{owned_value_path, path};
-
-use vector_lib::{
-    Error, Result,
-    event::{LogEvent, Value},
-};
 
 #[allow(warnings, clippy::all, clippy::pedantic, clippy::nursery)]
 mod dnstap_proto {
     include!(concat!(env!("OUT_DIR"), "/dnstap.rs"));
 }
-
-use crate::{internal_events::DnstapParseWarning, schema::DNSTAP_VALUE_PATHS};
-use dnstap_proto::{
-    Dnstap, Message as DnstapMessage, SocketFamily, SocketProtocol,
-    message::Type as DnstapMessageType,
-};
-use vector_lib::config::log_schema;
-use vector_lib::lookup::PathPrefix;
-use vector_lib::lookup::lookup_v2::ValuePath;
 
 use dnsmsg_parser::{
     dns_message::{
@@ -45,6 +32,14 @@ use dnsmsg_parser::{
     },
     dns_message_parser::DnsMessageParser,
 };
+use dnstap_proto::{
+    Dnstap, Message as DnstapMessage, SocketFamily, SocketProtocol,
+    message::Type as DnstapMessageType,
+};
+use vector_core::config::log_schema;
+use vector_lookup::{PathPrefix, lookup_v2::ValuePath};
+
+use crate::{internal_events::DnstapParseWarning, schema::DNSTAP_VALUE_PATHS};
 
 #[derive(Debug, Snafu)]
 enum DnstapParserError {
@@ -152,13 +147,13 @@ impl DnstapParser {
                 && let Err(err) =
                     DnstapParser::parse_dnstap_message(event, &root, message, parsing_options)
             {
-                emit!(DnstapParseWarning { error: &err });
+                emit(DnstapParseWarning { error: &err });
                 need_raw_data = true;
                 DnstapParser::insert(event, &root, &DNSTAP_VALUE_PATHS.error, err.to_string());
             }
         } else {
-            emit!(DnstapParseWarning {
-                error: format!("Unknown dnstap data type: {dnstap_data_type_id}")
+            emit(DnstapParseWarning {
+                error: format!("Unknown dnstap data type: {dnstap_data_type_id}"),
             });
             need_raw_data = true;
         }
@@ -1037,10 +1032,12 @@ fn to_dnstap_message_type(type_id: i32) -> String {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
+    use std::{collections::BTreeMap, vec};
+
     use chrono::DateTime;
     use dnsmsg_parser::dns_message_parser::DnsParserOptions;
-    use std::{collections::BTreeMap, vec};
+
+    use super::*;
 
     #[test]
     fn test_parse_dnstap_data_with_query_message() {

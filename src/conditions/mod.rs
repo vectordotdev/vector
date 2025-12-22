@@ -9,8 +9,10 @@ pub(crate) mod is_metric;
 pub(crate) mod is_trace;
 mod vrl;
 
-pub use self::datadog_search::{DatadogSearchConfig, DatadogSearchRunner};
-pub use self::vrl::VrlConfig;
+pub use self::{
+    datadog_search::{DatadogSearchConfig, DatadogSearchRunner},
+    vrl::VrlConfig,
+};
 use self::{
     is_log::{check_is_log, check_is_log_with_context},
     is_metric::{check_is_metric, check_is_metric_with_context},
@@ -51,7 +53,6 @@ impl Condition {
     /// Checks if a condition is true.
     ///
     /// The event should not be modified, it is only mutable so it can be passed into VRL, but VRL type checking prevents mutation.
-    #[allow(dead_code)]
     pub fn check(&self, e: Event) -> (bool, Event) {
         match self {
             Condition::IsLog => check_is_log(e),

@@ -1,0 +1,63 @@
+name: Publish vdev
+on:
+  push:
+    tags: [ "vdev-v*.*.*" ]
+
+permissions:
+  contents: write  # needed for creating releases
+
+jobs:
+  build:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        include:
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+
+    steps:
+      - name: Checkout Vector
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - name: Bootstrap runner environment (Ubuntu)
+        if: startsWith(matrix.os, 'ubuntu')
+        run: |
+          sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+
+      - name: Bootstrap runner environment (macOS)
+        if: startsWith(matrix.os, 'macos')
+        run: bash scripts/environment/bootstrap-macos.sh
+
+      - run: bash scripts/environment/prepare.sh --modules=rustup
+
+      - name: Build
+        working-directory: vdev
+        run: cargo build --release --target ${{ matrix.target }}
+
+      - name: Package
+        shell: bash
+        run: |
+          VERSION=${GITHUB_REF_NAME#vdev-v}
+          OUTDIR="vdev-${{ matrix.target }}-v${VERSION}"
+          mkdir -p "$OUTDIR"
+
+          BIN_ROOT="${CARGO_TARGET_DIR:-target}"
+          BIN="${BIN_ROOT}/${{ matrix.target }}/release/vdev"
+          if [[ ! -f "$BIN" ]]; then
+              echo "Binary not found at: $BIN"
+              find ${BIN_ROOT} -type -d
+              exit 1
+          fi
+
+          cp "$BIN" "$OUTDIR/"
+          tar -czf "${OUTDIR}.tgz" "$OUTDIR"
+          echo "ASSET=${OUTDIR}.tgz" >> "$GITHUB_ENV"
+
+      - name: Upload asset to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ASSET }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

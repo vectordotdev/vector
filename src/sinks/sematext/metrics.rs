@@ -6,9 +6,10 @@ use http::{StatusCode, Uri};
 use hyper::{Body, Request};
 use indoc::indoc;
 use tower::Service;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component,
+    sensitive_string::SensitiveString,
+};
 
 use super::Region;
 use crate::{
@@ -191,7 +192,7 @@ impl SematextMetricsService {
                         .map(|item| Ok(EncodedEvent::new(item, byte_size, json_byte_size)))
                 })
             })
-            .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error));
+            .sink_map_err(|error| error!(message = "Fatal sematext metrics sink error.", %error, internal_log_rate_limit = false));
 
         #[allow(deprecated)]
         Ok(VectorSink::from_event_sink(sink))
@@ -315,8 +316,9 @@ mod tests {
         event::{Event, metric::MetricKind},
         sinks::util::test::{build_test_server, load_sink},
         test_util::{
+            addr::next_addr,
             components::{HTTP_SINK_TAGS, assert_sink_compliance},
-            next_addr, test_generate_config,
+            test_generate_config,
         },
     };
 
@@ -414,7 +416,7 @@ mod tests {
         "#})
         .unwrap();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
         let endpoint = format!("http://{addr}");

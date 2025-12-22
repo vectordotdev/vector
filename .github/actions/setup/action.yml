@@ -1,0 +1,268 @@
+name: "CI Toolchain Setup"
+description: "Prepare a fast and minimal CI environment. Set any input to true to install or configure any tool"
+
+branding:
+  icon: package
+  color: purple
+
+inputs:
+  cargo-cache:
+    required: false
+    default: true
+    description: "Cache Cargo registry, index, and git DB. Enabled automatically if any Rust tools are requested."
+
+  mold:
+    required: false
+    default: true
+    description: "Install mold linker and configure a rustc wrapper to speed up linking. Avoid enabling with cross."
+
+  protoc:
+    required: false
+    default: false
+    description: "Install protoc (uses scripts/environment/install-protoc.sh)."
+  cue:
+    required: false
+    default: false
+    description: "Install cue."
+
+  # prepare.sh - rust
+  rust: # rustup module
+    required: false
+    default: false
+    description: "Install/ensure Rust toolchain via rustup (prepare.sh rustup module)."
+  cargo-deb:
+    required: false
+    default: false
+    description: "Install cargo-deb."
+  cross:
+    required: false
+    default: false
+    description: "Install cross for cross-compiling Rust."
+  cargo-nextest:
+    required: false
+    default: false
+    description: "Install cargo-nextest test runner."
+  cargo-deny:
+    required: false
+    default: false
+    description: "Install cargo-deny for advisory and license checks."
+  cargo-msrv:
+    required: false
+    default: false
+    description: "Install cargo-msrv for minimum supported Rust version checks."
+  dd-rust-license-tool:
+    required: false
+    default: false
+    description: "Install Datadog rust-license-tool."
+  wasm-pack:
+    required: false
+    default: false
+    description: "Install wasm-pack for Rust to WASM bridge."
+  vdev:
+    required: false
+    default: true
+    description: "Install vdev CLI tool (cached by vdev/ directory changes)."
+
+  # prepare.sh - npm
+  markdownlint:
+    required: false
+    default: false
+    description: "Install markdownlint (npm)."
+  datadog-ci:
+    required: false
+    default: false
+    description: "Install @datadog/datadog-ci (npm)."
+
+runs:
+  using: "composite"
+  steps:
+    - name: Check vdev cache status
+      id: check-vdev-cache
+      if: ${{ inputs.vdev == 'true' }}
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: ~/.cargo/bin/vdev
+        key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'Cargo.toml', 'Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-vdev-
+        lookup-only: true
+
+    - id: needs
+      name: Compute if rust is needed
+      shell: bash
+      run: |
+        rust="false"
+
+        # If any rust-related inputs are true (excluding vdev), enable rust
+        for val in "${{ inputs.mold }}" \
+                   "${{ inputs.rust }}" \
+                   "${{ inputs.cargo-deb }}" \
+                   "${{ inputs.cross }}" \
+                   "${{ inputs.cargo-nextest }}" \
+                   "${{ inputs.cargo-deny }}" \
+                   "${{ inputs.cargo-msrv }}" \
+                   "${{ inputs.dd-rust-license-tool }}" \
+                   "${{ inputs.wasm-pack }}"; do
+          if [[ "$val" == "true" ]]; then
+            rust="true"
+            break
+          fi
+        done
+
+        # If vdev needs compilation (cache miss), enable rust
+        vdev_needs_compile="false"
+        if [[ "${{ inputs.vdev }}" == "true" && "${{ steps.check-vdev-cache.outputs.cache-hit }}" != "true" ]]; then
+          rust="true"
+          vdev_needs_compile="true"
+        fi
+
+        echo "NEEDS_RUST=$rust" >> "$GITHUB_ENV"
+        echo "VDEV_NEEDS_COMPILE=$vdev_needs_compile" >> "$GITHUB_ENV"
+
+        if [[ "$rust" == "true" ]]; then
+          echo "RUST_BACKTRACE=full" >> "$GITHUB_ENV"
+          # Set nice CI colors
+          echo "CARGO_TERM_COLOR=always" >> "$GITHUB_ENV"
+        fi
+
+
+    - name: Enable rust matcher
+      if: ${{ env.NEEDS_RUST == 'true' }}
+      run: echo "::add-matcher::.github/matchers/rust.json"
+      shell: bash
+
+    - name: Override warnings
+      if: ${{ env.NEEDS_RUST == 'true' }}
+      run: |
+        CARGO_OVERRIDE_DIR="${HOME}/.cargo"
+        CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
+        cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+        [target.'cfg(linux)']
+        rustflags = [ "-D", "warnings" ]
+        EOF
+      shell: bash
+
+    - name: Cache Cargo registry, index, and git DB
+      if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: |
+          ~/.cargo/registry/index/
+          ~/.cargo/registry/cache/
+          ~/.cargo/git/db/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+
+    - name: Install mold
+      if: ${{ inputs.mold == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
+      shell: bash
+      run: |
+        echo "Installing mold"
+
+        CARGO_OVERRIDE_DIR="${HOME}/.cargo"
+        CARGO_OVERRIDE_CONF="${CARGO_OVERRIDE_DIR}/config.toml"
+
+        # Install mold, because the system linker wastes a bunch of time.
+        #
+        # Notably, we don't install/configure it when we're going to do anything with `cross`, as `cross` takes the Cargo
+        # configuration from the host system and ships it over...  which isn't good when we're overriding the `rustc-wrapper`
+        # and all of that.
+
+        # We explicitly put `mold-wrapper.so` right beside `mold` itself because it's hard-coded to look in the same directory
+        # first when trying to load the shared object, so we can dodge having to care about the "right" lib folder to put it in.
+        TEMP=$(mktemp -d)
+        MOLD_VERSION=1.2.1
+        MOLD_TARGET=mold-${MOLD_VERSION}-$(uname -m)-linux
+        curl -fsSL "https://github.com/rui314/mold/releases/download/v${MOLD_VERSION}/${MOLD_TARGET}.tar.gz" \
+        --output "$TEMP/${MOLD_TARGET}.tar.gz"
+        tar \
+            -xvf "${TEMP}/${MOLD_TARGET}.tar.gz" \
+            -C "${TEMP}"
+        sudo cp "${TEMP}/${MOLD_TARGET}/bin/mold" /usr/bin/mold
+        sudo cp "${TEMP}/${MOLD_TARGET}/lib/mold/mold-wrapper.so" /usr/bin/mold-wrapper.so
+        rm -rf "$TEMP"
+
+        # Create our rustc wrapper script that we'll use to actually invoke `rustc` such that `mold` will wrap it and intercept
+        # anything linking calls to use `mold` instead of `ld`, etc.
+        CARGO_BIN_DIR="${CARGO_OVERRIDE_DIR}/bin"
+        mkdir -p "$CARGO_BIN_DIR"
+
+        RUSTC_WRAPPER="${CARGO_BIN_DIR}/wrap-rustc"
+        cat <<EOF >"$RUSTC_WRAPPER"
+        #!/bin/sh
+        exec mold -run "\$@"
+        EOF
+        chmod +x "$RUSTC_WRAPPER"
+
+        # Now configure Cargo to use our rustc wrapper script.
+        cat <<EOF >>"$CARGO_OVERRIDE_CONF"
+        [build]
+        rustc-wrapper = "$RUSTC_WRAPPER"
+        EOF
+
+    - name: Install protoc
+      if: ${{ inputs.protoc == 'true' }}
+      shell: bash
+      run: |
+        echo "Installing protoc"
+        sudo bash ./scripts/environment/install-protoc.sh
+
+    - name: Install cue
+      if: ${{ inputs.cue == 'true' }}
+      shell: bash
+      run: |
+        echo "Installing cue"
+        TEMP=$(mktemp -d)
+        curl \
+          -L https://github.com/cue-lang/cue/releases/download/v0.10.0/cue_v0.10.0_linux_amd64.tar.gz \
+          -o "${TEMP}/cue_v0.10.0_linux_amd64.tar.gz"
+        tar \
+          -xvf "${TEMP}/cue_v0.10.0_linux_amd64.tar.gz" \
+          -C "${TEMP}"
+        sudo cp "${TEMP}/cue" /usr/bin/cue
+        rm -rf "$TEMP"
+
+    - name: Install vdev
+      if: ${{ inputs.vdev == 'true' }}
+      uses: ./.github/actions/install-vdev
+      with:
+        skip-cache: ${{ env.VDEV_NEEDS_COMPILE == 'true' }}
+
+    - name: Cache prepare.sh binaries
+      id: cache-prepare-binaries
+      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      with:
+        path: |
+          ~/.cargo/bin/cargo-deb
+          ~/.cargo/bin/cross
+          ~/.cargo/bin/cargo-nextest
+          ~/.cargo/bin/cargo-deny
+          ~/.cargo/bin/cargo-msrv
+          ~/.cargo/bin/dd-rust-license-tool
+          ~/.cargo/bin/wasm-pack
+          /usr/local/bin/markdownlint
+          /usr/local/bin/datadog-ci
+        key: ${{ runner.os }}-prepare-binaries-${{ hashFiles('scripts/environment/*') }}
+        restore-keys: |
+          ${{ runner.os }}-prepare-binaries-
+
+    - name: Run prepare.sh
+      shell: bash
+      run: |
+        mods=()
+        [[ "${{ inputs.rust == 'true' || env.NEEDS_RUST == 'true' }}" == "true" ]] && mods+=("rustup")
+        [[ "${{ inputs.cargo-deb }}" == "true" ]] && mods+=("cargo-deb")
+        [[ "${{ inputs.cross }}" == "true" ]] && mods+=("cross")
+        [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")
+        [[ "${{ inputs.cargo-deny }}" == "true" ]] && mods+=("cargo-deny")
+        [[ "${{ inputs.cargo-msrv }}" == "true" ]] && mods+=("cargo-msrv")
+        [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
+        [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
+        [[ "${{ inputs.markdownlint }}" == "true" ]] && mods+=("markdownlint")
+        [[ "${{ inputs.datadog-ci }}" == "true" ]] && mods+=("datadog-ci")
+        csm=$(IFS=,; echo "${mods[*]}")
+
+        if [[ "$csm" != "" ]]; then
+          ./scripts/environment/prepare.sh --modules="${csm}"
+        fi

@@ -1,20 +1,25 @@
-use crate::{
-    internal_events::{GrpcServerRequestReceived, GrpcServerResponseSent},
-    shutdown::{ShutdownSignal, ShutdownSignalToken},
-    tls::MaybeTlsSettings,
-};
+use std::{convert::Infallible, net::SocketAddr, time::Duration};
+
 use futures::FutureExt;
 use http::{Request, Response};
 use hyper::Body;
-use std::{convert::Infallible, net::SocketAddr, time::Duration};
-use tonic::transport::server::Routes;
-use tonic::{body::BoxBody, server::NamedService, transport::server::Server};
+use tonic::{
+    body::BoxBody,
+    server::NamedService,
+    transport::server::{Routes, Server},
+};
 use tower::Service;
 use tower_http::{
     classify::{GrpcErrorsAsFailures, SharedClassifier},
     trace::TraceLayer,
 };
 use tracing::Span;
+
+use crate::{
+    internal_events::{GrpcServerRequestReceived, GrpcServerResponseSent},
+    shutdown::{ShutdownSignal, ShutdownSignalToken},
+    tls::MaybeTlsSettings,
+};
 
 mod decompression;
 pub use self::decompression::{DecompressionAndMetrics, DecompressionAndMetricsLayer};

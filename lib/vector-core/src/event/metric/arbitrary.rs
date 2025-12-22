@@ -1,13 +1,14 @@
-use proptest::collection::{btree_set, hash_map, hash_set};
-use proptest::option;
-use proptest::prelude::*;
-
-use crate::metrics::AgentDDSketch;
+use proptest::{
+    collection::{btree_set, hash_map, hash_set},
+    option,
+    prelude::*,
+};
 
 use super::{
     Bucket, MetricSketch, MetricTags, MetricValue, Quantile, Sample, StatisticKind, TagValue,
     TagValueSet, samples_to_buckets,
 };
+use crate::metrics::AgentDDSketch;
 
 fn realistic_float() -> proptest::num::f64::Any {
     proptest::num::f64::POSITIVE | proptest::num::f64::NEGATIVE | proptest::num::f64::ZERO

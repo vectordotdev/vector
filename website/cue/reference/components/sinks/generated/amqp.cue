@@ -12,7 +12,7 @@ generated: components: sinks: amqp: configuration: {
 		required: false
 		type: object: options: enabled: {
 			description: """
-				Whether or not end-to-end acknowledgements are enabled.
+				Controls whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source that supports end-to-end
 				acknowledgements that is connected to that sink waits for events
@@ -94,7 +94,7 @@ generated: components: sinks: amqp: configuration: {
 					}
 					device_version: {
 						description: """
-																Identifies the version of the problem. The combination of the device product, vendor and this value make up the unique id of the device that sends messages.
+																Identifies the version of the problem. The combination of the device product, vendor, and this value make up the unique id of the device that sends messages.
 																The value length must be less than or equal to 31.
 																"""
 						required: true
@@ -124,7 +124,6 @@ generated: components: sinks: amqp: configuration: {
 					severity: {
 						description: """
 																This is a path that points to the field of a log event that reflects importance of the event.
-																Reflects importance of the event.
 
 																It must point to a number from 0 to 10.
 																0 = lowest_importance, 10 = highest_importance.
@@ -205,6 +204,15 @@ generated: components: sinks: amqp: configuration: {
 						[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 						[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 						"""
+					otlp: """
+						Encodes an event in the [OTLP (OpenTelemetry Protocol)][otlp] format.
+
+						This codec uses protobuf encoding, which is the recommended format for OTLP.
+						The output is suitable for sending to OTLP-compatible endpoints with
+						`content-type: application/x-protobuf`.
+
+						[otlp]: https://opentelemetry.io/docs/specs/otlp/
+						"""
 					protobuf: """
 						Encodes an event as a [Protobuf][protobuf] message.
 
@@ -239,7 +247,7 @@ generated: components: sinks: amqp: configuration: {
 					capacity: {
 						description: """
 																Sets the capacity (in bytes) of the internal buffer used in the CSV writer.
-																This defaults to 8KB.
+																This defaults to 8192 bytes (8KB).
 																"""
 						required: false
 						type: uint: default: 8192
@@ -318,6 +326,20 @@ generated: components: sinks: amqp: configuration: {
 				required:    false
 				type: array: items: type: string: {}
 			}
+			gelf: {
+				description:   "The GELF Serializer Options."
+				relevant_when: "codec = \"gelf\""
+				required:      false
+				type: object: options: max_chunk_size: {
+					description: """
+						Maximum size for each GELF chunked datagram (including 12-byte header).
+						Chunking starts when datagrams exceed this size.
+						For Graylog target, keep at or below 8192 bytes; for Vector target (`gelf` decoding with `chunked_gelf` framing), up to 65,500 bytes is recommended.
+						"""
+					required: false
+					type: uint: default: 8192
+				}
+			}
 			json: {
 				description:   "Options for the JsonSerializer."
 				relevant_when: "codec = \"json\""
@@ -333,7 +355,7 @@ generated: components: sinks: amqp: configuration: {
 					Controls how metric tag values are encoded.
 
 					When set to `single`, only the last non-bare value of tags are displayed with the
-					metric.  When set to `full`, all metric tags are exposed as separate assignments.
+					metric. When set to `full`, all metric tags are exposed as separate assignments.
 					"""
 				relevant_when: "codec = \"json\" or codec = \"text\""
 				required:      false
@@ -375,6 +397,19 @@ generated: components: sinks: amqp: configuration: {
 						required:    true
 						type: string: examples: ["package.Message"]
 					}
+					use_json_names: {
+						description: """
+																Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+
+																When enabled, the serializer looks for fields using their JSON names as defined
+																in the `.proto` file (for example `jobDescription` instead of `job_description`).
+
+																This is useful when working with data that has already been converted from JSON or
+																when interfacing with systems that use JSON naming conventions.
+																"""
+						required: false
+						type: bool: default: false
+					}
 				}
 			}
 			timestamp_format: {
@@ -386,7 +421,7 @@ generated: components: sinks: amqp: configuration: {
 					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
 					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
 					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
-					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
 				}
 			}
 		}

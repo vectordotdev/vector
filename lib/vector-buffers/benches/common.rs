@@ -2,8 +2,7 @@ use std::{error, fmt, path::PathBuf};
 
 use bytes::{Buf, BufMut};
 use metrics_tracing_context::{MetricsLayer, TracingContextLayer};
-use metrics_util::debugging::DebuggingRecorder;
-use metrics_util::layers::Layer;
+use metrics_util::{debugging::DebuggingRecorder, layers::Layer};
 use tracing::Span;
 use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
 use vector_buffers::{
@@ -14,8 +13,10 @@ use vector_buffers::{
         channel::{BufferReceiver, BufferSender},
     },
 };
-use vector_common::byte_size_of::ByteSizeOf;
-use vector_common::finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable};
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalization::{AddBatchNotifier, BatchNotifier, EventFinalizers, Finalizable},
+};
 
 #[derive(Clone, Debug)]
 pub struct Message<const N: usize> {

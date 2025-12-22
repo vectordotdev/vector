@@ -1,18 +1,18 @@
 #![deny(missing_docs)]
 
-use chrono::{DateTime, Utc};
 use core::fmt::Debug;
 use std::collections::BTreeMap;
 
+use chrono::{DateTime, Utc};
 use ordered_float::NotNan;
 use serde::{Deserialize, Deserializer};
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::{LogEvent, MaybeAsLogMut};
-use vector_lib::lookup::lookup_v2::ConfigValuePath;
-use vector_lib::lookup::{PathPrefix, event_path};
-use vector_lib::schema::meaning;
-use vrl::path::OwnedValuePath;
-use vrl::value::Value;
+use vector_lib::{
+    configurable::configurable_component,
+    event::{LogEvent, MaybeAsLogMut},
+    lookup::{PathPrefix, event_path, lookup_v2::ConfigValuePath},
+    schema::meaning,
+};
+use vrl::{path::OwnedValuePath, value::Value};
 
 use crate::{event::Event, serde::is_default};
 
@@ -250,7 +250,7 @@ pub enum TimestampFormat {
     /// Represent the timestamp as a Unix timestamp in milliseconds.
     UnixMs,
 
-    /// Represent the timestamp as a Unix timestamp in microseconds
+    /// Represent the timestamp as a Unix timestamp in microseconds.
     UnixUs,
 
     /// Represent the timestamp as a Unix timestamp in nanoseconds.
@@ -262,16 +262,18 @@ pub enum TimestampFormat {
 
 #[cfg(test)]
 mod tests {
+    use std::{collections::BTreeMap, sync::Arc};
+
     use indoc::indoc;
-    use vector_lib::btreemap;
-    use vector_lib::config::{LogNamespace, log_schema};
-    use vector_lib::lookup::path::parse_target_path;
+    use vector_lib::{
+        btreemap,
+        config::{LogNamespace, log_schema},
+        lookup::path::parse_target_path,
+    };
     use vrl::value::Kind;
 
-    use crate::config::schema;
-
     use super::*;
-    use std::{collections::BTreeMap, sync::Arc};
+    use crate::config::schema;
 
     #[test]
     fn serialize() {

@@ -97,7 +97,9 @@ async fn get_sketches_from_pipeline(address: String) -> SketchIntake {
         get_fakeintake_payloads::<FakeIntakeResponseRaw>(&address, SKETCHES_ENDPOINT).await;
 
     info!("unpacking payloads");
-    let payloads = unpack_proto_payloads(&payloads).await;
+    let payloads = unpack_proto_payloads(&payloads)
+        .await
+        .expect("Failed to unpack sketch payloads");
 
     info!("generating sketch intake");
     let sketches = generate_sketch_intake(payloads);

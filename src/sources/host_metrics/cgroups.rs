@@ -1,4 +1,9 @@
-use std::{io, num::ParseIntError, path::Path, path::PathBuf, str::FromStr};
+use std::{
+    io,
+    num::ParseIntError,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
 
 use futures::future::BoxFuture;
 use snafu::{ResultExt, Snafu};
@@ -450,10 +455,12 @@ fn join_name(base_name: &Path, filename: impl AsRef<Path>) -> PathBuf {
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeSet;
-    use std::fs::{self, File};
-    use std::io::Write;
-    use std::path::{Path, PathBuf};
+    use std::{
+        collections::BTreeSet,
+        fs::{self, File},
+        io::Write,
+        path::{Path, PathBuf},
+    };
 
     use rand::{Rng, rngs::ThreadRng};
     use similar_asserts::assert_eq;

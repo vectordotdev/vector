@@ -1,14 +1,17 @@
-use crate::conditions::{AnyCondition, ConditionConfig, VrlConfig};
-use crate::config::{
-    DataType, GenerateConfig, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
-    TransformOutput,
-};
-use crate::schema;
-use crate::sinks::prelude::configurable_component;
-use crate::transforms::Transform;
-use crate::transforms::exclusive_route::transform::ExclusiveRoute;
 use std::hash::{Hash, Hasher};
+
 use vector_lib::config::clone_input_definitions;
+
+use crate::{
+    conditions::{AnyCondition, ConditionConfig, VrlConfig},
+    config::{
+        DataType, GenerateConfig, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
+        TransformOutput,
+    },
+    schema,
+    sinks::prelude::configurable_component,
+    transforms::{Transform, exclusive_route::transform::ExclusiveRoute},
+};
 
 pub(super) const UNMATCHED_ROUTE: &str = "_unmatched";
 
@@ -52,6 +55,8 @@ impl Eq for Route {}
 #[serde(deny_unknown_fields)]
 pub struct ExclusiveRouteConfig {
     /// An array of named routes. The route names are expected to be unique.
+    /// Routes are evaluated in order from first to last, and only the first matching route receives each event
+    /// (first-match-wins).
     #[configurable(metadata(docs::examples = "routes_example()"))]
     pub routes: Vec<Route>,
 }
@@ -163,8 +168,9 @@ impl TransformConfig for ExclusiveRouteConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::ExclusiveRouteConfig;
     use indoc::indoc;
+
+    use super::ExclusiveRouteConfig;
 
     #[test]
     fn generate_config() {

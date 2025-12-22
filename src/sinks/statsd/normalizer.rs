@@ -23,7 +23,6 @@ mod tests {
     use vector_lib::event::MetricKind;
 
     use super::StatsdNormalizer;
-
     use crate::test_util::metrics::{
         assert_normalize, generate_f64s, get_aggregated_histogram, get_distribution, get_gauge,
         tests,

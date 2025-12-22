@@ -1,9 +1,10 @@
-use crate::encoding::BuildError;
 use bytes::{BufMut, BytesMut};
 use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
+
+use crate::encoding::BuildError;
 
 /// Config used to build a `AvroSerializer`.
 #[derive(Debug, Clone, Deserialize, Serialize)]

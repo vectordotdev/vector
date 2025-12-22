@@ -1,26 +1,26 @@
-use std::cell::RefCell;
-use std::collections::{HashMap, HashSet};
-use std::path::PathBuf;
+use std::{
+    cell::RefCell,
+    collections::{HashMap, HashSet},
+    path::PathBuf,
+};
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
-use vector_lib::configurable::attributes::CustomAttribute;
-use vector_lib::configurable::{
-    Configurable, GenerateError, Metadata, NamedComponent, configurable_component,
-    schema::{SchemaGenerator, SchemaObject},
-};
 use vector_lib::{
     config::{GlobalOptions, Input, LogNamespace, TransformOutput},
+    configurable::{
+        Configurable, GenerateError, Metadata, NamedComponent,
+        attributes::CustomAttribute,
+        configurable_component,
+        schema::{SchemaGenerator, SchemaObject},
+    },
     id::Inputs,
     schema,
     transform::Transform,
 };
 
-use super::ComponentKey;
-use super::OutputId;
-use super::dot_graph::GraphConfig;
-use super::schema::Options as SchemaOptions;
+use super::{ComponentKey, OutputId, dot_graph::GraphConfig, schema::Options as SchemaOptions};
 use crate::extra_context::ExtraContext;
 
 pub type BoxedTransform = Box<dyn TransformConfig>;

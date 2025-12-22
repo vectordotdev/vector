@@ -1,19 +1,22 @@
-use crate::sinks::{
-    elasticsearch::encoder::ProcessedEvent,
-    util::{metadata::RequestMetadataBuilder, request_builder::RequestBuilder},
-};
+use http::StatusCode;
+use serde::Deserialize;
+use vector_lib::{EstimatedJsonEncodedSizeOf, json_size::JsonSize};
+
 use crate::{
     event::Finalizable,
     http::HttpError,
     sinks::{
-        elasticsearch::service::{ElasticsearchRequest, ElasticsearchResponse},
-        util::retries::{RetryAction, RetryLogic},
+        elasticsearch::{
+            encoder::ProcessedEvent,
+            service::{ElasticsearchRequest, ElasticsearchResponse},
+        },
+        util::{
+            metadata::RequestMetadataBuilder,
+            request_builder::RequestBuilder,
+            retries::{RetryAction, RetryLogic},
+        },
     },
 };
-use http::StatusCode;
-use serde::Deserialize;
-use vector_lib::EstimatedJsonEncodedSizeOf;
-use vector_lib::json_size::JsonSize;
 
 #[derive(Deserialize, Debug)]
 struct EsResultResponse {

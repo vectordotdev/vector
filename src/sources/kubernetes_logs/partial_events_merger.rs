@@ -1,18 +1,25 @@
 #![deny(missing_docs)]
 
+use std::{
+    collections::HashMap,
+    time::{Duration, Instant},
+};
+
 use bytes::BytesMut;
 use futures::{Stream, StreamExt};
-use std::collections::HashMap;
-use std::time::{Duration, Instant};
-use vector_lib::config::LogNamespace;
-use vector_lib::lookup::OwnedTargetPath;
-use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
+use vector_lib::{
+    config::LogNamespace,
+    lookup::OwnedTargetPath,
+    stream::expiration_map::{Emitter, map_with_expiration},
+};
 use vrl::owned_value_path;
 
-use crate::event;
-use crate::event::{Event, LogEvent, Value};
-use crate::internal_events::KubernetesMergedLineTooBigError;
-use crate::sources::kubernetes_logs::transform_utils::get_message_path;
+use crate::{
+    event,
+    event::{Event, LogEvent, Value},
+    internal_events::KubernetesMergedLineTooBigError,
+    sources::kubernetes_logs::transform_utils::get_message_path,
+};
 
 /// The key we use for `file` field.
 const FILE_KEY: &str = "file";
@@ -207,9 +214,10 @@ fn merge_partial_events_with_custom_expiration(
 
 #[cfg(test)]
 mod test {
-    use super::*;
     use vector_lib::event::LogEvent;
     use vrl::value;
+
+    use super::*;
 
     #[tokio::test]
     async fn merge_single_event_legacy() {

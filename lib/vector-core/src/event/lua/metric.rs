@@ -2,12 +2,13 @@ use std::collections::BTreeMap;
 
 use mlua::prelude::*;
 
-use super::super::{
-    Metric, MetricKind, MetricValue, StatisticKind,
-    metric::TagValue,
-    metric::{self, MetricSketch, MetricTags, TagValueSet},
+use super::{
+    super::{
+        Metric, MetricKind, MetricValue, StatisticKind,
+        metric::{self, MetricSketch, MetricTags, TagValue, TagValueSet},
+    },
+    util::{table_to_timestamp, timestamp_to_table},
 };
-use super::util::{table_to_timestamp, timestamp_to_table};
 use crate::metrics::AgentDDSketch;
 
 pub struct LuaMetric {
@@ -87,7 +88,7 @@ impl FromLua for TagValueSet {
                 }
                 Ok(Self::from(string_values))
             }
-            LuaValue::String(x) => Ok(Self::from([x.to_string_lossy().to_string()])),
+            LuaValue::String(x) => Ok(Self::from([x.to_string_lossy().clone()])),
             _ => Err(mlua::Error::FromLuaConversionError {
                 from: value.type_name(),
                 to: String::from("metric tag value"),

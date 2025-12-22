@@ -570,7 +570,10 @@ impl Response for &str {}
 mod tests {
     use std::{
         convert::Infallible,
-        sync::{Arc, Mutex, atomic::AtomicUsize, atomic::Ordering::Relaxed},
+        sync::{
+            Arc, Mutex,
+            atomic::{AtomicUsize, Ordering::Relaxed},
+        },
     };
 
     use bytes::Bytes;

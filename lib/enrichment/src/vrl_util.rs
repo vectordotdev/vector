@@ -1,9 +1,12 @@
 //! Utilities shared between both VRL functions.
 use std::collections::BTreeMap;
 
+use vrl::{
+    diagnostic::{Label, Span},
+    prelude::*,
+};
+
 use crate::{Case, Condition, IndexHandle, TableRegistry};
-use vrl::diagnostic::{Label, Span};
-use vrl::prelude::*;
 
 #[derive(Debug)]
 pub enum Error {

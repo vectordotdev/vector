@@ -4,14 +4,15 @@ use bytes::BytesMut;
 use serde::Deserialize;
 use serde_json::Value;
 use tokio_util::codec::Encoder as _;
-use vector_lib::codecs::encoding::format::JsonSerializerOptions;
+use vector_lib::{
+    codecs::{
+        JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, MetricTagValues,
+        NewlineDelimitedEncoder, encoding, encoding::format::JsonSerializerOptions,
+    },
+    event::{Event, LogEvent},
+};
 
 use crate::codecs::Encoder;
-use vector_lib::codecs::{
-    JsonSerializer, LengthDelimitedEncoder, LogfmtSerializer, MetricTagValues,
-    NewlineDelimitedEncoder, encoding,
-};
-use vector_lib::event::{Event, LogEvent};
 
 /// A test case event for deserialization from yaml file.
 /// This is an intermediary step to TestEvent.

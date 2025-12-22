@@ -5,7 +5,7 @@ use futures_util::future::join_all;
 use tokio::sync::{mpsc, oneshot};
 use vector_lib::api_client::{Client, connect_subscription_client};
 
-use super::{
+use vector_lib::top::{
     dashboard::{init_dashboard, is_tty},
     metrics,
     state::{self, ConnectionStatus, EventType},
@@ -63,7 +63,8 @@ pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> e
     match init_dashboard(
         dashboard_title,
         opts.url().as_str(),
-        opts,
+        opts.interval,
+        opts.human_metrics,
         state_rx,
         shutdown_rx,
     )

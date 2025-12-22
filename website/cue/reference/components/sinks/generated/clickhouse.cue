@@ -12,7 +12,7 @@ generated: components: sinks: clickhouse: configuration: {
 		required: false
 		type: object: options: enabled: {
 			description: """
-				Whether or not end-to-end acknowledgements are enabled.
+				Controls whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source that supports end-to-end
 				acknowledgements that is connected to that sink waits for events
@@ -188,6 +188,7 @@ generated: components: sinks: clickhouse: configuration: {
 
 						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
 						"""
+					custom: "Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`"
 				}
 			}
 			token: {
@@ -201,6 +202,12 @@ generated: components: sinks: clickhouse: configuration: {
 				relevant_when: "strategy = \"basic\""
 				required:      true
 				type: string: examples: ["${USERNAME}", "username"]
+			}
+			value: {
+				description:   "Custom string value of the Authorization header"
+				relevant_when: "strategy = \"custom\""
+				required:      true
+				type: string: examples: ["${AUTH_HEADER_VALUE}", "CUSTOM_PREFIX ${TOKEN}"]
 			}
 		}
 	}
@@ -233,6 +240,50 @@ generated: components: sinks: clickhouse: configuration: {
 					default: 1.0
 					unit:    "seconds"
 				}
+			}
+		}
+	}
+	batch_encoding: {
+		description: """
+			The batch encoding configuration for encoding events in batches.
+
+			When specified, events are encoded together as a single batch.
+			This is mutually exclusive with per-event encoding based on the `format` field.
+			"""
+		required: false
+		type: object: options: {
+			allow_nullable_fields: {
+				description: """
+					Allow null values for non-nullable fields in the schema.
+
+					When enabled, missing or incompatible values will be encoded as null even for fields
+					marked as non-nullable in the Arrow schema. This is useful when working with downstream
+					systems that can handle null values through defaults, computed columns, or other mechanisms.
+
+					When disabled (default), missing values for non-nullable fields will cause encoding errors,
+					ensuring all required data is present before sending to the sink.
+					"""
+				required: false
+				type: bool: default: false
+			}
+			codec: {
+				description: """
+					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
+
+					This is the streaming variant of the Arrow IPC format, which writes
+					a continuous stream of record batches.
+
+					[apache_arrow]: https://arrow.apache.org/
+					"""
+				required: true
+				type: string: enum: arrow_stream: """
+					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
+
+					This is the streaming variant of the Arrow IPC format, which writes
+					a continuous stream of record batches.
+
+					[apache_arrow]: https://arrow.apache.org/
+					"""
 			}
 		}
 	}
@@ -306,7 +357,7 @@ generated: components: sinks: clickhouse: configuration: {
 					unix_float: "Represent the timestamp as a Unix timestamp in floating point."
 					unix_ms:    "Represent the timestamp as a Unix timestamp in milliseconds."
 					unix_ns:    "Represent the timestamp as a Unix timestamp in nanoseconds."
-					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds"
+					unix_us:    "Represent the timestamp as a Unix timestamp in microseconds."
 				}
 			}
 		}
@@ -326,6 +377,7 @@ generated: components: sinks: clickhouse: configuration: {
 		type: string: {
 			default: "json_each_row"
 			enum: {
+				arrow_stream:   "ArrowStream (beta)."
 				json_as_object: "JSONAsObject."
 				json_as_string: "JSONAsString."
 				json_each_row:  "JSONEachRow."
@@ -469,12 +521,12 @@ generated: components: sinks: clickhouse: configuration: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
-																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
+																Valid values are greater than or equal to `0`, and reasonable values range from `1.0` to `3.0`.
 
-																When calculating the past RTT average, we also compute a secondary “deviation” value that indicates how variable
-																those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
+																When calculating the past RTT average, a secondary “deviation” value is also computed that indicates how variable
+																those values are. That deviation is used when comparing the past RTT average to the current measurements, so we
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
-																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
+																an appropriate range. Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
 						required: false
 						type: float: default: 2.5
@@ -536,7 +588,7 @@ generated: components: sinks: clickhouse: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
+					After the first retry has failed, the Fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {

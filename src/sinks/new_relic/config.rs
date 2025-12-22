@@ -8,7 +8,6 @@ use super::{
     NewRelicApiResponse, NewRelicApiService, NewRelicEncoder, NewRelicSink, NewRelicSinkError,
     healthcheck, service::NewRelicApiRequest,
 };
-
 use crate::{http::HttpClient, sinks::prelude::*};
 
 /// New Relic region.

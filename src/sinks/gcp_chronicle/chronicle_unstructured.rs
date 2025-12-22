@@ -1,32 +1,32 @@
 //! This sink sends data to Google Chronicles unstructured log entries endpoint.
 //! See <https://cloud.google.com/chronicle/docs/reference/ingestion-api#unstructuredlogentries>
 //! for more information.
-use bytes::{Bytes, BytesMut};
+use std::{collections::HashMap, io};
 
+use bytes::{Bytes, BytesMut};
 use futures_util::{future::BoxFuture, task::Poll};
 use goauth::scopes::Scope;
-use http::header::{self, HeaderName, HeaderValue};
-use http::{Request, StatusCode, Uri};
+use http::{
+    Request, StatusCode, Uri,
+    header::{self, HeaderName, HeaderValue},
+};
 use hyper::Body;
 use indoc::indoc;
 use serde::Serialize;
 use serde_json::json;
 use snafu::Snafu;
-use std::collections::HashMap;
-use std::io;
 use tokio_util::codec::Encoder as _;
 use tower::{Service, ServiceBuilder};
-use vector_lib::configurable::configurable_component;
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     config::{AcknowledgementsConfig, Input, telemetry},
+    configurable::configurable_component,
     event::{Event, EventFinalizers, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     sink::VectorSink,
 };
 use vrl::value::Kind;
 
-use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{self, EncodingConfig},
     config::{GenerateConfig, SinkConfig, SinkContext},
@@ -49,6 +49,7 @@ use crate::{
             encoding::{Encoder, as_tracked_write},
             metadata::RequestMetadataBuilder,
             request_builder::EncodeResult,
+            service::TowerRequestConfigDefaults,
         },
     },
     template::{Template, TemplateParseError},
@@ -712,15 +713,15 @@ mod integration_tests {
         config(log_type, auth_path).build(cx).await
     }
 
+    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn publish_events() {
         trace_init();
 
         let log_type = random_string(10);
-        let (sink, healthcheck) =
-            config_build(&log_type, "/home/vector/scripts/integration/gcp/auth.json")
-                .await
-                .expect("Building sink failed");
+        let (sink, healthcheck) = config_build(&log_type, "tests/integration/gcp/config/auth.json")
+            .await
+            .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 
@@ -748,15 +749,12 @@ mod integration_tests {
 
         let log_type = random_string(10);
         // Test with an auth file that doesnt match the public key sent to the dummy chronicle server.
-        let sink = config_build(
-            &log_type,
-            "/home/vector/scripts/integration/gcp/invalidauth.json",
-        )
-        .await;
+        let sink = config_build(&log_type, "tests/integration/gcp/config/invalidauth.json").await;
 
         assert!(sink.is_err())
     }
 
+    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn publish_invalid_events() {
         trace_init();
@@ -764,10 +762,9 @@ mod integration_tests {
         // The chronicle-emulator we are testing against is setup so a `log_type` of "INVALID"
         // will return a `400 BAD_REQUEST`.
         let log_type = "INVALID";
-        let (sink, healthcheck) =
-            config_build(log_type, "/home/vector/scripts/integration/gcp/auth.json")
-                .await
-                .expect("Building sink failed");
+        let (sink, healthcheck) = config_build(log_type, "tests/integration/gcp/config/auth.json")
+            .await
+            .expect("Building sink failed");
 
         healthcheck.await.expect("Health check failed");
 

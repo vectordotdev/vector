@@ -1,7 +1,9 @@
-use std::collections::HashMap;
-use std::io::{self, Read};
-use std::net::SocketAddr;
-use std::time::Duration;
+use std::{
+    collections::HashMap,
+    io::{self, Read},
+    net::SocketAddr,
+    time::Duration,
+};
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::{Buf, Bytes, BytesMut};
@@ -11,15 +13,15 @@ use rmp_serde::{Deserializer, Serializer, decode};
 use serde::{Deserialize, Serialize};
 use smallvec::{SmallVec, smallvec};
 use tokio_util::codec::Decoder;
-use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::ipallowlist::IpAllowlistConfig;
-use vector_lib::lookup::lookup_v2::parse_value_path;
-use vector_lib::lookup::{OwnedValuePath, metadata_path, owned_value_path, path};
-use vector_lib::schema::Definition;
-use vrl::value::kind::Collection;
-use vrl::value::{Kind, Value};
+use vector_lib::{
+    codecs::{BytesDeserializerConfig, StreamDecodingError},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    ipallowlist::IpAllowlistConfig,
+    lookup::{OwnedValuePath, lookup_v2::parse_value_path, metadata_path, owned_value_path, path},
+    schema::Definition,
+};
+use vrl::value::{Kind, Value, kind::Collection};
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
@@ -834,9 +836,7 @@ mod tests {
         time::{Duration, error::Elapsed, timeout},
     };
     use tokio_util::codec::Decoder;
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::lookup::OwnedTargetPath;
-    use vector_lib::schema::Definition;
+    use vector_lib::{assert_event_data_eq, lookup::OwnedTargetPath, schema::Definition};
     use vrl::value::{ObjectMap, Value, kind::Collection};
 
     use super::{message::FluentMessageOptions, *};
@@ -844,7 +844,7 @@ mod tests {
         SourceSender,
         config::{SourceConfig, SourceContext},
         event::EventStatus,
-        test_util::{self, next_addr, trace_init, wait_for_tcp},
+        test_util::{self, addr::next_addr, trace_init, wait_for_tcp},
     };
 
     #[test]
@@ -926,7 +926,7 @@ mod tests {
             250, 129, 167, 109, 101, 115, 115, 97, 103, 101, 163, 98, 97, 122,
         ];
 
-        let expected = vec![
+        let expected = [
             mock_event("foo", "2015-09-07T01:23:04Z"),
             mock_event("bar", "2015-09-07T01:23:05Z"),
             mock_event("baz", "2015-09-07T01:23:06Z"),
@@ -958,7 +958,7 @@ mod tests {
             122, 101, 3,
         ];
 
-        let expected = vec![
+        let expected = [
             mock_event("foo", "2015-09-07T01:23:04Z"),
             mock_event("bar", "2015-09-07T01:23:05Z"),
             mock_event("baz", "2015-09-07T01:23:06Z"),
@@ -992,7 +992,7 @@ mod tests {
             101, 115, 115, 97, 103, 101, 163, 102, 111, 111,
         ];
 
-        let expected = vec![
+        let expected = [
             mock_event("foo", "2015-09-07T01:23:04Z"),
             mock_event("bar", "2015-09-07T01:23:05Z"),
             mock_event("baz", "2015-09-07T01:23:06Z"),
@@ -1027,7 +1027,7 @@ mod tests {
             164, 103, 122, 105, 112,
         ];
 
-        let expected = vec![
+        let expected = [
             mock_event("foo", "2015-09-07T01:23:04Z"),
             mock_event("bar", "2015-09-07T01:23:05Z"),
             mock_event("baz", "2015-09-07T01:23:06Z"),
@@ -1087,7 +1087,7 @@ mod tests {
         trace_init();
 
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let source = FluentConfig {
             mode: FluentMode::Tcp(FluentTcpConfig {
                 address: address.into(),
@@ -1258,16 +1258,16 @@ mod integration_tests {
     use tokio::time::sleep;
     use vector_lib::event::{Event, EventStatus};
 
-    use crate::sources::fluent::{FluentMode, FluentTcpConfig};
     use crate::{
         SourceSender,
         config::{SourceConfig, SourceContext},
         docker::Container,
-        sources::fluent::FluentConfig,
+        sources::fluent::{FluentConfig, FluentMode, FluentTcpConfig},
         test_util::{
+            addr::{PortGuard, next_addr, next_addr_for_ip},
             collect_ready,
             components::{SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance},
-            next_addr, next_addr_for_ip, random_string, wait_for_tcp,
+            random_string, wait_for_tcp,
         },
     };
 
@@ -1295,8 +1295,8 @@ mod integration_tests {
 
     async fn test_fluentbit(status: EventStatus) {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
-            let test_address = next_addr();
-            let (out, source_address) = source(status).await;
+            let (_guard, test_address) = next_addr();
+            let (out, source_address, _guard) = source(status).await;
 
             let dir = make_file(
                 "fluent-bit.conf",
@@ -1372,8 +1372,8 @@ mod integration_tests {
 
     async fn test_fluentd(status: EventStatus, options: &str) {
         assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async move {
-            let test_address = next_addr();
-            let (out, source_address) = source(status).await;
+            let (_guard, test_address) = next_addr();
+            let (out, source_address, _guard) = source(status).await;
 
             let config = format!(
                 r#"
@@ -1434,9 +1434,12 @@ mod integration_tests {
         .await;
     }
 
-    async fn source(status: EventStatus) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+    async fn source(
+        status: EventStatus,
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
+        let (_guard, address) =
+            next_addr_for_ip(std::net::IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED));
         tokio::spawn(async move {
             FluentConfig {
                 mode: FluentMode::Tcp(FluentTcpConfig {
@@ -1457,6 +1460,6 @@ mod integration_tests {
             .unwrap()
         });
         wait_for_tcp(address).await;
-        (recv, address)
+        (recv, address, _guard)
     }
 }

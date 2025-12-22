@@ -3,6 +3,10 @@ use std::fmt;
 use vector_lib::lookup::lookup_v2::ConfigValuePath;
 use vrl::path::PathPrefix;
 
+use super::{
+    ElasticsearchCommon, ElasticsearchConfig, VersionType,
+    encoder::{DocumentMetadata, DocumentVersion, DocumentVersionType},
+};
 use crate::{
     sinks::{
         elasticsearch::{
@@ -12,11 +16,6 @@ use crate::{
         prelude::*,
     },
     transforms::metric_to_log::MetricToLog,
-};
-
-use super::{
-    ElasticsearchCommon, ElasticsearchConfig, VersionType,
-    encoder::{DocumentMetadata, DocumentVersion, DocumentVersionType},
 };
 
 #[derive(Clone, Eq, Hash, PartialEq)]

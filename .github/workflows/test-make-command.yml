@@ -1,0 +1,68 @@
+name: Test Make Command - Linux
+
+on:
+  workflow_call:
+    inputs:
+      command:
+        description: 'Make command to run (e.g., test-behavior, check-examples, test-docs)'
+        required: true
+        type: string
+      job_name:
+        description: 'Display name for the job/status check'
+        required: true
+        type: string
+
+permissions:
+  statuses: write
+
+jobs:
+  run-make-command:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: (PR review) Set latest commit status as pending
+        if: ${{ github.event_name == 'pull_request_review' }}
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
+        with:
+          sha: ${{ github.event.review.commit_id }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: ${{ inputs.job_name }}
+          status: pending
+
+      - name: (PR review) Checkout review SHA
+        if: ${{ github.event_name == 'pull_request_review' }}
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ github.event.review.commit_id }}
+
+      - name: Checkout branch
+        if: ${{ github.event_name != 'pull_request_review' }}
+        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        name: Cache Cargo registry + index
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
+      - run: bash scripts/environment/prepare.sh --modules=rustup
+      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - run: make ${{ inputs.command }}
+
+      - name: (PR review) Set latest commit status as ${{ job.status }}
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
+        if: always() && github.event_name == 'pull_request_review'
+        with:
+          sha: ${{ github.event.review.commit_id }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: ${{ inputs.job_name }}
+          status: ${{ job.status }}
