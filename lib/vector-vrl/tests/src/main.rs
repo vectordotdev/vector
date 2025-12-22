@@ -117,6 +117,8 @@ pub fn test_dir() -> PathBuf {
 fn test_glob_pattern() -> String {
     test_dir().join("**/*.vrl").to_str().unwrap().to_string()
 }
+
+#[allow(clippy::disallowed_methods)]
 fn get_tests(cmd: &Cmd) -> Vec<Test> {
     // Don't test vrl stdlib functions examples since they are already tested in VRL and some will
     // fail to compile since they are missing required source files such as proto definitions.
