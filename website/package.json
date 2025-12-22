@@ -1,4 +1,5 @@
 {
+  "type": "module",
   "private": true,
   "scripts": {
     "typesense-index": "ts-node scripts/typesense-index.ts",
