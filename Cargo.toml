@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.52.0"
+version = "0.53.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -179,7 +179,7 @@ rand = { version = "0.9.2", default-features = false, features = ["small_rng", "
 rand_distr = { version = "0.5.1", default-features = false }
 regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11.26", features = ["json"] }
-rust_decimal = { version = "1.33", default-features = false, features = ["std"] }
+rust_decimal = { version = "1.37.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.143", default-features = false, features = ["raw_value", "std"] }
@@ -341,6 +341,7 @@ arc-swap = { version = "1.7", default-features = false, optional = true }
 async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
+arrow-schema = { version = "56.2.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { workspace = true, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
@@ -583,7 +584,7 @@ enrichment-tables-mmdb = ["dep:maxminddb"]
 enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
-codecs-arrow = ["vector-lib/arrow"]
+codecs-arrow = ["dep:arrow", "dep:arrow-schema", "vector-lib/arrow"]
 codecs-opentelemetry = ["vector-lib/opentelemetry"]
 codecs-syslog = ["vector-lib/syslog"]
 
@@ -852,7 +853,7 @@ sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage",
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
-sinks-clickhouse = []
+sinks-clickhouse = ["dep:rust_decimal", "codecs-arrow"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
 sinks-datadog_events = []

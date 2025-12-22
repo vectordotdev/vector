@@ -53,7 +53,6 @@ impl Condition {
     /// Checks if a condition is true.
     ///
     /// The event should not be modified, it is only mutable so it can be passed into VRL, but VRL type checking prevents mutation.
-    #[allow(dead_code)]
     pub fn check(&self, e: Event) -> (bool, Event) {
         match self {
             Condition::IsLog => check_is_log(e),
