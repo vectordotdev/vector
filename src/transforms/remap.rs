@@ -210,12 +210,6 @@ impl RemapConfig {
             _ => return Err(Box::new(BuildError::SourceAndOrFileOrFiles)),
         };
 
-        let mut functions = vrl::stdlib::all();
-        functions.append(&mut vector_lib::enrichment::vrl_functions());
-        #[cfg(feature = "sources-dnstap")]
-        functions.append(&mut dnstap_parser::vrl_functions());
-        functions.append(&mut vector_vrl_functions::all());
-
         let state = TypeState {
             local: Default::default(),
             external: ExternalEnv::new_with_kind(
@@ -228,7 +222,7 @@ impl RemapConfig {
         config.set_custom(enrichment_tables.clone());
         config.set_custom(MeaningList::default());
 
-        let res = compile_vrl(&source, &functions, &state, config)
+        let res = compile_vrl(&source, &vector_vrl_functions::all(), &state, config)
             .map_err(|diagnostics| format_vrl_diagnostics(&source, diagnostics))
             .map(|result| {
                 (
