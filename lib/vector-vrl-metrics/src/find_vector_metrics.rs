@@ -11,7 +11,7 @@ fn find_metrics(
     metrics_storage: &MetricsStorage,
     key: Value,
     tags: BTreeMap<String, String>,
-) -> std::result::Result<Value, ExpressionError> {
+) -> Result<Value, ExpressionError> {
     let key_str = key.as_str().expect("argument must be a string");
     Ok(Value::Array(
         metrics_storage

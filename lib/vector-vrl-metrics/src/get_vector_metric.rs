@@ -10,7 +10,7 @@ fn get_metric(
     metrics_storage: &MetricsStorage,
     key: Value,
     tags: BTreeMap<String, String>,
-) -> std::result::Result<Value, ExpressionError> {
+) -> Result<Value, ExpressionError> {
     let key_str = key.as_str().expect("argument must be a string");
     let value = match metrics_storage.get_metric(&key_str, tags) {
         Some(value) => metric_into_vrl(&value),

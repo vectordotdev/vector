@@ -13,7 +13,7 @@ fn aggregate_metrics(
     function: &Bytes,
     key: Value,
     tags: BTreeMap<String, String>,
-) -> std::result::Result<Value, ExpressionError> {
+) -> Result<Value, ExpressionError> {
     let key_str = key.as_str().expect("argument must be a string");
     let metrics = metrics_storage.find_metrics(&key_str, tags);
 
