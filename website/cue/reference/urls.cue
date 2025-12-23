@@ -111,6 +111,7 @@ urls: {
 	chrono_time_formats:                        "https://docs.rs/chrono/latest/chrono/format/strftime/index.html#specifiers"
 	cgroups_limit_resources:                    "https://the.binbashtheory.com/control-resources-cgroups/"
 	clickhouse:                                 "https://clickhouse.com/"
+	clickhouse_arrow:                           "https://clickhouse.com/docs/en/interfaces/formats#arrow"
 	clickhouse_http:                            "https://clickhouse.com/docs/en/interfaces/http/"
 	community_id_spec:                          "https://github.com/corelight/community-id-spec"
 	console:                                    "\(wikipedia)/wiki/System_console"

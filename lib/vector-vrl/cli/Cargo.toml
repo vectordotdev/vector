@@ -8,5 +8,5 @@ license = "MPL-2.0"
 
 [dependencies]
 clap.workspace = true
-vector-vrl-functions = { path = "../functions" }
+vector-vrl-functions.workspace = true
 vrl.workspace = true
