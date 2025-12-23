@@ -1,20 +1,427 @@
+//! Arrow record batch builder
+//!
+//! Builds Arrow RecordBatches from Vector events by creating appropriate
+//! array builders and appending values according to the schema.
+
 use arrow::{
-    array::ArrayRef,
-    datatypes::{DataType, SchemaRef},
+    array::{
+        ArrayBuilder, ArrayRef, BinaryBuilder, BooleanBuilder, Decimal128Builder,
+        Decimal256Builder, Float32Builder, Float64Builder, Int8Builder, Int16Builder, Int32Builder,
+        Int64Builder, ListBuilder, MapBuilder, StringBuilder, StructBuilder,
+        TimestampMicrosecondBuilder, TimestampMillisecondBuilder, TimestampNanosecondBuilder,
+        TimestampSecondBuilder, UInt8Builder, UInt16Builder, UInt32Builder, UInt64Builder,
+    },
+    datatypes::{DataType, Field, SchemaRef, TimeUnit, i256},
     record_batch::RecordBatch,
 };
-use vector_core::event::Event;
+use vector_core::event::{Event, Value};
 
-use crate::encoding::format::arrow::{
-    ArrowEncodingError,
-    types::{
-        build_binary_array, build_boolean_array, build_decimal128_array, build_decimal256_array,
-        build_float32_array, build_float64_array, build_int8_array, build_int16_array,
-        build_int32_array, build_int64_array, build_list_array, build_map_array,
-        build_string_array, build_struct_array, build_timestamp_array, build_uint8_array,
-        build_uint16_array, build_uint32_array, build_uint64_array,
-    },
-};
+use super::{ArrowEncodingError, types::create_array_builder_for_type};
+
+/// Checks if a data type is supported by the Arrow encoder.
+fn is_supported_type(data_type: &DataType) -> bool {
+    matches!(
+        data_type,
+        DataType::Int8
+            | DataType::Int16
+            | DataType::Int32
+            | DataType::Int64
+            | DataType::UInt8
+            | DataType::UInt16
+            | DataType::UInt32
+            | DataType::UInt64
+            | DataType::Float32
+            | DataType::Float64
+            | DataType::Boolean
+            | DataType::Utf8
+            | DataType::Binary
+            | DataType::Timestamp(_, _)
+            | DataType::Decimal128(_, _)
+            | DataType::Decimal256(_, _)
+            | DataType::List(_)
+            | DataType::Struct(_)
+            | DataType::Map(_, _)
+    )
+}
+
+/// Helper macro for downcasting builders
+macro_rules! downcast_builder {
+    // Infallible version - used for non-complex types
+    ($builder:expr, $builder_type:ty) => {
+        $builder
+            .as_any_mut()
+            .downcast_mut::<$builder_type>()
+            .expect(concat!(
+                "Failed to downcast builder to ",
+                stringify!($builder_type)
+            ))
+    };
+
+    // Fallible version - used for complex types (returns Result for error handling)
+    ($builder:expr, $builder_type:ty, $field:expr) => {
+        $builder
+            .as_any_mut()
+            .downcast_mut::<$builder_type>()
+            .ok_or_else(|| ArrowEncodingError::UnsupportedType {
+                field_name: $field.name().clone(),
+                data_type: $field.data_type().clone(),
+            })
+    };
+}
+
+/// Macro to simplify appending null values by generating match arms
+macro_rules! append_null_match {
+    ($builder:expr, $data_type:expr, {$($pattern:pat => $builder_type:ty),* $(,)?}) => {
+        match $data_type {
+            $($pattern => downcast_builder!($builder, $builder_type).append_null(),)*
+            _ => {}
+        }
+    };
+}
+
+/// Macro to simplify integer/float appending with bounds checking and casting.
+macro_rules! append_primitive {
+    // Simple case: no bounds checking
+    ($builder:expr, $builder_type:ty, $val:expr, $cast_type:ty) => {{
+        downcast_builder!($builder, $builder_type).append_value(*$val as $cast_type);
+    }};
+    // With bounds checking
+    ($builder:expr, $builder_type:ty, $val:expr, $cast_type:ty, $min:expr, $max:expr) => {{
+        if *$val >= $min as i64 && *$val <= $max as i64 {
+            downcast_builder!($builder, $builder_type).append_value(*$val as $cast_type);
+        } else {
+            downcast_builder!($builder, $builder_type).append_null();
+        }
+    }};
+}
+
+/// Helper function to serialize a Value to JSON string.
+/// This is used when the schema expects a string but the data contains complex types.
+fn value_to_json_string(value: &Value) -> Result<String, ArrowEncodingError> {
+    serde_json::to_string(value).map_err(|e| ArrowEncodingError::Io {
+        source: std::io::Error::new(std::io::ErrorKind::InvalidData, e),
+    })
+}
+
+/// Appends a null value to an array builder based on its type.
+fn append_null_to_builder(
+    builder: &mut dyn ArrayBuilder,
+    data_type: &DataType,
+) -> Result<(), ArrowEncodingError> {
+    append_null_match!(builder, data_type, {
+        DataType::Int8 => Int8Builder,
+        DataType::Int16 => Int16Builder,
+        DataType::Int32 => Int32Builder,
+        DataType::Int64 => Int64Builder,
+        DataType::UInt8 => UInt8Builder,
+        DataType::UInt16 => UInt16Builder,
+        DataType::UInt32 => UInt32Builder,
+        DataType::UInt64 => UInt64Builder,
+        DataType::Float32 => Float32Builder,
+        DataType::Float64 => Float64Builder,
+        DataType::Boolean => BooleanBuilder,
+        DataType::Utf8 => StringBuilder,
+        DataType::Binary => BinaryBuilder,
+        DataType::Timestamp(TimeUnit::Second, _) => TimestampSecondBuilder,
+        DataType::Timestamp(TimeUnit::Millisecond, _) => TimestampMillisecondBuilder,
+        DataType::Timestamp(TimeUnit::Microsecond, _) => TimestampMicrosecondBuilder,
+        DataType::Timestamp(TimeUnit::Nanosecond, _) => TimestampNanosecondBuilder,
+        DataType::Decimal128(_, _) => Decimal128Builder,
+        DataType::Decimal256(_, _) => Decimal256Builder,
+        DataType::List(_) => ListBuilder<Box<dyn ArrayBuilder>>,
+        DataType::Struct(_) => StructBuilder,
+    });
+
+    // Special case: Map uses append(false) instead of append_null()
+    if matches!(data_type, DataType::Map(_, _)) {
+        downcast_builder!(builder, MapBuilder<StringBuilder, Box<dyn ArrayBuilder>>)
+            .append(false)
+            .map_err(|e| ArrowEncodingError::RecordBatchCreation { source: e })?;
+    }
+
+    Ok(())
+}
+
+/// Recursively appends a VRL Value to an Arrow array builder.
+fn append_value_to_builder(
+    builder: &mut dyn ArrayBuilder,
+    value: &Value,
+    field: &Field,
+) -> Result<(), ArrowEncodingError> {
+    match (field.data_type(), value) {
+        // Integer types with range checking
+        (DataType::Int8, Value::Integer(i)) => {
+            append_primitive!(builder, Int8Builder, i, i8, i8::MIN, i8::MAX)
+        }
+        (DataType::Int16, Value::Integer(i)) => {
+            append_primitive!(builder, Int16Builder, i, i16, i16::MIN, i16::MAX)
+        }
+        (DataType::Int32, Value::Integer(i)) => {
+            append_primitive!(builder, Int32Builder, i, i32, i32::MIN, i32::MAX)
+        }
+        (DataType::Int64, Value::Integer(i)) => append_primitive!(builder, Int64Builder, i, i64),
+
+        // Unsigned integer types with range checking
+        (DataType::UInt8, Value::Integer(i)) => {
+            append_primitive!(builder, UInt8Builder, i, u8, 0, u8::MAX)
+        }
+        (DataType::UInt16, Value::Integer(i)) => {
+            append_primitive!(builder, UInt16Builder, i, u16, 0, u16::MAX)
+        }
+        (DataType::UInt32, Value::Integer(i)) => {
+            append_primitive!(builder, UInt32Builder, i, u32, 0, u32::MAX)
+        }
+        (DataType::UInt64, Value::Integer(i)) => {
+            if *i >= 0 {
+                append_primitive!(builder, UInt64Builder, i, u64);
+            } else {
+                downcast_builder!(builder, UInt64Builder).append_null();
+            }
+        }
+
+        // Float types
+        (DataType::Float32, Value::Float(f)) => {
+            let val = f.into_inner();
+            downcast_builder!(builder, Float32Builder).append_value(val as f32);
+        }
+        (DataType::Float32, Value::Integer(i)) => {
+            append_primitive!(builder, Float32Builder, i, f32)
+        }
+        (DataType::Float64, Value::Float(f)) => {
+            let val = f.into_inner();
+            downcast_builder!(builder, Float64Builder).append_value(val);
+        }
+        (DataType::Float64, Value::Integer(i)) => {
+            append_primitive!(builder, Float64Builder, i, f64)
+        }
+
+        // Boolean
+        (DataType::Boolean, Value::Boolean(b)) => {
+            downcast_builder!(builder, BooleanBuilder).append_value(*b);
+        }
+        // String types
+        (DataType::Utf8, Value::Bytes(bytes)) => match std::str::from_utf8(bytes) {
+            Ok(s) => downcast_builder!(builder, StringBuilder).append_value(s),
+            Err(_) => {
+                let s = String::from_utf8_lossy(bytes);
+                downcast_builder!(builder, StringBuilder).append_value(&s)
+            }
+        },
+        // Object -> String
+        (DataType::Utf8, Value::Object(obj)) => {
+            let json_str = value_to_json_string(&Value::Object(obj.clone()))?;
+            downcast_builder!(builder, StringBuilder).append_value(&json_str);
+        }
+        // Array -> String
+        (DataType::Utf8, Value::Array(arr)) => {
+            let json_str = value_to_json_string(&Value::Array(arr.clone()))?;
+            downcast_builder!(builder, StringBuilder).append_value(&json_str);
+        }
+        (DataType::Binary, Value::Bytes(bytes)) => {
+            downcast_builder!(builder, BinaryBuilder).append_value(bytes);
+        }
+
+        // Timestamp types
+        (DataType::Timestamp(time_unit, _), value) => {
+            use chrono::Utc;
+
+            let timestamp_value = match value {
+                Value::Timestamp(ts) => Some(*ts),
+                Value::Bytes(bytes) => std::str::from_utf8(bytes)
+                    .ok()
+                    .and_then(|s| chrono::DateTime::parse_from_rfc3339(s).ok())
+                    .map(|dt| dt.with_timezone(&Utc)),
+                _ => None,
+            };
+
+            let converted_value = match (time_unit, timestamp_value) {
+                (TimeUnit::Second, Some(ts)) => Some(ts.timestamp()),
+                (TimeUnit::Millisecond, Some(ts)) => Some(ts.timestamp_millis()),
+                (TimeUnit::Microsecond, Some(ts)) => Some(ts.timestamp_micros()),
+                (TimeUnit::Nanosecond, Some(ts)) => ts.timestamp_nanos_opt(),
+                _ => {
+                    // Fallback to raw integer if not a timestamp
+                    if let Value::Integer(i) = value {
+                        Some(*i)
+                    } else {
+                        None
+                    }
+                }
+            };
+
+            match (time_unit, converted_value) {
+                (TimeUnit::Second, Some(val)) => {
+                    downcast_builder!(builder, TimestampSecondBuilder).append_value(val);
+                }
+                (TimeUnit::Millisecond, Some(val)) => {
+                    downcast_builder!(builder, TimestampMillisecondBuilder).append_value(val);
+                }
+                (TimeUnit::Microsecond, Some(val)) => {
+                    downcast_builder!(builder, TimestampMicrosecondBuilder).append_value(val);
+                }
+                (TimeUnit::Nanosecond, Some(val)) => {
+                    downcast_builder!(builder, TimestampNanosecondBuilder).append_value(val);
+                }
+                (TimeUnit::Second, None) => {
+                    downcast_builder!(builder, TimestampSecondBuilder).append_null();
+                }
+                (TimeUnit::Millisecond, None) => {
+                    downcast_builder!(builder, TimestampMillisecondBuilder).append_null();
+                }
+                (TimeUnit::Microsecond, None) => {
+                    downcast_builder!(builder, TimestampMicrosecondBuilder).append_null();
+                }
+                (TimeUnit::Nanosecond, None) => {
+                    downcast_builder!(builder, TimestampNanosecondBuilder).append_null();
+                }
+            }
+        }
+
+        // Decimal types
+        (DataType::Decimal128(_precision, scale), value) => {
+            use rust_decimal::Decimal;
+
+            let decimal_builder = builder
+                .as_any_mut()
+                .downcast_mut::<Decimal128Builder>()
+                .expect("Failed to downcast to Decimal128Builder");
+
+            let target_scale = scale.unsigned_abs() as u32;
+
+            match value {
+                Value::Float(f) => {
+                    if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
+                        decimal.rescale(target_scale);
+                        decimal_builder.append_value(decimal.mantissa());
+                    } else {
+                        decimal_builder.append_null();
+                    }
+                }
+                Value::Integer(i) => {
+                    let mut decimal = Decimal::from(*i);
+                    decimal.rescale(target_scale);
+                    decimal_builder.append_value(decimal.mantissa());
+                }
+                _ => decimal_builder.append_null(),
+            }
+        }
+
+        (DataType::Decimal256(_precision, scale), value) => {
+            use rust_decimal::Decimal;
+
+            let decimal_builder = builder
+                .as_any_mut()
+                .downcast_mut::<Decimal256Builder>()
+                .expect("Failed to downcast to Decimal256Builder");
+
+            let target_scale = scale.unsigned_abs() as u32;
+
+            match value {
+                Value::Float(f) => {
+                    if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
+                        decimal.rescale(target_scale);
+                        decimal_builder.append_value(i256::from_i128(decimal.mantissa()));
+                    } else {
+                        decimal_builder.append_null();
+                    }
+                }
+                Value::Integer(i) => {
+                    let mut decimal = Decimal::from(*i);
+                    decimal.rescale(target_scale);
+                    decimal_builder.append_value(i256::from_i128(decimal.mantissa()));
+                }
+                _ => decimal_builder.append_null(),
+            }
+        }
+
+        // Complex types
+        (DataType::List(inner_field), Value::Array(arr)) => {
+            let list_builder =
+                downcast_builder!(builder, ListBuilder<Box<dyn ArrayBuilder>>, field)?;
+
+            for item in arr.iter() {
+                append_value_to_builder(list_builder.values(), item, inner_field)?;
+            }
+            list_builder.append(true);
+        }
+
+        (DataType::Struct(fields), Value::Object(obj)) => {
+            let struct_builder = downcast_builder!(builder, StructBuilder, field)?;
+
+            for (i, field) in fields.iter().enumerate() {
+                let key = format!("f{}", i);
+                let field_builder = &mut struct_builder.field_builders_mut()[i];
+                match obj.get(key.as_str()) {
+                    Some(val) => append_value_to_builder(field_builder.as_mut(), val, field)?,
+                    None => append_null_to_builder(field_builder.as_mut(), field.data_type())?,
+                }
+            }
+            struct_builder.append(true);
+        }
+
+        (DataType::Map(entries_field, _), Value::Object(obj)) => {
+            let map_builder = downcast_builder!(builder, MapBuilder<StringBuilder, Box<dyn ArrayBuilder>>, field)?;
+
+            let DataType::Struct(entries_struct) = entries_field.data_type() else {
+                return Err(ArrowEncodingError::UnsupportedType {
+                    field_name: field.name().clone(),
+                    data_type: field.data_type().clone(),
+                });
+            };
+
+            let value_field = &entries_struct[1];
+            for (key, value) in obj.iter() {
+                map_builder.keys().append_value(key.as_ref());
+                append_value_to_builder(map_builder.values(), value, value_field)?;
+            }
+            map_builder
+                .append(true)
+                .map_err(|e| ArrowEncodingError::RecordBatchCreation { source: e })?;
+        }
+
+        // Unsupported type/value combinations
+        _ => {
+            if !is_supported_type(field.data_type()) {
+                return Err(ArrowEncodingError::UnsupportedType {
+                    field_name: field.name().clone(),
+                    data_type: field.data_type().clone(),
+                });
+            }
+
+            // Supported type but value is missing/incompatible
+            if field.is_nullable() {
+                append_null_to_builder(builder, field.data_type())?;
+            } else {
+                return Err(ArrowEncodingError::NullConstraint {
+                    field_name: field.name().clone(),
+                });
+            }
+        }
+    }
+    Ok(())
+}
+
+fn build_array_for_field(events: &[Event], field: &Field) -> Result<ArrayRef, ArrowEncodingError> {
+    let mut builder = create_array_builder_for_type(field.data_type(), events.len())?;
+
+    events.iter().try_for_each(|event| {
+        let Event::Log(log) = event else {
+            return Ok(());
+        };
+
+        match log.get(field.name().as_str()) {
+            Some(value) => append_value_to_builder(builder.as_mut(), value, field),
+            None if field.is_nullable() => {
+                append_null_to_builder(builder.as_mut(), field.data_type())
+            }
+            None => Err(ArrowEncodingError::NullConstraint {
+                field_name: field.name().clone(),
+            }),
+        }
+    })?;
+
+    Ok(builder.finish())
+}
 
 /// Builds an Arrow RecordBatch from events
 pub(crate) fn build_record_batch(
@@ -25,46 +432,7 @@ pub(crate) fn build_record_batch(
     let mut columns: Vec<ArrayRef> = Vec::with_capacity(num_fields);
 
     for field in schema.fields() {
-        let field_name = field.name();
-        let nullable = field.is_nullable();
-        let array: ArrayRef = match field.data_type() {
-            DataType::Timestamp(time_unit, _) => {
-                build_timestamp_array(events, field_name, *time_unit, nullable)?
-            }
-            DataType::Utf8 => build_string_array(events, field_name, nullable)?,
-            DataType::Int8 => build_int8_array(events, field_name, nullable)?,
-            DataType::Int16 => build_int16_array(events, field_name, nullable)?,
-            DataType::Int32 => build_int32_array(events, field_name, nullable)?,
-            DataType::Int64 => build_int64_array(events, field_name, nullable)?,
-            DataType::UInt8 => build_uint8_array(events, field_name, nullable)?,
-            DataType::UInt16 => build_uint16_array(events, field_name, nullable)?,
-            DataType::UInt32 => build_uint32_array(events, field_name, nullable)?,
-            DataType::UInt64 => build_uint64_array(events, field_name, nullable)?,
-            DataType::Float32 => build_float32_array(events, field_name, nullable)?,
-            DataType::Float64 => build_float64_array(events, field_name, nullable)?,
-            DataType::Boolean => build_boolean_array(events, field_name, nullable)?,
-            DataType::Binary => build_binary_array(events, field_name, nullable)?,
-            DataType::Decimal128(precision, scale) => {
-                build_decimal128_array(events, field_name, *precision, *scale, nullable)?
-            }
-            DataType::Decimal256(precision, scale) => {
-                build_decimal256_array(events, field_name, *precision, *scale, nullable)?
-            }
-            DataType::List(inner_field) => {
-                build_list_array(events, field_name, inner_field, nullable)?
-            }
-            DataType::Struct(fields) => build_struct_array(events, field_name, fields, nullable)?,
-            DataType::Map(entries_field, _) => {
-                build_map_array(events, field_name, entries_field, nullable)?
-            }
-            other_type => {
-                return Err(ArrowEncodingError::UnsupportedType {
-                    field_name: field_name.into(),
-                    data_type: other_type.clone(),
-                });
-            }
-        };
-
+        let array = build_array_for_field(events, field)?;
         columns.push(array);
     }
 
