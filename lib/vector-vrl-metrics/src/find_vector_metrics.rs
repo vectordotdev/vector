@@ -56,7 +56,7 @@ impl Function for FindVectorMetrics {
             },
             example! {
                 title: "Find vector internal metrics matching the name and tags",
-                source: r#"find_vector_metrics("utilization", tags: {"component_id": "test"}})"#,
+                source: r#"find_vector_metrics("utilization", tags: {"component_id": "test"})"#,
                 result: Ok(
                     indoc! { r#"[{"name": "utilization", "tags": {"component_id": ["test"]}, "type": "gauge", "kind": "absolute", "value": 0.5}]"# },
                 ),
