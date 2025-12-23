@@ -216,6 +216,8 @@ mod tests {
         storage: MetricsStorage,
         vrl_source: &str,
     ) -> Result<CompilationResult, DiagnosticList> {
+        // vector_vrl_functions depends on this crate, so we can't use that here
+        #[allow(clippy::disallowed_methods)]
         let functions = vrl::stdlib::all().into_iter();
 
         let functions = functions.chain(crate::all()).collect::<Vec<_>>();
