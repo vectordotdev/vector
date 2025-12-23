@@ -33,14 +33,14 @@ remap: functions: get_vector_metric: {
 		{
 			title: "Get a vector internal metric matching the name"
 			source: #"""
-				get_vector_metric!("utilization")
+				get_vector_metric("utilization")
 				"""#
-			return: {"name": "utilization", "tags": {}, "type": "gauge", "kind": "absolute", "value": 0.5}
+			return: {"name": "utilization", "tags": {"component_id": ["test"]}, "type": "gauge", "kind": "absolute", "value": 0.5}
 		},
 		{
 			title: "Get a vector internal metric matching the name and tags"
 			source: #"""
-				get_vector_metric!("utilization", tags: {"component_id": "test"})
+				get_vector_metric("utilization", tags: {"component_id": "test"})
 				"""#
 			return: {"name": "utilization", "tags": {"component_id": ["test"]}, "type": "gauge", "kind": "absolute", "value": 0.5}
 		},

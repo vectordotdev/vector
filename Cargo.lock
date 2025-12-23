@@ -13093,7 +13093,9 @@ dependencies = [
  "serde_json",
  "tikv-jemallocator",
  "tracing-subscriber",
+ "vector-core",
  "vector-vrl-functions",
+ "vector-vrl-metrics",
  "vrl",
 ]
 

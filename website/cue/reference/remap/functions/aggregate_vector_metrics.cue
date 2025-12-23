@@ -47,7 +47,7 @@ remap: functions: aggregate_vector_metric: {
 			source: #"""
 				aggregate_vector_metrics("sum", "utilization")
 				"""#
-			return: 0.0
+			return: 0.5
 		},
 		{
 
@@ -55,28 +55,28 @@ remap: functions: aggregate_vector_metric: {
 			source: #"""
 				aggregate_vector_metrics("sum", "utilization", tags: {"component_id": "test"})
 				"""#
-			return: 0.0
+			return: 0.5
 		},
 		{
 			title: "Average of vector internal metrics matching the name"
 			source: #"""
 				aggregate_vector_metrics("avg", "utilization")
 				"""#
-			return: 0.0
+			return: 0.5
 		},
 		{
 			title: "Max of vector internal metrics matching the name"
 			source: #"""
 				aggregate_vector_metrics("max", "utilization")
 				"""#
-			return: 0.0
+			return: 0.5
 		},
 		{
 			title: "Min of vector internal metrics matching the name"
 			source: #"""
 				aggregate_vector_metrics("max", "utilization")
 				"""#
-			return: 0.0
+			return: 0.5
 		},
 	]
 }

@@ -45,7 +45,9 @@ impl DiagnosticMessage for Error {
 
 #[derive(Debug, Default, Clone)]
 pub struct MetricsStorage {
-    cache: Arc<ArcSwap<Vec<Metric>>>,
+    // Made pub only for vrl-test module
+    #[doc(hidden)]
+    pub cache: Arc<ArcSwap<Vec<Metric>>>,
 }
 
 impl MetricsStorage {
@@ -116,7 +118,7 @@ pub(crate) fn metrics_vrl_typedef() -> BTreeMap<Field, Kind> {
         (Field::from("tags"), Kind::any_object()),
         (Field::from("type"), Kind::bytes()),
         (Field::from("kind"), Kind::bytes()),
-        (Field::from("value"), Kind::integer() | Kind::null()),
+        (Field::from("value"), Kind::float() | Kind::null()),
     ])
 }
 
