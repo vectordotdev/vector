@@ -13065,6 +13065,7 @@ version = "0.1.0"
 dependencies = [
  "dnstap-parser",
  "enrichment",
+ "vector-vrl-metrics",
  "vrl",
 ]
 
