@@ -50,8 +50,7 @@ vector-config = { path = "../vector-config", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions.workspace = true
-toml = "0.9.8"
-
+toml = { version = "0.9.8", optional = true }
 [dev-dependencies]
 futures.workspace = true
 indoc.workspace = true
@@ -66,4 +65,4 @@ vrl.workspace = true
 [features]
 arrow = []
 opentelemetry = ["dep:opentelemetry-proto"]
-syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux"]
+syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux", "dep:toml"]
