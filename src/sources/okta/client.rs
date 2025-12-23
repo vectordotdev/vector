@@ -218,7 +218,7 @@ async fn run_once(url: String, result: OktaTimeoutResult, timeout: Duration) -> 
                 next = Some(next_url);
             };
 
-            let body = hyper::body::to_bytes(body).await?;
+            let body = http_body::Body::collect(body).await?.to_bytes();
 
             emit!(EndpointBytesReceived {
                 byte_size: body.len(),

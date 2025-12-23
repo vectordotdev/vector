@@ -7,7 +7,8 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{StreamExt, TryFutureExt, future::join_all};
 use http::{Request, StatusCode};
-use hyper::{Body, Uri, body::to_bytes as body_to_bytes};
+use http_body::Collected;
+use hyper::{Body, Uri};
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
 use tokio::time;
@@ -251,7 +252,10 @@ impl NginxMetrics {
         let response = self.http_client.send(request).await?;
         let (parts, body) = response.into_parts();
         match parts.status {
-            StatusCode::OK => body_to_bytes(body).err_into().await,
+            StatusCode::OK => http_body::Body::collect(body)
+                .err_into()
+                .await
+                .map(Collected::to_bytes),
             status => Err(Box::new(NginxError::InvalidResponseStatus { status })),
         }
     }

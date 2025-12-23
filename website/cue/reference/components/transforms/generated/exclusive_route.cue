@@ -1,8 +1,12 @@
 package metadata
 
 generated: components: transforms: exclusive_route: configuration: routes: {
-	description: "An array of named routes. The route names are expected to be unique."
-	required:    true
+	description: """
+		An array of named routes. The route names are expected to be unique.
+		Routes are evaluated in order from first to last, and only the first matching route receives each event
+		(first-match-wins).
+		"""
+	required: true
 	type: array: items: type: object: {
 		examples: [{
 			condition: {

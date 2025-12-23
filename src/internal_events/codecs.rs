@@ -1,9 +1,10 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DecoderFramingError<E> {
     pub error: E,
 }
@@ -27,7 +28,7 @@ impl<E: std::fmt::Display> InternalEvent for DecoderFramingError<E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DecoderDeserializeError<'a> {
     pub error: &'a crate::Error,
 }
@@ -51,7 +52,7 @@ impl InternalEvent for DecoderDeserializeError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct EncoderFramingError<'a> {
     pub error: &'a vector_lib::codecs::encoding::BoxedFramingError,
 }
@@ -77,7 +78,7 @@ impl InternalEvent for EncoderFramingError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct EncoderSerializeError<'a> {
     pub error: &'a crate::Error,
 }
@@ -106,7 +107,7 @@ impl InternalEvent for EncoderSerializeError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct EncoderWriteError<'a, E> {
     pub error: &'a E,
     pub count: usize,
@@ -137,7 +138,7 @@ impl<E: std::fmt::Display> InternalEvent for EncoderWriteError<'_, E> {
 }
 
 #[cfg(feature = "codecs-arrow")]
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct EncoderNullConstraintError<'a> {
     pub error: &'a crate::Error,
 }

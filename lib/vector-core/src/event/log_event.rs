@@ -1200,15 +1200,15 @@ mod test {
     }
 
     #[test]
-    fn metadata_set_unique_uuid_v7_source_event_id() {
-        // Check if event id is UUID v7
+    fn metadata_set_unique_uuid_v4_source_event_id() {
+        // Check if event id is UUID v4
         let log1 = LogEvent::default();
         assert_eq!(
             log1.metadata()
                 .source_event_id()
                 .expect("source_event_id should be auto-generated for new events")
                 .get_version(),
-            Some(Version::SortRand)
+            Some(Version::Random)
         );
 
         // Check if event id is unique on creation

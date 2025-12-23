@@ -15,9 +15,10 @@ path = "tests/bin/generate-avro-fixtures.rs"
 [dependencies]
 apache-avro = { version = "0.20.0", default-features = false }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc"] }
+async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
-rust_decimal = { version = "1.37", default-features = false, features = ["std"] }
+rust_decimal.workspace = true
 csv-core = { version = "0.1.12", default-features = false }
 derivative.workspace = true
 derive_more = { version = "2.0.1", optional = true, features = ["from", "display"] }
@@ -48,7 +49,8 @@ vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
-toml = "0.9.5"
+vector-vrl-functions.workspace = true
+toml = "0.9.8"
 
 [dev-dependencies]
 futures.workspace = true
@@ -63,5 +65,5 @@ vrl.workspace = true
 
 [features]
 arrow = []
-syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux"]
 opentelemetry = ["dep:opentelemetry-proto"]
+syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux"]

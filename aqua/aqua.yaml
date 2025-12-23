@@ -5,10 +5,13 @@ registries:
   - type: standard
     ref: v4.268.0 # renovate: depName=aquaproj/aqua-registry
 packages:
-  - name: rustwasm/wasm-pack@v0.13.1
-  - name: crates.io/cargo-deb@2.9.3
-  - name: cross-rs/cross@v0.2.5
-  - name: nextest-rs/nextest/cargo-nextest@cargo-nextest-0.9.47
-  - name: EmbarkStudios/cargo-deny@0.16.2
-  - name: foresterre/cargo-msrv@v0.15.1
-  - name: crates.io/dd-rust-license-tool@1.0.4
+  - name: rustwasm/wasm-pack@v0.13.1 # Build and package WebAssembly
+  - name: crates.io/cargo-deb@2.9.3 # Create Debian packages
+  - name: cross-rs/cross@v0.2.5 # Cross-compile Rust projects
+  - name: nextest-rs/nextest/cargo-nextest@cargo-nextest-0.9.47 # Rust test runner
+  - name: EmbarkStudios/cargo-deny@0.16.2 # Lint dependencies for security and licenses
+  - name: foresterre/cargo-msrv@v0.15.1 # Find minimum supported Rust version
+  - name: crates.io/dd-rust-license-tool@1.0.4 # Generate license information
+  - name: bufbuild/buf@v1.50.0 # Protobuf linting and breaking change detection
+  - name: cue-lang/cue@v0.11.2 # Validate and generate CUE configuration schemas
+  - name: nodejs/node@v22.12.0 # JavaScript runtime for website builds

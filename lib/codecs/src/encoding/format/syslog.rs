@@ -51,7 +51,10 @@ pub struct SyslogSerializerOptions {
     facility: Option<ConfigTargetPath>,
     /// Path to a field in the event to use for the severity. Defaults to "informational".
     severity: Option<ConfigTargetPath>,
-    /// Path to a field in the event to use for the app name. Defaults to "vector".
+    /// Path to a field in the event to use for the app name.
+    ///
+    /// If not provided, the encoder checks for a semantic "service" field.
+    /// If that is also missing, it defaults to "vector".
     app_name: Option<ConfigTargetPath>,
     /// Path to a field in the event to use for the proc ID.
     proc_id: Option<ConfigTargetPath>,
@@ -111,9 +114,6 @@ impl<'a> ConfigDecanter<'a> {
                     // P3: Hardcoded default
                     .unwrap_or_else(|| "vector".to_owned())
             });
-        // let mut app_name = self
-        //     .get_value(&config.app_name)
-        //     .unwrap_or_else(|| "vector".to_owned());
         let mut proc_id = self.get_value(&config.proc_id);
         let mut msg_id = self.get_value(&config.msg_id);
         if config.rfc == SyslogRFC::Rfc5424 {
