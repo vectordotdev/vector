@@ -11,8 +11,9 @@ use crate::encoding::format::arrow::{
     types::{
         build_binary_array, build_boolean_array, build_decimal128_array, build_decimal256_array,
         build_float32_array, build_float64_array, build_int8_array, build_int16_array,
-        build_int32_array, build_int64_array, build_string_array, build_timestamp_array,
-        build_uint8_array, build_uint16_array, build_uint32_array, build_uint64_array,
+        build_int32_array, build_int64_array, build_list_array, build_map_array,
+        build_string_array, build_struct_array, build_timestamp_array, build_uint8_array,
+        build_uint16_array, build_uint32_array, build_uint64_array,
     },
 };
 
@@ -49,6 +50,13 @@ pub(crate) fn build_record_batch(
             }
             DataType::Decimal256(precision, scale) => {
                 build_decimal256_array(events, field_name, *precision, *scale, nullable)?
+            }
+            DataType::List(inner_field) => {
+                build_list_array(events, field_name, inner_field, nullable)?
+            }
+            DataType::Struct(fields) => build_struct_array(events, field_name, fields, nullable)?,
+            DataType::Map(entries_field, _) => {
+                build_map_array(events, field_name, entries_field, nullable)?
             }
             other_type => {
                 return Err(ArrowEncodingError::UnsupportedType {

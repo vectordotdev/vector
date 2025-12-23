@@ -9,7 +9,7 @@ use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
 use crate::http::{Auth, HttpClient};
 
-use super::parser::clickhouse_type_to_arrow;
+use super::parser::parse_ch_type;
 
 #[derive(Debug, Deserialize)]
 struct ColumnInfo {
@@ -87,7 +87,8 @@ fn parse_schema_from_response(response: &str) -> crate::Result<Schema> {
 
     let mut fields = Vec::new();
     for column in columns {
-        let (arrow_type, nullable) = clickhouse_type_to_arrow(&column.column_type)
+        let (arrow_type, nullable) = parse_ch_type(&column.column_type)
+            .to_arrow()
             .map_err(|e| format!("Failed to convert column '{}': {}", column.name, e))?;
         fields.push(Field::new(&column.name, arrow_type, nullable));
     }

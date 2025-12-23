@@ -235,14 +235,30 @@ pub fn encode_events_to_arrow_ipc_stream(
 }
 
 /// Recursively makes a Field and all its nested fields nullable
-pub(crate) fn make_field_nullable(field: &arrow::datatypes::Field) -> arrow::datatypes::Field {
+fn make_field_nullable(field: &arrow::datatypes::Field) -> arrow::datatypes::Field {
     let new_data_type = match field.data_type() {
         DataType::List(inner_field) => DataType::List(Arc::new(make_field_nullable(inner_field))),
         DataType::Struct(fields) => {
             DataType::Struct(fields.iter().map(|f| make_field_nullable(f)).collect())
         }
-        DataType::Map(inner_field, sorted) => {
-            DataType::Map(Arc::new(make_field_nullable(inner_field)), *sorted)
+        DataType::Map(inner, sorted) => {
+            // A Map's inner field is typically a "entries" Struct<Key, Value>
+            let DataType::Struct(fields) = inner.data_type() else {
+                // Fallback for invalid Map structures (preserves original)
+                return field.clone().with_nullable(true);
+            };
+
+            let new_struct_fields = vec![fields[0].clone(), make_field_nullable(&fields[1]).into()];
+
+            // Reconstruct the inner "entries" field
+            // The inner field itself must be non-nullable (only the Map wrapper is nullable)
+            let new_inner_field = inner
+                .as_ref()
+                .clone()
+                .with_data_type(DataType::Struct(new_struct_fields.into()))
+                .with_nullable(false);
+
+            DataType::Map(Arc::new(new_inner_field), *sorted)
         }
         other => other.clone(),
     };

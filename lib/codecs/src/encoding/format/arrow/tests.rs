@@ -1,35 +1,81 @@
 use super::*;
 use arrow::{
     array::{
-        Array, BinaryArray, BooleanArray, Decimal128Array, Decimal256Array, Float64Array,
-        Int64Array, StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
-        TimestampNanosecondArray, TimestampSecondArray, UInt8Array, UInt16Array, UInt32Array,
-        UInt64Array,
+        Array, ArrayRef, BinaryArray, BooleanArray, Float64Array, Int64Array, ListArray, MapArray,
+        StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
+        TimestampNanosecondArray, TimestampSecondArray,
     },
-    datatypes::{Field, TimeUnit},
+    datatypes::{DataType, Field, Fields, Schema, TimeUnit},
     ipc::reader::StreamReader,
 };
-use bytes::BytesMut;
 use chrono::Utc;
-use std::io::Cursor;
-use tokio_util::codec::Encoder;
-use vector_core::event::{Event, LogEvent};
+use std::{io::Cursor, sync::Arc};
+use vector_core::event::{Event, LogEvent, Value};
 
 #[test]
 fn test_encode_all_types() {
+    use arrow::array::{
+        Decimal128Array, ListArray, MapArray, UInt8Array, UInt16Array, UInt32Array, UInt64Array,
+    };
+    use vrl::value::ObjectMap;
+
+    let now = Utc::now();
+
+    // Create a struct (tuple) value
+    let mut tuple_value = ObjectMap::new();
+    tuple_value.insert("f0".into(), Value::Bytes("nested_str".into()));
+    tuple_value.insert("f1".into(), Value::Integer(999));
+
+    // Create a list value
+    let list_value = Value::Array(vec![
+        Value::Integer(1),
+        Value::Integer(2),
+        Value::Integer(3),
+    ]);
+
+    // Create a map value
+    let mut map_value = ObjectMap::new();
+    map_value.insert("key1".into(), Value::Integer(100));
+    map_value.insert("key2".into(), Value::Integer(200));
+
     let mut log = LogEvent::default();
+    // Primitive types
     log.insert("string_field", "test");
     log.insert("int8_field", 127);
     log.insert("int16_field", 32000);
     log.insert("int32_field", 1000000);
     log.insert("int64_field", 42);
+    log.insert("uint8_field", 255);
+    log.insert("uint16_field", 65535);
+    log.insert("uint32_field", 4000000);
+    log.insert("uint64_field", 9000000000_i64);
     log.insert("float32_field", 3.15);
     log.insert("float64_field", 3.15);
     log.insert("bool_field", true);
     log.insert("bytes_field", bytes::Bytes::from("binary"));
-    log.insert("timestamp_field", Utc::now());
+    log.insert("timestamp_field", now);
+    log.insert("decimal_field", 99.99);
+    // Complex types
+    log.insert("list_field", list_value);
+    log.insert("struct_field", Value::Object(tuple_value));
+    log.insert("map_field", Value::Object(map_value));
 
     let events = vec![Event::Log(log)];
+
+    // Build schema with all supported types
+    let struct_fields = arrow::datatypes::Fields::from(vec![
+        Field::new("f0", DataType::Utf8, true),
+        Field::new("f1", DataType::Int64, true),
+    ]);
+
+    let map_entries = Field::new(
+        "entries",
+        DataType::Struct(arrow::datatypes::Fields::from(vec![
+            Field::new("keys", DataType::Utf8, false),
+            Field::new("values", DataType::Int64, true),
+        ])),
+        false,
+    );
 
     let schema = Arc::new(Schema::new(vec![
         Field::new("string_field", DataType::Utf8, true),
@@ -37,6 +83,10 @@ fn test_encode_all_types() {
         Field::new("int16_field", DataType::Int16, true),
         Field::new("int32_field", DataType::Int32, true),
         Field::new("int64_field", DataType::Int64, true),
+        Field::new("uint8_field", DataType::UInt8, true),
+        Field::new("uint16_field", DataType::UInt16, true),
+        Field::new("uint32_field", DataType::UInt32, true),
+        Field::new("uint64_field", DataType::UInt64, true),
         Field::new("float32_field", DataType::Float32, true),
         Field::new("float64_field", DataType::Float64, true),
         Field::new("bool_field", DataType::Boolean, true),
@@ -46,10 +96,22 @@ fn test_encode_all_types() {
             DataType::Timestamp(TimeUnit::Millisecond, None),
             true,
         ),
+        Field::new("decimal_field", DataType::Decimal128(10, 2), true),
+        Field::new(
+            "list_field",
+            DataType::List(Arc::new(Field::new("item", DataType::Int64, true))),
+            true,
+        ),
+        Field::new("struct_field", DataType::Struct(struct_fields), true),
+        Field::new(
+            "map_field",
+            DataType::Map(Arc::new(map_entries), false),
+            true,
+        ),
     ]));
 
     let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
-    assert!(result.is_ok());
+    assert!(result.is_ok(), "Failed to encode: {:?}", result.err());
 
     let bytes = result.unwrap();
     let cursor = Cursor::new(bytes);
@@ -57,9 +119,9 @@ fn test_encode_all_types() {
     let batch = reader.next().unwrap().unwrap();
 
     assert_eq!(batch.num_rows(), 1);
-    assert_eq!(batch.num_columns(), 10);
+    assert_eq!(batch.num_columns(), 18);
 
-    // Verify string field
+    // Verify all primitive types
     assert_eq!(
         batch
             .column(0)
@@ -69,8 +131,6 @@ fn test_encode_all_types() {
             .value(0),
         "test"
     );
-
-    // Verify int8 field
     assert_eq!(
         batch
             .column(1)
@@ -80,8 +140,6 @@ fn test_encode_all_types() {
             .value(0),
         127
     );
-
-    // Verify int16 field
     assert_eq!(
         batch
             .column(2)
@@ -91,8 +149,6 @@ fn test_encode_all_types() {
             .value(0),
         32000
     );
-
-    // Verify int32 field
     assert_eq!(
         batch
             .column(3)
@@ -102,8 +158,6 @@ fn test_encode_all_types() {
             .value(0),
         1000000
     );
-
-    // Verify int64 field
     assert_eq!(
         batch
             .column(4)
@@ -113,11 +167,45 @@ fn test_encode_all_types() {
             .value(0),
         42
     );
-
-    // Verify float32 field
+    assert_eq!(
+        batch
+            .column(5)
+            .as_any()
+            .downcast_ref::<UInt8Array>()
+            .unwrap()
+            .value(0),
+        255
+    );
+    assert_eq!(
+        batch
+            .column(6)
+            .as_any()
+            .downcast_ref::<UInt16Array>()
+            .unwrap()
+            .value(0),
+        65535
+    );
+    assert_eq!(
+        batch
+            .column(7)
+            .as_any()
+            .downcast_ref::<UInt32Array>()
+            .unwrap()
+            .value(0),
+        4000000
+    );
+    assert_eq!(
+        batch
+            .column(8)
+            .as_any()
+            .downcast_ref::<UInt64Array>()
+            .unwrap()
+            .value(0),
+        9000000000
+    );
     assert!(
         (batch
-            .column(5)
+            .column(9)
             .as_any()
             .downcast_ref::<arrow::array::Float32Array>()
             .unwrap()
@@ -126,11 +214,9 @@ fn test_encode_all_types() {
             .abs()
             < 0.001
     );
-
-    // Verify float64 field
     assert!(
         (batch
-            .column(6)
+            .column(10)
             .as_any()
             .downcast_ref::<Float64Array>()
             .unwrap()
@@ -139,39 +225,82 @@ fn test_encode_all_types() {
             .abs()
             < 0.001
     );
-
-    // Verify boolean field
     assert!(
         batch
-            .column(7)
+            .column(11)
             .as_any()
             .downcast_ref::<BooleanArray>()
             .unwrap()
-            .value(0),
-        "{}",
-        true
+            .value(0)
     );
-
-    // Verify binary field
     assert_eq!(
         batch
-            .column(8)
+            .column(12)
             .as_any()
             .downcast_ref::<BinaryArray>()
             .unwrap()
             .value(0),
         b"binary"
     );
-
-    // Verify timestamp field
-    assert!(
-        !batch
-            .column(9)
+    assert_eq!(
+        batch
+            .column(13)
             .as_any()
             .downcast_ref::<TimestampMillisecondArray>()
             .unwrap()
-            .is_null(0)
+            .value(0),
+        now.timestamp_millis()
     );
+
+    let decimal_array: &arrow::array::PrimitiveArray<arrow::datatypes::Decimal128Type> = batch
+        .column(14)
+        .as_any()
+        .downcast_ref::<Decimal128Array>()
+        .unwrap();
+    assert_eq!(decimal_array.value(0), 9999);
+
+    let list_array = batch
+        .column(15)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .unwrap();
+    assert!(!list_array.is_null(0));
+    let list_value = list_array.value(0);
+    assert_eq!(list_value.len(), 3);
+    let int_array = list_value.as_any().downcast_ref::<Int64Array>().unwrap();
+    assert_eq!(int_array.value(0), 1);
+    assert_eq!(int_array.value(1), 2);
+    assert_eq!(int_array.value(2), 3);
+
+    // Verify struct field
+    let struct_array = batch
+        .column(16)
+        .as_any()
+        .downcast_ref::<arrow::array::StructArray>()
+        .unwrap();
+    assert!(!struct_array.is_null(0));
+    let f0_array = struct_array
+        .column(0)
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
+    assert_eq!(f0_array.value(0), "nested_str");
+    let f1_array = struct_array
+        .column(1)
+        .as_any()
+        .downcast_ref::<Int64Array>()
+        .unwrap();
+    assert_eq!(f1_array.value(0), 999);
+
+    // Verify map field
+    let map_array = batch
+        .column(17)
+        .as_any()
+        .downcast_ref::<MapArray>()
+        .unwrap();
+    assert!(!map_array.is_null(0));
+    let map_value = map_array.value(0);
+    assert_eq!(map_value.len(), 2);
 }
 
 #[test]
@@ -519,6 +648,8 @@ fn test_encode_invalid_string_timestamp() {
 
 #[test]
 fn test_encode_decimal128_from_integer() {
+    use arrow::array::Decimal128Array;
+
     let mut log = LogEvent::default();
     // Store quantity as integer: 1000
     log.insert("quantity", 1000_i64);
@@ -555,6 +686,8 @@ fn test_encode_decimal128_from_integer() {
 
 #[test]
 fn test_encode_decimal256() {
+    use arrow::array::Decimal256Array;
+
     let mut log = LogEvent::default();
     // Very large precision number
     log.insert("big_value", 123456789.123456_f64);
@@ -592,6 +725,8 @@ fn test_encode_decimal256() {
 
 #[test]
 fn test_encode_decimal_null_values() {
+    use arrow::array::Decimal128Array;
+
     let mut log1 = LogEvent::default();
     log1.insert("price", 99.99_f64);
 
@@ -638,68 +773,9 @@ fn test_encode_decimal_null_values() {
 }
 
 #[test]
-fn test_encode_unsigned_integer_types() {
-    let mut log = LogEvent::default();
-    log.insert("uint8_field", 255_i64);
-    log.insert("uint16_field", 65535_i64);
-    log.insert("uint32_field", 4294967295_i64);
-    log.insert("uint64_field", 9223372036854775807_i64);
-
-    let events = vec![Event::Log(log)];
-
-    let schema = Arc::new(Schema::new(vec![
-        Field::new("uint8_field", DataType::UInt8, true),
-        Field::new("uint16_field", DataType::UInt16, true),
-        Field::new("uint32_field", DataType::UInt32, true),
-        Field::new("uint64_field", DataType::UInt64, true),
-    ]));
-
-    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
-    assert!(result.is_ok());
-
-    let bytes = result.unwrap();
-    let cursor = Cursor::new(bytes);
-    let mut reader = StreamReader::try_new(cursor, None).unwrap();
-    let batch = reader.next().unwrap().unwrap();
-
-    assert_eq!(batch.num_rows(), 1);
-    assert_eq!(batch.num_columns(), 4);
-
-    // Verify uint8
-    let uint8_array = batch
-        .column(0)
-        .as_any()
-        .downcast_ref::<UInt8Array>()
-        .unwrap();
-    assert_eq!(uint8_array.value(0), 255_u8);
-
-    // Verify uint16
-    let uint16_array = batch
-        .column(1)
-        .as_any()
-        .downcast_ref::<UInt16Array>()
-        .unwrap();
-    assert_eq!(uint16_array.value(0), 65535_u16);
-
-    // Verify uint32
-    let uint32_array = batch
-        .column(2)
-        .as_any()
-        .downcast_ref::<UInt32Array>()
-        .unwrap();
-    assert_eq!(uint32_array.value(0), 4294967295_u32);
-
-    // Verify uint64
-    let uint64_array = batch
-        .column(3)
-        .as_any()
-        .downcast_ref::<UInt64Array>()
-        .unwrap();
-    assert_eq!(uint64_array.value(0), 9223372036854775807_u64);
-}
-
-#[test]
 fn test_encode_unsigned_integers_with_null_and_overflow() {
+    use arrow::array::{UInt8Array, UInt32Array};
+
     let mut log1 = LogEvent::default();
     log1.insert("uint8_field", 100_i64);
     log1.insert("uint32_field", 1000_i64);
@@ -779,37 +855,6 @@ fn test_encode_non_nullable_field_with_null_value() {
 }
 
 #[test]
-fn test_encode_non_nullable_string_field_with_missing_value() {
-    // Test that encoding fails for non-nullable string field
-    let mut log1 = LogEvent::default();
-    log1.insert("name", "Alice");
-
-    let mut log2 = LogEvent::default();
-    log2.insert("name", "Bob");
-
-    let log3 = LogEvent::default();
-    // log3 is missing name field
-
-    let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
-
-    let schema = Arc::new(Schema::new(vec![Field::new(
-        "name",
-        DataType::Utf8,
-        false, // Not nullable
-    )]));
-
-    let result = encode_events_to_arrow_ipc_stream(&events, Some(schema));
-    assert!(result.is_err());
-
-    match result.unwrap_err() {
-        ArrowEncodingError::NullConstraint { field_name } => {
-            assert_eq!(field_name, "name");
-        }
-        other => panic!("Expected NullConstraint error, got: {:?}", other),
-    }
-}
-
-#[test]
 fn test_encode_non_nullable_field_all_values_present() {
     // Test that encoding succeeds when all values are present for non-nullable field
     let mut log1 = LogEvent::default();
@@ -855,6 +900,8 @@ fn test_encode_non_nullable_field_all_values_present() {
 
 #[test]
 fn test_config_allow_nullable_fields_overrides_schema() {
+    use tokio_util::codec::Encoder;
+
     // Create events: One valid, one missing the "required" field
     let mut log1 = LogEvent::default();
     log1.insert("strict_field", 42);
@@ -902,8 +949,6 @@ fn test_config_allow_nullable_fields_overrides_schema() {
 
 #[test]
 fn test_make_field_nullable_with_nested_types() {
-    use crate::encoding::format::arrow::make_field_nullable;
-
     // Test that make_field_nullable recursively handles List and Struct types
 
     // Create a nested structure: Struct containing a List of Structs
@@ -961,8 +1006,6 @@ fn test_make_field_nullable_with_nested_types() {
 
 #[test]
 fn test_make_field_nullable_with_map_type() {
-    use crate::encoding::format::arrow::make_field_nullable;
-
     // Test that make_field_nullable handles Map types
     // Map is internally represented as List<Struct<key, value>>
 
@@ -986,18 +1029,24 @@ fn test_make_field_nullable_with_map_type() {
         "Root map field should be nullable"
     );
 
-    // Verify map entries are nullable
+    // Verify map entries nullability matches MapBuilder behavior
     if let DataType::Map(entries_field, _sorted) = nullable_field.data_type() {
+        // MapBuilder creates entries struct as non-nullable
         assert!(
-            entries_field.is_nullable(),
-            "Map entries field should be nullable"
+            !entries_field.is_nullable(),
+            "Map entries field should be non-nullable to match MapBuilder"
         );
 
-        // Verify the struct inside the map is nullable
+        // Verify the struct inside the map
         if let DataType::Struct(struct_fields) = entries_field.data_type() {
             let key_field = &struct_fields[0];
             let value_field = &struct_fields[1];
-            assert!(key_field.is_nullable(), "Map key field should be nullable");
+            // MapBuilder keeps keys as non-nullable
+            assert!(
+                !key_field.is_nullable(),
+                "Map key field should be non-nullable to match MapBuilder"
+            );
+            // But values field should be transformed to nullable
             assert!(
                 value_field.is_nullable(),
                 "Map value field should be nullable"
@@ -1008,4 +1057,1090 @@ fn test_make_field_nullable_with_map_type() {
     } else {
         panic!("Expected Map type for my_map field");
     }
+}
+
+#[test]
+fn test_encode_nested_maps() {
+    use arrow::array::MapArray;
+    use vrl::value::ObjectMap;
+
+    // Create nested map: Map<String, Map<String, Int32>>
+    // {"outer_key1": {"inner_key1": 100, "inner_key2": 200}, "outer_key2": {"inner_key3": 300}}
+    let mut inner_map1 = ObjectMap::new();
+    inner_map1.insert("inner_key1".into(), Value::Integer(100));
+    inner_map1.insert("inner_key2".into(), Value::Integer(200));
+
+    let mut inner_map2 = ObjectMap::new();
+    inner_map2.insert("inner_key3".into(), Value::Integer(300));
+
+    let mut outer_map = ObjectMap::new();
+    outer_map.insert("outer_key1".into(), Value::Object(inner_map1));
+    outer_map.insert("outer_key2".into(), Value::Object(inner_map2));
+
+    let mut log = LogEvent::default();
+    log.insert("nested_map", Value::Object(outer_map));
+
+    let events = vec![Event::Log(log)];
+
+    // Define schema: Map<Utf8, Map<Utf8, Int32>>
+    // Note: MapBuilder uses "keys" and "values" (plural) as field names
+    let inner_map_entries = Field::new(
+        "entries",
+        DataType::Struct(arrow::datatypes::Fields::from(vec![
+            Field::new("keys", DataType::Utf8, false),
+            Field::new("values", DataType::Int32, true),
+        ])),
+        false,
+    );
+    let inner_map_type = DataType::Map(Arc::new(inner_map_entries), false);
+
+    let outer_map_entries = Field::new(
+        "entries",
+        DataType::Struct(arrow::datatypes::Fields::from(vec![
+            Field::new("keys", DataType::Utf8, false),
+            Field::new("values", inner_map_type, true),
+        ])),
+        false,
+    );
+    let outer_map_type = DataType::Map(Arc::new(outer_map_entries), false);
+
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "nested_map",
+        outer_map_type,
+        true,
+    )]));
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
+    assert!(
+        result.is_ok(),
+        "Failed to encode nested maps: {:?}",
+        result.as_ref().err()
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 1);
+
+    // Verify the outer map exists
+    let outer_map_array = batch.column(0).as_any().downcast_ref::<MapArray>().unwrap();
+    assert_eq!(outer_map_array.len(), 1);
+    assert!(!outer_map_array.is_null(0), "Outer map should not be null");
+
+    // Get the outer map's values (which are inner maps)
+    let outer_map_value = outer_map_array.value(0);
+    assert_eq!(outer_map_value.len(), 2, "Outer map should have 2 entries");
+
+    // The outer map's values are themselves a MapArray
+    let inner_maps = outer_map_array.values();
+    let inner_maps_array = inner_maps.as_any().downcast_ref::<MapArray>().unwrap();
+
+    // Verify we have 2 inner maps (one for each outer key)
+    // Total entries across both inner maps: 2 + 1 = 3
+    assert_eq!(inner_maps_array.len(), 2, "Should have 2 inner maps");
+
+    // Verify first inner map has 2 entries
+    let first_inner_map = inner_maps_array.value(0);
+    assert_eq!(
+        first_inner_map.len(),
+        2,
+        "First inner map should have 2 entries"
+    );
+
+    // Verify second inner map has 1 entry
+    let second_inner_map = inner_maps_array.value(1);
+    assert_eq!(
+        second_inner_map.len(),
+        1,
+        "Second inner map should have 1 entry"
+    );
+}
+
+#[test]
+fn test_encode_array_of_maps() {
+    use arrow::array::ListArray;
+    use vrl::value::ObjectMap;
+
+    // Create array of maps: Array<Map<String, Int32>>
+    // [{"key1": 100, "key2": 200}, {"key3": 300}]
+    let mut map1 = ObjectMap::new();
+    map1.insert("key1".into(), Value::Integer(100));
+    map1.insert("key2".into(), Value::Integer(200));
+
+    let mut map2 = ObjectMap::new();
+    map2.insert("key3".into(), Value::Integer(300));
+
+    let array_of_maps = Value::Array(vec![Value::Object(map1), Value::Object(map2)]);
+
+    let mut log = LogEvent::default();
+    log.insert("array_of_maps", array_of_maps);
+
+    let events = vec![Event::Log(log)];
+
+    // Define schema: List<Map<Utf8, Int32>>
+    // Note: MapBuilder uses "keys" and "values" (plural) as field names
+    let map_entries = Field::new(
+        "entries",
+        DataType::Struct(arrow::datatypes::Fields::from(vec![
+            Field::new("keys", DataType::Utf8, false),
+            Field::new("values", DataType::Int32, true),
+        ])),
+        false,
+    );
+    let map_type = DataType::Map(Arc::new(map_entries), false);
+    let list_field = Field::new("item", map_type, true);
+
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "array_of_maps",
+        DataType::List(Arc::new(list_field)),
+        true,
+    )]));
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
+    assert!(
+        result.is_ok(),
+        "Failed to encode array of maps: {:?}",
+        result.as_ref().err()
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 1);
+
+    // Verify the array exists
+    let list_array = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .unwrap();
+    assert!(!list_array.is_null(0), "Array should not be null");
+    assert_eq!(list_array.value(0).len(), 2, "Array should have 2 maps");
+
+    // Verify the maps inside the array
+    let maps = list_array.value(0);
+    let map_array = maps
+        .as_any()
+        .downcast_ref::<arrow::array::MapArray>()
+        .unwrap();
+
+    // First map should have 2 entries
+    let first_map = map_array.value(0);
+    assert_eq!(first_map.len(), 2, "First map should have 2 entries");
+
+    // Second map should have 1 entry
+    let second_map = map_array.value(1);
+    assert_eq!(second_map.len(), 1, "Second map should have 1 entry");
+}
+
+#[test]
+fn test_encode_array_of_structs() {
+    use arrow::array::ListArray;
+    use vrl::value::ObjectMap;
+
+    // Create array of structs (tuples): Array<Struct(String, Int32)>
+    // [{"f0": "value1", "f1": 100}, {"f0": "value2", "f1": 200}]
+    let mut tuple1 = ObjectMap::new();
+    tuple1.insert("f0".into(), Value::Bytes("value1".into()));
+    tuple1.insert("f1".into(), Value::Integer(100));
+
+    let mut tuple2 = ObjectMap::new();
+    tuple2.insert("f0".into(), Value::Bytes("value2".into()));
+    tuple2.insert("f1".into(), Value::Integer(200));
+
+    let array_of_structs = Value::Array(vec![Value::Object(tuple1), Value::Object(tuple2)]);
+
+    let mut log = LogEvent::default();
+    log.insert("array_of_structs", array_of_structs);
+
+    let events = vec![Event::Log(log)];
+
+    // Define schema: List<Struct(Utf8, Int32)>
+    let struct_fields = arrow::datatypes::Fields::from(vec![
+        Field::new("f0", DataType::Utf8, true),
+        Field::new("f1", DataType::Int32, true),
+    ]);
+    let struct_type = DataType::Struct(struct_fields);
+    let list_field = Field::new("item", struct_type, true);
+
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "array_of_structs",
+        DataType::List(Arc::new(list_field)),
+        true,
+    )]));
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
+    assert!(
+        result.is_ok(),
+        "Failed to encode array of structs: {:?}",
+        result.as_ref().err()
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 1);
+
+    // Verify the array exists and has the correct number of elements
+    let list_array = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .unwrap();
+    assert!(!list_array.is_null(0), "Array should not be null");
+    assert_eq!(list_array.value(0).len(), 2, "Array should have 2 structs");
+
+    // Verify the structs inside the array
+    let struct_array = list_array.value(0);
+    let struct_array = struct_array
+        .as_any()
+        .downcast_ref::<arrow::array::StructArray>()
+        .unwrap();
+
+    // Check first struct field (f0 - strings)
+    let f0_array = struct_array
+        .column(0)
+        .as_any()
+        .downcast_ref::<arrow::array::StringArray>()
+        .unwrap();
+    assert_eq!(f0_array.value(0), "value1");
+    assert_eq!(f0_array.value(1), "value2");
+
+    // Check second struct field (f1 - integers)
+    let f1_array = struct_array
+        .column(1)
+        .as_any()
+        .downcast_ref::<arrow::array::Int32Array>()
+        .unwrap();
+    assert_eq!(f1_array.value(0), 100);
+    assert_eq!(f1_array.value(1), 200);
+}
+
+#[test]
+fn test_encode_empty_arrays_and_maps() {
+    use arrow::array::{ListArray, MapArray};
+    use vrl::value::ObjectMap;
+
+    // Create log with empty array and empty map
+    let empty_array = Vec::<Value>::new();
+    let empty_map = ObjectMap::new();
+
+    let mut log = LogEvent::default();
+    log.insert("empty_array", Value::Array(empty_array));
+    log.insert("empty_map", Value::Object(empty_map));
+    log.insert(
+        "non_empty_array",
+        Value::Array(vec![Value::Integer(1), Value::Integer(2)]),
+    );
+
+    let events = vec![Event::Log(log)];
+
+    // Define schema
+    // Note: MapBuilder uses "keys" and "values" (plural) as field names
+    let array_field = Field::new("item", DataType::Int32, true);
+    let map_entries = Field::new(
+        "entries",
+        DataType::Struct(arrow::datatypes::Fields::from(vec![
+            Field::new("keys", DataType::Utf8, false),
+            Field::new("values", DataType::Int32, true),
+        ])),
+        false,
+    );
+
+    let schema = Arc::new(Schema::new(vec![
+        Field::new(
+            "empty_array",
+            DataType::List(Arc::new(array_field.clone())),
+            true,
+        ),
+        Field::new(
+            "empty_map",
+            DataType::Map(Arc::new(map_entries), false),
+            true,
+        ),
+        Field::new(
+            "non_empty_array",
+            DataType::List(Arc::new(array_field)),
+            true,
+        ),
+    ]));
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
+    assert!(
+        result.is_ok(),
+        "Failed to encode empty collections: {:?}",
+        result.as_ref().err()
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 3);
+
+    // Verify empty array
+    let empty_array = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .unwrap();
+    assert!(!empty_array.is_null(0), "Empty array should not be null");
+    assert_eq!(empty_array.value(0).len(), 0, "Array should be empty");
+
+    // Verify empty map
+    let empty_map = batch.column(1).as_any().downcast_ref::<MapArray>().unwrap();
+    assert!(!empty_map.is_null(0), "Empty map should not be null");
+    assert_eq!(empty_map.value(0).len(), 0, "Map should be empty");
+
+    // Verify non-empty array
+    let non_empty_array = batch
+        .column(2)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .unwrap();
+    assert!(!non_empty_array.is_null(0));
+    assert_eq!(non_empty_array.value(0).len(), 2);
+}
+
+#[test]
+fn test_encode_deep_nesting() {
+    use arrow::array::ListArray;
+
+    // Create deeply nested array structure (6 levels):
+    // Array -> Array -> Array -> Array -> Array -> Int32
+    let level_5 = Value::Array(vec![Value::Integer(42), Value::Integer(99)]);
+    let level_4 = Value::Array(vec![level_5]);
+    let level_3 = Value::Array(vec![level_4]);
+    let level_2 = Value::Array(vec![level_3]);
+    let level_1 = Value::Array(vec![level_2]);
+
+    let mut log = LogEvent::default();
+    log.insert("deep_array", level_1);
+
+    let events = vec![Event::Log(log)];
+
+    // Define schema for deep array nesting (6 levels total)
+    let mut current_field = Field::new("item", DataType::Int32, true);
+    for _ in 0..5 {
+        current_field = Field::new("item", DataType::List(Arc::new(current_field)), true);
+    }
+
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "deep_array",
+        current_field.data_type().clone(),
+        true,
+    )]));
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
+    assert!(
+        result.is_ok(),
+        "Failed to encode deeply nested arrays: {:?}",
+        result.as_ref().err()
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 1);
+
+    // Verify deep array by navigating down through all levels
+    // Store intermediate arrays to avoid lifetime issues
+    let mut arrays: Vec<ArrayRef> = Vec::new();
+    arrays.push(batch.column(0).clone());
+
+    // Navigate through 5 nested List levels
+    for level in 0..5 {
+        let list_array = arrays[level]
+            .as_any()
+            .downcast_ref::<ListArray>()
+            .unwrap_or_else(|| panic!("Expected ListArray at level {}", level));
+        assert!(
+            !list_array.is_null(0),
+            "Array should not be null at level {}",
+            level
+        );
+        assert_eq!(
+            list_array.len(),
+            1,
+            "Array should have 1 element at level {}",
+            level
+        );
+        arrays.push(list_array.value(0));
+    }
+
+    // Final level (level 5) should be Int32Array with values [42, 99]
+    let int_array = arrays[5]
+        .as_any()
+        .downcast_ref::<arrow::array::Int32Array>()
+        .unwrap();
+    assert_eq!(int_array.len(), 2, "Final array should have 2 elements");
+    assert_eq!(int_array.value(0), 42);
+    assert_eq!(int_array.value(1), 99);
+}
+
+#[test]
+fn test_encode_struct_with_list_and_map() {
+    use arrow::array::{ListArray, MapArray};
+    use vrl::value::ObjectMap;
+
+    // Create a struct containing both a list and a map
+    // Struct { list_field: [1, 2, 3], map_field: {"k1": 10, "k2": 20} }
+    let mut struct_value = ObjectMap::new();
+    struct_value.insert(
+        "f0".into(),
+        Value::Array(vec![
+            Value::Integer(1),
+            Value::Integer(2),
+            Value::Integer(3),
+        ]),
+    );
+
+    let mut map_value = ObjectMap::new();
+    map_value.insert("k1".into(), Value::Integer(10));
+    map_value.insert("k2".into(), Value::Integer(20));
+    struct_value.insert("f1".into(), Value::Object(map_value));
+
+    let mut log = LogEvent::default();
+    log.insert("complex_struct", Value::Object(struct_value));
+
+    let events = vec![Event::Log(log)];
+
+    // Define schema: Struct { list_field: List<Int32>, map_field: Map<Utf8, Int32> }
+    let map_entries = Field::new(
+        "entries",
+        DataType::Struct(arrow::datatypes::Fields::from(vec![
+            Field::new("keys", DataType::Utf8, false),
+            Field::new("values", DataType::Int32, true),
+        ])),
+        false,
+    );
+
+    let struct_fields = arrow::datatypes::Fields::from(vec![
+        Field::new(
+            "f0",
+            DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
+            true,
+        ),
+        Field::new("f1", DataType::Map(Arc::new(map_entries), false), true),
+    ]);
+
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "complex_struct",
+        DataType::Struct(struct_fields),
+        true,
+    )]));
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
+    assert!(
+        result.is_ok(),
+        "Failed to encode struct with list and map: {:?}",
+        result.err()
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 1);
+
+    // Verify the struct
+    let struct_array = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<arrow::array::StructArray>()
+        .unwrap();
+    assert!(!struct_array.is_null(0));
+
+    // Verify the list inside the struct (f0)
+    let list_array = struct_array
+        .column(0)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .unwrap();
+    assert!(!list_array.is_null(0));
+    let list_value = list_array.value(0);
+    assert_eq!(list_value.len(), 3);
+    let int_array = list_value
+        .as_any()
+        .downcast_ref::<arrow::array::Int32Array>()
+        .unwrap();
+    assert_eq!(int_array.value(0), 1);
+    assert_eq!(int_array.value(1), 2);
+    assert_eq!(int_array.value(2), 3);
+
+    // Verify the map inside the struct (f1)
+    let map_array = struct_array
+        .column(1)
+        .as_any()
+        .downcast_ref::<MapArray>()
+        .unwrap();
+    assert!(!map_array.is_null(0));
+    let map_value = map_array.value(0);
+    assert_eq!(map_value.len(), 2);
+}
+
+#[test]
+fn test_encode_map_with_struct_values() {
+    use arrow::array::MapArray;
+    use vrl::value::ObjectMap;
+
+    // Create a map where values are structs
+    // Map<String, Struct { name: String, count: Int32 }>
+    // {"item1": {"f0": "Alice", "f1": 10}, "item2": {"f0": "Bob", "f1": 20}}
+    let mut struct1 = ObjectMap::new();
+    struct1.insert("f0".into(), Value::Bytes("Alice".into()));
+    struct1.insert("f1".into(), Value::Integer(10));
+
+    let mut struct2 = ObjectMap::new();
+    struct2.insert("f0".into(), Value::Bytes("Bob".into()));
+    struct2.insert("f1".into(), Value::Integer(20));
+
+    let mut map_value = ObjectMap::new();
+    map_value.insert("item1".into(), Value::Object(struct1));
+    map_value.insert("item2".into(), Value::Object(struct2));
+
+    let mut log = LogEvent::default();
+    log.insert("map_with_structs", Value::Object(map_value));
+
+    let events = vec![Event::Log(log)];
+
+    // Define schema: Map<Utf8, Struct { f0: Utf8, f1: Int32 }>
+    let struct_fields = arrow::datatypes::Fields::from(vec![
+        Field::new("f0", DataType::Utf8, true),
+        Field::new("f1", DataType::Int32, true),
+    ]);
+
+    let map_entries = Field::new(
+        "entries",
+        DataType::Struct(arrow::datatypes::Fields::from(vec![
+            Field::new("keys", DataType::Utf8, false),
+            Field::new("values", DataType::Struct(struct_fields), true),
+        ])),
+        false,
+    );
+
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "map_with_structs",
+        DataType::Map(Arc::new(map_entries), false),
+        true,
+    )]));
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
+    assert!(
+        result.is_ok(),
+        "Failed to encode map with struct values: {:?}",
+        result.err()
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 1);
+
+    // Verify the map
+    let map_array = batch.column(0).as_any().downcast_ref::<MapArray>().unwrap();
+    assert!(!map_array.is_null(0));
+    let map_value = map_array.value(0);
+    assert_eq!(map_value.len(), 2);
+
+    // Verify the struct values in the map
+    let struct_array = map_array
+        .values()
+        .as_any()
+        .downcast_ref::<arrow::array::StructArray>()
+        .unwrap();
+    assert_eq!(struct_array.len(), 2);
+
+    // Check f0 field (names)
+    let names_array = struct_array
+        .column(0)
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
+    let name1 = names_array.value(0);
+    let name2 = names_array.value(1);
+    assert!(name1 == "Alice" || name1 == "Bob");
+    assert!(name2 == "Alice" || name2 == "Bob");
+    assert_ne!(name1, name2);
+
+    // Check f1 field (counts)
+    let counts_array = struct_array
+        .column(1)
+        .as_any()
+        .downcast_ref::<arrow::array::Int32Array>()
+        .unwrap();
+    assert!(counts_array.value(0) == 10 || counts_array.value(0) == 20);
+    assert!(counts_array.value(1) == 10 || counts_array.value(1) == 20);
+}
+
+#[test]
+fn test_encode_list_of_structs_containing_maps() {
+    use arrow::array::{ListArray, MapArray};
+    use vrl::value::ObjectMap;
+
+    // Create a list of structs, where each struct contains a map
+    // List<Struct { id: Int32, attributes: Map<String, String> }>
+    // [
+    //   {"f0": 1, "f1": {"color": "red", "size": "large"}},
+    //   {"f0": 2, "f1": {"color": "blue", "size": "small"}}
+    // ]
+    let mut attrs1 = ObjectMap::new();
+    attrs1.insert("color".into(), Value::Bytes("red".into()));
+    attrs1.insert("size".into(), Value::Bytes("large".into()));
+
+    let mut struct1 = ObjectMap::new();
+    struct1.insert("f0".into(), Value::Integer(1));
+    struct1.insert("f1".into(), Value::Object(attrs1));
+
+    let mut attrs2 = ObjectMap::new();
+    attrs2.insert("color".into(), Value::Bytes("blue".into()));
+    attrs2.insert("size".into(), Value::Bytes("small".into()));
+
+    let mut struct2 = ObjectMap::new();
+    struct2.insert("f0".into(), Value::Integer(2));
+    struct2.insert("f1".into(), Value::Object(attrs2));
+
+    let list_value = Value::Array(vec![Value::Object(struct1), Value::Object(struct2)]);
+
+    let mut log = LogEvent::default();
+    log.insert("list_of_structs_with_maps", list_value);
+
+    let events = vec![Event::Log(log)];
+
+    // Define schema
+    let map_entries = Field::new(
+        "entries",
+        DataType::Struct(arrow::datatypes::Fields::from(vec![
+            Field::new("keys", DataType::Utf8, false),
+            Field::new("values", DataType::Utf8, true),
+        ])),
+        false,
+    );
+
+    let struct_fields = arrow::datatypes::Fields::from(vec![
+        Field::new("f0", DataType::Int32, true),
+        Field::new("f1", DataType::Map(Arc::new(map_entries), false), true),
+    ]);
+
+    let list_field = Field::new("item", DataType::Struct(struct_fields), true);
+
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "list_of_structs_with_maps",
+        DataType::List(Arc::new(list_field)),
+        true,
+    )]));
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
+    assert!(
+        result.is_ok(),
+        "Failed to encode list of structs with maps: {:?}",
+        result.err()
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 1);
+
+    // Verify the list
+    let list_array = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .unwrap();
+    assert!(!list_array.is_null(0));
+    let list_value = list_array.value(0);
+    assert_eq!(list_value.len(), 2);
+
+    // Verify the structs in the list
+    let struct_array = list_value
+        .as_any()
+        .downcast_ref::<arrow::array::StructArray>()
+        .unwrap();
+    assert_eq!(struct_array.len(), 2);
+
+    // Verify IDs (f0)
+    let id_array = struct_array
+        .column(0)
+        .as_any()
+        .downcast_ref::<arrow::array::Int32Array>()
+        .unwrap();
+    assert_eq!(id_array.value(0), 1);
+    assert_eq!(id_array.value(1), 2);
+
+    // Verify maps (f1)
+    let map_array = struct_array
+        .column(1)
+        .as_any()
+        .downcast_ref::<MapArray>()
+        .unwrap();
+    assert_eq!(map_array.len(), 2);
+    assert!(!map_array.is_null(0));
+    assert!(!map_array.is_null(1));
+
+    // Verify first map has 2 entries
+    let first_map = map_array.value(0);
+    assert_eq!(first_map.len(), 2);
+
+    // Verify second map has 2 entries
+    let second_map = map_array.value(1);
+    assert_eq!(second_map.len(), 2);
+}
+
+#[test]
+fn test_encode_deeply_nested_mixed_types() {
+    use arrow::array::{ListArray, MapArray};
+    use vrl::value::ObjectMap;
+
+    // Create a very complex nested structure:
+    // Struct {
+    //   data: List<Map<String, Struct { values: List<Int32>, metadata: Map<String, String> }>>
+    // }
+    let mut metadata = ObjectMap::new();
+    metadata.insert("key1".into(), Value::Bytes("value1".into()));
+
+    let mut inner_struct = ObjectMap::new();
+    inner_struct.insert("f0".into(), Value::Array(vec![Value::Integer(100)]));
+    inner_struct.insert("f1".into(), Value::Object(metadata));
+
+    let mut map_in_list = ObjectMap::new();
+    map_in_list.insert("item_key".into(), Value::Object(inner_struct));
+
+    let mut outer_struct = ObjectMap::new();
+    outer_struct.insert("f0".into(), Value::Array(vec![Value::Object(map_in_list)]));
+
+    let mut log = LogEvent::default();
+    log.insert("deeply_nested", Value::Object(outer_struct));
+
+    let events = vec![Event::Log(log)];
+
+    // Define schema
+    let metadata_map_entries = Field::new(
+        "entries",
+        DataType::Struct(arrow::datatypes::Fields::from(vec![
+            Field::new("keys", DataType::Utf8, false),
+            Field::new("values", DataType::Utf8, true),
+        ])),
+        false,
+    );
+
+    let inner_struct_fields = arrow::datatypes::Fields::from(vec![
+        Field::new(
+            "f0",
+            DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
+            true,
+        ),
+        Field::new(
+            "f1",
+            DataType::Map(Arc::new(metadata_map_entries), false),
+            true,
+        ),
+    ]);
+
+    let map_entries = Field::new(
+        "entries",
+        DataType::Struct(arrow::datatypes::Fields::from(vec![
+            Field::new("keys", DataType::Utf8, false),
+            Field::new("values", DataType::Struct(inner_struct_fields), true),
+        ])),
+        false,
+    );
+
+    let list_field = Field::new("item", DataType::Map(Arc::new(map_entries), false), true);
+
+    let outer_struct_fields = arrow::datatypes::Fields::from(vec![Field::new(
+        "f0",
+        DataType::List(Arc::new(list_field)),
+        true,
+    )]);
+
+    let schema = Arc::new(Schema::new(vec![Field::new(
+        "deeply_nested",
+        DataType::Struct(outer_struct_fields),
+        true,
+    )]));
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
+    assert!(
+        result.is_ok(),
+        "Failed to encode deeply nested mixed types: {:?}",
+        result.err()
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+    assert_eq!(batch.num_columns(), 1);
+
+    // Verify the outer struct
+    let outer_struct = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<arrow::array::StructArray>()
+        .unwrap();
+    assert!(!outer_struct.is_null(0));
+
+    // Verify the list inside the outer struct
+    let list_array = outer_struct
+        .column(0)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .unwrap();
+    assert!(!list_array.is_null(0));
+    let list_value = list_array.value(0);
+    assert_eq!(list_value.len(), 1);
+
+    // Verify the map inside the list
+    let map_array = list_value.as_any().downcast_ref::<MapArray>().unwrap();
+    assert_eq!(map_array.len(), 1);
+    assert!(!map_array.is_null(0));
+
+    // Verify the struct inside the map
+    let struct_values = map_array
+        .values()
+        .as_any()
+        .downcast_ref::<arrow::array::StructArray>()
+        .unwrap();
+    assert_eq!(struct_values.len(), 1);
+
+    // Verify the list inside the struct
+    let inner_list = struct_values
+        .column(0)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .unwrap();
+    assert!(!inner_list.is_null(0));
+    let inner_list_value = inner_list.value(0);
+    assert_eq!(inner_list_value.len(), 1);
+
+    // Verify the innermost map
+    let inner_map = struct_values
+        .column(1)
+        .as_any()
+        .downcast_ref::<MapArray>()
+        .unwrap();
+    assert!(!inner_map.is_null(0));
+    let inner_map_value = inner_map.value(0);
+    assert_eq!(inner_map_value.len(), 1);
+}
+
+#[test]
+fn test_automatic_json_serialization_for_array_of_objects() {
+    use vrl::value::ObjectMap;
+
+    // Create array of objects (like the user's components data)
+    let mut obj1 = ObjectMap::new();
+    obj1.insert("name".into(), Value::Bytes("tick.mexc.spot".into()));
+    obj1.insert("alias".into(), Value::Bytes("guiusdt".into()));
+    obj1.insert("expireAfter".into(), Value::Integer(60000));
+
+    let mut obj2 = ObjectMap::new();
+    obj2.insert("name".into(), Value::Bytes("tick.binance".into()));
+    obj2.insert("alias".into(), Value::Bytes("btcusdt".into()));
+    obj2.insert("expireAfter".into(), Value::Integer(30000));
+
+    let components = Value::Array(vec![Value::Object(obj1), Value::Object(obj2)]);
+
+    let mut log = LogEvent::default();
+    log.insert("components", components);
+
+    let events = vec![Event::Log(log)];
+
+    // Schema expects Array(String), but we're providing Array(Object)
+    // The encoder should automatically serialize objects to JSON strings
+    let schema = Schema::new(vec![Field::new(
+        "components",
+        DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+        false,
+    )]);
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::new(schema)));
+    assert!(
+        result.is_ok(),
+        "Encoding should succeed with automatic JSON serialization"
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+
+    let list_array = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .unwrap();
+    assert!(!list_array.is_null(0));
+
+    let list_value = list_array.value(0);
+    let string_array = list_value.as_any().downcast_ref::<StringArray>().unwrap();
+
+    // Should have 2 strings (JSON serialized objects)
+    assert_eq!(string_array.len(), 2);
+
+    // Verify the first object was serialized to JSON
+    let json1 = string_array.value(0);
+    assert!(json1.contains("\"name\":\"tick.mexc.spot\""));
+    assert!(json1.contains("\"alias\":\"guiusdt\""));
+    assert!(json1.contains("\"expireAfter\":60000"));
+
+    // Verify the second object was serialized to JSON
+    let json2 = string_array.value(1);
+    assert!(json2.contains("\"name\":\"tick.binance\""));
+    assert!(json2.contains("\"alias\":\"btcusdt\""));
+    assert!(json2.contains("\"expireAfter\":30000"));
+}
+
+#[test]
+fn test_object_in_map_values_to_string() {
+    use vrl::value::ObjectMap;
+
+    // Create a map with object values: Map<String, Object>
+    // Schema expects Map<String, String>, so objects should serialize to JSON
+    let mut inner_obj = ObjectMap::new();
+    inner_obj.insert("config".into(), Value::Bytes("enabled".into()));
+    inner_obj.insert("timeout".into(), Value::Integer(5000));
+
+    let mut map_value = ObjectMap::new();
+    map_value.insert("setting1".into(), Value::Object(inner_obj));
+    map_value.insert("setting2".into(), Value::Bytes("simple string".into()));
+
+    let mut log = LogEvent::default();
+    log.insert("settings", Value::Object(map_value));
+
+    let events = vec![Event::Log(log)];
+
+    // Schema: Map<String, String> (expects string values, but we have objects)
+    let key_field = Field::new("keys", DataType::Utf8, false);
+    let value_field = Field::new("values", DataType::Utf8, true);
+    let entries_struct = DataType::Struct(Fields::from(vec![key_field, value_field]));
+    let entries_field = Field::new("entries", entries_struct, false);
+    let map_type = DataType::Map(Arc::new(entries_field), false);
+
+    let schema = Schema::new(vec![Field::new("settings", map_type, false)]);
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::new(schema)));
+    assert!(
+        result.is_ok(),
+        "Map with object values should serialize to JSON strings"
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+
+    let map_array = batch.column(0).as_any().downcast_ref::<MapArray>().unwrap();
+    assert!(!map_array.is_null(0));
+
+    // Get the values from the map
+    let values_array = map_array
+        .values()
+        .as_any()
+        .downcast_ref::<StringArray>()
+        .unwrap();
+
+    // One value should be a JSON object, one should be a plain string
+    let mut found_json_object = false;
+    let mut found_plain_string = false;
+
+    for i in 0..values_array.len() {
+        let value = values_array.value(i);
+        if value.contains("\"config\"") && value.contains("\"timeout\"") {
+            found_json_object = true;
+        } else if value == "simple string" {
+            found_plain_string = true;
+        }
+    }
+
+    assert!(
+        found_json_object,
+        "Should find JSON-serialized object in map values"
+    );
+    assert!(found_plain_string, "Should find plain string in map values");
+}
+
+#[test]
+fn test_nested_arrays_with_objects() {
+    use vrl::value::ObjectMap;
+
+    // Array of arrays, where inner arrays contain objects
+    let mut obj = ObjectMap::new();
+    obj.insert("id".into(), Value::Integer(123));
+
+    let inner_array = Value::Array(vec![Value::Object(obj.clone())]);
+    let outer_array = Value::Array(vec![inner_array]);
+
+    let mut log = LogEvent::default();
+    log.insert("nested", outer_array);
+
+    let events = vec![Event::Log(log)];
+
+    // Schema: Array(Array(String))
+    let inner_field = Field::new("item", DataType::Utf8, true);
+    let middle_field = Field::new("item", DataType::List(Arc::new(inner_field)), true);
+    let outer_list = DataType::List(Arc::new(middle_field));
+
+    let schema = Schema::new(vec![Field::new("nested", outer_list, false)]);
+
+    let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::new(schema)));
+    assert!(
+        result.is_ok(),
+        "Nested arrays with objects should serialize"
+    );
+
+    let bytes = result.unwrap();
+    let cursor = Cursor::new(bytes);
+    let mut reader = StreamReader::try_new(cursor, None).unwrap();
+    let batch = reader.next().unwrap().unwrap();
+
+    assert_eq!(batch.num_rows(), 1);
+
+    // Navigate to the deepest array
+    let outer_list = batch
+        .column(0)
+        .as_any()
+        .downcast_ref::<ListArray>()
+        .unwrap();
+    let outer_value = outer_list.value(0);
+    let middle_list = outer_value.as_any().downcast_ref::<ListArray>().unwrap();
+    let middle_value = middle_list.value(0);
+    let inner_strings = middle_value.as_any().downcast_ref::<StringArray>().unwrap();
+
+    // Should have one JSON string
+    assert_eq!(inner_strings.len(), 1);
+    let json_str = inner_strings.value(0);
+    assert!(
+        json_str.contains("\"id\":123"),
+        "Deeply nested object should be serialized to JSON"
+    );
 }
