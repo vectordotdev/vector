@@ -408,7 +408,6 @@ mod tests {
         Array, Int32Array, Int64Array, ListArray, MapArray, StringArray, StructArray,
     };
     use arrow::datatypes::{DataType, Field, Fields};
-    use std::sync::Arc;
     use vector_core::event::{Event, LogEvent, Value};
     use vrl::value::ObjectMap;
 
@@ -720,7 +719,7 @@ mod tests {
             Field::new("f0", DataType::Utf8, true),
             Field::new(
                 "f1",
-                DataType::List(Arc::new(Field::new("item", DataType::Int64, true))),
+                DataType::List(Field::new("item", DataType::Int64, true).into()),
                 true,
             ),
         ]);

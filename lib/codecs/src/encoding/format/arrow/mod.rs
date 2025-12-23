@@ -11,7 +11,7 @@ mod types;
 mod tests;
 
 use arrow::{
-    datatypes::{DataType, Schema},
+    datatypes::{DataType, FieldRef, Schema, SchemaRef},
     ipc::writer::StreamWriter,
 };
 use async_trait::async_trait;
@@ -94,7 +94,7 @@ impl ArrowStreamSerializerConfig {
 /// Arrow IPC stream batch serializer that holds the schema
 #[derive(Clone, Debug)]
 pub struct ArrowStreamSerializer {
-    schema: Arc<Schema>,
+    schema: SchemaRef,
 }
 
 impl ArrowStreamSerializer {
@@ -111,8 +111,8 @@ impl ArrowStreamSerializer {
                 schema
                     .fields()
                     .iter()
-                    .map(|f| Arc::new(make_field_nullable(f)))
-                    .collect::<Vec<_>>(),
+                    .map(|f| make_field_nullable(f).into())
+                    .collect::<Vec<FieldRef>>(),
                 schema.metadata().clone(),
             )
         } else {
@@ -120,7 +120,7 @@ impl ArrowStreamSerializer {
         };
 
         Ok(Self {
-            schema: Arc::new(schema),
+            schema: SchemaRef::new(schema),
         })
     }
 }
@@ -213,7 +213,7 @@ impl From<std::io::Error> for ArrowEncodingError {
 /// Encodes a batch of events into Arrow IPC streaming format
 pub fn encode_events_to_arrow_ipc_stream(
     events: &[vector_core::event::Event],
-    schema: Option<Arc<Schema>>,
+    schema: Option<SchemaRef>,
 ) -> Result<Bytes, ArrowEncodingError> {
     if events.is_empty() {
         return Err(ArrowEncodingError::NoEvents);
@@ -237,7 +237,7 @@ pub fn encode_events_to_arrow_ipc_stream(
 /// Recursively makes a Field and all its nested fields nullable
 fn make_field_nullable(field: &arrow::datatypes::Field) -> arrow::datatypes::Field {
     let new_data_type = match field.data_type() {
-        DataType::List(inner_field) => DataType::List(Arc::new(make_field_nullable(inner_field))),
+        DataType::List(inner_field) => DataType::List(make_field_nullable(inner_field).into()),
         DataType::Struct(fields) => {
             DataType::Struct(fields.iter().map(|f| make_field_nullable(f)).collect())
         }
@@ -258,7 +258,7 @@ fn make_field_nullable(field: &arrow::datatypes::Field) -> arrow::datatypes::Fie
                 .with_data_type(DataType::Struct(new_struct_fields.into()))
                 .with_nullable(false);
 
-            DataType::Map(Arc::new(new_inner_field), *sorted)
+            DataType::Map(new_inner_field.into(), *sorted)
         }
         other => other.clone(),
     };

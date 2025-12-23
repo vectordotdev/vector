@@ -5,7 +5,7 @@ use arrow::{
         StringArray, TimestampMicrosecondArray, TimestampMillisecondArray,
         TimestampNanosecondArray, TimestampSecondArray,
     },
-    datatypes::{DataType, Field, Fields, Schema, TimeUnit},
+    datatypes::{DataType, Field, Fields, Schema, SchemaRef, TimeUnit},
     ipc::reader::StreamReader,
 };
 use chrono::Utc;
@@ -77,7 +77,7 @@ fn test_encode_all_types() {
         false,
     );
 
-    let schema = Arc::new(Schema::new(vec![
+    let schema = SchemaRef::new(Schema::new(vec![
         Field::new("string_field", DataType::Utf8, true),
         Field::new("int8_field", DataType::Int8, true),
         Field::new("int16_field", DataType::Int16, true),
@@ -99,15 +99,11 @@ fn test_encode_all_types() {
         Field::new("decimal_field", DataType::Decimal128(10, 2), true),
         Field::new(
             "list_field",
-            DataType::List(Arc::new(Field::new("item", DataType::Int64, true))),
+            DataType::List(Field::new("item", DataType::Int64, true).into()),
             true,
         ),
         Field::new("struct_field", DataType::Struct(struct_fields), true),
-        Field::new(
-            "map_field",
-            DataType::Map(Arc::new(map_entries), false),
-            true,
-        ),
+        Field::new("map_field", DataType::Map(map_entries.into(), false), true),
     ]));
 
     let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
@@ -315,7 +311,7 @@ fn test_encode_null_values() {
 
     let events = vec![Event::Log(log1), Event::Log(log2)];
 
-    let schema = Arc::new(Schema::new(vec![
+    let schema = SchemaRef::new(Schema::new(vec![
         Field::new("field_a", DataType::Int64, true),
         Field::new("field_b", DataType::Int64, true),
     ]));
@@ -358,7 +354,7 @@ fn test_encode_type_mismatches() {
     let events = vec![Event::Log(log1), Event::Log(log2)];
 
     // Schema expects Int64
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "field",
         DataType::Int64,
         true,
@@ -396,7 +392,7 @@ fn test_encode_complex_json_values() {
 
     let events = vec![Event::Log(log)];
 
-    let schema = Arc::new(Schema::new(vec![
+    let schema = SchemaRef::new(Schema::new(vec![
         Field::new("object_field", DataType::Utf8, true),
         Field::new("array_field", DataType::Utf8, true),
     ]));
@@ -437,7 +433,7 @@ fn test_encode_unsupported_type() {
     let events = vec![Event::Log(log)];
 
     // Use an unsupported type
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "field",
         DataType::Duration(TimeUnit::Millisecond),
         true,
@@ -485,7 +481,7 @@ fn test_encode_timestamp_precisions() {
 
     let events = vec![Event::Log(log)];
 
-    let schema = Arc::new(Schema::new(vec![
+    let schema = SchemaRef::new(Schema::new(vec![
         Field::new(
             "ts_second",
             DataType::Timestamp(TimeUnit::Second, None),
@@ -566,7 +562,7 @@ fn test_encode_mixed_timestamp_string_and_native() {
 
     let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "ts",
         DataType::Timestamp(TimeUnit::Nanosecond, None),
         true,
@@ -618,7 +614,7 @@ fn test_encode_invalid_string_timestamp() {
 
     let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "timestamp",
         DataType::Timestamp(TimeUnit::Nanosecond, None),
         true,
@@ -657,7 +653,7 @@ fn test_encode_decimal128_from_integer() {
     let events = vec![Event::Log(log)];
 
     // Decimal(10, 3) - will represent 1000 as 1000.000
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "quantity",
         DataType::Decimal128(10, 3),
         true,
@@ -695,7 +691,7 @@ fn test_encode_decimal256() {
     let events = vec![Event::Log(log)];
 
     // Decimal256(50, 6) - high precision decimal
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "big_value",
         DataType::Decimal256(50, 6),
         true,
@@ -738,7 +734,7 @@ fn test_encode_decimal_null_values() {
 
     let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "price",
         DataType::Decimal128(10, 2),
         true,
@@ -789,7 +785,7 @@ fn test_encode_unsigned_integers_with_null_and_overflow() {
 
     let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
-    let schema = Arc::new(Schema::new(vec![
+    let schema = SchemaRef::new(Schema::new(vec![
         Field::new("uint8_field", DataType::UInt8, true),
         Field::new("uint32_field", DataType::UInt32, true),
     ]));
@@ -837,7 +833,7 @@ fn test_encode_non_nullable_field_with_null_value() {
     let events = vec![Event::Log(log1), Event::Log(log2)];
 
     // Create schema with non-nullable field
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "required_field",
         DataType::Int64,
         false, // Not nullable
@@ -868,7 +864,7 @@ fn test_encode_non_nullable_field_all_values_present() {
 
     let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "id",
         DataType::Int64,
         false, // Not nullable
@@ -956,7 +952,7 @@ fn test_make_field_nullable_with_nested_types() {
     let inner_struct_field = Field::new("nested_field", DataType::Int64, false);
     let inner_struct = DataType::Struct(arrow::datatypes::Fields::from(vec![inner_struct_field]));
     let list_field = Field::new("item", inner_struct, false);
-    let list_type = DataType::List(Arc::new(list_field));
+    let list_type = DataType::List(list_field.into());
     let outer_field = Field::new("inner_list", list_type, false);
     let outer_struct = DataType::Struct(arrow::datatypes::Fields::from(vec![outer_field]));
 
@@ -1016,7 +1012,7 @@ fn test_make_field_nullable_with_map_type() {
     let entries_struct =
         DataType::Struct(arrow::datatypes::Fields::from(vec![key_field, value_field]));
     let entries_field = Field::new("entries", entries_struct, false);
-    let map_type = DataType::Map(Arc::new(entries_field), false);
+    let map_type = DataType::Map(entries_field.into(), false);
 
     let original_field = Field::new("my_map", map_type, false);
 
@@ -1092,7 +1088,7 @@ fn test_encode_nested_maps() {
         ])),
         false,
     );
-    let inner_map_type = DataType::Map(Arc::new(inner_map_entries), false);
+    let inner_map_type = DataType::Map(inner_map_entries.into(), false);
 
     let outer_map_entries = Field::new(
         "entries",
@@ -1102,9 +1098,9 @@ fn test_encode_nested_maps() {
         ])),
         false,
     );
-    let outer_map_type = DataType::Map(Arc::new(outer_map_entries), false);
+    let outer_map_type = DataType::Map(outer_map_entries.into(), false);
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "nested_map",
         outer_map_type,
         true,
@@ -1190,12 +1186,12 @@ fn test_encode_array_of_maps() {
         ])),
         false,
     );
-    let map_type = DataType::Map(Arc::new(map_entries), false);
+    let map_type = DataType::Map(map_entries.into(), false);
     let list_field = Field::new("item", map_type, true);
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "array_of_maps",
-        DataType::List(Arc::new(list_field)),
+        DataType::List(list_field.into()),
         true,
     )]));
 
@@ -1269,9 +1265,9 @@ fn test_encode_array_of_structs() {
     let struct_type = DataType::Struct(struct_fields);
     let list_field = Field::new("item", struct_type, true);
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "array_of_structs",
-        DataType::List(Arc::new(list_field)),
+        DataType::List(list_field.into()),
         true,
     )]));
 
@@ -1356,22 +1352,14 @@ fn test_encode_empty_arrays_and_maps() {
         false,
     );
 
-    let schema = Arc::new(Schema::new(vec![
+    let schema = SchemaRef::new(Schema::new(vec![
         Field::new(
             "empty_array",
-            DataType::List(Arc::new(array_field.clone())),
+            DataType::List(array_field.clone().into()),
             true,
         ),
-        Field::new(
-            "empty_map",
-            DataType::Map(Arc::new(map_entries), false),
-            true,
-        ),
-        Field::new(
-            "non_empty_array",
-            DataType::List(Arc::new(array_field)),
-            true,
-        ),
+        Field::new("empty_map", DataType::Map(map_entries.into(), false), true),
+        Field::new("non_empty_array", DataType::List(array_field.into()), true),
     ]));
 
     let result = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)));
@@ -1433,10 +1421,10 @@ fn test_encode_deep_nesting() {
     // Define schema for deep array nesting (6 levels total)
     let mut current_field = Field::new("item", DataType::Int32, true);
     for _ in 0..5 {
-        current_field = Field::new("item", DataType::List(Arc::new(current_field)), true);
+        current_field = Field::new("item", DataType::List(current_field.into()), true);
     }
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "deep_array",
         current_field.data_type().clone(),
         true,
@@ -1532,13 +1520,13 @@ fn test_encode_struct_with_list_and_map() {
     let struct_fields = arrow::datatypes::Fields::from(vec![
         Field::new(
             "f0",
-            DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
+            DataType::List(Field::new("item", DataType::Int32, true).into()),
             true,
         ),
-        Field::new("f1", DataType::Map(Arc::new(map_entries), false), true),
+        Field::new("f1", DataType::Map(map_entries.into(), false), true),
     ]);
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "complex_struct",
         DataType::Struct(struct_fields),
         true,
@@ -1635,9 +1623,9 @@ fn test_encode_map_with_struct_values() {
         false,
     );
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "map_with_structs",
-        DataType::Map(Arc::new(map_entries), false),
+        DataType::Map(map_entries.into(), false),
         true,
     )]));
 
@@ -1738,14 +1726,14 @@ fn test_encode_list_of_structs_containing_maps() {
 
     let struct_fields = arrow::datatypes::Fields::from(vec![
         Field::new("f0", DataType::Int32, true),
-        Field::new("f1", DataType::Map(Arc::new(map_entries), false), true),
+        Field::new("f1", DataType::Map(map_entries.into(), false), true),
     ]);
 
     let list_field = Field::new("item", DataType::Struct(struct_fields), true);
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "list_of_structs_with_maps",
-        DataType::List(Arc::new(list_field)),
+        DataType::List(list_field.into()),
         true,
     )]));
 
@@ -1849,12 +1837,12 @@ fn test_encode_deeply_nested_mixed_types() {
     let inner_struct_fields = arrow::datatypes::Fields::from(vec![
         Field::new(
             "f0",
-            DataType::List(Arc::new(Field::new("item", DataType::Int32, true))),
+            DataType::List(Field::new("item", DataType::Int32, true).into()),
             true,
         ),
         Field::new(
             "f1",
-            DataType::Map(Arc::new(metadata_map_entries), false),
+            DataType::Map(metadata_map_entries.into(), false),
             true,
         ),
     ]);
@@ -1868,15 +1856,15 @@ fn test_encode_deeply_nested_mixed_types() {
         false,
     );
 
-    let list_field = Field::new("item", DataType::Map(Arc::new(map_entries), false), true);
+    let list_field = Field::new("item", DataType::Map(map_entries.into(), false), true);
 
     let outer_struct_fields = arrow::datatypes::Fields::from(vec![Field::new(
         "f0",
-        DataType::List(Arc::new(list_field)),
+        DataType::List(list_field.into()),
         true,
     )]);
 
-    let schema = Arc::new(Schema::new(vec![Field::new(
+    let schema = SchemaRef::new(Schema::new(vec![Field::new(
         "deeply_nested",
         DataType::Struct(outer_struct_fields),
         true,
@@ -1975,7 +1963,7 @@ fn test_automatic_json_serialization_for_array_of_objects() {
     // The encoder should automatically serialize objects to JSON strings
     let schema = Schema::new(vec![Field::new(
         "components",
-        DataType::List(Arc::new(Field::new("item", DataType::Utf8, true))),
+        DataType::List(Field::new("item", DataType::Utf8, true).into()),
         false,
     )]);
 
@@ -2042,7 +2030,7 @@ fn test_object_in_map_values_to_string() {
     let value_field = Field::new("values", DataType::Utf8, true);
     let entries_struct = DataType::Struct(Fields::from(vec![key_field, value_field]));
     let entries_field = Field::new("entries", entries_struct, false);
-    let map_type = DataType::Map(Arc::new(entries_field), false);
+    let map_type = DataType::Map(entries_field.into(), false);
 
     let schema = Schema::new(vec![Field::new("settings", map_type, false)]);
 
@@ -2107,8 +2095,8 @@ fn test_nested_arrays_with_objects() {
 
     // Schema: Array(Array(String))
     let inner_field = Field::new("item", DataType::Utf8, true);
-    let middle_field = Field::new("item", DataType::List(Arc::new(inner_field)), true);
-    let outer_list = DataType::List(Arc::new(middle_field));
+    let middle_field = Field::new("item", DataType::List(inner_field.into()), true);
+    let outer_list = DataType::List(middle_field.into());
 
     let schema = Schema::new(vec![Field::new("nested", outer_list, false)]);
 

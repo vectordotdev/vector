@@ -1,9 +1,8 @@
 use arrow::{
     array::ArrayRef,
-    datatypes::{DataType, Schema},
+    datatypes::{DataType, SchemaRef},
     record_batch::RecordBatch,
 };
-use std::sync::Arc;
 use vector_core::event::Event;
 
 use crate::encoding::format::arrow::{
@@ -19,7 +18,7 @@ use crate::encoding::format::arrow::{
 
 /// Builds an Arrow RecordBatch from events
 pub(crate) fn build_record_batch(
-    schema: Arc<Schema>,
+    schema: SchemaRef,
     events: &[Event],
 ) -> Result<RecordBatch, ArrowEncodingError> {
     let num_fields = schema.fields().len();
