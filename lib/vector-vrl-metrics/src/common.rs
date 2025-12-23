@@ -160,7 +160,7 @@ pub(crate) fn metric_into_vrl(value: &Metric) -> Value {
                 vector_core::event::MetricValue::Counter { value }
                 | vector_core::event::MetricValue::Gauge { value } => NotNan::new(*value).ok(),
                 _ => None,
-            };
+            }
         }
     })
 }
