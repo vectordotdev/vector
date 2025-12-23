@@ -230,12 +230,11 @@ fn build_warp_log_filter(
                     parse_with_deserializer(d, decoded_body, log_namespace)
                 } else {
                     decode_log_body(decoded_body, log_namespace, &events_received)
-                }.map(
-                    |mut events| {
-                        enrich_events(&mut events, &headers_cfg, &headers, log_namespace);
-                        events
-                    },
-                )
+                }
+                .map(|mut events| {
+                    enrich_events(&mut events, &headers_cfg, &headers, log_namespace);
+                    events
+                })
             })
     };
 

@@ -1,4 +1,8 @@
-use std::{net, sync::Arc, time::{SystemTime, UNIX_EPOCH}};
+use std::{
+    net,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
+};
 
 use chrono::{DateTime, TimeZone, Utc};
 use futures::Stream;
@@ -16,9 +20,7 @@ use vector_lib::{
                 ExportMetricsServiceRequest, metrics_service_client::MetricsServiceClient,
             },
         },
-        common::v1::{
-            AnyValue, InstrumentationScope, KeyValue, any_value::Value::StringValue,
-        },
+        common::v1::{AnyValue, InstrumentationScope, KeyValue, any_value::Value::StringValue},
         logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
         metrics::v1::{
             AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
@@ -1063,7 +1065,11 @@ async fn receive_summary_metric() {
     .await;
 }
 
-fn get_source_config_with_headers(grpc_addr: net::SocketAddr, http_addr: net::SocketAddr, use_otlp_decoding: bool) -> OpentelemetryConfig {
+fn get_source_config_with_headers(
+    grpc_addr: net::SocketAddr,
+    http_addr: net::SocketAddr,
+    use_otlp_decoding: bool,
+) -> OpentelemetryConfig {
     OpentelemetryConfig {
         grpc: GrpcConfig {
             address: grpc_addr,
@@ -1228,7 +1234,7 @@ async fn http_headers_logs_use_otlp_decoding_true() {
         assert_eq!(log["AbsentHeader"], Value::Null);
         assert_eq!(log["User-Agent"], "Test".into());
     })
-        .await;
+    .await;
 }
 
 pub struct OTelTestEnv {
