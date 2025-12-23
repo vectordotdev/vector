@@ -1,0 +1,32 @@
+# Dependencies
+node_modules/
+.yarn/
+.pnp.*
+
+# Build output
+public/
+resources/
+dist/
+.hugo_build.lock
+
+# Data files
+data/
+
+# Files with Hugo template syntax (contains {{ }} Go templates)
+assets/js/app.js
+assets/js/dd-browser-logs-rum.js
+assets/js/cookie-banner.js
+assets/js/tracking-marketing.js
+
+# Generated files
+*.min.js
+*.bundle.js
+
+# Test files (if any)
+**/*.test.js
+**/*.spec.js
+**/*.test.ts
+**/*.spec.ts
+
+# Config files that don't need linting
+.prettierrc.js
