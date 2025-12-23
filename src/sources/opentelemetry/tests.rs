@@ -1087,7 +1087,7 @@ fn get_source_config_with_headers(
         },
         acknowledgements: Default::default(),
         log_namespace: Default::default(),
-        use_otlp_decoding: use_otlp_decoding,
+        use_otlp_decoding,
     }
 }
 
