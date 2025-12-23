@@ -6,7 +6,10 @@
     "typesense-sync:preview": "NODE_ENV=preview ts-node scripts/typesense-sync.ts",
     "typesense-sync:production": "NODE_ENV=production ts-node scripts/typesense-sync.ts",
     "config-examples": "node scripts/create-config-examples.js",
-    "lighthouse": "lighthouse --output html --output-path ./reports/lighthouse.html --view https://vector.dev"
+    "lighthouse": "lighthouse --output html --output-path ./reports/lighthouse.html --view https://vector.dev",
+    "lint": "eslint . --ext .js,.ts,.tsx",
+    "lint:fix": "eslint . --ext .js,.ts,.tsx --fix",
+    "type-check": "tsc --noEmit"
   },
   "dependencies": {
     "@algolia/autocomplete-js": "^1.2.1",
@@ -63,6 +66,16 @@
     "since 2017-06"
   ],
   "devDependencies": {
+    "@types/d3-geo": "^3.1.0",
+    "@types/react": "^19.2.7",
+    "@types/react-dom": "^19.2.3",
+    "@types/topojson-client": "^3.1.5",
+    "@typescript-eslint/eslint-plugin": "^6.21.0",
+    "@typescript-eslint/parser": "^6.21.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-jsx-a11y": "^6.8.0",
+    "eslint-plugin-react": "^7.34.1",
+    "eslint-plugin-react-hooks": "^4.6.0",
     "prettier": "^3.5.3",
     "prettier-plugin-go-template": "^0.0.15"
   }

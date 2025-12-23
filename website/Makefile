@@ -85,3 +85,15 @@ local-preview-build: clean setup cargo-data structured-data preview-build run-li
 # Generate Lighthouse scores locally
 lighthouse-report:
 	yarn lighthouse
+
+# Linting and type checking
+lint: ## Lint website JavaScript/TypeScript
+	yarn lint
+
+lint-fix: ## Fix linting issues in website code
+	yarn lint:fix
+
+type-check: ## Type check website TypeScript
+	yarn type-check
+
+check-website: lint type-check ## Check website code (lint + type-check)

@@ -17,6 +17,13 @@ tmp/
 # Yarn errors
 yarn-error.log
 
+# Yarn PnP (Plug'n'Play) - following best practices
+# Exclude build artifacts and cache, but commit PnP runtime files
+.yarn/cache/
+.yarn/install-state.gz
+.yarn/unplugged/
+.yarn/build-state.yml
+
 # Local env vars
 .env
 
