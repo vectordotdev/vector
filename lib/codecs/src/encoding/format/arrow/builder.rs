@@ -393,13 +393,11 @@ pub(crate) fn build_record_batch(
     schema: SchemaRef,
     events: &[Event],
 ) -> Result<RecordBatch, ArrowEncodingError> {
-    let num_fields = schema.fields().len();
-    let mut columns: Vec<ArrayRef> = Vec::with_capacity(num_fields);
-
-    for field in schema.fields() {
-        let array = build_array_for_field(events, field)?;
-        columns.push(array);
-    }
+    let columns: Vec<ArrayRef> = schema
+        .fields()
+        .iter()
+        .map(|field| build_array_for_field(events, field))
+        .collect::<Result<_, _>>()?;
 
     RecordBatch::try_new(schema, columns)
         .map_err(|source| ArrowEncodingError::RecordBatchCreation { source })
