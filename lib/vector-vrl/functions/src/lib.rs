@@ -41,11 +41,13 @@ pub fn all() -> Vec<Box<dyn Function>> {
     let functions = vrl::stdlib::all()
         .into_iter()
         .chain(secret_functions())
-        .chain(enrichment::vrl_functions())
-        .chain(vector_vrl_metrics::all());
+        .chain(enrichment::vrl_functions());
 
     #[cfg(feature = "dnstap")]
     let functions = functions.chain(dnstap_parser::vrl_functions());
+
+    #[cfg(feature = "vrl-metrics")]
+    let functions = functions.chain(vector_vrl_metrics::all());
 
     functions.collect()
 }
