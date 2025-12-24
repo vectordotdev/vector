@@ -314,7 +314,9 @@ fn append_value_to_builder(
             let struct_builder = downcast_builder!(builder, StructBuilder, field)?;
 
             for (i, field) in fields.iter().enumerate() {
-                let key = format!("f{}", i);
+                // Use the actual field name from the schema
+                // This supports both named tuples and unnamed tuples (which use "f0", "f1", etc.)
+                let key = field.name();
                 let field_builder = &mut struct_builder.field_builders_mut()[i];
                 match obj.get(key.as_str()) {
                     Some(val) => append_value_to_builder(field_builder.as_mut(), val, field)?,

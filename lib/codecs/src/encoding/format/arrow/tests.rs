@@ -99,10 +99,15 @@ mod comprehensive {
 
         let now = Utc::now();
 
-        // Create a struct (tuple) value
+        // Create a struct (tuple) value with unnamed fields
         let mut tuple_value = ObjectMap::new();
         tuple_value.insert("f0".into(), Value::Bytes("nested_str".into()));
         tuple_value.insert("f1".into(), Value::Integer(999));
+
+        // Create a named struct (named tuple) value
+        let mut named_tuple_value = ObjectMap::new();
+        named_tuple_value.insert("category".into(), Value::Bytes("test_category".into()));
+        named_tuple_value.insert("tag".into(), Value::Bytes("test_tag".into()));
 
         // Create a list value
         let list_value = Value::Array(vec![
@@ -136,6 +141,7 @@ mod comprehensive {
         // Complex types
         log.insert("list_field", list_value);
         log.insert("struct_field", Value::Object(tuple_value));
+        log.insert("named_struct_field", Value::Object(named_tuple_value));
         log.insert("map_field", Value::Object(map_value));
 
         let events = vec![Event::Log(log)];
@@ -144,6 +150,11 @@ mod comprehensive {
         let struct_fields = arrow::datatypes::Fields::from(vec![
             Field::new("f0", DataType::Utf8, true),
             Field::new("f1", DataType::Int64, true),
+        ]);
+
+        let named_struct_fields = arrow::datatypes::Fields::from(vec![
+            Field::new("category", DataType::Utf8, true),
+            Field::new("tag", DataType::Utf8, true),
         ]);
 
         let map_entries = Field::new(
@@ -181,13 +192,18 @@ mod comprehensive {
                 true,
             ),
             Field::new("struct_field", DataType::Struct(struct_fields), true),
+            Field::new(
+                "named_struct_field",
+                DataType::Struct(named_struct_fields),
+                true,
+            ),
             Field::new("map_field", DataType::Map(map_entries.into(), false), true),
         ]));
 
         let batch = encode_and_decode(events, schema).expect("Failed to encode");
 
         assert_eq!(batch.num_rows(), 1);
-        assert_eq!(batch.num_columns(), 18);
+        assert_eq!(batch.num_columns(), 19);
 
         // Verify all primitive types
         assert_eq!(
@@ -260,7 +276,7 @@ mod comprehensive {
         assert_eq!(int_array.value(1), 2);
         assert_eq!(int_array.value(2), 3);
 
-        // Verify struct field
+        // Verify struct field (unnamed)
         let struct_array = batch
             .column(16)
             .as_any()
@@ -270,9 +286,19 @@ mod comprehensive {
         assert_primitive_value!(struct_array, 0, 0, StringArray, "nested_str");
         assert_primitive_value!(struct_array, 1, 0, Int64Array, 999);
 
+        // Verify named struct field (named tuple)
+        let named_struct_array = batch
+            .column(17)
+            .as_any()
+            .downcast_ref::<arrow::array::StructArray>()
+            .unwrap();
+        assert!(!named_struct_array.is_null(0));
+        assert_primitive_value!(named_struct_array, 0, 0, StringArray, "test_category");
+        assert_primitive_value!(named_struct_array, 1, 0, StringArray, "test_tag");
+
         // Verify map field
         let map_array = batch
-            .column(17)
+            .column(18)
             .as_any()
             .downcast_ref::<MapArray>()
             .unwrap();

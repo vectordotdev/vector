@@ -19,8 +19,8 @@ pub enum ClickHouseType<'a> {
     LowCardinality(Box<ClickHouseType<'a>>),
     /// Array(T)
     Array(Box<ClickHouseType<'a>>),
-    /// Tuple(T1, T2, ...)
-    Tuple(Vec<ClickHouseType<'a>>),
+    /// Tuple(T1, T2, ...) or Tuple(name1 T1, name2 T2, ...)
+    Tuple(Vec<(Option<&'a str>, ClickHouseType<'a>)>),
     /// Map(K, V)
     Map(Box<ClickHouseType<'a>>, Box<ClickHouseType<'a>>),
 }
@@ -98,9 +98,19 @@ impl<'a> ClickHouseType<'a> {
                 let fields: Result<Vec<Field>, String> = elements
                     .iter()
                     .enumerate()
-                    .map(|(i, elem)| {
+                    .map(|(i, (field_name, elem))| {
                         let (elem_arrow, elem_nullable) = elem.to_arrow()?;
-                        Ok(Field::new(format!("f{}", i), elem_arrow, elem_nullable))
+                        let name = field_name.unwrap_or_else(|| {
+                            // Use a static string slice that lives long enough
+                            // For unnamed fields, we'll use format! below
+                            ""
+                        });
+                        let field_name = if name.is_empty() {
+                            format!("f{}", i)
+                        } else {
+                            name.to_string()
+                        };
+                        Ok(Field::new(field_name, elem_arrow, elem_nullable))
                     })
                     .collect();
                 Ok((DataType::Struct(Fields::from(fields?)), is_nullable))
@@ -149,7 +159,7 @@ pub fn parse_ch_type(ty: &str) -> ClickHouseType<'_> {
             "Tuple" => {
                 let elements = parse_args(args_str)
                     .into_iter()
-                    .map(|arg| parse_ch_type(arg))
+                    .map(|arg| parse_tuple_element(arg))
                     .collect();
                 return ClickHouseType::Tuple(elements);
             }
@@ -170,6 +180,42 @@ pub fn parse_ch_type(ty: &str) -> ClickHouseType<'_> {
     ClickHouseType::Primitive(ty)
 }
 
+/// Helper: Finds the index of a delimiter, respecting nested parentheses/quotes.
+fn find_delimiter(input: &str, delimiter: char) -> Option<usize> {
+    let mut depth = 0;
+    let mut in_quotes = false;
+
+    for (i, c) in input.char_indices() {
+        match c {
+            '\'' => in_quotes = !in_quotes,
+            '(' if !in_quotes => depth += 1,
+            ')' if !in_quotes => depth -= 1,
+            c if c == delimiter && depth == 0 && !in_quotes => return Some(i),
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Parses a Tuple element which can be:
+/// - Just a type: "String" -> (None, ClickHouseType::Primitive("String"))
+/// - Named field: "category String" -> (Some("category"), ClickHouseType::Primitive("String"))
+fn parse_tuple_element(element: &str) -> (Option<&str>, ClickHouseType<'_>) {
+    let element = element.trim();
+
+    // Use the helper to find the first space
+    if let Some(pos) = find_delimiter(element, ' ') {
+        let name = element[..pos].trim();
+        let type_str = element[pos + 1..].trim();
+        if !name.is_empty() && !type_str.is_empty() {
+            return (Some(name), parse_ch_type(type_str));
+        }
+    }
+
+    // No named field found, treat entire element as a type
+    (None, parse_ch_type(element))
+}
+
 /// Tries to parse "TypeName(args)" into ("TypeName", "args").
 fn try_parse_wrapper(ty: &str) -> Option<(&str, &str)> {
     let paren_pos = ty.find('(')?;
@@ -186,13 +232,10 @@ fn try_parse_wrapper(ty: &str) -> Option<(&str, &str)> {
 /// Parses comma-separated arguments, respecting nesting and quotes.
 /// Handles input with or without surrounding parentheses.
 /// Examples: "Int32, String" or "(Int32, String)" both work.
-/// Parses comma-separated arguments, respecting nesting and quotes.
-/// Handles input with or without surrounding parentheses.
-/// Examples: "Int32, String" or "(Int32, String)" both work.
 fn parse_args(input: &str) -> Vec<&str> {
     let input = input.trim();
 
-    // Strip parentheses if present
+    // Strip outer parens
     let input = if input.starts_with('(') && input.ends_with(')') {
         &input[1..input.len() - 1]
     } else {
@@ -204,24 +247,16 @@ fn parse_args(input: &str) -> Vec<&str> {
     }
 
     let mut args = Vec::new();
-    let mut start = 0;
-    let mut depth = 0;
-    let mut in_quotes = false;
+    let mut current = input;
 
-    for (i, c) in input.char_indices() {
-        match c {
-            '\'' => in_quotes = !in_quotes,
-            '(' if !in_quotes => depth += 1,
-            ')' if !in_quotes => depth -= 1,
-            ',' if depth == 0 && !in_quotes => {
-                args.push(input[start..i].trim());
-                start = i + 1;
-            }
-            _ => {}
-        }
+    // Use the same helper to loop through commas
+    while let Some(pos) = find_delimiter(current, ',') {
+        args.push(current[..pos].trim());
+        current = &current[pos + 1..];
     }
+    // Push the remainder
+    args.push(current.trim());
 
-    args.push(input[start..].trim());
     args
 }
 
@@ -805,6 +840,70 @@ mod tests {
         {
             let value_field = &fields[1];
             assert!(matches!(value_field.data_type(), DataType::Struct(_)));
+        }
+    }
+
+    #[test]
+    fn test_named_tuple_fields() {
+        // Simple named tuple
+        let result = convert_type_no_metadata("Tuple(category String, tag String)");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::Struct(fields) = dtype {
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name(), "category");
+            assert_eq!(fields[1].name(), "tag");
+            assert!(matches!(fields[0].data_type(), DataType::Utf8));
+            assert!(matches!(fields[1].data_type(), DataType::Utf8));
+        } else {
+            panic!("Expected Struct type");
+        }
+
+        // Array of named tuples (the original failing case)
+        let result = convert_type_no_metadata("Array(Tuple(category String, tag String))");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::List(inner) = dtype {
+            if let DataType::Struct(fields) = inner.data_type() {
+                assert_eq!(fields.len(), 2);
+                assert_eq!(fields[0].name(), "category");
+                assert_eq!(fields[1].name(), "tag");
+                assert!(matches!(fields[0].data_type(), DataType::Utf8));
+                assert!(matches!(fields[1].data_type(), DataType::Utf8));
+            } else {
+                panic!("Expected Struct type inside List");
+            }
+        } else {
+            panic!("Expected List type");
+        }
+
+        // Mixed named and unnamed (named fields take precedence)
+        let result = convert_type_no_metadata("Tuple(id Int64, data String)");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::Struct(fields) = dtype {
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name(), "id");
+            assert_eq!(fields[1].name(), "data");
+            assert!(matches!(fields[0].data_type(), DataType::Int64));
+            assert!(matches!(fields[1].data_type(), DataType::Utf8));
+        } else {
+            panic!("Expected Struct type");
+        }
+
+        // Named tuple with complex types
+        let result =
+            convert_type_no_metadata("Tuple(items Array(Int32), metadata Map(String, String))");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::Struct(fields) = dtype {
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name(), "items");
+            assert_eq!(fields[1].name(), "metadata");
+            assert!(matches!(fields[0].data_type(), DataType::List(_)));
+            assert!(matches!(fields[1].data_type(), DataType::Map(_, _)));
+        } else {
+            panic!("Expected Struct type");
         }
     }
 }

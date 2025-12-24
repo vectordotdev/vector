@@ -657,7 +657,8 @@ async fn test_complex_types() {
              response_metrics Tuple(Int32, Int64, Float64), \
              tags Array(String), \
              user_properties Map(String, Array(String)), \
-             array_with_nulls Array(Nullable(Int32))",
+             array_with_nulls Array(Nullable(Int32)), \
+             array_with_named_tuple Array(Tuple(category String, tag String))",
         )
         .await;
 
@@ -850,6 +851,32 @@ async fn test_complex_types() {
         ]),
     );
 
+    // Named tuple array - tests that named fields work correctly
+    let mut named_tuple1 = vector_lib::event::ObjectMap::new();
+    named_tuple1.insert(
+        "category".into(),
+        vector_lib::event::Value::Bytes("priority".into()),
+    );
+    named_tuple1.insert("tag".into(), vector_lib::event::Value::Bytes("high".into()));
+
+    let mut named_tuple2 = vector_lib::event::ObjectMap::new();
+    named_tuple2.insert(
+        "category".into(),
+        vector_lib::event::Value::Bytes("environment".into()),
+    );
+    named_tuple2.insert(
+        "tag".into(),
+        vector_lib::event::Value::Bytes("production".into()),
+    );
+
+    event1.insert(
+        "array_with_named_tuple",
+        vector_lib::event::Value::Array(vec![
+            vector_lib::event::Value::Object(named_tuple1),
+            vector_lib::event::Value::Object(named_tuple2),
+        ]),
+    );
+
     events.push(event1.into());
 
     // Event 2: Empty and edge cases
@@ -928,6 +955,10 @@ async fn test_complex_types() {
         vector_lib::event::Value::Object(empty_map),
     );
     event2.insert("array_with_nulls", vector_lib::event::Value::Array(vec![]));
+    event2.insert(
+        "array_with_named_tuple",
+        vector_lib::event::Value::Array(vec![]),
+    );
 
     events.push(event2.into());
 
@@ -1070,6 +1101,21 @@ async fn test_complex_types() {
     event3.insert(
         "array_with_nulls",
         vector_lib::event::Value::Array(vec![vector_lib::event::Value::Integer(42)]),
+    );
+
+    // Named tuple with single element
+    let mut named_tuple3 = vector_lib::event::ObjectMap::new();
+    named_tuple3.insert(
+        "category".into(),
+        vector_lib::event::Value::Bytes("status".into()),
+    );
+    named_tuple3.insert(
+        "tag".into(),
+        vector_lib::event::Value::Bytes("active".into()),
+    );
+    event3.insert(
+        "array_with_named_tuple",
+        vector_lib::event::Value::Array(vec![vector_lib::event::Value::Object(named_tuple3)]),
     );
 
     events.push(event3.into());
