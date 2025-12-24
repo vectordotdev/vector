@@ -1333,11 +1333,7 @@ impl RunningTopology {
         let metrics_refresh_period = config
             .global
             .metrics_storage_refresh_period
-            .map(Duration::from_secs_f64)
-            // TODO: Should we instead disable refresh completely? To make it
-            // mandatory to set a refresh period to use vector metrics VRL
-            // functions?
-            .unwrap_or(Duration::from_secs(5));
+            .map(Duration::from_secs_f64);
         let mut running_topology = Self::new(config, abort_tx);
 
         if !running_topology
@@ -1361,26 +1357,24 @@ impl RunningTopology {
                 utilization_emitter
                     .run_utilization(utilization_shutdown_signal)
                     .await;
-                // TODO: new task output type for this? Or handle this task in a completely
-                // different way
                 Ok(TaskOutput::Healthcheck)
             },
         )));
-        let (metrics_task_shutdown_trigger, metrics_shutdown_signal, _) =
-            ShutdownSignal::new_wired();
-        running_topology.metrics_task_shutdown_trigger = Some(metrics_task_shutdown_trigger);
-        running_topology.metrics_task = Some(tokio::spawn(Task::new(
-            "metrics_heartbeat".into(),
-            "",
-            async move {
-                metrics_storage
-                    .run_periodic_refresh(metrics_refresh_period, metrics_shutdown_signal)
-                    .await;
-                // TODO: new task output type for this? Or handle this task in a completely
-                // different way
-                Ok(TaskOutput::Healthcheck)
-            },
-        )));
+        if let Some(metrics_refresh_period) = metrics_refresh_period {
+            let (metrics_task_shutdown_trigger, metrics_shutdown_signal, _) =
+                ShutdownSignal::new_wired();
+            running_topology.metrics_task_shutdown_trigger = Some(metrics_task_shutdown_trigger);
+            running_topology.metrics_task = Some(tokio::spawn(Task::new(
+                "metrics_heartbeat".into(),
+                "",
+                async move {
+                    metrics_storage
+                        .run_periodic_refresh(metrics_refresh_period, metrics_shutdown_signal)
+                        .await;
+                    Ok(TaskOutput::Healthcheck)
+                },
+            )));
+        }
 
         Some((running_topology, abort_rx))
     }

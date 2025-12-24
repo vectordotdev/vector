@@ -275,7 +275,7 @@ pub fn get_transform_output_ids<T: TransformConfig + ?Sized>(
         .outputs(
             &TransformContext {
                 schema: SchemaOptions {
-                    log_namespace: global_log_namespace.into(),
+                    log_namespace: Some(global_log_namespace.into()),
                     ..Default::default()
                 },
                 ..Default::default()

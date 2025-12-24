@@ -876,6 +876,7 @@ generated: configuration: configuration: {
 	metrics_storage_refresh_period: {
 		description: """
 			The interval, in seconds, at which the internal metrics cache for VRL is refreshed.
+			This must be set to be able to access metrics in VRL functions.
 
 			Higher values lead to stale metric values from `get_vector_metric`,
 			`find_vector_metrics`, and `aggregate_vector_metrics` functions.
