@@ -79,22 +79,6 @@ macro_rules! append_null_match {
     };
 }
 
-/// Macro to simplify integer/float appending with bounds checking and casting.
-macro_rules! append_primitive {
-    // Simple case: no bounds checking
-    ($builder:expr, $builder_type:ty, $val:expr, $cast_type:ty) => {{
-        downcast_builder!($builder, $builder_type).append_value(*$val as $cast_type);
-    }};
-    // With bounds checking
-    ($builder:expr, $builder_type:ty, $val:expr, $cast_type:ty, $min:expr, $max:expr) => {{
-        if *$val >= $min as i64 && *$val <= $max as i64 {
-            downcast_builder!($builder, $builder_type).append_value(*$val as $cast_type);
-        } else {
-            downcast_builder!($builder, $builder_type).append_null();
-        }
-    }};
-}
-
 /// Helper function to serialize a Value to JSON string.
 /// This is used when the schema expects a string but the data contains complex types.
 fn value_to_json_string(value: &Value) -> Result<String, ArrowEncodingError> {
@@ -151,48 +135,51 @@ fn append_value_to_builder(
     match (field.data_type(), value) {
         // Integer types with range checking
         (DataType::Int8, Value::Integer(i)) => {
-            append_primitive!(builder, Int8Builder, i, i8, i8::MIN, i8::MAX)
+            let val = (*i >= i8::MIN as i64 && *i <= i8::MAX as i64).then_some(*i as i8);
+            downcast_builder!(builder, Int8Builder).append_option(val);
         }
         (DataType::Int16, Value::Integer(i)) => {
-            append_primitive!(builder, Int16Builder, i, i16, i16::MIN, i16::MAX)
+            let val = (*i >= i16::MIN as i64 && *i <= i16::MAX as i64).then_some(*i as i16);
+            downcast_builder!(builder, Int16Builder).append_option(val);
         }
         (DataType::Int32, Value::Integer(i)) => {
-            append_primitive!(builder, Int32Builder, i, i32, i32::MIN, i32::MAX)
+            let val = (*i >= i32::MIN as i64 && *i <= i32::MAX as i64).then_some(*i as i32);
+            downcast_builder!(builder, Int32Builder).append_option(val);
         }
-        (DataType::Int64, Value::Integer(i)) => append_primitive!(builder, Int64Builder, i, i64),
+        (DataType::Int64, Value::Integer(i)) => {
+            downcast_builder!(builder, Int64Builder).append_value(*i);
+        }
 
         // Unsigned integer types with range checking
         (DataType::UInt8, Value::Integer(i)) => {
-            append_primitive!(builder, UInt8Builder, i, u8, 0, u8::MAX)
+            let val = (*i >= 0 && *i <= u8::MAX as i64).then_some(*i as u8);
+            downcast_builder!(builder, UInt8Builder).append_option(val);
         }
         (DataType::UInt16, Value::Integer(i)) => {
-            append_primitive!(builder, UInt16Builder, i, u16, 0, u16::MAX)
+            let val = (*i >= 0 && *i <= u16::MAX as i64).then_some(*i as u16);
+            downcast_builder!(builder, UInt16Builder).append_option(val);
         }
         (DataType::UInt32, Value::Integer(i)) => {
-            append_primitive!(builder, UInt32Builder, i, u32, 0, u32::MAX)
+            let val = (*i >= 0 && *i <= u32::MAX as i64).then_some(*i as u32);
+            downcast_builder!(builder, UInt32Builder).append_option(val);
         }
         (DataType::UInt64, Value::Integer(i)) => {
-            if *i >= 0 {
-                append_primitive!(builder, UInt64Builder, i, u64);
-            } else {
-                downcast_builder!(builder, UInt64Builder).append_null();
-            }
+            let val = (*i >= 0).then_some(*i as u64);
+            downcast_builder!(builder, UInt64Builder).append_option(val);
         }
 
         // Float types
         (DataType::Float32, Value::Float(f)) => {
-            let val = f.into_inner();
-            downcast_builder!(builder, Float32Builder).append_value(val as f32);
+            downcast_builder!(builder, Float32Builder).append_value(f.into_inner() as f32);
         }
         (DataType::Float32, Value::Integer(i)) => {
-            append_primitive!(builder, Float32Builder, i, f32)
+            downcast_builder!(builder, Float32Builder).append_value(*i as f32);
         }
         (DataType::Float64, Value::Float(f)) => {
-            let val = f.into_inner();
-            downcast_builder!(builder, Float64Builder).append_value(val);
+            downcast_builder!(builder, Float64Builder).append_value(f.into_inner());
         }
         (DataType::Float64, Value::Integer(i)) => {
-            append_primitive!(builder, Float64Builder, i, f64)
+            downcast_builder!(builder, Float64Builder).append_value(*i as f64);
         }
 
         // Boolean
@@ -249,30 +236,22 @@ fn append_value_to_builder(
                 }
             };
 
-            match (time_unit, converted_value) {
-                (TimeUnit::Second, Some(val)) => {
-                    downcast_builder!(builder, TimestampSecondBuilder).append_value(val);
+            match time_unit {
+                TimeUnit::Second => {
+                    downcast_builder!(builder, TimestampSecondBuilder)
+                        .append_option(converted_value);
                 }
-                (TimeUnit::Millisecond, Some(val)) => {
-                    downcast_builder!(builder, TimestampMillisecondBuilder).append_value(val);
+                TimeUnit::Millisecond => {
+                    downcast_builder!(builder, TimestampMillisecondBuilder)
+                        .append_option(converted_value);
                 }
-                (TimeUnit::Microsecond, Some(val)) => {
-                    downcast_builder!(builder, TimestampMicrosecondBuilder).append_value(val);
+                TimeUnit::Microsecond => {
+                    downcast_builder!(builder, TimestampMicrosecondBuilder)
+                        .append_option(converted_value);
                 }
-                (TimeUnit::Nanosecond, Some(val)) => {
-                    downcast_builder!(builder, TimestampNanosecondBuilder).append_value(val);
-                }
-                (TimeUnit::Second, None) => {
-                    downcast_builder!(builder, TimestampSecondBuilder).append_null();
-                }
-                (TimeUnit::Millisecond, None) => {
-                    downcast_builder!(builder, TimestampMillisecondBuilder).append_null();
-                }
-                (TimeUnit::Microsecond, None) => {
-                    downcast_builder!(builder, TimestampMicrosecondBuilder).append_null();
-                }
-                (TimeUnit::Nanosecond, None) => {
-                    downcast_builder!(builder, TimestampNanosecondBuilder).append_null();
+                TimeUnit::Nanosecond => {
+                    downcast_builder!(builder, TimestampNanosecondBuilder)
+                        .append_option(converted_value);
                 }
             }
         }
@@ -281,57 +260,43 @@ fn append_value_to_builder(
         (DataType::Decimal128(_precision, scale), value) => {
             use rust_decimal::Decimal;
 
-            let decimal_builder = builder
-                .as_any_mut()
-                .downcast_mut::<Decimal128Builder>()
-                .expect("Failed to downcast to Decimal128Builder");
-
             let target_scale = scale.unsigned_abs() as u32;
 
-            match value {
-                Value::Float(f) => {
-                    if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
-                        decimal.rescale(target_scale);
-                        decimal_builder.append_value(decimal.mantissa());
-                    } else {
-                        decimal_builder.append_null();
-                    }
-                }
+            let mantissa = match value {
+                Value::Float(f) => Decimal::try_from(f.into_inner()).ok().map(|mut d| {
+                    d.rescale(target_scale);
+                    d.mantissa()
+                }),
                 Value::Integer(i) => {
                     let mut decimal = Decimal::from(*i);
                     decimal.rescale(target_scale);
-                    decimal_builder.append_value(decimal.mantissa());
+                    Some(decimal.mantissa())
                 }
-                _ => decimal_builder.append_null(),
-            }
+                _ => None,
+            };
+
+            downcast_builder!(builder, Decimal128Builder).append_option(mantissa);
         }
 
         (DataType::Decimal256(_precision, scale), value) => {
             use rust_decimal::Decimal;
 
-            let decimal_builder = builder
-                .as_any_mut()
-                .downcast_mut::<Decimal256Builder>()
-                .expect("Failed to downcast to Decimal256Builder");
-
             let target_scale = scale.unsigned_abs() as u32;
 
-            match value {
-                Value::Float(f) => {
-                    if let Ok(mut decimal) = Decimal::try_from(f.into_inner()) {
-                        decimal.rescale(target_scale);
-                        decimal_builder.append_value(i256::from_i128(decimal.mantissa()));
-                    } else {
-                        decimal_builder.append_null();
-                    }
-                }
+            let mantissa = match value {
+                Value::Float(f) => Decimal::try_from(f.into_inner()).ok().map(|mut d| {
+                    d.rescale(target_scale);
+                    i256::from_i128(d.mantissa())
+                }),
                 Value::Integer(i) => {
                     let mut decimal = Decimal::from(*i);
                     decimal.rescale(target_scale);
-                    decimal_builder.append_value(i256::from_i128(decimal.mantissa()));
+                    Some(i256::from_i128(decimal.mantissa()))
                 }
-                _ => decimal_builder.append_null(),
-            }
+                _ => None,
+            };
+
+            downcast_builder!(builder, Decimal256Builder).append_option(mantissa);
         }
 
         // Complex types
