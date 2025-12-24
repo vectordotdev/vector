@@ -677,22 +677,22 @@ generated: components: sinks: azure_blob: configuration: {
 						type: object: {
 							examples: [{
 								id: {
-									bloom_filter:     false
-									bloom_filter_fpp: null
-									bloom_filter_ndv: null
-									type:             "int64"
+									bloom_filter:                     false
+									bloom_filter_false_positive_pct:  null
+									bloom_filter_num_distinct_values: null
+									type:                             "int64"
 								}
 								name: {
-									bloom_filter:     true
-									bloom_filter_fpp: 0.01
-									bloom_filter_ndv: 1000000
-									type:             "utf8"
+									bloom_filter:                     true
+									bloom_filter_false_positive_pct:  0.01
+									bloom_filter_num_distinct_values: 1000000
+									type:                             "utf8"
 								}
 								timestamp: {
-									bloom_filter:     false
-									bloom_filter_fpp: null
-									bloom_filter_ndv: null
-									type:             "timestamp_microsecond"
+									bloom_filter:                     false
+									bloom_filter_false_positive_pct:  null
+									bloom_filter_num_distinct_values: null
+									type:                             "timestamp_microsecond"
 								}
 							}]
 							options: "*": {
@@ -713,9 +713,9 @@ generated: components: sinks: azure_blob: configuration: {
 											examples: [true]
 										}
 									}
-									bloom_filter_fpp: {
+									bloom_filter_false_positive_pct: {
 										description: """
-																								False positive probability for this column's Bloom filter
+																								False positive probability for this column's Bloom filter (as a percentage)
 
 																								Lower values create larger but more accurate filters.
 
@@ -725,7 +725,7 @@ generated: components: sinks: azure_blob: configuration: {
 										required: false
 										type: float: examples: [0.05, 0.01]
 									}
-									bloom_filter_ndv: {
+									bloom_filter_num_distinct_values: {
 										description: """
 																								Number of distinct values expected for this column's Bloom filter
 

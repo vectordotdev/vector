@@ -1666,6 +1666,39 @@ def unwrap_resolved_schema(root_schema, schema_name, friendly_name)
   return sort_hash_nested(unwrapped_resolved_schema)
 end
 
+PARQUET_ALLOWED_SINKS = %w[aws_s3 gcp_cloud_storage azure_blob].freeze
+
+def remove_parquet_from_codec_config!(schema, field_name)
+  field = schema[field_name]
+  return if field.nil?
+
+  field_options = field.dig('type', 'object', 'options')
+  return if field_options.nil?
+
+  field_options.delete('parquet')
+
+  codec = field_options['codec']
+  codec_enum = codec.dig('type', 'string', 'enum') if codec.is_a?(Hash)
+  if codec_enum.is_a?(Hash)
+    codec_enum.delete('parquet')
+  elsif codec_enum.is_a?(Array)
+    codec_enum.delete('parquet')
+  end
+end
+
+def prune_parquet_from_schema!(schema)
+  return unless schema.is_a?(Hash)
+
+  schema.each do |field_name, field_def|
+    if %w[encoding batch_encoding].include?(field_name)
+      remove_parquet_from_codec_config!(schema, field_name)
+    end
+
+    options = field_def.dig('type', 'object', 'options')
+    prune_parquet_from_schema!(options) if options.is_a?(Hash)
+  end
+end
+
 def render_and_import_schema(unwrapped_resolved_schema, friendly_name, config_map_path, cue_relative_path)
 
   # Set up the appropriate structure for the value based on the configuration map path. It defines
@@ -1714,6 +1747,10 @@ end
 def render_and_import_component_schema(root_schema, schema_name, component_type, component_name)
   friendly_name = "'#{component_name}' #{component_type} configuration"
   unwrapped_resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
+  unwrapped_resolved_schema = deep_copy(unwrapped_resolved_schema)
+  if component_type == 'sink' && !PARQUET_ALLOWED_SINKS.include?(component_name)
+    prune_parquet_from_schema!(unwrapped_resolved_schema)
+  end
   render_and_import_schema(
     unwrapped_resolved_schema,
     friendly_name,

@@ -5,7 +5,9 @@ use std::fmt;
 use http::{Request, StatusCode, Uri};
 use hyper::Body;
 use vector_lib::codecs::encoding::format::SchemaProvider;
-use vector_lib::codecs::encoding::{ArrowStreamSerializerConfig, BatchSerializerConfig};
+use vector_lib::codecs::encoding::{
+    ArrowStreamSerializer, ArrowStreamSerializerConfig, BatchSerializerConfig,
+};
 
 use super::{
     request_builder::ClickhouseRequestBuilder,
@@ -293,6 +295,12 @@ impl ClickhouseConfig {
 
             let mut arrow_config = match batch_encoding {
                 BatchSerializerConfig::ArrowStream(config) => config.clone(),
+                #[cfg(feature = "codecs-parquet")]
+                BatchSerializerConfig::Parquet { .. } => {
+                    return Err(
+                        "'batch_encoding' does not support Parquet for the ClickHouse sink.".into(),
+                    );
+                }
             };
 
             self.resolve_arrow_schema(
@@ -304,10 +312,9 @@ impl ClickhouseConfig {
             )
             .await?;
 
-            let resolved_batch_config = BatchSerializerConfig::ArrowStream(arrow_config);
-            let arrow_serializer = resolved_batch_config.build()?;
+            let arrow_serializer = ArrowStreamSerializer::new(arrow_config)?;
             let batch_serializer = BatchSerializer::Arrow(arrow_serializer);
-            let encoder = EncoderKind::Batch(BatchEncoder::new(batch_serializer));
+            let encoder = EncoderKind::Batch(Box::new(BatchEncoder::new(batch_serializer)));
 
             return Ok((Format::ArrowStream, encoder));
         }

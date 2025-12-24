@@ -307,12 +307,9 @@ impl SerializerConfig {
             }
             SerializerConfig::Text(config) => Ok(Serializer::Text(config.build())),
             #[cfg(feature = "parquet")]
-            SerializerConfig::Parquet { .. } => Err(
-                VectorError::from(
-                    "Parquet codec is available only for batch encoding and cannot be built as a framed serializer.",
-                )
-                .into(),
-            ),
+            SerializerConfig::Parquet { .. } => Err(VectorError::from(
+                "Parquet codec is available only for batch encoding and cannot be built as a framed serializer.",
+            )),
         }
     }
 

@@ -22,7 +22,7 @@ pub enum BatchSerializer {
     Arrow(ArrowStreamSerializer),
     /// Parquet columnar format serializer.
     #[cfg(feature = "codecs-parquet")]
-    Parquet(ParquetSerializer),
+    Parquet(Box<ParquetSerializer>),
 }
 
 /// An encoder that encodes batches of events.
@@ -103,7 +103,7 @@ pub enum EncoderKind {
     Framed(Box<Encoder<Framer>>),
     /// Encodes events in batches without framing
     #[cfg(any(feature = "codecs-arrow", feature = "codecs-parquet"))]
-    Batch(BatchEncoder),
+    Batch(Box<BatchEncoder>),
 }
 
 #[derive(Debug, Clone)]

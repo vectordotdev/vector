@@ -1,4 +1,4 @@
-#[cfg(any(feature = "codecs-arrow", feature = "codecs-parquet"))]
+#[cfg(feature = "codecs-parquet")]
 use crate::codecs::{BatchEncoder, BatchSerializer};
 use crate::codecs::{Encoder, EncoderKind, Transformer};
 #[cfg(feature = "codecs-parquet")]
@@ -149,8 +149,9 @@ impl EncodingConfigWithFraming {
             #[cfg(feature = "codecs-parquet")]
             SerializerConfig::Parquet { parquet } => {
                 let serializer = ParquetSerializer::new(parquet.clone())?;
-                let encoder =
-                    EncoderKind::Batch(BatchEncoder::new(BatchSerializer::Parquet(serializer)));
+                let encoder = EncoderKind::Batch(Box::new(BatchEncoder::new(
+                    BatchSerializer::Parquet(Box::new(serializer)),
+                )));
                 Ok((self.transformer(), encoder))
             }
             _ => {

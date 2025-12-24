@@ -44,7 +44,7 @@ pub enum ParquetCompression {
 
 impl ParquetCompression {
     /// Convert to parquet Compression with optional level override
-    fn to_compression(&self, level: Option<i32>) -> Result<Compression, String> {
+    fn to_compression(self, level: Option<i32>) -> Result<Compression, String> {
         match (self, level) {
             (ParquetCompression::Uncompressed, _) => Ok(Compression::UNCOMPRESSED),
             (ParquetCompression::Snappy, _) => Ok(Compression::SNAPPY),
@@ -419,9 +419,7 @@ impl ParquetSerializer {
     /// Create a new ParquetSerializer with the given configuration
     pub fn new(config: ParquetSerializerConfig) -> Result<Self, vector_common::Error> {
         // Validate configuration
-        config
-            .validate()
-            .map_err(|e| vector_common::Error::from(e))?;
+        config.validate().map_err(vector_common::Error::from)?;
 
         // Keep a copy of schema_def for later use with Bloom filters
         let schema_def_opt = config.schema.clone();
@@ -465,7 +463,7 @@ impl ParquetSerializer {
         let compression = config
             .compression
             .to_compression(config.compression_level)
-            .map_err(|e| vector_common::Error::from(e))?;
+            .map_err(vector_common::Error::from)?;
 
         tracing::debug!(
             compression = ?config.compression,
@@ -711,7 +709,7 @@ fn infer_schema_from_events(
                 continue;
             }
 
-            let inferred_type = infer_arrow_type(&value);
+            let inferred_type = infer_arrow_type(value);
 
             match field_types.get(&key_str) {
                 None => {
@@ -827,7 +825,7 @@ mod tests {
             .set_compression(Compression::SNAPPY)
             .build();
 
-        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props, None);
+        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props);
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -931,7 +929,7 @@ mod tests {
 
         let props = WriterProperties::builder().build();
 
-        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props, None);
+        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props);
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -971,7 +969,7 @@ mod tests {
             true,
         )]));
         let props = WriterProperties::builder().build();
-        let result = encode_events_to_parquet(&events, schema, &props, None);
+        let result = encode_events_to_parquet(&events, schema, &props);
         assert!(result.is_err());
         assert!(matches!(
             result.unwrap_err(),
@@ -1004,7 +1002,7 @@ mod tests {
                 .set_compression(compression.into())
                 .build();
 
-            let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props, None);
+            let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props);
             assert!(result.is_ok(), "Failed with compression: {:?}", compression);
 
             // Verify we can read it back
@@ -1021,7 +1019,7 @@ mod tests {
 
     #[test]
     fn test_parquet_serializer_config() {
-        use super::schema_definition::FieldDefinition;
+        use super::super::schema_definition::FieldDefinition;
         use std::collections::BTreeMap;
 
         let mut fields = BTreeMap::new();
@@ -1073,7 +1071,7 @@ mod tests {
 
     #[test]
     fn test_encoder_trait_implementation() {
-        use super::schema_definition::FieldDefinition;
+        use super::super::schema_definition::FieldDefinition;
         use std::collections::BTreeMap;
         use tokio_util::codec::Encoder;
 
@@ -1139,7 +1137,7 @@ mod tests {
             .set_max_row_group_size(5000) // 2 row groups
             .build();
 
-        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props, None);
+        let result = encode_events_to_parquet(&events, Arc::clone(&schema), &props);
         assert!(result.is_ok());
 
         let bytes = result.unwrap();
@@ -1155,7 +1153,7 @@ mod tests {
 
     #[test]
     fn test_allow_nullable_fields_config() {
-        use super::schema_definition::FieldDefinition;
+        use super::super::schema_definition::FieldDefinition;
         use std::collections::BTreeMap;
         use tokio_util::codec::Encoder;
 

@@ -152,7 +152,7 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::EncoderKind) {
             }
             #[cfg(any(feature = "codecs-arrow", feature = "codecs-parquet"))]
             crate::codecs::EncoderKind::Batch(encoder) => {
-                (self.0.clone(), encoder.clone()).encode_input(events, writer)
+                (self.0.clone(), *encoder.clone()).encode_input(events, writer)
             }
         }
     }
