@@ -1,4 +1,4 @@
-use crate::utils::git;
+use crate::{app, utils::git};
 use anyhow::Result;
 use sha2::Digest;
 use std::{env, fs, path::Path};
@@ -22,6 +22,7 @@ impl Cli {
         // Create temporary directory for cloning the homebrew-brew repository
         let td = TempDir::new()?;
         env::set_current_dir(td.path())?;
+        trace!("Cloned at {td:?}");
 
         debug!(
             "Cloning the homebrew repository for username: {}",
@@ -49,8 +50,20 @@ fn clone_and_setup_git(username: &str) -> Result<()> {
 
     git::clone(&homebrew_repo)?;
     env::set_current_dir("homebrew-brew")?;
+
+    // Update the global path to the homebrew-brew repo so git operations work correctly
+    app::set_global_path(env::current_dir()?.to_string_lossy().to_string());
+
+    // Set the remote URL with credentials to ensure push works
+    git::set_remote_url("origin", &homebrew_repo)?;
+
+    // Disable credential helper to ensure we use the PAT from the URL
+    git::set_config_value("credential.helper", "")?;
+
     git::set_config_value("user.name", "vic")?;
     git::set_config_value("user.email", "vector@datadoghq.com")?;
+
+    git::checkout_or_create_branch("test")?;
     Ok(())
 }
 
@@ -97,7 +110,7 @@ fn commit_and_push_changes(vector_version: &str) -> Result<()> {
         debug!("Modified lines {:?}", git::get_modified_files());
         let commit_message = format!("Release Vector {vector_version}");
         git::commit(&commit_message)?;
-        git::push()?;
+        git::push_branch("test")?;
     } else {
         debug!("No changes to push.");
     }
