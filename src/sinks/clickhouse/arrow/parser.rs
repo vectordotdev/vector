@@ -1,7 +1,6 @@
 //! ClickHouse type parsing and conversion to Arrow types.
 
 use arrow::datatypes::{DataType, Field, Fields, TimeUnit};
-use std::sync::Arc;
 
 const DECIMAL32_PRECISION: u8 = 9;
 const DECIMAL64_PRECISION: u8 = 18;
@@ -51,10 +50,10 @@ impl<'a> ClickHouseType<'a> {
     pub fn to_arrow(&self) -> Result<(DataType, bool), String> {
         let is_nullable = self.is_nullable();
 
-        match self.base_type() {
+        let data_type = match self.base_type() {
             ClickHouseType::Primitive(name) => {
                 let (type_name, _) = extract_identifier(name);
-                let data_type = match type_name {
+                match type_name {
                     // Numeric
                     "Int8" => DataType::Int8,
                     "Int16" => DataType::Int16,
@@ -74,69 +73,57 @@ impl<'a> ClickHouseType<'a> {
                     // Strings
                     "String" | "FixedString" => DataType::Utf8,
 
-                    // Date and time types (timezones not currently handled, defaults to UTC)
+                    // Date and time
                     "Date" | "Date32" => DataType::Date32,
                     "DateTime" => DataType::Timestamp(TimeUnit::Second, None),
                     "DateTime64" => parse_datetime64_precision(name)?,
 
-                    // Unknown
-                    _ => {
-                        return Err(format!(
-                            "Unknown ClickHouse type '{}'. This type cannot be automatically converted.",
-                            type_name
-                        ));
-                    }
-                };
-                Ok((data_type, is_nullable))
+                    _ => return Err(format!("Unknown ClickHouse type '{}'", type_name)),
+                }
             }
             ClickHouseType::Array(inner) => {
                 let (inner_arrow, inner_nullable) = inner.to_arrow()?;
-                let field = Field::new("item", inner_arrow, inner_nullable);
-                Ok((DataType::List(Arc::new(field)), is_nullable))
+                DataType::List(Field::new("item", inner_arrow, inner_nullable).into())
             }
             ClickHouseType::Tuple(elements) => {
-                let fields: Result<Vec<Field>, String> = elements
+                let fields: Vec<Field> = elements
                     .iter()
                     .enumerate()
-                    .map(|(i, (field_name, elem))| {
-                        let (elem_arrow, elem_nullable) = elem.to_arrow()?;
-                        let name = field_name.unwrap_or_else(|| {
-                            // Use a static string slice that lives long enough
-                            // For unnamed fields, we'll use format! below
-                            ""
-                        });
-                        let field_name = if name.is_empty() {
-                            format!("f{}", i)
-                        } else {
-                            name.to_string()
-                        };
-                        Ok(Field::new(field_name, elem_arrow, elem_nullable))
+                    .map(|(i, (name_opt, elem))| {
+                        let (dt, nullable) = elem.to_arrow()?;
+
+                        let name = name_opt
+                            .as_deref()
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| format!("f{}", i));
+
+                        Ok(Field::new(name, dt, nullable))
                     })
-                    .collect();
-                Ok((DataType::Struct(Fields::from(fields?)), is_nullable))
+                    .collect::<Result<_, String>>()?;
+
+                DataType::Struct(Fields::from(fields))
             }
             ClickHouseType::Map(key_type, value_type) => {
-                // Validate key is String
                 let (key_arrow, _) = key_type.to_arrow()?;
+
                 if !matches!(key_arrow, DataType::Utf8) {
-                    return Err(
-                        "Map keys must be String type. Vector's ObjectMap only supports String keys."
-                            .to_string(),
-                    );
+                    return Err("Map keys must be String type.".to_string());
                 }
 
-                // Recursively convert value type
                 let (value_arrow, value_nullable) = value_type.to_arrow()?;
 
-                // Arrow Map is represented as Map<String, T>
-                let key_field = Field::new("keys", DataType::Utf8, false);
-                let value_field = Field::new("values", value_arrow, value_nullable);
-                let entries_struct = DataType::Struct(Fields::from(vec![key_field, value_field]));
-                let entries_field = Field::new("entries", entries_struct, false);
-                Ok((DataType::Map(Arc::new(entries_field), false), is_nullable))
+                let entries = DataType::Struct(Fields::from(vec![
+                    Field::new("keys", DataType::Utf8, false),
+                    Field::new("values", value_arrow, value_nullable),
+                ]));
+
+                DataType::Map(Field::new("entries", entries, false).into(), false)
             }
-            _ => Err("Unsupported ClickHouse type".to_string()),
-        }
+            _ => return Err("Unsupported ClickHouse type".to_string()),
+        };
+
+        Ok((data_type, is_nullable))
     }
 }
 
