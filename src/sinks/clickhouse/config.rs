@@ -73,7 +73,7 @@ pub struct ClickhouseConfig {
         deprecated = "This option has been deprecated, the `endpoints` option should be used instead."
     )]
     #[configurable(metadata(docs::examples = "http://localhost:8123"))]
-    pub endpoint: UriSerde,
+    pub endpoint: Option<UriSerde>,
 
     /// A list of ClickHouse endpoints to send logs to.
     #[serde(default)]
@@ -331,7 +331,13 @@ impl ClickhouseConfig {
 
         warn!(message = "DEPRECATION: use 'endpoints' instead of 'endpoint'");
 
-        Ok(vec![self.endpoint.clone()])
+        if let Some(endpoint) = &self.endpoint {
+            warn!(message = "DEPRECATION: use 'endpoints' instead of 'endpoint'");
+            Ok(vec![endpoint.clone()])
+        } else {
+            // Both endpoints and endpoint are empty/None
+            Err(ParseError::EndpointRequired.into())
+        }
     }
 
     /// Resolves the encoding strategy (format + encoder) based on configuration.
@@ -503,7 +509,7 @@ mod tests {
         batch_encoding: Option<BatchSerializerConfig>,
     ) -> ClickhouseConfig {
         ClickhouseConfig {
-            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            endpoint: Some("http://localhost:8123".parse::<http::Uri>().unwrap().into()),
             table: "test_table".try_into().unwrap(),
             database: Some("test_db".try_into().unwrap()),
             format,
