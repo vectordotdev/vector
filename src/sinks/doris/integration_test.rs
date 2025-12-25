@@ -84,7 +84,7 @@ struct DorisAuth {
 fn config_auth() -> DorisAuth {
     DorisAuth {
         user: "root".to_string(),
-        password: "123456".to_string(),
+        password: "".to_string(),
     }
 }
 
@@ -202,15 +202,19 @@ impl DorisTestClient {
 
         // Configure MySQL connection parameters - For Doris specifically adjusted
         // Disable these options to not send `SET @@sql_mode=CONCAT(@@sql_mode, {})` which is not supported on Doris.
-        let connect_options = MySqlConnectOptions::new()
+        let mut connect_options = MySqlConnectOptions::new()
             .host(&host)
             .port(port)
             .username(&auth.user)
-            .password(&auth.password)
             .no_engine_substitution(false) // Keep false to avoid SET statement
             .pipes_as_concat(false) // Keep false to avoid SET statement
             .ssl_mode(sqlx::mysql::MySqlSslMode::Disabled)
             .disable_statement_logging();
+
+        // Only set password if it's not empty (Doris root user has no password by default)
+        if !auth.password.is_empty() {
+            connect_options = connect_options.password(&auth.password);
+        }
 
         info!(
             message = "DorisTestClient initialized successfully.",

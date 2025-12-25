@@ -5,7 +5,7 @@ features:
 test_filter: 'sinks::doris::integration_test::'
 
 env:
-  DORIS_ADDRESS: http://doris:8030
+  DORIS_ADDRESS: http://doris:8040
 
 matrix:
   version: ['2.1.7']

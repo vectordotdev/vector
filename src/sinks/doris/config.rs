@@ -161,21 +161,22 @@ impl SinkConfig for DorisConfig {
 
         let services_futures = commons
             .iter()
-            .cloned()
             .map(|common| {
                 let client_clone = client.clone();
                 let compression = self.compression;
                 let label_prefix = self.label_prefix.clone();
                 let headers = self.headers.clone();
                 let log_request = self.log_request;
+                let base_url = common.base_url.clone();
+                let auth = common.auth.clone();
 
                 async move {
-                    let endpoint = common.base_url.clone();
+                    let endpoint = base_url.to_string();
 
                     let doris_client = DorisSinkClient::new(
                         client_clone,
-                        common.base_url.clone(),
-                        common.auth.clone(),
+                        base_url,
+                        auth,
                         compression,
                         label_prefix,
                         headers,

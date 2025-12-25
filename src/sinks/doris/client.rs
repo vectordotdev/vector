@@ -37,7 +37,7 @@ pub type ThreadSafeDorisSinkClient = Arc<DorisSinkClient>;
 #[derive(Clone, Debug)]
 pub struct DorisSinkClient {
     http_client: HttpClient,
-    base_url: String,
+    base_url: Uri,
     auth: Option<Auth>,
     compression: Compression,
     label_prefix: String,
@@ -47,7 +47,7 @@ pub struct DorisSinkClient {
 impl DorisSinkClient {
     pub async fn new(
         http_client: HttpClient,
-        base_url: String,
+        base_url: Uri,
         auth: Option<Auth>,
         compression: Compression,
         label_prefix: String,
@@ -108,9 +108,13 @@ impl DorisSinkClient {
                 StreamLoadError::InvalidRedirectUri { source }
             })?
         } else {
-            // Build original URL
-            let stream_load_url =
-                format!("{}/api/{}/{}/_stream_load", self.base_url, database, table);
+            // Build original URL using Uri components to avoid trailing slash issues
+            let scheme = self.base_url.scheme_str().unwrap_or("http");
+            let authority = self.base_url.authority().map(|a| a.as_str()).unwrap_or("");
+            let stream_load_url = format!(
+                "{}://{}/api/{}/{}/_stream_load",
+                scheme, authority, database, table
+            );
 
             stream_load_url.parse::<Uri>().map_err(|source| {
                 debug!(
@@ -293,11 +297,11 @@ impl DorisSinkClient {
         })
     }
 
-    pub async fn healthcheck_fenode(&self, endpoint: String) -> crate::Result<()> {
+    pub async fn healthcheck_fenode(&self, endpoint: &Uri) -> crate::Result<()> {
         // Use Doris bootstrap API endpoint for health check, GET method
-        let query_path = "/api/bootstrap";
-        let endpoint_str = endpoint.trim_end_matches('/');
-        let uri_str = format!("{}{}", endpoint_str, query_path);
+        let scheme = endpoint.scheme_str().unwrap_or("http");
+        let authority = endpoint.authority().map(|a| a.as_str()).unwrap_or("");
+        let uri_str = format!("{}://{}/api/bootstrap", scheme, authority);
 
         let uri = uri_str.parse::<Uri>().map_err(|source| {
             debug!(

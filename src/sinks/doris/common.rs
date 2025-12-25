@@ -10,11 +10,12 @@ use crate::{
     },
     tls::TlsSettings,
 };
+use http::Uri;
 use vector_lib::codecs::encoding::Framer;
 
 #[derive(Debug, Clone)]
 pub struct DorisCommon {
-    pub base_url: String,
+    pub base_url: Uri,
     pub auth: Option<Auth>,
     pub request_builder: DorisRequestBuilder,
     pub tls_settings: TlsSettings,
@@ -30,7 +31,7 @@ impl DorisCommon {
 
         // basic auth must be some for now
         let auth = config.auth.choose_one(&endpoint.auth)?;
-        let base_url = endpoint.uri.to_string().trim_end_matches('/').to_owned();
+        let base_url = endpoint.uri.clone();
         let tls_settings = TlsSettings::from_options(config.tls.as_ref())?;
 
         // Build encoder from the encoding configuration
@@ -61,6 +62,6 @@ impl DorisCommon {
     }
 
     pub async fn healthcheck(&self, client: ThreadSafeDorisSinkClient) -> crate::Result<()> {
-        client.healthcheck_fenode(self.base_url.clone()).await
+        client.healthcheck_fenode(&self.base_url).await
     }
 }
