@@ -334,6 +334,28 @@ generated: components: sinks: clickhouse: configuration: {
 		required:    false
 		type: bool: default: false
 	}
+	distribution: {
+		description: "Options for determining the health of an endpoint."
+		required:    false
+		type: object: options: {
+			retry_initial_backoff_secs: {
+				description: "Initial delay between attempts to reactivate endpoints once they become unhealthy."
+				required:    false
+				type: uint: {
+					default: 1
+					unit:    "seconds"
+				}
+			}
+			retry_max_duration_secs: {
+				description: "Maximum delay between attempts to reactivate endpoints once they become unhealthy."
+				required:    false
+				type: uint: {
+					default: 3600
+					unit:    "seconds"
+				}
+			}
+		}
+	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
 		required:    false
@@ -363,9 +385,19 @@ generated: components: sinks: clickhouse: configuration: {
 		}
 	}
 	endpoint: {
-		description: "The endpoint of the ClickHouse server."
-		required:    true
+		deprecated:         true
+		deprecated_message: "This option has been deprecated, the `endpoints` option should be used instead."
+		description:        "The endpoint of the ClickHouse server."
+		required:           false
 		type: string: examples: ["http://localhost:8123"]
+	}
+	endpoints: {
+		description: "A list of ClickHouse endpoints to send logs to."
+		required:    false
+		type: array: {
+			default: []
+			items: type: string: examples: ["http://10.24.32.122:8123", "https://example.com:8123"]
+		}
 	}
 	format: {
 		description: """
