@@ -1,7 +1,7 @@
 package metadata
 
 generated: configuration: configuration: {
-	healthcheck: {
+	healthchecks: {
 		type: object: options: {
 			enabled: {
 				type: bool: default: true

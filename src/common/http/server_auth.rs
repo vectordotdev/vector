@@ -144,12 +144,6 @@ impl HttpServerAuthConfig {
                 ))
             }
             HttpServerAuthConfig::Custom { source } => {
-                let functions = vrl::stdlib::all()
-                    .into_iter()
-                    .chain(vector_lib::enrichment::vrl_functions())
-                    .chain(vector_vrl_functions::all())
-                    .collect::<Vec<_>>();
-
                 let state = TypeState::default();
 
                 let mut config = CompileConfig::default();
@@ -160,7 +154,7 @@ impl HttpServerAuthConfig {
                     program,
                     warnings,
                     config: _,
-                } = compile_vrl(source, &functions, &state, config)
+                } = compile_vrl(source, &vector_vrl_functions::all(), &state, config)
                     .map_err(|diagnostics| format_vrl_diagnostics(source, diagnostics))?;
 
                 if !program.final_type_info().result.is_boolean() {

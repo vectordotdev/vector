@@ -270,7 +270,7 @@ impl Config {
 }
 
 /// Healthcheck options.
-#[configurable_component(global_option("healthcheck"))]
+#[configurable_component(global_option("healthchecks"))]
 #[derive(Clone, Copy, Debug)]
 #[serde(default)]
 pub struct HealthcheckOptions {

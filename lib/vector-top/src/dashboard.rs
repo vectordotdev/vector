@@ -9,7 +9,6 @@ use crossterm::{
     tty::IsTty,
 };
 use num_format::{Locale, ToFormattedString};
-use number_prefix::NumberPrefix;
 use ratatui::{
     Frame, Terminal,
     backend::CrosstermBackend,
@@ -19,6 +18,7 @@ use ratatui::{
     widgets::{Block, Borders, Cell, Paragraph, Row, Table, Wrap},
 };
 use tokio::sync::oneshot;
+use unit_prefix::NumberPrefix;
 
 use super::{
     events::capture_key_press,

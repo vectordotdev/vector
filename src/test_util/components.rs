@@ -7,10 +7,11 @@
 //! internal events and metrics, and testing that they fit the required
 //! patterns.
 
-use std::{env, sync::LazyLock, time::Duration};
+use std::{collections::HashSet, env, sync::LazyLock, time::Duration};
 
 use futures::{SinkExt, Stream, StreamExt, stream};
 use futures_util::Future;
+use itertools::Itertools as _;
 use tokio::{pin, select, time::sleep};
 use vector_lib::event_test_util;
 
@@ -64,6 +65,36 @@ pub const HTTP_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 /// The standard set of tags for all `AWS`-based sinks.
 pub const AWS_SINK_TAGS: [&str; 2] = ["protocol", "region"];
 
+/// The set of suffixes that define the source/transform buffer metric family.
+const BUFFER_METRIC_SUFFIXES: [&str; 3] = [
+    // While hypothetically possible, the `max_byte_size` metric is never actually emitted, because
+    // both sources and transforms limit their buffers by event count. If we ever allow
+    // configuration by byte size, we will need to account for this in these tests.
+    "max_event_size",
+    "utilization",
+    "utilization_level",
+];
+
+/// Buffer metric requirements shared between sources and transforms.
+#[derive(Clone, Copy)]
+struct BufferMetricRequirement {
+    prefix: &'static str,
+    suffixes: &'static [&'static str],
+    required_tags: &'static [&'static str],
+}
+
+const SOURCE_BUFFER_METRIC_REQUIREMENT: BufferMetricRequirement = BufferMetricRequirement {
+    prefix: "source_buffer_",
+    suffixes: &BUFFER_METRIC_SUFFIXES,
+    required_tags: &["output"],
+};
+
+const TRANSFORM_BUFFER_METRIC_REQUIREMENT: BufferMetricRequirement = BufferMetricRequirement {
+    prefix: "transform_buffer_",
+    suffixes: &BUFFER_METRIC_SUFFIXES,
+    required_tags: &[],
+};
+
 /// This struct is used to describe a set of component tests.
 pub struct ComponentTests<'a, 'b, 'c> {
     /// The list of event (suffixes) that must be emitted by the component
@@ -72,6 +103,8 @@ pub struct ComponentTests<'a, 'b, 'c> {
     tagged_counters: &'b [&'b str],
     /// The list of counter metrics (with no particular tags) that must be incremented
     untagged_counters: &'c [&'c str],
+    /// Optional buffer metric validation requirements.
+    buffer_metrics: Option<BufferMetricRequirement>,
 }
 
 /// The component test specification for all sources.
@@ -84,6 +117,7 @@ pub static SOURCE_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| ComponentTe
         "component_sent_events_total",
         "component_sent_event_bytes_total",
     ],
+    buffer_metrics: Some(SOURCE_BUFFER_METRIC_REQUIREMENT),
 });
 
 /// The component error test specification (sources and sinks).
@@ -91,6 +125,7 @@ pub static COMPONENT_TESTS_ERROR: LazyLock<ComponentTests> = LazyLock::new(|| Co
     events: &["Error"],
     tagged_counters: &["component_errors_total"],
     untagged_counters: &[],
+    buffer_metrics: None,
 });
 
 /// The component test specification for all transforms.
@@ -103,6 +138,7 @@ pub static TRANSFORM_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| Componen
         "component_sent_events_total",
         "component_sent_event_bytes_total",
     ],
+    buffer_metrics: Some(TRANSFORM_BUFFER_METRIC_REQUIREMENT),
 });
 
 /// The component test specification for sinks that are push-based.
@@ -114,6 +150,7 @@ pub static SINK_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| {
             "component_sent_events_total",
             "component_sent_event_bytes_total",
         ],
+        buffer_metrics: None,
     }
 });
 
@@ -126,6 +163,7 @@ pub static DATA_VOLUME_SINK_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| {
             "component_sent_event_bytes_total",
         ],
         untagged_counters: &[],
+        buffer_metrics: None,
     }
 });
 
@@ -137,6 +175,7 @@ pub static NONSENDING_SINK_TESTS: LazyLock<ComponentTests> = LazyLock::new(|| Co
         "component_sent_event_bytes_total",
     ],
     untagged_counters: &[],
+    buffer_metrics: None,
 });
 
 /// The component test specification for components with multiple outputs.
@@ -148,6 +187,7 @@ pub static COMPONENT_MULTIPLE_OUTPUTS_TESTS: LazyLock<ComponentTests> =
             "component_sent_event_bytes_total",
         ],
         untagged_counters: &[],
+        buffer_metrics: None,
     });
 
 impl ComponentTests<'_, '_, '_> {
@@ -158,6 +198,9 @@ impl ComponentTests<'_, '_, '_> {
         test.emitted_all_events(self.events);
         test.emitted_all_counters(self.tagged_counters, tags);
         test.emitted_all_counters(self.untagged_counters, &[]);
+        if let Some(requirement) = self.buffer_metrics {
+            test.emitted_buffer_metrics(requirement);
+        }
         if !test.errors.is_empty() {
             panic!(
                 "Failed to assert compliance, errors:\n{}\n",
@@ -247,6 +290,80 @@ impl ComponentTester {
             if let Err(err_msg) = event_test_util::contains_name_once(name) {
                 self.errors.push(format!("  - {err_msg}"));
             }
+        }
+    }
+
+    fn emitted_buffer_metrics(&mut self, requirement: BufferMetricRequirement) {
+        let expected: HashSet<String> = requirement
+            .suffixes
+            .iter()
+            .map(|suffix| format!("{}{}", requirement.prefix, suffix))
+            .collect();
+
+        let mut missing = expected.clone();
+        let mut partial_matches = Vec::new();
+
+        for metric in self.metrics.iter().filter(|m| expected.contains(m.name())) {
+            let tags = metric.tags();
+            let is_histogram = matches!(metric.value(), MetricValue::AggregatedHistogram { .. });
+            let is_gauge = matches!(metric.value(), MetricValue::Gauge { .. });
+
+            let missing_tags: Vec<_> = requirement
+                .required_tags
+                .iter()
+                .copied()
+                .filter(|tag| tags.is_none_or(|t| !t.contains_key(tag)))
+                .collect();
+
+            if (is_histogram || is_gauge) && missing_tags.is_empty() {
+                missing.remove(metric.name());
+                continue;
+            }
+
+            let tags_desc = tags
+                .map(|t| format!("{{{}}}", itertools::join(t.keys(), ",")))
+                .unwrap_or_default();
+
+            let mut reasons = Vec::new();
+            if !is_histogram && !is_gauge {
+                reasons.push(format!("unexpected type `{}`", metric.value().as_name()));
+            }
+            if !missing_tags.is_empty() {
+                reasons.push(format!(
+                    "missing {}",
+                    missing_tags
+                        .iter()
+                        .format_with(", ", |tag, fmt| fmt(&format!("`{tag}`")))
+                ));
+            }
+            let detail = if reasons.is_empty() {
+                String::new()
+            } else {
+                format!(" ({})", reasons.join(", "))
+            };
+            partial_matches.push(format!(
+                "\n    -> Found metric `{}{tags_desc}`{detail}",
+                metric.name(),
+            ));
+        }
+
+        if !missing.is_empty() {
+            let partial = partial_matches.join("");
+            let tag_clause = if requirement.required_tags.is_empty() {
+                String::new()
+            } else {
+                format!(
+                    " with tag {}",
+                    requirement
+                        .required_tags
+                        .iter()
+                        .format_with(", ", |tag, fmt| fmt(&format!("`{tag}`")))
+                )
+            };
+            self.errors.push(format!(
+                "  - Missing metric `{}`{tag_clause}{partial}",
+                missing.iter().sorted().join(", ")
+            ));
         }
     }
 }
@@ -529,6 +646,7 @@ pub async fn assert_sink_error_with_events<T>(
         events,
         tagged_counters: &["component_errors_total"],
         untagged_counters: &[],
+        buffer_metrics: None,
     };
     assert_sink_error_with_component_tests(&component_tests, tags, f).await
 }

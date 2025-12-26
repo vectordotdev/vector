@@ -32,6 +32,8 @@ on:
         value: ${{ jobs.source.outputs.source }}
       dependencies:
         value: ${{ jobs.source.outputs.dependencies }}
+      deny:
+        value: ${{ jobs.source.outputs.deny }}
       internal_events:
         value: ${{ jobs.source.outputs.internal_events }}
       cue:
@@ -160,6 +162,7 @@ jobs:
     outputs:
       source: ${{ steps.filter.outputs.source }}
       dependencies: ${{ steps.filter.outputs.dependencies }}
+      deny: ${{ steps.filter.outputs.deny }}
       internal_events: ${{ steps.filter.outputs.internal_events }}
       cue: ${{ steps.filter.outputs.cue }}
       component_docs: ${{ steps.filter.outputs.component_docs }}
@@ -177,7 +180,7 @@ jobs:
       unit_mac-yml: ${{ steps.filter.outputs.unit_mac-yml }}
       unit_windows-yml: ${{ steps.filter.outputs.unit_windows-yml }}
     steps:
-    - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+    - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
     - uses: dorny/paths-filter@de90cc6fb38fc0963ad72b210f1f284cd68cea36 # v3.0.2
       id: filter
@@ -209,6 +212,10 @@ jobs:
             - 'scripts/cross/**'
             - "vdev/**"
             - ".github/workflows/changes.yml"
+          deny:
+            - '**/Cargo.toml'
+            - 'Cargo.lock'
+            - ".github/workflows/deny.yml"
           cue:
             - 'website/cue/**'
             - "vdev/**"
@@ -316,11 +323,13 @@ jobs:
       webhdfs: ${{ steps.filter.outputs.webhdfs }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - uses: ./.github/actions/setup
         with:
           vdev: true
+          mold: false
+          cargo-cache: false
 
       # creates a yaml file that contains the filters for each integration,
       # extracted from the output of the `vdev int ci-paths` command, which
@@ -405,11 +414,13 @@ jobs:
       opentelemetry-metrics: ${{ steps.filter.outputs.opentelemetry-metrics }}
       any: ${{ steps.detect-changes.outputs.any }}
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
 
       - uses: ./.github/actions/setup
         with:
           vdev: true
+          mold: false
+          cargo-cache: false
 
       # creates a yaml file that contains the filters for each test,
       # extracted from the output of the `vdev int ci-paths` command, which

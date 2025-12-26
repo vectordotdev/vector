@@ -55,6 +55,8 @@ impl Eq for Route {}
 #[serde(deny_unknown_fields)]
 pub struct ExclusiveRouteConfig {
     /// An array of named routes. The route names are expected to be unique.
+    /// Routes are evaluated in order from first to last, and only the first matching route receives each event
+    /// (first-match-wins).
     #[configurable(metadata(docs::examples = "routes_example()"))]
     pub routes: Vec<Route>,
 }
