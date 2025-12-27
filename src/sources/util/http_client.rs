@@ -322,6 +322,7 @@ async fn prepare_request(auth: Option<Auth>, request: Request<Body>) -> Request<
     }
 }
 
+#[cfg(feature = "aws-core")]
 async fn sign_aws_request(
     auth: AwsAuthentication,
     request: Request<Body>,
