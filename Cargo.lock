@@ -2632,6 +2632,7 @@ dependencies = [
  "vector-config-macros",
  "vector-core",
  "vector-lookup",
+ "vector-vrl-functions",
  "vrl",
 ]
 
@@ -3600,7 +3601,10 @@ dependencies = [
  "prost-build 0.12.6",
  "snafu 0.8.9",
  "tracing 0.1.41",
- "vector-lib",
+ "vector-common",
+ "vector-config",
+ "vector-core",
+ "vector-lookup",
  "vrl",
 ]
 
@@ -13114,6 +13118,8 @@ dependencies = [
 name = "vector-vrl-functions"
 version = "0.1.0"
 dependencies = [
+ "dnstap-parser",
+ "enrichment",
  "vrl",
 ]
 
@@ -13123,7 +13129,6 @@ version = "0.1.0"
 dependencies = [
  "chrono-tz",
  "clap",
- "dnstap-parser",
  "enrichment",
  "glob",
  "serde",
