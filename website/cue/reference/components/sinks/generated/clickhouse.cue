@@ -386,7 +386,7 @@ generated: components: sinks: clickhouse: configuration: {
 	}
 	endpoint: {
 		deprecated:         true
-		deprecated_message: "This option has been deprecated, the `endpoints` option should be used instead."
+		deprecated_message: "This option has been deprecated. Use the `endpoints` option instead."
 		description:        "The endpoint of the ClickHouse server."
 		required:           false
 		type: string: examples: ["http://localhost:8123"]
