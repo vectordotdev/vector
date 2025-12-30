@@ -178,6 +178,7 @@ jobs:
             vector source
             websocket source
 
+            aggregate transform
             aws_ec2_metadata transform
             dedupe transform
             exclusive_route transform
