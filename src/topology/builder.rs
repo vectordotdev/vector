@@ -2,7 +2,7 @@ use std::{
     collections::HashMap,
     future::ready,
     num::NonZeroUsize,
-    sync::{Arc, LazyLock, Mutex},
+    sync::{Arc, LazyLock, Mutex, RwLock},
     time::Instant,
 };
 
@@ -42,7 +42,8 @@ use crate::{
     SourceSender,
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
-        ProxyConfig, SinkContext, SourceContext, TransformContext, TransformOuter, TransformOutput,
+        ProxyConfig, SharedTopologyMetadata, SinkContext, SourceContext, TopologyMetadata,
+        TransformContext, TransformOuter, TransformOutput,
     },
     event::{EventArray, EventContainer},
     extra_context::ExtraContext,
@@ -86,6 +87,7 @@ struct Builder<'a> {
     extra_context: ExtraContext,
     utilization_emitter: Option<UtilizationEmitter>,
     utilization_registry: UtilizationRegistry,
+    topology_metadata: Option<SharedTopologyMetadata>,
 }
 
 impl<'a> Builder<'a> {
@@ -118,7 +120,66 @@ impl<'a> Builder<'a> {
             extra_context,
             utilization_emitter: emitter,
             utilization_registry: registry,
+            topology_metadata: None,
         }
+    }
+
+    /// Create topology metadata from the current configuration, reusing the existing shared state
+    fn create_topology_metadata(&mut self) -> SharedTopologyMetadata {
+        if let Some(shared) = &self.topology_metadata {
+            return Arc::clone(shared);
+        }
+
+        let mut metadata = TopologyMetadata::new();
+
+        // Collect inputs for each component
+        for (key, transform) in self.config.transforms() {
+            for input in &transform.inputs {
+                metadata
+                    .inputs
+                    .entry(key.clone())
+                    .or_default()
+                    .push(input.clone());
+            }
+            metadata.component_types.insert(
+                key.clone(),
+                (
+                    transform.inner.get_component_name().to_string(),
+                    "transform".to_string(),
+                ),
+            );
+        }
+
+        for (key, sink) in self.config.sinks() {
+            for input in &sink.inputs {
+                metadata
+                    .inputs
+                    .entry(key.clone())
+                    .or_default()
+                    .push(input.clone());
+            }
+            metadata.component_types.insert(
+                key.clone(),
+                (
+                    sink.inner.get_component_name().to_string(),
+                    "sink".to_string(),
+                ),
+            );
+        }
+
+        for (key, source) in self.config.sources() {
+            metadata.component_types.insert(
+                key.clone(),
+                (
+                    source.inner.get_component_name().to_string(),
+                    "source".to_string(),
+                ),
+            );
+        }
+
+        let shared = Arc::new(RwLock::new(metadata));
+        self.topology_metadata = Some(Arc::clone(&shared));
+        shared
     }
 
     /// Builds the new pieces of the topology found in `self.diff`.
@@ -144,6 +205,7 @@ impl<'a> Builder<'a> {
                 utilization: self
                     .utilization_emitter
                     .map(|e| (e, self.utilization_registry)),
+                topology_metadata: self.topology_metadata,
             })
         } else {
             Err(self.errors)
@@ -350,6 +412,13 @@ impl<'a> Builder<'a> {
                 .shutdown_coordinator
                 .register_source(key, INTERNAL_SOURCES.contains(&typetag));
 
+            // Create topology metadata for any internal_metrics source
+            let topology_metadata = if typetag == "internal_metrics" {
+                Some(self.create_topology_metadata())
+            } else {
+                None
+            };
+
             let context = SourceContext {
                 key: key.clone(),
                 globals: self.config.global.clone(),
@@ -361,6 +430,7 @@ impl<'a> Builder<'a> {
                 schema_definitions,
                 schema: self.config.schema,
                 extra_context: self.extra_context.clone(),
+                topology_metadata,
             };
             let server = match source.inner.build(context).await {
                 Err(error) => {
@@ -780,6 +850,7 @@ pub struct TopologyPieces {
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
+    pub(crate) topology_metadata: Option<SharedTopologyMetadata>,
 }
 
 /// Builder for constructing TopologyPieces with a fluent API.
