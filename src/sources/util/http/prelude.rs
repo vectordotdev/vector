@@ -17,7 +17,8 @@ use warp::{
         BoxedFilter,
         path::{FullPath, Tail},
     },
-    http::{HeaderMap, StatusCode},
+    host::Authority,
+    http::{HeaderMap, HeaderValue, StatusCode},
     reject::Rejection,
 };
 
@@ -116,18 +117,26 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 .and(warp::path::full())
                 .and(warp::header::optional::<String>("content-encoding"))
                 .and(warp::header::headers_cloned())
+                .and(warp::host::optional())
                 .and(warp::body::bytes())
                 .and(warp::query::<HashMap<String, String>>())
                 .and(warp::filters::ext::optional())
                 .and_then(
                     move |path: FullPath,
                           encoding_header: Option<String>,
-                          headers: HeaderMap,
+                          mut headers: HeaderMap,
+                          host: Option<Authority>,
                           body: Bytes,
                           query_parameters: HashMap<String, String>,
                           addr: Option<PeerAddr>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
+                        if !headers.contains_key("host") && let Some(host) = host {
+                            // Put authority into the "host" header for compatibility with HTTP/2.
+                            let host_header = HeaderValue::from_str(host.as_str())
+                                .expect("authority is valid header");
+                            headers.insert("host", host_header);
+                        }
                         let events = auth_matcher
                             .as_ref()
                             .map_or(Ok(()), |a| {
