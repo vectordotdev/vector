@@ -58,6 +58,18 @@ pub struct VectorConfig {
     #[serde(default)]
     compression: bool,
 
+    /// Time-to-live (TTL) for connections in seconds.
+    ///
+    /// After this duration, the connection will be closed and a new one will be established.
+    /// This is useful for load balancing scenarios where long-lived connections prevent
+    /// proper distribution of traffic across backend instances.
+    ///
+    /// If not set, connections will be reused indefinitely (subject to HTTP/2 keep-alive).
+    #[configurable(metadata(docs::examples = 300))]
+    #[configurable(metadata(docs::examples = 600))]
+    #[serde(default)]
+    pub(in crate::sinks::vector) connection_ttl_secs: Option<u64>,
+
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<RealtimeEventBasedDefaultBatchSettings>,
@@ -98,6 +110,7 @@ fn default_config(address: &str) -> VectorConfig {
         version: None,
         address: address.to_owned(),
         compression: false,
+        connection_ttl_secs: None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig::default(),
         tls: None,
@@ -111,8 +124,9 @@ impl SinkConfig for VectorConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSinkType, Healthcheck)> {
         let tls = MaybeTlsSettings::from_config(self.tls.as_ref(), false)?;
         let uri = with_default_scheme(&self.address, tls.is_tls())?;
+        let proxy_config = cx.proxy().clone();
 
-        let client = new_client(&tls, cx.proxy())?;
+        let client = new_client(&tls, &proxy_config)?;
 
         let healthcheck_uri = cx
             .healthcheck
@@ -120,9 +134,26 @@ impl SinkConfig for VectorConfig {
             .clone()
             .map(|uri| uri.uri)
             .unwrap_or_else(|| uri.clone());
-        let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri, false);
-        let healthcheck = healthcheck(healthcheck_client, cx.healthcheck);
-        let service = VectorService::new(client, uri, self.compression);
+        let healthcheck_options = cx.healthcheck;
+        let healthcheck_client = VectorService::new(
+            client.clone(),
+            healthcheck_uri,
+            false,
+            None,
+            tls.clone(),
+            proxy_config.clone(),
+        );
+        let healthcheck = healthcheck(healthcheck_client, healthcheck_options);
+
+        let connection_ttl = self.connection_ttl_secs.map(std::time::Duration::from_secs);
+        let service = VectorService::new(
+            client,
+            uri,
+            self.compression,
+            connection_ttl,
+            tls,
+            proxy_config,
+        );
         let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 
