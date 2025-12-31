@@ -101,7 +101,8 @@ fn handle_events(
 
     for event in events {
         if let Event::Log(log) = event {
-            log_namespace.insert_standard_vector_source_metadata(log, SocketConfig::NAME, now);
+            log.metadata_mut().set_ingest_timestamp(now);
+            log_namespace.insert_standard_vector_source_metadata(log, SocketConfig::NAME);
 
             if let Some(ref host) = received_from {
                 let legacy_host_key = host_key.clone().path;

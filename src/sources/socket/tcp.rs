@@ -222,11 +222,9 @@ impl TcpSource for RawTcpSource {
 
         for event in events {
             if let Event::Log(log) = event {
-                self.log_namespace.insert_standard_vector_source_metadata(
-                    log,
-                    SocketConfig::NAME,
-                    now,
-                );
+                log.metadata_mut().set_ingest_timestamp(now);
+                self.log_namespace
+                    .insert_standard_vector_source_metadata(log, SocketConfig::NAME);
 
                 let legacy_host_key = self
                     .config

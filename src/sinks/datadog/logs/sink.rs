@@ -547,7 +547,8 @@ mod tests {
         log.insert(event_path!("message"), "the_message");
         let namespace = log.namespace();
 
-        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent", Utc::now());
+        log.metadata_mut().set_ingest_timestamp(Utc::now());
+        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent");
 
         let tags = vec![
             Value::Bytes("key1:value1".into()),
@@ -594,7 +595,8 @@ mod tests {
         log.insert(metadata_path!("vector", "foo"), "bar");
 
         let namespace = log.namespace();
-        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent", Utc::now());
+        log.metadata_mut().set_ingest_timestamp(Utc::now());
+        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent");
 
         let tags = vec![
             Value::Bytes("key1:value1".into()),
@@ -634,7 +636,8 @@ mod tests {
         );
         let mut log = LogEvent::new_with_metadata(agent_event_metadata(definition));
         let namespace = log.namespace();
-        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent", Utc::now());
+        log.metadata_mut().set_ingest_timestamp(Utc::now());
+        namespace.insert_standard_vector_source_metadata(&mut log, "datadog_agent");
 
         let tags = vec![
             Value::Bytes("key1:value1".into()),

@@ -1099,17 +1099,15 @@ impl ReceivedMessage {
 
     fn apply(&self, keys: &Keys, event: &mut Event, log_namespace: LogNamespace) {
         if let Event::Log(log) = event {
+            log.metadata_mut().set_ingest_timestamp(Utc::now());
             match log_namespace {
                 LogNamespace::Vector => {
                     // We'll only use this function in Vector namespaces because we don't want
                     // "timestamp" to be set automatically in legacy namespaces. In legacy
                     // namespaces, the "timestamp" field corresponds to the Kafka message, not the
                     // timestamp when the event was processed.
-                    log_namespace.insert_standard_vector_source_metadata(
-                        log,
-                        KafkaSourceConfig::NAME,
-                        Utc::now(),
-                    );
+                    log_namespace
+                        .insert_standard_vector_source_metadata(log, KafkaSourceConfig::NAME);
                 }
                 LogNamespace::Legacy => {
                     if let Some(source_type_key) = log_schema().source_type_key_target_path() {

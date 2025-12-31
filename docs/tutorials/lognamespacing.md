@@ -112,7 +112,8 @@ separate namespace to the event data.
 
 The actual value to be placed into the field.
 
-For the ingest timestamp this will be `chrono::Utc::now()`. Source type will be
+For the ingest timestamp this should be recorded on the event metadata via
+`log.metadata_mut().set_ingest_timestamp(chrono::Utc::now())`. Source type will be
 the `NAME` property of the `Config` struct. `NAME` is provided by the
 `configurable_component` macro. You may need to include `use vector_config::NamedComponent;`.
 
@@ -127,11 +128,8 @@ insert both these fields into the Vector namespace:
 
 ```rust
 
-  log_namespace.insert_standard_vector_source_metadata(
-      log,
-      KafkaSourceConfig::NAME,
-      Utc::now(),
-  );
+  log.metadata_mut().set_ingest_timestamp(Utc::now());
+  log_namespace.insert_standard_vector_source_metadata(log, KafkaSourceConfig::NAME);
 ```
 
 ### Source Metadata

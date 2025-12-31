@@ -587,7 +587,8 @@ fn spawn_input_driver(
             if component_type != ComponentType::Source
                 && let Event::Log(log) = input_event.get_event()
             {
-                log_namespace.insert_standard_vector_source_metadata(log, "vector", now);
+                log.metadata_mut().set_ingest_timestamp(now);
+                log_namespace.insert_standard_vector_source_metadata(log, "vector");
             }
 
             let (failure_case, mut event) = input_event.clone().get();

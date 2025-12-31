@@ -565,11 +565,9 @@ impl http_client::HttpClientContext for HttpClientContext {
         for event in events {
             match event {
                 Event::Log(log) => {
-                    self.log_namespace.insert_standard_vector_source_metadata(
-                        log,
-                        HttpClientConfig::NAME,
-                        now,
-                    );
+                    log.metadata_mut().set_ingest_timestamp(now);
+                    self.log_namespace
+                        .insert_standard_vector_source_metadata(log, HttpClientConfig::NAME);
                 }
                 Event::Metric(metric) => {
                     if let Some(source_type_key) = log_schema().source_type_key() {

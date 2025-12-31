@@ -60,11 +60,9 @@ pub async fn process_message(
                 let now = Utc::now();
                 let events = events.into_iter().map(|mut event| {
                     if let Event::Log(ref mut log) = event {
-                        log_namespace.insert_standard_vector_source_metadata(
-                            log,
-                            NatsSourceConfig::NAME,
-                            now,
-                        );
+                        log.metadata_mut().set_ingest_timestamp(now);
+                        log_namespace
+                            .insert_standard_vector_source_metadata(log, NatsSourceConfig::NAME);
                         let legacy_subject_key_field = config
                             .subject_key_field
                             .path
