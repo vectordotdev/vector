@@ -101,7 +101,7 @@ const Result = ({ hit, components, category }) => {
         </div>
         <p className="text-gray-600 text-sm">
           {hit.content && (
-            <span dangerouslySetInnerHTML={{__html: hit.content}} />
+            <span style={{ whiteSpace: 'pre-line' }} dangerouslySetInnerHTML={{ __html: hit.content }} />
           )}
           {!hit.content && (
             <span style={{ wordBreak: 'break-word' }}>{hit.document.itemUrl}</span>
