@@ -1,0 +1,393 @@
+use std::path::PathBuf;
+use std::sync::Arc;
+
+use async_trait::async_trait;
+use futures::StreamExt;
+use tokio::select;
+use vector_lib::finalizer::OrderedFinalizer;
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
+use vector_lib::{EstimatedJsonEncodedSizeOf, config::LogNamespace};
+use vrl::value::Kind;
+
+use crate::{
+    SourceSender,
+    config::{DataType, SourceConfig, SourceContext, SourceOutput},
+    event::{BatchNotifier, BatchStatus, BatchStatusReceiver},
+    internal_events::{
+        EventsReceived, StreamClosedError, WindowsEventLogParseError, WindowsEventLogQueryError,
+    },
+    shutdown::ShutdownSignal,
+};
+
+mod bookmark;
+mod checkpoint;
+mod config;
+pub mod error;
+mod parser;
+mod subscription;
+
+#[cfg(test)]
+mod tests;
+
+// Integration tests are feature-gated to avoid requiring Windows Event Log service.
+// To run integration tests on Windows: cargo test --features sources-windows_event_log-integration-tests
+#[cfg(all(test, feature = "sources-windows_event_log-integration-tests"))]
+mod integration_tests;
+
+pub use self::config::*;
+use self::{
+    checkpoint::Checkpointer, error::WindowsEventLogError, parser::EventLogParser,
+    subscription::EventLogSubscription,
+};
+
+/// Entry for the acknowledgment finalizer containing checkpoint information.
+/// Each entry represents a batch of events that need to be acknowledged before
+/// the checkpoint can be safely updated. Contains all channel bookmarks from
+/// the batch since a single batch may span multiple channels.
+#[derive(Debug, Clone)]
+struct FinalizerEntry {
+    /// Channel bookmarks: (channel_name, bookmark_xml) pairs
+    bookmarks: Vec<(String, String)>,
+}
+
+/// Shared checkpointer type for use with the finalizer
+type SharedCheckpointer = Arc<Checkpointer>;
+
+/// Finalizer for handling acknowledgments.
+/// Supports both synchronous (immediate checkpoint) and asynchronous (deferred checkpoint) modes.
+enum Finalizer {
+    /// Synchronous mode: checkpoints are updated immediately after reading events.
+    /// Used when acknowledgements are disabled.
+    Sync(SharedCheckpointer),
+    /// Asynchronous mode: checkpoints are updated only after downstream sinks acknowledge receipt.
+    /// Used when acknowledgements are enabled.
+    Async(OrderedFinalizer<FinalizerEntry>),
+}
+
+impl Finalizer {
+    /// Create a new finalizer based on acknowledgement configuration.
+    fn new(
+        acknowledgements: bool,
+        checkpointer: SharedCheckpointer,
+        shutdown: ShutdownSignal,
+    ) -> Self {
+        if acknowledgements {
+            let (finalizer, mut ack_stream) =
+                OrderedFinalizer::<FinalizerEntry>::new(Some(shutdown.clone()));
+
+            // Spawn background task to process acknowledgments and update checkpoints
+            tokio::spawn(async move {
+                while let Some((status, entry)) = ack_stream.next().await {
+                    if status == BatchStatus::Delivered {
+                        // Only update checkpoint on successful delivery
+                        if let Err(e) = checkpointer.set_batch(entry.bookmarks.clone()).await {
+                            warn!(
+                                message = "Failed to update checkpoint after acknowledgement",
+                                error = %e
+                            );
+                        } else {
+                            debug!(
+                                message = "Checkpoint updated after acknowledgement",
+                                channels = entry.bookmarks.len()
+                            );
+                        }
+                    } else {
+                        debug!(
+                            message = "Events not delivered, checkpoint not updated",
+                            status = ?status
+                        );
+                    }
+                }
+                debug!("Acknowledgement stream completed");
+            });
+
+            Self::Async(finalizer)
+        } else {
+            Self::Sync(checkpointer)
+        }
+    }
+
+    /// Finalize a batch of events.
+    /// In sync mode, immediately updates the checkpoint.
+    /// In async mode, registers the entry for deferred checkpoint update.
+    async fn finalize(&self, entry: FinalizerEntry, receiver: Option<BatchStatusReceiver>) {
+        match (self, receiver) {
+            (Self::Sync(checkpointer), None) => {
+                // Immediate checkpoint update (no acks)
+                if let Err(e) = checkpointer.set_batch(entry.bookmarks.clone()).await {
+                    warn!(
+                        message = "Failed to update checkpoint",
+                        error = %e
+                    );
+                }
+            }
+            (Self::Async(finalizer), Some(receiver)) => {
+                // Deferred checkpoint update (with acks)
+                finalizer.add(entry, receiver);
+            }
+            (Self::Sync(_), Some(_)) => {
+                // This shouldn't happen - acks enabled but sync mode
+                warn!("Received acknowledgement receiver in sync mode, ignoring");
+            }
+            (Self::Async(_), None) => {
+                // This shouldn't happen - async mode but no receiver
+                warn!("No acknowledgement receiver in async mode, checkpoint may be lost");
+            }
+        }
+    }
+}
+
+/// Windows Event Log source implementation
+pub struct WindowsEventLogSource {
+    config: WindowsEventLogConfig,
+    data_dir: PathBuf,
+    acknowledgements: bool,
+}
+
+impl WindowsEventLogSource {
+    pub fn new(
+        config: WindowsEventLogConfig,
+        data_dir: PathBuf,
+        acknowledgements: bool,
+    ) -> crate::Result<Self> {
+        // Validate configuration
+        config.validate()?;
+
+        Ok(Self {
+            config,
+            data_dir,
+            acknowledgements,
+        })
+    }
+
+    async fn run_internal(
+        &mut self,
+        mut out: SourceSender,
+        shutdown: ShutdownSignal,
+    ) -> Result<(), WindowsEventLogError> {
+        // Initialize checkpointer for state persistence
+        let checkpointer = Arc::new(Checkpointer::new(&self.data_dir).await?);
+
+        // Create finalizer based on acknowledgement configuration
+        let finalizer = Finalizer::new(
+            self.acknowledgements,
+            Arc::clone(&checkpointer),
+            shutdown.clone(),
+        );
+
+        let mut subscription = EventLogSubscription::new(
+            &self.config,
+            Arc::clone(&checkpointer),
+            self.acknowledgements,
+        )
+        .await?;
+        let parser = EventLogParser::new(&self.config);
+
+        let events_received = register!(EventsReceived);
+        let bytes_received = register!(BytesReceived::from(Protocol::from("windows_event_log")));
+
+        info!(
+            message = "Starting Windows Event Log source",
+            acknowledgements = self.acknowledgements,
+        );
+
+        let mut shutdown = shutdown;
+        loop {
+            select! {
+                _ = &mut shutdown => {
+                    info!("Windows Event Log source received shutdown signal");
+                    #[cfg(windows)]
+                    {
+                        // Only flush bookmarks in sync mode - async mode handles via finalizer
+                        if !self.acknowledgements {
+                            info!("Flushing bookmarks before shutdown");
+                            if let Err(e) = subscription.flush_bookmarks().await {
+                                warn!("Failed to flush bookmarks on shutdown: {}", e);
+                            }
+                        }
+                    }
+                    break;
+                }
+
+                events_result = subscription.next_events(self.config.batch_size as usize) => {
+                    match events_result {
+                        Ok(events) => {
+                            if events.is_empty() {
+                                // No events received within timeout - this is normal
+                                continue;
+                            }
+
+                            debug!(
+                                message = "Received Windows Event Log events",
+                                event_count = events.len()
+                            );
+
+                            // Create batch notifier for acknowledgement tracking
+                            let (batch, receiver) =
+                                BatchNotifier::maybe_new_with_receiver(self.acknowledgements);
+
+                            let mut log_events = Vec::new();
+                            let mut total_byte_size = 0;
+                            let mut channels_in_batch = std::collections::HashSet::new();
+
+                            for event in events {
+                                let channel = event.channel.clone();
+                                channels_in_batch.insert(channel.clone());
+                                let event_id = event.event_id;
+                                match parser.parse_event(event) {
+                                    Ok(mut log_event) => {
+                                        let byte_size = log_event.estimated_json_encoded_size_of();
+                                        total_byte_size += byte_size.get();
+
+                                        // Attach batch notifier to event for acknowledgement tracking
+                                        if let Some(ref batch) = batch {
+                                            log_event = log_event.with_batch_notifier(batch);
+                                        }
+
+                                        log_events.push(log_event);
+                                    }
+                                    Err(e) => {
+                                        emit!(WindowsEventLogParseError {
+                                            error: e.to_string(),
+                                            channel,
+                                            event_id: Some(event_id),
+                                        });
+                                    }
+                                }
+                            }
+
+                            if !log_events.is_empty() {
+                                let count = log_events.len();
+                                events_received.emit(CountByteSize(count, total_byte_size.into()));
+                                bytes_received.emit(ByteSize(total_byte_size));
+
+                                if let Err(_error) = out.send_batch(log_events).await {
+                                    emit!(StreamClosedError { count });
+                                    break;
+                                }
+
+                                // Register checkpoint entry with finalizer
+                                // Collect all channel bookmarks from this batch
+                                let bookmarks: Vec<(String, String)> = channels_in_batch
+                                    .into_iter()
+                                    .filter_map(|channel| {
+                                        subscription
+                                            .get_bookmark_xml(&channel)
+                                            .map(|xml| (channel, xml))
+                                    })
+                                    .collect();
+
+                                if !bookmarks.is_empty() {
+                                    let entry = FinalizerEntry { bookmarks };
+                                    finalizer.finalize(entry, receiver).await;
+                                }
+                            }
+                        }
+                        Err(e) => {
+                            emit!(WindowsEventLogQueryError {
+                                channel: "all".to_string(),
+                                query: None,
+                                error: e.to_string(),
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+#[async_trait]
+#[typetag::serde(name = "windows_event_log")]
+impl SourceConfig for WindowsEventLogConfig {
+    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
+        // Resolve data directory using Vector's global data_dir, creating a subdir for this source
+        let data_dir = cx
+            .globals
+            .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
+
+        // Check if acknowledgements are enabled (merges source and global config)
+        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+
+        let source = WindowsEventLogSource::new(self.clone(), data_dir, acknowledgements)?;
+        Ok(Box::pin(async move {
+            let mut source = source;
+            if let Err(error) = source.run_internal(cx.out, cx.shutdown).await {
+                error!(message = "Windows Event Log source failed", %error);
+            }
+            Ok(())
+        }))
+    }
+
+    fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {
+        // Respect the per-source log_namespace setting, falling back to global
+        let log_namespace = self
+            .log_namespace
+            .map(|b| {
+                if b {
+                    LogNamespace::Vector
+                } else {
+                    LogNamespace::Legacy
+                }
+            })
+            .unwrap_or(global_log_namespace);
+
+        let schema_definition = match log_namespace {
+            LogNamespace::Vector => vector_lib::schema::Definition::new_with_default_metadata(
+                Kind::object(std::collections::BTreeMap::from([
+                    ("timestamp".into(), Kind::timestamp().or_undefined()),
+                    ("message".into(), Kind::bytes().or_undefined()),
+                    ("level".into(), Kind::bytes().or_undefined()),
+                    ("source".into(), Kind::bytes().or_undefined()),
+                    ("event_id".into(), Kind::integer().or_undefined()),
+                    ("provider_name".into(), Kind::bytes().or_undefined()),
+                    ("computer".into(), Kind::bytes().or_undefined()),
+                    ("user_id".into(), Kind::bytes().or_undefined()),
+                    ("record_id".into(), Kind::integer().or_undefined()),
+                    ("activity_id".into(), Kind::bytes().or_undefined()),
+                    ("related_activity_id".into(), Kind::bytes().or_undefined()),
+                    ("process_id".into(), Kind::integer().or_undefined()),
+                    ("thread_id".into(), Kind::integer().or_undefined()),
+                    ("channel".into(), Kind::bytes().or_undefined()),
+                    ("opcode".into(), Kind::bytes().or_undefined()),
+                    ("task".into(), Kind::bytes().or_undefined()),
+                    ("keywords".into(), Kind::bytes().or_undefined()),
+                ])),
+                [LogNamespace::Vector],
+            ),
+            LogNamespace::Legacy => vector_lib::schema::Definition::any(),
+        };
+
+        vec![SourceOutput::new_maybe_logs(
+            DataType::Log,
+            schema_definition,
+        )]
+    }
+
+    fn resources(&self) -> Vec<crate::config::Resource> {
+        // Windows Event Logs are local resources
+        self.channels
+            .iter()
+            .map(|channel| crate::config::Resource::DiskBuffer(channel.clone()))
+            .collect()
+    }
+
+    fn can_acknowledge(&self) -> bool {
+        true
+    }
+}
+
+use vector_config::component::SourceDescription;
+
+inventory::submit! {
+    SourceDescription::new::<WindowsEventLogConfig>(
+        "windows_event_log",
+        "Collect logs from Windows Event Log channels",
+        "A Windows-specific source that subscribes to Windows Event Log channels and streams events in real-time using the Windows Event Log API.",
+        "https://vector.dev/docs/reference/configuration/sources/windows_event_log/"
+    )
+}
