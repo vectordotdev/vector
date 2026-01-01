@@ -775,18 +775,18 @@ fn reconcile_position_options(
 #[cfg(unix)]
 fn get_file_ownership(file_path: &str) -> (Option<String>, Option<String>) {
     use std::fs::metadata;
-    
+
     match metadata(file_path) {
         Ok(meta) => {
             let uid = meta.uid();
             let gid = meta.gid();
-            
-            let owner = users::get_user_by_uid(uid)
-                .map(|user| user.name().to_string_lossy().into_owned());
-            
-            let group = users::get_group_by_gid(gid)
-                .map(|grp| grp.name().to_string_lossy().into_owned());
-            
+
+            let owner =
+                users::get_user_by_uid(uid).map(|user| user.name().to_string_lossy().into_owned());
+
+            let group =
+                users::get_group_by_gid(gid).map(|grp| grp.name().to_string_lossy().into_owned());
+
             (owner, group)
         }
         Err(_) => (None, None),
@@ -903,7 +903,7 @@ fn create_event(
             owner_name,
         );
     }
-    
+
     if let Some(group_name) = group {
         let legacy_group_key = meta.group_key.as_ref().map(LegacyKey::Overwrite);
         log_namespace.insert_source_metadata(
