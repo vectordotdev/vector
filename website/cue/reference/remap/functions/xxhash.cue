@@ -45,19 +45,19 @@ remap: functions: xxhash: {
 			source: #"""
 				xxhash("foo", "XXH64")
 				"""#
-			return: -3728699739546630719
+			return: 3728699739546630719
 		},
 		{
 			title: "Calculate a hash using the XXH3-64 algorithm"
 			source: #"""
-				xxhash("foo", "XXH3-64)
+				xxhash("foo", "XXH3-64")
 				"""#
 			return: -6093828362558603894
 		},
 		{
 			title: "Calculate a hash using the XXH3-128 algorithm"
 			source: #"""
-				xxhash("foo", "XXH3-128)
+				xxhash("foo", "XXH3-128")
 				"""#
 			return: "161745101148472925293886522910304009610"
 		},

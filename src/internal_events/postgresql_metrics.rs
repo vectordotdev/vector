@@ -1,7 +1,8 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct PostgresqlMetricsCollectError<'a> {
     pub error: String,
     pub endpoint: &'a str,

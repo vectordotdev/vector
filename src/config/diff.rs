@@ -225,7 +225,7 @@ fn extract_table_component_keys(
         .collect()
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "enrichment-tables-memory"))]
 mod tests {
     use crate::config::ConfigBuilder;
     use indoc::indoc;
