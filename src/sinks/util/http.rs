@@ -2,11 +2,14 @@
 use aws_credential_types::provider::SharedCredentialsProvider;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
+use brotli::Decompressor as BrotliDecoder;
 use bytes::{Buf, Bytes};
+use flate2::read::GzDecoder;
 use futures::{Sink, future::BoxFuture};
 use headers::HeaderName;
 use http::{HeaderValue, Request, Response, StatusCode, header};
 use http_body::Body as _;
+use zstd::stream::read::Decoder as ZstdDecoder;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct OrderedHeaderName(HeaderName);
@@ -38,21 +41,24 @@ impl PartialOrd for OrderedHeaderName {
         Some(self.cmp(other))
     }
 }
+use flate2::bufread::ZlibDecoder;
+use http::header::{CONTENT_ENCODING, CONTENT_TYPE};
+use hyper::Body;
+use pin_project::pin_project;
+use snafu::{ResultExt, Snafu};
+use std::io::Read;
 use std::{
     collections::BTreeMap,
     fmt,
     future::Future,
     hash::Hash,
+    io,
     marker::PhantomData,
     pin::Pin,
     sync::Arc,
     task::{Context, Poll, ready},
     time::Duration,
 };
-
-use hyper::Body;
-use pin_project::pin_project;
-use snafu::{ResultExt, Snafu};
 use tower::{Service, ServiceBuilder};
 use tower_http::decompression::DecompressionLayer;
 use vector_lib::{
@@ -580,12 +586,91 @@ impl<Req: Clone + Send + Sync + 'static> RetryLogic for HttpRetryLogic<Req> {
             StatusCode::NOT_IMPLEMENTED => {
                 RetryAction::DontRetry("endpoint not implemented".into())
             }
-            _ if status.is_server_error() => RetryAction::Retry(
-                format!("{}: {}", status, String::from_utf8_lossy(response.body())).into(),
-            ),
             _ if status.is_success() => RetryAction::Successful,
-            _ => RetryAction::DontRetry(format!("response status: {status}").into()),
+            _ => {
+                const LOG_SINK_HTTP_RESPONSE: &str = "sink-http-response";
+                if tracing::enabled!(target: LOG_SINK_HTTP_RESPONSE, tracing::Level::DEBUG) {
+                    // gate the response body decoding logic
+                    let body_preview = get_response_preview(response)
+                        .unwrap_or_else(|err| format!("cannot peek: {err:?}"));
+                    debug!(target: LOG_SINK_HTTP_RESPONSE, message = "sink http response", %status, %body_preview);
+                }
+                let msg = format!("response status: {status}").into();
+                if status.is_server_error() {
+                    RetryAction::Retry(msg)
+                } else {
+                    RetryAction::DontRetry(msg)
+                }
+            }
         }
+    }
+}
+
+#[derive(Debug, Snafu)]
+pub enum ResponsePreviewError {
+    #[snafu(display("Cannot preview a binary response content: {}", content_type))]
+    BinaryContent { content_type: String },
+    #[snafu(display("Unknown encoding of content in HTTP response: {}", content_encoding))]
+    UnknownEncoding { content_encoding: String },
+    #[snafu(display("Error reading data: {:?}", err))]
+    IOError { err: io::Error },
+}
+
+/// Try to decompress and read the first 1024 bytes from the HTTP response body.
+fn get_response_preview(response: &Response<Bytes>) -> crate::Result<String> {
+    const BROTLI_INTERNAL_BUFFER_SIZE: usize = 4096;
+    const PEEK_UTF8_CHARACTERS: usize = 1024;
+    const UNKNOWN_CONTENT_ENCODING: &str = "unspecified";
+
+    // skip binary data
+    if let Some(content_type) = response
+        .headers()
+        .get(CONTENT_TYPE)
+        .and_then(|v| v.to_str().ok())
+    {
+        let is_binary_resp = content_type.starts_with("image/")
+            || content_type.starts_with("video/")
+            || content_type.starts_with("audio/")
+            || content_type == "application/octet-stream";
+        if is_binary_resp {
+            return Err(Box::new(ResponsePreviewError::BinaryContent {
+                content_type: content_type.to_string(),
+            }));
+        }
+    }
+
+    let body_bytes = response.body().as_ref();
+    let content_encoding = response
+        .headers()
+        .get(CONTENT_ENCODING)
+        .and_then(|v| v.to_str().ok())
+        .unwrap_or_else(|| UNKNOWN_CONTENT_ENCODING);
+
+    // handle different compression methods in HTTP response
+    let mut reader: Box<dyn Read> = match content_encoding {
+        "gzip" => Box::new(GzDecoder::new(body_bytes)),
+        "deflate" => Box::new(ZlibDecoder::new(body_bytes)),
+        "br" => Box::new(BrotliDecoder::new(body_bytes, BROTLI_INTERNAL_BUFFER_SIZE)),
+        "zstd" => Box::new(
+            ZstdDecoder::new(body_bytes).unwrap_or_else(|_| ZstdDecoder::new(body_bytes).unwrap()),
+        ),
+        // unspecified or identity encoding, treat as utf-8 directly
+        UNKNOWN_CONTENT_ENCODING | "identity" => Box::new(body_bytes),
+        encoding => {
+            return Err(Box::new(ResponsePreviewError::UnknownEncoding {
+                content_encoding: encoding.to_string(),
+            }));
+        }
+    };
+
+    // one utf-8 char takes up to 4 bytes, read at most that number of bytes for utf-8 decoding
+    let mut buf = [0u8; PEEK_UTF8_CHARACTERS * 4];
+    match reader.read(&mut buf) {
+        Ok(cnt) => Ok(String::from_utf8_lossy(&buf[..cnt])
+            .chars()
+            .take(PEEK_UTF8_CHARACTERS)
+            .collect()),
+        Err(why) => Err(Box::new(ResponsePreviewError::IOError { err: why })),
     }
 }
 

@@ -35,6 +35,10 @@ You can set different verbosity levels for specific components:
 VECTOR_LOG=info,vector::sources::aws_s3=warn vector --config path/to/config.yaml
 ```
 
+There are some standalone log targets which may help you to debug:
+
+* `sink-http-response`: log sinks HTTP response body in `DEBUG` level.
+
 You can find more information on the syntax [here](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#usage-notes).
 
 ### Vector Tools
