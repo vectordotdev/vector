@@ -241,13 +241,20 @@ async fn fetch_netlink_inet_headers(addr_family: u8) -> Result<Vec<InetResponseH
         .await
         .context(NetlinkSendSnafu)?;
 
-    let mut receive_buffer = vec![0; 4096];
     let mut inet_resp_hdrs = Vec::with_capacity(32); // Pre-allocate with an estimate
 
-    while let Ok(()) = socket.recv(&mut &mut receive_buffer[..]).await {
-        let done = parse_netlink_messages(&receive_buffer, &mut inet_resp_hdrs)?;
-        if done {
-            break;
+    loop {
+        match socket.recv_from_full().await {
+            Ok((receive_buffer, _addr)) => {
+                if receive_buffer.is_empty() {
+                    break;
+                }
+                let done = parse_netlink_messages(&receive_buffer, &mut inet_resp_hdrs)?;
+                if done {
+                    break;
+                }
+            }
+            Err(_) => break,
         }
     }
 
