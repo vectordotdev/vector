@@ -29,6 +29,17 @@ const DORIS_CONTENT_TYPE: &str = "text/plain;charset=utf-8";
 /// before sending the request body, which is required by Doris Stream Load protocol.
 const DORIS_EXPECT_HEADER: &str = "100-continue";
 
+/// Group commit header name for Doris Stream Load.
+const GROUP_COMMIT_HEADER: &str = "group_commit";
+
+/// Group commit sync mode - multiple imports merged into one transaction,
+/// returns after transaction commit. Data is visible immediately after import.
+const GROUP_COMMIT_SYNC_MODE: &str = "sync_mode";
+
+/// Group commit async mode - data written to WAL first, returns immediately.
+/// Data is visible after async commit based on group_commit_interval.
+const GROUP_COMMIT_ASYNC_MODE: &str = "async_mode";
+
 /// Thread-safe version of the DorisSinkClient, wrapped in an Arc
 pub type ThreadSafeDorisSinkClient = Arc<DorisSinkClient>;
 
@@ -87,6 +98,19 @@ impl DorisSinkClient {
         )
     }
 
+    /// Check if group commit is enabled in the custom headers
+    /// Group commit has three modes:
+    /// - off_mode: disabled, label is required
+    /// - sync_mode: enabled, label should be skipped
+    /// - async_mode: enabled, label should be skipped
+    fn is_group_commit_enabled(&self) -> bool {
+        self.headers.iter().any(|(k, v)| {
+            k.eq_ignore_ascii_case(GROUP_COMMIT_HEADER)
+                && (v.eq_ignore_ascii_case(GROUP_COMMIT_SYNC_MODE)
+                    || v.eq_ignore_ascii_case(GROUP_COMMIT_ASYNC_MODE))
+        })
+    }
+
     /// Build a request for the Doris stream load
     async fn build_request(
         &self,
@@ -95,8 +119,6 @@ impl DorisSinkClient {
         payload: &Bytes,
         redirect_url: Option<&str>,
     ) -> Result<Request<Body>, crate::Error> {
-        let label = self.generate_label(database, table);
-
         let uri = if let Some(redirect_url) = redirect_url {
             debug!(%redirect_url, "Using redirect URL.");
             redirect_url.parse::<Uri>().map_err(|source| {
@@ -126,15 +148,26 @@ impl DorisSinkClient {
             })?
         };
 
-        debug!(%uri, %label, "Building request.");
-
         let mut builder = Request::builder()
             .method(Method::PUT)
             .uri(uri.clone())
             .header(CONTENT_LENGTH, payload.len())
             .header(CONTENT_TYPE, DORIS_CONTENT_TYPE)
-            .header(EXPECT, DORIS_EXPECT_HEADER)
-            .header("label", &label);
+            .header(EXPECT, DORIS_EXPECT_HEADER);
+
+        // Only set label when group commit is not enabled
+        // When group commit is enabled, Doris server ignores the label anyway
+        // as multiple requests are merged into a single transaction
+        let label = if self.is_group_commit_enabled() {
+            debug!(%uri, "Building request with group commit enabled (no label).");
+            None
+        } else {
+            let label = self.generate_label(database, table);
+            debug!(%uri, %label, "Building request.");
+            builder = builder.header("label", &label);
+            Some(label)
+        };
+        let _ = label; // Suppress unused variable warning
 
         // Add compression headers if needed
         if let Some(ce) = self.compression.content_encoding() {
