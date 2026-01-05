@@ -8,7 +8,7 @@ use std::{
 };
 
 use crc32fast::Hasher;
-use rkyv::{util::AlignedVec, access::archived_root};
+use rkyv::{util::AlignedVec, access_unchecked};
 use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};
@@ -17,7 +17,7 @@ use super::{
     Filesystem,
     common::create_crc32c_hasher,
     ledger::Ledger,
-    record::{ArchivedRecord, Record, RecordStatus, validate_record_archive},
+    record::{ArchivedRecord, RecordStatus, validate_record_archive},
 };
 use crate::{
     Bufferable,
@@ -372,7 +372,7 @@ where
         // - `try_next_record` is the only method that can hand back a `ReadToken`
         // - we only get a `ReadToken` if there's a valid record in `self.aligned_buf`
         // - `try_next_record` does all the archive checks, checksum validation, etc
-        let record = unsafe { archived_root::<Record<'_>>(&self.aligned_buf) };
+        let record = unsafe { access_unchecked::<ArchivedRecord>(&self.aligned_buf) };
 
         decode_record_payload(record)
     }
@@ -1133,7 +1133,7 @@ where
 }
 
 pub(crate) fn decode_record_payload<T: Bufferable>(
-    record: &ArchivedRecord<'_>,
+    record: &ArchivedRecord,
 ) -> Result<T, ReaderError<T>> {
     // Try and convert the raw record metadata into the true metadata type used by `T`, and then
     // also verify that `T` is able to decode records with the metadata used for this record in particular.

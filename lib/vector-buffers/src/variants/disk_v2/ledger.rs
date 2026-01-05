@@ -8,7 +8,6 @@ use std::{
     time::Instant,
 };
 
-use bytecheck::CheckBytes;
 use bytes::BytesMut;
 use crossbeam_utils::atomic::AtomicCell;
 use fslock::LockFile;
@@ -90,7 +89,7 @@ pub enum LedgerLoadCreateError {
 ///
 /// Do not do any of the listed things unless you _absolutely_ know what you're doing. :)
 #[derive(Archive, Serialize, Debug)]
-#[rkyv(attr(derive(CheckBytes, Debug)))]
+#[rkyv(attr(derive(Debug)))]
 pub struct LedgerState {
     /// Next record ID to use when writing a record.
     writer_next_record: u64,
@@ -116,10 +115,34 @@ impl Default for LedgerState {
     }
 }
 
+// Helper functions to safely access archived atomic fields.
+// These use UnsafeCell to provide safe atomic access to memory-mapped data.
+// SAFETY: The transmutation from &u64 to &AtomicU64 is sound because:
+// 1. They have the same size and alignment (guaranteed by Rust)
+// 2. The memory is properly aligned (guaranteed by rkyv)
+// 3. We only access via atomic operations (no data races)
+// 4. The memory is validly initialized (guaranteed by rkyv validation)
 impl ArchivedLedgerState {
+    #[inline]
+    fn atomic_u64_from_le(value: &rkyv::rend::u64_le) -> &AtomicU64 {
+        // SAFETY: u64_le and AtomicU64 have the same memory layout and alignment.
+        // This is guaranteed by the Rust standard library and is a common pattern
+        // for accessing archived atomic fields in memory-mapped rkyv data.
+        // rkyv 0.8 archives integers as little-endian types which have the same layout.
+        unsafe { &*(value as *const _ as *const AtomicU64) }
+    }
+
+    #[inline]
+    fn atomic_u16_from_le(value: &rkyv::rend::u16_le) -> &AtomicU16 {
+        // SAFETY: u16_le and AtomicU16 have the same memory layout and alignment.
+        // This is guaranteed by the Rust standard library and is a common pattern
+        // for accessing archived atomic fields in memory-mapped rkyv data.
+        // rkyv 0.8 archives integers as little-endian types which have the same layout.
+        unsafe { &*(value as *const _ as *const AtomicU16) }
+    }
+
     fn get_current_writer_file_id(&self) -> u16 {
-        let atomic = unsafe { &*(&self.writer_current_data_file as *const u16 as *const AtomicU16) };
-        atomic.load(Ordering::Acquire)
+        Self::atomic_u16_from_le(&self.writer_current_data_file).load(Ordering::Acquire)
     }
 
     fn get_next_writer_file_id(&self) -> u16 {
@@ -127,24 +150,22 @@ impl ArchivedLedgerState {
     }
 
     pub(super) fn increment_writer_file_id(&self) {
-        let atomic = unsafe { &*(&self.writer_current_data_file as *const u16 as *const AtomicU16) };
-        atomic.store(self.get_next_writer_file_id(), Ordering::Release);
+        Self::atomic_u16_from_le(&self.writer_current_data_file)
+            .store(self.get_next_writer_file_id(), Ordering::Release);
     }
 
     pub(super) fn get_next_writer_record_id(&self) -> u64 {
-        let atomic = unsafe { &*(&self.writer_next_record as *const u64 as *const AtomicU64) };
-        atomic.load(Ordering::Acquire)
+        Self::atomic_u64_from_le(&self.writer_next_record).load(Ordering::Acquire)
     }
 
     pub(super) fn increment_next_writer_record_id(&self, amount: u64) -> u64 {
-        let atomic = unsafe { &*(&self.writer_next_record as *const u64 as *const AtomicU64) };
-        let previous = atomic.fetch_add(amount, Ordering::AcqRel);
+        let previous = Self::atomic_u64_from_le(&self.writer_next_record)
+            .fetch_add(amount, Ordering::AcqRel);
         previous.wrapping_add(amount)
     }
 
     fn get_current_reader_file_id(&self) -> u16 {
-        let atomic = unsafe { &*(&self.reader_current_data_file as *const u16 as *const AtomicU16) };
-        atomic.load(Ordering::Acquire)
+        Self::atomic_u16_from_le(&self.reader_current_data_file).load(Ordering::Acquire)
     }
 
     fn get_next_reader_file_id(&self) -> u16 {
@@ -157,19 +178,16 @@ impl ArchivedLedgerState {
 
     fn increment_reader_file_id(&self) -> u16 {
         let value = self.get_next_reader_file_id();
-        let atomic = unsafe { &*(&self.reader_current_data_file as *const u16 as *const AtomicU16) };
-        atomic.store(value, Ordering::Release);
+        Self::atomic_u16_from_le(&self.reader_current_data_file).store(value, Ordering::Release);
         value
     }
 
     pub(super) fn get_last_reader_record_id(&self) -> u64 {
-        let atomic = unsafe { &*(&self.reader_last_record as *const u64 as *const AtomicU64) };
-        atomic.load(Ordering::Acquire)
+        Self::atomic_u64_from_le(&self.reader_last_record).load(Ordering::Acquire)
     }
 
     pub(super) fn increment_last_reader_record_id(&self, amount: u64) {
-        let atomic = unsafe { &*(&self.reader_last_record as *const u64 as *const AtomicU64) };
-        atomic.fetch_add(amount, Ordering::AcqRel);
+        Self::atomic_u64_from_le(&self.reader_last_record).fetch_add(amount, Ordering::AcqRel);
     }
 
     #[cfg(test)]
@@ -185,8 +203,7 @@ impl ArchivedLedgerState {
         //
         // Despite it being test-only, we're really amping up the "this is only for testing!" factor
         // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
-        let atomic = &*(&self.writer_next_record as *const u64 as *const AtomicU64);
-        atomic.store(id, Ordering::Release);
+        Self::atomic_u64_from_le(&self.writer_next_record).store(id, Ordering::Release);
     }
 
     #[cfg(test)]
@@ -202,8 +219,7 @@ impl ArchivedLedgerState {
         //
         // Despite it being test-only, we're really amping up the "this is only for testing!" factor
         // by making it an actual `unsafe` function, and putting "unsafe" in the name. :)
-        let atomic = &*(&self.reader_last_record as *const u64 as *const AtomicU64);
-        atomic.store(id, Ordering::Release);
+        Self::atomic_u64_from_le(&self.reader_last_record).store(id, Ordering::Release);
     }
 }
 
