@@ -2,7 +2,8 @@ use std::fmt;
 
 use bytecheck::CheckBytes;
 use rkyv::{
-    Archive, check_archived_root,
+    Archive,
+    access::check_archived_root,
     validation::{CheckArchiveError, validators::DefaultValidator},
 };
 

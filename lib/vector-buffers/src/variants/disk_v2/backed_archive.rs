@@ -4,9 +4,10 @@ use std::pin::Pin;
 
 use bytecheck::CheckBytes;
 use rkyv::{
-    Archive, Serialize, archived_root, check_archived_root,
-    ser::{Serializer, serializers::AllocSerializer},
-    validation::validators::DefaultValidator,
+    Archive, Serialize,
+    access::{archived_root, check_archived_root},
+    api::high::HighSerializer,
+    util::AlignedVec,
 };
 
 use super::ser::{DeserializeError, SerializeError};
@@ -15,7 +16,7 @@ use super::ser::{DeserializeError, SerializeError};
 ///
 /// Callers do not need to know or care about this, but it must be public as it is part of the
 /// `BackedArchive` API.
-pub type DefaultSerializer = AllocSerializer<4096>;
+pub type DefaultSerializer = HighSerializer<AlignedVec, rkyv::rancor::Error>;
 
 /// Backed wrapper for any type that implements [`Archive`][archive].
 ///
@@ -67,7 +68,7 @@ where
     /// If the data in the backing store is not valid for `T`, an error variant will be returned.
     pub fn from_backing(backing: B) -> Result<BackedArchive<B, T>, DeserializeError>
     where
-        for<'a> T::Archived: CheckBytes<DefaultValidator<'a>>,
+        T::Archived: for<'a> CheckBytes<rkyv::validation::validators::DefaultValidator<'a>>,
     {
         // Validate that the input is, well, valid.
         _ = check_archived_root::<T>(backing.as_ref())?;
@@ -105,15 +106,11 @@ where
     /// must be, as well containing the value that failed to get serialized.
     pub fn from_value(mut backing: B, value: T) -> Result<BackedArchive<B, T>, SerializeError<T>>
     where
-        T: Serialize<DefaultSerializer>,
+        T: for<'a> Serialize<HighSerializer<AlignedVec, rkyv::rancor::Error>>,
     {
         // Serialize our value so we can shove it into the backing.
-        let mut serializer = DefaultSerializer::default();
-        _ = serializer
-            .serialize_value(&value)
+        let src_buf = rkyv::to_bytes::<rkyv::rancor::Error>(&value)
             .map_err(|e| SerializeError::FailedToSerialize(e.to_string()))?;
-
-        let src_buf = serializer.into_serializer().into_inner();
 
         // Now we have to write the serialized version to the backing store.  For obvious reasons,
         // the backing store needs to be able to hold the entire serialized representation, so we
@@ -136,7 +133,7 @@ where
     /// Gets a reference to the archived value.
     #[cfg(test)]
     pub fn get_archive_mut(&mut self) -> Pin<&mut T::Archived> {
-        use rkyv::archived_root_mut;
+        use rkyv::access::archived_root_mut;
 
         let pinned = Pin::new(self.backing.as_mut());
         unsafe { archived_root_mut::<T>(pinned) }

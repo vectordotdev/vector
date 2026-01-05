@@ -5,7 +5,6 @@ use crc32fast::Hasher;
 use rkyv::{
     Archive, Archived, Serialize,
     boxed::ArchivedBox,
-    with::{CopyOptimize, RefAsBox},
 };
 
 use super::{
@@ -68,7 +67,6 @@ pub struct Record<'a> {
     /// The record payload.
     ///
     /// This is the encoded form of the actual record itself.
-    #[with(CopyOptimize, RefAsBox)]
     payload: &'a [u8],
 }
 
@@ -78,8 +76,7 @@ pub struct Record<'a> {
 // Upstream issue: https://github.com/rkyv/rkyv/issues/221
 impl<'a, C: ?Sized> CheckBytes<C> for ArchivedRecord<'a>
 where
-    rkyv::with::With<&'a [u8], RefAsBox>: Archive<Archived = ArchivedBox<[u8]>>,
-    ArchivedBox<[u8]>: CheckBytes<C>,
+    <&'a [u8] as Archive>::Archived: CheckBytes<C>,
 {
     type Error = StructCheckError;
     unsafe fn check_bytes<'b>(
@@ -105,7 +102,7 @@ where
                     inner: ErrorBox::new(e),
                 }
             })?;
-            ArchivedBox::<[u8]>::check_bytes(addr_of!((*value).payload), context).map_err(|e| {
+            <&'a [u8] as Archive>::Archived::check_bytes(addr_of!((*value).payload), context).map_err(|e| {
                 StructCheckError {
                     field_name: "payload",
                     inner: ErrorBox::new(e),

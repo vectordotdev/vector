@@ -8,7 +8,7 @@ use std::{
 };
 
 use crc32fast::Hasher;
-use rkyv::{AlignedVec, archived_root};
+use rkyv::{util::AlignedVec, access::archived_root};
 use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncBufReadExt, AsyncRead, BufReader};
 use vector_common::{finalization::BatchNotifier, finalizer::OrderedFinalizer};

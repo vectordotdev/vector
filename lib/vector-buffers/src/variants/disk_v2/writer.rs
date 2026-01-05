@@ -11,14 +11,9 @@ use std::{
 use bytes::BufMut;
 use crc32fast::Hasher;
 use rkyv::{
-    AlignedVec, Infallible,
-    ser::{
-        Serializer,
-        serializers::{
-            AlignedSerializer, AllocScratch, AllocScratchError, BufferScratch, CompositeSerializer,
-            CompositeSerializerError, FallbackScratch,
-        },
-    },
+    util::AlignedVec,
+    rancor::Infallible,
+    api::high::HighSerializer,
 };
 use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncWrite, AsyncWriteExt};
