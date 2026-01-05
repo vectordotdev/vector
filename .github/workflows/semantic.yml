@@ -159,6 +159,7 @@ jobs:
             kubernetes_logs source
             logstash source
             mongodb_metrics source
+            mqtt source
             nats source
             new source
             nginx_metrics source
@@ -177,6 +178,7 @@ jobs:
             vector source
             websocket source
 
+            aggregate transform
             aws_ec2_metadata transform
             dedupe transform
             exclusive_route transform
