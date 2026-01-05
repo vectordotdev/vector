@@ -2600,6 +2600,7 @@ dependencies = [
  "chrono",
  "csv-core",
  "derivative",
+ "derive_more 2.0.1",
  "dyn-clone",
  "flate2",
  "futures 0.3.31",
@@ -2615,14 +2616,17 @@ dependencies = [
  "rstest",
  "rust_decimal",
  "serde",
+ "serde-aux",
  "serde_json",
  "serde_with",
  "similar-asserts",
  "smallvec",
  "snafu 0.8.9",
+ "strum 0.26.3",
  "syslog_loose 0.23.0",
  "tokio",
  "tokio-util",
+ "toml 0.9.8",
  "tracing 0.1.41",
  "tracing-test",
  "uuid",
@@ -3489,6 +3493,27 @@ dependencies = [
  "quote 1.0.40",
  "rustc_version",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "derive_more"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "093242cf7570c207c83073cf82f79706fe7b8317e98620a47d5be7c3d8497678"
+dependencies = [
+ "derive_more-impl",
+]
+
+[[package]]
+name = "derive_more-impl"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bda628edc44c4bb645fbe0f758797143e4e07926f7ebf4e9bdfbd3d2ce621df3"
+dependencies = [
+ "proc-macro2 1.0.101",
+ "quote 1.0.40",
+ "syn 2.0.106",
+ "unicode-xid 0.2.4",
 ]
 
 [[package]]
@@ -6948,7 +6973,7 @@ dependencies = [
  "bson",
  "chrono",
  "derive-where",
- "derive_more",
+ "derive_more 0.99.17",
  "futures-core",
  "futures-executor",
  "futures-io",
@@ -10093,6 +10118,18 @@ checksum = "9a8e94ea7f378bd32cbbd37198a4a91436180c5bb472411e48b5ec2e2124ae9e"
 dependencies = [
  "serde_core",
  "serde_derive",
+]
+
+[[package]]
+name = "serde-aux"
+version = "4.7.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "207f67b28fe90fb596503a9bf0bf1ea5e831e21307658e177c5dfcdfc3ab8a0a"
+dependencies = [
+ "chrono",
+ "serde",
+ "serde-value",
+ "serde_json",
 ]
 
 [[package]]
