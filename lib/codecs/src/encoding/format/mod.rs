@@ -10,6 +10,7 @@ mod cef;
 mod common;
 mod csv;
 mod gelf;
+mod influxdb;
 mod json;
 mod logfmt;
 mod native;
@@ -30,6 +31,11 @@ pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};
 use dyn_clone::DynClone;
 pub use gelf::{GelfSerializer, GelfSerializerConfig};
+pub use influxdb::{
+    Field, InfluxLineProtocolSerializer, InfluxLineProtocolSerializerConfig,
+    InfluxLineProtocolSerializerError, ProtocolVersion, default_summary_quantiles,
+    encode_timestamp, influx_line_protocol,
+};
 pub use json::{JsonSerializer, JsonSerializerConfig, JsonSerializerOptions};
 pub use logfmt::{LogfmtSerializer, LogfmtSerializerConfig};
 pub use native::{NativeSerializer, NativeSerializerConfig};

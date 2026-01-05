@@ -13,9 +13,10 @@ use super::{
     format::{
         AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
         CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer,
-        GelfSerializerConfig, JsonSerializer, JsonSerializerConfig, LogfmtSerializer,
-        LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
-        NativeSerializerConfig, ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer,
+        GelfSerializerConfig, InfluxLineProtocolSerializer, InfluxLineProtocolSerializerConfig,
+        JsonSerializer, JsonSerializerConfig, LogfmtSerializer, LogfmtSerializerConfig,
+        NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer, NativeSerializerConfig,
+        ProtobufSerializer, ProtobufSerializerConfig, RawMessageSerializer,
         RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
     },
     framing::{
@@ -68,6 +69,11 @@ pub enum SerializerConfig {
     /// [gelf]: https://docs.graylog.org/docs/gelf
     /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
     Gelf(GelfSerializerConfig),
+
+    /// Encodes a metric as an [InfluxDB Line Protocol][ilp] message.
+    ///
+    /// [ilp]: https://docs.influxdata.com/influxdb/v2/reference/syntax/line-protocol/
+    Influxdb(InfluxLineProtocolSerializerConfig),
 
     /// Encodes an event as [JSON][json].
     ///
@@ -207,6 +213,12 @@ impl From<GelfSerializerConfig> for SerializerConfig {
     }
 }
 
+impl From<InfluxLineProtocolSerializerConfig> for SerializerConfig {
+    fn from(config: InfluxLineProtocolSerializerConfig) -> Self {
+        Self::Influxdb(config)
+    }
+}
+
 impl From<JsonSerializerConfig> for SerializerConfig {
     fn from(config: JsonSerializerConfig) -> Self {
         Self::Json(config)
@@ -266,6 +278,7 @@ impl SerializerConfig {
             SerializerConfig::Cef(config) => Ok(Serializer::Cef(config.build()?)),
             SerializerConfig::Csv(config) => Ok(Serializer::Csv(config.build()?)),
             SerializerConfig::Gelf(config) => Ok(Serializer::Gelf(config.build())),
+            SerializerConfig::Influxdb(config) => Ok(Serializer::Influxdb(config.build())),
             SerializerConfig::Json(config) => Ok(Serializer::Json(config.build())),
             SerializerConfig::Logfmt => Ok(Serializer::Logfmt(LogfmtSerializerConfig.build())),
             SerializerConfig::Native => Ok(Serializer::Native(NativeSerializerConfig.build())),
@@ -308,6 +321,7 @@ impl SerializerConfig {
             }
             SerializerConfig::Cef(_)
             | SerializerConfig::Csv(_)
+            | SerializerConfig::Influxdb(_)
             | SerializerConfig::Json(_)
             | SerializerConfig::Logfmt
             | SerializerConfig::NativeJson
@@ -328,6 +342,7 @@ impl SerializerConfig {
             SerializerConfig::Cef(config) => config.input_type(),
             SerializerConfig::Csv(config) => config.input_type(),
             SerializerConfig::Gelf(config) => config.input_type(),
+            SerializerConfig::Influxdb(config) => config.input_type(),
             SerializerConfig::Json(config) => config.input_type(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.input_type(),
             SerializerConfig::Native => NativeSerializerConfig.input_type(),
@@ -349,6 +364,7 @@ impl SerializerConfig {
             SerializerConfig::Cef(config) => config.schema_requirement(),
             SerializerConfig::Csv(config) => config.schema_requirement(),
             SerializerConfig::Gelf(config) => config.schema_requirement(),
+            SerializerConfig::Influxdb(config) => config.schema_requirement(),
             SerializerConfig::Json(config) => config.schema_requirement(),
             SerializerConfig::Logfmt => LogfmtSerializerConfig.schema_requirement(),
             SerializerConfig::Native => NativeSerializerConfig.schema_requirement(),
@@ -373,6 +389,8 @@ pub enum Serializer {
     Csv(CsvSerializer),
     /// Uses a `GelfSerializer` for serialization.
     Gelf(GelfSerializer),
+    /// Uses an `InfluxLineProtocolSerializer` for serialization.
+    Influxdb(InfluxLineProtocolSerializer),
     /// Uses a `JsonSerializer` for serialization.
     Json(JsonSerializer),
     /// Uses a `LogfmtSerializer` for serialization.
@@ -400,6 +418,7 @@ impl Serializer {
             Serializer::Avro(_)
             | Serializer::Cef(_)
             | Serializer::Csv(_)
+            | Serializer::Influxdb(_)
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
@@ -424,6 +443,7 @@ impl Serializer {
             Serializer::Avro(_)
             | Serializer::Cef(_)
             | Serializer::Csv(_)
+            | Serializer::Influxdb(_)
             | Serializer::Logfmt(_)
             | Serializer::Text(_)
             | Serializer::Native(_)
@@ -460,6 +480,7 @@ impl Serializer {
             Serializer::Otlp(_) => true,
             Serializer::Cef(_)
             | Serializer::Csv(_)
+            | Serializer::Influxdb(_)
             | Serializer::Logfmt(_)
             | Serializer::Gelf(_)
             | Serializer::Json(_)
@@ -490,6 +511,12 @@ impl From<CsvSerializer> for Serializer {
 impl From<GelfSerializer> for Serializer {
     fn from(serializer: GelfSerializer) -> Self {
         Self::Gelf(serializer)
+    }
+}
+
+impl From<InfluxLineProtocolSerializer> for Serializer {
+    fn from(serializer: InfluxLineProtocolSerializer) -> Self {
+        Self::Influxdb(serializer)
     }
 }
 
@@ -551,6 +578,7 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             Serializer::Cef(serializer) => serializer.encode(event, buffer),
             Serializer::Csv(serializer) => serializer.encode(event, buffer),
             Serializer::Gelf(serializer) => serializer.encode(event, buffer),
+            Serializer::Influxdb(serializer) => serializer.encode(event, buffer),
             Serializer::Json(serializer) => serializer.encode(event, buffer),
             Serializer::Logfmt(serializer) => serializer.encode(event, buffer),
             Serializer::Native(serializer) => serializer.encode(event, buffer),
