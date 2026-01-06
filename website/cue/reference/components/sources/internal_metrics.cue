@@ -750,6 +750,14 @@ components: sources: internal_metrics: {
 				output: _output
 			}
 		}
+		source_buffer_utilization_mean: {
+			description:       "The mean utilization level of the buffer that the source's outputs send into. This value is smoothed over time using an exponentially weighted moving average (EWMA)."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
 		splunk_pending_acks: {
 			description:       "The number of outstanding Splunk HEC indexer acknowledgement acks."
 			type:              "gauge"
@@ -876,6 +884,14 @@ components: sources: internal_metrics: {
 		}
 		transform_buffer_utilization_level: {
 			description:       "The current utilization level of the buffer that feeds into a transform."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		transform_buffer_utilization_mean: {
+			description:       "The mean utilization level of the buffer that feeds into a transform. This value is smoothed over time using an exponentially weighted moving average (EWMA)."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {
