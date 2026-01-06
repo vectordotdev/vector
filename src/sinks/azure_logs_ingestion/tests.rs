@@ -265,6 +265,7 @@ async fn correct_request() {
     let (parts, body) = request.into_parts();
     assert_eq!(&parts.method.to_string(), "POST");
 
+    #[allow(deprecated)]
     let body = body::to_bytes(body).await.unwrap();
     let body_json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
     let expected_json = serde_json::json!([
