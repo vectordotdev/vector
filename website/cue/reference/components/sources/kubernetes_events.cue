@@ -67,7 +67,7 @@ components: sources: kubernetes_events: {
 				}
 			}
 			message: {
-				description: "Human readable description of what happened."
+				description: "Human-readable description of what happened."
 				required:    false
 				type: string: {
 					examples: ["Created pod: convexio-argo-workflows-server-686559bfd5-wt4n2"]
