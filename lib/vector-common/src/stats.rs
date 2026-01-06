@@ -1,4 +1,5 @@
 #![allow(missing_docs)]
+
 /// Exponentially Weighted Moving Average
 #[derive(Clone, Copy, Debug)]
 pub struct Ewma {
@@ -7,11 +8,13 @@ pub struct Ewma {
 }
 
 impl Ewma {
+    #[must_use]
     pub const fn new(alpha: f64) -> Self {
         let average = None;
         Self { average, alpha }
     }
 
+    #[must_use]
     pub const fn average(&self) -> Option<f64> {
         self.average
     }
@@ -35,6 +38,7 @@ pub struct EwmaDefault {
 }
 
 impl EwmaDefault {
+    #[must_use]
     pub const fn new(alpha: f64, initial_value: f64) -> Self {
         Self {
             average: initial_value,
@@ -42,6 +46,7 @@ impl EwmaDefault {
         }
     }
 
+    #[must_use]
     pub const fn average(&self) -> f64 {
         self.average
     }
@@ -67,21 +72,25 @@ pub struct MeanVariance {
 }
 
 impl EwmaVar {
+    #[must_use]
     pub const fn new(alpha: f64) -> Self {
         let state = None;
         Self { state, alpha }
     }
 
+    #[must_use]
     pub const fn state(&self) -> Option<MeanVariance> {
         self.state
     }
 
     #[cfg(test)]
+    #[must_use]
     pub fn average(&self) -> Option<f64> {
         self.state.map(|state| state.mean)
     }
 
     #[cfg(test)]
+    #[must_use]
     pub fn variance(&self) -> Option<f64> {
         self.state.map(|state| state.variance)
     }
@@ -114,11 +123,16 @@ pub struct Mean {
 
 impl Mean {
     /// Update the and return the current average
+    #[expect(
+        clippy::cast_precision_loss,
+        reason = "We have to convert count to f64 for the calculation, it's okay to lose precision for very large counts."
+    )]
     pub fn update(&mut self, point: f64) {
         self.count += 1;
         self.mean += (point - self.mean) / self.count as f64;
     }
 
+    #[must_use]
     pub const fn average(&self) -> Option<f64> {
         match self.count {
             0 => None,
