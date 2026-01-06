@@ -88,7 +88,7 @@ components: sources: kubernetes_events: {
 				}
 			}
 			reporting_controller: {
-				description: "Name of the controller that emitted the Event."
+				description: "Name of the controller that emitted the event."
 				required:    false
 				type: string: {
 					examples: ["replicaset-controller"]
