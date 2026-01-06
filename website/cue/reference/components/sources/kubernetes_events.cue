@@ -60,7 +60,7 @@ components: sources: kubernetes_events: {
 				type: object: options: {}
 			}
 			event_uid: {
-				description: "Unique identifier of the Kubernetes Event."
+				description: "Unique identifier of the Kubernetes event."
 				required:    true
 				type: string: {
 					examples: ["6b6890ca-47f8-4b04-ae15-986bfdcae4d5"]
