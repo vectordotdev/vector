@@ -95,7 +95,7 @@ components: sources: kubernetes_events: {
 				}
 			}
 			reporting_instance: {
-				description: "Identifier of the controller instance that emitted the Event."
+				description: "Identifier of the controller instance that emitted the event."
 				required:    false
 				type: string: {
 					examples: ["kubelet-ip-10-0-0-1"]
