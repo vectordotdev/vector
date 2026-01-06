@@ -74,7 +74,7 @@ components: sources: kubernetes_events: {
 				}
 			}
 			namespace: {
-				description: "Namespace where the Event occurred."
+				description: "Namespace where the event occurred."
 				required:    false
 				type: string: {
 					examples: ["kube-system"]
