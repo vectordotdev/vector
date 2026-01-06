@@ -59,6 +59,7 @@ pub mod shutdown;
 #[cfg(feature = "sensitive_string")]
 pub mod sensitive_string;
 
+pub mod atomic;
 pub mod trigger;
 
 #[macro_use]
