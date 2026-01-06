@@ -44,7 +44,7 @@ generated: components: sources: kubernetes_events: configuration: {
 		}
 	}
 	kube_config_file: {
-		description: "Path to a kubeconfig file. If omitted, in-cluster configuration or the local kubeconfig is used."
+		description: "Path to a kubeconfig file. If omitted, the in-cluster configuration or local kubeconfig is used."
 		required:    false
 		type: string: examples: ["/path/to/kubeconfig"]
 	}
