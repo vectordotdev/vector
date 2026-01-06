@@ -55,7 +55,7 @@ components: sources: kubernetes_events: {
 		description: "Represents a Kubernetes [`Event`](https://kubernetes.io/docs/reference/generated/kubernetes-api/v1.29/#event-v1-events-k8s-io) object."
 		fields: {
 			event: {
-				description: "The full Kubernetes Event payload."
+				description: "The full Kubernetes event payload."
 				required:    true
 				type: object: options: {}
 			}
