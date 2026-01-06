@@ -117,7 +117,7 @@ components: sources: kubernetes_events: {
 				}
 			}
 			verb: {
-				description: "Derived Vector verb for the Event (`ADDED` or `UPDATED`)."
+				description: "Derived Vector verb for the event (`ADDED` or `UPDATED`)."
 				required:    true
 				type: string: {
 					examples: ["ADDED", "UPDATED"]
