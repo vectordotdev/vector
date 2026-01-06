@@ -1,5 +1,9 @@
 #![allow(missing_docs)]
 
+use std::sync::atomic::Ordering;
+
+use crate::atomic::AtomicF64;
+
 /// Exponentially Weighted Moving Average
 #[derive(Clone, Copy, Debug)]
 pub struct Ewma {
@@ -141,6 +145,43 @@ impl Mean {
     }
 }
 
+/// Atomic EWMA that uses an `AtomicF64` to store the current average.
+#[derive(Debug)]
+pub struct AtomicEwma {
+    average: AtomicF64,
+    alpha: f64,
+}
+
+impl AtomicEwma {
+    #[must_use]
+    pub fn new(alpha: f64) -> Self {
+        Self {
+            average: AtomicF64::new(f64::NAN),
+            alpha,
+        }
+    }
+
+    pub fn update(&self, point: f64) -> f64 {
+        let mut result = f64::NAN;
+        self.average
+            .fetch_update(Ordering::Relaxed, Ordering::Relaxed, |current| {
+                let average = if current.is_nan() {
+                    point
+                } else {
+                    point.mul_add(self.alpha, current * (1.0 - self.alpha))
+                };
+                result = average;
+                average
+            });
+        result
+    }
+
+    pub fn average(&self) -> Option<f64> {
+        let value = self.average.load(Ordering::Relaxed);
+        if value.is_nan() { None } else { Some(value) }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -158,16 +199,17 @@ mod tests {
     }
 
     #[test]
+    #[expect(clippy::float_cmp, reason = "none of the values will be rounded")]
     fn ewma_update_works() {
         let mut mean = Ewma::new(0.5);
         assert_eq!(mean.average(), None);
-        mean.update(2.0);
+        assert_eq!(mean.update(2.0), 2.0);
         assert_eq!(mean.average(), Some(2.0));
-        mean.update(2.0);
+        assert_eq!(mean.update(2.0), 2.0);
         assert_eq!(mean.average(), Some(2.0));
-        mean.update(1.0);
+        assert_eq!(mean.update(1.0), 1.5);
         assert_eq!(mean.average(), Some(1.5));
-        mean.update(2.0);
+        assert_eq!(mean.update(2.0), 1.75);
         assert_eq!(mean.average(), Some(1.75));
 
         assert_eq!(mean.average, Some(1.75));
@@ -198,5 +240,16 @@ mod tests {
                 variance: 0.1875
             })
         );
+    }
+
+    #[test]
+    #[expect(clippy::float_cmp, reason = "none of the values will be rounded")]
+    fn atomic_ewma_update_works() {
+        let ewma = AtomicEwma::new(0.5);
+        assert_eq!(ewma.average(), None);
+        assert_eq!(ewma.update(2.0), 2.0);
+        assert_eq!(ewma.average(), Some(2.0));
+        assert_eq!(ewma.update(1.0), 1.5);
+        assert_eq!(ewma.average(), Some(1.5));
     }
 }
