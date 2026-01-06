@@ -1,11 +1,8 @@
-use std::{mem, ptr::addr_of};
+use std::mem;
 
-use bytecheck::{CheckBytes, ErrorBox, StructCheckError};
 use crc32fast::Hasher;
 use rkyv::{
-    Archive, Archived, Serialize,
-    boxed::ArchivedBox,
-    with::{CopyOptimize, RefAsBox},
+    Archive, Serialize,
 };
 
 use super::{
@@ -13,7 +10,7 @@ use super::{
     ser::{DeserializeError, try_as_archive},
 };
 
-pub const RECORD_HEADER_LEN: usize = align16(mem::size_of::<ArchivedRecord<'_>>() + 8);
+pub const RECORD_HEADER_LEN: usize = align16(mem::size_of::<ArchivedRecord>() + 8);
 
 /// Result of checking if a buffer contained a valid record.
 pub enum RecordStatus {
@@ -44,11 +41,8 @@ pub enum RecordStatus {
 ///
 /// Do not do any of the listed things unless you _absolutely_ know what you're doing. :)
 #[derive(Archive, Serialize, Debug)]
-// Switch back to the derived implementation of CheckBytes once the upstream ICE issue is fixed.
-//
-// Upstream issue: https://github.com/rkyv/rkyv/issues/221
-//#[archive_attr(derive(CheckBytes))]
-pub struct Record<'a> {
+#[rkyv(attr(derive(Debug)))]
+pub struct Record {
     /// The checksum of the record.
     ///
     /// The checksum is CRC32C(BE(id) + BE(metadata) + payload), where BE(x) returns a byte slice of
@@ -68,71 +62,26 @@ pub struct Record<'a> {
     /// The record payload.
     ///
     /// This is the encoded form of the actual record itself.
-    #[with(CopyOptimize, RefAsBox)]
-    payload: &'a [u8],
+    payload: Vec<u8>,
 }
 
-// Manual implementation of CheckBytes required as the derived version currently causes an internal
-// compiler error.
-//
-// Upstream issue: https://github.com/rkyv/rkyv/issues/221
-impl<'a, C: ?Sized> CheckBytes<C> for ArchivedRecord<'a>
-where
-    rkyv::with::With<&'a [u8], RefAsBox>: Archive<Archived = ArchivedBox<[u8]>>,
-    ArchivedBox<[u8]>: CheckBytes<C>,
-{
-    type Error = StructCheckError;
-    unsafe fn check_bytes<'b>(
-        value: *const Self,
-        context: &mut C,
-    ) -> Result<&'b Self, Self::Error> {
-        unsafe {
-            Archived::<u32>::check_bytes(addr_of!((*value).checksum), context).map_err(|e| {
-                StructCheckError {
-                    field_name: "checksum",
-                    inner: ErrorBox::new(e),
-                }
-            })?;
-            Archived::<u64>::check_bytes(addr_of!((*value).id), context).map_err(|e| {
-                StructCheckError {
-                    field_name: "id",
-                    inner: ErrorBox::new(e),
-                }
-            })?;
-            Archived::<u32>::check_bytes(addr_of!((*value).metadata), context).map_err(|e| {
-                StructCheckError {
-                    field_name: "schema_metadata",
-                    inner: ErrorBox::new(e),
-                }
-            })?;
-            ArchivedBox::<[u8]>::check_bytes(addr_of!((*value).payload), context).map_err(|e| {
-                StructCheckError {
-                    field_name: "payload",
-                    inner: ErrorBox::new(e),
-                }
-            })?;
-            Ok(&*value)
-        }
-    }
-}
-
-impl<'a> Record<'a> {
+impl Record {
     /// Creates a [`Record`] from the ID and payload, and calculates the checksum.
-    pub fn with_checksum(id: u64, metadata: u32, payload: &'a [u8], checksummer: &Hasher) -> Self {
+    pub fn with_checksum(id: u64, metadata: u32, payload: &[u8], checksummer: &Hasher) -> Self {
         let checksum = generate_checksum(checksummer, id, metadata, payload);
         Self {
             checksum,
             id,
             metadata,
-            payload,
+            payload: payload.to_vec(),
         }
     }
 }
 
-impl ArchivedRecord<'_> {
+impl ArchivedRecord {
     /// Gets the metadata of this record.
     pub fn metadata(&self) -> u32 {
-        self.metadata
+        self.metadata.into()
     }
 
     /// Gets the payload of this record.
@@ -142,13 +91,15 @@ impl ArchivedRecord<'_> {
 
     /// Verifies if the stored checksum of this record matches the record itself.
     pub fn verify_checksum(&self, checksummer: &Hasher) -> RecordStatus {
-        let calculated = generate_checksum(checksummer, self.id, self.metadata, &self.payload);
-        if self.checksum == calculated {
-            RecordStatus::Valid { id: self.id }
+        let calculated = generate_checksum(checksummer, self.id.into(), self.metadata.into(), &self.payload);
+        let checksum: u32 = self.checksum.into();
+        let id: u64 = self.id.into();
+        if checksum == calculated {
+            RecordStatus::Valid { id }
         } else {
             RecordStatus::Corrupted {
                 calculated,
-                actual: self.checksum,
+                actual: checksum,
             }
         }
     }
@@ -190,6 +141,6 @@ pub fn validate_record_archive(buf: &[u8], checksummer: &Hasher) -> RecordStatus
 /// will be returned.  Otherwise, the deserialization error encountered will be provided, which describes the error in a more verbose,
 /// debugging-oriented fashion.
 #[cfg_attr(test, instrument(skip_all, level = "trace"))]
-pub fn try_as_record_archive(buf: &[u8]) -> Result<&ArchivedRecord<'_>, DeserializeError> {
-    try_as_archive::<Record<'_>>(buf)
+pub fn try_as_record_archive(buf: &[u8]) -> Result<&ArchivedRecord, DeserializeError> {
+    try_as_archive::<Record>(buf)
 }

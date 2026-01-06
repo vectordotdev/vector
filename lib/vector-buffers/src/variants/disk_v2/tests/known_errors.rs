@@ -1,5 +1,4 @@
 use bytes::{Buf, BufMut};
-use memmap2::MmapMut;
 use std::{
     io::{self, SeekFrom},
     path::PathBuf,
@@ -7,7 +6,7 @@ use std::{
 };
 use tokio::{
     fs::OpenOptions,
-    io::{AsyncSeekExt, AsyncWriteExt},
+    io::{AsyncReadExt, AsyncSeekExt, AsyncWriteExt},
     time::{Duration, timeout},
 };
 use tracing::Instrument;
@@ -23,7 +22,7 @@ use crate::{
     assert_file_exists_async, assert_reader_writer_v2_file_positions, await_timeout,
     encoding::{AsMetadata, Encodable},
     test::{SizedRecord, UndecodableRecord, acknowledge, install_tracing_helpers, with_temp_dir},
-    variants::disk_v2::{ReaderError, backed_archive::BackedArchive, record::Record},
+    variants::disk_v2::ReaderError,
 };
 
 impl AsMetadata for u32 {
@@ -488,8 +487,10 @@ async fn writer_detects_when_last_record_has_invalid_checksum() {
             // We should not have seen a call to `mark_for_skip` yet.
             assert!(!marked_for_skip.try_assert());
 
-            // Open the file, mutably deserialize the record, and flip a bit in the checksum.
-            let data_file = OpenOptions::new()
+            // Open the file and corrupt the checksum field by flipping the 15th bit.
+            // The checksum is the first field in the archived record, located at offset 8
+            // (after the 8-byte length delimiter).
+            let mut data_file = OpenOptions::new()
                 .read(true)
                 .write(true)
                 .open(&data_file_path)
@@ -503,30 +504,38 @@ async fn writer_detects_when_last_record_has_invalid_checksum() {
                 .expect("metadata should not fail");
             assert_eq!(expected_data_file_len, metadata.len());
 
-            let std_data_file = data_file.into_std().await;
-            let record_mmap =
-                unsafe { MmapMut::map_mut(&std_data_file).expect("mmap should not fail") };
-            drop(std_data_file);
+            // Seek to the checksum field (8 bytes for length delimiter, then the checksum is first)
+            let checksum_offset = 8u64;
+            let pos = data_file
+                .seek(SeekFrom::Start(checksum_offset))
+                .await
+                .expect("seek should not fail");
+            assert_eq!(checksum_offset, pos);
 
-            let mut backed_record = BackedArchive::<_, Record>::from_backing(record_mmap)
-                .expect("archive should not fail");
-            let record = backed_record.get_archive_mut();
+            // Read the current checksum bytes
+            let mut checksum_bytes = [0u8; 4];
+            data_file
+                .read_exact(&mut checksum_bytes)
+                .await
+                .expect("read should not fail");
 
-            // Just flip the 15th bit.  Should be enough. *shrug*
-            {
-                let projected_checksum =
-                    unsafe { record.map_unchecked_mut(|record| &mut record.checksum) };
-                let projected_checksum = projected_checksum.get_mut();
-                let new_checksum = *projected_checksum ^ (1 << 15);
-                *projected_checksum = new_checksum;
-            }
+            // Flip the 15th bit
+            let current_checksum = u32::from_le_bytes(checksum_bytes);
+            let new_checksum = current_checksum ^ (1 << 15);
+            let new_checksum_bytes = new_checksum.to_le_bytes();
 
-            // Flush the memory-mapped data file to disk and we're done with our modification.
-            backed_record
-                .get_backing_ref()
-                .flush()
-                .expect("flush should not fail");
-            drop(backed_record);
+            // Write back the corrupted checksum
+            data_file
+                .seek(SeekFrom::Start(checksum_offset))
+                .await
+                .expect("seek should not fail");
+            data_file
+                .write_all(&new_checksum_bytes)
+                .await
+                .expect("write should not fail");
+            data_file.flush().await.expect("flush should not fail");
+            data_file.sync_all().await.expect("sync should not fail");
+            drop(data_file);
 
             // Now reopen the buffer, which should trigger a `Writer::mark_for_skip` call which
             // instructs the writer to skip to the next data file, although this doesn't happen

@@ -1,6 +1,5 @@
 use std::{
     cmp::Ordering,
-    convert::Infallible as StdInfallible,
     fmt,
     io::{self, ErrorKind},
     marker::PhantomData,
@@ -10,16 +9,7 @@ use std::{
 
 use bytes::BufMut;
 use crc32fast::Hasher;
-use rkyv::{
-    AlignedVec, Infallible,
-    ser::{
-        Serializer,
-        serializers::{
-            AlignedSerializer, AllocScratch, AllocScratchError, BufferScratch, CompositeSerializer,
-            CompositeSerializerError, FallbackScratch,
-        },
-    },
-};
+use rkyv::util::AlignedVec;
 use snafu::{ResultExt, Snafu};
 use tokio::io::{AsyncWrite, AsyncWriteExt};
 
@@ -179,18 +169,13 @@ impl<T: Bufferable + PartialEq> PartialEq for WriterError<T> {
     }
 }
 
-impl<T> From<CompositeSerializerError<StdInfallible, AllocScratchError, StdInfallible>>
-    for WriterError<T>
+impl<T> From<rkyv::rancor::Error> for WriterError<T>
 where
     T: Bufferable,
 {
-    fn from(e: CompositeSerializerError<StdInfallible, AllocScratchError, StdInfallible>) -> Self {
-        match e {
-            CompositeSerializerError::ScratchSpaceError(sse) => WriterError::FailedToSerialize {
-                reason: format!("insufficient space to serialize encoded record: {sse}"),
-            },
-            // Only our scratch space strategy is fallible, so we should never get here.
-            _ => unreachable!(),
+    fn from(e: rkyv::rancor::Error) -> Self {
+        WriterError::FailedToSerialize {
+            reason: format!("failed to serialize encoded record: {e}"),
         }
     }
 }
@@ -485,9 +470,7 @@ where
             Record::with_checksum(id, metadata, &self.encode_buf, &self.checksummer);
 
         // Push 8 dummy bytes where our length delimiter will sit.  We'll fix this up after
-        // serialization.  Notably, `AlignedSerializer` will report the serializer position as
-        // the length of its backing store, which now includes our 8 bytes, so we _subtract_
-        // those from the position when figuring out the actual value to write back after.
+        // serialization.
         //
         // We write it this way -- in the serializer buffer, and not as a separate write -- so that
         // we can do a single write but also so that we always have an aligned buffer.
@@ -496,18 +479,10 @@ where
 
         // Now serialize the record, which puts it into its archived form.  This is what powers our
         // ability to do zero-copy deserialization from disk.
-        let mut serializer = CompositeSerializer::new(
-            AlignedSerializer::new(&mut self.ser_buf),
-            FallbackScratch::new(
-                BufferScratch::new(&mut self.ser_scratch),
-                AllocScratch::new(),
-            ),
-            Infallible,
-        );
+        let serialized_record = rkyv::to_bytes::<rkyv::rancor::Error>(&wrapped_record)?;
+        self.ser_buf.extend_from_slice(&serialized_record);
 
-        let serialized_len = serializer
-            .serialize_value(&wrapped_record)
-            .map(|_| serializer.pos())?;
+        let serialized_len = self.ser_buf.len();
 
         // Sanity check before we do our length math.
         if serialized_len <= 8 || self.ser_buf.len() != serialized_len {

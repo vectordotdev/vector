@@ -1,10 +1,4 @@
-use std::fmt;
-
-use bytecheck::CheckBytes;
-use rkyv::{
-    Archive, check_archived_root,
-    validation::{CheckArchiveError, validators::DefaultValidator},
-};
+use rkyv::{Archive, rancor::Error};
 
 /// Error that occurred during serialization.
 #[derive(Debug)]
@@ -45,6 +39,7 @@ pub enum DeserializeError {
     ///
     /// The backing store that was given is returned, along with an error string that briefly
     /// describes the error in a more verbose fashion, suitable for debugging.
+    #[allow(dead_code)]
     InvalidData(String),
 }
 
@@ -58,20 +53,9 @@ impl DeserializeError {
     }
 }
 
-impl<T, C> From<CheckArchiveError<T, C>> for DeserializeError
-where
-    T: fmt::Display,
-    C: fmt::Display,
-{
-    fn from(e: CheckArchiveError<T, C>) -> Self {
-        match e {
-            CheckArchiveError::ContextError(ce) => {
-                DeserializeError::InvalidStructure(ce.to_string())
-            }
-            CheckArchiveError::CheckBytesError(cbe) => {
-                DeserializeError::InvalidData(cbe.to_string())
-            }
-        }
+impl From<Error> for DeserializeError {
+    fn from(e: Error) -> Self {
+        DeserializeError::InvalidStructure(e.to_string())
     }
 }
 
@@ -88,8 +72,11 @@ where
 pub fn try_as_archive<'a, T>(buf: &'a [u8]) -> Result<&'a T::Archived, DeserializeError>
 where
     T: Archive,
-    T::Archived: for<'b> CheckBytes<DefaultValidator<'b>>,
+    T::Archived: rkyv::Portable + for<'b> bytecheck::CheckBytes<rkyv::rancor::Strategy<rkyv::validation::Validator<rkyv::validation::archive::ArchiveValidator<'b>, rkyv::validation::shared::SharedValidator>, rkyv::rancor::Error>>,
 {
     debug_assert!(!buf.is_empty());
-    check_archived_root::<T>(buf).map_err(Into::into)
+
+    // Use rkyv::access which performs CheckBytes validation in rkyv 0.8
+    rkyv::access::<T::Archived, Error>(buf)
+        .map_err(|e| DeserializeError::InvalidStructure(e.to_string()))
 }
