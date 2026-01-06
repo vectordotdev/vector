@@ -71,7 +71,7 @@ components: sinks: azure_logs_ingestion: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.azure_logs_ingestion.configuration
+	configuration: generated.components.sinks.azure_logs_ingestion.configuration
 
 	input: {
 		logs:    true
