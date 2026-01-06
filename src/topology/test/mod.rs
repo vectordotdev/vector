@@ -39,6 +39,7 @@ mod crash;
 mod doesnt_reload;
 #[cfg(all(feature = "sources-http_server", feature = "sinks-http"))]
 mod end_to_end;
+mod processing_time;
 #[cfg(all(
     feature = "sources-prometheus",
     feature = "sinks-prometheus",
