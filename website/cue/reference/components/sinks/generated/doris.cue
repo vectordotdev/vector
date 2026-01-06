@@ -188,6 +188,7 @@ generated: components: sinks: doris: configuration: {
 
 						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
 						"""
+					custom: "Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`"
 				}
 			}
 			token: {
@@ -201,6 +202,12 @@ generated: components: sinks: doris: configuration: {
 				relevant_when: "strategy = \"basic\""
 				required:      true
 				type: string: examples: ["${USERNAME}", "username"]
+			}
+			value: {
+				description:   "Custom string value of the Authorization header"
+				relevant_when: "strategy = \"custom\""
+				required:      true
+				type: string: examples: ["${AUTH_HEADER_VALUE}", "CUSTOM_PREFIX ${TOKEN}"]
 			}
 		}
 	}
@@ -761,8 +768,19 @@ generated: components: sinks: doris: configuration: {
 		}
 	}
 	headers: {
-		description: "Custom HTTP headers to add to the request."
-		required:    false
+		description: """
+			Custom HTTP headers to add to the request.
+
+			These headers can be used to set Doris-specific Stream Load parameters:
+			- `format`: Data format (json, csv.)
+			- `read_json_by_line`: Whether to read JSON line by line
+			- `strip_outer_array`: Whether to strip outer array brackets
+			- Column mappings and transformations
+
+			See [Doris Stream Load documentation](https://doris.apache.org/docs/data-operate/import/import-way/stream-load-manual)
+			for all available parameters.
+			"""
+		required: false
 		type: object: options: "*": {
 			description: "An HTTP header value."
 			required:    true
