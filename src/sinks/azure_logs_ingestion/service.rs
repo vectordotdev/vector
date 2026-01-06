@@ -2,15 +2,12 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 use std::task::{Context, Poll};
 
-use azure_core::credentials::{
-    AccessToken,
-    TokenCredential,
-};
+use azure_core::credentials::{AccessToken, TokenCredential};
 
 use bytes::Bytes;
 use http::{
-    header::{self, HeaderMap},
     HeaderValue, Request, StatusCode, Uri,
+    header::{self, HeaderMap},
 };
 use hyper::Body;
 use tracing::Instrument;

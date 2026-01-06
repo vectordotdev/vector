@@ -1,16 +1,14 @@
-use std::time::Duration;
 use futures::stream;
 use http::Response;
 use hyper::body;
+use std::time::Duration;
 use tokio::time::timeout;
 use vector_lib::config::log_schema;
 
 use azure_core::credentials::{AccessToken, TokenCredential};
 use azure_core::date::OffsetDateTime;
 use azure_identity::{
-    ClientSecretCredential,
-    ClientSecretCredentialOptions,
-    TokenCredentialOptions,
+    ClientSecretCredential, ClientSecretCredentialOptions, TokenCredentialOptions,
 };
 
 use super::config::AzureLogsIngestionConfig;
@@ -19,14 +17,10 @@ use crate::{
     event::LogEvent,
     sinks::prelude::*,
     test_util::{
-        components::{
-            run_and_assert_sink_compliance,
-            SINK_TAGS,
-        },
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::spawn_blackhole_http_server,
     },
 };
-
 
 #[test]
 fn generate_config() {
@@ -40,11 +34,18 @@ async fn basic_config_error_with_no_auth() {
             endpoint = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
             dcr_immutable_id = "dcr-00000000000000000000000000000000"
             stream_name = "Custom-UnitTest"
-        "#)
-        .expect("Config parsing failed");
-    
-    assert_eq!(config.endpoint, "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com");
-    assert_eq!(config.dcr_immutable_id, "dcr-00000000000000000000000000000000");
+        "#,
+    )
+    .expect("Config parsing failed");
+
+    assert_eq!(
+        config.endpoint,
+        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+    );
+    assert_eq!(
+        config.dcr_immutable_id,
+        "dcr-00000000000000000000000000000000"
+    );
     assert_eq!(config.stream_name, "Custom-UnitTest");
     assert_eq!(config.token_scope, "https://monitor.azure.com/.default");
     assert_eq!(config.timestamp_field, "TimeGenerated");
@@ -76,7 +77,6 @@ async fn basic_config_error_with_no_auth() {
             );
         }
     }
-
 }
 
 #[test]
@@ -86,16 +86,23 @@ fn basic_config_with_client_credentials() {
             endpoint = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
             dcr_immutable_id = "dcr-00000000000000000000000000000000"
             stream_name = "Custom-UnitTest"
-            
+
             [auth]
             azure_tenant_id = "00000000-0000-0000-0000-000000000000"
             azure_client_id = "mock-client-id"
             azure_client_secret = "mock-client-secret"
-        "#)
-        .expect("Config parsing failed");
-    
-    assert_eq!(config.endpoint, "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com");
-    assert_eq!(config.dcr_immutable_id, "dcr-00000000000000000000000000000000");
+        "#,
+    )
+    .expect("Config parsing failed");
+
+    assert_eq!(
+        config.endpoint,
+        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+    );
+    assert_eq!(
+        config.dcr_immutable_id,
+        "dcr-00000000000000000000000000000000"
+    );
     assert_eq!(config.stream_name, "Custom-UnitTest");
     assert_eq!(config.token_scope, "https://monitor.azure.com/.default");
     assert_eq!(config.timestamp_field, "TimeGenerated");
@@ -122,14 +129,21 @@ fn basic_config_with_managed_identity() {
             endpoint = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
             dcr_immutable_id = "dcr-00000000000000000000000000000000"
             stream_name = "Custom-UnitTest"
-            
+
             [auth]
             azure_credential_kind = "managedidentity"
-        "#)
-        .expect("Config parsing failed");
-    
-    assert_eq!(config.endpoint, "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com");
-    assert_eq!(config.dcr_immutable_id, "dcr-00000000000000000000000000000000");
+        "#,
+    )
+    .expect("Config parsing failed");
+
+    assert_eq!(
+        config.endpoint,
+        "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
+    );
+    assert_eq!(
+        config.dcr_immutable_id,
+        "dcr-00000000000000000000000000000000"
+    );
     assert_eq!(config.stream_name, "Custom-UnitTest");
     assert_eq!(config.token_scope, "https://monitor.azure.com/.default");
     assert_eq!(config.timestamp_field, "TimeGenerated");
@@ -163,7 +177,6 @@ fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
 
 #[tokio::test]
 async fn correct_request() {
-
     // Other tests can use `create_mock_credential`, we're going to run this end-to-end test with our own mock OAuth endpoint as well
     let (authority_tx, mut _authority_rx) = tokio::sync::mpsc::channel(1);
     let mock_token_authority = spawn_blackhole_http_server(move |request| {
@@ -174,12 +187,13 @@ async fn correct_request() {
                 "access_token": "mock-access-token",
                 "token_type": "Bearer",
                 "expires_in": 3600
-            }).to_string();
+            })
+            .to_string();
 
             Ok(Response::builder()
-            .header("Content-Type", "application/json")
-            .body(body.into())
-            .unwrap())
+                .header("Content-Type", "application/json")
+                .body(body.into())
+                .unwrap())
         }
     })
     .await;
@@ -192,9 +206,7 @@ async fn correct_request() {
         "00000000-0000-0000-0000-000000000000",
         "mock-client-id".into(),
         "mock-client-secret".into(),
-        Some(ClientSecretCredentialOptions {
-            credential_options,
-        }),
+        Some(ClientSecretCredentialOptions { credential_options }),
     )
     .expect("failed to create ClientSecretCredential");
 
@@ -208,8 +220,9 @@ async fn correct_request() {
             azure_tenant_id = "00000000-0000-0000-0000-000000000000"
             azure_client_id = "mock-client-id"
             azure_client_secret = "mock-client-secret"
-        "#)
-        .unwrap();
+        "#,
+    )
+    .unwrap();
 
     let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
     let (_timestamp_key1, timestamp_value1) = insert_timestamp_kv(&mut log1);
@@ -274,7 +287,6 @@ async fn correct_request() {
         &parts.uri.path_and_query().unwrap().to_string(),
         "/dataCollectionRules/dcr-00000000000000000000000000000000/streams/Custom-UnitTest?api-version=2023-01-01"
     );
-
 }
 
 fn create_mock_credential() -> impl TokenCredential {
@@ -300,7 +312,6 @@ fn create_mock_credential() -> impl TokenCredential {
 
 #[tokio::test]
 async fn mock_healthcheck_with_403_response() {
-
     let config: AzureLogsIngestionConfig = toml::from_str(
         r#"
             endpoint = "http://localhost:9001"
@@ -311,8 +322,9 @@ async fn mock_healthcheck_with_403_response() {
             azure_tenant_id = "00000000-0000-0000-0000-000000000000"
             azure_client_id = "mock-client-id"
             azure_client_secret = "mock-client-secret"
-        "#)
-        .unwrap();
+        "#,
+    )
+    .unwrap();
 
     let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
     let (_timestamp_key1, _timestamp_value1) = insert_timestamp_kv(&mut log1);
@@ -324,13 +336,14 @@ async fn mock_healthcheck_with_403_response() {
             endpoint_tx.send(request).await.unwrap();
             let body = serde_json::json!({
                 "error": "bla",
-            }).to_string();
+            })
+            .to_string();
 
             Ok(Response::builder()
-            .status(403)
-            .header("Content-Type", "application/json")
-            .body(body.into())
-            .unwrap())
+                .status(403)
+                .header("Content-Type", "application/json")
+                .body(body.into())
+                .unwrap())
         }
     })
     .await;
@@ -353,5 +366,9 @@ async fn mock_healthcheck_with_403_response() {
 
     let hc_err = healthcheck.await.unwrap_err();
     let err_str = hc_err.to_string();
-    assert!(err_str.contains("Forbidden"), "Healthcheck error does not contain 'Forbidden': {}", err_str);
+    assert!(
+        err_str.contains("Forbidden"),
+        "Healthcheck error does not contain 'Forbidden': {}",
+        err_str
+    );
 }
