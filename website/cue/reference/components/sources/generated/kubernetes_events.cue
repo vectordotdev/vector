@@ -49,7 +49,7 @@ generated: components: sources: kubernetes_events: configuration: {
 		type: string: examples: ["/path/to/kubeconfig"]
 	}
 	label_selector: {
-		description: "Label selector applied to the events list/watch request."
+		description: "Label selector applied to the events list and watch request."
 		required:    false
 		type: string: examples: ["type=Warning"]
 	}
