@@ -10,7 +10,7 @@ generated: components: sources: kubernetes_events: configuration: {
 		}
 	}
 	field_selector: {
-		description: "Field selector applied to the events list/watch request."
+		description: "Field selector applied to the events list and watch request."
 		required:    false
 		type: string: examples: ["regarding.kind=Pod"]
 	}
