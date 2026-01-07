@@ -24,28 +24,28 @@ remap: functions: split_path: {
 		{
 			title: "Split path with trailing slash"
 			source: """
-				split_path!("/home/user/")
+				split_path("/home/user/")
 				"""
 			return: ["/", "home", "user"]
 		},
 		{
 			title: "Split path from file path"
 			source: """
-				split_path!("/home/user")
+				split_path("/home/user")
 				"""
 			return: ["/", "home", "user"]
 		},
 		{
 			title: "Split path from root"
 			source: """
-				split_path!("/")
+				split_path("/")
 				"""
 			return: ["/"]
 		},
 		{
 			title: "Empty path returns empty array"
 			source: """
-				split_path!("")
+				split_path("")
 				"""
 			return: []
 		},

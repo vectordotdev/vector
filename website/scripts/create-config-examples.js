@@ -1,8 +1,9 @@
-const fs = require('fs');
+import fs from 'fs';
+import chalk from 'chalk';
+import * as TOML from '@iarna/toml';
+import YAML from 'yaml';
+
 const cueJsonOutput = "data/docs.json";
-const chalk = require('chalk');
-const TOML = require('@iarna/toml');
-const YAML = require('yaml');
 
 // Helper functions
 const getExampleValue = (param, deepFilter) => {
@@ -241,7 +242,7 @@ const makeUseCaseExamples = (component) => {
         output = example.output;
       }
 
-      useCase = {
+      const useCase = {
         title: example.title,
         description: example.description,
         configuration: {

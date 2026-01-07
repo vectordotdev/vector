@@ -37,7 +37,7 @@ remap: functions: assert: {
 	internal_failure_reasons: [
 		"`condition` evaluates to `false`.",
 	]
-	return: types: ["null"]
+	return: types: ["boolean"]
 
 	examples: [
 		{

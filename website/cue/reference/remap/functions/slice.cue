@@ -32,7 +32,7 @@ remap: functions: slice: {
 		},
 	]
 	internal_failure_reasons: []
-	return: types: ["string"]
+	return: types: ["array", "string"]
 
 	examples: [
 		{

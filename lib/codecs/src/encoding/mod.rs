@@ -7,7 +7,9 @@ pub mod framing;
 pub mod serializer;
 pub use chunking::{Chunker, Chunking, GelfChunker};
 #[cfg(feature = "arrow")]
-pub use format::{ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig};
+pub use format::{
+    ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
+};
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
@@ -19,6 +21,8 @@ pub use format::{
 };
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "syslog")]
+pub use format::{SyslogSerializer, SyslogSerializerConfig};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, Framer, FramingConfig,

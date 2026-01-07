@@ -40,6 +40,8 @@ pub enum WebSocketError {
     DnsError { source: dns::DnsError },
     #[snafu(display("No addresses returned."))]
     NoAddresses,
+    #[snafu(display("Connection attempt timed out"))]
+    ConnectionTimedOut,
 }
 
 #[derive(Clone)]
@@ -119,6 +121,7 @@ impl WebSocketConnector {
         Ok(ws_stream)
     }
 
+    #[cfg(feature = "sinks-websocket")]
     pub(crate) async fn connect_backoff(&self) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
         let mut backoff = ExponentialBackoff::default();
 
@@ -135,6 +138,42 @@ impl WebSocketConnector {
                     time::sleep(backoff.next().unwrap()).await;
                 }
             }
+        }
+    }
+
+    /// Connects with exponential backoff, applying a timeout to each individual connection attempt.
+    /// This will retry forever until a connection is established.
+    #[cfg(feature = "sources-websocket")]
+    pub(crate) async fn connect_backoff_with_timeout(
+        &self,
+        timeout_duration: Duration,
+    ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
+        let mut backoff = ExponentialBackoff::default();
+
+        loop {
+            match time::timeout(timeout_duration, self.connect()).await {
+                Ok(Ok(ws_stream)) => {
+                    emit!(WebSocketConnectionEstablished {});
+                    return ws_stream;
+                }
+                Ok(Err(error)) => {
+                    emit!(WebSocketConnectionFailedError {
+                        error: Box::new(error)
+                    });
+                }
+                Err(_) => {
+                    emit!(WebSocketConnectionFailedError {
+                        error: Box::new(WebSocketError::ConnectionTimedOut),
+                    });
+                }
+            }
+
+            time::sleep(
+                backoff
+                    .next()
+                    .expect("backoff iterator always returns some value"),
+            )
+            .await;
         }
     }
 

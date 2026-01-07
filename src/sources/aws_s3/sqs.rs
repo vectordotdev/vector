@@ -4,7 +4,7 @@ use std::{
     num::NonZeroUsize,
     panic,
     sync::{Arc, LazyLock},
-    time::Duration,
+    time::{Duration, Instant},
 };
 
 use aws_sdk_s3::{Client as S3Client, operation::get_object::GetObjectError};
@@ -49,11 +49,11 @@ use crate::{
     config::{SourceAcknowledgementsConfig, SourceContext},
     event::{BatchNotifier, BatchStatus, EstimatedJsonEncodedSizeOf, Event, LogEvent},
     internal_events::{
-        EventsReceived, SqsMessageDeleteBatchError, SqsMessageDeletePartialError,
-        SqsMessageDeleteSucceeded, SqsMessageProcessingError, SqsMessageProcessingSucceeded,
-        SqsMessageReceiveError, SqsMessageReceiveSucceeded, SqsMessageSendBatchError,
-        SqsMessageSentPartialError, SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored,
-        StreamClosedError,
+        EventsReceived, S3ObjectProcessingFailed, S3ObjectProcessingSucceeded,
+        SqsMessageDeleteBatchError, SqsMessageDeletePartialError, SqsMessageDeleteSucceeded,
+        SqsMessageProcessingError, SqsMessageProcessingSucceeded, SqsMessageReceiveError,
+        SqsMessageReceiveSucceeded, SqsMessageSendBatchError, SqsMessageSentPartialError,
+        SqsMessageSentSucceeded, SqsS3EventRecordInvalidEventIgnored, StreamClosedError,
     },
     line_agg::{self, LineAgg},
     shutdown::ShutdownSignal,
@@ -670,6 +670,8 @@ impl IngestorProcess {
             }
         }
 
+        let download_start = Instant::now();
+
         let object_result = self
             .state
             .s3_client
@@ -793,6 +795,15 @@ impl IngestorProcess {
         // Up above, `lines` captures `read_error`, and eventually is captured by `stream`,
         // so we explicitly drop it so that we can again utilize `read_error` below.
         drop(stream);
+
+        let bucket = &s3_event.s3.bucket.name;
+        let duration = download_start.elapsed();
+
+        if read_error.is_some() {
+            emit!(S3ObjectProcessingFailed { bucket, duration });
+        } else {
+            emit!(S3ObjectProcessingSucceeded { bucket, duration });
+        }
 
         // The BatchNotifier is cloned for each LogEvent in the batch stream, but the last
         // reference must be dropped before the status of the batch is sent to the channel.

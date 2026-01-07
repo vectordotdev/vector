@@ -43,7 +43,7 @@ remap: functions: decode_lz4: {
 			title: "Decode Lz4 data with prepended size."
 			source: #"""
 				encoded_text = decode_base64!("LAAAAPAdVGhlIHF1aWNrIGJyb3duIGZveCBqdW1wcyBvdmVyIDEzIGxhenkgZG9ncy4=")
-				decode_lz4!(encoded_text, use_prepended_size: true)
+				decode_lz4!(encoded_text, prepended_size: true)
 				"""#
 			return: "The quick brown fox jumps over 13 lazy dogs."
 		},

@@ -2,7 +2,6 @@ use std::time::Duration;
 
 use futures::{future::ready, stream};
 use http::Response;
-use hyper::body;
 use openssl::{base64, hash, pkey, sign};
 use tokio::time::timeout;
 use vector_lib::config::log_schema;
@@ -205,7 +204,7 @@ async fn correct_request() {
     let (parts, body) = request.into_parts();
     assert_eq!(&parts.method.to_string(), "POST");
 
-    let body = body::to_bytes(body).await.unwrap();
+    let body = http_body::Body::collect(body).await.unwrap().to_bytes();
     let json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
     let expected_json = serde_json::json!([
         {

@@ -58,7 +58,7 @@ remap: functions: encrypt_ip: {
 				encrypted_ip = encrypt_ip!("2001:db8::1", "sixteen byte key", "aes128")
 				encrypted_ip
 				"""#
-			return: "d09e:a5ea:585a:2547:dc6d:65ea:d9f1:d09d"
+			return: "c0e6:eb35:6887:f554:4c65:8ace:17ca:6c6a"
 		},
 		{
 			title: "Encrypt IPv4 address with prefix-preserving mode"
@@ -66,7 +66,7 @@ remap: functions: encrypt_ip: {
 				encrypted_ip = encrypt_ip!("192.168.1.1", "thirty-two bytes key for pfx use", "pfx")
 				encrypted_ip
 				"""#
-			return: "b51c:3c43:4e89:819e:64ce:225f:d6d1:bf01"
+			return: "33.245.248.61"
 		},
 		{
 			title: "Encrypt IPv6 address with prefix-preserving mode"

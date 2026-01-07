@@ -30,7 +30,7 @@ remap: functions: parse_int: {
 		"The base is not between 2 and 36.",
 		"The number cannot be parsed in the base.",
 	]
-	return: types: ["string"]
+	return: types: ["integer"]
 
 	examples: [
 		{

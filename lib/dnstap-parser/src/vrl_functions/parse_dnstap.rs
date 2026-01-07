@@ -1,6 +1,6 @@
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
-use vector_lib::event::LogEvent;
+use vector_core::event::LogEvent;
 use vrl::prelude::*;
 
 use crate::{parser::DnstapParser, schema::DnstapEventSchema};
