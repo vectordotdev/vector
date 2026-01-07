@@ -10,7 +10,7 @@
   ],
   "tabWidth": 2,
   "useTabs": false,
-  "semi": false,
+  "semi": true,
   "singleQuote": false,
   "trailingComma": "none",
   "printWidth": 120
