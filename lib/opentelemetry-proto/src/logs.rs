@@ -15,6 +15,7 @@ use crate::proto::{
 
 const SOURCE_NAME: &str = "opentelemetry";
 pub const RESOURCE_KEY: &str = "resources";
+pub const EVENT_NAME_KEY: &str = "event_name";
 pub const ATTRIBUTES_KEY: &str = "attributes";
 pub const SCOPE_KEY: &str = "scope";
 pub const NAME_KEY: &str = "name";
@@ -52,7 +53,7 @@ struct ResourceLog {
     log_record: LogRecord,
 }
 
-// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.15.0/specification/logs/data-model.md
+// https://github.com/open-telemetry/opentelemetry-specification/blob/v1.40.0/specification/logs/data-model.md
 impl ResourceLog {
     fn into_event(self, log_namespace: LogNamespace, now: DateTime<Utc>) -> Event {
         let mut log = match log_namespace {
@@ -179,6 +180,16 @@ impl ResourceLog {
                 Some(LegacyKey::Overwrite(path!(FLAGS_KEY))),
                 path!(FLAGS_KEY),
                 self.log_record.flags,
+            );
+        }
+
+        if !self.log_record.event_name.is_empty() {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(EVENT_NAME_KEY))),
+                path!(EVENT_NAME_KEY),
+                self.log_record.event_name,
             );
         }
 
