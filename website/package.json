@@ -6,7 +6,10 @@
     "typesense-sync:preview": "NODE_ENV=preview ts-node scripts/typesense-sync.ts",
     "typesense-sync:production": "NODE_ENV=production ts-node scripts/typesense-sync.ts",
     "config-examples": "node scripts/create-config-examples.js",
-    "lighthouse": "lighthouse --output html --output-path ./reports/lighthouse.html --view https://vector.dev"
+    "lighthouse": "lighthouse --output html --output-path ./reports/lighthouse.html --view https://vector.dev",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "format:html": "prettier --write \"layouts/**/*.html\""
   },
   "dependencies": {
     "@algolia/autocomplete-js": "^1.2.1",
