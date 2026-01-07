@@ -1,4 +1,9 @@
 {{ $file := printf "static/%s" .src }}
-<div class="svg{{ with .h }} h-{{ . }}{{ end }}{{ with .w }} w-{{ . }}{{ end }}{{ with .class }} {{ . }}{{ end }}">
+<div
+  class="svg
+  {{ with .h }}h-{{ . }}{{ end }}
+  {{ with .w }}w-{{ . }}{{ end }}
+  {{ with .class }}{{ . }}{{ end }}"
+>
   {{ $file | readFile | safeHTML }}
 </div>
