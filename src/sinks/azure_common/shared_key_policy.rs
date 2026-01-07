@@ -199,7 +199,7 @@ fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> Az
     s.push_str(url.path());
 
     // Canonicalized query: lowercase names, sort by name, join multi-values by comma, each line "name:value\n"
-    if let Some(_) = url.query() {
+    if url.query().is_some() {
         let mut qp_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for (name, value) in url.query_pairs() {
             let key_l = name.to_ascii_lowercase();

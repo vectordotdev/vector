@@ -43,11 +43,11 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 .client
                 .blob_client(request.metadata.partition_key.as_str());
             let byte_size = request.blob_data.len();
-            let mut upload_options = BlockBlobClientUploadOptions::default();
-            upload_options.blob_content_type = Some(request.content_type.to_string());
-            if let Some(encoding) = request.content_encoding {
-                upload_options.blob_content_encoding = Some(encoding.to_string());
-            }
+            let upload_options = BlockBlobClientUploadOptions {
+                blob_content_type: Some(request.content_type.to_string()),
+                blob_content_encoding: request.content_encoding.map(|e| e.to_string()),
+                ..Default::default()
+            };
 
             let result = blob_client
                 .upload(

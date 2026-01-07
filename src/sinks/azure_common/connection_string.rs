@@ -33,17 +33,17 @@ SAS handling
 Examples:
 - Access key connection string:
   "DefaultEndpointsProtocol=https;AccountName=myacct;AccountKey=base64key==;EndpointSuffix=core.windows.net"
-  Container URL: https://myacct.blob.core.windows.net/logs
-  Blob URL: https://myacct.blob.core.windows.net/logs/file.txt
+  Container URL: <https://myacct.blob.core.windows.net/logs>
+  Blob URL: <https://myacct.blob.core.windows.net/logs/file.txt>
 
 - SAS connection string:
-  "BlobEndpoint=https://myacct.blob.core.windows.net/;SharedAccessSignature=sv=2022-11-02&ss=b&..."
-  Container URL (with SAS): https://myacct.blob.core.windows.net/logs?sv=2022-11-02&ss=b&...
-  Blob URL (with SAS): https://myacct.blob.core.windows.net/logs/file.txt?sv=2022-11-02&ss=b&...
+  "BlobEndpoint=<https://myacct.blob.core.windows.net/>;SharedAccessSignature=sv=2022-11-02&ss=b&..."
+  Container URL (with SAS): <https://myacct.blob.core.windows.net/logs?sv=2022-11-02&ss=b&...>
+  Blob URL (with SAS): <https://myacct.blob.core.windows.net/logs/file.txt?sv=2022-11-02&ss=b&...>
 
 - Azurite/dev storage:
   "UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1"
-  Container URL: http://127.0.0.1:10000/devstoreaccount1/logs
+  Container URL: <http://127.0.0.1:10000/devstoreaccount1/logs>
 */
 
 use std::collections::HashMap;
@@ -87,7 +87,7 @@ pub enum Auth {
 }
 
 /// A parsed Azure Storage connection string and helpers to compose URLs for containers/blobs.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct ParsedConnectionString {
     pub account_name: Option<String>,
     pub account_key: Option<String>,
@@ -97,21 +97,6 @@ pub struct ParsedConnectionString {
     pub blob_endpoint: Option<String>,
     pub use_development_storage: bool,
     pub development_storage_proxy_uri: Option<String>,
-}
-
-impl Default for ParsedConnectionString {
-    fn default() -> Self {
-        Self {
-            account_name: None,
-            account_key: None,
-            shared_access_signature: None,
-            default_endpoints_protocol: None,
-            endpoint_suffix: None,
-            blob_endpoint: None,
-            use_development_storage: false,
-            development_storage_proxy_uri: None,
-        }
-    }
 }
 
 impl ParsedConnectionString {
@@ -135,28 +120,23 @@ impl ParsedConnectionString {
         }
 
         // Build the structure from the parsed map.
-        let mut parsed = ParsedConnectionString::default();
-
-        parsed.account_name = map.get("accountname").cloned();
-        parsed.account_key = map.get("accountkey").cloned();
-        parsed.shared_access_signature = map
-            .get("sharedaccesssignature")
-            .map(|s| normalize_sas(s.as_str()));
-
-        parsed.default_endpoints_protocol = map
-            .get("defaultendpointsprotocol")
-            .map(|s| s.to_ascii_lowercase());
-
-        parsed.endpoint_suffix = map.get("endpointsuffix").cloned();
-
-        parsed.blob_endpoint = map.get("blobendpoint").cloned();
-
-        parsed.use_development_storage = map
-            .get("usedevelopmentstorage")
-            .map(|v| v.eq_ignore_ascii_case("true"))
-            .unwrap_or(false);
-
-        parsed.development_storage_proxy_uri = map.get("developmentstorageproxyuri").cloned();
+        let parsed = ParsedConnectionString {
+            account_name: map.get("accountname").cloned(),
+            account_key: map.get("accountkey").cloned(),
+            shared_access_signature: map
+                .get("sharedaccesssignature")
+                .map(|s| normalize_sas(s.as_str())),
+            default_endpoints_protocol: map
+                .get("defaultendpointsprotocol")
+                .map(|s| s.to_ascii_lowercase()),
+            endpoint_suffix: map.get("endpointsuffix").cloned(),
+            blob_endpoint: map.get("blobendpoint").cloned(),
+            use_development_storage: map
+                .get("usedevelopmentstorage")
+                .map(|v| v.eq_ignore_ascii_case("true"))
+                .unwrap_or(false),
+            development_storage_proxy_uri: map.get("developmentstorageproxyuri").cloned(),
+        };
 
         Ok(parsed)
     }
@@ -256,15 +236,18 @@ impl ParsedConnectionString {
 
     /// Build a blob URL, optionally appending SAS if present.
     pub fn blob_url(&self, container: &str, blob: &str) -> Result<String, ConnectionStringError> {
-        let container_url = self.container_url(container)?;
+        // Build the base container URL without SAS, then append the blob path,
+        // and finally append the SAS so it appears after the full path.
+        let base = self.blob_account_endpoint()?;
+        let container_no_sas = format!("{}/{}", trim_trailing_slash(&base), container);
+        let blob_full = format!(
+            "{}/{}",
+            trim_trailing_slash(&container_no_sas),
+            encode_path_segment(blob)
+        );
         Ok(append_query_segment(
-            &format!(
-                "{}/{}",
-                trim_trailing_slash(&container_url),
-                encode_path_segment(blob)
-            ),
-            // container_url already handled SAS; if it already had query args, append with '&'
-            None, // SAS already appended at container level if present
+            &blob_full,
+            self.shared_access_signature.as_deref(),
         ))
     }
 }
@@ -278,7 +261,7 @@ fn normalize_sas(s: &str) -> String {
 fn append_query_segment(base_url: &str, sas: Option<&str>) -> String {
     match sas {
         None => base_url.to_string(),
-        Some(q) if q.is_empty() => base_url.to_string(),
+        Some("") => base_url.to_string(),
         Some(q) => {
             let sep = if base_url.contains('?') { '&' } else { '?' };
             format!("{base_url}{sep}{q}")
@@ -288,8 +271,8 @@ fn append_query_segment(base_url: &str, sas: Option<&str>) -> String {
 
 /// Trim exactly one trailing slash from a string, if present.
 fn trim_trailing_slash(s: &str) -> String {
-    if s.ends_with('/') {
-        s[..s.len() - 1].to_string()
+    if let Some(stripped) = s.strip_suffix('/') {
+        stripped.to_string()
     } else {
         s.to_string()
     }
