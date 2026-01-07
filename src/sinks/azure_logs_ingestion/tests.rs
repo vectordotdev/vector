@@ -1,6 +1,6 @@
+use bytes::Bytes;
 use futures::stream;
 use http::Response;
-use hyper::body;
 use std::time::Duration;
 use tokio::time::timeout;
 use vector_lib::config::log_schema;
@@ -265,9 +265,11 @@ async fn correct_request() {
     let (parts, body) = request.into_parts();
     assert_eq!(&parts.method.to_string(), "POST");
 
-    #[allow(deprecated)]
-    let body = body::to_bytes(body).await.unwrap();
-    let body_json: serde_json::Value = serde_json::from_slice(&body[..]).unwrap();
+    let body_bytes: Bytes = http_body::Body::collect(body)
+        .await
+        .expect("failed to collect body")
+        .to_bytes();
+    let body_json: serde_json::Value = serde_json::from_slice(&body_bytes[..]).unwrap();
     let expected_json = serde_json::json!([
         {
             "TimeGenerated": timestamp_value1,
@@ -309,6 +311,75 @@ fn create_mock_credential() -> impl TokenCredential {
     }
 
     MockCredential
+}
+
+#[tokio::test]
+async fn mock_healthcheck_with_400_response() {
+    let config: AzureLogsIngestionConfig = toml::from_str(
+        r#"
+            endpoint = "http://localhost:9001"
+            dcr_immutable_id = "dcr-00000000000000000000000000000000"
+            stream_name = "Custom-UnitTest"
+
+            [auth]
+            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
+            azure_client_id = "mock-client-id"
+            azure_client_secret = "mock-client-secret"
+        "#,
+    )
+    .unwrap();
+
+    let mut log1 = [("message", "hello")].iter().copied().collect::<LogEvent>();
+    let (_timestamp_key1, _timestamp_value1) = insert_timestamp_kv(&mut log1);
+
+    let (endpoint_tx, _endpoint_rx) = tokio::sync::mpsc::channel(1);
+    let mock_endpoint = spawn_blackhole_http_server(move |request| {
+        let endpoint_tx = endpoint_tx.clone();
+        async move {
+            endpoint_tx.send(request).await.unwrap();
+            let body = serde_json::json!({
+                "error": "Mock400ErrorResponse",
+            })
+            .to_string();
+
+            Ok(Response::builder()
+                .status(400)
+                .header("Content-Type", "application/json")
+                .body(body.into())
+                .unwrap())
+        }
+    })
+    .await;
+
+    let context = SinkContext::default();
+    let credential = std::sync::Arc::new(create_mock_credential());
+
+    let (_sink, healthcheck) = config
+        .build_inner(
+            context,
+            mock_endpoint.into(),
+            config.dcr_immutable_id.clone(),
+            config.stream_name.clone(),
+            credential,
+            config.token_scope.clone(),
+            config.timestamp_field.clone(),
+        )
+        .await
+        .unwrap();
+
+    let hc_err = healthcheck.await.unwrap_err();
+    let err_str = hc_err.to_string();
+    // Both generic 400 "Bad Request", and our mock error message should be present
+    assert!(
+        err_str.contains("Bad Request"),
+        "Healthcheck error does not contain 'Bad Request': {}",
+        err_str
+    );
+    assert!(
+        err_str.contains("Mock400ErrorResponse"),
+        "Healthcheck error does not contain 'Mock400ErrorResponse': {}",
+        err_str
+    );
 }
 
 #[tokio::test]

@@ -157,8 +157,7 @@ impl AzureLogsIngestionService {
             }
 
             if res.status() == StatusCode::BAD_REQUEST {
-                #[allow(deprecated)]
-                let body_bytes: Bytes = hyper::body::to_bytes(res.into_body()).await.unwrap();
+                let body_bytes: Bytes = http_body::Body::collect(res.into_body()).await?.to_bytes();
                 let body_string: String = String::from_utf8(body_bytes.to_vec()).unwrap();
                 let err_string: String = format!("Azure returned 400 Bad Request: {body_string}");
                 return Err(err_string.into());
