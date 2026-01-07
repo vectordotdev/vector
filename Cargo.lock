@@ -12751,6 +12751,7 @@ dependencies = [
  "vector-config-macros",
  "vector-lib",
  "vector-vrl-functions",
+ "vector-vrl-metrics",
  "vrl",
  "warp",
  "windows-service",
@@ -13101,6 +13102,19 @@ version = "0.1.0"
 dependencies = [
  "dnstap-parser",
  "enrichment",
+ "vector-vrl-metrics",
+ "vrl",
+]
+
+[[package]]
+name = "vector-vrl-metrics"
+version = "0.1.0"
+dependencies = [
+ "arc-swap",
+ "tokio",
+ "tokio-stream",
+ "vector-common",
+ "vector-core",
  "vrl",
 ]
 
@@ -13116,7 +13130,9 @@ dependencies = [
  "serde_json",
  "tikv-jemallocator",
  "tracing-subscriber",
+ "vector-core",
  "vector-vrl-functions",
+ "vector-vrl-metrics",
  "vrl",
 ]
 

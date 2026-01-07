@@ -132,11 +132,13 @@ members = [
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
   "lib/vector-vrl/web-playground",
+  "lib/vector-vrl-metrics",
   "vdev",
 ]
 
 [workspace.dependencies]
 anyhow = { version = "1.0.99", default-features = false, features = ["std"] }
+arc-swap = { version = "1.7.1", default-features = false }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
@@ -228,7 +230,8 @@ vector-lib.workspace = true
 vector-config.workspace = true
 vector-config-common.workspace = true
 vector-config-macros.workspace = true
-vector-vrl-functions.workspace = true
+vector-vrl-functions = { workspace = true, features = ["vrl-metrics"] }
+vector-vrl-metrics = { path = "lib/vector-vrl-metrics" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
@@ -338,7 +341,7 @@ hex = { version = "0.4.3", default-features = false, optional = true }
 greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "f7243393808640f5123b0d5b7b798da591a4df6e", optional = true }
 
 # External libs
-arc-swap = { version = "1.7", default-features = false, optional = true }
+arc-swap = { workspace = true, default-features = false, optional = true }
 async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
