@@ -12,6 +12,6 @@
   "useTabs": false,
   "semi": true,
   "singleQuote": false,
-  "trailingComma": "none",
+  "trailingComma": "es5",
   "printWidth": 120
 }
