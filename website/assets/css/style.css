@@ -66,8 +66,8 @@ a[type="button"] {
 
 /* Algolia search */
 :root {
-  --docsearch-key-shadow: inset 0 -2px 0 0 rgb(205, 205, 230),
-    inset 0 0 1px 1px #fff, 0 1px 2px 1px rgba(30, 35, 90, 0.4);
+  --docsearch-key-shadow:
+    inset 0 -2px 0 0 rgb(205, 205, 230), inset 0 0 1px 1px #fff, 0 1px 2px 1px rgba(30, 35, 90, 0.4);
 }
 
 .aa-DetachedFormContainer,
@@ -149,10 +149,7 @@ a[type="button"] {
 }
 
 .aa-DetachedContainer .aa-DetachedFormContainer {
-  background: rgba(
-    var(--aa-background-color-rgb),
-    var(--aa-background-color-alpha)
-  );
+  background: rgba(var(--aa-background-color-rgb), var(--aa-background-color-alpha));
   padding: calc(var(--aa-spacing-half) * 1.5);
 }
 
@@ -239,10 +236,7 @@ a[type="button"] {
   font-size: 0.85em;
   border-width: 1px;
   border-style: solid;
-  border-color: rgba(
-    var(--aa-panel-border-color-rgb),
-    var(--aa-panel-border-color-alpha)
-  );
+  border-color: rgba(var(--aa-panel-border-color-rgb), var(--aa-panel-border-color-alpha));
   border-radius: 3px;
 }
 
@@ -254,7 +248,9 @@ a[type="button"] {
 
 .aa-Footer {
   padding: 15px;
-  box-shadow: 0 -1px 0 0 #e0e3e8, 0 -3px 6px 0 rgba(69, 98, 155, 0.12);
+  box-shadow:
+    0 -1px 0 0 #e0e3e8,
+    0 -3px 6px 0 rgba(69, 98, 155, 0.12);
 }
 
 @media screen and (max-width: 679px) {
@@ -263,13 +259,8 @@ a[type="button"] {
   }
 }
 
-[data-autocomplete-source-id="suggestions"]
-  .aa-Item[aria-selected="true"]
-  .aa-QuerySuggestion {
-  background: rgba(
-    var(--aa-selected-color-rgb),
-    var(--aa-selected-color-alpha)
-  );
+[data-autocomplete-source-id="suggestions"] .aa-Item[aria-selected="true"] .aa-QuerySuggestion {
+  background: rgba(var(--aa-selected-color-rgb), var(--aa-selected-color-alpha));
   border-color: transparent;
 }
 

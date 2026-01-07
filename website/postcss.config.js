@@ -1,7 +1,7 @@
-import postcssImport from 'postcss-import';
-import tailwindCss from 'tailwindcss';
-import autoprefixer from 'autoprefixer';
-import purgecssPlugin from '@fullhuman/postcss-purgecss';
+import postcssImport from "postcss-import";
+import tailwindCss from "tailwindcss";
+import autoprefixer from "autoprefixer";
+import purgecssPlugin from "@fullhuman/postcss-purgecss";
 
 // These are classes for things that are applied by JS, and thus missed by Hugo.
 // See assets/js/*.js for places where this happens.
@@ -41,17 +41,17 @@ const safeClasses = {
     "text-sm",
     "w-2",
     "w-3",
-  ]
+  ],
 };
 
 const purgecss = purgecssPlugin({
-  content: ['./hugo_stats.json'],
+  content: ["./hugo_stats.json"],
   safelist: safeClasses,
   defaultExtractor: (content) => {
     const broadMatches = content.match(/[^<>"'`\s]*[^<>"'`\s:]/g) || [];
     const innerMatches = content.match(/[^<>"'`\s.()]*[^<>"'`\s.():]/g) || [];
     return broadMatches.concat(innerMatches);
-  }
+  },
 });
 
 export default {
@@ -59,6 +59,6 @@ export default {
     postcssImport,
     tailwindCss,
     autoprefixer,
-    ...(process.env.HUGO_ENVIRONMENT === 'production' ? [purgecss] : [])
-  ]
-}
+    ...(process.env.HUGO_ENVIRONMENT === "production" ? [purgecss] : []),
+  ],
+};
