@@ -1,7 +1,7 @@
-import fs from 'fs';
-import chalk from 'chalk';
-import * as TOML from '@iarna/toml';
-import YAML from 'yaml';
+import fs from "fs";
+import chalk from "chalk";
+import * as TOML from "@iarna/toml";
+import YAML from "yaml";
 
 const cueJsonOutput = "data/docs.json";
 
@@ -10,56 +10,54 @@ const getExampleValue = (param, deepFilter) => {
   let value;
 
   const getArrayValue = (obj) => {
-    const enumVal = (obj.enum != null) ? [Object.keys(obj.enum)[0]] : null;
+    const enumVal = obj.enum != null ? [Object.keys(obj.enum)[0]] : null;
 
-    const examplesVal = (obj.examples != null && obj.examples.length > 0) ? [obj.examples[0]] : null;
+    const examplesVal = obj.examples != null && obj.examples.length > 0 ? [obj.examples[0]] : null;
 
     return obj.default || examplesVal || enumVal || null;
-  }
+  };
 
   const getValue = (obj) => {
-    const enumVal = (obj.enum != null) ? Object.keys(obj.enum)[0] : null;
+    const enumVal = obj.enum != null ? Object.keys(obj.enum)[0] : null;
 
-    const examplesVal = (obj.examples != null && obj.examples.length > 0) ? obj.examples[0] : null;
+    const examplesVal = obj.examples != null && obj.examples.length > 0 ? obj.examples[0] : null;
 
     return obj.default || examplesVal || enumVal || null;
-  }
+  };
 
-  Object.keys(param.type).forEach(k => {
+  Object.keys(param.type).forEach((k) => {
     const p = param.type[k];
 
-    if (['array', 'object'].includes(k)) {
+    if (["array", "object"].includes(k)) {
       const topType = k;
 
       if (p.items && p.items.type) {
         const typeInfo = p.items.type;
 
-        Object.keys(typeInfo).forEach(k => {
-          if (['array', 'object'].includes(k)) {
+        Object.keys(typeInfo).forEach((k) => {
+          if (["array", "object"].includes(k)) {
             const subType = k;
             const options = typeInfo[k].options;
 
             var subObj = {};
 
-            Object
-              .keys(options)
-              .filter(k => deepFilter(options[k]))
-              .forEach(k => {
-                Object.keys(options[k].type).forEach(key => {
+            Object.keys(options)
+              .filter((k) => deepFilter(options[k]))
+              .forEach((k) => {
+                Object.keys(options[k].type).forEach((key) => {
                   const deepTypeInfo = options[k].type[key];
 
-                  if (subType === 'array') {
+                  if (subType === "array") {
                     subObj[k] = getArrayValue(deepTypeInfo);
                   } else {
                     subObj[k] = getValue(deepTypeInfo);
                   }
-
                 });
               });
 
             value = subObj;
           } else {
-            if (topType === 'array') {
+            if (topType === "array") {
               value = getArrayValue(typeInfo[k]);
             } else {
               value = getValue(typeInfo[k]);
@@ -75,15 +73,14 @@ const getExampleValue = (param, deepFilter) => {
   });
 
   return value;
-}
+};
 
 Object.makeExampleParams = (params, filter, deepFilter) => {
   var obj = {};
 
-  Object
-    .keys(params)
-    .filter(k => filter(params[k]))
-    .forEach(k => {
+  Object.keys(params)
+    .filter((k) => filter(params[k]))
+    .forEach((k) => {
       let value = getExampleValue(params[k], deepFilter);
       if (value) {
         obj[k] = value;
@@ -91,22 +88,22 @@ Object.makeExampleParams = (params, filter, deepFilter) => {
     });
 
   return obj;
-}
+};
 
 // Convert object to TOML string
 const toToml = (obj) => {
   return TOML.stringify(obj);
-}
+};
 
 // Convert object to YAML string
 const toYaml = (obj) => {
   return `${YAML.stringify(obj)}`;
-}
+};
 
 // Convert object to JSON string (indented)
 const toJson = (obj) => {
   return JSON.stringify(obj, null, 2);
-}
+};
 
 // Set the example value for a given config parameter
 const setExampleValue = (exampleConfig, paramName, param) => {
@@ -125,7 +122,7 @@ const setExampleValue = (exampleConfig, paramName, param) => {
       exampleConfig[paramName] = p.examples[0];
     }
 
-    if (['array', 'object'].includes(k)) {
+    if (["array", "object"].includes(k)) {
       if (p.items) {
         var obj = {};
 
@@ -157,7 +154,7 @@ const setExampleValue = (exampleConfig, paramName, param) => {
       }
     }
   });
-}
+};
 
 // Assemble the "minimal" params for an example config
 const makeMinimalParams = (configuration) => {
@@ -175,7 +172,7 @@ const makeMinimalParams = (configuration) => {
   }
 
   return minimal;
-}
+};
 
 // Assemble the "advanced" params for an example config
 const makeAllParams = (configuration) => {
@@ -190,7 +187,7 @@ const makeAllParams = (configuration) => {
   }
 
   return optional;
-}
+};
 
 // Convert the use case examples (`component.examples`) into multi-format
 const makeUseCaseExamples = (component) => {
@@ -210,31 +207,31 @@ const makeUseCaseExamples = (component) => {
         exampleConfig = {
           [kindPlural]: {
             [keyName]: {
-              "type": component.type,
-              inputs: ['my-source-or-transform-id'],
-              ...extra
-            }
-          }
-        }
+              type: component.type,
+              inputs: ["my-source-or-transform-id"],
+              ...extra,
+            },
+          },
+        };
       } else {
         exampleConfig = {
           [kindPlural]: {
             [keyName]: {
-              "type": component.type,
-              ...extra
-            }
-          }
-        }
+              type: component.type,
+              ...extra,
+            },
+          },
+        };
       }
 
       // Strip the "log" or "metric" key in the example output
       let output;
 
       if (example.output) {
-        if (example.output['log']) {
-          output = example.output['log'];
-        } else if (example.output['metric']) {
-          output = example.output['metric'];
+        if (example.output["log"]) {
+          output = example.output["log"];
+        } else if (example.output["metric"]) {
+          output = example.output["metric"];
         } else {
           output = example.output;
         }
@@ -252,7 +249,7 @@ const makeUseCaseExamples = (component) => {
         },
         input: example.input,
         output: output,
-      }
+      };
 
       useCases.push(useCase);
     });
@@ -261,12 +258,12 @@ const makeUseCaseExamples = (component) => {
   } else {
     return null;
   }
-}
+};
 
 const main = () => {
   try {
     const debug = process.env.DEBUG === "true" || false;
-    const data = fs.readFileSync(cueJsonOutput, 'utf8');
+    const data = fs.readFileSync(cueJsonOutput, "utf8");
     const docs = JSON.parse(data);
     const components = docs.components;
 
@@ -285,13 +282,13 @@ const main = () => {
 
         const minimalParams = Object.makeExampleParams(
           configuration,
-            p => p.required || p.minimal,
-            p => p.required || p.minimal,
+          (p) => p.required || p.minimal,
+          (p) => p.required || p.minimal
         );
         const advancedParams = Object.makeExampleParams(
           configuration,
-          _ => true,
-            p => p.required || p.minimal || p.relevant_when,
+          (_) => true,
+          (p) => p.required || p.minimal || p.relevant_when
         );
         const useCaseExamples = makeUseCaseExamples(component);
 
@@ -300,49 +297,49 @@ const main = () => {
         let minimalExampleConfig, advancedExampleConfig;
 
         // Sinks and transforms are treated differently because they need an `inputs` field
-        if (['sinks', 'transforms'].includes(kind)) {
+        if (["sinks", "transforms"].includes(kind)) {
           minimalExampleConfig = {
             [kind]: {
               [keyName]: {
-                "type": componentType,
-                inputs: ['my-source-or-transform-id'],
+                type: componentType,
+                inputs: ["my-source-or-transform-id"],
                 ...minimalParams,
-              }
-            }
+              },
+            },
           };
 
           advancedExampleConfig = {
             [kind]: {
               [keyName]: {
-                "type": componentType,
-                inputs: ['my-source-or-transform-id'],
+                type: componentType,
+                inputs: ["my-source-or-transform-id"],
                 ...advancedParams,
-              }
-            }
+              },
+            },
           };
         } else {
           minimalExampleConfig = {
             [kind]: {
               [keyName]: {
-                "type": componentType,
+                type: componentType,
                 ...minimalParams,
-              }
-            }
+              },
+            },
           };
 
           advancedExampleConfig = {
             [kind]: {
               [keyName]: {
-                "type": componentType,
+                type: componentType,
                 ...advancedParams,
-              }
-            }
+              },
+            },
           };
         }
 
-        docs['components'][kind][componentType]['examples'] = useCaseExamples;
+        docs["components"][kind][componentType]["examples"] = useCaseExamples;
 
-        docs['components'][kind][componentType]['example_configs'] = {
+        docs["components"][kind][componentType]["example_configs"] = {
           minimal: {
             toml: toToml(minimalExampleConfig),
             yaml: toYaml(minimalExampleConfig),
@@ -357,25 +354,23 @@ const main = () => {
       }
     }
 
-
     // A debugging statement to make sure things are going basically as planned
     if (debug) {
-      console.log(docs['components']['sources']['syslog']['examples']);
+      console.log(docs["components"]["sources"]["syslog"]["examples"]);
     }
-
 
     console.log(chalk.green("Success. Finished generating examples for all components."));
     console.log(chalk.blue(`Writing generated examples as JSON to ${cueJsonOutput}...`));
 
     // Write back to the JSON file only when not in debug mode
     if (!debug) {
-      fs.writeFileSync(cueJsonOutput, JSON.stringify(docs), 'utf8');
+      fs.writeFileSync(cueJsonOutput, JSON.stringify(docs), "utf8");
     }
 
     console.log(chalk.green(`Success. Finished writing example configs to ${cueJsonOutput}.`));
   } catch (err) {
     console.error(err);
   }
-}
+};
 
 main();
