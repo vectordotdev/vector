@@ -158,16 +158,13 @@ impl DorisSinkClient {
         // Only set label when group commit is not enabled
         // When group commit is enabled, Doris server ignores the label anyway
         // as multiple requests are merged into a single transaction
-        let label = if self.is_group_commit_enabled() {
+        if self.is_group_commit_enabled() {
             debug!(%uri, "Building request with group commit enabled (no label).");
-            None
         } else {
             let label = self.generate_label(database, table);
             debug!(%uri, %label, "Building request.");
             builder = builder.header("label", &label);
-            Some(label)
         };
-        let _ = label; // Suppress unused variable warning
 
         // Add compression headers if needed
         if let Some(ce) = self.compression.content_encoding() {
