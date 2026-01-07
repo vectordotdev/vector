@@ -265,7 +265,8 @@ impl<'a> Builder<'a> {
 
             let mut builder = SourceSender::builder()
                 .with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
-                .with_timeout(source.inner.send_timeout());
+                .with_timeout(source.inner.send_timeout())
+                .with_ewma_alpha(self.config.global.buffer_utilization_ewma_alpha);
             let mut pumps = Vec::new();
             let mut controls = HashMap::new();
             let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -528,6 +529,7 @@ impl<'a> Builder<'a> {
                 WhenFull::Block,
                 &span,
                 Some(metrics),
+                self.config.global.buffer_utilization_ewma_alpha,
             );
 
             self.inputs

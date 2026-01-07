@@ -11,6 +11,14 @@ use super::{
 };
 use crate::config::schema;
 
+/// Minimum value (exclusive) for `utilization_ewma_alpha`.
+/// The alpha value must be strictly greater than this value.
+const EWMA_ALPHA_MIN: f64 = 0.0;
+
+/// Maximum value (exclusive) for `utilization_ewma_alpha`.
+/// The alpha value must be strictly less than this value.
+const EWMA_ALPHA_MAX: f64 = 1.0;
+
 /// Check that provide + topology config aren't present in the same builder, which is an error.
 pub fn check_provider(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     if config.provider.is_some()
@@ -147,8 +155,20 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-/// To avoid collisions between `output` metric tags, check that a component
-/// does not have a named output with the name [`DEFAULT_OUTPUT`]
+/// Validates that `buffer_utilization_ewma_alpha` value is within the valid range (0 < alpha < 1)
+/// for the global configuration.
+pub fn check_buffer_utilization_ewma_alpha(config: &ConfigBuilder) -> Result<(), Vec<String>> {
+    if let Some(alpha) = config.global.buffer_utilization_ewma_alpha
+        && (alpha <= EWMA_ALPHA_MIN || alpha >= EWMA_ALPHA_MAX)
+    {
+        Err(vec![format!(
+            "Global `buffer_utilization_ewma_alpha` must be between 0 and 1 exclusive (0 < alpha < 1), got {alpha}"
+        )])
+    } else {
+        Ok(())
+    }
+}
+
 pub fn check_outputs(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     let mut errors = Vec::new();
     for (key, source) in config.sources.iter() {
