@@ -719,7 +719,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		source_buffer_max_byte_size: {
-			description:       "The maximum number of bytes the buffer that the source's outputs send into can hold."
+			description:       "The maximum number of bytes the source buffer can hold. The output(s) of the source send data to this buffer."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {
@@ -727,7 +727,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		source_buffer_max_event_size: {
-			description:       "The maximum number of events the buffer that the source's outputs send into can hold."
+			description:       "The maximum number of events the source buffer can hold. The output(s) of the source send data to this buffer."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {
@@ -735,7 +735,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		source_buffer_utilization: {
-			description:       "The utilization level of the buffer that the source's outputs send into."
+			description:       "The utilization level of the source buffer. The output(s) of the source send data to this buffer."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags: _component_tags & {
@@ -743,7 +743,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		source_buffer_utilization_level: {
-			description:       "The current utilization level of the buffer that the source's outputs send into."
+			description:       "The current utilization level of the source buffer. The output(s) of the source send data to this buffer."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {
@@ -751,7 +751,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		source_buffer_utilization_mean: {
-			description:       "The mean utilization level of the buffer that the source's outputs send into. This value is smoothed over time using an exponentially weighted moving average (EWMA)."
+			description:       "The mean utilization level of the source buffer. The output(s) of the source send data to this buffer. The mean utilization is smoothed over time using an exponentially weighted moving average (EWMA)."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {
