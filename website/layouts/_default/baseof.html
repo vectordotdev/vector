@@ -1,14 +1,14 @@
 {{/* Root template for all pages */}}
 {{ $hasBottomNav := eq .Section "docs" }}
 {{ $displayBanner := site.Params.display_banner }}
-<!DOCTYPE html>
+<!doctype html>
 <html
   lang="{{ site.LanguageCode }}"
-  x-data="{ dark: $store.global.dark{{ if $hasBottomNav }}, slideover: false {{ end }} }"
+  x-data="{ dark: $store.global.dark{{ if $hasBottomNav }}, slideover: false{{ end }} }"
   x-on:toggle-dark="dark = !dark"
   :class="{ 'dark': dark, 'light': !dark }"
-  class="h-screen">
-
+  class="h-screen"
+>
   <head>
     {{/* Make sure the page is always visible if JS is disabled */}}
     <noscript>
@@ -21,14 +21,18 @@
 
     {{/* Ensure smooth page loading */}}
     <script>
-      function showBody() { document.body.style.visibility = 'visible'; }
+      function showBody() {
+        document.body.style.visibility = "visible";
+      }
     </script>
 
     {{ partial "meta.html" . }}
 
+
     <title>
       {{ block "title" . }}
-      {{ site.Title }} | {{ site.Params.description }}
+        {{ site.Title }} |
+        {{ site.Params.description }}
       {{ end }}
     </title>
 
@@ -37,13 +41,28 @@
     {{/* JS that needs to load at the start */}}
     {{ partial "javascript/head.html" . }}
   </head>
-  <body class="dark:bg-dark font-sans antialiased flex flex-col min-h-full{{ if $hasBottomNav }} pb-16 lg:pb-0{{ end }}" onload="showBody()" style="visibility: hidden;">
+  <body
+    class="dark:bg-dark font-sans antialiased flex flex-col min-h-full
+    {{ if $hasBottomNav }}
+      pb-16 lg:pb-0
+    {{ end }}"
+    onload="showBody()"
+    style="visibility: hidden;"
+  >
     <!-- Google Tag Manager (noscript) -->
-    <noscript><iframe src="https://www.googletagmanager.com/ns.html?id=GTM-M7MFKZ9" height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
+    <noscript>
+      <iframe
+        src="https://www.googletagmanager.com/ns.html?id=GTM-M7MFKZ9"
+        height="0"
+        width="0"
+        style="display:none;visibility:hidden"
+      >
+      </iframe>
+    </noscript>
     <!-- End Google Tag Manager (noscript) -->
     <div class="flex-1 z-1">
       {{ if $displayBanner }}
-      {{ partial "banner.html" . }}
+        {{ partial "banner.html" . }}
       {{ end }}
 
       {{ partial "navbar.html" . }}
@@ -51,8 +70,8 @@
       {{ block "main" . }}
       {{ end }}
 
-      {{/*  Include modal partial ONCE - Handles all instances of button-modal partial  */}}
-      {{/*  To add a modal, include another dict based on .Params.marketo_form  */}}
+      {{/* Include modal partial ONCE - Handles all instances of button-modal partial */}}
+      {{/* To add a modal, include another dict based on .Params.marketo_form */}}
       {{ partial "modal.html" (dict "form" (slice (dict "form_id" "12461" "form_title" "Sign up to receive emails on the latest Vector content and new releases" "form_thankyou" "Thank you for joining our Updates Newsletter"))) }}
     </div>
 
@@ -71,7 +90,7 @@
 
     {{/* JS that's solely for the front page React.js shenanigans */}}
     {{ if .IsHome }}
-    {{ partial "javascript/home.html" . }}
+      {{ partial "javascript/home.html" . }}
     {{ end }}
 
     {{/* React component used for global search */}}
