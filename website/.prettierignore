@@ -25,7 +25,6 @@ layouts/_default/index.json.json
 layouts/_default/_markup/render-heading.html
 
 layouts/partials/badge.html
-layouts/partials/content.html
 layouts/partials/docs/sidebar.html
 layouts/partials/heading.html
 layouts/releases/li.html
