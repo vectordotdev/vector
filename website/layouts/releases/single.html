@@ -1,274 +1,293 @@
 {{ define "title" }}
-{{ .Title }} | {{ site.Title }}
+  {{ .Title }} |
+  {{ site.Title }}
 {{ end }}
 
 {{ define "main" }}
-{{ $version := .File.BaseFileName }}
-{{ $release := index site.Data.docs.releases $version }}
-{{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
-{{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "deprecation" "deprecations" "chore" "chore"}}
-{{ $orderedGroups := slice "feat" "enhancement" "fix" "deprecation" "chore" }}
+  {{ $version := .File.BaseFileName }}
+  {{ $release := index site.Data.docs.releases $version }}
+  {{ $highlights := where (where site.RegularPages "Section" "highlights") ".Params.release" "eq" $version }}
+  {{ $groups := dict "enhancement" "enhancements" "feat" "new features" "fix" "bug fixes" "deprecation" "deprecations" "chore" "chore" }}
+  {{ $orderedGroups := slice "feat" "enhancement" "fix" "deprecation" "chore" }}
 
-<div class="max-w-3xl md:max-w-5xl px-6 lg:px-8 mx-auto">
-  <div class="my-16">
-    <div class="mb-4 md:mb-6">
-      {{ partial "breadcrumb.html" . }}
-    </div>
-    <div class="pb-1 md:pb-2 lg:pb-3">
-      {{ partial "hero.html" . }}
-    </div>
 
-    <div>
-      {{ with $release.codename }}
-      <p class="inline-flex space-x-4 border dark:border-gray-700 rounded-md py-2 px-3.5">
-        <span class="tracking-tight text-gray-600 dark:text-gray-300">
-          Code name
-        </span>
-
-        <span class="font-bold text-dark dark:text-primary">
-          {{ . }}
-        </span>
-      </p>
-      {{ end }}
-
-      {{ with $release.description }}
-      <div class="mt-8 prose dark:prose-dark max-w-none">
-        {{ . | markdownify }}
+  <div class="max-w-3xl md:max-w-5xl px-6 lg:px-8 mx-auto">
+    <div class="my-16">
+      <div class="mb-4 md:mb-6">
+        {{ partial "breadcrumb.html" . }}
       </div>
-      {{ end }}
+      <div class="pb-1 md:pb-2 lg:pb-3">
+        {{ partial "hero.html" . }}
+      </div>
 
-      <div class="mt-8">
-        <div class="admonition dark:prose-dark prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-yellow-400">
-          <div class="flex items-center">
-            <div class="flex-shrink-0">
-              <svg class="h-6 w-6 text-yellow-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                <path fill-rule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path>
-              </svg>
-            </div>
-            <div class="ml-6 flex flex-col m-0 space-y-1.5">
-              <span class="lg:text-lg text-base font-bold leading-tight tracking-tight">
-                Upgrading Vector
-              </span>
-              <div class="tracking-tight leading-snug max-w-none">
-                When upgrading, we recommend stepping through minor versions as
-                these can each contain breaking changes while Vector is pre-1.0.
-                These breaking changes are noted in their respective upgrade
-                guides.
+      <div>
+        {{ with $release.codename }}
+          <p class="inline-flex space-x-4 border dark:border-gray-700 rounded-md py-2 px-3.5">
+            <span class="tracking-tight text-gray-600 dark:text-gray-300"> Code name </span>
+
+            <span class="font-bold text-dark dark:text-primary">
+              {{ . }}
+            </span>
+          </p>
+        {{ end }}
+
+        {{ with $release.description }}
+          <div class="mt-8 prose dark:prose-dark max-w-none">
+            {{ . | markdownify }}
+          </div>
+        {{ end }}
+
+
+        <div class="mt-8">
+          <div
+            class="admonition dark:prose-dark prose rounded-xl border-3 px-3 py-3.5 lg:px-5 lg:py-4 border-yellow-400"
+          >
+            <div class="flex items-center">
+              <div class="flex-shrink-0">
+                <svg
+                  class="h-6 w-6 text-yellow-400"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 20 20"
+                  fill="currentColor"
+                  aria-hidden="true"
+                >
+                  <path
+                    fill-rule="evenodd"
+                    d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                    clip-rule="evenodd"
+                  ></path>
+                </svg>
+              </div>
+              <div class="ml-6 flex flex-col m-0 space-y-1.5">
+                <span class="lg:text-lg text-base font-bold leading-tight tracking-tight"> Upgrading Vector </span>
+                <div class="tracking-tight leading-snug max-w-none">
+                  When upgrading, we recommend stepping through minor versions as these can each contain breaking
+                  changes while Vector is pre-1.0. These breaking changes are noted in their respective upgrade guides.
+                </div>
               </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {{ with $highlights }}
-      <div class="mt-8">
-        <div class="prose dark:prose-dark">
-          {{ partial "heading.html" (dict "text" "Highlights" "level" 2) }}
-        </div>
+        {{ with $highlights }}
+          <div class="mt-8">
+            <div class="prose dark:prose-dark">
+              {{ partial "heading.html" (dict "text" "Highlights" "level" 2) }}
+            </div>
 
-        <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-          {{ range . }}
-          {{ .Render "li" }}
-          {{ end }}
-        </div>
-      </div>
-      {{ end }}
-
-      {{ with $release.known_issues }}
-      {{ if gt (len $release.known_issues) 0 }}
-      <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
-          {{ partial "heading.html" (dict "text" "Known issues" "level" 2) }}
-        </div>
-
-        <div class="mt-6 flex flex-col space-y-8">
-          <div>
-            <ul class="list-disc">
+            <div class="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
               {{ range . }}
-              <li>
-                  <span class="prose dark:prose-dark">
-                    {{ .| markdownify }}
-                  </span>
-              </li>
+                {{ .Render "li" }}
               {{ end }}
-            </ul>
+            </div>
           </div>
-        </div>
-      </div>
-      {{ end }}
-      {{ end }}
+        {{ end }}
 
-      {{ if gt (len $release.changelog) 0 }}
-      <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
-          {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
-        </div>
+        {{ with $release.known_issues }}
+          {{ if gt (len $release.known_issues) 0 }}
+            <div class="mt-8">
+              <div class="prose dark:prose-dark max-w-none">
+                {{ partial "heading.html" (dict "text" "Known issues" "level" 2) }}
+              </div>
 
-        <div class="mt-6 flex flex-col space-y-8">
-          {{ range $orderedGroups }}
-          {{ $key := . }}
-          {{ $value := index $groups $key }}
-          {{ $changes := where $release.changelog ".type" "eq" $key }}
-          {{ if $changes }}
-          {{ $numChanges := len $changes }}
-          {{ $heading := printf "%d %s" $numChanges $value }}
-          <div>
+              <div class="mt-6 flex flex-col space-y-8">
+                <div>
+                  <ul class="list-disc">
+                    {{ range . }}
+                      <li>
+                        <span class="prose dark:prose-dark">
+                          {{ .| markdownify }}
+                        </span>
+                      </li>
+                    {{ end }}
+                  </ul>
+                </div>
+              </div>
+            </div>
+          {{ end }}
+        {{ end }}
+
+        {{ if gt (len $release.changelog) 0 }}
+          <div class="mt-8">
             <div class="prose dark:prose-dark max-w-none">
-              {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
+              {{ partial "heading.html" (dict "text" "Vector Changelog" "level" 2) }}
             </div>
 
-            <ul class="prose dark:prose-dark list-disc ml-6">
-              {{ range $changes }}
-              <li>
-                  <span class="prose dark:prose-dark">
-                    {{ .description | markdownify }}
-                  </span>
-                {{ if gt (len .contributors) 0 }}
-                <br>
-                <span class="prose dark:prose-dark italic">
-                  Thanks to
-                  {{ $len := len .contributors }}
-                  {{ range $i, $contributor := .contributors }}
-                    <a href="https://github.com/{{ replace $contributor "@" "" }}" rel="noopener" target="_blank">{{ $contributor }}</a>{{ if lt (add $i 1) $len }}, {{ end }}
-                  {{ end }}
-                  for contributing this change!
-                </span>
+            <div class="mt-6 flex flex-col space-y-8">
+              {{ range $orderedGroups }}
+                {{ $key := . }}
+                {{ $value := index $groups $key }}
+                {{ $changes := where $release.changelog ".type" "eq" $key }}
+                {{ if $changes }}
+                  {{ $numChanges := len $changes }}
+                  {{ $heading := printf "%d %s" $numChanges $value }}
+                  <div>
+                    <div class="prose dark:prose-dark max-w-none">
+                      {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
+                    </div>
+
+                    <ul class="prose dark:prose-dark list-disc ml-6">
+                      {{ range $changes }}
+                        <li>
+                          <span class="prose dark:prose-dark">
+                            {{ .description | markdownify }}
+                          </span>
+                          {{ if gt (len .contributors) 0 }}
+                            <br />
+                            <span class="prose dark:prose-dark italic">
+                              Thanks to
+                              {{ $len := len .contributors }}
+                              {{ range $i, $contributor := .contributors }}
+                                <a
+                                  href="https://github.com/{{ replace $contributor "@" "" }}"
+                                  rel="noopener"
+                                  target="_blank"
+                                  >{{ $contributor }}</a
+                                >{{ if lt (add $i 1) $len }},{{ end }}
+                              {{ end }}
+                              for contributing this change!
+                            </span>
+                          {{ end }}
+                        </li>
+                      {{ end }}
+                    </ul>
+                  </div>
                 {{ end }}
-              </li>
-              {{ end }}
-            </ul>
-          </div>
-          {{ end }}
-          {{ end }}
-        </div>
-      </div>
-      {{ else }}
-      {{ if gt (len $release.commits) 0 }}
-      <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
-          {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
-        </div>
-
-        <div class="mt-6 flex flex-col space-y-8">
-          {{ range $orderedGroups }}
-          {{ $key := . }}
-          {{ $value := index $groups $key }}
-          {{ $commits := where $release.commits ".type" "eq" $key }}
-          {{ if $commits }}
-          {{ $numCommits := len $commits }}
-          {{ $heading := printf "%d %s" $numCommits $value }}
-          <div class="ml-6">
-            <div class="prose dark:prose-dark max-w-none">
-              {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
-            </div>
-
-            <div class="mt-4 flex flex-col space-y-2">
-              {{ range $commits }}
-              {{ template "commit" . }}
               {{ end }}
             </div>
           </div>
+        {{ else }}
+          {{ if gt (len $release.commits) 0 }}
+            <div class="mt-8">
+              <div class="prose dark:prose-dark max-w-none">
+                {{ partial "heading.html" (dict "text" "Changelog" "level" 2) }}
+              </div>
+
+              <div class="mt-6 flex flex-col space-y-8">
+                {{ range $orderedGroups }}
+                  {{ $key := . }}
+                  {{ $value := index $groups $key }}
+                  {{ $commits := where $release.commits ".type" "eq" $key }}
+                  {{ if $commits }}
+                    {{ $numCommits := len $commits }}
+                    {{ $heading := printf "%d %s" $numCommits $value }}
+                    <div class="ml-6">
+                      <div class="prose dark:prose-dark max-w-none">
+                        {{ partial "heading.html" (dict "text" $heading "level" 3 "icon" false) }}
+                      </div>
+
+                      <div class="mt-4 flex flex-col space-y-2">
+                        {{ range $commits }}
+                          {{ template "commit" . }}
+                        {{ end }}
+                      </div>
+                    </div>
+                  {{ end }}
+                {{ end }}
+              </div>
+            </div>
           {{ end }}
+        {{ end }}
+
+        {{ with $release.vrl_changelog }}
+          {{ if ne . "" }}
+            <div class="mt-8">
+              <div class="prose dark:prose-dark max-w-none">
+                {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
+              </div>
+
+              <div class="mt-6 prose dark:prose-dark max-w-none">
+                {{ . | markdownify }}
+              </div>
+            </div>
           {{ end }}
-        </div>
-      </div>
-      {{ end }}
-      {{ end }}
+        {{ end }}
 
-      {{ with $release.vrl_changelog }}
-      {{ if ne . "" }}
-      <div class="mt-8">
-        <div class="prose dark:prose-dark max-w-none">
-          {{ partial "heading.html" (dict "text" "VRL Changelog" "level" 2) }}
-        </div>
-
-        <div class="mt-6 prose dark:prose-dark max-w-none">
-          {{ . | markdownify }}
-        </div>
-      </div>
-      {{ end }}
-      {{ end }}
-
-      {{ with $release.whats_next }}
-      <div class="mt-8">
-        <span class="prose dark:prose-dark max-w-none">
-          {{ partial "heading.html" (dict "text" "What's next" "level" 2) }}
-        </span>
-
-        <div class="mt-6 flex flex-col space-y-6">
-          {{ range . }}
-          <div>
-            <span class="text-xl font-semibold text-dark dark:text-gray-300">
-              {{ .title }}
+        {{ with $release.whats_next }}
+          <div class="mt-8">
+            <span class="prose dark:prose-dark max-w-none">
+              {{ partial "heading.html" (dict "text" "What's next" "level" 2) }}
             </span>
 
-            <div class="mt-2.5 prose dark:prose-dark max-w-none">
-              {{ .description | markdownify }}
+            <div class="mt-6 flex flex-col space-y-6">
+              {{ range . }}
+                <div>
+                  <span class="text-xl font-semibold text-dark dark:text-gray-300">
+                    {{ .title }}
+                  </span>
+
+                  <div class="mt-2.5 prose dark:prose-dark max-w-none">
+                    {{ .description | markdownify }}
+                  </div>
+                </div>
+              {{ end }}
             </div>
           </div>
-          {{ end }}
-        </div>
+        {{ end }}
       </div>
-      {{ end }}
-    </div>
-    <div class="mt-8">
-      <div class="lg:grid lg:grid-cols-3 gap-8">
-        <div class="col-span-2">
-          <div class="prose">
-            {{ partial "heading.html" (dict "text" (print "Download Version " $version) "level" 2) }}
-          </div>
+      <div class="mt-8">
+        <div class="lg:grid lg:grid-cols-3 gap-8">
+          <div class="col-span-2">
+            <div class="prose">
+              {{ partial "heading.html" (dict "text" (print "Download Version " $version) "level" 2) }}
+            </div>
 
-          <div class="mt-2 border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
-            {{ partial "download/download-matrix.html" (dict "version" $version) }}
+            <div class="mt-2 border px-4 py-3 lg:px-6 lg:py-4 rounded-md dark:border-gray-700">
+              {{ partial "download/download-matrix.html" (dict "version" $version) }}
+            </div>
           </div>
         </div>
       </div>
     </div>
   </div>
-</div>
 {{ end }}
 
 {{ define "changelog_entry" }}
-<span class="flex items-center justify-between space-x-3">
-  <span class="flex items-center space-x-3">
-    {{/* Description */}}
-    <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
-      {{ .description | markdownify }}
+  <span class="flex items-center justify-between space-x-3">
+    <span class="flex items-center space-x-3">
+      {{/* Description */}}
+      <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
+        {{ .description | markdownify }}
+      </span>
     </span>
   </span>
-</span>
 {{ end }}
 
 {{ define "commit" }}
-<span class="flex items-center justify-between space-x-3">
-  <span class="flex items-center space-x-3">
-    {{/* Scopes */}}
-    <span class="flex space-x-1.5">
-      {{ range .scopes }}
-      {{ partial "badge.html" (dict "word" . "color" "blue") }}
-      {{ end }}
+  <span class="flex items-center justify-between space-x-3">
+    <span class="flex items-center space-x-3">
+      {{/* Scopes */}}
+      <span class="flex space-x-1.5">
+        {{ range .scopes }}
+          {{ partial "badge.html" (dict "word" . "color" "blue") }}
+        {{ end }}
+      </span>
+
+      {{/* Description */}}
+      <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
+        {{ .description | markdownify }}
+      </span>
     </span>
 
-    {{/* Description */}}
-    <span class="prose dark:prose-dark leading-snug flex-shrink prose-sm">
-      {{ .description | markdownify }}
-    </span>
+    {{/* Pull request chip */}}
+    {{ with .pr_number }}
+      {{ $link := printf "https://github.com/vectordotdev/vector/pull/%v" . }}
+      <a
+        href="{{ $link }}"
+        class="font-mono flex items-center space-x-1 py-1 px-2 rounded-md bg-gray-100 dark:bg-gray-500 text-dark dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600"
+        rel="noopener"
+        target="_blank"
+      >
+        <ion-icon class="h-3 w-3" name="git-pull-request-sharp"></ion-icon>
+
+        <span class="text-xs p-0">
+          {{ . }}
+        </span>
+      </a>
+    {{ end }}
   </span>
-
-  {{/* Pull request chip */}}
-  {{ with .pr_number }}
-  {{ $link := printf "https://github.com/vectordotdev/vector/pull/%v" . }}
-  <a href="{{ $link }}" class="font-mono flex items-center space-x-1 py-1 px-2 rounded-md bg-gray-100 dark:bg-gray-500 text-dark dark:text-gray-100 hover:bg-gray-200 dark:hover:bg-gray-600" rel="noopener" target="_blank">
-    <ion-icon class="h-3 w-3" name="git-pull-request-sharp"></ion-icon>
-
-    <span class="text-xs p-0">
-      {{ . }}
-    </span>
-  </a>
-  {{ end }}
-</span>
 {{ end }}
 
 {{ define "below" }}
-{{ partial "releases/pagination.html" . }}
+  {{ partial "releases/pagination.html" . }}
 {{ end }}
