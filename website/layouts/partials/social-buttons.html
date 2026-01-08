@@ -8,7 +8,8 @@
       <span class="sr-only"> {{ $val.Name }} icon and link </span>
       <span
         class="{{ with .Params.dark }}
-          dark:text-{{ . }} dark:hover:text-{{ $hoverColor }}
+          dark:text-{{ . }}
+          dark:hover:text-{{ $hoverColor }}
         {{ end }} text-{{ $iconColor }} hover:text-{{ $hoverColor }}"
       >
         <ion-icon name="logo-{{ .Params.icon }}"></ion-icon>
