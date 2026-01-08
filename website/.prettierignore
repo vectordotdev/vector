@@ -27,7 +27,6 @@ layouts/_default/_markup/render-heading.html
 layouts/partials/badge.html
 layouts/partials/docs/sidebar.html
 layouts/partials/heading.html
-layouts/releases/li.html
 layouts/releases/single.html
 
 *.md
