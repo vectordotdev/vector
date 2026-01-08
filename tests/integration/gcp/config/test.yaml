@@ -15,6 +15,7 @@ matrix:
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
 - "src/internal_events/gcp_pubsub.rs"
+- "src/sources/gcp_*/**"
 - "src/sources/gcp_pubsub.rs"
 - "src/sources/util/**"
 - "src/sinks/gcp/**"
