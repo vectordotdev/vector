@@ -1,9 +1,0 @@
-{{ $words := slice "flags" "options" "subcommand" "args" }}
-<div class="bg-black font-mono py-3 px-5 rounded-md">
-  <span class="text-gray-100 font-bold">
-    vector
-    {{ range $words }}
-    <span class="text-violet-400">{</span><span class="text-primary">{{ . }}</span><span class="text-violet-400">}</span>
-    {{ end }}
-  </span>
-</div>
