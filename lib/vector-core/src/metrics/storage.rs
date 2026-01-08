@@ -3,8 +3,9 @@ use std::sync::{
     atomic::{AtomicU32, Ordering},
 };
 
-use metrics::{GaugeFn, HistogramFn, atomics::AtomicU64};
+use metrics::{HistogramFn, atomics::AtomicU64};
 use metrics_util::registry::Storage;
+use vector_common::atomic::AtomicF64;
 
 use crate::event::{MetricValue, metric::Bucket};
 
@@ -25,50 +26,6 @@ impl<K> Storage<K> for VectorStorage {
 
     fn histogram(&self, _: &K) -> Self::Histogram {
         Arc::new(Histogram::new())
-    }
-}
-
-#[derive(Debug)]
-pub(super) struct AtomicF64 {
-    inner: AtomicU64,
-}
-
-impl AtomicF64 {
-    fn new(init: f64) -> Self {
-        Self {
-            inner: AtomicU64::new(init.to_bits()),
-        }
-    }
-
-    fn fetch_update(
-        &self,
-        set_order: Ordering,
-        fetch_order: Ordering,
-        mut f: impl FnMut(f64) -> f64,
-    ) {
-        self.inner
-            .fetch_update(set_order, fetch_order, |x| {
-                Some(f(f64::from_bits(x)).to_bits())
-            })
-            .expect("Cannot fail");
-    }
-
-    pub(super) fn load(&self, order: Ordering) -> f64 {
-        f64::from_bits(self.inner.load(order))
-    }
-}
-
-impl GaugeFn for AtomicF64 {
-    fn increment(&self, amount: f64) {
-        self.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| value + amount);
-    }
-
-    fn decrement(&self, amount: f64) {
-        self.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |value| value - amount);
-    }
-
-    fn set(&self, value: f64) {
-        self.inner.store(f64::to_bits(value), Ordering::Relaxed);
     }
 }
 
