@@ -203,6 +203,23 @@ jobs:
           rustup target add wasm32-unknown-unknown
           wasm-pack build --target web --out-dir public/pkg
 
+  check-website-fmt:
+    name: Check Website Formatting
+    runs-on: ubuntu-24.04
+    if: ${{ needs.changes.outputs.website == 'true' || needs.changes.outputs.test-yml == 'true' }}
+    needs: changes
+    steps:
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/setup-node@39370e3970a6d050c480ffad4ff0ed4d3fdee5af # v4.1.0
+        with:
+          node-version: '20'
+          cache: 'yarn'
+          cache-dependency-path: 'website/yarn.lock'
+      - name: Install dependencies
+        run: cd website && yarn install --frozen-lockfile
+      - name: Check formatting
+        run: cd website && make format-check
+
   all-checks:
     name: Test Suite
     runs-on: ubuntu-24.04
@@ -221,6 +238,7 @@ jobs:
       - check-rust-docs
       - test-vrl
       - build-vrl-playground
+      - check-website-fmt
     steps:
       - name: Check all jobs status
         run: |

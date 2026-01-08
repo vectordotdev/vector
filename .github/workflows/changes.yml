@@ -44,6 +44,8 @@ on:
         value: ${{ jobs.source.outputs.markdown }}
       scripts:
         value: ${{ jobs.source.outputs.scripts }}
+      website:
+        value: ${{ jobs.source.outputs.website }}
       website_only:
         value: ${{ jobs.source.outputs.website_only }}
       install:
@@ -172,6 +174,7 @@ jobs:
       scripts: ${{ steps.filter.outputs.scripts }}
       install: ${{ steps.filter.outputs.install }}
       k8s: ${{ steps.filter.outputs.k8s }}
+      website: ${{ steps.filter.outputs.website }}
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
       test-yml: ${{ steps.filter.outputs.test-yml }}
       integration-yml: ${{ steps.filter.outputs.integration-yml }}
