@@ -22,6 +22,8 @@ mod protobuf;
 mod raw_message;
 #[cfg(any(feature = "arrow", feature = "parquet"))]
 mod schema_definition;
+#[cfg(feature = "syslog")]
+mod syslog;
 mod text;
 
 use std::fmt::Debug;
@@ -48,6 +50,8 @@ pub use protobuf::{ProtobufSerializer, ProtobufSerializerConfig, ProtobufSeriali
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
 #[cfg(any(feature = "arrow", feature = "parquet"))]
 pub use schema_definition::{SchemaDefinition, SchemaDefinitionError};
+#[cfg(feature = "syslog")]
+pub use syslog::{SyslogSerializer, SyslogSerializerConfig};
 pub use text::{TextSerializer, TextSerializerConfig};
 use vector_core::event::Event;
 

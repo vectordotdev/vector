@@ -27,6 +27,8 @@ pub use format::{
 };
 #[cfg(any(feature = "arrow", feature = "parquet"))]
 pub use format::{SchemaDefinition, SchemaDefinitionError};
+#[cfg(feature = "syslog")]
+pub use format::{SyslogSerializer, SyslogSerializerConfig};
 pub use framing::{
     BoxedFramer, BoxedFramingError, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
     CharacterDelimitedEncoderConfig, CharacterDelimitedEncoderOptions, Framer, FramingConfig,

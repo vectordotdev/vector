@@ -12,6 +12,8 @@ use super::format::ArrowStreamSerializerConfig;
 use super::format::ParquetSerializerConfig;
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "syslog")]
+use super::format::{SyslogSerializer, SyslogSerializerConfig};
 use super::{
     chunking::Chunker,
     format::{
@@ -145,6 +147,11 @@ pub enum SerializerConfig {
     /// transform) and removing the message field while doing additional parsing on it, as this
     /// could lead to the encoding emitting empty strings for the given event.
     Text(TextSerializerConfig),
+
+    /// Syslog encoding
+    /// RFC 3164 and 5424 are supported
+    #[cfg(feature = "syslog")]
+    Syslog(SyslogSerializerConfig),
 }
 
 impl Default for SerializerConfig {
@@ -310,6 +317,8 @@ impl SerializerConfig {
             SerializerConfig::Parquet { .. } => Err(VectorError::from(
                 "Parquet codec is available only for batch encoding and cannot be built as a framed serializer.",
             )),
+            #[cfg(feature = "syslog")]
+            SerializerConfig::Syslog(config) => Ok(Serializer::Syslog(config.build())),
         }
     }
 
@@ -342,6 +351,8 @@ impl SerializerConfig {
             | SerializerConfig::NativeJson
             | SerializerConfig::RawMessage
             | SerializerConfig::Text(_) => FramingConfig::NewlineDelimited,
+            #[cfg(feature = "syslog")]
+            SerializerConfig::Syslog(_) => FramingConfig::NewlineDelimited,
             SerializerConfig::Gelf(_) => {
                 FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
             }
@@ -370,6 +381,8 @@ impl SerializerConfig {
             SerializerConfig::Parquet { parquet } => parquet.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
             SerializerConfig::Text(config) => config.input_type(),
+            #[cfg(feature = "syslog")]
+            SerializerConfig::Syslog(config) => config.input_type(),
         }
     }
 
@@ -393,6 +406,8 @@ impl SerializerConfig {
             SerializerConfig::Parquet { parquet } => parquet.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
             SerializerConfig::Text(config) => config.schema_requirement(),
+            #[cfg(feature = "syslog")]
+            SerializerConfig::Syslog(config) => config.schema_requirement(),
         }
     }
 }
@@ -425,6 +440,9 @@ pub enum Serializer {
     RawMessage(RawMessageSerializer),
     /// Uses a `TextSerializer` for serialization.
     Text(TextSerializer),
+    /// Uses a `SyslogSerializer` for serialization.
+    #[cfg(feature = "syslog")]
+    Syslog(SyslogSerializer),
 }
 
 impl Serializer {
@@ -440,6 +458,8 @@ impl Serializer {
             | Serializer::Native(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => false,
+            #[cfg(feature = "syslog")]
+            Serializer::Syslog(_) => false,
             #[cfg(feature = "opentelemetry")]
             Serializer::Otlp(_) => false,
         }
@@ -464,6 +484,10 @@ impl Serializer {
             | Serializer::Native(_)
             | Serializer::Protobuf(_)
             | Serializer::RawMessage(_) => {
+                panic!("Serializer does not support JSON")
+            }
+            #[cfg(feature = "syslog")]
+            Serializer::Syslog(_) => {
                 panic!("Serializer does not support JSON")
             }
             #[cfg(feature = "opentelemetry")]
@@ -493,6 +517,8 @@ impl Serializer {
             | Serializer::Protobuf(_) => true,
             #[cfg(feature = "opentelemetry")]
             Serializer::Otlp(_) => true,
+            #[cfg(feature = "syslog")]
+            Serializer::Syslog(_) => false,
             Serializer::Cef(_)
             | Serializer::Csv(_)
             | Serializer::Logfmt(_)
@@ -576,6 +602,12 @@ impl From<TextSerializer> for Serializer {
         Self::Text(serializer)
     }
 }
+#[cfg(feature = "syslog")]
+impl From<SyslogSerializer> for Serializer {
+    fn from(serializer: SyslogSerializer) -> Self {
+        Self::Syslog(serializer)
+    }
+}
 
 impl tokio_util::codec::Encoder<Event> for Serializer {
     type Error = vector_common::Error;
@@ -595,6 +627,8 @@ impl tokio_util::codec::Encoder<Event> for Serializer {
             Serializer::Protobuf(serializer) => serializer.encode(event, buffer),
             Serializer::RawMessage(serializer) => serializer.encode(event, buffer),
             Serializer::Text(serializer) => serializer.encode(event, buffer),
+            #[cfg(feature = "syslog")]
+            Serializer::Syslog(serializer) => serializer.encode(event, buffer),
         }
     }
 }
