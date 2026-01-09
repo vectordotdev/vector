@@ -23,6 +23,7 @@ jobs:
         with:
           rust: true
           cargo-nextest: true
+          protoc: true
           datadog-ci: true
       - run: make test-cli
       - name: Upload test results
