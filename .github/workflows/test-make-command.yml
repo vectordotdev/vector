@@ -36,4 +36,5 @@ jobs:
         with:
           rust: true
           protoc: true
+          libsasl2: true
       - run: make ${{ inputs.command }}
