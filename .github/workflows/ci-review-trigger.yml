@@ -86,6 +86,7 @@ jobs:
         run: exit 1
 
   cli:
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cli')
     uses: ./.github/workflows/cli.yml
     with:
       ref: ${{ github.event.review.commit_id }}
