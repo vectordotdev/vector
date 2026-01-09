@@ -172,6 +172,17 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 			}
 		}
 	}
+	content_type: {
+		description: """
+			Overrides the MIME type of the created objects.
+
+			Directly comparable to the `Content-Type` HTTP header.
+
+			If not specified, defaults to the encoder's content type.
+			"""
+		required: false
+		type: string: examples: ["text/plain; charset=utf-8", "application/gzip"]
+	}
 	credentials_path: {
 		description: """
 			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
