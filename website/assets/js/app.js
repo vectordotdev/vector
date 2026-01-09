@@ -3,7 +3,6 @@
 {{ $siteGeneration := site.Params.site_generation }}
 import '@ryangjchandler/spruce';
 import 'alpinejs';
-import './cookie-banner'
 
 const sayHello = () => {
   console.log('Welcome to the Vector website and documentation!');
