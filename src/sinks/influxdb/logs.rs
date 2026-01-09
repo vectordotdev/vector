@@ -944,11 +944,8 @@ mod integration_tests {
             path!("host"),
             "aws.cloud.eur",
         );
-        LogNamespace::Vector.insert_standard_vector_source_metadata(
-            &mut namespaced_log,
-            "file",
-            now,
-        );
+        namespaced_log.metadata_mut().set_ingest_timestamp(now);
+        LogNamespace::Vector.insert_standard_vector_source_metadata(&mut namespaced_log, "file");
         let schema = BytesDeserializerConfig
             .schema_definition(LogNamespace::Vector)
             .with_metadata_field(

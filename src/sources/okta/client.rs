@@ -187,11 +187,9 @@ impl SourceConfig for OktaConfig {
 fn enrich_events(events: &mut Vec<Event>, log_namespace: LogNamespace) {
     let now = Utc::now();
     for event in events {
-        log_namespace.insert_standard_vector_source_metadata(
-            event.as_mut_log(),
-            OktaConfig::NAME,
-            now,
-        );
+        let log = event.as_mut_log();
+        log.metadata_mut().set_ingest_timestamp(now);
+        log_namespace.insert_standard_vector_source_metadata(log, OktaConfig::NAME);
     }
 }
 

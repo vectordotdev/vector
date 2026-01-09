@@ -148,11 +148,11 @@ async fn process_stream(
                         match event{
                             Event::Log(_) => {
                                 let log = event.as_mut_log();
+                                log.metadata_mut().set_ingest_timestamp(now);
 
                                 log_namespace.insert_standard_vector_source_metadata(
                                     log,
                                     source_type,
-                                    now
                                 );
 
                                 if let Some(hostname) = &hostname {

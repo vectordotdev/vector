@@ -1,5 +1,9 @@
 #![allow(missing_docs)]
 
+pub mod ewma_gauge;
+
+pub use ewma_gauge::{DEFAULT_EWMA_ALPHA, EwmaGauge};
+
 use std::sync::atomic::Ordering;
 
 use crate::atomic::AtomicF64;

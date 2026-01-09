@@ -256,9 +256,10 @@ impl WebSocketSource {
     }
 
     fn add_metadata(&self, event: &mut LogEvent) {
+        event.metadata_mut().set_ingest_timestamp(Utc::now());
         self.params
             .log_namespace
-            .insert_standard_vector_source_metadata(event, WebSocketConfig::NAME, Utc::now());
+            .insert_standard_vector_source_metadata(event, WebSocketConfig::NAME);
     }
 
     async fn reconnect(

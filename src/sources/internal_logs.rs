@@ -190,11 +190,8 @@ async fn run(
             pid,
         );
 
-        log_namespace.insert_standard_vector_source_metadata(
-            &mut log,
-            InternalLogsConfig::NAME,
-            Utc::now(),
-        );
+        log.metadata_mut().set_ingest_timestamp(Utc::now());
+        log_namespace.insert_standard_vector_source_metadata(&mut log, InternalLogsConfig::NAME);
 
         if (out.send_event(Event::from(log)).await).is_err() {
             // this wont trigger any infinite loop considering it stops the component

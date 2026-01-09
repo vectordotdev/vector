@@ -2,7 +2,6 @@ use std::{collections::HashMap, fmt, num::NonZeroUsize, sync::Arc};
 
 use bitmask_enum::bitmask;
 use bytes::Bytes;
-use chrono::{DateTime, Utc};
 
 mod global_options;
 mod log_schema;
@@ -487,15 +486,16 @@ impl LogNamespace {
     }
 
     /// Vector: The `ingest_timestamp`, and `source_type` fields are added to "event metadata", nested
-    /// under the name "vector". This data will be marked as read-only in VRL.
+    /// under the name "vector". This data will be marked as read-only in VRL. The `ingest_timestamp`
+    /// is only inserted if it already exists on the event metadata.
     ///
     /// Legacy: The values of `source_type_key`, and `timestamp_key` are stored as keys on the event root,
     /// only if a field with that name doesn't already exist.
+    #[allow(clippy::missing_panics_doc, reason = "Can only panic in test")]
     pub fn insert_standard_vector_source_metadata(
         &self,
         log: &mut LogEvent,
         source_name: &'static str,
-        now: DateTime<Utc>,
     ) {
         self.insert_vector_metadata(
             log,
@@ -503,12 +503,21 @@ impl LogNamespace {
             path!("source_type"),
             Bytes::from_static(source_name.as_bytes()),
         );
-        self.insert_vector_metadata(
-            log,
-            log_schema().timestamp_key(),
-            path!("ingest_timestamp"),
-            now,
+        // We could automatically set the ingest timestamp here, but it's better to make the source
+        // set it so that it can ensure that all events in a batch have the same timestamp.
+        #[cfg(test)]
+        assert!(
+            log.metadata().ingest_timestamp().is_some(),
+            "Event ingest_timestamp was not set by the source"
         );
+        if let Some(timestamp) = log.metadata().ingest_timestamp() {
+            self.insert_vector_metadata(
+                log,
+                log_schema().timestamp_key(),
+                path!("ingest_timestamp"),
+                timestamp,
+            );
+        }
     }
 
     /// Vector: This is added to the "event metadata", nested under the name "vector". This data
@@ -587,7 +596,8 @@ mod test {
 
         let namespace = LogNamespace::Legacy;
         let mut event = LogEvent::from("log");
-        namespace.insert_standard_vector_source_metadata(&mut event, "source", Utc::now());
+        event.metadata_mut().set_ingest_timestamp(Utc::now());
+        namespace.insert_standard_vector_source_metadata(&mut event, "source");
 
         assert!(event.get(event_path!("a", "b", "c", "d")).is_some());
     }

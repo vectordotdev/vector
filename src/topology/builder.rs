@@ -35,6 +35,7 @@ use vector_vrl_metrics::MetricsStorage;
 use super::{
     BuiltBuffer, ConfigDiff,
     fanout::{self, Fanout},
+    processing_time::ProcessingTimeRecorder,
     schema,
     task::{Task, TaskOutput, TaskResult},
 };
@@ -591,7 +592,7 @@ impl<'a> Builder<'a> {
                 self.errors.append(&mut err);
             };
 
-            let (tx, rx) = match self.buffers.remove(key) {
+            let (mut tx, rx) = match self.buffers.remove(key) {
                 Some(buffer) => buffer,
                 _ => {
                     let buffer_type =
@@ -617,6 +618,11 @@ impl<'a> Builder<'a> {
                     }
                 }
             };
+
+            tx.with_custom_instrumentation(ProcessingTimeRecorder::new(
+                key,
+                self.config.global.processing_time_ewma_alpha,
+            ));
 
             let cx = SinkContext {
                 healthcheck,

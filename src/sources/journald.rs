@@ -838,6 +838,8 @@ async fn get_systemd_version_from_journalctl(journalctl_path: &PathBuf) -> crate
 }
 
 fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
+    let now = Utc::now();
+    log.metadata_mut().set_ingest_timestamp(now);
     match log_namespace {
         LogNamespace::Vector => {
             if let Some(host) = log
@@ -886,7 +888,7 @@ fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
     // Add timestamp.
     match log_namespace {
         LogNamespace::Vector => {
-            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
+            log.insert(metadata_path!("vector", "ingest_timestamp"), now);
 
             if let Some(ts) = timestamp {
                 log.insert(metadata_path!(JournaldConfig::NAME, "timestamp"), ts);
