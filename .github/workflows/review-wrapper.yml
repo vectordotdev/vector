@@ -1,0 +1,62 @@
+name: Review Wrapper
+
+on:
+  workflow_call:
+    inputs:
+      workflow:
+        description: 'Workflow to call (e.g., ./.github/workflows/cli.yml)'
+        required: true
+        type: string
+      context:
+        description: 'Status check context name (e.g., CLI - Linux)'
+        required: true
+        type: string
+      ref:
+        description: 'Git ref to checkout'
+        required: true
+        type: string
+
+permissions:
+  statuses: write
+
+jobs:
+  set-pending:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    permissions:
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Set commit status as pending
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
+        with:
+          sha: ${{ inputs.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: ${{ inputs.context }}
+          status: pending
+
+  run-workflow:
+    needs: set-pending
+    uses: ${{ inputs.workflow }}
+    with:
+      ref: ${{ inputs.ref }}
+    secrets: inherit
+
+  set-final-status:
+    needs: run-workflow
+    if: always()
+
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+
+    permissions:
+      pull-requests: read
+      statuses: write
+    steps:
+      - name: Set commit status as ${{ needs.run-workflow.result }}
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
+        with:
+          sha: ${{ inputs.ref }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          context: ${{ inputs.context }}
+          status: ${{ needs.run-workflow.result }}

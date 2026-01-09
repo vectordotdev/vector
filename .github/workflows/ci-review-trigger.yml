@@ -84,40 +84,15 @@ jobs:
         if: steps.comment.outputs.isTeamMember == 'false'
         run: exit 1
 
-  set-cli-pending:
+  cli:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cli')
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Set commit status as pending
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: CLI - Linux
-          status: pending
-
-  cli:
-    needs: set-cli-pending
-    uses: ./.github/workflows/cli.yml
+    uses: ./.github/workflows/review-wrapper.yml
     with:
+      workflow: ./.github/workflows/cli.yml
+      context: CLI - Linux
       ref: ${{ github.event.review.commit_id }}
     secrets: inherit
-
-  set-cli-status:
-    needs: cli
-    if: always()
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    steps:
-      - name: Set commit status as ${{ needs.cli.result }}
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: CLI - Linux
-          status: ${{ needs.cli.result }}
 
   make-test-behavior:
     needs: validate
