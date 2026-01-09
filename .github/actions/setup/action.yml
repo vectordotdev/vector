@@ -206,7 +206,11 @@ runs:
       shell: bash
       run: |
         echo "Installing protoc"
-        sudo bash ./scripts/environment/install-protoc.sh
+        if [[ "${{ runner.os }}" == "macOS" ]]; then
+          sudo bash ./scripts/environment/install-protoc.sh /usr/local/bin
+        else
+          sudo bash ./scripts/environment/install-protoc.sh
+        fi
 
     - name: Install cue
       if: ${{ inputs.cue == 'true' }}
