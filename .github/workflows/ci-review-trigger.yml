@@ -85,31 +85,11 @@ jobs:
         if: steps.comment.outputs.isTeamMember == 'false'
         run: exit 1
 
-
-  # CLI - Linux
-  set-cli-pending:
-    needs: validate
-    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cli')
-    uses: ./.github/workflows/set-commit-status-pending.yml
-    with:
-      sha: ${{ github.event.review.commit_id }}
-      context: CLI - Linux
-
   cli:
-    needs: set-cli-pending
     uses: ./.github/workflows/cli.yml
     with:
       ref: ${{ github.event.review.commit_id }}
     secrets: inherit
-
-  set-cli-final:
-    needs: cli
-    if: always()
-    uses: ./.github/workflows/set-commit-status-final.yml
-    with:
-      sha: ${{ github.event.review.commit_id }}
-      context: CLI - Linux
-      status: ${{ needs.cli.result }}
 
   make-test-behavior:
     needs: validate
