@@ -24,6 +24,10 @@ inputs:
     required: false
     default: false
     description: "Install cue."
+  libsasl2:
+    required: false
+    default: false
+    description: "Install libsasl2." # Required to fully build Vector
 
   # prepare.sh - rust
   rust: # rustup module
@@ -226,6 +230,11 @@ runs:
           -C "${TEMP}"
         sudo cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
+
+    - name: Install libsasl2
+      if: ${{ inputs.libsasl2 == 'true' }}
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
 
     - name: Install vdev
       if: ${{ inputs.vdev == 'true' }}
