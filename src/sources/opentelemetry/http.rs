@@ -157,11 +157,19 @@ fn parse_with_deserializer(
     deserializer: &OtlpDeserializer,
     body: Bytes,
     log_namespace: LogNamespace,
+    events_received: &Registered<EventsReceived>,
 ) -> Result<Vec<Event>, ErrorMessage> {
-    deserializer
+    let events = deserializer
         .parse(body, log_namespace)
         .map(|r| r.into_vec())
-        .map_err(emit_decode_error)
+        .map_err(emit_decode_error)?;
+
+    events_received.emit(CountByteSize(
+        events.len(),
+        events.estimated_json_encoded_size_of(),
+    ));
+
+    Ok(events)
 }
 
 fn build_ingest_filter<Resp, F>(
@@ -227,7 +235,7 @@ fn build_warp_log_filter(
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
                 if let Some(d) = deserializer.as_ref() {
-                    parse_with_deserializer(d, decoded_body, log_namespace)
+                    parse_with_deserializer(d, decoded_body, log_namespace, &events_received)
                 } else {
                     decode_log_body(decoded_body, log_namespace, &events_received)
                 }
@@ -266,7 +274,7 @@ fn build_warp_metrics_filter(
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
                 if let Some(d) = deserializer.as_ref() {
-                    parse_with_deserializer(d, decoded_body, LogNamespace::default())
+                    parse_with_deserializer(d, decoded_body, LogNamespace::default(), &events_received)
                 } else {
                     decode_metrics_body(decoded_body, &events_received)
                 }
@@ -302,7 +310,7 @@ fn build_warp_trace_filter(
             .and_then(|decoded_body| {
                 bytes_received.emit(ByteSize(decoded_body.len()));
                 if let Some(d) = deserializer.as_ref() {
-                    parse_with_deserializer(d, decoded_body, LogNamespace::default())
+                    parse_with_deserializer(d, decoded_body, LogNamespace::default(), &events_received)
                 } else {
                     decode_trace_body(decoded_body, &events_received)
                 }
