@@ -14,14 +14,57 @@ use crate::{
     },
 };
 
+const EVENT_COUNT: usize = 100;
+const SOURCE_ID: &str = "latency_source";
+const TRANSFORM_ID: &str = "latency_delay";
+const TRANSFORM_TYPE: &str = "test_noop";
+const TRANSFORM_KIND: &str = "transform";
+const SINK_ID: &str = "latency_sink";
+
+struct ProcessingTimeTestRun {
+    metrics: Vec<Metric>,
+    elapsed_time: f64,
+}
+
 #[tokio::test]
 async fn sink_processing_time_metrics_emitted() {
+    let run = run_processing_time_topology().await;
+
+    assert_histogram_count(
+        &run.metrics,
+        "event_processing_time_seconds",
+        has_latency_tags,
+    );
+    assert_gauge_range(
+        &run.metrics,
+        "event_processing_time_mean_seconds",
+        has_latency_tags,
+        run.elapsed_time,
+    );
+}
+
+#[tokio::test]
+async fn component_processing_time_metrics_emitted() {
+    let run = run_processing_time_topology().await;
+
+    assert_histogram_count(
+        &run.metrics,
+        "component_processing_time_seconds",
+        has_component_tags,
+    );
+    assert_gauge_range(
+        &run.metrics,
+        "component_processing_time_mean_seconds",
+        has_component_tags,
+        run.elapsed_time,
+    );
+}
+
+async fn run_processing_time_topology() -> ProcessingTimeTestRun {
     trace_init();
 
     let controller = Controller::get().expect("metrics controller");
     controller.reset();
-
-    const EVENT_COUNT: usize = 100;
 
     let (mut source_tx, source_config) = basic_source();
     let transform_config = noop_transform();
@@ -29,9 +72,9 @@ async fn sink_processing_time_metrics_emitted() {
     let sink_config = completion_sink(EVENT_COUNT, sink_done_tx);
 
     let mut config = Config::builder();
-    config.add_source("latency_source", source_config);
-    config.add_transform("latency_delay", &["latency_source"], transform_config);
-    config.add_sink("latency_sink", &["latency_delay"], sink_config);
+    config.add_source(SOURCE_ID, source_config);
+    config.add_transform(TRANSFORM_ID, &[SOURCE_ID], transform_config);
+    config.add_sink(SINK_ID, &[TRANSFORM_ID], sink_config);
 
     let start_time = Instant::now();
     let (topology, _) = start_topology(config.build().unwrap(), false).await;
@@ -55,17 +98,17 @@ async fn sink_processing_time_metrics_emitted() {
     topology.stop().await;
     let elapsed_time = start_time.elapsed().as_secs_f64();
 
-    let metrics = controller.capture_metrics();
-    let sink_id = "latency_sink";
-    let source_id = "latency_source";
+    ProcessingTimeTestRun {
+        metrics: controller.capture_metrics(),
+        elapsed_time,
+    }
+}
 
+fn assert_histogram_count(metrics: &[Metric], metric_name: &str, tags_match: fn(&Metric) -> bool) {
     let histogram = metrics
         .iter()
-        .find(|metric| {
-            metric.name() == "event_processing_time_seconds"
-                && has_latency_tags(metric, sink_id, source_id)
-        })
-        .expect("event_processing_time_seconds histogram missing");
+        .find(|metric| metric.name() == metric_name && tags_match(metric))
+        .unwrap_or_else(|| panic!("{metric_name} histogram missing"));
 
     match histogram.value() {
         MetricValue::AggregatedHistogram { count, .. } => {
@@ -76,14 +119,18 @@ async fn sink_processing_time_metrics_emitted() {
         }
         other => panic!("expected aggregated histogram, got {other:?}"),
     }
+}
 
+fn assert_gauge_range(
+    metrics: &[Metric],
+    metric_name: &str,
+    tags_match: fn(&Metric) -> bool,
+    elapsed_time: f64,
+) {
     let gauge = metrics
         .iter()
-        .find(|metric| {
-            metric.name() == "event_processing_time_mean_seconds"
-                && has_latency_tags(metric, sink_id, source_id)
-        })
-        .expect("event_processing_time_mean_seconds gauge missing");
+        .find(|metric| metric.name() == metric_name && tags_match(metric))
+        .unwrap_or_else(|| panic!("{metric_name} gauge missing"));
 
     match gauge.value() {
         MetricValue::Gauge { value } => {
@@ -100,9 +147,17 @@ async fn sink_processing_time_metrics_emitted() {
     }
 }
 
-fn has_latency_tags(metric: &Metric, sink: &str, source: &str) -> bool {
+fn has_latency_tags(metric: &Metric) -> bool {
     metric.tags().is_some_and(|tags| {
-        tags.get("source_component_id") == Some(source)
-            && tags.get("sink_component_id") == Some(sink)
+        tags.get("source_component_id") == Some(SOURCE_ID)
+            && tags.get("sink_component_id") == Some(SINK_ID)
+    })
+}
+
+fn has_component_tags(metric: &Metric) -> bool {
+    metric.tags().is_some_and(|tags| {
+        tags.get("component_id") == Some(TRANSFORM_ID)
+            && tags.get("component_type") == Some(TRANSFORM_TYPE)
+            && tags.get("component_kind") == Some(TRANSFORM_KIND)
     })
 }

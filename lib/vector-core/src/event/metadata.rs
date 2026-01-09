@@ -84,6 +84,11 @@ pub(super) struct Inner {
     #[derivative(PartialEq = "ignore")]
     #[serde(default, skip)]
     pub(crate) ingest_timestamp: Option<DateTime<Utc>>,
+
+    /// The timestamp when the event last entered a transform buffer.
+    #[derivative(PartialEq = "ignore")]
+    #[serde(default, skip)]
+    pub(crate) last_transform_timestamp: Option<DateTime<Utc>>,
 }
 
 /// Metric Origin metadata for submission to Datadog.
@@ -256,6 +261,17 @@ impl EventMetadata {
     pub fn set_ingest_timestamp(&mut self, timestamp: DateTime<Utc>) {
         self.get_mut().ingest_timestamp = Some(timestamp);
     }
+
+    /// Returns the timestamp of the last transform buffer enqueue operation, if it exists.
+    #[must_use]
+    pub fn last_transform_timestamp(&self) -> Option<DateTime<Utc>> {
+        self.0.last_transform_timestamp
+    }
+
+    /// Sets the transform enqueue timestamp to the provided value.
+    pub fn set_last_transform_timestamp(&mut self, timestamp: DateTime<Utc>) {
+        self.get_mut().last_transform_timestamp = Some(timestamp);
+    }
 }
 
 impl Default for Inner {
@@ -272,6 +288,7 @@ impl Default for Inner {
             datadog_origin_metadata: None,
             source_event_id: Some(Uuid::new_v4()),
             ingest_timestamp: None,
+            last_transform_timestamp: None,
         }
     }
 }

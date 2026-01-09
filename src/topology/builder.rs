@@ -6,6 +6,7 @@ use std::{
     time::Instant,
 };
 
+use chrono::Utc;
 use futures::{FutureExt, StreamExt, TryStreamExt, stream::FuturesOrdered};
 use futures_util::stream::FuturesUnordered;
 use metrics::gauge;
@@ -35,7 +36,7 @@ use vector_vrl_metrics::MetricsStorage;
 use super::{
     BuiltBuffer, ConfigDiff,
     fanout::{self, Fanout},
-    processing_time::ProcessingTimeRecorder,
+    processing_time::{ComponentProcessingTimeRecorder, ProcessingTimeRecorder},
     schema,
     task::{Task, TaskOutput, TaskResult},
 };
@@ -289,6 +290,7 @@ impl<'a> Builder<'a> {
                     {
                         array.set_output_id(&source);
                         array.set_source_type(source_type);
+                        array.set_last_transform_timestamp(Utc::now());
                         fanout
                             .send(array, Some(send_reference))
                             .await
@@ -525,13 +527,17 @@ impl<'a> Builder<'a> {
             };
 
             let metrics = ChannelMetricMetadata::new(TRANSFORM_CHANNEL_METRIC_PREFIX, None);
-            let (input_tx, input_rx) = TopologyBuilder::standalone_memory(
+            let (mut input_tx, input_rx) = TopologyBuilder::standalone_memory(
                 TOPOLOGY_BUFFER_SIZE,
                 WhenFull::Block,
                 &span,
                 Some(metrics),
                 self.config.global.buffer_utilization_ewma_alpha,
             );
+
+            input_tx.with_custom_instrumentation(ComponentProcessingTimeRecorder::new(
+                self.config.global.processing_time_ewma_alpha,
+            ));
 
             self.inputs
                 .insert(key.clone(), (input_tx, node.inputs.clone()));

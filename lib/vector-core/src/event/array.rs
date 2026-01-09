@@ -4,6 +4,7 @@
 
 use std::{iter, slice, sync::Arc, vec};
 
+use chrono::Utc;
 use futures::{Stream, stream};
 #[cfg(test)]
 use quickcheck::{Arbitrary, Gen};
@@ -169,6 +170,15 @@ impl EventArray {
             for metric in metrics {
                 metric.metadata_mut().set_source_type(source_type);
             }
+        }
+    }
+
+    /// Sets the `last_transform_timestamp` in the metadata for all events in this array. This is
+    /// used to initialize the timestamp before the first transform so that component processing
+    /// time can be measured.
+    pub fn set_last_transform_timestamp(&mut self, timestamp: chrono::DateTime<Utc>) {
+        for mut event in self.iter_events_mut() {
+            event.metadata_mut().set_last_transform_timestamp(timestamp);
         }
     }
 

@@ -11,6 +11,8 @@ use crate::{config::ComponentKey, event::EventArray};
 const NANOS_PER_SECOND: f64 = 1_000_000_000.0;
 const EVENT_PROCESSING_TIME: &str = "event_processing_time_seconds";
 const EVENT_PROCESSING_TIME_MEAN: &str = "event_processing_time_mean_seconds";
+const COMPONENT_PROCESSING_TIME: &str = "component_processing_time_seconds";
+const COMPONENT_PROCESSING_TIME_MEAN: &str = "component_processing_time_mean_seconds";
 const DEFAULT_PROCESSING_TIME_EWMA_ALPHA: f64 = 0.9;
 
 #[cfg(test)]
@@ -87,7 +89,7 @@ impl ProcessingTimeRecorder {
 }
 
 impl BufferInstrumentation<EventArray> for ProcessingTimeRecorder {
-    fn on_send(&self, events: &EventArray) {
+    fn on_send(&self, events: &mut EventArray) {
         self.record_events(events);
     }
 }
@@ -121,6 +123,47 @@ impl Metrics {
     fn record(&self, latency_seconds: f64) {
         self.histogram.record(latency_seconds);
         self.gauge.record(latency_seconds);
+    }
+}
+
+#[derive(Debug)]
+pub(crate) struct ComponentProcessingTimeRecorder {
+    histogram: Histogram,
+    gauge: EwmaGauge,
+}
+
+impl ComponentProcessingTimeRecorder {
+    pub(crate) fn new(ewma_alpha: Option<f64>) -> Self {
+        Self {
+            histogram: histogram!(COMPONENT_PROCESSING_TIME),
+            gauge: EwmaGauge::new(
+                gauge!(COMPONENT_PROCESSING_TIME_MEAN),
+                Some(ewma_alpha.unwrap_or(DEFAULT_PROCESSING_TIME_EWMA_ALPHA)),
+            ),
+        }
+    }
+
+    fn record(&self, latency_seconds: f64) {
+        self.histogram.record(latency_seconds);
+        self.gauge.record(latency_seconds);
+    }
+}
+
+impl BufferInstrumentation<EventArray> for ComponentProcessingTimeRecorder {
+    fn on_send(&self, events: &mut EventArray) {
+        let now = Utc::now();
+
+        for mut event in events.iter_events_mut() {
+            let metadata = event.metadata_mut();
+            if let Some(previous) = metadata.last_transform_timestamp()
+                && let Some(latency_ns) = now.signed_duration_since(previous).num_nanoseconds()
+                && latency_ns >= 0
+            {
+                self.record(latency_ns as f64 / NANOS_PER_SECOND);
+            }
+
+            metadata.set_last_transform_timestamp(now);
+        }
     }
 }
 

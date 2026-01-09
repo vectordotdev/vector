@@ -112,7 +112,7 @@ impl<T> Bufferable for T where T: InMemoryBufferable + Encodable {}
 pub trait BufferInstrumentation<T: Bufferable>: Send + Sync + 'static {
     /// Called immediately before the item is emitted to the underlying buffer.
     /// The underlying type is stored in an `Arc`, so we cannot have `&mut self`.
-    fn on_send(&self, item: &T);
+    fn on_send(&self, item: &mut T);
 }
 
 pub trait EventCount {
