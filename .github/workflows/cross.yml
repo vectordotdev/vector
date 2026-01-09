@@ -41,7 +41,6 @@ jobs:
           rust: true
           protoc: true
           cross: true
-          mold: false
 
       # Why is this build, not check? Because we need to make sure the linking phase works.
       # aarch64 and musl in particular are notoriously hard to link.
