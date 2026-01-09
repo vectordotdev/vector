@@ -34,8 +34,8 @@ metrics-util.workspace = true
 mlua = { version = "0.10.5", default-features = false, features = ["lua54", "send", "vendored"], optional = true }
 no-proxy = { version = "0.3.6", default-features = false, features = ["serialize"] }
 ordered-float.workspace = true
-openssl = { version = "0.10.73", default-features = false, features = ["vendored"] }
-parking_lot = { version = "0.12.4", default-features = false }
+openssl = { version = "0.10.75", default-features = false, features = ["vendored"] }
+parking_lot = { version = "0.12.5", default-features = false }
 pin-project.workspace = true
 proptest = { version = "1.8", optional = true }
 prost-types.workspace = true
@@ -70,7 +70,7 @@ cfg-if.workspace = true
 security-framework = "3.5.1"
 
 [target.'cfg(windows)'.dependencies]
-schannel = "0.1.27"
+schannel = "0.1.28"
 
 [build-dependencies]
 prost-build.workspace = true
@@ -88,7 +88,7 @@ tokio-test = "0.4.4"
 toml.workspace = true
 ndarray = "0.16.1"
 ndarray-stats = "0.6.0"
-noisy_float = "0.2.0"
+noisy_float = "0.2.1"
 rand.workspace = true
 rand_distr.workspace = true
 serde_yaml = { version = "0.9.34", default-features = false }
