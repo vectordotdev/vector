@@ -20,6 +20,7 @@ on:
     types: [checks_requested]
 
 permissions:
+  contents: read
   statuses: write
 
 concurrency:
