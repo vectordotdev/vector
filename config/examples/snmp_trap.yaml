@@ -1,0 +1,61 @@
+# SNMP Trap Example
+# ------------------------------------------------------------------------------
+# A simple example that demonstrates receiving SNMP traps over UDP.
+# This source supports SNMPv1 and SNMPv2c traps.
+#
+# To test this configuration, you can use the snmptrap command:
+# snmptrap -v 2c -c public localhost:1162 '' 1.3.6.1.4.1.8072.2.3.0.1 1.3.6.1.4.1.8072.2.3.2.1 i 123456
+
+data_dir: "/var/lib/vector"
+
+# Receive SNMP traps on UDP port 1162 (using non-privileged port for testing)
+# In production, SNMP traps are typically sent to UDP port 162
+sources:
+  snmp_traps:
+    type: snmp_trap
+    address: "0.0.0.0:1162"
+    # Optional: Set receive buffer size
+    receive_buffer_bytes: 65536
+
+# Process and enrich the trap data
+transforms:
+  process_traps:
+    type: remap
+    inputs: ["snmp_traps"]
+    source: |
+      # Add a timestamp if not present
+      if !exists(.timestamp) {
+        .timestamp = now()
+      }
+      
+      # Add a human-readable severity based on trap type
+      if .snmp_version == "1" {
+        .severity = if .generic_trap == 0 {
+          "info"
+        } else if .generic_trap == 2 || .generic_trap == 3 {
+          "warning"
+        } else if .generic_trap == 4 {
+          "critical"
+        } else {
+          "info"
+        }
+      } else {
+        .severity = "info"
+      }
+
+# Output to console for inspection
+sinks:
+  console:
+    type: console
+    inputs: ["process_traps"]
+    encoding:
+      codec: json
+
+  # Optionally, send to a file for persistent storage
+  file:
+    type: file
+    inputs: ["process_traps"]
+    path: "/var/log/vector/snmp_traps-%Y-%m-%d.log"
+    encoding:
+      codec: json
+
