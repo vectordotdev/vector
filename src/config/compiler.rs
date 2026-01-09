@@ -36,6 +36,10 @@ pub fn compile(mut builder: ConfigBuilder) -> Result<(Config, Vec<String>), Vec<
         errors.extend(output_errors);
     }
 
+    if let Err(alpha_errors) = validation::check_buffer_utilization_ewma_alpha(&builder) {
+        errors.extend(alpha_errors);
+    }
+
     let ConfigBuilder {
         global,
         #[cfg(feature = "api")]

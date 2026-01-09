@@ -13,6 +13,7 @@ pub struct Builder {
     named_outputs: HashMap<String, Output>,
     lag_time: Option<Histogram>,
     timeout: Option<Duration>,
+    ewma_alpha: Option<f64>,
 }
 
 impl Default for Builder {
@@ -23,6 +24,7 @@ impl Default for Builder {
             named_outputs: Default::default(),
             lag_time: Some(histogram!(LAG_TIME_NAME)),
             timeout: None,
+            ewma_alpha: None,
         }
     }
 }
@@ -37,6 +39,12 @@ impl Builder {
     #[must_use]
     pub fn with_timeout(mut self, timeout: Option<Duration>) -> Self {
         self.timeout = timeout;
+        self
+    }
+
+    #[must_use]
+    pub fn with_ewma_alpha(mut self, alpha: Option<f64>) -> Self {
+        self.ewma_alpha = alpha;
         self
     }
 
@@ -60,6 +68,7 @@ impl Builder {
                     log_definition,
                     output_id,
                     self.timeout,
+                    self.ewma_alpha,
                 );
                 self.default_output = Some(output);
                 rx
@@ -72,6 +81,7 @@ impl Builder {
                     log_definition,
                     output_id,
                     self.timeout,
+                    self.ewma_alpha,
                 );
                 self.named_outputs.insert(name, output);
                 rx
