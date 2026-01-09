@@ -137,14 +137,14 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = { version = "1.0.99", default-features = false, features = ["std"] }
+anyhow = { version = "1.0.100", default-features = false, features = ["std"] }
 arc-swap = { version = "1.7.1", default-features = false }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
-cfg-if = { version = "1.0.3", default-features = false }
-chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
+cfg-if = { version = "1.0.4", default-features = false }
+chrono = { version = "0.4.42", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"] }
 clap = { version = "4.5.53", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "3.0.0", default-features = false }
@@ -153,14 +153,14 @@ darling = { version = "0.20.11", default-features = false, features = ["suggesti
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
-flate2 = { version = "1.1.2", default-features = false, features = ["zlib-rs"] }
+flate2 = { version = "1.1.5", default-features = false, features = ["zlib-rs"] }
 futures = { version = "0.3.31", default-features = false, features = ["compat", "io-compat", "std"], package = "futures" }
 futures-util = { version = "0.3.29", default-features = false }
 glob = { version = "0.3.3", default-features = false }
 hickory-proto = { version = "0.25.2", default-features = false, features = ["dnssec-ring"] }
 humantime = { version = "2.3.0", default-features = false }
 indexmap = { version = "2.11.0", default-features = false, features = ["serde", "std"] }
-indoc = { version = "2.0.6" }
+indoc = { version = "2.0.7" }
 inventory = { version = "0.3" }
 itertools = { version = "0.14.0", default-features = false, features = ["use_alloc"] }
 libc = { version = "0.2", default-features = false, features = ["std"] }
@@ -182,7 +182,7 @@ rand_distr = { version = "0.5.1", default-features = false }
 regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11.26", features = ["json"] }
 rust_decimal = { version = "1.37.0", default-features = false, features = ["std"] }
-semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
+semver = { version = "1.0.27", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.143", default-features = false, features = ["raw_value", "std"] }
 serde_yaml = { version = "0.9.34", default-features = false }
@@ -190,7 +190,7 @@ snafu = { version = "0.8.9", default-features = false, features = ["futures", "s
 socket2 = { version = "0.5.10", default-features = false }
 tempfile = "3.23.0"
 tokio = { version = "1.45.1", default-features = false }
-toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
+toml = { version = "0.9.11", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
 tracing = { version = "0.1.34", default-features = false }
