@@ -29,6 +29,7 @@ on:
     types: [submitted]
 
 permissions:
+  contents: read
   statuses: write
 
 env:
