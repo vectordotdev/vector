@@ -1,11 +1,15 @@
 //! Serializer configuration and implementation for encoding structured events as bytes.
 
 use bytes::BytesMut;
+#[cfg(feature = "parquet")]
+use vector_common::Error as VectorError;
 use vector_config::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
 
 #[cfg(feature = "arrow")]
-use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
+use super::format::ArrowStreamSerializerConfig;
+#[cfg(feature = "parquet")]
+use super::format::ParquetSerializerConfig;
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
 #[cfg(feature = "syslog")]
@@ -112,6 +116,19 @@ pub enum SerializerConfig {
     /// [protobuf]: https://protobuf.dev/
     Protobuf(ProtobufSerializerConfig),
 
+    /// Encodes events in [Apache Parquet][apache_parquet] columnar format.
+    ///
+    /// Parquet is a columnar storage format optimized for analytics workloads.
+    /// It provides efficient compression and encoding schemes, making it ideal
+    /// for long-term storage and query performance.
+    ///
+    /// [apache_parquet]: https://parquet.apache.org/
+    #[cfg(feature = "parquet")]
+    Parquet {
+        /// Apache Parquet-specific encoder options.
+        parquet: ParquetSerializerConfig,
+    },
+
     /// No encoding.
     ///
     /// This encoding uses the `message` field of a log event.
@@ -160,32 +177,40 @@ pub enum BatchSerializerConfig {
     #[cfg(feature = "arrow")]
     #[serde(rename = "arrow_stream")]
     ArrowStream(ArrowStreamSerializerConfig),
+
+    /// Encodes events in [Apache Parquet][apache_parquet] columnar format.
+    ///
+    /// Parquet is a columnar storage format optimized for analytics workloads.
+    /// It provides efficient compression and encoding schemes, making it ideal
+    /// for long-term storage and query performance.
+    ///
+    /// [apache_parquet]: https://parquet.apache.org/
+    #[cfg(feature = "parquet")]
+    Parquet {
+        /// Apache Parquet-specific encoder options.
+        parquet: ParquetSerializerConfig,
+    },
 }
 
-#[cfg(feature = "arrow")]
+#[cfg(any(feature = "arrow", feature = "parquet"))]
 impl BatchSerializerConfig {
-    /// Build the `ArrowStreamSerializer` from this configuration.
-    pub fn build(
-        &self,
-    ) -> Result<ArrowStreamSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
-        match self {
-            BatchSerializerConfig::ArrowStream(arrow_config) => {
-                ArrowStreamSerializer::new(arrow_config.clone())
-            }
-        }
-    }
-
     /// The data type of events that are accepted by this batch serializer.
     pub fn input_type(&self) -> DataType {
         match self {
+            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
+            #[cfg(feature = "parquet")]
+            BatchSerializerConfig::Parquet { parquet } => parquet.input_type(),
         }
     }
 
     /// The schema required by the batch serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
+            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
+            #[cfg(feature = "parquet")]
+            BatchSerializerConfig::Parquet { parquet } => parquet.schema_requirement(),
         }
     }
 }
@@ -288,6 +313,10 @@ impl SerializerConfig {
                 Ok(Serializer::RawMessage(RawMessageSerializerConfig.build()))
             }
             SerializerConfig::Text(config) => Ok(Serializer::Text(config.build())),
+            #[cfg(feature = "parquet")]
+            SerializerConfig::Parquet { .. } => Err(VectorError::from(
+                "Parquet codec is available only for batch encoding and cannot be built as a framed serializer.",
+            )),
             #[cfg(feature = "syslog")]
             SerializerConfig::Syslog(config) => Ok(Serializer::Syslog(config.build())),
         }
@@ -327,6 +356,8 @@ impl SerializerConfig {
             SerializerConfig::Gelf(_) => {
                 FramingConfig::CharacterDelimited(CharacterDelimitedEncoderConfig::new(0))
             }
+            #[cfg(feature = "parquet")]
+            SerializerConfig::Parquet { .. } => FramingConfig::NewlineDelimited,
         }
     }
 
@@ -346,6 +377,8 @@ impl SerializerConfig {
             #[cfg(feature = "opentelemetry")]
             SerializerConfig::Otlp => OtlpSerializerConfig::default().input_type(),
             SerializerConfig::Protobuf(config) => config.input_type(),
+            #[cfg(feature = "parquet")]
+            SerializerConfig::Parquet { parquet } => parquet.input_type(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.input_type(),
             SerializerConfig::Text(config) => config.input_type(),
             #[cfg(feature = "syslog")]
@@ -369,6 +402,8 @@ impl SerializerConfig {
             #[cfg(feature = "opentelemetry")]
             SerializerConfig::Otlp => OtlpSerializerConfig::default().schema_requirement(),
             SerializerConfig::Protobuf(config) => config.schema_requirement(),
+            #[cfg(feature = "parquet")]
+            SerializerConfig::Parquet { parquet } => parquet.schema_requirement(),
             SerializerConfig::RawMessage => RawMessageSerializerConfig.schema_requirement(),
             SerializerConfig::Text(config) => config.schema_requirement(),
             #[cfg(feature = "syslog")]

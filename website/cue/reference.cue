@@ -56,7 +56,7 @@ _values: {
 // * `removed` - The component has been removed.
 #DevelopmentStatus: "beta" | "stable" | "deprecated" | "removed"
 
-#EncodingCodec: "json" | "logfmt" | "text" | "csv" | "native" | "native_json" | "avro" | "gelf"
+#EncodingCodec: "json" | "logfmt" | "text" | "csv" | "native" | "native_json" | "avro" | "gelf" | "parquet"
 
 #Endpoint: {
 	description: string
@@ -556,6 +556,8 @@ _values: {
 }
 
 #TypeObject: {
+	_args: required: bool
+
 	// `examples` clarify values through examples. This should be used
 	// when examples cannot be derived from the `default` or `enum`
 	// options.

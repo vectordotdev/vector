@@ -239,6 +239,8 @@ fn serializer_config_to_deserializer(
         SerializerConfig::RawMessage | SerializerConfig::Text(_) => DeserializerConfig::Bytes,
         #[cfg(feature = "codecs-opentelemetry")]
         SerializerConfig::Otlp => todo!(),
+        #[cfg(feature = "codecs-parquet")]
+        SerializerConfig::Parquet { .. } => DeserializerConfig::Bytes, // Parquet files are binary
         #[cfg(feature = "codecs-syslog")]
         SerializerConfig::Syslog(_) => todo!(),
     };
