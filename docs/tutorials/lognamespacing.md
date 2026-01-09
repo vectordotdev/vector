@@ -112,8 +112,8 @@ separate namespace to the event data.
 
 The actual value to be placed into the field.
 
-For the ingest timestamp this should be recorded on the event metadata via
-`log.metadata_mut().set_ingest_timestamp(chrono::Utc::now())`. Source type will be
+The ingest timestamp should be recorded on the event metadata using
+`log.metadata_mut().set_ingest_timestamp(chrono::Utc::now())`. The source type will be
 the `NAME` property of the `Config` struct. `NAME` is provided by the
 `configurable_component` macro. You may need to include `use vector_config::NamedComponent;`.
 
