@@ -534,6 +534,7 @@ mod tests {
     use futures::Stream;
     use headers::{Authorization, authorization::Credentials};
     use http::{HeaderMap, Method, StatusCode, Uri, header::AUTHORIZATION};
+    use rstest::rstest;
     use similar_asserts::assert_eq;
     use vector_lib::{
         codecs::{
@@ -689,6 +690,27 @@ mod tests {
             .post(format!("http://{address}/"))
             .headers(headers)
             .body(body)
+            .send()
+            .await
+            .unwrap()
+            .status()
+            .as_u16()
+    }
+
+    enum HttpVersion {
+        Http1,
+        Http2,
+    }
+
+    async fn send_with_http_version(address: SocketAddr, body: &str, http_version: HttpVersion) -> u16 {
+        let mut builder = reqwest::Client::builder();
+        builder = match http_version {
+            HttpVersion::Http1 => builder.http1_only(),
+            HttpVersion::Http2 => builder.http2_prior_knowledge(),
+        };
+        builder.build().expect("client")
+            .post(format!("http://{address}/"))
+            .body(body.to_owned())
             .send()
             .await
             .unwrap()
@@ -1133,6 +1155,51 @@ mod tests {
             assert_eq!(log["key1"], "value1".into());
             assert_eq!(log["\"user-agent\""], "test_client".into());
             assert_eq!(log["\"x-case-sensitive-value\""], "CaseSensitive".into());
+            assert_event_metadata(log).await;
+        }
+    }
+
+    #[tokio::test]
+    #[rstest(
+        http_version,
+        case(HttpVersion::Http1),
+        case(HttpVersion::Http2),
+    )]
+    async fn http_host_header(http_version: HttpVersion) {
+        let mut expected_host_header = "UPDATED_BELOW".to_string();
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec!["Host".to_string()],
+                vec![],
+                "http_path",
+                "remote_ip",
+                "/",
+                "POST",
+                StatusCode::OK,
+                None,
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::default().into()),
+            )
+            .await;
+            expected_host_header.replace_range(.., &addr.to_string());
+
+            spawn_ok_collect_n(
+                send_with_http_version(addr, "{\"key1\":\"value1\"}", http_version),
+                rx,
+                1,
+            )
+            .await
+        })
+        .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["key1"], "value1".into());
+            assert_eq!(log["Host"], Value::from(expected_host_header));
             assert_event_metadata(log).await;
         }
     }
@@ -1610,6 +1677,52 @@ mod tests {
             Authorization::basic("test", "test").0.encode(),
         );
         assert_eq!(200, send_with_headers(addr, "", headers).await);
+    }
+
+    #[tokio::test]
+    #[rstest(
+        http_version,
+        case(HttpVersion::Http1),
+        case(HttpVersion::Http2),
+    )]
+    async fn custom_auth_can_access_host(http_version: HttpVersion) {
+        let mut expected_host_header = "UPDATED_BELOW".to_string();
+        let mut events = assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
+            let (rx, addr) = source(
+                vec![],
+                vec![],
+                "http_path",
+                "remote_ip",
+                "/",
+                "POST",
+                StatusCode::OK,
+                Some(HttpServerAuthConfig::Custom {
+                    source: ".headers.host != null".to_string(),
+                }),
+                true,
+                EventStatus::Delivered,
+                true,
+                None,
+                Some(JsonDeserializerConfig::default().into()),
+            )
+            .await;
+            expected_host_header.replace_range(.., &addr.to_string());
+
+            spawn_ok_collect_n(
+                send_with_http_version(addr, "{\"key1\":\"value1\"}", http_version),
+                rx,
+                1,
+            )
+            .await
+        })
+        .await;
+
+        {
+            let event = events.remove(0);
+            let log = event.as_log();
+            assert_eq!(log["key1"], "value1".into());
+            assert_event_metadata(log).await;
+        }
     }
 
     #[test]
