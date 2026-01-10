@@ -1,0 +1,19 @@
+features:
+- sinks-doris
+- doris-integration-tests
+
+test_filter: 'sinks::doris::integration_test::'
+
+env:
+  DORIS_ADDRESS: http://doris:8040
+
+matrix:
+  version: ['2.1.7']
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+- "src/internal_events/doris.rs"
+- "src/sinks/doris/**"
+- "src/sinks/util/**"
+- "tests/integration/doris/**"

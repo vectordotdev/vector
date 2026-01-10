@@ -235,6 +235,24 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		doris_bytes_loaded_total: {
+			description:       "The total number of bytes loaded into Doris."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		doris_rows_filtered_total: {
+			description:       "The total number of rows filtered by Doris during stream load."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		doris_rows_loaded_total: {
+			description:       "The total number of rows successfully loaded into Doris."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		k8s_format_picker_edge_cases_total: {
 			description:       "The total number of edge cases encountered while picking format of the Kubernetes log message."
 			type:              "counter"
@@ -719,7 +737,7 @@ components: sources: internal_metrics: {
 			tags:              _component_tags
 		}
 		source_buffer_max_byte_size: {
-			description:       "The maximum number of bytes the buffer that the source's outputs send into can hold."
+			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {
@@ -727,7 +745,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		source_buffer_max_event_size: {
-			description:       "The maximum number of events the buffer that the source's outputs send into can hold."
+			description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {
@@ -735,7 +753,7 @@ components: sources: internal_metrics: {
 			}
 		}
 		source_buffer_utilization: {
-			description:       "The utilization level of the buffer that the source's outputs send into."
+			description:       "The utilization level of the source buffer. The outputs of the source send data to this buffer."
 			type:              "histogram"
 			default_namespace: "vector"
 			tags: _component_tags & {
@@ -743,7 +761,15 @@ components: sources: internal_metrics: {
 			}
 		}
 		source_buffer_utilization_level: {
-			description:       "The current utilization level of the buffer that the source's outputs send into."
+			description:       "The current utilization level of the source buffer. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		source_buffer_utilization_mean: {
+			description:       "The mean utilization level of the source buffer. The outputs of the source send data to this buffer. The mean utilization is smoothed over time using an exponentially weighted moving average (EWMA)."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {
@@ -761,6 +787,28 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
+		}
+		s3_object_processing_failed_duration_seconds: {
+			description:       "The time taken to process an S3 object that failed, in seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				bucket: {
+					description: "The name of the S3 bucket."
+					required:    true
+				}
+			}
+		}
+		s3_object_processing_succeeded_duration_seconds: {
+			description:       "The time taken to process an S3 object that succeeded, in seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				bucket: {
+					description: "The name of the S3 bucket."
+					required:    true
+				}
+			}
 		}
 		sqs_message_delete_succeeded_total: {
 			description:       "The total number of successful deletions of SQS messages."
@@ -854,6 +902,14 @@ components: sources: internal_metrics: {
 		}
 		transform_buffer_utilization_level: {
 			description:       "The current utilization level of the buffer that feeds into a transform."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		transform_buffer_utilization_mean: {
+			description:       "The mean utilization level of the buffer that feeds into a transform. This value is smoothed over time using an exponentially weighted moving average (EWMA)."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags: _component_tags & {

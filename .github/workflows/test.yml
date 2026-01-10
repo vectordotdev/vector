@@ -30,7 +30,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -42,7 +42,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -56,7 +56,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -83,7 +83,12 @@ jobs:
     if: ${{ needs.changes.outputs.scripts == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: ./.github/actions/setup
+        with:
+          cargo-cache: false
+          mold: false
+          vdev: true
       - run: make check-scripts
 
   check-events:
@@ -92,10 +97,12 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/setup
         with:
-          rust: true
+          cargo-cache: false
+          mold: false
+          vdev: true
       - run: make check-events
 
   check-licenses:
@@ -104,11 +111,12 @@ jobs:
     if: ${{ needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/setup
         with:
           cargo-cache: false
           mold: false
+          vdev: true
           dd-rust-license-tool: true
       - run: make check-licenses
 
@@ -118,7 +126,7 @@ jobs:
     if: ${{ needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -131,7 +139,7 @@ jobs:
     if: ${{ needs.changes.outputs.markdown == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -144,7 +152,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.component_docs == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - uses: ./.github/actions/setup
         with:
@@ -159,7 +167,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -171,7 +179,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cue == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true
@@ -185,7 +193,7 @@ jobs:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.dependencies == 'true' || needs.changes.outputs.test-yml == 'true' }}
     needs: changes
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
       - uses: ./.github/actions/setup
         with:
           rust: true

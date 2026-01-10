@@ -266,7 +266,7 @@ async fn emits_buffer_utilization_histogram_on_send_and_receive() {
         .into_iter()
         .filter(|metric| metric.name().starts_with("source_buffer_"))
         .collect();
-    assert_eq!(metrics.len(), 3, "expected 3 utilization metrics");
+    assert_eq!(metrics.len(), 4, "expected 4 utilization metrics");
 
     let find_metric = |name: &str| {
         metrics

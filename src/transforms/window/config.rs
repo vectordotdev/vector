@@ -1,7 +1,4 @@
-use vector_lib::{
-    config::{LogNamespace, clone_input_definitions},
-    configurable::configurable_component,
-};
+use vector_lib::{config::clone_input_definitions, configurable::configurable_component};
 
 use super::transform::Window;
 use crate::{
@@ -66,9 +63,12 @@ impl TransformConfig for WindowConfig {
             Window::new(
                 self.forward_when
                     .as_ref()
-                    .map(|condition| condition.build(&context.enrichment_tables))
+                    .map(|condition| {
+                        condition.build(&context.enrichment_tables, &context.metrics_storage)
+                    })
                     .transpose()?,
-                self.flush_when.build(&context.enrichment_tables)?,
+                self.flush_when
+                    .build(&context.enrichment_tables, &context.metrics_storage)?,
                 self.num_events_before,
                 self.num_events_after,
             )
@@ -82,9 +82,8 @@ impl TransformConfig for WindowConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         // The event is not modified, so the definition is passed through as-is
         vec![TransformOutput::new(

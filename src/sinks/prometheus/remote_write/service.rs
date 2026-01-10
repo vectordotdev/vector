@@ -69,7 +69,7 @@ impl Service<RemoteWriteRequest> for RemoteWriteService {
 
             let response = client.send(http_request).await?;
             let (parts, body) = response.into_parts();
-            let body = hyper::body::to_bytes(body).await?;
+            let body = http_body::Body::collect(body).await?.to_bytes();
             let http_response = hyper::Response::from_parts(parts, body);
 
             if http_response.status().is_success() {
