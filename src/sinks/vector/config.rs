@@ -11,6 +11,7 @@ use super::{
     service::{VectorRequest, VectorResponse, VectorService},
     sink::VectorSink,
 };
+use crate::http::AnyResolver;
 use crate::{
     config::{
         AcknowledgementsConfig, GenerateConfig, Input, ProxyConfig, SinkConfig, SinkContext,
@@ -209,8 +210,9 @@ pub fn with_default_scheme(address: &str, tls: bool) -> crate::Result<Uri> {
 fn new_client(
     tls_settings: &MaybeTlsSettings,
     proxy_config: &ProxyConfig,
-) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>> {
-    let proxy = build_proxy_connector(tls_settings.clone(), proxy_config)?;
+) -> crate::Result<hyper::Client<ProxyConnector<HttpsConnector<HttpConnector<AnyResolver>>>, BoxBody>>
+{
+    let proxy = build_proxy_connector(tls_settings.clone(), proxy_config, false)?;
 
     Ok(hyper::Client::builder().http2_only(true).build(proxy))
 }
