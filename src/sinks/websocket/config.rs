@@ -77,9 +77,21 @@ impl WebSocketSinkConfig {
 #[cfg(test)]
 mod test {
     use super::*;
+    use vector_lib::codecs::InfluxLineProtocolSerializerConfig;
 
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<WebSocketSinkConfig>();
+    }
+
+    #[test]
+    fn influxdb_encoding_requires_metrics() {
+        let config = WebSocketSinkConfig {
+            common: WebSocketCommonConfig::default(),
+            encoding: InfluxLineProtocolSerializerConfig::default().into(),
+            acknowledgements: Default::default(),
+        };
+
+        assert_eq!(config.input(), Input::metric());
     }
 }

@@ -13,10 +13,14 @@ use hyper::{Body, Method, Response, StatusCode};
 use serde::{Deserialize, de};
 use vector_lib::{
     codecs::{
-        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+        InfluxLineProtocolSerializerConfig, JsonSerializerConfig, NewlineDelimitedEncoderConfig,
+        TextSerializerConfig,
         encoding::{Framer, FramingConfig},
     },
-    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    event::{
+        BatchNotifier, BatchStatus, Event, LogEvent,
+        metric::{Metric, MetricKind, MetricValue},
+    },
     finalization::AddBatchNotifier,
 };
 
@@ -118,6 +122,37 @@ fn http_encode_event_ndjson() {
     let output = serde_json::from_slice::<ExpectedEvent>(&encoded[..]).unwrap();
 
     assert_eq!(output.message, "hello world".to_string());
+}
+
+#[test]
+fn http_encode_event_influxdb() {
+    let metric = Metric::new(
+        "cpu_usage",
+        MetricKind::Absolute,
+        MetricValue::Gauge { value: 42.0 },
+    )
+    .into();
+
+    let cfg = default_cfg(
+        (
+            None::<FramingConfig>,
+            InfluxLineProtocolSerializerConfig::default(),
+        )
+            .into(),
+    );
+    let encoder = cfg.build_encoder().unwrap();
+    let transformer = cfg.encoding.transformer();
+
+    let encoder = HttpEncoder::new(encoder, transformer, "".to_owned(), "".to_owned());
+
+    let mut encoded = vec![];
+    encoder.encode_input(vec![metric], &mut encoded).unwrap();
+
+    let payload = String::from_utf8(encoded).unwrap();
+    assert!(payload.ends_with('\n'));
+    let line = payload.trim_end();
+    assert!(line.starts_with("cpu_usage,metric_type=gauge"));
+    assert!(line.contains("value=42"));
 }
 
 #[test]
