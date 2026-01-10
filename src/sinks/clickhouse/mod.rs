@@ -16,3 +16,18 @@ mod integration_tests;
 mod request_builder;
 mod service;
 mod sink;
+
+use snafu::Snafu;
+
+#[derive(Debug, Snafu)]
+#[snafu(visibility(pub))]
+pub enum ParseError {
+    #[snafu(display("Endpoints option must be specified"))]
+    EndpointRequired,
+    #[snafu(display("Invalid host {:?}", host,))]
+    InvalidHost { host: String },
+    #[snafu(display(
+        "`endpoint` and `endpoints` options are mutually exclusive. Please use `endpoints` option."
+    ))]
+    EndpointsExclusive,
+}
