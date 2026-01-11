@@ -24,6 +24,7 @@ components: transforms: [Name=string]: {
 		transform_buffer_max_byte_size:       components.sources.internal_metrics.output.metrics.transform_buffer_max_byte_size
 		transform_buffer_utilization:         components.sources.internal_metrics.output.metrics.transform_buffer_utilization
 		transform_buffer_utilization_level:   components.sources.internal_metrics.output.metrics.transform_buffer_utilization_level
+		transform_buffer_utilization_mean:    components.sources.internal_metrics.output.metrics.transform_buffer_utilization_mean
 		utilization:                          components.sources.internal_metrics.output.metrics.utilization
 	}
 }
