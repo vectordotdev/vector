@@ -100,13 +100,14 @@ impl PulsarSink {
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let service = ServiceBuilder::new().service(self.service);
+        let service = ServiceBuilder::new().service(self.service.clone());
         let request_builder = PulsarRequestBuilder {
             encoder: PulsarEncoder {
                 transformer: self.transformer.clone(),
                 encoder: self.encoder.clone(),
             },
         };
+
         let sink = input
             .filter_map(|event| {
                 std::future::ready(util::make_pulsar_event(
@@ -124,7 +125,23 @@ impl PulsarSink {
             .into_driver(service)
             .protocol("tcp");
 
-        sink.run().await
+        let result = sink.run().await;
+
+        debug!(message = "Receiver exhausted, closing Pulsar producer.");
+
+        // Fermer tous les producers pour chaque topic
+        let producer_arc = self.service.get_producer();
+        let mut producer = producer_arc.lock().await;
+        let topics = producer.topics();
+        for topic in topics {
+            if let Err(e) = producer.close_producer(&topic).await {
+                warn!(message = "Error closing Pulsar producer for topic.", topic = %topic, error = ?e);
+            } else {
+                debug!(message = "Pulsar producer closed successfully for topic.", topic = %topic);
+            }
+        }
+
+        result
     }
 }
 

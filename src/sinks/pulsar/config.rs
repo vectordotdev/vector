@@ -338,6 +338,9 @@ impl PulsarSinkConfig {
             batch_size: self.batch.max_events,
             batch_byte_size: self.batch.max_bytes,
             compression: None,
+            batch_timeout: None,
+            block_queue_if_full: false,
+            routing_policy: None,
         };
 
         match &self.compression {
