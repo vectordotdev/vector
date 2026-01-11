@@ -4,14 +4,15 @@
     {
       "files": ["*.html"],
       "options": {
-        "parser": "go-template"
+        "parser": "go-template",
+        "htmlWhitespaceSensitivity": "strict"
       }
     }
   ],
   "tabWidth": 2,
   "useTabs": false,
-  "semi": false,
-  "singleQuote": true,
-  "trailingComma": "none",
+  "semi": true,
+  "singleQuote": false,
+  "trailingComma": "es5",
   "printWidth": 120
 }

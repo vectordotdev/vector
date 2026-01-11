@@ -6,25 +6,27 @@
 {{ $tags = $tags | append $type }}
 
 {{ if $docs.input.logs }}
-{{ $tags = $tags | append "logs" }}
+  {{ $tags = $tags | append "logs" }}
 {{ end }}
 
 {{ if $docs.input.metrics }}
-{{ $tags = $tags | append "metrics" }}
+  {{ $tags = $tags | append "metrics" }}
 {{ end }}
+
 
 <a href="{{ .RelPermalink }}">
   <div class="component-card is-hoverable" x-data="{ tags: {{ $tags | jsonify }} }">
     <header class="component-card-header">
-      {{ .Title }} {{ .Params.component_kind }}
+      {{ .Title }}
+      {{ .Params.component_kind }}
     </header>
 
     {{ with $desc }}
-    <div class="component-card-content">
-      <p>
-        {{ . | markdownify | plainify }}
-      </p>
-    </div>
+      <div class="component-card-content">
+        <p>
+          {{ . | markdownify | plainify }}
+        </p>
+      </div>
     {{ end }}
   </div>
 </a>
