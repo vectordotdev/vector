@@ -1319,9 +1319,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sdk-ssooidc"
-version = "1.65.0"
+version = "1.73.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "acbbb3ce8da257aedbccdcb1aadafbbb6a5fe9adf445db0e1ea897bdc7e22d08"
+checksum = "f879a8572b4683a8f84f781695bebf2f25cf11a81a2693c31fc0e0215c2c1726"
 dependencies = [
  "aws-credential-types",
  "aws-runtime",
@@ -1335,7 +1335,6 @@ dependencies = [
  "bytes 1.10.1",
  "fastrand 2.3.0",
  "http 0.2.9",
- "once_cell",
  "regex-lite",
  "tracing 0.1.41",
 ]
@@ -2656,7 +2655,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -5259,7 +5258,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.41",
