@@ -17,6 +17,9 @@ on:
         required: true
         type: string
 
+permissions:
+  contents: read
+
 jobs:
   publish-homebrew:
     runs-on: ubuntu-24.04
