@@ -145,7 +145,7 @@ mod tests {
         let source_b_key = ComponentKey::from("source_b");
         let recorder = ProcessingTimeRecorder::new(
             &ComponentKey::from("sink"),
-            &[source_a_key.clone(), source_b_key.clone()],
+            vec![source_a_key.clone(), source_b_key.clone()],
             None,
         );
         let source_a = Arc::new(source_a_key);
