@@ -50,4 +50,5 @@ ignore = [
   { id = "RUSTSEC-2025-0012", reason = "backoff is unmaintained" },
   # rustls-pemfile is unmaintained. Blocked by both async-nats and http 1.0.0 upgrade.
   { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile is unmaintained" },
+  { id = "RUSTSEC-2026-0002", reason = "latest aws-sdk-s3 (v1.119.0) is still using lru v0.12.5" },
 ]

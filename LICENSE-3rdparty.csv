@@ -150,7 +150,6 @@ bytes,https://github.com/carllerche/bytes,MIT,Carl Lerche <me@carllerche.com>
 bytes,https://github.com/tokio-rs/bytes,MIT,"Carl Lerche <me@carllerche.com>, Sean McArthur <sean@seanmonstar.com>"
 bytes-utils,https://github.com/vorner/bytes-utils,Apache-2.0 OR MIT,Michal 'vorner' Vaner <vorner@vorner.cz>
 bytesize,https://github.com/bytesize-rs/bytesize,Apache-2.0,"Hyunsik Choi <hyunsik.choi@gmail.com>, MrCroxx <mrcroxx@outlook.com>, Rob Ede <robjtede@icloud.com>"
-cassowary,https://github.com/dylanede/cassowary-rs,MIT  OR  Apache-2.0,Dylan Ede <dylanede@googlemail.com>
 castaway,https://github.com/sagebind/castaway,MIT,Stephen M. Coakley <me@stephencoakley.com>
 cbc,https://github.com/RustCrypto/block-modes,MIT OR Apache-2.0,RustCrypto Developers
 cesu8,https://github.com/emk/cesu8-rs,Apache-2.0 OR MIT,Eric Kidd <git@randomhacks.net>
@@ -237,6 +236,7 @@ derive_builder,https://github.com/colin-kiegel/rust-derive-builder,MIT OR Apache
 derive_builder_core,https://github.com/colin-kiegel/rust-derive-builder,MIT OR Apache-2.0,"Colin Kiegel <kiegel@gmx.de>, Pascal Hertleif <killercup@gmail.com>, Jan-Erik Rediger <janerik@fnordig.de>, Ted Driggs <ted.driggs@outlook.com>"
 derive_builder_macro,https://github.com/colin-kiegel/rust-derive-builder,MIT OR Apache-2.0,"Colin Kiegel <kiegel@gmx.de>, Pascal Hertleif <killercup@gmail.com>, Jan-Erik Rediger <janerik@fnordig.de>, Ted Driggs <ted.driggs@outlook.com>"
 derive_more,https://github.com/JelteF/derive_more,MIT,Jelte Fennema <github-tech@jeltef.nl>
+derive_more-impl,https://github.com/JelteF/derive_more,MIT,Jelte Fennema <github-tech@jeltef.nl>
 digest,https://github.com/RustCrypto/traits,MIT OR Apache-2.0,RustCrypto Developers
 dirs-next,https://github.com/xdg-rs/dirs,MIT OR Apache-2.0,The @xdg-rs members
 dirs-sys-next,https://github.com/xdg-rs/dirs/tree/master/dirs-sys,MIT OR Apache-2.0,The @xdg-rs members
@@ -415,6 +415,7 @@ jsonpath-rust,https://github.com/besok/jsonpath-rust,MIT,BorisZhguchev <zhguchev
 jsonptr,https://github.com/chanced/jsonptr,MIT OR Apache-2.0,chance dinkins
 jsonschema,https://github.com/Stranger6667/jsonschema,MIT,Dmitry Dygalo <dmitry@dygalo.dev>
 k8s-openapi,https://github.com/Arnavion/k8s-openapi,Apache-2.0,Arnav Singh <me@arnavion.dev>
+kasuari,https://github.com/ratatui/kasuari,MIT OR Apache-2.0,"Dylan Ede <dylanede@googlemail.com>, The Ratatui Developers"
 keccak,https://github.com/RustCrypto/sponges/tree/master/keccak,Apache-2.0 OR MIT,RustCrypto Developers
 kqueue,https://gitlab.com/rust-kqueue/rust-kqueue,MIT,William Orr <will@worrbase.com>
 kqueue-sys,https://gitlab.com/rust-kqueue/rust-kqueue-sys,MIT,"William Orr <will@worrbase.com>, Daniel (dmilith) Dettlaff <dmilith@me.com>"
@@ -439,6 +440,7 @@ libm,https://github.com/rust-lang/libm,MIT OR Apache-2.0,Jorge Aparicio <jorge@j
 libsqlite3-sys,https://github.com/rusqlite/rusqlite,MIT,The rusqlite developers
 libz-rs-sys,https://github.com/trifectatechfoundation/zlib-rs,Zlib,The libz-rs-sys Authors
 libz-sys,https://github.com/rust-lang/libz-sys,MIT OR Apache-2.0,"Alex Crichton <alex@alexcrichton.com>, Josh Triplett <josh@joshtriplett.org>, Sebastian Thiel <sebastian.thiel@icloud.com>"
+line-clipping,https://github.com/joshka/line-clipping,MIT OR Apache-2.0,Josh McKinney
 linked-hash-map,https://github.com/contain-rs/linked-hash-map,MIT OR Apache-2.0,"Stepan Koltsov <stepan.koltsov@gmail.com>, Andrew Paseltiner <apaseltiner@gmail.com>"
 linked_hash_set,https://github.com/alexheretic/linked-hash-set,Apache-2.0,Alex Butler <alexheretic@gmail.com>
 linux-raw-sys,https://github.com/sunfishcode/linux-raw-sys,Apache-2.0 WITH LLVM-exception OR Apache-2.0 OR MIT,Dan Gohman <dev@sunfishcode.online>
@@ -623,6 +625,9 @@ rand_distr,https://github.com/rust-random/rand_distr,MIT OR Apache-2.0,The Rand 
 rand_hc,https://github.com/rust-random/rand,MIT OR Apache-2.0,The Rand Project Developers
 rand_xorshift,https://github.com/rust-random/rngs,MIT OR Apache-2.0,"The Rand Project Developers, The Rust Project Developers"
 ratatui,https://github.com/ratatui/ratatui,MIT,"Florian Dehau <work@fdehau.com>, The Ratatui Developers"
+ratatui-core,https://github.com/ratatui/ratatui,MIT,"Florian Dehau <work@fdehau.com>, The Ratatui Developers"
+ratatui-crossterm,https://github.com/ratatui/ratatui,MIT,"Florian Dehau <work@fdehau.com>, The Ratatui Developers"
+ratatui-widgets,https://github.com/ratatui/ratatui,MIT,"Florian Dehau <work@fdehau.com>, The Ratatui Developers"
 raw-cpuid,https://github.com/gz/rust-cpuid,MIT,Gerd Zellweger <mail@gerdzellweger.com>
 raw-window-handle,https://github.com/rust-windowing/raw-window-handle,MIT OR Apache-2.0 OR Zlib,Osspial <osspial@gmail.com>
 rdkafka,https://github.com/fede1024/rust-rdkafka,MIT,Federico Giraud <giraud.federico@gmail.com>
@@ -688,6 +693,7 @@ security-framework,https://github.com/kornelski/rust-security-framework,MIT OR A
 security-framework-sys,https://github.com/kornelski/rust-security-framework,MIT OR Apache-2.0,"Steven Fackler <sfackler@gmail.com>, Kornel <kornel@geekhood.net>"
 semver,https://github.com/dtolnay/semver,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
 serde,https://github.com/serde-rs/serde,MIT OR Apache-2.0,"Erick Tryzelaar <erick.tryzelaar@gmail.com>, David Tolnay <dtolnay@gmail.com>"
+serde-aux,https://github.com/iddm/serde-aux,MIT,Victor Polevoy <maintainer@vpolevoy.com>
 serde-toml-merge,https://github.com/jdrouet/serde-toml-merge,MIT,Jeremie Drouet <jeremie.drouet@gmail.com>
 serde-value,https://github.com/arcnmx/serde-value,MIT,arcnmx
 serde_bytes,https://github.com/serde-rs/bytes,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
@@ -834,6 +840,7 @@ unicode-normalization,https://github.com/unicode-rs/unicode-normalization,MIT OR
 unicode-segmentation,https://github.com/unicode-rs/unicode-segmentation,MIT OR Apache-2.0,"kwantam <kwantam@gmail.com>, Manish Goregaokar <manishsmail@gmail.com>"
 unicode-truncate,https://github.com/Aetf/unicode-truncate,MIT OR Apache-2.0,Aetf <aetf@unlimitedcodeworks.xyz>
 unicode-width,https://github.com/unicode-rs/unicode-width,MIT OR Apache-2.0,"kwantam <kwantam@gmail.com>, Manish Goregaokar <manishsmail@gmail.com>"
+unicode-xid,https://github.com/unicode-rs/unicode-xid,MIT OR Apache-2.0,"erick.tryzelaar <erick.tryzelaar@gmail.com>, kwantam <kwantam@gmail.com>, Manish Goregaokar <manishsmail@gmail.com>"
 unit-prefix,https://codeberg.org/commons-rs/unit-prefix,MIT,"Fabio Valentini <decathorpe@gmail.com>, Benjamin Sago <ogham@bsago.me>"
 universal-hash,https://github.com/RustCrypto/traits,MIT OR Apache-2.0,RustCrypto Developers
 unreachable,https://github.com/reem/rust-unreachable,MIT  OR  Apache-2.0,Jonathan Reem <jonathan.reem@gmail.com>

@@ -70,7 +70,7 @@ impl WebSocketListenerSink {
         let encoder = Encoder::<()>::new(serializer);
         let auth = config
             .auth
-            .map(|config| config.build(&cx.enrichment_tables))
+            .map(|config| config.build(&cx.enrichment_tables, &cx.metrics_storage))
             .transpose()?;
 
         Ok(Self {

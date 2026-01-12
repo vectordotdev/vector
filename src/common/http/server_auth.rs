@@ -14,6 +14,7 @@ use vector_lib::{
     event::{Event, LogEvent, VrlTarget},
     sensitive_string::SensitiveString,
 };
+use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     compiler::{CompilationResult, CompileConfig, Program, runtime::Runtime},
     core::Value,
@@ -135,6 +136,7 @@ impl HttpServerAuthConfig {
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<HttpServerAuthMatcher> {
         match self {
             HttpServerAuthConfig::Basic { username, password } => {
@@ -148,6 +150,7 @@ impl HttpServerAuthConfig {
 
                 let mut config = CompileConfig::default();
                 config.set_custom(enrichment_tables.clone());
+                config.set_custom(metrics_storage.clone());
                 config.set_read_only();
 
                 let CompilationResult {
@@ -357,7 +360,7 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth.build(&Default::default());
+        let matcher = basic_auth.build(&Default::default(), &Default::default());
 
         assert!(matcher.is_ok());
         assert!(matches!(
@@ -373,7 +376,10 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let (_, error_message) = basic_auth.build(&Default::default()).unwrap().auth_header();
+        let (_, error_message) = basic_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap()
+            .auth_header();
         assert_eq!("Invalid username/password", error_message);
     }
 
@@ -386,7 +392,10 @@ mod tests {
             password: password.clone().into(),
         };
 
-        let (header, _) = basic_auth.build(&Default::default()).unwrap().auth_header();
+        let (header, _) = basic_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap()
+            .auth_header();
         assert_eq!(
             Authorization::basic(&username, &password).0.encode(),
             header
@@ -399,7 +408,11 @@ mod tests {
             source: "invalid VRL source".to_string(),
         };
 
-        assert!(custom_auth.build(&Default::default()).is_err());
+        assert!(
+            custom_auth
+                .build(&Default::default(), &Default::default())
+                .is_err()
+        );
     }
 
     #[test]
@@ -412,7 +425,11 @@ mod tests {
             .to_string(),
         };
 
-        assert!(custom_auth.build(&Default::default()).is_err());
+        assert!(
+            custom_auth
+                .build(&Default::default(), &Default::default())
+                .is_err()
+        );
     }
 
     #[test]
@@ -424,7 +441,11 @@ mod tests {
             .to_string(),
         };
 
-        assert!(custom_auth.build(&Default::default()).is_ok());
+        assert!(
+            custom_auth
+                .build(&Default::default(), &Default::default())
+                .is_ok()
+        );
     }
 
     #[test]
@@ -434,7 +455,9 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth.build(&Default::default()).unwrap();
+        let matcher = basic_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let (_guard, addr) = next_addr();
         let result = matcher.handle_auth(Some(&addr), &HeaderMap::new(), "/");
@@ -452,7 +475,9 @@ mod tests {
             password: random_string(16).into(),
         };
 
-        let matcher = basic_auth.build(&Default::default()).unwrap();
+        let matcher = basic_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("Basic wrong"));
@@ -474,7 +499,9 @@ mod tests {
             password: password.clone().into(),
         };
 
-        let matcher = basic_auth.build(&Default::default()).unwrap();
+        let matcher = basic_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(
@@ -493,7 +520,9 @@ mod tests {
             source: r#".headers.authorization == "test""#.to_string(),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("test"));
@@ -511,7 +540,9 @@ mod tests {
             source: format!(".address == \"{addr_string}\""),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let headers = HeaderMap::new();
         let result = matcher.handle_auth(Some(&addr), &headers, "/");
@@ -527,7 +558,9 @@ mod tests {
             source: format!(".address == \"{addr_string}\""),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let headers = HeaderMap::new();
         let result = matcher.handle_auth(None, &headers, "/");
@@ -541,7 +574,9 @@ mod tests {
             source: r#".path == "/ok""#.to_string(),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let headers = HeaderMap::new();
         let (_guard, addr) = next_addr();
@@ -556,7 +591,9 @@ mod tests {
             source: r#".path == "/ok""#.to_string(),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let headers = HeaderMap::new();
         let (_guard, addr) = next_addr();
@@ -571,7 +608,9 @@ mod tests {
             source: r#".headers.authorization == "test""#.to_string(),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("wrong value"));
@@ -590,7 +629,9 @@ mod tests {
             source: "abort".to_string(),
         };
 
-        let matcher = custom_auth.build(&Default::default()).unwrap();
+        let matcher = custom_auth
+            .build(&Default::default(), &Default::default())
+            .unwrap();
 
         let mut headers = HeaderMap::new();
         headers.insert(AUTHORIZATION, HeaderValue::from_static("test"));

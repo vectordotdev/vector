@@ -92,6 +92,8 @@ on:
         value: ${{ jobs.int_tests.outputs.dnstap }}
       docker-logs:
         value: ${{ jobs.int_tests.outputs.docker-logs }}
+      doris:
+        value: ${{ jobs.int_tests.outputs.doris }}
       elasticsearch:
         value: ${{ jobs.int_tests.outputs.elasticsearch }}
       eventstoredb:
@@ -299,6 +301,7 @@ jobs:
       datadog-traces: ${{ steps.filter.outputs.datadog-traces }}
       dnstap: ${{ steps.filter.outputs.dnstap }}
       docker-logs: ${{ steps.filter.outputs.docker-logs }}
+      doris: ${{ steps.filter.outputs.doris }}
       elasticsearch: ${{ steps.filter.outputs.elasticsearch }}
       eventstoredb: ${{ steps.filter.outputs.eventstoredb }}
       fluent: ${{ steps.filter.outputs.fluent }}
@@ -364,6 +367,7 @@ jobs:
             "datadog-traces": ${{ steps.filter.outputs.datadog-traces }},
             "dnstap": ${{ steps.filter.outputs.dnstap }},
             "docker-logs": ${{ steps.filter.outputs.docker-logs }},
+            "doris": ${{ steps.filter.outputs.doris }},
             "elasticsearch": ${{ steps.filter.outputs.elasticsearch }},
             "eventstoredb": ${{ steps.filter.outputs.eventstoredb }},
             "fluent": ${{ steps.filter.outputs.fluent }},
@@ -397,7 +401,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: int_tests_changes
           path: int_tests_changes.json
@@ -457,7 +461,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: e2e_tests_changes
           path: e2e_tests_changes.json
