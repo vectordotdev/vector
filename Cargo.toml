@@ -132,11 +132,13 @@ members = [
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
   "lib/vector-vrl/web-playground",
+  "lib/vector-vrl-metrics",
   "vdev",
 ]
 
 [workspace.dependencies]
 anyhow = { version = "1.0.99", default-features = false, features = ["std"] }
+arc-swap = { version = "1.7.1", default-features = false }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
@@ -144,7 +146,7 @@ bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.3", default-features = false }
 chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"] }
-clap = { version = "4.5.48", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.53", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 colored = { version = "3.0.0", default-features = false }
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
@@ -228,7 +230,8 @@ vector-lib.workspace = true
 vector-config.workspace = true
 vector-config-common.workspace = true
 vector-config-macros.workspace = true
-vector-vrl-functions.workspace = true
+vector-vrl-functions = { workspace = true, features = ["vrl-metrics"] }
+vector-vrl-metrics = { path = "lib/vector-vrl-metrics" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
@@ -338,7 +341,7 @@ hex = { version = "0.4.3", default-features = false, optional = true }
 greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "f7243393808640f5123b0d5b7b798da591a4df6e", optional = true }
 
 # External libs
-arc-swap = { version = "1.7", default-features = false, optional = true }
+arc-swap = { workspace = true, default-features = false, optional = true }
 async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
@@ -386,7 +389,7 @@ itertools.workspace = true
 k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26"], optional = true }
 kube = { version = "0.93.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
-lru = { version = "0.16.0", default-features = false }
+lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.3.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
@@ -793,6 +796,7 @@ sinks-logs = [
   "sinks-datadog_events",
   "sinks-datadog_logs",
   "sinks-datadog_traces",
+  "sinks-doris",
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
@@ -860,6 +864,7 @@ sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
 sinks-datadog_traces = ["protobuf-build", "dep:prost", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
+sinks-doris = ["sqlx/mysql"]
 sinks-elasticsearch = ["transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
 sinks-gcp = ["sinks-gcp-chronicle", "dep:base64", "gcp"]
@@ -913,6 +918,7 @@ all-integration-tests = [
   "datadog-traces-integration-tests",
   "dnstap-integration-tests",
   "docker-logs-integration-tests",
+  "doris-integration-tests",
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
   "fluent-integration-tests",
@@ -978,6 +984,7 @@ datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics", "dep:prost"]
 datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_traces", "axum/tokio"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
+doris-integration-tests = ["sinks-doris"]
 es-integration-tests = ["sinks-elasticsearch", "aws-core"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
 fluent-integration-tests = ["docker", "sources-fluent"]

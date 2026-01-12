@@ -10,10 +10,10 @@ pub use vector_buffers as buffers;
 #[cfg(feature = "test")]
 pub use vector_common::event_test_util;
 pub use vector_common::{
-    Error, NamedInternalEvent, Result, TimeZone, assert_event_data_eq, btreemap, byte_size_of,
-    byte_size_of::ByteSizeOf, conversion, encode_logfmt, finalization, finalizer, id,
+    Error, NamedInternalEvent, Result, TimeZone, assert_event_data_eq, atomic, btreemap,
+    byte_size_of, byte_size_of::ByteSizeOf, conversion, encode_logfmt, finalization, finalizer, id,
     impl_event_data_eq, internal_event, json_size, registered_event, request_metadata,
-    sensitive_string, shutdown, trigger,
+    sensitive_string, shutdown, stats, trigger,
 };
 pub use vector_config as configurable;
 pub use vector_config::impl_generate_config_from_default;

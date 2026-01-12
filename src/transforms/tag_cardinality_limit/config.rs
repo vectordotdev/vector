@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use vector_lib::{config::LogNamespace, configurable::configurable_component};
+use vector_lib::configurable::configurable_component;
 
 use crate::{
     config::{
@@ -174,9 +174,8 @@ impl TransformConfig for TagCardinalityLimitConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         _: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }
