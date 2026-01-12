@@ -1,5 +1,5 @@
 use vector_lib::{
-    config::{LogNamespace, clone_input_definitions},
+    config::clone_input_definitions,
     configurable::configurable_component,
     internal_event::{Count, InternalEventHandle as _, Registered},
 };
@@ -44,9 +44,10 @@ impl GenerateConfig for FilterConfig {
 #[typetag::serde(name = "filter")]
 impl TransformConfig for FilterConfig {
     async fn build(&self, context: &TransformContext) -> crate::Result<Transform> {
-        Ok(Transform::function(Filter::new(
-            self.condition.build(&context.enrichment_tables)?,
-        )))
+        Ok(Transform::function(Filter::new(self.condition.build(
+            &context.enrichment_tables,
+            &context.metrics_storage,
+        )?)))
     }
 
     fn input(&self) -> Input {
@@ -55,9 +56,8 @@ impl TransformConfig for FilterConfig {
 
     fn outputs(
         &self,
-        _enrichment_tables: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::all_bits(),

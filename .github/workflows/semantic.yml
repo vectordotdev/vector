@@ -221,6 +221,7 @@ jobs:
             datadog_events sink
             datadog_logs sink
             datadog_metrics sink
+            doris sink
             elasticsearch sink
             file sink
             gcp_chronicle sink
