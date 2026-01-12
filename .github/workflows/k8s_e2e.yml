@@ -19,7 +19,17 @@ permissions:
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
   workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
   pull_request:
   merge_group:
     types: [checks_requested]
@@ -67,40 +77,15 @@ jobs:
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
       CARGO_INCREMENTAL: 0
     steps:
-      - name: (PR review) Set latest commit status as pending
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: pending
-
-      - name: (PR review) Checkout PR branch
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          ref: ${{ github.event.review.commit_id }}
-
       - name: Checkout branch
-        if: ${{ github.event_name != 'pull_request_review' }}
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          ref: ${{ inputs.ref }}
 
-      - run: sudo -E bash scripts/ci-free-disk-space.sh
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh --modules=rustup,cross
-      - run: rustup target add x86_64-unknown-linux-gnu
-      - run: echo "::add-matcher::.github/matchers/rust.json"
-
-      # TODO: Use the setup action in this workflow.
-      - name: Install vdev
-        uses: ./.github/actions/install-vdev
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cross: true
 
       - run: VECTOR_VERSION="$(vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
@@ -108,14 +93,6 @@ jobs:
         with:
           name: e2e-test-deb-package
           path: target/artifacts/*
-
-      - name: (PR review) Set latest commit status as 'failure'
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        if: failure() && github.event_name == 'pull_request_review'
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: 'failure'
 
   # GitHub Actions don't support `matrix` at the job-level `if:` condition.
   # We apply this workaround - compute `matrix` in a preceding job, and assign
@@ -191,20 +168,10 @@ jobs:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
     steps:
-      - name: (PR review) Get PR branch
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3.0.0
-        id: comment-branch
-
-      - name: (PR review) Checkout PR branch
-        if: ${{ github.event_name == 'pull_request_review' }}
+      - name: Checkout branch
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
-          ref: ${{ steps.comment-branch.outputs.head_ref }}
-
-      - name: Checkout branch
-        if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+          ref: ${{ inputs.ref }}
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
@@ -230,14 +197,6 @@ jobs:
           max_attempts: 3
           command: make test-e2e-kubernetes
 
-      - name: (PR review) Set latest commit status as failure
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        if: failure() && github.event_name == 'pull_request_review'
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: 'failure'
-
   final-result:
     name: K8s E2E Suite
     runs-on: ubuntu-24.04
@@ -251,19 +210,6 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:
-      - name: (PR review) Get PR branch
-        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
-        uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3.0.0
-        id: comment-branch
-
-      - name: (PR review) Submit PR result as success
-        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: 'success'
-
       - name: Check all jobs status
         run: |
           if [[ "${{ env.FAILED }}" == "true" ]]; then
