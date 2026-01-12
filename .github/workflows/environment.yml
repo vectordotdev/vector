@@ -28,7 +28,7 @@ env:
   SHOULD_PUBLISH: ${{ (github.event_name != 'workflow_dispatch' && github.ref == 'refs/heads/master') || (github.event_name == 'workflow_dispatch' && github.event.inputs.push == 'true') }}
 
 permissions:
-  statuses: write
+  contents: read
 
 jobs:
   publish-new-environment:

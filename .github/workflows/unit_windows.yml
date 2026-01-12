@@ -10,7 +10,7 @@ on:
 
 
 permissions:
-  statuses: write
+  contents: read
 
 jobs:
   test-windows:

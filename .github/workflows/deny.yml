@@ -29,7 +29,7 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  statuses: write
+  contents: read
 
 jobs:
   changes:

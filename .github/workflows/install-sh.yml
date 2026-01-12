@@ -15,7 +15,7 @@ on:
         type: string
 
 permissions:
-  statuses: write
+  contents: read
 
 jobs:
   test-install:

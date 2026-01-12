@@ -21,7 +21,6 @@ on:
 
 permissions:
   contents: read
-  statuses: write
 
 concurrency:
   # `github.ref` is unique for MQ runs and PRs

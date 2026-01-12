@@ -26,7 +26,7 @@ on:
     - cron: '0 10 * * 1' # 10:00 UTC Monday (6 AM EST NYC)
 
 permissions:
-  statuses: write
+  contents: read
 
 jobs:
   check-component-features:

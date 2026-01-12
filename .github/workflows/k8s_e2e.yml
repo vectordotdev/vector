@@ -15,7 +15,7 @@
 name: K8S E2E Suite
 
 permissions:
-  statuses: write
+  contents: read
 
 on:
   workflow_dispatch:

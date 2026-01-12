@@ -30,7 +30,6 @@ on:
 
 permissions:
   contents: read
-  statuses: write
 
 env:
   DD_ENV: "ci"
