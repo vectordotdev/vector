@@ -1,9 +1,8 @@
-use std::sync::Arc;
 #[cfg(test)]
 use std::sync::atomic::{AtomicUsize, Ordering};
+use std::{collections::HashMap, sync::Arc};
 
 use chrono::Utc;
-use dashmap::{DashMap, mapref::one::RefMut};
 use metrics::{Histogram, gauge, histogram};
 use vector_lib::{buffers::BufferInstrumentation, stats::EwmaGauge};
 
@@ -19,24 +18,26 @@ static METRICS_ENTRY_CALLS: AtomicUsize = AtomicUsize::new(0);
 
 #[derive(Debug)]
 pub(crate) struct ProcessingTimeRecorder {
-    sink_id: Arc<str>,
-    metrics: DashMap<Arc<ComponentKey>, Metrics>,
-    ewma_alpha: f64,
-}
-
-#[derive(Debug)]
-struct Metrics {
-    histogram: Histogram,
-    gauge: EwmaGauge,
+    metrics: HashMap<Arc<ComponentKey>, Metrics>,
 }
 
 impl ProcessingTimeRecorder {
-    pub(crate) fn new(sink_key: &ComponentKey, ewma_alpha: Option<f64>) -> Self {
-        Self {
-            sink_id: Arc::from(sink_key.id().to_owned()),
-            metrics: DashMap::new(),
-            ewma_alpha: ewma_alpha.unwrap_or(DEFAULT_PROCESSING_TIME_EWMA_ALPHA),
-        }
+    pub(crate) fn new(
+        sink_key: &ComponentKey,
+        sources: Vec<ComponentKey>,
+        ewma_alpha: Option<f64>,
+    ) -> Self {
+        let ewma_alpha = ewma_alpha.unwrap_or(DEFAULT_PROCESSING_TIME_EWMA_ALPHA);
+        let sink_id = Arc::from(sink_key.id().to_owned());
+        let metrics = sources
+            .into_iter()
+            .map(|source_key| {
+                let source_id = Arc::new(source_key);
+                let metrics = Metrics::new(&sink_id, &source_id, ewma_alpha);
+                (source_id, metrics)
+            })
+            .collect();
+        Self { metrics }
     }
 
     fn record_events(&self, events: &EventArray) {
@@ -63,30 +64,25 @@ impl ProcessingTimeRecorder {
                 // actually access anything _through_ the pointer, this is a safe use of pointers.
                 let source_ptr = Arc::as_ptr(source_id);
                 if curr_source != Some(source_ptr) {
-                    curr_metrics = Some(self.metrics_entry(source_id));
+                    curr_metrics = self.metrics_entry(source_id);
                     curr_source = Some(source_ptr);
                 }
 
-                if let Some(metrics) = curr_metrics.as_ref() {
+                if let Some(metrics) = curr_metrics {
                     metrics.record(latency_ns as f64 / NANOS_PER_SECOND);
                 }
             }
         }
     }
 
-    fn metrics_entry<'a>(
-        &'a self,
-        source_id: &Arc<ComponentKey>,
-    ) -> RefMut<'a, Arc<ComponentKey>, Metrics> {
+    fn metrics_entry<'a>(&'a self, source_id: &Arc<ComponentKey>) -> Option<&'a Metrics> {
         #[cfg(test)]
         {
             // This is a test-only metric to track the number of times record_events calls this function.
             METRICS_ENTRY_CALLS.fetch_add(1, Ordering::Relaxed);
         }
 
-        self.metrics
-            .entry(Arc::clone(source_id))
-            .or_insert_with(|| Metrics::new(&self.sink_id, source_id, self.ewma_alpha))
+        self.metrics.get(source_id)
     }
 }
 
@@ -94,6 +90,12 @@ impl BufferInstrumentation<EventArray> for ProcessingTimeRecorder {
     fn on_send(&self, events: &EventArray) {
         self.record_events(events);
     }
+}
+
+#[derive(Debug)]
+struct Metrics {
+    histogram: Histogram,
+    gauge: EwmaGauge,
 }
 
 impl Metrics {
@@ -139,9 +141,15 @@ mod tests {
     fn caches_metrics_entry_by_source_run() {
         METRICS_ENTRY_CALLS.store(0, Ordering::Relaxed);
 
-        let recorder = ProcessingTimeRecorder::new(&ComponentKey::from("sink"), None);
-        let source_a = Arc::new(ComponentKey::from("source_a"));
-        let source_b = Arc::new(ComponentKey::from("source_b"));
+        let source_a_key = ComponentKey::from("source_a");
+        let source_b_key = ComponentKey::from("source_b");
+        let recorder = ProcessingTimeRecorder::new(
+            &ComponentKey::from("sink"),
+            &[source_a_key.clone(), source_b_key.clone()],
+            None,
+        );
+        let source_a = Arc::new(source_a_key);
+        let source_b = Arc::new(source_b_key);
         let events = EventArray::Logs(vec![
             make_log_event(&source_a),
             make_log_event(&source_a),
