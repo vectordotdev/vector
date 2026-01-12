@@ -82,7 +82,7 @@ impl Function for FindEnrichmentTableRecords {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "find records",
             source: r#"find_enrichment_table_records!("test", {"surname": "Smith"})"#,
             result: Ok(
@@ -90,7 +90,7 @@ impl Function for FindEnrichmentTableRecords {
                              {"id": 2, "firstname": "Fred", "surname": "Smith"}]"#,
                 },
             ),
-        }]
+        )]
     }
 
     fn compile(

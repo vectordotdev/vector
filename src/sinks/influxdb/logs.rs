@@ -405,11 +405,11 @@ mod tests {
             util::test::{build_test_server_status, load_sink},
         },
         test_util::{
+            addr::next_addr,
             components::{
                 COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, run_and_assert_sink_compliance,
                 run_and_assert_sink_error,
             },
-            next_addr,
         },
     };
 
@@ -760,7 +760,7 @@ mod tests {
         // Make sure we can build the config
         _ = config.build(cx.clone()).await.unwrap();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         // Swap out the host so we can force send it
         // to our local server
         let host = format!("http://{addr}");

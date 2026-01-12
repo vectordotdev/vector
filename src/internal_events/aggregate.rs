@@ -1,7 +1,8 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::InternalEvent;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AggregateEventRecorded;
 
 impl InternalEvent for AggregateEventRecorded {
@@ -10,7 +11,7 @@ impl InternalEvent for AggregateEventRecorded {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AggregateFlushed;
 
 impl InternalEvent for AggregateFlushed {
@@ -19,7 +20,7 @@ impl InternalEvent for AggregateFlushed {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AggregateUpdateFailed;
 
 impl InternalEvent for AggregateUpdateFailed {

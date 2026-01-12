@@ -40,7 +40,7 @@ pub(super) fn find_active_environment(
             // all environments to find a match after applying the same sanitization
             for env_name in config.environments().keys() {
                 if env_name.replace('.', "-") == sanitized_env_name {
-                    return Some(env_name.to_string());
+                    return Some(env_name.clone());
                 }
             }
         }

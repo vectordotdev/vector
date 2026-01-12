@@ -8,6 +8,8 @@ use vector_lib::{
     request_metadata::GroupedCountByteSize,
 };
 
+#[cfg(feature = "codecs-arrow")]
+use crate::internal_events::EncoderNullConstraintError;
 use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
 
 pub trait Encoder<T> {
@@ -94,6 +96,65 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
         write_all(writer, 1, &bytes)?;
         Ok((bytes.len(), byte_size))
+    }
+}
+
+#[cfg(feature = "codecs-arrow")]
+impl Encoder<Vec<Event>> for (Transformer, crate::codecs::BatchEncoder) {
+    fn encode_input(
+        &self,
+        events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        use tokio_util::codec::Encoder as _;
+
+        let mut encoder = self.1.clone();
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        let n_events = events.len();
+        let mut transformed_events = Vec::with_capacity(n_events);
+
+        for mut event in events {
+            self.0.transform(&mut event);
+            byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+            transformed_events.push(event);
+        }
+
+        let mut bytes = BytesMut::new();
+        encoder
+            .encode(transformed_events, &mut bytes)
+            .map_err(|error| {
+                if let vector_lib::codecs::encoding::Error::SchemaConstraintViolation(
+                    ref constraint_error,
+                ) = error
+                {
+                    emit!(EncoderNullConstraintError {
+                        error: constraint_error
+                    });
+                }
+                io::Error::new(io::ErrorKind::InvalidData, error)
+            })?;
+
+        write_all(writer, n_events, &bytes)?;
+        Ok((bytes.len(), byte_size))
+    }
+}
+
+impl Encoder<Vec<Event>> for (Transformer, crate::codecs::EncoderKind) {
+    fn encode_input(
+        &self,
+        events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        // Delegate to the specific encoder implementation
+        match &self.1 {
+            crate::codecs::EncoderKind::Framed(encoder) => {
+                (self.0.clone(), *encoder.clone()).encode_input(events, writer)
+            }
+            #[cfg(feature = "codecs-arrow")]
+            crate::codecs::EncoderKind::Batch(encoder) => {
+                (self.0.clone(), encoder.clone()).encode_input(events, writer)
+            }
+        }
     }
 }
 

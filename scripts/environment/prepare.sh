@@ -163,8 +163,8 @@ if contains_module cargo-nextest; then
 fi
 
 if contains_module cargo-deny; then
-  if ! cargo-deny --version 2>/dev/null | grep -q '^cargo-deny 0.16.2'; then
-    cargo "${install[@]}" cargo-deny --version 0.16.2 --force --locked
+  if ! cargo-deny --version 2>/dev/null | grep -q '^cargo-deny 0.18.9'; then
+    cargo "${install[@]}" cargo-deny --version 0.18.9 --force --locked
   fi
 fi
 
@@ -176,7 +176,7 @@ fi
 
 if contains_module dd-rust-license-tool; then
   if ! dd-rust-license-tool --help &>/dev/null; then
-    cargo install dd-rust-license-tool --version 1.0.2 --force --locked
+    cargo install dd-rust-license-tool --version 1.0.4 --force --locked
   fi
 fi
 

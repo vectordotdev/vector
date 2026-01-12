@@ -137,6 +137,14 @@ pub struct RootOpts {
     #[arg(short, long, action = ArgAction::Count)]
     pub quiet: u8,
 
+    /// Disable interpolation of environment variables in configuration files.
+    #[arg(
+        long,
+        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub disable_env_var_interpolation: bool,
+
     /// Set the logging format
     #[arg(long, default_value = "text", env = "VECTOR_LOG_FORMAT")]
     pub log_format: LogFormat,
@@ -361,11 +369,7 @@ impl SubCommand {
             #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
             Self::Validate(v) => validate::validate(v, color).await,
-            Self::Vrl(s) => {
-                let mut functions = vrl::stdlib::all();
-                functions.extend(vector_vrl_functions::all());
-                vrl::cli::cmd::cmd(s, functions)
-            }
+            Self::Vrl(s) => vrl::cli::cmd::cmd(s, vector_vrl_functions::all()),
         }
     }
 }
@@ -410,7 +414,7 @@ pub enum WatchConfigMethod {
 
 pub fn handle_config_errors(errors: Vec<String>) -> exitcode::ExitCode {
     for error in errors {
-        error!(message = "Configuration error.", %error);
+        error!(message = "Configuration error.", %error, internal_log_rate_limit = false);
     }
 
     exitcode::CONFIG

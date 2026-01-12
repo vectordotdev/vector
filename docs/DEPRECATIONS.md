@@ -15,7 +15,6 @@ For example:
 ## To be deprecated
 
 - `v0.50.0` | `http-server-encoding` | The `encoding` field will be removed. Use `decoding` and `framing` instead.
-- `v0.49.0` | `block_interpolation` | Interpolating _multi-line_ configuration blocks using environment variables is now deprecated.
 
 ## To be migrated
 

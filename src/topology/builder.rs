@@ -22,14 +22,15 @@ use vector_lib::{
         BufferType, WhenFull,
         topology::{
             builder::TopologyBuilder,
-            channel::{BufferReceiver, BufferSender},
+            channel::{BufferReceiver, BufferSender, ChannelMetricMetadata},
         },
     },
-    config::LogNamespace,
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     schema::Definition,
+    source_sender::{CHUNK_SIZE, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
+use vector_vrl_metrics::MetricsStorage;
 
 use super::{
     BuiltBuffer, ConfigDiff,
@@ -47,21 +48,22 @@ use crate::{
     extra_context::ExtraContext,
     internal_events::EventsReceived,
     shutdown::SourceShutdownCoordinator,
-    source_sender::{CHUNK_SIZE, SourceSenderItem},
     spawn_named,
     topology::task::TaskError,
     transforms::{SyncTransform, TaskTransform, Transform, TransformOutputs, TransformOutputsBuf},
-    utilization::{UtilizationComponentSender, UtilizationEmitter, wrap},
+    utilization::{UtilizationComponentSender, UtilizationEmitter, UtilizationRegistry, wrap},
 };
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
     LazyLock::new(vector_lib::enrichment::TableRegistry::default);
+static METRICS_STORAGE: LazyLock<MetricsStorage> = LazyLock::new(MetricsStorage::default);
 
 pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
     LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
 
 const READY_ARRAY_CAPACITY: NonZeroUsize = NonZeroUsize::new(CHUNK_SIZE * 4).unwrap();
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
+const TRANSFORM_CHANNEL_METRIC_PREFIX: &str = "transform_buffer";
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
     crate::app::worker_threads()
@@ -83,7 +85,8 @@ struct Builder<'a> {
     healthchecks: HashMap<ComponentKey, Task>,
     detach_triggers: HashMap<ComponentKey, Trigger>,
     extra_context: ExtraContext,
-    utilization_emitter: UtilizationEmitter,
+    utilization_emitter: Option<UtilizationEmitter>,
+    utilization_registry: UtilizationRegistry,
 }
 
 impl<'a> Builder<'a> {
@@ -92,7 +95,16 @@ impl<'a> Builder<'a> {
         diff: &'a ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
+        utilization_registry: Option<UtilizationRegistry>,
     ) -> Self {
+        // If registry is not passed, we need to build a whole new utilization emitter + registry
+        // Otherwise, we just store the registry and reuse it for this build
+        let (emitter, registry) = if let Some(registry) = utilization_registry {
+            (None, registry)
+        } else {
+            let (emitter, registry) = UtilizationEmitter::new();
+            (Some(emitter), registry)
+        };
         Self {
             config,
             diff,
@@ -105,7 +117,8 @@ impl<'a> Builder<'a> {
             healthchecks: HashMap::new(),
             detach_triggers: HashMap::new(),
             extra_context,
-            utilization_emitter: UtilizationEmitter::new(),
+            utilization_emitter: emitter,
+            utilization_registry: registry,
         }
     }
 
@@ -129,7 +142,10 @@ impl<'a> Builder<'a> {
                 healthchecks: self.healthchecks,
                 shutdown_coordinator: self.shutdown_coordinator,
                 detach_triggers: self.detach_triggers,
-                utilization_emitter: Some(self.utilization_emitter),
+                metrics_storage: METRICS_STORAGE.clone(),
+                utilization: self
+                    .utilization_emitter
+                    .map(|e| (e, self.utilization_registry)),
             })
         } else {
             Err(self.errors)
@@ -247,7 +263,10 @@ impl<'a> Builder<'a> {
                 key.id()
             );
 
-            let mut builder = SourceSender::builder().with_buffer(*SOURCE_SENDER_BUFFER_SIZE);
+            let mut builder = SourceSender::builder()
+                .with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
+                .with_timeout(source.inner.send_timeout())
+                .with_ewma_alpha(self.config.global.buffer_utilization_ewma_alpha);
             let mut pumps = Vec::new();
             let mut controls = HashMap::new();
             let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -330,8 +349,6 @@ impl<'a> Builder<'a> {
             };
             let pump = Task::new(key.clone(), typetag, pump);
 
-            let pipeline = builder.build();
-
             let (shutdown_signal, force_shutdown_tripwire) = self
                 .shutdown_coordinator
                 .register_source(key, INTERNAL_SOURCES.contains(&typetag));
@@ -340,16 +357,16 @@ impl<'a> Builder<'a> {
                 key: key.clone(),
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 shutdown: shutdown_signal,
-                out: pipeline,
+                out: builder.build(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, &source.proxy),
                 acknowledgements: source.sink_acknowledgements,
                 schema_definitions,
                 schema: self.config.schema,
                 extra_context: self.extra_context.clone(),
             };
-            let source = source.inner.build(context).await;
-            let server = match source {
+            let server = match source.inner.build(context).await {
                 Err(error) => {
                     self.errors.push(format!("Source \"{key}\": {error}"));
                     continue;
@@ -458,14 +475,19 @@ impl<'a> Builder<'a> {
                 component_id = %key.id(),
                 component_type = %transform.inner.get_component_name(),
             );
+            let _span = span.enter();
 
             // Create a map of the outputs to the list of possible definitions from those outputs.
             let schema_definitions = transform
                 .inner
                 .outputs(
-                    enrichment_tables.clone(),
+                    &TransformContext {
+                        enrichment_tables: enrichment_tables.clone(),
+                        metrics_storage: METRICS_STORAGE.clone(),
+                        schema: self.config.schema,
+                        ..Default::default()
+                    },
                     &input_definitions,
-                    self.config.schema.log_namespace(),
                 )
                 .into_iter()
                 .map(|output| {
@@ -478,19 +500,15 @@ impl<'a> Builder<'a> {
                 key: Some(key.clone()),
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 schema_definitions,
                 merged_schema_definition: merged_definition.clone(),
                 schema: self.config.schema,
                 extra_context: self.extra_context.clone(),
             };
 
-            let node = TransformNode::from_parts(
-                key.clone(),
-                enrichment_tables.clone(),
-                transform,
-                &input_definitions,
-                self.config.schema.log_namespace(),
-            );
+            let node =
+                TransformNode::from_parts(key.clone(), &context, transform, &input_definitions);
 
             let transform = match transform
                 .inner
@@ -505,17 +523,20 @@ impl<'a> Builder<'a> {
                 Ok(transform) => transform,
             };
 
-            let (input_tx, input_rx) =
-                TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block, &span)
-                    .await;
+            let metrics = ChannelMetricMetadata::new(TRANSFORM_CHANNEL_METRIC_PREFIX, None);
+            let (input_tx, input_rx) = TopologyBuilder::standalone_memory(
+                TOPOLOGY_BUFFER_SIZE,
+                WhenFull::Block,
+                &span,
+                Some(metrics),
+                self.config.global.buffer_utilization_ewma_alpha,
+            );
 
             self.inputs
                 .insert(key.clone(), (input_tx, node.inputs.clone()));
 
-            let (transform_task, transform_outputs) = {
-                let _span = span.enter();
-                build_transform(transform, node, input_rx, &mut self.utilization_emitter)
-            };
+            let (transform_task, transform_outputs) =
+                build_transform(transform, node, input_rx, &self.utilization_registry);
 
             self.outputs.extend(transform_outputs);
             self.tasks.insert(key.clone(), transform_task);
@@ -601,6 +622,7 @@ impl<'a> Builder<'a> {
                 healthcheck,
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
                 schema: self.config.schema,
                 app_name: crate::get_app_name().to_string(),
@@ -619,7 +641,7 @@ impl<'a> Builder<'a> {
             let (trigger, tripwire) = Tripwire::new();
 
             let utilization_sender = self
-                .utilization_emitter
+                .utilization_registry
                 .add_component(key.clone(), gauge!("utilization"));
             let component_key = key.clone();
             let sink = async move {
@@ -763,7 +785,90 @@ pub struct TopologyPieces {
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
-    pub(crate) utilization_emitter: Option<UtilizationEmitter>,
+    pub(crate) metrics_storage: MetricsStorage,
+    pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
+}
+
+/// Builder for constructing TopologyPieces with a fluent API.
+///
+/// # Examples
+///
+/// ```ignore
+/// let pieces = TopologyPiecesBuilder::new(&config, &diff)
+///     .with_buffers(buffers)
+///     .with_extra_context(extra_context)
+///     .build()
+///     .await?;
+/// ```
+pub struct TopologyPiecesBuilder<'a> {
+    config: &'a Config,
+    diff: &'a ConfigDiff,
+    buffers: HashMap<ComponentKey, BuiltBuffer>,
+    extra_context: ExtraContext,
+    utilization_registry: Option<UtilizationRegistry>,
+}
+
+impl<'a> TopologyPiecesBuilder<'a> {
+    /// Creates a new builder with required parameters.
+    pub fn new(config: &'a Config, diff: &'a ConfigDiff) -> Self {
+        Self {
+            config,
+            diff,
+            buffers: HashMap::new(),
+            extra_context: ExtraContext::default(),
+            utilization_registry: None,
+        }
+    }
+
+    /// Sets the buffers for the topology.
+    pub fn with_buffers(mut self, buffers: HashMap<ComponentKey, BuiltBuffer>) -> Self {
+        self.buffers = buffers;
+        self
+    }
+
+    /// Sets the extra context for the topology.
+    pub fn with_extra_context(mut self, extra_context: ExtraContext) -> Self {
+        self.extra_context = extra_context;
+        self
+    }
+
+    /// Sets the utilization registry for the topology.
+    pub fn with_utilization_registry(mut self, registry: Option<UtilizationRegistry>) -> Self {
+        self.utilization_registry = registry;
+        self
+    }
+
+    /// Builds the topology pieces, returning errors if any occur.
+    ///
+    /// Use this method when you need to handle errors explicitly,
+    /// such as in tests or validation code.
+    pub async fn build(self) -> Result<TopologyPieces, Vec<String>> {
+        Builder::new(
+            self.config,
+            self.diff,
+            self.buffers,
+            self.extra_context,
+            self.utilization_registry,
+        )
+        .build()
+        .await
+    }
+
+    /// Builds the topology pieces, logging any errors that occur.
+    ///
+    /// Use this method for runtime configuration loading where
+    /// errors should be logged and execution should continue.
+    pub async fn build_or_log_errors(self) -> Option<TopologyPieces> {
+        match self.build().await {
+            Err(errors) => {
+                for error in errors {
+                    error!(message = "Configuration error.", %error, internal_log_rate_limit = false);
+                }
+                None
+            }
+            Ok(new_pieces) => Some(new_pieces),
+        }
+    }
 }
 
 impl TopologyPieces {
@@ -772,16 +877,14 @@ impl TopologyPieces {
         diff: &ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
+        utilization_registry: Option<UtilizationRegistry>,
     ) -> Option<Self> {
-        match TopologyPieces::build(config, diff, buffers, extra_context).await {
-            Err(errors) => {
-                for error in errors {
-                    error!(message = "Configuration error.", %error);
-                }
-                None
-            }
-            Ok(new_pieces) => Some(new_pieces),
-        }
+        TopologyPiecesBuilder::new(config, diff)
+            .with_buffers(buffers)
+            .with_extra_context(extra_context)
+            .with_utilization_registry(utilization_registry)
+            .build_or_log_errors()
+            .await
     }
 
     /// Builds only the new pieces, and doesn't check their topology.
@@ -790,8 +893,12 @@ impl TopologyPieces {
         diff: &ConfigDiff,
         buffers: HashMap<ComponentKey, BuiltBuffer>,
         extra_context: ExtraContext,
+        utilization_registry: Option<UtilizationRegistry>,
     ) -> Result<Self, Vec<String>> {
-        Builder::new(config, diff, buffers, extra_context)
+        TopologyPiecesBuilder::new(config, diff)
+            .with_buffers(buffers)
+            .with_extra_context(extra_context)
+            .with_utilization_registry(utilization_registry)
             .build()
             .await
     }
@@ -818,21 +925,16 @@ struct TransformNode {
 impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        context: &TransformContext,
         transform: &TransformOuter<OutputId>,
         schema_definition: &[(OutputId, Definition)],
-        global_log_namespace: LogNamespace,
     ) -> Self {
         Self {
             key,
             typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
-            outputs: transform.inner.outputs(
-                enrichment_tables,
-                schema_definition,
-                global_log_namespace,
-            ),
+            outputs: transform.inner.outputs(context, schema_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
         }
     }
@@ -842,14 +944,14 @@ fn build_transform(
     transform: Transform,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
-    utilization_emitter: &mut UtilizationEmitter,
+    utilization_registry: &UtilizationRegistry,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     match transform {
         // TODO: avoid the double boxing for function transforms here
         Transform::Function(t) => {
-            build_sync_transform(Box::new(t), node, input_rx, utilization_emitter)
+            build_sync_transform(Box::new(t), node, input_rx, utilization_registry)
         }
-        Transform::Synchronous(t) => build_sync_transform(t, node, input_rx, utilization_emitter),
+        Transform::Synchronous(t) => build_sync_transform(t, node, input_rx, utilization_registry),
         Transform::Task(t) => build_task_transform(
             t,
             input_rx,
@@ -857,7 +959,7 @@ fn build_transform(
             node.typetag,
             &node.key,
             &node.outputs,
-            utilization_emitter,
+            utilization_registry,
         ),
     }
 }
@@ -866,11 +968,11 @@ fn build_sync_transform(
     t: Box<dyn SyncTransform>,
     node: TransformNode,
     input_rx: BufferReceiver<EventArray>,
-    utilization_emitter: &mut UtilizationEmitter,
+    utilization_registry: &UtilizationRegistry,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (outputs, controls) = TransformOutputs::new(node.outputs, &node.key);
 
-    let sender = utilization_emitter.add_component(node.key.clone(), gauge!("utilization"));
+    let sender = utilization_registry.add_component(node.key.clone(), gauge!("utilization"));
     let runner = Runner::new(t, input_rx, sender, node.input_details.data_type(), outputs);
     let transform = if node.enable_concurrency {
         runner.run_concurrently().boxed()
@@ -1047,11 +1149,11 @@ fn build_task_transform(
     typetag: &str,
     key: &ComponentKey,
     outputs: &[TransformOutput],
-    utilization_emitter: &mut UtilizationEmitter,
+    utilization_registry: &UtilizationRegistry,
 ) -> (Task, HashMap<OutputId, fanout::ControlChannel>) {
     let (mut fanout, control) = Fanout::new();
 
-    let sender = utilization_emitter.add_component(key.clone(), gauge!("utilization"));
+    let sender = utilization_registry.add_component(key.clone(), gauge!("utilization"));
     let input_rx = wrap(sender, key.clone(), input_rx.into_stream());
 
     let events_received = register!(EventsReceived);

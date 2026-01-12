@@ -1,12 +1,13 @@
 use std::time::Instant;
 
 use metrics::{counter, histogram};
+use vector_lib::NamedInternalEvent;
 pub use vector_lib::internal_event::EventsReceived;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct EndpointBytesReceived<'a> {
     pub byte_size: usize,
     pub protocol: &'a str,
@@ -30,7 +31,7 @@ impl InternalEvent for EndpointBytesReceived<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct EndpointBytesSent<'a> {
     pub byte_size: usize,
     pub protocol: &'a str,
@@ -54,7 +55,7 @@ impl InternalEvent for EndpointBytesSent<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SocketOutgoingConnectionError<E> {
     pub error: E,
 }
@@ -80,7 +81,7 @@ impl<E: std::error::Error> InternalEvent for SocketOutgoingConnectionError<E> {
 
 const STREAM_CLOSED: &str = "stream_closed";
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct StreamClosedError {
     pub count: usize,
 }
@@ -107,7 +108,7 @@ impl InternalEvent for StreamClosedError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct CollectionCompleted {
     pub start: Instant,
     pub end: Instant,
@@ -121,7 +122,7 @@ impl InternalEvent for CollectionCompleted {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct SinkRequestBuildError<E> {
     pub error: E,
 }

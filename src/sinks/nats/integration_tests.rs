@@ -252,7 +252,7 @@ async fn nats_tls_valid() {
     conf.tls = Some(TlsEnableableConfig {
         enabled: Some(true),
         options: TlsConfig {
-            ca_file: Some("tests/data/nats/rootCA.pem".into()),
+            ca_file: Some("tests/integration/nats/data/rootCA.pem".into()),
             ..Default::default()
         },
     });
@@ -293,9 +293,9 @@ async fn nats_tls_client_cert_valid() {
     conf.tls = Some(TlsEnableableConfig {
         enabled: Some(true),
         options: TlsConfig {
-            ca_file: Some("tests/data/nats/rootCA.pem".into()),
-            crt_file: Some("tests/data/nats/nats-client.pem".into()),
-            key_file: Some("tests/data/nats/nats-client.key".into()),
+            ca_file: Some("tests/integration/nats/data/rootCA.pem".into()),
+            crt_file: Some("tests/integration/nats/data/nats-client.pem".into()),
+            key_file: Some("tests/integration/nats/data/nats-client.key".into()),
             ..Default::default()
         },
     });
@@ -319,7 +319,7 @@ async fn nats_tls_client_cert_invalid() {
     conf.tls = Some(TlsEnableableConfig {
         enabled: Some(true),
         options: TlsConfig {
-            ca_file: Some("tests/data/nats/rootCA.pem".into()),
+            ca_file: Some("tests/integration/nats/data/rootCA.pem".into()),
             ..Default::default()
         },
     });
@@ -343,13 +343,13 @@ async fn nats_tls_jwt_auth_valid() {
     conf.tls = Some(TlsEnableableConfig {
         enabled: Some(true),
         options: TlsConfig {
-            ca_file: Some("tests/data/nats/rootCA.pem".into()),
+            ca_file: Some("tests/integration/nats/data/rootCA.pem".into()),
             ..Default::default()
         },
     });
     conf.auth = Some(NatsAuthConfig::CredentialsFile {
         credentials_file: NatsAuthCredentialsFile {
-            path: "tests/data/nats/nats.creds".into(),
+            path: "tests/integration/nats/data/nats.creds".into(),
         },
     });
 
@@ -372,13 +372,13 @@ async fn nats_tls_jwt_auth_invalid() {
     conf.tls = Some(TlsEnableableConfig {
         enabled: Some(true),
         options: TlsConfig {
-            ca_file: Some("tests/data/nats/rootCA.pem".into()),
+            ca_file: Some("tests/integration/nats/data/rootCA.pem".into()),
             ..Default::default()
         },
     });
     conf.auth = Some(NatsAuthConfig::CredentialsFile {
         credentials_file: NatsAuthCredentialsFile {
-            path: "tests/data/nats/nats-bad.creds".into(),
+            path: "tests/integration/nats/data/nats-bad.creds".into(),
         },
     });
 

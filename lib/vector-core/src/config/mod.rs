@@ -393,7 +393,7 @@ impl From<bool> for AcknowledgementsConfig {
     }
 }
 
-#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq)]
+#[derive(Debug, Copy, Clone, PartialEq, Serialize, Deserialize, PartialOrd, Ord, Eq, Default)]
 pub enum LogNamespace {
     /// Vector native namespacing
     ///
@@ -405,6 +405,7 @@ pub enum LogNamespace {
     ///
     /// All data is set in the root of the event. Since this can lead
     /// to collisions, deserialized data has priority over metadata
+    #[default]
     Legacy,
 }
 
@@ -420,9 +421,9 @@ impl From<bool> for LogNamespace {
     }
 }
 
-impl Default for LogNamespace {
-    fn default() -> Self {
-        Self::Legacy
+impl From<LogNamespace> for bool {
+    fn from(x: LogNamespace) -> Self {
+        x == LogNamespace::Vector
     }
 }
 

@@ -1,10 +1,7 @@
-use crate::git;
+use crate::utils::git;
 use anyhow::Result;
-use hex;
-use reqwest;
 use sha2::Digest;
-use std::path::Path;
-use std::{env, fs};
+use std::{env, fs, path::Path};
 use tempfile::TempDir;
 
 /// Releases latest version to the vectordotdev homebrew tap
@@ -26,7 +23,10 @@ impl Cli {
         let td = TempDir::new()?;
         env::set_current_dir(td.path())?;
 
-        debug!("Cloning the homebrew repository for username: {}", self.username);
+        debug!(
+            "Cloning the homebrew repository for username: {}",
+            self.username
+        );
         clone_and_setup_git(&self.username)?;
 
         let vector_version = env::var("VECTOR_VERSION")?;
@@ -41,15 +41,11 @@ impl Cli {
     }
 }
 
-
 /// Clones the repository and sets up Git configuration
 fn clone_and_setup_git(username: &str) -> Result<()> {
-    let github_token = env::var("HOMEBREW_PAT")
-        .or_else(|_| env::var("GITHUB_TOKEN"))?;
-    let homebrew_repo = format!(
-        "https://{username}:{github_token}@github.com/{username}/homebrew-brew.git"
-    );
-
+    let github_token = env::var("HOMEBREW_PAT").or_else(|_| env::var("GITHUB_TOKEN"))?;
+    let homebrew_repo =
+        format!("https://{username}:{github_token}@github.com/{username}/homebrew-brew.git");
 
     git::clone(&homebrew_repo)?;
     env::set_current_dir("homebrew-brew")?;

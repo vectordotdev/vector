@@ -21,6 +21,22 @@ In the following sections we will examine the tools we have at our disposal.
 
 <img src="/img/guides/debugging-meme.png"  alt="debugging-meme" width="400"/>
 
+### Controlling Log Verbosity
+
+Use the `VECTOR_LOG` environment variable to control log verbosity:
+
+```shell
+VECTOR_LOG=debug vector --config path/to/config.yaml
+```
+
+You can set different verbosity levels for specific components:
+
+```shell
+VECTOR_LOG=info,vector::sources::aws_s3=warn vector --config path/to/config.yaml
+```
+
+You can find more information on the syntax [here](https://docs.rs/tracing-subscriber/latest/tracing_subscriber/filter/struct.EnvFilter.html#usage-notes).
+
 ### Vector Tools
 
 #### Vector top

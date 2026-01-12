@@ -1,4 +1,4 @@
-use crate::codecs::Transformer;
+use crate::codecs::{Encoder, EncoderKind, Transformer};
 use vector_lib::{
     codecs::{
         CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
@@ -132,11 +132,20 @@ impl EncodingConfigWithFraming {
                 | Serializer::RawMessage(_)
                 | Serializer::Text(_),
             ) => NewlineDelimitedEncoder::default().into(),
+            #[cfg(feature = "codecs-syslog")]
+            (None, Serializer::Syslog(_)) => NewlineDelimitedEncoder::default().into(),
             #[cfg(feature = "codecs-opentelemetry")]
             (None, Serializer::Otlp(_)) => BytesEncoder.into(),
         };
 
         Ok((framer, serializer))
+    }
+
+    /// Build the `Transformer` and `EncoderKind` for this config.
+    pub fn build_encoder(&self, sink_type: SinkType) -> crate::Result<(Transformer, EncoderKind)> {
+        let (framer, serializer) = self.build(sink_type)?;
+        let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(framer, serializer)));
+        Ok((self.transformer(), encoder))
     }
 }
 

@@ -267,6 +267,10 @@ generated: components: sinks: websocket_server: configuration: {
 						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
+					syslog: """
+						Syslog encoding
+						RFC 3164 and 5424 are supported
+						"""
 					text: """
 						Plain text encoding.
 
@@ -449,6 +453,54 @@ generated: components: sinks: websocket_server: configuration: {
 																"""
 						required: false
 						type: bool: default: false
+					}
+				}
+			}
+			syslog: {
+				description:   "Options for the Syslog serializer."
+				relevant_when: "codec = \"syslog\""
+				required:      false
+				type: object: options: {
+					app_name: {
+						description: """
+																Path to a field in the event to use for the app name.
+
+																If not provided, the encoder checks for a semantic "service" field.
+																If that is also missing, it defaults to "vector".
+																"""
+						required: false
+						type: string: {}
+					}
+					facility: {
+						description: "Path to a field in the event to use for the facility. Defaults to \"user\"."
+						required:    false
+						type: string: {}
+					}
+					msg_id: {
+						description: "Path to a field in the event to use for the msg ID."
+						required:    false
+						type: string: {}
+					}
+					proc_id: {
+						description: "Path to a field in the event to use for the proc ID."
+						required:    false
+						type: string: {}
+					}
+					rfc: {
+						description: "RFC to use for formatting."
+						required:    false
+						type: string: {
+							default: "rfc5424"
+							enum: {
+								rfc3164: "The legacy RFC3164 syslog format."
+								rfc5424: "The modern RFC5424 syslog format."
+							}
+						}
+					}
+					severity: {
+						description: "Path to a field in the event to use for the severity. Defaults to \"informational\"."
+						required:    false
+						type: string: {}
 					}
 				}
 			}
@@ -655,16 +707,34 @@ generated: components: sinks: websocket_server: configuration: {
 								description:   "GELF-specific decoding options."
 								relevant_when: "codec = \"gelf\""
 								required:      false
-								type: object: options: lossy: {
-									description: """
+								type: object: options: {
+									lossy: {
+										description: """
 																								Determines whether to replace invalid UTF-8 sequences instead of failing.
 
 																								When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
 																								[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
 																								"""
-									required: false
-									type: bool: default: true
+										required: false
+										type: bool: default: true
+									}
+									validation: {
+										description: "Configures the decoding validation mode."
+										required:    false
+										type: string: {
+											default: "strict"
+											enum: {
+												relaxed: """
+																											Uses more relaxed validation that skips strict GELF specification checks.
+
+																											This mode will not treat specification violations as errors, allowing the decoder
+																											to accept messages from sources that don't strictly follow the GELF spec.
+																											"""
+												strict: "Uses strict validation that closely follows the GELF spec."
+											}
+										}
+									}
 								}
 							}
 							influxdb: {

@@ -54,7 +54,12 @@ fn reduce(c: &mut Criterion) {
                 .iter_batched(
                     || {
                         let reduce = Transform::event_task(
-                            Reduce::new(&param.reduce_config, &Default::default()).unwrap(),
+                            Reduce::new(
+                                &param.reduce_config,
+                                &Default::default(),
+                                &Default::default(),
+                            )
+                            .unwrap(),
                         )
                         .into_task();
                         (Box::new(reduce), Box::pin(param.input.clone()))
