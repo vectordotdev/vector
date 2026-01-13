@@ -1,8 +1,11 @@
 use std::path::PathBuf;
 
-use azure_identity::{ClientAssertionCredentialOptions, ClientSecretCredential, ClientSecretCredentialOptions, TokenCredentialOptions, WorkloadIdentityCredential, WorkloadIdentityCredentialOptions};
 use azure_core::credentials::{AccessToken, TokenCredential, TokenRequestOptions};
 use azure_core::error::{Error, ErrorKind, ResultExt};
+use azure_identity::{
+    ClientAssertionCredentialOptions, ClientSecretCredential, ClientSecretCredentialOptions,
+    TokenCredentialOptions, WorkloadIdentityCredential, WorkloadIdentityCredentialOptions,
+};
 
 const AZURE_TENANT_ID_ENV_KEY: &str = "AZURE_TENANT_ID";
 const AZURE_CLIENT_ID_ENV_KEY: &str = "AZURE_CLIENT_ID";
@@ -43,18 +46,18 @@ impl Default for EnvironmentCredential {
 impl EnvironmentCredential {
     /// Creates a new `EnvironmentCredential`.
     pub fn new(options: TokenCredentialOptions) -> Self {
-        Self {
-            options,
-        }
+        Self { options }
     }
 }
 
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl TokenCredential for EnvironmentCredential {
-    async fn get_token(&self,
-            scopes: &[&str],
-            options: Option<TokenRequestOptions>,) -> azure_core::Result<AccessToken> {
+    async fn get_token(
+        &self,
+        scopes: &[&str],
+        options: Option<TokenRequestOptions>,
+    ) -> azure_core::Result<AccessToken> {
         let tenant_id = std::env::var(AZURE_TENANT_ID_ENV_KEY)
             .with_context(ErrorKind::Credential, || {
                 format!("missing tenant id set in {AZURE_TENANT_ID_ENV_KEY} environment variable")
@@ -67,15 +70,18 @@ impl TokenCredential for EnvironmentCredential {
         let federated_token_file = std::env::var(AZURE_FEDERATED_TOKEN_FILE);
         let client_secret = std::env::var(AZURE_CLIENT_SECRET_ENV_KEY);
 
-       if let Ok(file) = federated_token_file {
-            if let Ok(credential) = WorkloadIdentityCredential::new(
-                Some(WorkloadIdentityCredentialOptions {
-                    credential_options: ClientAssertionCredentialOptions { credential_options: self.options.clone(), ..Default::default() },
+        if let Ok(file) = federated_token_file {
+            if let Ok(credential) =
+                WorkloadIdentityCredential::new(Some(WorkloadIdentityCredentialOptions {
+                    credential_options: ClientAssertionCredentialOptions {
+                        credential_options: self.options.clone(),
+                        ..Default::default()
+                    },
                     client_id: Some(client_id),
                     tenant_id: Some(tenant_id),
                     token_file_path: Some(PathBuf::from(file)),
-                })
-            ) {
+                }))
+            {
                 return credential.get_token(scopes, options).await;
             }
         } else if let Ok(client_secret) = client_secret {
@@ -83,7 +89,9 @@ impl TokenCredential for EnvironmentCredential {
                 &tenant_id,
                 client_id,
                 client_secret.into(),
-                Some(ClientSecretCredentialOptions { credential_options: self.options.clone() })
+                Some(ClientSecretCredentialOptions {
+                    credential_options: self.options.clone(),
+                }),
             ) {
                 return credential.get_token(scopes, options).await;
             }

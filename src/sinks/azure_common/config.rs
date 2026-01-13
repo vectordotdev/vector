@@ -16,7 +16,10 @@ use vector_lib::{
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    sinks::{Healthcheck, util::retries::RetryLogic, azure_common::environment_credentials::EnvironmentCredential},
+    sinks::{
+        Healthcheck, azure_common::environment_credentials::EnvironmentCredential,
+        util::retries::RetryLogic,
+    },
 };
 
 use super::azure_credential_interop::TokenCredentialInterop;
