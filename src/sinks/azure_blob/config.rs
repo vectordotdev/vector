@@ -67,11 +67,7 @@ pub struct AzureBlobSinkConfig {
 
     /// The Azure Blob Storage Account name.
     ///
-    /// Attempts to load credentials for the account in the following ways, in order:
-    ///
-    /// - read from environment variables ([more information][env_cred_docs])
-    /// - looks for a [Managed Identity][managed_ident_docs]
-    /// - uses the `az` CLI tool to get an access token ([more information][az_cli_docs])
+    /// Attempts to load credentials for the account via environment variables ([more information][env_cred_docs])
     ///
     /// Either `connection_string`, or this field, must be specified.
     ///
