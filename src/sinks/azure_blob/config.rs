@@ -71,7 +71,7 @@ pub struct AzureBlobSinkConfig {
     ///
     /// Either `connection_string`, or this field, must be specified.
     ///
-    /// [env_cred_docs]: https://docs.rs/azure_identity/latest/azure_identity/struct.EnvironmentCredential.html
+    /// [env_cred_docs]: https://docs.rs/azure_identity/0.17.0/azure_identity/struct.EnvironmentCredential.html
     #[configurable(metadata(docs::examples = "mylogstorage"))]
     pub storage_account: Option<String>,
 
