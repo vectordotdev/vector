@@ -265,7 +265,7 @@ impl SinkConfig for HttpSinkConfig {
             use Framer::*;
             use Serializer::*;
             match (encoder.serializer(), encoder.framer()) {
-                (RawMessage(_) | Text(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
+                (RawMessage(_) | Text(_) | Influxdb(_), _) => Some(CONTENT_TYPE_TEXT.to_owned()),
                 (Json(_), NewlineDelimited(_)) => Some(CONTENT_TYPE_NDJSON.to_owned()),
                 (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
                     Some(CONTENT_TYPE_JSON.to_owned())

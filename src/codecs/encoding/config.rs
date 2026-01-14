@@ -130,7 +130,8 @@ impl EncodingConfigWithFraming {
                 | Serializer::Logfmt(_)
                 | Serializer::NativeJson(_)
                 | Serializer::RawMessage(_)
-                | Serializer::Text(_),
+                | Serializer::Text(_)
+                | Serializer::Influxdb(_),
             ) => NewlineDelimitedEncoder::default().into(),
             #[cfg(feature = "codecs-syslog")]
             (None, Serializer::Syslog(_)) => NewlineDelimitedEncoder::default().into(),

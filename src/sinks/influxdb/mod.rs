@@ -1,42 +1,17 @@
 pub mod logs;
 pub mod metrics;
 
-use std::collections::HashMap;
-
-use bytes::{BufMut, BytesMut};
-use chrono::{DateTime, Utc};
 use futures::FutureExt;
 use http::{StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
-use vector_lib::{
-    configurable::configurable_component,
-    event::{KeyString, MetricTags},
-    sensitive_string::SensitiveString,
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
+
+pub use vector_lib::codecs::encoding::format::{
+    Field, ProtocolVersion, encode_timestamp, influx_line_protocol,
 };
 
 use crate::http::HttpClient;
-
-pub(in crate::sinks) enum Field {
-    /// string
-    String(String),
-    /// float
-    Float(f64),
-    /// unsigned integer
-    /// Influx can support 64 bit integers if compiled with a flag, see:
-    /// <https://github.com/influxdata/influxdb/issues/7801#issuecomment-466801839>
-    UnsignedInt(u64),
-    /// integer
-    Int(i64),
-    /// boolean
-    Bool(bool),
-}
-
-#[derive(Clone, Copy, Debug)]
-pub(in crate::sinks) enum ProtocolVersion {
-    V1,
-    V2,
-}
 
 #[derive(Debug, Snafu)]
 enum ConfigError {
@@ -229,127 +204,6 @@ fn healthcheck(
     .boxed())
 }
 
-// https://docs.influxdata.com/influxdb/latest/reference/syntax/line-protocol/
-pub(in crate::sinks) fn influx_line_protocol(
-    protocol_version: ProtocolVersion,
-    measurement: &str,
-    tags: Option<MetricTags>,
-    fields: Option<HashMap<KeyString, Field>>,
-    timestamp: i64,
-    line_protocol: &mut BytesMut,
-) -> Result<(), &'static str> {
-    // Fields
-    let unwrapped_fields = fields.unwrap_or_default();
-    // LineProtocol should have a field
-    if unwrapped_fields.is_empty() {
-        return Err("fields must not be empty");
-    }
-
-    encode_string(measurement, line_protocol);
-
-    // Tags are optional
-    let unwrapped_tags = tags.unwrap_or_default();
-    if !unwrapped_tags.is_empty() {
-        line_protocol.put_u8(b',');
-        encode_tags(unwrapped_tags, line_protocol);
-    }
-    line_protocol.put_u8(b' ');
-
-    // Fields
-    encode_fields(protocol_version, unwrapped_fields, line_protocol);
-    line_protocol.put_u8(b' ');
-
-    // Timestamp
-    line_protocol.put_slice(&timestamp.to_string().into_bytes());
-    line_protocol.put_u8(b'\n');
-    Ok(())
-}
-
-fn encode_tags(tags: MetricTags, output: &mut BytesMut) {
-    let original_len = output.len();
-    // `tags` is already sorted
-    for (key, value) in tags.iter_single() {
-        if key.is_empty() || value.is_empty() {
-            continue;
-        }
-        encode_string(key, output);
-        output.put_u8(b'=');
-        encode_string(value, output);
-        output.put_u8(b',');
-    }
-
-    // remove last ','
-    if output.len() > original_len {
-        output.truncate(output.len() - 1);
-    }
-}
-
-fn encode_fields(
-    protocol_version: ProtocolVersion,
-    fields: HashMap<KeyString, Field>,
-    output: &mut BytesMut,
-) {
-    let original_len = output.len();
-    for (key, value) in fields.into_iter() {
-        encode_string(&key, output);
-        output.put_u8(b'=');
-        match value {
-            Field::String(s) => {
-                output.put_u8(b'"');
-                for c in s.chars() {
-                    if "\\\"".contains(c) {
-                        output.put_u8(b'\\');
-                    }
-                    let mut c_buffer: [u8; 4] = [0; 4];
-                    output.put_slice(c.encode_utf8(&mut c_buffer).as_bytes());
-                }
-                output.put_u8(b'"');
-            }
-            Field::Float(f) => output.put_slice(&f.to_string().into_bytes()),
-            Field::UnsignedInt(i) => {
-                output.put_slice(&i.to_string().into_bytes());
-                let c = match protocol_version {
-                    ProtocolVersion::V1 => 'i',
-                    ProtocolVersion::V2 => 'u',
-                };
-                let mut c_buffer: [u8; 4] = [0; 4];
-                output.put_slice(c.encode_utf8(&mut c_buffer).as_bytes());
-            }
-            Field::Int(i) => {
-                output.put_slice(&i.to_string().into_bytes());
-                output.put_u8(b'i');
-            }
-            Field::Bool(b) => {
-                output.put_slice(&b.to_string().into_bytes());
-            }
-        };
-        output.put_u8(b',');
-    }
-
-    // remove last ','
-    if output.len() > original_len {
-        output.truncate(output.len() - 1);
-    }
-}
-
-fn encode_string(key: &str, output: &mut BytesMut) {
-    for c in key.chars() {
-        if "\\, =".contains(c) {
-            output.put_u8(b'\\');
-        }
-        let mut c_buffer: [u8; 4] = [0; 4];
-        output.put_slice(c.encode_utf8(&mut c_buffer).as_bytes());
-    }
-}
-
-pub(in crate::sinks) fn encode_timestamp(timestamp: Option<DateTime<Utc>>) -> i64 {
-    if let Some(ts) = timestamp {
-        ts.timestamp_nanos_opt().unwrap()
-    } else {
-        encode_timestamp(Some(Utc::now()))
-    }
-}
-
 pub(in crate::sinks) fn encode_uri(
     endpoint: &str,
     path: &str,
@@ -382,6 +236,7 @@ pub mod test_util {
     use std::{fs::File, io::Read};
 
     use chrono::{DateTime, SecondsFormat, Timelike, Utc, offset::TimeZone};
+    use vector_lib::event::MetricTags;
     use vector_lib::metric_tags;
 
     use super::*;
@@ -567,8 +422,6 @@ mod tests {
     use serde::{Deserialize, Serialize};
 
     use super::*;
-    use crate::sinks::influxdb::test_util::{assert_fields, tags, ts};
-
     #[derive(Deserialize, Serialize, Debug, Clone, Default)]
     #[serde(deny_unknown_fields)]
     pub struct InfluxDbTestConfig {
@@ -690,151 +543,6 @@ mod tests {
             .healthcheck_uri("http://localhost:9999".to_owned())
             .unwrap();
         assert_eq!("http://localhost:9999/ping", uri.to_string())
-    }
-
-    #[test]
-    fn test_encode_tags() {
-        let mut value = BytesMut::new();
-        encode_tags(tags(), &mut value);
-
-        assert_eq!(value, "normal_tag=value,true_tag=true");
-
-        let tags_to_escape = vec![
-            ("tag".to_owned(), "val=ue".to_owned()),
-            ("name escape".to_owned(), "true".to_owned()),
-            ("value_escape".to_owned(), "value escape".to_owned()),
-            ("a_first_place".to_owned(), "10".to_owned()),
-        ]
-        .into_iter()
-        .collect();
-
-        let mut value = BytesMut::new();
-        encode_tags(tags_to_escape, &mut value);
-        assert_eq!(
-            value,
-            "a_first_place=10,name\\ escape=true,tag=val\\=ue,value_escape=value\\ escape"
-        );
-    }
-
-    #[test]
-    fn tags_order() {
-        let mut value = BytesMut::new();
-        encode_tags(
-            vec![
-                ("a", "value"),
-                ("b", "value"),
-                ("c", "value"),
-                ("d", "value"),
-                ("e", "value"),
-            ]
-            .into_iter()
-            .map(|(k, v)| (k.to_owned(), v.to_owned()))
-            .collect(),
-            &mut value,
-        );
-        assert_eq!(value, "a=value,b=value,c=value,d=value,e=value");
-    }
-
-    #[test]
-    fn test_encode_fields_v1() {
-        let fields = vec![
-            ("field_string".into(), Field::String("string value".into())),
-            (
-                "field_string_escape".into(),
-                Field::String("string\\val\"ue".into()),
-            ),
-            ("field_float".into(), Field::Float(123.45)),
-            ("field_unsigned_int".into(), Field::UnsignedInt(657)),
-            ("field_int".into(), Field::Int(657646)),
-            ("field_bool_true".into(), Field::Bool(true)),
-            ("field_bool_false".into(), Field::Bool(false)),
-            ("escape key".into(), Field::Float(10.0)),
-        ]
-        .into_iter()
-        .collect();
-
-        let mut value = BytesMut::new();
-        encode_fields(ProtocolVersion::V1, fields, &mut value);
-        let value = String::from_utf8(value.freeze().as_ref().to_owned()).unwrap();
-        assert_fields(
-            value,
-            [
-                "escape\\ key=10",
-                "field_float=123.45",
-                "field_string=\"string value\"",
-                "field_string_escape=\"string\\\\val\\\"ue\"",
-                "field_unsigned_int=657i",
-                "field_int=657646i",
-                "field_bool_true=true",
-                "field_bool_false=false",
-            ]
-            .to_vec(),
-        )
-    }
-
-    #[test]
-    fn test_encode_fields() {
-        let fields = vec![
-            ("field_string".into(), Field::String("string value".into())),
-            (
-                "field_string_escape".into(),
-                Field::String("string\\val\"ue".into()),
-            ),
-            ("field_float".into(), Field::Float(123.45)),
-            ("field_unsigned_int".into(), Field::UnsignedInt(657)),
-            ("field_int".into(), Field::Int(657646)),
-            ("field_bool_true".into(), Field::Bool(true)),
-            ("field_bool_false".into(), Field::Bool(false)),
-            ("escape key".into(), Field::Float(10.0)),
-        ]
-        .into_iter()
-        .collect();
-
-        let mut value = BytesMut::new();
-        encode_fields(ProtocolVersion::V2, fields, &mut value);
-        let value = String::from_utf8(value.freeze().as_ref().to_owned()).unwrap();
-        assert_fields(
-            value,
-            [
-                "escape\\ key=10",
-                "field_float=123.45",
-                "field_string=\"string value\"",
-                "field_string_escape=\"string\\\\val\\\"ue\"",
-                "field_unsigned_int=657u",
-                "field_int=657646i",
-                "field_bool_true=true",
-                "field_bool_false=false",
-            ]
-            .to_vec(),
-        )
-    }
-
-    #[test]
-    fn test_encode_string() {
-        let mut value = BytesMut::new();
-        encode_string("measurement_name", &mut value);
-        assert_eq!(value, "measurement_name");
-
-        let mut value = BytesMut::new();
-        encode_string("measurement name", &mut value);
-        assert_eq!(value, "measurement\\ name");
-
-        let mut value = BytesMut::new();
-        encode_string("measurement=name", &mut value);
-        assert_eq!(value, "measurement\\=name");
-
-        let mut value = BytesMut::new();
-        encode_string("measurement,name", &mut value);
-        assert_eq!(value, "measurement\\,name");
-    }
-
-    #[test]
-    fn test_encode_timestamp() {
-        let start = Utc::now()
-            .timestamp_nanos_opt()
-            .expect("Timestamp out of range");
-        assert_eq!(encode_timestamp(Some(ts())), 1542182950000000011);
-        assert!(encode_timestamp(None) >= start)
     }
 
     #[test]
