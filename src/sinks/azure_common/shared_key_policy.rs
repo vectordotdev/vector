@@ -199,6 +199,7 @@ fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> Az
     s.push_str(url.path());
 
     // Canonicalized query: lowercase names, sort by name, join multi-values by comma, each line "name:value\n"
+    // https://learn.microsoft.com/en-us/rest/api/storageservices/authorize-with-shared-key#shared-key-format-for-2009-09-19-and-later
     if url.query().is_some() {
         let mut qp_map: BTreeMap<String, Vec<String>> = BTreeMap::new();
         for (name, value) in url.query_pairs() {
@@ -206,7 +207,6 @@ fn append_canonicalized_resource(s: &mut String, account: &str, url: &Url) -> Az
             qp_map.entry(key_l).or_default().push(value.to_string());
         }
         for (k, mut vals) in qp_map {
-            // Sort values (optional but deterministic)
             vals.sort();
             let mut line = String::new();
             let _ = write!(&mut line, "\n{}:", k);

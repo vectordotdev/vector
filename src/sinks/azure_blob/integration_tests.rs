@@ -79,8 +79,9 @@ async fn azure_blob_insert_lines_into_blob() {
     let blobs = config.list_blobs(blob_prefix).await;
     assert_eq!(blobs.len(), 1);
     assert!(blobs[0].clone().ends_with(".log"));
-    let (content_type, _content_encoding, blob_lines) = config.get_blob(blobs[0].clone()).await;
+    let (content_type, content_encoding, blob_lines) = config.get_blob(blobs[0].clone()).await;
     assert_eq!(content_type, Some(String::from("text/plain")));
+    assert_eq!(content_encoding, None);
     assert_eq!(lines, blob_lines);
 }
 

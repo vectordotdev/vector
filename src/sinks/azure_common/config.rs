@@ -73,7 +73,6 @@ impl RetryLogic for AzureBlobRetryLogic {
 
 #[derive(Debug)]
 pub struct AzureBlobResponse {
-    pub inner: (),
     pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,
 }

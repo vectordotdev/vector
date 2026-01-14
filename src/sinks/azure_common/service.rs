@@ -61,7 +61,6 @@ impl Service<AzureBlobRequest> for AzureBlobService {
                 .map_err(|err| err.into());
 
             result.map(|_resp| AzureBlobResponse {
-                inner: (),
                 events_byte_size: request
                     .request_metadata
                     .into_events_estimated_json_encoded_byte_size(),
