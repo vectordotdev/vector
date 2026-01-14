@@ -14,7 +14,7 @@ use ordered_float::NotNan;
 use serde::Deserialize;
 use vector_lib::{
     configurable::configurable_component,
-    enrichment::{Case, Condition, IndexHandle, Table},
+    enrichment::{Case, Condition, Error, IndexHandle, Table},
 };
 use vrl::value::{ObjectMap, Value};
 
@@ -272,13 +272,13 @@ impl Table for Geoip {
         select: Option<&[String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, String> {
+    ) -> Result<ObjectMap, Error> {
         let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
-            Some(_) => Err("More than 1 row found".to_string()),
-            None => Err("IP not found".to_string()),
+            Some(_) => Err(Error::MoreThanOneRowFound("More than 1 row found".into())),
+            None => Err(Error::NoRowsFound("IP not found".into())),
         }
     }
 
@@ -292,21 +292,25 @@ impl Table for Geoip {
         select: Option<&[String]>,
         _wildcard: Option<&Value>,
         _: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String> {
+    ) -> Result<Vec<ObjectMap>, Error> {
         match condition.first() {
-            Some(_) if condition.len() > 1 => Err("Only one condition is allowed".to_string()),
+            Some(_) if condition.len() > 1 => {
+                Err(Error::InvalidInput("Only one condition is allowed".into()))
+            }
             Some(Condition::Equals { value, .. }) => {
                 let ip = value
                     .to_string_lossy()
                     .parse::<IpAddr>()
-                    .map_err(|_| "Invalid IP address".to_string())?;
+                    .map_err(|_| Error::InvalidInput("Invalid IP address".into()))?;
                 Ok(self
                     .lookup(ip, select)
                     .map(|values| vec![values])
                     .unwrap_or_default())
             }
-            Some(_) => Err("Only equality condition is allowed".to_string()),
-            None => Err("IP condition must be specified".to_string()),
+            Some(_) => Err(Error::InvalidInput(
+                "Only equality condition is allowed".into(),
+            )),
+            None => Err(Error::InvalidInput("IP condition must be specified".into())),
         }
     }
 
@@ -315,11 +319,11 @@ impl Table for Geoip {
     ///
     /// # Errors
     /// Errors if the fields are not in the table.
-    fn add_index(&mut self, _: Case, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn add_index(&mut self, _: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         match fields.len() {
-            0 => Err("IP field is required".to_string()),
+            0 => Err(Error::InvalidInput("IP field is required".into())),
             1 => Ok(IndexHandle(0)),
-            _ => Err("Only one field is allowed".to_string()),
+            _ => Err(Error::InvalidInput("Only one field is allowed".into())),
         }
     }
 

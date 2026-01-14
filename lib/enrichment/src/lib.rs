@@ -46,6 +46,42 @@ pub enum Case {
     Insensitive,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Error {
+    NoRowsFound(String),
+    MoreThanOneRowFound(String),
+    InvalidInput(String),
+    TableError(String),
+}
+
+impl Error {
+    pub fn message(&self) -> String {
+        match self {
+            Error::NoRowsFound(message) => message.clone(),
+            Error::MoreThanOneRowFound(message) => message.clone(),
+            Error::InvalidInput(message) => message.clone(),
+            Error::TableError(message) => message.clone(),
+        }
+    }
+}
+impl std::fmt::Display for Error {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.message())
+    }
+}
+
+impl std::error::Error for Error {}
+
+impl From<Error> for vrl::prelude::ExpressionError {
+    fn from(error: Error) -> Self {
+        vrl::prelude::ExpressionError::Error {
+            message: error.message(),
+            labels: vec![],
+            notes: vec![],
+        }
+    }
+}
+
 /// Enrichment tables represent additional data sources that can be used to enrich the event data
 /// passing through Vector.
 pub trait Table: DynClone {
@@ -61,7 +97,7 @@ pub trait Table: DynClone {
         select: Option<&[String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, String>;
+    ) -> Result<ObjectMap, Error>;
 
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).
@@ -73,14 +109,14 @@ pub trait Table: DynClone {
         select: Option<&[String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String>;
+    ) -> Result<Vec<ObjectMap>, Error>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.
     ///
     /// # Errors
     /// Errors if the fields are not in the table.
-    fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, String>;
+    fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, Error>;
 
     /// Returns a list of the field names that are in each index
     fn index_fields(&self) -> Vec<(Case, Vec<String>)>;

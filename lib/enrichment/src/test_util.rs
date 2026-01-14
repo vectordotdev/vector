@@ -5,7 +5,7 @@ use std::{
 
 use vrl::value::{ObjectMap, Value};
 
-use crate::{Case, Condition, IndexHandle, Table, TableRegistry};
+use crate::{Case, Condition, Error, IndexHandle, Table, TableRegistry};
 
 #[derive(Debug, Clone)]
 pub(crate) struct DummyEnrichmentTable {
@@ -41,7 +41,7 @@ impl Table for DummyEnrichmentTable {
         _select: Option<&[String]>,
         _wildcard: Option<&Value>,
         _index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, String> {
+    ) -> Result<ObjectMap, Error> {
         Ok(self.data.clone())
     }
 
@@ -52,11 +52,11 @@ impl Table for DummyEnrichmentTable {
         _select: Option<&[String]>,
         _wildcard: Option<&Value>,
         _index: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String> {
+    ) -> Result<Vec<ObjectMap>, Error> {
         Ok(vec![self.data.clone()])
     }
 
-    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         let mut indexes = self.indexes.lock().unwrap();
         indexes.push(fields.iter().map(|s| (*s).to_string()).collect());
         Ok(IndexHandle(indexes.len() - 1))

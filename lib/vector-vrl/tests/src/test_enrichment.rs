@@ -13,7 +13,7 @@ impl enrichment::Table for TestEnrichmentTable {
         _select: Option<&[String]>,
         _wildcard: Option<&Value>,
         _index: Option<enrichment::IndexHandle>,
-    ) -> Result<ObjectMap, String> {
+    ) -> Result<ObjectMap, enrichment::Error> {
         let mut result = ObjectMap::new();
         result.insert("id".into(), Value::from(1));
         result.insert("firstname".into(), Value::from("Bob"));
@@ -29,7 +29,7 @@ impl enrichment::Table for TestEnrichmentTable {
         _select: Option<&[String]>,
         _wildcard: Option<&Value>,
         _index: Option<enrichment::IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String> {
+    ) -> Result<Vec<ObjectMap>, enrichment::Error> {
         let mut result1 = ObjectMap::new();
         result1.insert("id".into(), Value::from(1));
         result1.insert("firstname".into(), Value::from("Bob"));
@@ -47,7 +47,7 @@ impl enrichment::Table for TestEnrichmentTable {
         &mut self,
         _case: enrichment::Case,
         _fields: &[&str],
-    ) -> Result<enrichment::IndexHandle, String> {
+    ) -> Result<enrichment::IndexHandle, enrichment::Error> {
         Ok(enrichment::IndexHandle(1))
     }
 
