@@ -72,7 +72,7 @@ jobs:
         # If you modify this list, please also update the `int_tests` job in changes.yml.
         service: [
           "amqp", "appsignal", "axiom", "aws", "azure", "clickhouse", "databend", "datadog-agent",
-          "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "elasticsearch",
+          "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "doris", "elasticsearch",
           "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
           "loki", "mqtt", "mongodb", "nats", "nginx", "odbc-mariadb", "odbc-postgresql", "opentelemetry",
           "postgres", "prometheus", "pulsar", "redis", "webhdfs"

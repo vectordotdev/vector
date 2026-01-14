@@ -92,6 +92,8 @@ on:
         value: ${{ jobs.int_tests.outputs.dnstap }}
       docker-logs:
         value: ${{ jobs.int_tests.outputs.docker-logs }}
+      doris:
+        value: ${{ jobs.int_tests.outputs.doris }}
       elasticsearch:
         value: ${{ jobs.int_tests.outputs.elasticsearch }}
       eventstoredb:
@@ -303,6 +305,7 @@ jobs:
       datadog-traces: ${{ steps.filter.outputs.datadog-traces }}
       dnstap: ${{ steps.filter.outputs.dnstap }}
       docker-logs: ${{ steps.filter.outputs.docker-logs }}
+      doris: ${{ steps.filter.outputs.doris }}
       elasticsearch: ${{ steps.filter.outputs.elasticsearch }}
       eventstoredb: ${{ steps.filter.outputs.eventstoredb }}
       fluent: ${{ steps.filter.outputs.fluent }}
@@ -370,6 +373,7 @@ jobs:
             "datadog-traces": ${{ steps.filter.outputs.datadog-traces }},
             "dnstap": ${{ steps.filter.outputs.dnstap }},
             "docker-logs": ${{ steps.filter.outputs.docker-logs }},
+            "doris": ${{ steps.filter.outputs.doris }},
             "elasticsearch": ${{ steps.filter.outputs.elasticsearch }},
             "eventstoredb": ${{ steps.filter.outputs.eventstoredb }},
             "fluent": ${{ steps.filter.outputs.fluent }},
