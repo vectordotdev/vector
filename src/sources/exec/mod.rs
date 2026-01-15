@@ -673,8 +673,7 @@ fn handle_event(
     log_namespace: LogNamespace,
 ) {
     if let Event::Log(log) = event {
-        log.metadata_mut().set_ingest_timestamp(Utc::now());
-        log_namespace.insert_standard_vector_source_metadata(log, ExecConfig::NAME);
+        log_namespace.insert_standard_vector_source_metadata(log, ExecConfig::NAME, Utc::now());
 
         // Add data stream of stdin or stderr (if needed)
         if let Some(data_stream) = data_stream {

@@ -404,10 +404,10 @@ async fn parse_message(
 
                     let events = events.into_iter().map(|mut event| {
                         if let Event::Log(ref mut log) = event {
-                            log.metadata_mut().set_ingest_timestamp(now);
                             log_namespace.insert_standard_vector_source_metadata(
                                 log,
                                 PulsarSourceConfig::NAME,
+                                now,
                             );
 
                             log_namespace.insert_source_metadata(

@@ -159,10 +159,10 @@ pub(crate) fn decode_log_body(
                             // compute EstimatedJsonSizeOf before enrichment
                             event_bytes_received += log.estimated_json_encoded_size_of();
 
-                            log.metadata_mut().set_ingest_timestamp(now);
                             namespace.insert_standard_vector_source_metadata(
                                 log,
                                 DatadogAgentConfig::NAME,
+                                now,
                             );
 
                             if let Some(k) = &api_key {

@@ -1119,8 +1119,7 @@ fn raw_event(
         );
     }
 
-    log.metadata_mut().set_ingest_timestamp(Utc::now());
-    log_namespace.insert_standard_vector_source_metadata(&mut log, SplunkConfig::NAME);
+    log_namespace.insert_standard_vector_source_metadata(&mut log, SplunkConfig::NAME, Utc::now());
 
     if let Some(batch) = batch {
         log = log.with_batch_notifier(&batch);

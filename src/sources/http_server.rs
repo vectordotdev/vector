@@ -438,7 +438,6 @@ impl HttpSource for SimpleHttpSource {
         for event in events.iter_mut() {
             match event {
                 Event::Log(log) => {
-                    log.metadata_mut().set_ingest_timestamp(now);
                     // add request_path to each event
                     self.log_namespace.insert_source_metadata(
                         SimpleHttpConfig::NAME,
@@ -448,8 +447,11 @@ impl HttpSource for SimpleHttpSource {
                         request_path.to_owned(),
                     );
 
-                    self.log_namespace
-                        .insert_standard_vector_source_metadata(log, SimpleHttpConfig::NAME);
+                    self.log_namespace.insert_standard_vector_source_metadata(
+                        log,
+                        SimpleHttpConfig::NAME,
+                        now,
+                    );
 
                     if let Some(addr) = source_ip {
                         self.log_namespace.insert_source_metadata(

@@ -113,8 +113,7 @@ fn namespaced_timestamp_generator(
         log.insert(timestamp_field.as_str(), Value::from(timestamp));
 
         // We need vector metadata for it to pick up that it is in the Vector namespace.
-        log.metadata_mut().set_ingest_timestamp(Utc::now());
-        LogNamespace::Vector.insert_standard_vector_source_metadata(&mut log, "loki");
+        LogNamespace::Vector.insert_standard_vector_source_metadata(&mut log, "loki", Utc::now());
 
         let schema = schema::Definition::new_with_default_metadata(
             Kind::object(Collection::empty()),

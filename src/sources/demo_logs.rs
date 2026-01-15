@@ -245,9 +245,11 @@ async fn demo_logs_source(
 
                     let events = events.into_iter().map(|mut event| {
                         let log = event.as_mut_log();
-                        log.metadata_mut().set_ingest_timestamp(now);
-                        log_namespace
-                            .insert_standard_vector_source_metadata(log, DemoLogsConfig::NAME);
+                        log_namespace.insert_standard_vector_source_metadata(
+                            log,
+                            DemoLogsConfig::NAME,
+                            now,
+                        );
                         log_namespace.insert_source_metadata(
                             DemoLogsConfig::NAME,
                             log,

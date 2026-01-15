@@ -107,9 +107,11 @@ impl MemorySource {
                                 EventMetadata::default(),
                             ));
                             let log = event.as_mut_log();
-                            log.metadata_mut().set_ingest_timestamp(utc_now);
-                            self.log_namespace
-                                .insert_standard_vector_source_metadata(log, MemoryConfig::NAME);
+                            self.log_namespace.insert_standard_vector_source_metadata(
+                                log,
+                                MemoryConfig::NAME,
+                                utc_now,
+                            );
 
                             Some(event)
                         })
@@ -156,9 +158,11 @@ impl MemorySource {
                         EventMetadata::default(),
                     ));
                     let log = event.as_mut_log();
-                    log.metadata_mut().set_ingest_timestamp(Utc::now());
-                    self.log_namespace
-                        .insert_standard_vector_source_metadata(log, MemoryConfig::NAME);
+                    self.log_namespace.insert_standard_vector_source_metadata(
+                        log,
+                        MemoryConfig::NAME,
+                        Utc::now(),
+                    );
                     Some(event)
                 },
             )

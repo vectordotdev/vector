@@ -276,10 +276,10 @@ pub(super) fn udp(
 
                                 for event in &mut events {
                                     if let Event::Log(log) = event {
-                                        log.metadata_mut().set_ingest_timestamp(now);
                                         log_namespace.insert_standard_vector_source_metadata(
                                             log,
                                             SocketConfig::NAME,
+                                            now,
                                         );
 
                                         let legacy_host_key = config

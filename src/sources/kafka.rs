@@ -1106,8 +1106,11 @@ impl ReceivedMessage {
                     // "timestamp" to be set automatically in legacy namespaces. In legacy
                     // namespaces, the "timestamp" field corresponds to the Kafka message, not the
                     // timestamp when the event was processed.
-                    log_namespace
-                        .insert_standard_vector_source_metadata(log, KafkaSourceConfig::NAME);
+                    log_namespace.insert_standard_vector_source_metadata(
+                        log,
+                        KafkaSourceConfig::NAME,
+                        Utc::now(),
+                    );
                 }
                 LogNamespace::Legacy => {
                     if let Some(source_type_key) = log_schema().source_type_key_target_path() {
