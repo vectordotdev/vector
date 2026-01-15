@@ -10774,6 +10774,7 @@ dependencies = [
  "memchr",
  "once_cell",
  "percent-encoding",
+ "rustls 0.23.23",
  "serde",
  "serde_json",
  "sha2",
@@ -10783,6 +10784,7 @@ dependencies = [
  "tokio-stream",
  "tracing 0.1.41",
  "url",
+ "webpki-roots 0.26.1",
 ]
 
 [[package]]
