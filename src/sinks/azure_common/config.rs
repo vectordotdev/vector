@@ -152,7 +152,7 @@ pub fn build_client(
             let policy = SharedKeyAuthorizationPolicy::new(
                 account_name,
                 account_key,
-                // Use the same version as the generated client defaults
+                // Use an Azurite-supported storage service version
                 String::from("2025-11-05"),
             )
             .map_err(|e| format!("Failed to create SharedKey policy: {e}"))?;
