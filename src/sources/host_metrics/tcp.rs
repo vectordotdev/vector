@@ -243,18 +243,13 @@ async fn fetch_netlink_inet_headers(addr_family: u8) -> Result<Vec<InetResponseH
 
     let mut inet_resp_hdrs = Vec::with_capacity(32); // Pre-allocate with an estimate
 
-    loop {
-        match socket.recv_from_full().await {
-            Ok((receive_buffer, _addr)) => {
-                if receive_buffer.is_empty() {
-                    break;
-                }
-                let done = parse_netlink_messages(&receive_buffer, &mut inet_resp_hdrs)?;
-                if done {
-                    break;
-                }
-            }
-            Err(_) => break,
+    while let Ok((receive_buffer, _addr)) = socket.recv_from_full().await {
+        if receive_buffer.is_empty() {
+            break;
+        }
+        let done = parse_netlink_messages(&receive_buffer, &mut inet_resp_hdrs)?;
+        if done {
+            break;
         }
     }
 
