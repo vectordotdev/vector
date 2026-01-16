@@ -13,31 +13,24 @@ use vector_lib::{
 use vrl::event_path;
 use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
+use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler, ddtrace_proto};
 use crate::{
-    SourceSender,
     common::http::ErrorMessage,
     event::{Event, ObjectMap, TraceEvent, Value},
-    sources::datadog_agent::{
-        ApiKeyQueryParams, DatadogAgentSource, ddtrace_proto, handle_request,
-    },
 };
 
-pub(crate) fn build_warp_filter(
-    acknowledgements: bool,
-    multiple_outputs: bool,
-    out: SourceSender,
+pub(super) fn build_warp_filter(
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
-    build_trace_filter(acknowledgements, multiple_outputs, out, source)
+    build_trace_filter(handler, source)
         .or(build_stats_filter())
         .unify()
         .boxed()
 }
 
 fn build_trace_filter(
-    acknowledgements: bool,
-    multiple_outputs: bool,
-    out: SourceSender,
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
@@ -50,7 +43,7 @@ fn build_trace_filter(
         ))
         .and(warp::query::<ApiKeyQueryParams>())
         .and(warp::body::bytes())
-        .and_then(
+        .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,
                   api_token: Option<String>,
@@ -77,10 +70,9 @@ fn build_trace_filter(
                             )
                         })
                     });
-                let output = multiple_outputs.then_some(super::TRACES);
-                handle_request(events, acknowledgements, out.clone(), output)
-            },
-        )
+                handler.clone().handle_request(events, super::TRACES)
+            }
+        })
         .boxed()
 }
 

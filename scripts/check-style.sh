@@ -83,6 +83,11 @@ for FILE in $FILES; do
     continue
   fi
 
+  # Skip files that don't exist (e.g., deleted in this branch).
+  if [[ ! -f "$FILE" ]]; then
+    continue
+  fi
+
   # check that the file contains trailing newline
   if [ -n "$(tail -c1 "$FILE" | tr -d $'\n')" ]; then
     case "$MODE" in

@@ -25,7 +25,7 @@ remap: functions: mod: {
 		"`modulus` is not an integer or float.",
 		"`modulus` is equal to 0.",
 	]
-	return: types: ["string"]
+	return: types: ["integer", "float"]
 
 	examples: [
 		{

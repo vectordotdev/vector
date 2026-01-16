@@ -2,6 +2,7 @@ mod bytes_received;
 mod bytes_sent;
 pub mod cached_event;
 pub mod component_events_dropped;
+pub mod component_events_timed_out;
 mod events_received;
 mod events_sent;
 mod optional_tag;
@@ -15,6 +16,7 @@ pub use bytes_sent::BytesSent;
 #[allow(clippy::module_name_repetitions)]
 pub use cached_event::{RegisterTaggedInternalEvent, RegisteredEventCache};
 pub use component_events_dropped::{ComponentEventsDropped, INTENTIONAL, UNINTENTIONAL};
+pub use component_events_timed_out::ComponentEventsTimedOut;
 pub use events_received::{EventsReceived, EventsReceivedHandle};
 pub use events_sent::{DEFAULT_OUTPUT, EventsSent, TaggedEventsSent};
 pub use metrics::SharedString;
@@ -24,24 +26,19 @@ pub use service::{CallError, PollReadyError};
 
 use crate::json_size::JsonSize;
 
-pub trait InternalEvent: Sized {
-    fn emit(self);
+pub trait NamedInternalEvent {
+    fn name(&self) -> &'static str;
+}
 
-    // Optional for backwards compat until all events implement this
-    fn name(&self) -> Option<&'static str> {
-        None
-    }
+pub trait InternalEvent: NamedInternalEvent + Sized {
+    fn emit(self);
 }
 
 #[allow(clippy::module_name_repetitions)]
-pub trait RegisterInternalEvent: Sized {
+pub trait RegisterInternalEvent: NamedInternalEvent + Sized {
     type Handle: InternalEventHandle;
 
     fn register(self) -> Self::Handle;
-
-    fn name(&self) -> Option<&'static str> {
-        None
-    }
 }
 
 #[allow(clippy::module_name_repetitions)]
@@ -50,39 +47,9 @@ pub trait InternalEventHandle: Sized {
     fn emit(&self, data: Self::Data);
 }
 
-// Sets the name of an event if it doesn't have one
-pub struct DefaultName<E> {
-    pub name: &'static str,
-    pub event: E,
-}
-
-impl<E: InternalEvent> InternalEvent for DefaultName<E> {
-    fn emit(self) {
-        self.event.emit();
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some(self.event.name().unwrap_or(self.name))
-    }
-}
-
-impl<E: RegisterInternalEvent> RegisterInternalEvent for DefaultName<E> {
-    type Handle = E::Handle;
-
-    fn register(self) -> Self::Handle {
-        self.event.register()
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some(self.event.name().unwrap_or(self.name))
-    }
-}
-
 #[cfg(any(test, feature = "test"))]
 pub fn emit(event: impl InternalEvent) {
-    if let Some(name) = event.name() {
-        super::event_test_util::record_internal_event(name);
-    }
+    super::event_test_util::record_internal_event(event.name());
     event.emit();
 }
 
@@ -93,9 +60,7 @@ pub fn emit(event: impl InternalEvent) {
 
 #[cfg(any(test, feature = "test"))]
 pub fn register<E: RegisterInternalEvent>(event: E) -> E::Handle {
-    if let Some(name) = event.name() {
-        super::event_test_util::record_internal_event(name);
-    }
+    super::event_test_util::record_internal_event(event.name());
     event.register()
 }
 
@@ -195,7 +160,7 @@ impl From<Protocol> for SharedString {
 macro_rules! registered_event {
     // A registered event struct with no fields (zero-sized type).
     ($event:ident => $($tail:tt)*) => {
-        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Debug, Clone, Eq, Hash, $crate::NamedInternalEvent, Ord, PartialEq, PartialOrd)]
         pub struct $event;
 
         $crate::registered_event!(=> $event $($tail)*);
@@ -203,7 +168,7 @@ macro_rules! registered_event {
 
     // A normal registered event struct.
     ($event:ident { $( $field:ident: $type:ty, )* } => $($tail:tt)*) => {
-        #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+        #[derive(Debug, Clone, Eq, Hash, $crate::NamedInternalEvent, Ord, PartialEq, PartialOrd)]
         pub struct $event {
             $( pub $field: $type, )*
         }
@@ -231,10 +196,6 @@ macro_rules! registered_event {
 
             impl $crate::internal_event::RegisterInternalEvent for $event {
                 type Handle = [<$event Handle>];
-
-                fn name(&self) -> Option<&'static str> {
-                    Some(stringify!($event))
-                }
 
                 fn register($slf) -> Self::Handle {
                     Self::Handle {

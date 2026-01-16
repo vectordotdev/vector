@@ -24,14 +24,15 @@ vector-top = { path = "../vector-top", optional = true }
 vrl = { workspace = true, optional = true }
 
 [features]
-api = ["vector-tap/api"]
+allocation-tracing = ["vector-top?/allocation-tracing"]
 api-client = ["dep:vector-api-client"]
-lua = ["vector-core/lua"]
+arrow = ["codecs/arrow"]
+api = ["vector-tap/api"]
 file-source = ["dep:file-source", "dep:file-source-common"]
+lua = ["vector-core/lua"]
 opentelemetry = ["dep:opentelemetry-proto", "codecs/opentelemetry"]
 prometheus = ["dep:prometheus-parser"]
 proptest = ["vector-lookup/proptest", "vrl/proptest"]
 syslog = ["codecs/syslog"]
 test = ["vector-core/test"]
 vrl = ["vector-core/vrl", "dep:vrl"]
-allocation-tracing = ["vector-top?/allocation-tracing"]

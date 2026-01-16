@@ -1778,7 +1778,7 @@ mod integration_test {
         delay: Duration,
         status: EventStatus,
     ) -> (SourceSender, impl Stream<Item = EventArray> + Unpin) {
-        let (pipe, recv) = SourceSender::new_test_sender_with_buffer(100);
+        let (pipe, recv) = SourceSender::new_test_sender_with_options(100, None);
         let recv = recv.into_stream();
         let recv = recv.then(move |item| async move {
             let mut events = item.events;

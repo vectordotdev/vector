@@ -300,7 +300,7 @@ mod tests {
     };
     use crate::{
         sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer},
-        test_util::next_addr,
+        test_util::addr::next_addr,
     };
 
     #[test]
@@ -344,7 +344,7 @@ mod tests {
 
     async fn fetches_nl_net_hdrs() {
         // start a TCP server
-        let next_addr = next_addr();
+        let (_guard, next_addr) = next_addr();
         let listener = TcpListener::bind(next_addr).await.unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
@@ -375,7 +375,7 @@ mod tests {
     }
 
     async fn generates_tcp_metrics() {
-        let next_addr = next_addr();
+        let (_guard, next_addr) = next_addr();
         let _listener = TcpListener::bind(next_addr).await.unwrap();
 
         let mut buffer = MetricsBuffer::new(None);

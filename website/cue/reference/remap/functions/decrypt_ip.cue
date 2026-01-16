@@ -55,7 +55,7 @@ remap: functions: decrypt_ip: {
 		{
 			title: "Decrypt IPv6 address with AES128"
 			source: #"""
-				decrypted_ip = decrypt_ip!("d09e:a5ea:585a:2547:dc6d:65ea:d9f1:d09d", "sixteen byte key", "aes128")
+				decrypted_ip = decrypt_ip!("c0e6:eb35:6887:f554:4c65:8ace:17ca:6c6a", "sixteen byte key", "aes128")
 				decrypted_ip
 				"""#
 			return: "2001:db8::1"
@@ -63,7 +63,7 @@ remap: functions: decrypt_ip: {
 		{
 			title: "Decrypt IPv4 address with prefix-preserving mode"
 			source: #"""
-				decrypted_ip = decrypt_ip!("b51c:3c43:4e89:819e:64ce:225f:d6d1:bf01", "thirty-two bytes key for pfx use", "pfx")
+				decrypted_ip = decrypt_ip!("33.245.248.61", "thirty-two bytes key for pfx use", "pfx")
 				decrypted_ip
 				"""#
 			return: "192.168.1.1"
@@ -81,10 +81,10 @@ remap: functions: decrypt_ip: {
 			source: #"""
 				original_ip = "192.168.1.100"
 				key = "sixteen byte key"
-				
+
 				encrypted = encrypt_ip!(original_ip, key, "aes128")
 				decrypted = decrypt_ip!(encrypted, key, "aes128")
-				
+
 				decrypted == original_ip
 				"""#
 			return: true

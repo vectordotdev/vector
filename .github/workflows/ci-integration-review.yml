@@ -95,6 +95,7 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
+      fail-fast: false
       matrix:
         service: [
           "amqp", "appsignal", "aws", "axiom", "azure", "clickhouse", "databend", "datadog-agent",
@@ -104,7 +105,7 @@ jobs:
           "redis", "splunk", "webhdfs"
         ]
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
@@ -134,12 +135,13 @@ jobs:
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
     strategy:
+      fail-fast: false
       matrix:
         service: [
           "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"
         ]
     steps:
-      - uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}

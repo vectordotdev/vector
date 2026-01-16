@@ -56,7 +56,7 @@ impl Mmdb {
 
         // Check if we can read database with dummy Ip.
         let ip = IpAddr::V4(std::net::Ipv4Addr::UNSPECIFIED);
-        let result = dbreader.lookup::<ObjectMap>(ip).map(|_| ());
+        let result = dbreader.lookup(ip)?.decode::<ObjectMap>().map(|_| ());
 
         match result {
             Ok(_) => Ok(Mmdb {
@@ -69,7 +69,7 @@ impl Mmdb {
     }
 
     fn lookup(&self, ip: IpAddr, select: Option<&[String]>) -> Option<ObjectMap> {
-        let data = self.dbreader.lookup::<ObjectMap>(ip).ok()??;
+        let data = self.dbreader.lookup(ip).ok()?.decode().ok()??;
 
         if let Some(fields) = select {
             let mut filtered = Value::from(ObjectMap::new());

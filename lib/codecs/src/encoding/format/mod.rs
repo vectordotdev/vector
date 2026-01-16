@@ -3,6 +3,8 @@
 
 #![deny(missing_docs)]
 
+#[cfg(feature = "arrow")]
+mod arrow;
 mod avro;
 mod cef;
 mod common;
@@ -16,10 +18,16 @@ mod native_json;
 mod otlp;
 mod protobuf;
 mod raw_message;
+#[cfg(feature = "syslog")]
+mod syslog;
 mod text;
 
 use std::fmt::Debug;
 
+#[cfg(feature = "arrow")]
+pub use arrow::{
+    ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
+};
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};
 use dyn_clone::DynClone;
@@ -32,6 +40,8 @@ pub use native_json::{NativeJsonSerializer, NativeJsonSerializerConfig};
 pub use otlp::{OtlpSerializer, OtlpSerializerConfig};
 pub use protobuf::{ProtobufSerializer, ProtobufSerializerConfig, ProtobufSerializerOptions};
 pub use raw_message::{RawMessageSerializer, RawMessageSerializerConfig};
+#[cfg(feature = "syslog")]
+pub use syslog::{SyslogSerializer, SyslogSerializerConfig};
 pub use text::{TextSerializer, TextSerializerConfig};
 use vector_core::event::Event;
 
