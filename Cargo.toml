@@ -180,7 +180,7 @@ prost-types = { version = "0.12", default-features = false }
 rand = { version = "0.9.2", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
 regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
-reqwest = { version = "0.11.26", features = ["json"] }
+reqwest = { version = "0.12", features = ["json"] }
 rust_decimal = { version = "1.37.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
@@ -209,7 +209,7 @@ serial_test = { version = "3.2" }
 
 [dependencies]
 cfg-if.workspace = true
-reqwest_0_12_24 = { package = "reqwest", version = "0.12.24", features = ["json"] }
+reqwest.workspace = true
 clap.workspace = true
 indoc.workspace = true
 paste.workspace = true
