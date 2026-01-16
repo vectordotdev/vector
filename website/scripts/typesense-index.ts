@@ -110,7 +110,7 @@ async function indexHTMLFiles(
           tagName: node.tagName,
           content: $(node)
             .text()
-            .replace(/[\n\t]/g, " "),
+            .replace(/\t/g, " "),
         });
       }
 
