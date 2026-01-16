@@ -602,8 +602,9 @@ pub fn file_source(
 
         let mut encoding_decoder = encoding_charset.map(Decoder::new);
 
-        // sizing here is just a guess
-        let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(2);
+        // Buffer size needs to be large enough to handle backpressure from downstream
+        // components without blocking the file server's read loop during shutdown.
+        let (tx, rx) = futures::channel::mpsc::channel::<Vec<Line>>(16);
         let rx = rx
             .map(futures::stream::iter)
             .flatten()
@@ -683,17 +684,18 @@ pub fn file_source(
         });
 
         let span = info_span!("file_server");
-        tokio::task::spawn_blocking(move || {
-            let _enter = span.enter();
-            let rt = tokio::runtime::Handle::current();
-            let result =
-                rt.block_on(file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer));
-            emit!(FileOpen { count: 0 });
-            // Panic if we encounter any error originating from the file server.
-            // We're at the `spawn_blocking` call, the panic will be caught and
-            // passed to the `JoinHandle` error, similar to the usual threads.
-            result.expect("file server exited with an error");
-        })
+        tokio::spawn(
+            async move {
+                let result =
+                    file_server.run(tx, shutdown, shutdown_checkpointer, checkpointer).await;
+                emit!(FileOpen { count: 0 });
+                // Panic if we encounter any error originating from the file server.
+                // We're at the `spawn` call, the panic will be caught and
+                // passed to the `JoinHandle` error, similar to the usual threads.
+                result.expect("file server exited with an error");
+            }
+            .instrument(span),
+        )
         .map_err(|error| error!(message="File server unexpectedly stopped.", %error, internal_log_rate_limit = false))
         .await
     })
