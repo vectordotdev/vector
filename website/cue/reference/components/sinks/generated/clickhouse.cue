@@ -263,19 +263,13 @@ generated: components: sinks: clickhouse: configuration: {
 					When disabled (default), missing values for non-nullable fields will cause encoding errors,
 					ensuring all required data is present before sending to the sink.
 					"""
-				required: false
+				relevant_when: "codec = \"arrow_stream\""
+				required:      false
 				type: bool: default: false
 			}
 			codec: {
-				description: """
-					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
-
-					This is the streaming variant of the Arrow IPC format, which writes
-					a continuous stream of record batches.
-
-					[apache_arrow]: https://arrow.apache.org/
-					"""
-				required: true
+				description: "The codec to use for batch encoding events."
+				required:    true
 				type: string: enum: arrow_stream: """
 					Encodes events in [Apache Arrow][apache_arrow] IPC streaming format.
 
