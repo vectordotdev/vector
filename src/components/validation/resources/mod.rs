@@ -175,6 +175,7 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::Vrl { .. } => unimplemented!(),
         #[cfg(feature = "codecs-opentelemetry")]
         DeserializerConfig::Otlp { .. } => SerializerConfig::Otlp,
+        DeserializerConfig::MessagePack => todo!(),
     };
 
     serializer_config

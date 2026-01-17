@@ -51,6 +51,9 @@ vector-config-macros = { path = "../vector-config-macros", default-features = fa
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions.workspace = true
 toml = { version = "0.9.8", optional = true }
+rmp = "0.8.15"
+rmp-serde = "1.3.1"
+
 [dev-dependencies]
 futures.workspace = true
 indoc.workspace = true
