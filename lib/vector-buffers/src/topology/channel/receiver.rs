@@ -14,6 +14,7 @@ use super::limited_queue::LimitedReceiver;
 use crate::{
     Bufferable,
     buffer_usage_data::BufferUsageHandle,
+    internal_events::BufferReadError,
     variants::disk_v2::{self, ProductionFilesystem},
 };
 
@@ -50,13 +51,24 @@ where
             ReceiverAdapter::DiskV2(reader) => loop {
                 match reader.next().await {
                     Ok(result) => break result,
-                    Err(e) => match e.as_recoverable_error() {
-                        Some(re) => {
-                            // If we've hit a recoverable error, we'll emit an event to indicate as much but we'll still
-                            // keep trying to read the next available record.
-                            emit(re);
+                    Err(e) => {
+                        // Emit event for both recoverable and unrecoverable errors.
+                        // The reader has already called roll_to_next_data_file() for bad reads.
+                        match e.as_recoverable_error() {
+                            Some(re) => {
+                                // Corruption, checksum, etc - expected recoverable errors
+                                emit(re);
+                            }
+                            None => {
+                                // I/O errors, empty records - treat as recoverable too.
+                                // Log at ERROR level and continue trying next file.
+                                emit(BufferReadError {
+                                    error_code: e.as_error_code(),
+                                    error: format!("I/O error reading buffer, skipping to next file: {e}"),
+                                });
+                            }
                         }
-                        None => panic!("Reader encountered unrecoverable error: {e:?}"),
+                        // Continue loop - reader has already advanced to next file if needed.
                     },
                 }
             },
