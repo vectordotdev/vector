@@ -75,6 +75,7 @@ pub mod aws;
 #[allow(unreachable_pub)]
 pub mod codecs;
 pub mod common;
+pub mod completion;
 mod convert_config;
 pub mod encoding_transcode;
 pub mod enrichment_tables;
