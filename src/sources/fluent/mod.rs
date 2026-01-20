@@ -483,10 +483,6 @@ impl StreamDecodingError for DecodeError {
             DecodeError::UnexpectedValue(_) => true,
         }
     }
-
-    fn is_io(&self) -> bool {
-        matches!(self, DecodeError::IO(_))
-    }
 }
 
 impl From<io::Error> for DecodeError {

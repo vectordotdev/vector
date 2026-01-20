@@ -75,13 +75,6 @@ impl StreamDecodingError for Error {
             Self::ParsingError(_) => true,
         }
     }
-
-    fn is_io(&self) -> bool {
-        match self {
-            Self::FramingError(error) => error.is_io(),
-            Self::ParsingError(_) => false,
-        }
-    }
 }
 
 /// Framing configuration.
