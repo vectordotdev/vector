@@ -80,3 +80,56 @@ impl<T: AsyncWrite, F> AsyncWrite for AfterRead<T, F> {
         self.project().inner.poll_shutdown(cx)
     }
 }
+
+/// A wrapper around an `AsyncRead` that silently ignores `ConnectionReset`
+/// errors during reads and treats them as EOF (like receiving a FIN).
+#[pin_project]
+pub struct LenientRead<T> {
+    #[pin]
+    inner: T,
+}
+
+impl<T> LenientRead<T> {
+    const fn new(inner: T) -> Self {
+        Self { inner }
+    }
+
+    pub const fn get_ref(&self) -> &T {
+        &self.inner
+    }
+
+    pub const fn get_mut_ref(&mut self) -> &mut T {
+        &mut self.inner
+    }
+}
+
+impl<T: AsyncRead + Unpin> AsyncRead for LenientRead<T> {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        match self.project().inner.poll_read(cx, buf) {
+            Poll::Ready(Err(e)) if e.kind() == io::ErrorKind::ConnectionReset => {
+                // Treat ConnectionReset as EOF (like a FIN)
+                Poll::Ready(Ok(()))
+            }
+            other => other,
+        }
+    }
+}
+
+/// A trait for wrapping an `AsyncRead` that silently ignores `ConnectionReset`
+/// errors during reads and treats them as EOF (like receiving a FIN).
+pub trait LenientReadExt {
+    fn lenient(self) -> LenientRead<Self>
+    where
+        Self: Sized;
+}
+
+impl<T: AsyncRead> LenientReadExt for T {
+    /// Wraps the `AsyncRead` in a `LenientRead` that silently ignores `ConnectionReset`
+    fn lenient(self) -> LenientRead<Self> {
+        LenientRead::new(self)
+    }
+}

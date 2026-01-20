@@ -38,7 +38,7 @@ use crate::{
         TcpSocketTlsConnectionError,
     },
     shutdown::ShutdownSignal,
-    sources::util::AfterReadExt,
+    sources::util::{AfterReadExt, LenientReadExt},
     tcp::TcpKeepaliveConfig,
     tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
@@ -291,7 +291,7 @@ async fn handle_stream<T>(
         .and_then(|stream| stream.ssl().peer_certificate())
         .map(CertificateMetadata::from);
 
-    let reader = FramedRead::new(socket, source.decoder());
+    let reader = FramedRead::new(socket.lenient(), source.decoder());
     let mut reader = ReadyFrames::new(reader);
 
     let connection_close_timeout = OptionFuture::from(
@@ -305,13 +305,13 @@ async fn handle_stream<T>(
         let mut permit = tokio::select! {
             _ = &mut tripwire => break,
             Some(_) = &mut connection_close_timeout  => {
-                if close_socket(reader.get_ref().get_ref().get_ref()) {
+                if close_socket(reader.get_ref().get_ref().get_ref().get_ref()) {
                     break;
                 }
                 None
             },
             _ = &mut shutdown_signal => {
-                if close_socket(reader.get_ref().get_ref().get_ref()) {
+                if close_socket(reader.get_ref().get_ref().get_ref().get_ref()) {
                     break;
                 }
                 None
@@ -328,7 +328,7 @@ async fn handle_stream<T>(
         tokio::select! {
             _ = &mut tripwire => break,
             _ = &mut shutdown_signal => {
-                if close_socket(reader.get_ref().get_ref().get_ref()) {
+                if close_socket(reader.get_ref().get_ref().get_ref().get_ref()) {
                     break;
                 }
             },
@@ -399,7 +399,7 @@ async fn handle_stream<T>(
                                         }
                                 };
                                 if let Some(ack_bytes) = acker.build_ack(ack){
-                                    let stream = reader.get_mut().get_mut();
+                                    let stream = reader.get_mut().get_mut().get_mut_ref();
                                     if let Err(error) = stream.write_all(&ack_bytes).await {
                                         emit!(TcpSendAckError{ error });
                                         break;
