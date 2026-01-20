@@ -76,6 +76,10 @@ impl StreamDecodingError for BoxedFramingError {
     fn can_continue(&self) -> bool {
         self.as_ref().can_continue()
     }
+
+    fn is_io(&self) -> bool {
+        self.as_ref().is_io()
+    }
 }
 
 /// Produce byte frames from a byte stream / byte message.

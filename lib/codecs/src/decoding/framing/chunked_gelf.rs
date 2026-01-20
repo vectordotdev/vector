@@ -286,6 +286,10 @@ impl StreamDecodingError for ChunkedGelfDecoderError {
     fn can_continue(&self) -> bool {
         true
     }
+
+    fn is_io(&self) -> bool {
+        false
+    }
 }
 
 impl FramingError for ChunkedGelfDecoderError {

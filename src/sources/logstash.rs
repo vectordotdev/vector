@@ -351,6 +351,10 @@ impl StreamDecodingError for DecodeError {
             DecompressionFailed { .. } => true,
         }
     }
+
+    fn is_io(&self) -> bool {
+        matches!(self, Self::IO { .. })
+    }
 }
 
 impl From<io::Error> for DecodeError {

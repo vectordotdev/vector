@@ -11,6 +11,11 @@ pub trait StreamDecodingError {
     /// This can occur e.g. when reading the header of a length-delimited codec
     /// failed and it can no longer be determined where the next header starts.
     fn can_continue(&self) -> bool;
+
+    /// Whether the error is an I/O error (e.g disk or network read error) and not a decoding error.
+    ///
+    /// IO errors are expected and should be handled silently.
+    fn is_io(&self) -> bool;
 }
 
 impl StreamDecodingError for LinesCodecError {
@@ -20,10 +25,21 @@ impl StreamDecodingError for LinesCodecError {
             LinesCodecError::Io(error) => error.can_continue(),
         }
     }
+
+    fn is_io(&self) -> bool {
+        match self {
+            LinesCodecError::MaxLineLengthExceeded => false,
+            LinesCodecError::Io(_) => true,
+        }
+    }
 }
 
 impl StreamDecodingError for std::io::Error {
     fn can_continue(&self) -> bool {
         false
+    }
+
+    fn is_io(&self) -> bool {
+        true
     }
 }

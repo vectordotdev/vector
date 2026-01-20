@@ -417,7 +417,10 @@ async fn handle_stream<T>(
                     }
                     Some(Err(error)) => {
                         if !<<T as TcpSource>::Error as StreamDecodingError>::can_continue(&error) {
-                            emit!(DecoderFramingError { error });
+                            if !<<T as TcpSource>::Error as StreamDecodingError>::is_io(&error) {
+                                // This is a decoding error, so we should emit it.
+                                emit!(DecoderFramingError { error });
+                            }
                             break;
                         }
                     }

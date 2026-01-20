@@ -28,6 +28,10 @@ impl StreamDecodingError for VarintFramingError {
             Self::TrailingData => false,
         }
     }
+
+    fn is_io(&self) -> bool {
+        false
+    }
 }
 
 impl FramingError for VarintFramingError {
