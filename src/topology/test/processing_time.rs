@@ -1,3 +1,4 @@
+use std::time::Instant;
 use tokio::{
     sync::oneshot,
     time::{Duration, timeout},
@@ -20,21 +21,22 @@ async fn sink_processing_time_metrics_emitted() {
     let controller = Controller::get().expect("metrics controller");
     controller.reset();
 
-    let event_count = 3;
+    const EVENT_COUNT: usize = 100;
 
     let (mut source_tx, source_config) = basic_source();
     let transform_config = noop_transform();
     let (sink_done_tx, sink_done_rx) = oneshot::channel();
-    let sink_config = completion_sink(event_count, sink_done_tx);
+    let sink_config = completion_sink(EVENT_COUNT, sink_done_tx);
 
     let mut config = Config::builder();
     config.add_source("latency_source", source_config);
     config.add_transform("latency_delay", &["latency_source"], transform_config);
     config.add_sink("latency_sink", &["latency_delay"], sink_config);
 
+    let start_time = Instant::now();
     let (topology, _) = start_topology(config.build().unwrap(), false).await;
 
-    for idx in 0..event_count {
+    for idx in 0..EVENT_COUNT {
         let event = Event::Log(LogEvent::from(format!("payload-{idx}")));
         source_tx.send_event(event).await.unwrap();
     }
@@ -51,6 +53,7 @@ async fn sink_processing_time_metrics_emitted() {
     );
 
     topology.stop().await;
+    let elapsed_time = start_time.elapsed().as_secs_f64();
 
     let metrics = controller.capture_metrics();
     let sink_id = "latency_sink";
@@ -67,7 +70,7 @@ async fn sink_processing_time_metrics_emitted() {
     match histogram.value() {
         MetricValue::AggregatedHistogram { count, .. } => {
             assert_eq!(
-                *count, event_count as u64,
+                *count, EVENT_COUNT as u64,
                 "histogram count should match number of events"
             );
         }
@@ -85,8 +88,12 @@ async fn sink_processing_time_metrics_emitted() {
     match gauge.value() {
         MetricValue::Gauge { value } => {
             assert!(
-                *value >= 0.0,
-                "expected mean latency to be non-negative, got {value}"
+                *value > 0.0,
+                "expected mean latency to be positive, got {value}"
+            );
+            assert!(
+                *value < elapsed_time,
+                "expected mean latency ({value}) to be less than elapsed time ({elapsed_time})"
             );
         }
         other => panic!("expected gauge metric, got {other:?}"),
