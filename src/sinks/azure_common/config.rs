@@ -163,11 +163,11 @@ pub fn build_client(
         }
     }
 
-    // Force Azure SDK to use reqwest_0_12_24 transport to avoid affecting global reqwest
+    // Use reqwest v0.12 since Azure SDK only implements HttpClient for reqwest::Client v0.12.
     options.client_options.transport = Some(azure_core::http::Transport::new(std::sync::Arc::new(
-        reqwest_0_12_24::ClientBuilder::new()
+        reqwest::ClientBuilder::new()
             .build()
-            .map_err(|e| format!("Failed to build reqwest_0_12_24 client: {e}"))?,
+            .map_err(|e| format!("Failed to build reqwest client: {e}"))?,
     )));
     let client =
         BlobContainerClient::from_url(url, None, Some(options)).map_err(|e| format!("{e}"))?;
