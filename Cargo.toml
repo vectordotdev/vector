@@ -288,12 +288,10 @@ aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.30", default-features = false, features = ["reqwest", "hmac_openssl"], optional = true }
-azure_identity = { version = "0.30", default-features = false, optional = true }
+azure_core = { version = "0.30", features = ["reqwest", "hmac_openssl"], optional = true }
 
 # Azure Storage
-azure_storage_blob = { version = "0.7", default-features = false, optional = true }
-
+azure_storage_blob = { version = "0.7", optional = true }
 
 # OpenDAL
 opendal = { version = "0.54", default-features = false, features = ["services-webhdfs"], optional = true }
