@@ -1,17 +1,17 @@
 use bytes::{Bytes, BytesMut};
 use smallvec::SmallVec;
-use vector_lib::{
-    codecs::decoding::{
-        BoxedFramingError, BytesDeserializer, Deserializer, Error, Framer, NewlineDelimitedDecoder,
-        format::Deserializer as _,
-    },
-    config::LogNamespace,
-};
+use vector_common::internal_event::emit;
+use vector_core::{config::LogNamespace, event::Event};
 
 use crate::{
-    event::Event,
+    decoding::format::Deserializer as _,
+    decoding::{
+        BoxedFramingError, BytesDeserializer, Deserializer, Error, Framer, NewlineDelimitedDecoder,
+    },
     internal_events::{DecoderDeserializeError, DecoderFramingError},
 };
+
+type DecodedFrame = (SmallVec<[Event; 1]>, usize);
 
 /// A decoder that can decode structured events from a byte stream / byte
 /// messages.
@@ -60,9 +60,9 @@ impl Decoder {
     fn handle_framing_result(
         &mut self,
         frame: Result<Option<Bytes>, BoxedFramingError>,
-    ) -> Result<Option<(SmallVec<[Event; 1]>, usize)>, Error> {
+    ) -> Result<Option<DecodedFrame>, Error> {
         let frame = frame.map_err(|error| {
-            emit!(DecoderFramingError { error: &error });
+            emit(DecoderFramingError { error: &error });
             Error::FramingError(error)
         })?;
 
@@ -72,7 +72,7 @@ impl Decoder {
     }
 
     /// Parses a frame using the included deserializer, and handles any errors by logging.
-    pub fn deserializer_parse(&self, frame: Bytes) -> Result<(SmallVec<[Event; 1]>, usize), Error> {
+    pub fn deserializer_parse(&self, frame: Bytes) -> Result<DecodedFrame, Error> {
         let byte_size = frame.len();
 
         // Parse structured events from the byte frame.
@@ -80,14 +80,14 @@ impl Decoder {
             .parse(frame, self.log_namespace)
             .map(|events| (events, byte_size))
             .map_err(|error| {
-                emit!(DecoderDeserializeError { error: &error });
+                emit(DecoderDeserializeError { error: &error });
                 Error::ParsingError(error)
             })
     }
 }
 
 impl tokio_util::codec::Decoder for Decoder {
-    type Item = (SmallVec<[Event; 1]>, usize);
+    type Item = DecodedFrame;
     type Error = Error;
 
     fn decode(&mut self, buf: &mut BytesMut) -> Result<Option<Self::Item>, Self::Error> {
@@ -106,13 +106,13 @@ mod tests {
     use bytes::Bytes;
     use futures::{StreamExt, stream};
     use tokio_util::{codec::FramedRead, io::StreamReader};
-    use vector_lib::codecs::{
-        JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
-        decoding::{Deserializer, Framer},
-    };
     use vrl::value::Value;
 
     use super::Decoder;
+    use crate::{
+        JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
+        decoding::{Deserializer, Framer},
+    };
 
     #[tokio::test]
     async fn framed_read_recover_from_error() {

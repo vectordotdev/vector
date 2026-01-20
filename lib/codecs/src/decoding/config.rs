@@ -1,10 +1,7 @@
 use serde::{Deserialize, Serialize};
-use vector_lib::{
-    codecs::decoding::{DeserializerConfig, FramingConfig},
-    config::LogNamespace,
-};
+use vector_core::config::LogNamespace;
 
-use crate::codecs::Decoder;
+use crate::decoding::{Decoder, DeserializerConfig, FramingConfig};
 
 /// Config used to build a `Decoder`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -43,7 +40,7 @@ impl DecodingConfig {
     }
 
     /// Builds a `Decoder` from the provided configuration.
-    pub fn build(&self) -> vector_lib::Result<Decoder> {
+    pub fn build(&self) -> vector_common::Result<Decoder> {
         // Build the framer.
         let framer = self.framing.build();
 
