@@ -78,10 +78,18 @@ impl GelfDeserializerConfig {
             [log_namespace],
         )
         .with_event_field(&owned_value_path!(VERSION), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!(HOST), Kind::bytes(), None)
-        .with_event_field(&owned_value_path!(SHORT_MESSAGE), Kind::bytes(), None)
+        .with_event_field(&owned_value_path!(HOST), Kind::bytes(), Some("host"))
+        .with_event_field(
+            &owned_value_path!(SHORT_MESSAGE),
+            Kind::bytes(),
+            Some("message"),
+        )
         .optional_field(&owned_value_path!(FULL_MESSAGE), Kind::bytes(), None)
-        .optional_field(&owned_value_path!(TIMESTAMP), Kind::timestamp(), None)
+        .optional_field(
+            &owned_value_path!(TIMESTAMP),
+            Kind::timestamp(),
+            Some("timestamp"),
+        )
         .optional_field(&owned_value_path!(LEVEL), Kind::integer(), None)
         .optional_field(&owned_value_path!(FACILITY), Kind::bytes(), None)
         .optional_field(&owned_value_path!(LINE), Kind::integer(), None)
@@ -260,6 +268,7 @@ mod tests {
     use serde_json::json;
     use similar_asserts::assert_eq;
     use smallvec::SmallVec;
+    use std::sync::Arc;
     use vector_core::{config::log_schema, event::Event};
     use vrl::value::Value;
 
@@ -272,7 +281,16 @@ mod tests {
         let config = GelfDeserializerConfig::new(options);
         let deserializer = config.build();
         let buffer = Bytes::from(serde_json::to_vec(&input).unwrap());
-        deserializer.parse(buffer, LogNamespace::Legacy)
+        Ok(deserializer
+            .parse(buffer, LogNamespace::Legacy)?
+            .into_iter()
+            .map(|mut event| {
+                event.metadata_mut().set_schema_definition(&Arc::new(
+                    config.schema_definition(LogNamespace::Legacy),
+                ));
+                event
+            })
+            .collect())
     }
 
     /// Validates all the spec'd fields of GELF are deserialized correctly.
@@ -309,8 +327,19 @@ mod tests {
             log.get(HOST),
             Some(&Value::Bytes(Bytes::from_static(b"example.org")))
         );
+        dbg!(&log);
+        assert_eq!(
+            log.get_by_meaning("host"),
+            Some(&Value::Bytes(Bytes::from_static(b"example.org")))
+        );
         assert_eq!(
             log.get(log_schema().message_key_target_path().unwrap()),
+            Some(&Value::Bytes(Bytes::from_static(
+                b"A short message that helps you identify what is going on"
+            )))
+        );
+        assert_eq!(
+            log.get_by_meaning("message"),
             Some(&Value::Bytes(Bytes::from_static(
                 b"A short message that helps you identify what is going on"
             )))
@@ -323,6 +352,7 @@ mod tests {
         );
         let dt = DateTime::from_timestamp(1385053862, 307_200_000).expect("invalid timestamp");
         assert_eq!(log.get(TIMESTAMP), Some(&Value::Timestamp(dt)));
+        assert_eq!(log.get_by_meaning("timestamp"), Some(&Value::Timestamp(dt)));
         assert_eq!(log.get(LEVEL), Some(&Value::Integer(1)));
         assert_eq!(
             log.get(FACILITY),
