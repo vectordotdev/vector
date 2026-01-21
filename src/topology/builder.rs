@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap,
+    collections::{HashMap, HashSet},
     future::ready,
     num::NonZeroUsize,
     sync::{Arc, LazyLock, Mutex},
@@ -25,16 +25,17 @@ use vector_lib::{
             channel::{BufferReceiver, BufferSender, ChannelMetricMetadata},
         },
     },
-    config::LogNamespace,
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     schema::Definition,
     source_sender::{CHUNK_SIZE, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
+use vector_vrl_metrics::MetricsStorage;
 
 use super::{
     BuiltBuffer, ConfigDiff,
     fanout::{self, Fanout},
+    processing_time::ProcessingTimeRecorder,
     schema,
     task::{Task, TaskOutput, TaskResult},
 };
@@ -56,6 +57,7 @@ use crate::{
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
     LazyLock::new(vector_lib::enrichment::TableRegistry::default);
+static METRICS_STORAGE: LazyLock<MetricsStorage> = LazyLock::new(MetricsStorage::default);
 
 pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
     LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
@@ -141,6 +143,7 @@ impl<'a> Builder<'a> {
                 healthchecks: self.healthchecks,
                 shutdown_coordinator: self.shutdown_coordinator,
                 detach_triggers: self.detach_triggers,
+                metrics_storage: METRICS_STORAGE.clone(),
                 utilization: self
                     .utilization_emitter
                     .map(|e| (e, self.utilization_registry)),
@@ -263,7 +266,8 @@ impl<'a> Builder<'a> {
 
             let mut builder = SourceSender::builder()
                 .with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
-                .with_timeout(source.inner.send_timeout());
+                .with_timeout(source.inner.send_timeout())
+                .with_ewma_alpha(self.config.global.buffer_utilization_ewma_alpha);
             let mut pumps = Vec::new();
             let mut controls = HashMap::new();
             let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -354,6 +358,7 @@ impl<'a> Builder<'a> {
                 key: key.clone(),
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 shutdown: shutdown_signal,
                 out: builder.build(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, &source.proxy),
@@ -477,9 +482,13 @@ impl<'a> Builder<'a> {
             let schema_definitions = transform
                 .inner
                 .outputs(
-                    enrichment_tables.clone(),
+                    &TransformContext {
+                        enrichment_tables: enrichment_tables.clone(),
+                        metrics_storage: METRICS_STORAGE.clone(),
+                        schema: self.config.schema,
+                        ..Default::default()
+                    },
                     &input_definitions,
-                    self.config.schema.log_namespace(),
                 )
                 .into_iter()
                 .map(|output| {
@@ -492,19 +501,15 @@ impl<'a> Builder<'a> {
                 key: Some(key.clone()),
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 schema_definitions,
                 merged_schema_definition: merged_definition.clone(),
                 schema: self.config.schema,
                 extra_context: self.extra_context.clone(),
             };
 
-            let node = TransformNode::from_parts(
-                key.clone(),
-                enrichment_tables.clone(),
-                transform,
-                &input_definitions,
-                self.config.schema.log_namespace(),
-            );
+            let node =
+                TransformNode::from_parts(key.clone(), &context, transform, &input_definitions);
 
             let transform = match transform
                 .inner
@@ -525,6 +530,7 @@ impl<'a> Builder<'a> {
                 WhenFull::Block,
                 &span,
                 Some(metrics),
+                self.config.global.buffer_utilization_ewma_alpha,
             );
 
             self.inputs
@@ -535,6 +541,31 @@ impl<'a> Builder<'a> {
 
             self.outputs.extend(transform_outputs);
             self.tasks.insert(key.clone(), transform_task);
+        }
+    }
+
+    fn source_component_keys(&self, sink_key: &ComponentKey) -> Vec<ComponentKey> {
+        let mut sources = Vec::new();
+        self.collect_source_component_keys(sink_key, &mut sources, &mut HashSet::new());
+        sources
+    }
+
+    fn collect_source_component_keys(
+        &self,
+        component: &ComponentKey,
+        sources: &mut Vec<ComponentKey>,
+        visited: &mut HashSet<ComponentKey>,
+    ) {
+        if visited.insert(component.clone()) {
+            if self.config.source(component).is_some()
+                || self.config.enrichment_table(component).is_some()
+            {
+                sources.push(component.clone());
+            } else if let Some(inputs) = self.config.inputs_for_node(component) {
+                for input in inputs {
+                    self.collect_source_component_keys(&input.component, sources, visited);
+                }
+            }
         }
     }
 
@@ -566,6 +597,15 @@ impl<'a> Builder<'a> {
             let typetag = sink.inner.get_component_name();
             let input_type = sink.inner.input().data_type();
 
+            // We need to create the processing time recorder before the span is entered, otherwise
+            // the metrics will be created with additional labels (i.e. `component_id`
+            // `component_kind` and `component_type`) that are not required for these metrics.
+            let processing_time_recorder = ProcessingTimeRecorder::new(
+                key,
+                self.source_component_keys(key),
+                self.config.global.processing_time_ewma_alpha,
+            );
+
             let span = error_span!(
                 "sink",
                 component_kind = "sink",
@@ -586,7 +626,7 @@ impl<'a> Builder<'a> {
                 self.errors.append(&mut err);
             };
 
-            let (tx, rx) = match self.buffers.remove(key) {
+            let (mut tx, rx) = match self.buffers.remove(key) {
                 Some(buffer) => buffer,
                 _ => {
                     let buffer_type =
@@ -613,10 +653,13 @@ impl<'a> Builder<'a> {
                 }
             };
 
+            tx.with_custom_instrumentation(processing_time_recorder);
+
             let cx = SinkContext {
                 healthcheck,
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
                 schema: self.config.schema,
                 app_name: crate::get_app_name().to_string(),
@@ -779,6 +822,7 @@ pub struct TopologyPieces {
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
+    pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
 }
 
@@ -918,21 +962,16 @@ struct TransformNode {
 impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        context: &TransformContext,
         transform: &TransformOuter<OutputId>,
         schema_definition: &[(OutputId, Definition)],
-        global_log_namespace: LogNamespace,
     ) -> Self {
         Self {
             key,
             typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
-            outputs: transform.inner.outputs(
-                enrichment_tables,
-                schema_definition,
-                global_log_namespace,
-            ),
+            outputs: transform.inner.outputs(context, schema_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
         }
     }

@@ -5,7 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use futures::{Stream, StreamExt as _};
 use metrics::Histogram;
 use tracing::Span;
@@ -115,10 +115,11 @@ impl Output {
         log_definition: Option<Arc<Definition>>,
         output_id: OutputId,
         timeout: Option<Duration>,
+        ewma_alpha: Option<f64>,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap());
         let metrics = ChannelMetricMetadata::new(UTILIZATION_METRIC_PREFIX, Some(output.clone()));
-        let (tx, rx) = channel::limited(limit, Some(metrics));
+        let (tx, rx) = channel::limited(limit, Some(metrics), ewma_alpha);
         (
             Self {
                 sender: tx,
@@ -134,13 +135,25 @@ impl Output {
         )
     }
 
+    /// Set the ingest timestamp for any events that don't already have one.
+    fn ensure_ingest_timestamp(events: &mut EventArray, now: DateTime<Utc>) {
+        events.iter_events_mut().for_each(|mut event| {
+            if event.metadata().ingest_timestamp().is_none() {
+                event.metadata_mut().set_ingest_timestamp(now);
+            }
+        });
+    }
+
     pub(super) async fn send(
         &mut self,
         mut events: EventArray,
         unsent_event_count: &mut UnsentEventCount,
     ) -> Result<(), SendError> {
+        let now = Utc::now();
+        Self::ensure_ingest_timestamp(&mut events, now);
+
         let send_reference = Instant::now();
-        let reference = Utc::now().timestamp_millis();
+        let reference = now.timestamp_millis();
         events
             .iter_events()
             .for_each(|event| self.emit_lag_time(event, reference));

@@ -183,15 +183,6 @@ fn headers_examples() -> HashMap<String, Vec<String>> {
     ])
 }
 
-/// Helper function to get all VRL functions for compilation
-fn get_vrl_functions() -> Vec<Box<dyn Function>> {
-    vrl::stdlib::all()
-        .into_iter()
-        .chain(vector_lib::enrichment::vrl_functions())
-        .chain(vector_vrl_functions::all())
-        .collect()
-}
-
 /// Helper function to compile a VRL parameter value into a Program
 fn compile_parameter_vrl(
     param: &ParameterValue,
@@ -274,7 +265,7 @@ pub struct Query {
 
 impl Query {
     pub fn new(params: &HashMap<String, QueryParameterValue>) -> Result<Self, sources::BuildError> {
-        let functions = get_vrl_functions();
+        let functions = vector_vrl_functions::all();
 
         let mut compiled: HashMap<String, CompiledQueryParameterValue> = HashMap::new();
 
@@ -330,7 +321,7 @@ impl Query {
 impl SourceConfig for HttpClientConfig {
     async fn build(&self, cx: SourceContext) -> crate::Result<sources::Source> {
         let query = Query::new(&self.query)?;
-        let functions = get_vrl_functions();
+        let functions = vector_vrl_functions::all();
 
         // Compile body if present
         let body = self
@@ -447,7 +438,7 @@ impl HttpClientContext {
                 }
                 Ok(None) => break,
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

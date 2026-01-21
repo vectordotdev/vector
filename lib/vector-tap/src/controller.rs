@@ -361,6 +361,7 @@ async fn tap_handler(
                                 WhenFull::DropNewest,
                                 &Span::current(),
                                 None,
+                                None,
                             );
                             let mut tap_transformer = TapTransformer::new(tx.clone(), output.clone());
 

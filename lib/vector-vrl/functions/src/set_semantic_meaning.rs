@@ -9,6 +9,8 @@ use vrl::{
     prelude::*,
 };
 
+use indoc::indoc;
+
 #[derive(Debug, Default, Clone)]
 pub struct MeaningList(pub BTreeMap<String, OwnedTargetPath>);
 
@@ -32,6 +34,16 @@ pub struct SetSemanticMeaning;
 impl Function for SetSemanticMeaning {
     fn identifier(&self) -> &'static str {
         "set_semantic_meaning"
+    }
+
+    fn usage(&self) -> &'static str {
+        indoc! {"
+            Sets a semantic meaning for an event. **Note**: This function assigns
+            meaning at startup, and has _no_ runtime behavior. It is suggested
+            to put all calls to this function at the beginning of a VRL function. The function
+            cannot be conditionally called. For example, using an if statement cannot stop the meaning
+            from being assigned.
+        "}
     }
 
     fn parameters(&self) -> &'static [Parameter] {

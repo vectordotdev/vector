@@ -3,7 +3,6 @@ use std::{collections::HashMap, num::ParseFloatError, sync::Arc};
 use chrono::Utc;
 use indexmap::IndexMap;
 use vector_lib::{
-    config::LogNamespace,
     configurable::configurable_component,
     event::{
         DatadogMetricOriginMetadata, LogEvent,
@@ -213,9 +212,8 @@ impl TransformConfig for LogToMetricConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         _: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         // Converting the log to a metric means we lose all incoming `Definition`s.
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]

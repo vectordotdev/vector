@@ -132,11 +132,13 @@ members = [
   "lib/vector-vrl/functions",
   "lib/vector-vrl/tests",
   "lib/vector-vrl/web-playground",
+  "lib/vector-vrl-metrics",
   "vdev",
 ]
 
 [workspace.dependencies]
 anyhow = { version = "1.0.99", default-features = false, features = ["std"] }
+arc-swap = { version = "1.7.1", default-features = false }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
@@ -144,8 +146,10 @@ bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.3", default-features = false }
 chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"] }
-clap = { version = "4.5.48", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.53", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap_complete = "4.5.65"
 colored = { version = "3.0.0", default-features = false }
+const-str = { version = "1.0.0", default-features = false }
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
@@ -179,7 +183,7 @@ rand = { version = "0.9.2", default-features = false, features = ["small_rng", "
 rand_distr = { version = "0.5.1", default-features = false }
 regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
 reqwest = { version = "0.11.26", features = ["json"] }
-rust_decimal = { version = "1.33", default-features = false, features = ["std"] }
+rust_decimal = { version = "1.37.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
 serde_json = { version = "1.0.143", default-features = false, features = ["raw_value", "std"] }
@@ -200,6 +204,7 @@ vector-config-common = { path = "lib/vector-config-common" }
 vector-config-macros = { path = "lib/vector-config-macros" }
 vector-common-macros = { path = "lib/vector-common-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
+vector-vrl-functions = { path = "lib/vector-vrl/functions" }
 vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
 mock_instant = { version = "0.6" }
 serial_test = { version = "3.2" }
@@ -207,6 +212,8 @@ serial_test = { version = "3.2" }
 [dependencies]
 cfg-if.workspace = true
 clap.workspace = true
+clap_complete.workspace = true
+dashmap.workspace = true
 indoc.workspace = true
 paste.workspace = true
 pin-project.workspace = true
@@ -227,7 +234,8 @@ vector-lib.workspace = true
 vector-config.workspace = true
 vector-config-common.workspace = true
 vector-config-macros.workspace = true
-vector-vrl-functions = { path = "lib/vector-vrl/functions" }
+vector-vrl-functions = { workspace = true, features = ["vrl-metrics"] }
+vector-vrl-metrics = { path = "lib/vector-vrl-metrics" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
@@ -337,10 +345,11 @@ hex = { version = "0.4.3", default-features = false, optional = true }
 greptimedb-ingester = { git = "https://github.com/GreptimeTeam/greptimedb-ingester-rust", rev = "f7243393808640f5123b0d5b7b798da591a4df6e", optional = true }
 
 # External libs
-arc-swap = { version = "1.7", default-features = false, optional = true }
+arc-swap = { workspace = true, default-features = false, optional = true }
 async-compression = { version = "0.4.27", default-features = false, features = ["tokio", "gzip", "zstd"], optional = true }
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
+arrow-schema = { version = "56.2.0", default-features = false, optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { workspace = true, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
@@ -384,7 +393,7 @@ itertools.workspace = true
 k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26"], optional = true }
 kube = { version = "0.93.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
-lru = { version = "0.16.0", default-features = false }
+lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.3.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
@@ -411,7 +420,7 @@ seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
 socket2.workspace = true
-sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional = true }
+sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio", "tls-rustls-ring"], optional = true }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
@@ -583,7 +592,7 @@ enrichment-tables-mmdb = ["dep:maxminddb"]
 enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
-codecs-arrow = ["vector-lib/arrow"]
+codecs-arrow = ["dep:arrow", "dep:arrow-schema", "vector-lib/arrow"]
 codecs-opentelemetry = ["vector-lib/opentelemetry"]
 codecs-syslog = ["vector-lib/syslog"]
 
@@ -653,7 +662,7 @@ sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-co
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sources-datadog_agent = ["sources-utils-http-encoding", "protobuf-build", "dep:prost"]
 sources-demo_logs = ["dep:fakedata"]
-sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "dep:dnstap-parser", "protobuf-build", "dep:prost"]
+sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "dep:dnstap-parser", "protobuf-build", "dep:prost", "vector-vrl-functions/dnstap"]
 sources-docker_logs = ["docker"]
 sources-eventstoredb_metrics = []
 sources-exec = []
@@ -791,6 +800,7 @@ sinks-logs = [
   "sinks-datadog_events",
   "sinks-datadog_logs",
   "sinks-datadog_traces",
+  "sinks-doris",
   "sinks-elasticsearch",
   "sinks-file",
   "sinks-gcp",
@@ -851,13 +861,14 @@ sinks-azure_blob = ["dep:azure_core", "dep:azure_identity", "dep:azure_storage",
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
-sinks-clickhouse = []
+sinks-clickhouse = ["dep:rust_decimal", "codecs-arrow"]
 sinks-console = []
 sinks-databend = ["dep:databend-client"]
 sinks-datadog_events = []
 sinks-datadog_logs = []
 sinks-datadog_metrics = ["protobuf-build", "dep:prost", "dep:prost-reflect"]
 sinks-datadog_traces = ["protobuf-build", "dep:prost", "dep:rmpv", "dep:rmp-serde", "dep:serde_bytes"]
+sinks-doris = ["sqlx/mysql"]
 sinks-elasticsearch = ["transforms-metric_to_log"]
 sinks-file = ["dep:async-compression"]
 sinks-gcp = ["sinks-gcp-chronicle", "dep:base64", "gcp"]
@@ -911,6 +922,7 @@ all-integration-tests = [
   "datadog-traces-integration-tests",
   "dnstap-integration-tests",
   "docker-logs-integration-tests",
+  "doris-integration-tests",
   "es-integration-tests",
   "eventstoredb_metrics-integration-tests",
   "fluent-integration-tests",
@@ -976,6 +988,7 @@ datadog-logs-integration-tests = ["sinks-datadog_logs"]
 datadog-metrics-integration-tests = ["sinks-datadog_metrics", "dep:prost"]
 datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_traces", "axum/tokio"]
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
+doris-integration-tests = ["sinks-doris"]
 es-integration-tests = ["sinks-elasticsearch", "aws-core"]
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
 fluent-integration-tests = ["docker", "sources-fluent"]
