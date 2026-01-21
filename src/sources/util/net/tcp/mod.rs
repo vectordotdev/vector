@@ -14,7 +14,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     time::sleep,
 };
-use tokio_util::codec::{Decoder, FramedRead};
+use tokio_util::codec::Decoder;
 use tracing::Instrument;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -39,7 +39,7 @@ use crate::{
         SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
         TcpSocketTlsConnectionError,
     },
-    sources::util::{AfterReadExt, LenientRead},
+    sources::util::{AfterReadExt, LenientFramedRead},
 };
 
 pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
@@ -290,7 +290,8 @@ async fn handle_stream<T>(
         .and_then(|stream| stream.ssl().peer_certificate())
         .map(CertificateMetadata::from);
 
-    let reader = FramedRead::new(LenientRead::new(socket), source.decoder());
+    let reader = LenientFramedRead::new(socket, source.decoder());
+
     let mut reader = ReadyFrames::new(reader);
 
     let connection_close_timeout = OptionFuture::from(
@@ -304,13 +305,13 @@ async fn handle_stream<T>(
         let mut permit = tokio::select! {
             _ = &mut tripwire => break,
             Some(_) = &mut connection_close_timeout  => {
-                if close_socket(reader.get_ref().get_ref().get_ref().get_ref()) {
+                if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;
                 }
                 None
             },
             _ = &mut shutdown_signal => {
-                if close_socket(reader.get_ref().get_ref().get_ref().get_ref()) {
+                if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;
                 }
                 None
@@ -327,7 +328,7 @@ async fn handle_stream<T>(
         tokio::select! {
             _ = &mut tripwire => break,
             _ = &mut shutdown_signal => {
-                if close_socket(reader.get_ref().get_ref().get_ref().get_ref()) {
+                if close_socket(reader.get_ref().get_ref().get_ref()) {
                     break;
                 }
             },
@@ -398,7 +399,7 @@ async fn handle_stream<T>(
                                         }
                                 };
                                 if let Some(ack_bytes) = acker.build_ack(ack){
-                                    let stream = reader.get_mut().get_mut().get_mut();
+                                    let stream = reader.get_mut().get_mut();
                                     if let Err(error) = stream.write_all(&ack_bytes).await {
                                         emit!(TcpSendAckError{ error });
                                         break;

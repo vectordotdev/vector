@@ -53,7 +53,7 @@ pub use unix::change_socket_permissions;
 pub use unix_datagram::build_unix_datagram_source;
 #[cfg(all(unix, feature = "sources-utils-net-unix",))]
 pub use unix_stream::build_unix_stream_source;
-pub use wrappers::{AfterRead, AfterReadExt, LenientRead};
+pub use wrappers::{AfterRead, AfterReadExt, LenientFramedRead};
 
 #[cfg(feature = "sources-http_server")]
 pub use self::body_decoding::Encoding;
