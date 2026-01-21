@@ -18,29 +18,28 @@ use tokio_util::codec::{Decoder, FramedRead};
 use tracing::Instrument;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::StreamDecodingError,
+    codecs::{ReadyFrames, StreamDecodingError, internal_events::DecoderFramingError},
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    event::{BatchNotifier, BatchStatus, Event},
     finalization::AddBatchNotifier,
     lookup::{OwnedValuePath, path},
+    shutdown::ShutdownSignal,
+    source_sender::SourceSender,
+    tcp::TcpKeepaliveConfig,
+    tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 use vrl::value::ObjectMap;
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
 use crate::{
-    SourceSender,
-    codecs::ReadyFrames,
     config::SourceContext,
-    event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
-        ConnectionOpen, DecoderFramingError, OpenGauge, SocketBindError, SocketEventsReceived,
-        SocketMode, SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
+        ConnectionOpen, OpenGauge, SocketBindError, SocketEventsReceived, SocketMode,
+        SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
         TcpSocketTlsConnectionError,
     },
-    shutdown::ShutdownSignal,
     sources::util::{AfterReadExt, LenientRead},
-    tcp::TcpKeepaliveConfig,
-    tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 
 pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
