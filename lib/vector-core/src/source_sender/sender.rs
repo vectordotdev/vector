@@ -119,6 +119,7 @@ impl SourceSender {
             None,
             output_id,
             timeout,
+            None,
         );
         (
             Self {
@@ -192,7 +193,7 @@ impl SourceSender {
             port: Some(name.clone()),
         };
         let (output, recv) =
-            Output::new_with_buffer(100, name.clone(), None, None, output_id, None);
+            Output::new_with_buffer(100, name.clone(), None, None, output_id, None, None);
         let recv = recv.into_stream().map(move |mut item| {
             item.events.iter_events_mut().for_each(|mut event| {
                 let metadata = event.metadata_mut();

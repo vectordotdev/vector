@@ -7,6 +7,7 @@ pub use limited_queue::{
 };
 pub use receiver::*;
 pub use sender::*;
+pub use vector_common::stats::DEFAULT_EWMA_ALPHA;
 
 #[cfg(test)]
 mod tests;

@@ -68,8 +68,8 @@ When possible, Vector will error at start-up when a removed configuration option
 
 When introducing a deprecation into Vector, the pull request introducing the deprecation should:
 
-- Add a note to the Deprecations section of the upgrade guide for the next release with a description and
-  directions for transitioning if applicable.
+- Add a note to the Deprecations section of the upgrade guide in `website/content/en/highlights` for
+  the next release with a description and directions for transitioning if applicable.
 - Copy the same note from the previous step, to a changelog fragment, with type="deprecation". See the changelog
   fragment [README.md](../changelog.d/README.md) for details.
 - Add a deprecation note to the docs. Typically, this means adding `deprecation: "description of the deprecation"`
@@ -80,7 +80,7 @@ When introducing a deprecation into Vector, the pull request introducing the dep
   the new name will be appended with the text `(formerly OldName)`.
 - Add a log message to Vector that is logged at the `WARN` level starting with the word `DEPRECATION` if Vector detects
   the deprecated configuration or feature being used (when possible).
-- Add the deprecation to [DEPRECATIONS.md](DEPRECATIONS.md) to track migration (if applicable) and removal
+- Add the deprecation to [docs/DEPRECATIONS.md](../docs/DEPRECATIONS.md) to track migration (if applicable) and removal
 
 When removing a deprecation in a subsequent release, the pull request should:
 
@@ -90,4 +90,4 @@ When removing a deprecation in a subsequent release, the pull request should:
   for transitioning if applicable.
 - Copy the same note from the previous step, to a changelog fragment, with type="breaking". See the changelog
   fragment [README.md](../changelog.d/README.md) for details.
-- Remove the deprecation from [DEPRECATIONS.md](DEPRECATIONS.md)
+- Remove the deprecation from [docs/DEPRECATIONS.md](../docs/DEPRECATIONS.md)
