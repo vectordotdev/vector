@@ -38,7 +38,7 @@ use crate::{
         TcpSocketTlsConnectionError,
     },
     shutdown::ShutdownSignal,
-    sources::util::{AfterReadExt, LenientReadExt},
+    sources::util::{AfterReadExt, LenientRead},
     tcp::TcpKeepaliveConfig,
     tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
@@ -291,7 +291,7 @@ async fn handle_stream<T>(
         .and_then(|stream| stream.ssl().peer_certificate())
         .map(CertificateMetadata::from);
 
-    let reader = FramedRead::new(socket.lenient(), source.decoder());
+    let reader = FramedRead::new(LenientRead::new(socket), source.decoder());
     let mut reader = ReadyFrames::new(reader);
 
     let connection_close_timeout = OptionFuture::from(
@@ -399,7 +399,7 @@ async fn handle_stream<T>(
                                         }
                                 };
                                 if let Some(ack_bytes) = acker.build_ack(ack){
-                                    let stream = reader.get_mut().get_mut().get_mut_ref();
+                                    let stream = reader.get_mut().get_mut().get_mut();
                                     if let Err(error) = stream.write_all(&ack_bytes).await {
                                         emit!(TcpSendAckError{ error });
                                         break;

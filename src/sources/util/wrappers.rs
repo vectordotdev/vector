@@ -90,7 +90,7 @@ pub struct LenientRead<T> {
 }
 
 impl<T> LenientRead<T> {
-    const fn new(inner: T) -> Self {
+    pub const fn new(inner: T) -> Self {
         Self { inner }
     }
 
@@ -98,7 +98,7 @@ impl<T> LenientRead<T> {
         &self.inner
     }
 
-    pub const fn get_mut_ref(&mut self) -> &mut T {
+    pub const fn get_mut(&mut self) -> &mut T {
         &mut self.inner
     }
 }
@@ -116,20 +116,5 @@ impl<T: AsyncRead + Unpin> AsyncRead for LenientRead<T> {
             }
             other => other,
         }
-    }
-}
-
-/// A trait for wrapping an `AsyncRead` that silently ignores `ConnectionReset`
-/// errors during reads and treats them as EOF (like receiving a FIN).
-pub trait LenientReadExt {
-    fn lenient(self) -> LenientRead<Self>
-    where
-        Self: Sized;
-}
-
-impl<T: AsyncRead> LenientReadExt for T {
-    /// Wraps the `AsyncRead` in a `LenientRead` that silently ignores `ConnectionReset`
-    fn lenient(self) -> LenientRead<Self> {
-        LenientRead::new(self)
     }
 }
