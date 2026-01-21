@@ -235,6 +235,8 @@ urls: {
 	github:                                     "https://github.com"
 	github_protected_branches:                  "https://help.github.com/en/github/administering-a-repository/about-protected-branches"
 	github_sign_commits:                        "https://help.github.com/en/github/authenticating-to-github/signing-commits"
+	glob_crate:                                 "https://crates.io/crates/glob"
+	glob_crate_pattern:                         "https://docs.rs/glob/latest/glob/struct.Pattern.html"
 	globbing:                                   "\(wikipedia)/wiki/Glob_(programming)"
 	glog:                                       "\(github)/google/glog"
 	graphql:                                    "https://graphql.org"

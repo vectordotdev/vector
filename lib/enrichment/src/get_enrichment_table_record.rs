@@ -48,6 +48,14 @@ impl Function for GetEnrichmentTableRecord {
         "get_enrichment_table_record"
     }
 
+    fn usage(&self) -> &'static str {
+        const USAGE: &str = const_str::concat!(
+            "Searches an [enrichment table](/docs/reference/glossary/#enrichment-tables) for a row that matches the provided condition. A single row must be matched. If no rows are found or more than one row is found, an error is returned.\n\n",
+            super::ENRICHMENT_TABLE_EXPLAINER
+        );
+        USAGE
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {

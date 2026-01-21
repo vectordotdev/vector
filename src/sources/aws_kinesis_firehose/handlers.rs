@@ -92,6 +92,7 @@ pub(super) async fn firehose(
                             event.add_batch_notifier(batch.clone());
                         }
                         if let Event::Log(log) = event {
+                            log.metadata_mut().set_ingest_timestamp(now);
                             log_namespace.insert_vector_metadata(
                                 log,
                                 log_schema().source_type_key(),
@@ -174,7 +175,7 @@ pub(super) async fn firehose(
                     }
                 }
                 Some(Err(error)) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

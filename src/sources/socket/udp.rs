@@ -319,7 +319,7 @@ pub(super) fn udp(
                                 }
                             }
                             Err(error) => {
-                                // Error is logged by `crate::codecs::Decoder`, no
+                                // Error is logged by `vector_lib::codecs::Decoder`, no
                                 // further handling is needed here.
                                 if !error.can_continue() {
                                     break;
