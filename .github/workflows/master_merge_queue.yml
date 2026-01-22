@@ -112,6 +112,8 @@ jobs:
     secrets: inherit
 
   master-merge-queue-check:
+    permissions:
+      statuses: write
     name: Master Merge Queue Suite
     # Always run this so that pull_request triggers are marked as success.
     if: always()

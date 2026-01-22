@@ -14,6 +14,9 @@ env:
   CI: true
   PROFILE: debug
 
+permissions:
+  contents: read
+
 jobs:
   check-msrv:
     runs-on: ubuntu-24.04
