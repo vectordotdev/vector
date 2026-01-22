@@ -649,7 +649,6 @@ urls: {
 	vector_test_harness:                        "\(vector_repo)-test-harness/"
 	vector_topologies:                          "/docs/setup/deployment/topologies"
 	vector_transforms:                          "/docs/reference/configuration/transforms"
-	vector_twitter:                             "https://twitter.com/vectordotdev"
 	vector_unit_tests:                          "/docs/reference/configuration/unit-tests"
 	vector_version_branches:                    "\(vector_repo)/branches/all?query=v"
 	vrl_announcement:                           "/blog/vector-remap-language"
