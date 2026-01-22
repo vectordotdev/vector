@@ -25,5 +25,7 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
+          protoc: true
+          libsasl2: true
           cargo-msrv: true
       - run: cargo msrv verify
