@@ -1,5 +1,6 @@
 //! Shared functionality for the AWS components.
 pub mod auth;
+pub mod refreshing_file_credentials;
 pub mod region;
 pub mod timeout;
 
