@@ -2,45 +2,28 @@ name: Unit - Windows
 
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
+
 
 permissions:
-  statuses: write
+  contents: read
 
 jobs:
   test-windows:
     runs-on: windows-2025-8core
     timeout-minutes: 60
     steps:
-      - name: (PR review) Set latest commit status as pending
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: Unit - Windows
-          status: pending
-
-      - name: (PR review) Checkout PR branch
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          ref: ${{ github.event.review.commit_id }}
-
       - name: Checkout branch
-        if: ${{ github.event_name != 'pull_request_review' }}
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: actions/setup-python@v6
         with:
           python-version: "3.10"
       - run: .\scripts\environment\bootstrap-windows-2025.ps1
       - run: make test
-
-      - name: (PR review) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        if: always() && github.event_name == 'pull_request_review'
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: Unit - Windows
-          status: ${{ job.status }}
