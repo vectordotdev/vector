@@ -177,18 +177,18 @@ fn count_otlp_items(events: &[Event]) -> usize {
                             return resource_logs_array
                                 .iter()
                                 .map(|rl| {
-                                    if let Some(scope_logs) = rl.get("scopeLogs") {
-                                        if let Some(scope_logs_array) = scope_logs.as_array() {
-                                            return scope_logs_array
-                                                .iter()
-                                                .map(|sl| {
-                                                    sl.get("logRecords")
-                                                        .and_then(|lr| lr.as_array())
-                                                        .map(|arr| arr.len())
-                                                        .unwrap_or(0)
-                                                })
-                                                .sum();
-                                        }
+                                    if let Some(scope_logs) = rl.get("scopeLogs")
+                                        && let Some(scope_logs_array) = scope_logs.as_array()
+                                    {
+                                        return scope_logs_array
+                                            .iter()
+                                            .map(|sl| {
+                                                sl.get("logRecords")
+                                                    .and_then(|lr| lr.as_array())
+                                                    .map(|arr| arr.len())
+                                                    .unwrap_or(0)
+                                            })
+                                            .sum();
                                     }
                                     0
                                 })
@@ -196,56 +196,55 @@ fn count_otlp_items(events: &[Event]) -> usize {
                         }
                     }
                     // Count metrics in resourceMetrics
-                    else if let Some(resource_metrics) = log.get(RESOURCE_METRICS_JSON_FIELD) {
-                        if let Some(resource_metrics_array) = resource_metrics.as_array() {
-                            return resource_metrics_array
-                                .iter()
-                                .map(|rm| {
-                                    if let Some(scope_metrics) = rm.get("scopeMetrics") {
-                                        if let Some(scope_metrics_array) = scope_metrics.as_array()
-                                        {
-                                            return scope_metrics_array
-                                                .iter()
-                                                .map(|sm| {
-                                                    sm.get("metrics")
-                                                        .and_then(|m| m.as_array())
-                                                        .map(|arr| arr.len())
-                                                        .unwrap_or(0)
-                                                })
-                                                .sum();
-                                        }
-                                    }
-                                    0
-                                })
-                                .sum();
-                        }
+                    else if let Some(resource_metrics) = log.get(RESOURCE_METRICS_JSON_FIELD)
+                        && let Some(resource_metrics_array) = resource_metrics.as_array()
+                    {
+                        return resource_metrics_array
+                            .iter()
+                            .map(|rm| {
+                                if let Some(scope_metrics) = rm.get("scopeMetrics")
+                                    && let Some(scope_metrics_array) = scope_metrics.as_array()
+                                {
+                                    return scope_metrics_array
+                                        .iter()
+                                        .map(|sm| {
+                                            sm.get("metrics")
+                                                .and_then(|m| m.as_array())
+                                                .map(|arr| arr.len())
+                                                .unwrap_or(0)
+                                        })
+                                        .sum();
+                                }
+                                0
+                            })
+                            .sum();
                     }
                     0
                 }
                 Event::Trace(trace) => {
                     // Count spans in resourceSpans
-                    if let Some(resource_spans) = trace.get(RESOURCE_SPANS_JSON_FIELD) {
-                        if let Some(resource_spans_array) = resource_spans.as_array() {
-                            return resource_spans_array
-                                .iter()
-                                .map(|rs| {
-                                    if let Some(scope_spans) = rs.get("scopeSpans") {
-                                        if let Some(scope_spans_array) = scope_spans.as_array() {
-                                            return scope_spans_array
-                                                .iter()
-                                                .map(|ss| {
-                                                    ss.get("spans")
-                                                        .and_then(|s| s.as_array())
-                                                        .map(|arr| arr.len())
-                                                        .unwrap_or(0)
-                                                })
-                                                .sum();
-                                        }
-                                    }
-                                    0
-                                })
-                                .sum();
-                        }
+                    if let Some(resource_spans) = trace.get(RESOURCE_SPANS_JSON_FIELD)
+                        && let Some(resource_spans_array) = resource_spans.as_array()
+                    {
+                        return resource_spans_array
+                            .iter()
+                            .map(|rs| {
+                                if let Some(scope_spans) = rs.get("scopeSpans")
+                                    && let Some(scope_spans_array) = scope_spans.as_array()
+                                {
+                                    return scope_spans_array
+                                        .iter()
+                                        .map(|ss| {
+                                            ss.get("spans")
+                                                .and_then(|s| s.as_array())
+                                                .map(|arr| arr.len())
+                                                .unwrap_or(0)
+                                        })
+                                        .sum();
+                                }
+                                0
+                            })
+                            .sum();
                     }
                     0
                 }

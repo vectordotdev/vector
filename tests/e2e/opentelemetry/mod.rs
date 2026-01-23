@@ -137,21 +137,20 @@ pub fn assert_component_received_events_total(data_type: &str, expected_count: u
             .unwrap_or_else(|e| panic!("Failed to parse metrics JSON: {e}"));
 
         // Look for component_received_events_total metric
-        if let Some(name) = metric.get("name").and_then(|v| v.as_str()) {
-            if name == "component_received_events_total" {
-                // Check if this is for our opentelemetry source
-                if let Some(tags) = metric.get("tags") {
-                    if let Some(component_id) = tags.get("component_id").and_then(|v| v.as_str()) {
-                        if component_id == "source0" {
-                            found_metric = true;
-                            // Get the counter value
-                            if let Some(counter) = metric.get("counter") {
-                                if let Some(value) = counter.get("value").and_then(|v| v.as_f64()) {
-                                    total_events = value as u64;
-                                }
-                            }
-                        }
-                    }
+        if let Some(name) = metric.get("name").and_then(|v| v.as_str())
+            && name == "component_received_events_total"
+        {
+            // Check if this is for our opentelemetry source
+            if let Some(tags) = metric.get("tags")
+                && let Some(component_id) = tags.get("component_id").and_then(|v| v.as_str())
+                && component_id == "source0"
+            {
+                found_metric = true;
+                // Get the counter value
+                if let Some(counter) = metric.get("counter")
+                    && let Some(value) = counter.get("value").and_then(|v| v.as_f64())
+                {
+                    total_events = value as u64;
                 }
             }
         }
