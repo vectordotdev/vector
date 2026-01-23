@@ -1409,3 +1409,340 @@ async fn http_logs_use_otlp_decoding_emits_metric() {
         _ => panic!("component_received_events_total should be a counter"),
     }
 }
+
+#[test]
+fn test_count_otlp_items_empty() {
+    let events = vec![];
+    assert_eq!(super::count_otlp_items(&events), 0);
+}
+
+#[test]
+fn test_count_otlp_items_single_log_record() {
+    use vector_lib::opentelemetry::proto::RESOURCE_LOGS_JSON_FIELD;
+
+    let mut log = LogEvent::default();
+    log.insert(
+        RESOURCE_LOGS_JSON_FIELD,
+        value!([{
+            "scopeLogs": [{
+                "logRecords": [{}, {}]
+            }]
+        }]),
+    );
+
+    let events = vec![Event::Log(log)];
+    assert_eq!(super::count_otlp_items(&events), 2);
+}
+
+#[test]
+fn test_count_otlp_items_multiple_resource_logs() {
+    use vector_lib::opentelemetry::proto::RESOURCE_LOGS_JSON_FIELD;
+
+    let mut log = LogEvent::default();
+    log.insert(
+        RESOURCE_LOGS_JSON_FIELD,
+        value!([
+            {
+                "scopeLogs": [{
+                    "logRecords": [{}, {}, {}]
+                }]
+            },
+            {
+                "scopeLogs": [{
+                    "logRecords": [{}, {}]
+                }]
+            }
+        ]),
+    );
+
+    let events = vec![Event::Log(log)];
+    assert_eq!(super::count_otlp_items(&events), 5);
+}
+
+#[test]
+fn test_count_otlp_items_multiple_scope_logs() {
+    use vector_lib::opentelemetry::proto::RESOURCE_LOGS_JSON_FIELD;
+
+    let mut log = LogEvent::default();
+    log.insert(
+        RESOURCE_LOGS_JSON_FIELD,
+        value!([{
+            "scopeLogs": [
+                {
+                    "logRecords": [{}, {}]
+                },
+                {
+                    "logRecords": [{}, {}, {}]
+                }
+            ]
+        }]),
+    );
+
+    let events = vec![Event::Log(log)];
+    assert_eq!(super::count_otlp_items(&events), 5);
+}
+
+#[test]
+fn test_count_otlp_items_single_metric() {
+    use vector_lib::opentelemetry::proto::RESOURCE_METRICS_JSON_FIELD;
+
+    let mut log = LogEvent::default();
+    log.insert(
+        RESOURCE_METRICS_JSON_FIELD,
+        value!([{
+            "scopeMetrics": [{
+                "metrics": [{}, {}]
+            }]
+        }]),
+    );
+
+    let events = vec![Event::Log(log)];
+    assert_eq!(super::count_otlp_items(&events), 2);
+}
+
+#[test]
+fn test_count_otlp_items_multiple_resource_metrics() {
+    use vector_lib::opentelemetry::proto::RESOURCE_METRICS_JSON_FIELD;
+
+    let mut log = LogEvent::default();
+    log.insert(
+        RESOURCE_METRICS_JSON_FIELD,
+        value!([
+            {
+                "scopeMetrics": [{
+                    "metrics": [{}, {}, {}]
+                }]
+            },
+            {
+                "scopeMetrics": [{
+                    "metrics": [{}]
+                }]
+            }
+        ]),
+    );
+
+    let events = vec![Event::Log(log)];
+    assert_eq!(super::count_otlp_items(&events), 4);
+}
+
+#[test]
+fn test_count_otlp_items_multiple_scope_metrics() {
+    use vector_lib::opentelemetry::proto::RESOURCE_METRICS_JSON_FIELD;
+
+    let mut log = LogEvent::default();
+    log.insert(
+        RESOURCE_METRICS_JSON_FIELD,
+        value!([{
+            "scopeMetrics": [
+                {
+                    "metrics": [{}, {}]
+                },
+                {
+                    "metrics": [{}]
+                }
+            ]
+        }]),
+    );
+
+    let events = vec![Event::Log(log)];
+    assert_eq!(super::count_otlp_items(&events), 3);
+}
+
+#[test]
+fn test_count_otlp_items_single_trace_span() {
+    use crate::event::TraceEvent;
+    use vector_lib::opentelemetry::proto::RESOURCE_SPANS_JSON_FIELD;
+
+    let mut trace = TraceEvent::default();
+    trace.insert(
+        RESOURCE_SPANS_JSON_FIELD,
+        value!([{
+            "scopeSpans": [{
+                "spans": [{}, {}]
+            }]
+        }]),
+    );
+
+    let events = vec![Event::Trace(trace)];
+    assert_eq!(super::count_otlp_items(&events), 2);
+}
+
+#[test]
+fn test_count_otlp_items_multiple_resource_spans() {
+    use crate::event::TraceEvent;
+    use vector_lib::opentelemetry::proto::RESOURCE_SPANS_JSON_FIELD;
+
+    let mut trace = TraceEvent::default();
+    trace.insert(
+        RESOURCE_SPANS_JSON_FIELD,
+        value!([
+            {
+                "scopeSpans": [{
+                    "spans": [{}, {}, {}]
+                }]
+            },
+            {
+                "scopeSpans": [{
+                    "spans": [{}, {}]
+                }]
+            }
+        ]),
+    );
+
+    let events = vec![Event::Trace(trace)];
+    assert_eq!(super::count_otlp_items(&events), 5);
+}
+
+#[test]
+fn test_count_otlp_items_multiple_scope_spans() {
+    use crate::event::TraceEvent;
+    use vector_lib::opentelemetry::proto::RESOURCE_SPANS_JSON_FIELD;
+
+    let mut trace = TraceEvent::default();
+    trace.insert(
+        RESOURCE_SPANS_JSON_FIELD,
+        value!([{
+            "scopeSpans": [
+                {
+                    "spans": [{}, {}]
+                },
+                {
+                    "spans": [{}, {}, {}]
+                }
+            ]
+        }]),
+    );
+
+    let events = vec![Event::Trace(trace)];
+    assert_eq!(super::count_otlp_items(&events), 5);
+}
+
+#[test]
+fn test_count_otlp_items_mixed_event_types() {
+    use crate::event::TraceEvent;
+    use vector_lib::opentelemetry::proto::{
+        RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, RESOURCE_SPANS_JSON_FIELD,
+    };
+
+    // Create log event with 3 log records
+    let mut log = LogEvent::default();
+    log.insert(
+        RESOURCE_LOGS_JSON_FIELD,
+        value!([{
+            "scopeLogs": [{
+                "logRecords": [{}, {}, {}]
+            }]
+        }]),
+    );
+
+    // Create log event with 2 metrics
+    let mut metrics = LogEvent::default();
+    metrics.insert(
+        RESOURCE_METRICS_JSON_FIELD,
+        value!([{
+            "scopeMetrics": [{
+                "metrics": [{}, {}]
+            }]
+        }]),
+    );
+
+    // Create trace event with 4 spans
+    let mut trace = TraceEvent::default();
+    trace.insert(
+        RESOURCE_SPANS_JSON_FIELD,
+        value!([{
+            "scopeSpans": [{
+                "spans": [{}, {}, {}, {}]
+            }]
+        }]),
+    );
+
+    let events = vec![Event::Log(log), Event::Log(metrics), Event::Trace(trace)];
+    assert_eq!(super::count_otlp_items(&events), 9);
+}
+
+#[test]
+fn test_count_otlp_items_non_otlp_events() {
+    // Events without OTLP fields should count as 0
+    let log = LogEvent::default();
+    let events = vec![Event::Log(log)];
+    assert_eq!(super::count_otlp_items(&events), 0);
+}
+
+#[test]
+fn test_count_otlp_items_malformed_structure() {
+    use vector_lib::opentelemetry::proto::RESOURCE_LOGS_JSON_FIELD;
+
+    // Missing scopeLogs field
+    let mut log1 = LogEvent::default();
+    log1.insert(RESOURCE_LOGS_JSON_FIELD, value!([{}]));
+
+    // scopeLogs is not an array
+    let mut log2 = LogEvent::default();
+    log2.insert(
+        RESOURCE_LOGS_JSON_FIELD,
+        value!([{
+            "scopeLogs": "not_an_array"
+        }]),
+    );
+
+    // Missing logRecords field
+    let mut log3 = LogEvent::default();
+    log3.insert(
+        RESOURCE_LOGS_JSON_FIELD,
+        value!([{
+            "scopeLogs": [{}]
+        }]),
+    );
+
+    // logRecords is not an array
+    let mut log4 = LogEvent::default();
+    log4.insert(
+        RESOURCE_LOGS_JSON_FIELD,
+        value!([{
+            "scopeLogs": [{
+                "logRecords": "not_an_array"
+            }]
+        }]),
+    );
+
+    let events = vec![
+        Event::Log(log1),
+        Event::Log(log2),
+        Event::Log(log3),
+        Event::Log(log4),
+    ];
+    assert_eq!(super::count_otlp_items(&events), 0);
+}
+
+#[test]
+fn test_count_otlp_items_empty_arrays() {
+    use vector_lib::opentelemetry::proto::RESOURCE_LOGS_JSON_FIELD;
+
+    // Empty resourceLogs array
+    let mut log1 = LogEvent::default();
+    log1.insert(RESOURCE_LOGS_JSON_FIELD, value!([]));
+
+    // Empty scopeLogs array
+    let mut log2 = LogEvent::default();
+    log2.insert(
+        RESOURCE_LOGS_JSON_FIELD,
+        value!([{
+            "scopeLogs": []
+        }]),
+    );
+
+    // Empty logRecords array
+    let mut log3 = LogEvent::default();
+    log3.insert(
+        RESOURCE_LOGS_JSON_FIELD,
+        value!([{
+            "scopeLogs": [{
+                "logRecords": []
+            }]
+        }]),
+    );
+
+    let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
+    assert_eq!(super::count_otlp_items(&events), 0);
+}
