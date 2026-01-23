@@ -19,7 +19,7 @@ use vector_lib::{
 /// Counts individual log records, metrics, or spans within OTLP batch events.
 /// When use_otlp_decoding is enabled, events contain entire OTLP batches, but
 /// we want to count the individual items for metric consistency with other sources.
-pub(crate) fn count_otlp_items(events: &[Event]) -> usize {
+pub fn count_otlp_items(events: &[Event]) -> usize {
     events
         .iter()
         .map(|event| {
