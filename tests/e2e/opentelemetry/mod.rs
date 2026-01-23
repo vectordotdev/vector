@@ -118,10 +118,7 @@ pub fn assert_service_name_with<ResourceT, F>(
 /// Verifies that the component_received_events_total internal metric counts
 /// individual log records/metrics/spans, not batch requests.
 /// This ensures consistency when use_otlp_decoding is enabled.
-pub fn assert_component_received_events_total(
-    data_type: &str,
-    expected_count: usize,
-) {
+pub fn assert_component_received_events_total(data_type: &str, expected_count: usize) {
     let metrics_content = read_file_helper(data_type, "vector-internal-metrics-sink.log")
         .expect("Failed to read internal metrics file");
 
