@@ -273,23 +273,6 @@ components: sources: internal_metrics: {
 				reason: _reason
 			}
 		}
-		event_processing_time_seconds: {
-			description: """
-				The elapsed time, in fractional seconds, between when a source ingests an event and when a sink receives it.
-				"""
-			type:              "histogram"
-			default_namespace: "vector"
-			tags:              _processing_time_tags
-		}
-		event_processing_time_mean_seconds: {
-			description: """
-				The mean elapsed time, in fractional seconds, between when a source ingests an event and when a sink receives it.
-				This value is smoothed over time using an exponentially weighted moving average (EWMA).
-				"""
-			type:              "gauge"
-			default_namespace: "vector"
-			tags:              _processing_time_tags
-		}
 		buffer_byte_size: {
 			description:        "The number of bytes currently in the buffer."
 			type:               "gauge"
@@ -1116,10 +1099,6 @@ components: sources: internal_metrics: {
 			component_id:   _component_id
 			component_type: _component_type
 		}
-		_processing_time_tags: _internal_metrics_tags & {
-			sink_component_id:   _sink_component_id
-			source_component_id: _source_component_id
-		}
 
 		// All available tags
 		_collector: {
@@ -1144,16 +1123,6 @@ components: sources: internal_metrics: {
 			description: "The Vector component type."
 			required:    true
 			examples: ["file", "http", "honeycomb", "splunk_hec"]
-		}
-		_sink_component_id: {
-			description: "The sink component ID that emitted the event."
-			required:    true
-			examples: ["out_http", "out_console"]
-		}
-		_source_component_id: {
-			description: "The source component ID that originally ingested the event."
-			required:    true
-			examples: ["in_kafka", "in_file"]
 		}
 		_endpoint: {
 			description: "The absolute path of originating file."

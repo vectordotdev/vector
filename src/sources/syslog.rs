@@ -444,6 +444,7 @@ fn enrich_syslog_event(
             parsed_host,
         );
     }
+
     log_namespace.insert_standard_vector_source_metadata(log, SyslogConfig::NAME, Utc::now());
 
     if log_namespace == LogNamespace::Legacy {
