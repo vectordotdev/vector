@@ -691,6 +691,7 @@ impl From<Metadata> for EventMetadata {
                 datadog_origin_metadata,
                 source_event_id,
             }),
+            last_transform_timestamp: None,
         }
     }
 }

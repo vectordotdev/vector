@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc, time::Instant};
 
 use derivative::Derivative;
 use lookup::OwnedTargetPath;
@@ -23,10 +23,16 @@ const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
 
 /// The event metadata structure is a `Arc` wrapper around the actual metadata to avoid cloning the
 /// underlying data until it becomes necessary to provide a `mut` copy.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(PartialEq)]
 pub struct EventMetadata {
     #[serde(flatten)]
     pub(super) inner: Arc<Inner>,
+
+    /// The timestamp when the event last entered a transform buffer.
+    #[derivative(PartialEq = "ignore")]
+    #[serde(default, skip)]
+    pub(crate) last_transform_timestamp: Option<Instant>,
 }
 
 /// The actual metadata structure contained by both `struct Metric`
@@ -137,6 +143,7 @@ impl EventMetadata {
                 value,
                 ..Default::default()
             }),
+            last_transform_timestamp: None,
         }
     }
 
@@ -244,6 +251,17 @@ impl EventMetadata {
     pub fn source_event_id(&self) -> Option<Uuid> {
         self.inner.source_event_id
     }
+
+    /// Returns the timestamp of the last transform buffer enqueue operation, if it exists.
+    #[must_use]
+    pub fn last_transform_timestamp(&self) -> Option<Instant> {
+        self.last_transform_timestamp
+    }
+
+    /// Sets the transform enqueue timestamp to the provided value.
+    pub fn set_last_transform_timestamp(&mut self, timestamp: Instant) {
+        self.last_transform_timestamp = Some(timestamp);
+    }
 }
 
 impl Default for Inner {
@@ -267,6 +285,7 @@ impl Default for EventMetadata {
     fn default() -> Self {
         Self {
             inner: Arc::new(Inner::default()),
+            last_transform_timestamp: None,
         }
     }
 }
