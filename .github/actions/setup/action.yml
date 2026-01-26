@@ -24,6 +24,10 @@ inputs:
     required: false
     default: false
     description: "Install cue."
+  libsasl2:
+    required: false
+    default: false
+    description: "Install libsasl2." # Required to fully build Vector
 
   # prepare.sh - rust
   rust: # rustup module
@@ -155,7 +159,7 @@ runs:
           ${{ runner.os }}-cargo-
 
     - name: Install mold
-      if: ${{ inputs.mold == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
+      if: ${{ runner.os == 'Linux' && (inputs.mold == 'true' || env.VDEV_NEEDS_COMPILE == 'true') }}
       shell: bash
       run: |
         echo "Installing mold"
@@ -206,7 +210,11 @@ runs:
       shell: bash
       run: |
         echo "Installing protoc"
-        sudo bash ./scripts/environment/install-protoc.sh
+        if [[ "${{ runner.os }}" == "macOS" ]]; then
+          sudo bash ./scripts/environment/install-protoc.sh /usr/local/bin
+        else
+          sudo bash ./scripts/environment/install-protoc.sh
+        fi
 
     - name: Install cue
       if: ${{ inputs.cue == 'true' }}
@@ -222,6 +230,11 @@ runs:
           -C "${TEMP}"
         sudo cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
+
+    - name: Install libsasl2
+      if: ${{ inputs.libsasl2 == 'true' }}
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
 
     - name: Install vdev
       if: ${{ inputs.vdev == 'true' }}
