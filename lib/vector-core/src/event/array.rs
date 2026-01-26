@@ -2,7 +2,7 @@
 //! This module contains the definitions and wrapper types for handling
 //! arrays of type `Event`, in the various forms they may appear.
 
-use std::{iter, slice, sync::Arc, vec};
+use std::{iter, slice, sync::Arc, time::Instant, vec};
 
 use futures::{Stream, stream};
 #[cfg(test)]
@@ -169,6 +169,13 @@ impl EventArray {
             for metric in metrics {
                 metric.metadata_mut().set_source_type(source_type);
             }
+        }
+    }
+
+    /// Sets the `last_transform_timestamp` in the metadata for all events in this array.
+    pub fn set_last_transform_timestamp(&mut self, timestamp: Instant) {
+        for mut event in self.iter_events_mut() {
+            event.metadata_mut().set_last_transform_timestamp(timestamp);
         }
     }
 
