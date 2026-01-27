@@ -95,6 +95,10 @@ jobs:
           github_token: ${{ secrets.GITHUB_TOKEN }}
           commit_sha: ${{ github.sha }}
 
+      - name: Free disk space for GCP tests
+        if: matrix.service == 'gcp'
+        run: sudo -E bash scripts/ci-free-disk-space.sh --no-docker
+
       - name: Run Integration Tests for ${{ matrix.service }}
         uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
