@@ -10,16 +10,14 @@ use vector_lib::{
 
 use self::{
     sinks::{
-        BackpressureSinkConfig, BasicSinkConfig, CompletionSinkConfig, ErrorSinkConfig,
-        OneshotSinkConfig, PanicSinkConfig,
+        BackpressureSinkConfig, BasicSinkConfig, ErrorSinkConfig, OneshotSinkConfig,
+        PanicSinkConfig,
     },
     sources::{
         BackpressureSourceConfig, BasicSourceConfig, ErrorSourceConfig, PanicSourceConfig,
         TripwireSourceConfig,
     },
-    transforms::{
-        BasicTransformConfig, ErrorDefinitionTransformConfig, NoopTransformConfig, TransformType,
-    },
+    transforms::{BasicTransformConfig, ErrorDefinitionTransformConfig},
 };
 
 pub mod sinks;
@@ -113,12 +111,4 @@ pub fn oneshot_sink(tx: Sender<EventArray>) -> OneshotSinkConfig {
 
 pub fn panic_sink() -> PanicSinkConfig {
     PanicSinkConfig::default()
-}
-
-pub fn completion_sink(expected: usize, tx: Sender<bool>) -> CompletionSinkConfig {
-    CompletionSinkConfig::new(expected, tx)
-}
-
-pub fn noop_transform() -> NoopTransformConfig {
-    NoopTransformConfig::from(TransformType::Function)
 }

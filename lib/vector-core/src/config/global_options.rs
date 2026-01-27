@@ -143,28 +143,15 @@ pub struct GlobalOptions {
     /// The alpha value for the exponential weighted moving average (EWMA) of source and transform
     /// buffer utilization metrics.
     ///
-    /// This controls how quickly the `*_buffer_utilization_mean` gauges respond to new
-    /// observations. Values closer to 1.0 retain more of the previous value, leading to slower
-    /// adjustments. The default value of 0.9 is equivalent to a "half life" of 6-7 measurements.
+    /// This value specifies how much of the existing value is retained when each update is made.
+    /// Values closer to 1.0 result in the value adjusting slower to changes. The default value of
+    /// 0.9 is equivalent to a "half life" of 6-7 measurements.
     ///
-    /// Must be between 0 and 1 exclusively (0 < alpha < 1).
+    /// Must be between 0 and 1 exclusive (0 < alpha < 1).
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     #[configurable(metadata(docs::advanced))]
     pub buffer_utilization_ewma_alpha: Option<f64>,
-
-    /// The alpha value for the exponential weighted moving average (EWMA) of transform processing
-    /// time metrics.
-    ///
-    /// This controls how quickly the `event_processing_time_mean_seconds` gauge responds to new
-    /// observations. Values closer to 1.0 retain more of the previous value, leading to slower
-    /// adjustments. The default value of 0.9 is equivalent to a "half life" of 6-7 measurements.
-    ///
-    /// Must be between 0 and 1 exclusively (0 < alpha < 1).
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(validation(range(min = 0.0, max = 1.0)))]
-    #[configurable(metadata(docs::advanced))]
-    pub processing_time_ewma_alpha: Option<f64>,
 
     /// The interval, in seconds, at which the internal metrics cache for VRL is refreshed.
     /// This must be set to be able to access metrics in VRL functions.
@@ -324,9 +311,6 @@ impl GlobalOptions {
                 buffer_utilization_ewma_alpha: self
                     .buffer_utilization_ewma_alpha
                     .or(with.buffer_utilization_ewma_alpha),
-                processing_time_ewma_alpha: self
-                    .processing_time_ewma_alpha
-                    .or(with.processing_time_ewma_alpha),
                 metrics_storage_refresh_period: self
                     .metrics_storage_refresh_period
                     .or(with.metrics_storage_refresh_period),

@@ -43,7 +43,6 @@ pub fn decode_message<'a>(
                             path!("source_type"),
                             Bytes::from(source_type),
                         );
-                        log.metadata_mut().set_ingest_timestamp(now);
                         match log_namespace {
                             LogNamespace::Vector => {
                                 if let Some(timestamp) = timestamp {

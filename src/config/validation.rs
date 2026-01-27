@@ -11,11 +11,11 @@ use super::{
 };
 use crate::config::schema;
 
-/// Minimum value (exclusive) for EWMA alpha options.
+/// Minimum value (exclusive) for `utilization_ewma_alpha`.
 /// The alpha value must be strictly greater than this value.
 const EWMA_ALPHA_MIN: f64 = 0.0;
 
-/// Maximum value (exclusive) for EWMA alpha options.
+/// Maximum value (exclusive) for `utilization_ewma_alpha`.
 /// The alpha value must be strictly less than this value.
 const EWMA_ALPHA_MAX: f64 = 1.0;
 
@@ -155,29 +155,17 @@ pub fn check_resources(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     }
 }
 
-/// Validates that `*_ewma_alpha` values are within the valid range (0 < alpha < 1).
-pub fn check_values(config: &ConfigBuilder) -> Result<(), Vec<String>> {
-    let mut errors = Vec::new();
-
+/// Validates that `buffer_utilization_ewma_alpha` value is within the valid range (0 < alpha < 1)
+/// for the global configuration.
+pub fn check_buffer_utilization_ewma_alpha(config: &ConfigBuilder) -> Result<(), Vec<String>> {
     if let Some(alpha) = config.global.buffer_utilization_ewma_alpha
         && (alpha <= EWMA_ALPHA_MIN || alpha >= EWMA_ALPHA_MAX)
     {
-        errors.push(format!(
+        Err(vec![format!(
             "Global `buffer_utilization_ewma_alpha` must be between 0 and 1 exclusive (0 < alpha < 1), got {alpha}"
-        ));
-    }
-    if let Some(alpha) = config.global.processing_time_ewma_alpha
-        && (alpha <= EWMA_ALPHA_MIN || alpha >= EWMA_ALPHA_MAX)
-    {
-        errors.push(format!(
-            "Global `processing_time_ewma_alpha` must be between 0 and 1 exclusive (0 < alpha < 1), got {alpha}"
-        ));
-    }
-
-    if errors.is_empty() {
-        Ok(())
+        )])
     } else {
-        Err(errors)
+        Ok(())
     }
 }
 

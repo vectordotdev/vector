@@ -1018,18 +1018,16 @@ fn create_event(
         path!("source_type"),
         Bytes::from(Config::NAME),
     );
-    let now = Utc::now();
-    log.metadata_mut().set_ingest_timestamp(now);
     match (log_namespace, ingestion_timestamp_field) {
         // When using LogNamespace::Vector always set the ingest_timestamp.
         (LogNamespace::Vector, _) => {
             log.metadata_mut()
                 .value_mut()
-                .insert(path!("vector", "ingest_timestamp"), now);
+                .insert(path!("vector", "ingest_timestamp"), Utc::now());
         }
         // When LogNamespace::Legacy, only set when the `ingestion_timestamp_field` is configured.
         (LogNamespace::Legacy, Some(ingestion_timestamp_field)) => {
-            log.try_insert(ingestion_timestamp_field, now)
+            log.try_insert(ingestion_timestamp_field, Utc::now())
         }
         // The CRI/Docker parsers handle inserting the `log_schema().timestamp_key()` value.
         (LogNamespace::Legacy, None) => (),

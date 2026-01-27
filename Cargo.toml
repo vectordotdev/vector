@@ -213,7 +213,6 @@ serial_test = { version = "3.2" }
 cfg-if.workspace = true
 clap.workspace = true
 clap_complete.workspace = true
-dashmap.workspace = true
 indoc.workspace = true
 paste.workspace = true
 pin-project.workspace = true

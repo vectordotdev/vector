@@ -108,13 +108,6 @@ pub trait Bufferable: InMemoryBufferable + Encodable {}
 // Blanket implementation for anything that is already bufferable.
 impl<T> Bufferable for T where T: InMemoryBufferable + Encodable {}
 
-/// Hook for observing items as they are sent into a `BufferSender`.
-pub trait BufferInstrumentation<T: Bufferable>: Send + Sync + 'static {
-    /// Called immediately before the item is emitted to the underlying buffer.
-    /// The underlying type is stored in an `Arc`, so we cannot have `&mut self`.
-    fn on_send(&self, item: &T);
-}
-
 pub trait EventCount {
     fn event_count(&self) -> usize;
 }

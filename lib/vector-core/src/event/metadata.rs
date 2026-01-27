@@ -2,7 +2,6 @@
 
 use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
 
-use chrono::{DateTime, Utc};
 use derivative::Derivative;
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
@@ -79,11 +78,6 @@ pub(super) struct Inner {
     /// An internal vector id that can be used to identify this event across all components.
     #[derivative(PartialEq = "ignore")]
     pub(crate) source_event_id: Option<Uuid>,
-
-    /// The timestamp when the event was ingested into Vector.
-    #[derivative(PartialEq = "ignore")]
-    #[serde(default, skip)]
-    pub(crate) ingest_timestamp: Option<DateTime<Utc>>,
 }
 
 /// Metric Origin metadata for submission to Datadog.
@@ -245,17 +239,6 @@ impl EventMetadata {
     pub fn source_event_id(&self) -> Option<Uuid> {
         self.0.source_event_id
     }
-
-    /// Returns the ingest timestamp, if it exists.
-    #[must_use]
-    pub fn ingest_timestamp(&self) -> Option<DateTime<Utc>> {
-        self.0.ingest_timestamp
-    }
-
-    /// Sets the ingest timestamp to the provided value.
-    pub fn set_ingest_timestamp(&mut self, timestamp: DateTime<Utc>) {
-        self.get_mut().ingest_timestamp = Some(timestamp);
-    }
 }
 
 impl Default for Inner {
@@ -271,7 +254,6 @@ impl Default for Inner {
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
             source_event_id: Some(Uuid::new_v4()),
-            ingest_timestamp: None,
         }
     }
 }
