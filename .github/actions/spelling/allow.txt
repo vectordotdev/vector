@@ -276,6 +276,7 @@ KDL
 keepappkey
 keephq
 kenton
+keybinds
 Kingcom
 Kolkata
 konqueror
