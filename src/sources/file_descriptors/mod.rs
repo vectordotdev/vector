@@ -152,7 +152,7 @@ async fn process_stream(
                                 log_namespace.insert_standard_vector_source_metadata(
                                     log,
                                     source_type,
-                                    now
+                                    now,
                                 );
 
                                 if let Some(hostname) = &hostname {
@@ -174,7 +174,7 @@ async fn process_stream(
                     }
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no
+                    // Error is logged by `vector_lib::codecs::Decoder`, no
                     // further handling is needed here.
                     if !error.can_continue() {
                         break;

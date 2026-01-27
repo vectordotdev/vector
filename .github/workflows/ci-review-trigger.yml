@@ -29,7 +29,7 @@ on:
     types: [submitted]
 
 permissions:
-  statuses: write
+  contents: read
 
 env:
   DD_ENV: "ci"
@@ -85,9 +85,10 @@ jobs:
         run: exit 1
 
   cli:
-    needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cli')
     uses: ./.github/workflows/cli.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
     secrets: inherit
 
   make-test-behavior:
@@ -95,6 +96,7 @@ jobs:
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-test-behavior')
     uses: ./.github/workflows/test-make-command.yml
     with:
+      ref: ${{ github.event.review.commit_id }}
       command: test-behavior
       job_name: make test-behavior
     secrets: inherit
@@ -104,6 +106,7 @@ jobs:
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-check-examples')
     uses: ./.github/workflows/test-make-command.yml
     with:
+      ref: ${{ github.event.review.commit_id }}
       command: check-examples
       job_name: make check-examples
     secrets: inherit
@@ -113,6 +116,7 @@ jobs:
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-test-docs')
     uses: ./.github/workflows/test-make-command.yml
     with:
+      ref: ${{ github.event.review.commit_id }}
       command: test-docs
       job_name: make test-docs
     secrets: inherit
@@ -121,40 +125,54 @@ jobs:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-deny')
     uses: ./.github/workflows/deny.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
     secrets: inherit
 
   component-features:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-component-features')
     uses: ./.github/workflows/component_features.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
     secrets: inherit
 
   cross:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-cross')
     uses: ./.github/workflows/cross.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
     secrets: inherit
 
   unit-mac:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-unit-mac')
     uses: ./.github/workflows/unit_mac.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
     secrets: inherit
 
   unit-windows:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-unit-windows')
     uses: ./.github/workflows/unit_windows.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
     secrets: inherit
 
   environment:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-environment')
     uses: ./.github/workflows/environment.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
     secrets: inherit
 
   k8s:
     needs: validate
     if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-k8s')
     uses: ./.github/workflows/k8s_e2e.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
     secrets: inherit

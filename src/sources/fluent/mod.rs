@@ -793,10 +793,12 @@ impl From<FluentEvent<'_>> for LogEvent {
             Bytes::from_static(FluentConfig::NAME.as_bytes()),
         );
 
+        let now = Utc::now();
+        log.metadata_mut().set_ingest_timestamp(now);
         match log_namespace {
             LogNamespace::Vector => {
                 log.insert(metadata_path!(FluentConfig::NAME, "timestamp"), timestamp);
-                log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
+                log.insert(metadata_path!("vector", "ingest_timestamp"), now);
             }
             LogNamespace::Legacy => {
                 log.maybe_insert(log_schema().timestamp_key_target_path(), timestamp);
