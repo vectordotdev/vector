@@ -159,7 +159,7 @@ runs:
           ${{ runner.os }}-cargo-
 
     - name: Install mold
-      if: ${{ runner.os == 'Linux' && (inputs.mold == 'true' || env.VDEV_NEEDS_COMPILE == 'true') }}
+      if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && (inputs.mold == 'true' || env.VDEV_NEEDS_COMPILE == 'true') }}
       shell: bash
       run: |
         echo "Installing mold"
