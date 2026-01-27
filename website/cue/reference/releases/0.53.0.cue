@@ -12,7 +12,7 @@ releases: "0.53.0": {
 		## Release highlights
 
 		- Functions to access internal Vector metrics are now available for VRL: `get_vector_metric`,
-		  `find_vector_metrics` and `aggregate_vector_metrics`. You are now able to fetch snapshots
+		  `find_vector_metrics`, and `aggregate_vector_metrics`. You are now able to fetch snapshots
 		  of the metrics that are updated every `metrics_storage_refresh_period`.
 		- The `clickhouse` sink now supports the `arrow_stream` format option, enabling high-performance
 		  binary data transfer using Apache Arrow IPC. This provides significantly better performance
@@ -20,12 +20,12 @@ releases: "0.53.0": {
 		- Added a new `doris` sink for sending log data to Apache Doris databases using the Stream Load API.
 		- Added `syslog` codec for encoding Vector events to Syslog format. RFC5424 and RFC3164 are
 		  supported.
-		- Added moving-mean gauges for source and transform buffers (`source_buffer_utilization_mean` and `transform_buffer_utilization_mean`), so observers can track an EWMA of buffer utilization in addition to the instant level.
+		- Added moving-mean gauges for source and transform buffers (`source_buffer_utilization_mean` and `transform_buffer_utilization_mean`), so observers can track an exponentially weighted moving average (EWMA) of buffer utilization in addition to the instant level.
 
 		## Breaking Changes
 		- Buffers now emit metric names for sizes that better follow the metric naming standard specification
 		  while keeping the old related gauges available for a transition period. Operators should update
-		  dashboards/alerts to the new variants as the legacy names are now deprecated.
+		  dashboards and alerts to the new variants as the legacy names are now deprecated.
 
 		  * `buffer_max_size_bytes` deprecates `buffer_max_byte_size`
 		  * `buffer_max_size_events` deprecates `buffer_max_event_size`
@@ -35,7 +35,7 @@ releases: "0.53.0": {
 
 		- Increased the number of buckets in internal histograms to reduce the smallest
 		  bucket down to approximately 0.000244 (2.0^-12). If you were manually indexing buckets
-		  using VRL you will have to change your indexes since the number of buckets changed
+		  using VRL, you have to change your indexes since the number of buckets changed
 		  from 20 to 26.
 		"""
 
@@ -43,14 +43,14 @@ releases: "0.53.0": {
 		{
 			type: "fix"
 			description: """
-				Fixed a `host_metrics` source issue that caused tcp metrics collection to fail with "Could not parse netlink response: invalid netlink buffer" errors on Linux systems.
+				Fixed a `host_metrics` source issue that caused TCP metrics collection to fail with "Could not parse netlink response: invalid netlink buffer" errors on Linux systems.
 				"""
 			contributors: ["mushrowan"]
 		},
 		{
 			type: "fix"
 			description: """
-				Fixed recurrent "Failed framing bytes" produced by TCP sources such as fluent and logstash by ignoring connection
+				Fixed recurrent "Failed framing bytes" produced by TCP sources such as Fluent and Logstash by ignoring connection
 				resets that occur after complete frames. Connection resets with partial frame data are still reported as errors.
 				"""
 			contributors: ["gwenaskell"]
@@ -58,7 +58,7 @@ releases: "0.53.0": {
 		{
 			type: "feat"
 			description: """
-				Functions to access internal Vector metrics are now available for VRL: `get_vector_metric`, `find_vector_metrics` and `aggregate_vector_metrics`. They work with a snapshot of the metrics and the interval the snapshot is taken in can be controlled with `metrics_storage_refresh_period` global option. Aggregation supports `max`, `avg`, `min` and `max` functions.
+				Functions to access internal Vector metrics are now available for VRL: `get_vector_metric`, `find_vector_metrics` and `aggregate_vector_metrics`. They work with a snapshot of the metrics, and the interval the snapshot is taken in can be controlled with the `metrics_storage_refresh_period` global option. Aggregation supports `max`, `avg`, `min`, and `max` functions.
 				"""
 			contributors: ["esensar", "Quad9DNS"]
 		},
@@ -72,7 +72,7 @@ releases: "0.53.0": {
 		{
 			type: "enhancement"
 			description: """
-				The `mqtt` source config field `topic` can now be a list of mqtt topic strings instead of just a string. If a list is provided, the `mqtt` source client will subscribe to all the topics.
+				The `mqtt` source config field `topic` can now be a list of MQTT topic strings instead of just a string. If a list is provided, the `mqtt` source client subscribes to all the topics.
 				"""
 			contributors: ["december1981"]
 		},
@@ -86,7 +86,7 @@ releases: "0.53.0": {
 		{
 			type: "fix"
 			description: """
-				Fixed the opentelemetry source to collect HTTP headers for logs with or without `use_otlp_decoding` configuration option.
+				Fixed the OpenTelemetry source to collect HTTP headers for logs with or without the `use_otlp_decoding` configuration option.
 				"""
 			contributors: ["ozanichkovsky"]
 		},
@@ -100,7 +100,7 @@ releases: "0.53.0": {
 		{
 			type: "enhancement"
 			description: """
-				Autocompletion scripts for the vector cli can now be generated via `vector completion <SHELL>`.
+				Autocompletion scripts for the Vector CLI can now be generated with `vector completion <SHELL>`.
 				"""
 			contributors: ["weriomat"]
 		},
@@ -116,7 +116,7 @@ releases: "0.53.0": {
 			description: """
 				Buffers now emit metric names for sizes that better follow the metric naming standard specification
 				while keeping the old related gauges available for a transition period. Operators should update
-				dashboards/alerts to the new variants as the legacy names are now deprecated.
+				dashboards and alerts to the new variants as the legacy names are now deprecated.
 
 				* `buffer_max_size_bytes` deprecates `buffer_max_byte_size`
 				* `buffer_max_size_events` deprecates `buffer_max_event_size`
@@ -159,7 +159,7 @@ releases: "0.53.0": {
 			type: "feat"
 			description: """
 				Added `syslog` codec for encoding Vector events to Syslog format.
-				It handles RFC5424 and RFC3164 format, including specific field length limitations, character sanitization
+				It handles RFC5424 and RFC3164 format, including specific field length limitations, character sanitization,
 				and security escaping.
 				"""
 			contributors: ["syedriko", "polarathene", "vparfonov"]
@@ -178,7 +178,7 @@ releases: "0.53.0": {
 			type: "enhancement"
 			description: """
 				Vector-specific VRL functions are now available everywhere. Previously some functions were not
-				available inside codec VRL transforms and in the VRL cli (via `vector vrl`).
+				available inside codec VRL transforms and in the VRL CLI (through `vector vrl`).
 				"""
 			contributors: ["thomasqueirozb"]
 		},
@@ -196,7 +196,7 @@ releases: "0.53.0": {
 
 		#### Fixes
 
-		- Corrected the type definition for `format_int` function to return bytes instead of integer.
+		- Corrected the type definition for the `format_int` function to return bytes instead of integer.
 
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1586)
 
