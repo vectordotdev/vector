@@ -44,6 +44,11 @@ pub enum DataTypeConfig {
     ///
     /// Redis channels function in a pub/sub fashion, allowing many-to-many broadcasting and receiving.
     Channel,
+
+    /// The Redis `string` type.
+    ///
+    /// This resembles a sequence of bytes.
+    String,
 }
 
 /// List-specific options.
