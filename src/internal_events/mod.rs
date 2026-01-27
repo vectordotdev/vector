@@ -92,6 +92,8 @@ mod metric_to_log;
 mod mongodb_metrics;
 #[cfg(feature = "sinks-mqtt")]
 mod mqtt;
+#[cfg(feature = "sources-nats")]
+mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 mod nginx_metrics;
 mod open;
@@ -247,6 +249,8 @@ pub(crate) use self::lua::*;
 pub(crate) use self::metric_to_log::*;
 #[cfg(feature = "sinks-mqtt")]
 pub(crate) use self::mqtt::*;
+#[cfg(feature = "sources-nats")]
+pub(crate) use self::nats::*;
 #[cfg(feature = "sources-nginx_metrics")]
 pub(crate) use self::nginx_metrics::*;
 #[cfg(any(
