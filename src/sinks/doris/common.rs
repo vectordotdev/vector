@@ -1,5 +1,4 @@
 use crate::{
-    codecs::Encoder,
     http::{Auth, MaybeAuth},
     sinks::{
         doris::{
@@ -11,7 +10,7 @@ use crate::{
     tls::TlsSettings,
 };
 use http::Uri;
-use vector_lib::codecs::encoding::Framer;
+use vector_lib::codecs::{Encoder, SinkType, encoding::Framer};
 
 #[derive(Debug, Clone)]
 pub struct DorisCommon {
@@ -36,9 +35,7 @@ impl DorisCommon {
 
         // Build encoder from the encoding configuration
         let transformer = config.encoding.transformer();
-        let (framer, serializer) = config
-            .encoding
-            .build(crate::codecs::SinkType::StreamBased)?;
+        let (framer, serializer) = config.encoding.build(SinkType::StreamBased)?;
         let encoder = Encoder::<Framer>::new(framer, serializer);
 
         let request_builder = DorisRequestBuilder {

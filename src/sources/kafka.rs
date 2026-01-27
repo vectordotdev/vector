@@ -1206,6 +1206,7 @@ impl ReceivedMessage {
 
     fn apply(&self, keys: &Keys, event: &mut Event, log_namespace: LogNamespace) {
         if let Event::Log(log) = event {
+            log.metadata_mut().set_ingest_timestamp(Utc::now());
             match log_namespace {
                 LogNamespace::Vector => {
                     // We'll only use this function in Vector namespaces because we don't want

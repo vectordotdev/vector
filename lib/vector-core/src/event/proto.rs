@@ -688,6 +688,7 @@ impl From<Metadata> for EventMetadata {
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata,
             source_event_id,
+            ingest_timestamp: None,
         }))
     }
 }
