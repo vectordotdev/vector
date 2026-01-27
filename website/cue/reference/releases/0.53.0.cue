@@ -135,7 +135,7 @@ releases: "0.53.0": {
 		{
 			type: "feat"
 			description: """
-				Add new Apache Doris sink for sending log data to Apache Doris databases using the Stream Load API. The sink supports configurable batching, custom HTTP headers for Doris-specific options, authentication, rate limiting, adaptive concurrency control, and includes comprehensive health checks.
+				Added a new `doris` sink for sending log data to Apache Doris databases using the Stream Load API. The sink supports configurable batching, custom HTTP headers for Doris-specific options, authentication, rate limiting, adaptive concurrency control, and includes comprehensive health checks.
 				"""
 			contributors: ["bingquanzhao"]
 		},
@@ -151,7 +151,7 @@ releases: "0.53.0": {
 		{
 			type: "enhancement"
 			description: """
-				Add `content_type` option to the `gcp_cloud_storage` sink to override the `Content-Type` of created objects. If unset, defaults to the encoder's content type.
+				Added the `content_type` option to the `gcp_cloud_storage` sink to override the `Content-Type` of created objects. If unset, defaults to the encoder's content type.
 				"""
 			contributors: ["AnuragEkkati"]
 		},
