@@ -118,6 +118,12 @@ pub fn set_config_value(key: &str, value: &str) -> Result<String> {
         .check_output()
 }
 
+pub fn set_remote_url(remote_name: &str, url: &str) -> Result<String> {
+    Command::new("git")
+        .args(["remote", "set-url", remote_name, url])
+        .check_output()
+}
+
 /// Checks if the current directory's repo is clean
 pub fn check_git_repository_clean() -> Result<bool> {
     Ok(Command::new("git")
