@@ -6,6 +6,38 @@ releases: "0.53.0": {
 
 	whats_next: []
 
+	description: """
+		The Vector team is excited to announce version `0.52.0`!
+
+		## Release highlights
+
+		- Functions to access internal Vector metrics are now available for VRL: `get_vector_metric`,
+		  `find_vector_metrics` and `aggregate_vector_metrics`. You are now able to fetch snapshots
+		  of the metrics that are updated every `metrics_storage_refresh_period`.
+		- The `clickhouse` sink now supports the `arrow_stream` format option, enabling high-performance
+		  binary data transfer using Apache Arrow IPC. This provides significantly better performance
+		  and smaller payload sizes compared to JSON-based formats.
+		- Added a new `doris` sink for sending log data to Apache Doris databases using the Stream Load API.
+		- Added `syslog` codec for encoding Vector events to Syslog format. RFC5424 and RFC3164 are
+		  supported.
+
+		## Breaking Changes
+		- Buffers now emit metric names for sizes that better follow the metric naming standard specification
+		  while keeping the old related gauges available for a transition period. Operators should update
+		  dashboards/alerts to the new variants as the legacy names are now deprecated.
+
+		  * `buffer_max_size_bytes` deprecates `buffer_max_byte_size`
+		  * `buffer_max_size_events` deprecates `buffer_max_event_size`
+		  * `buffer_size_bytes` deprecates `buffer_byte_size`
+		  * `buffer_size_events` deprecates `buffer_events`
+
+
+		- Increased the number of buckets in internal histograms to reduce the smallest
+		  bucket down to approximately 0.000244 (2.0^-12). If you were manually indexing buckets
+		  using VRL you will have to change your indexes since the number of buckets changed
+		  from 20 to 26.
+		"""
+
 	changelog: [
 		{
 			type: "fix"
@@ -84,7 +116,7 @@ releases: "0.53.0": {
 				Buffers now emit metric names for sizes that better follow the metric naming standard specification
 				while keeping the old related gauges available for a transition period. Operators should update
 				dashboards/alerts to the new variants as the legacy names are now deprecated.
-				
+
 				* `buffer_max_size_bytes` deprecates `buffer_max_byte_size`
 				* `buffer_max_size_events` deprecates `buffer_max_event_size`
 				* `buffer_size_bytes` deprecates `buffer_byte_size`
@@ -153,21 +185,21 @@ releases: "0.53.0": {
 
 	vrl_changelog: """
 		### [0.30.0 (2026-01-22)]
-		
+
 		#### Breaking Changes & Upgrade Guide
-		
+
 		- The `usage()` method on the `Function` trait is now required. Custom VRL functions must implement this
 		method to return a `&'static str` describing the function's purpose.
-		
+
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1608)
-		
+
 		#### Fixes
-		
+
 		- Corrected the type definition for `format_int` function to return bytes instead of integer.
-		
+
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1586)
-		
-		
+
+
 		### [0.29.0 (2025-12-11)]
 		"""
 
