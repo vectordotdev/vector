@@ -7,7 +7,7 @@ releases: "0.53.0": {
 	whats_next: []
 
 	description: """
-		The Vector team is excited to announce version `0.52.0`!
+		The Vector team is excited to announce version `0.53.0`!
 
 		## Release highlights
 
@@ -20,6 +20,7 @@ releases: "0.53.0": {
 		- Added a new `doris` sink for sending log data to Apache Doris databases using the Stream Load API.
 		- Added `syslog` codec for encoding Vector events to Syslog format. RFC5424 and RFC3164 are
 		  supported.
+		- Added moving-mean gauges for source and transform buffers (`source_buffer_utilization_mean` and `transform_buffer_utilization_mean`), so observers can track an EWMA of buffer utilization in addition to the instant level.
 
 		## Breaking Changes
 		- Buffers now emit metric names for sizes that better follow the metric naming standard specification
