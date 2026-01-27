@@ -34,3 +34,6 @@ image = "vector-cross-env:arm-unknown-linux-gnueabi"
 
 [target.arm-unknown-linux-musleabi]
 image = "vector-cross-env:arm-unknown-linux-musleabi"
+
+[target.s390x-unknown-linux-gnu]
+image = "vector-cross-env:s390x-unknown-linux-gnu"
