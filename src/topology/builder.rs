@@ -1,5 +1,5 @@
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     future::ready,
     num::NonZeroUsize,
     sync::{Arc, LazyLock, Mutex},
@@ -35,7 +35,6 @@ use vector_vrl_metrics::MetricsStorage;
 use super::{
     BuiltBuffer, ConfigDiff,
     fanout::{self, Fanout},
-    processing_time::ProcessingTimeRecorder,
     schema,
     task::{Task, TaskOutput, TaskResult},
 };
@@ -544,31 +543,6 @@ impl<'a> Builder<'a> {
         }
     }
 
-    fn source_component_keys(&self, sink_key: &ComponentKey) -> Vec<ComponentKey> {
-        let mut sources = Vec::new();
-        self.collect_source_component_keys(sink_key, &mut sources, &mut HashSet::new());
-        sources
-    }
-
-    fn collect_source_component_keys(
-        &self,
-        component: &ComponentKey,
-        sources: &mut Vec<ComponentKey>,
-        visited: &mut HashSet<ComponentKey>,
-    ) {
-        if visited.insert(component.clone()) {
-            if self.config.source(component).is_some()
-                || self.config.enrichment_table(component).is_some()
-            {
-                sources.push(component.clone());
-            } else if let Some(inputs) = self.config.inputs_for_node(component) {
-                for input in inputs {
-                    self.collect_source_component_keys(&input.component, sources, visited);
-                }
-            }
-        }
-    }
-
     async fn build_sinks(&mut self, enrichment_tables: &vector_lib::enrichment::TableRegistry) {
         let table_sinks = self
             .config
@@ -597,15 +571,6 @@ impl<'a> Builder<'a> {
             let typetag = sink.inner.get_component_name();
             let input_type = sink.inner.input().data_type();
 
-            // We need to create the processing time recorder before the span is entered, otherwise
-            // the metrics will be created with additional labels (i.e. `component_id`
-            // `component_kind` and `component_type`) that are not required for these metrics.
-            let processing_time_recorder = ProcessingTimeRecorder::new(
-                key,
-                self.source_component_keys(key),
-                self.config.global.processing_time_ewma_alpha,
-            );
-
             let span = error_span!(
                 "sink",
                 component_kind = "sink",
@@ -626,7 +591,7 @@ impl<'a> Builder<'a> {
                 self.errors.append(&mut err);
             };
 
-            let (mut tx, rx) = match self.buffers.remove(key) {
+            let (tx, rx) = match self.buffers.remove(key) {
                 Some(buffer) => buffer,
                 _ => {
                     let buffer_type =
@@ -652,8 +617,6 @@ impl<'a> Builder<'a> {
                     }
                 }
             };
-
-            tx.with_custom_instrumentation(processing_time_recorder);
 
             let cx = SinkContext {
                 healthcheck,

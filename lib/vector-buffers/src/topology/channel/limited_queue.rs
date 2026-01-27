@@ -16,9 +16,14 @@ use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
 use metrics::{Gauge, Histogram, gauge, histogram};
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
-use vector_common::stats::EwmaGauge;
+use vector_common::stats::AtomicEwma;
 
 use crate::{InMemoryBufferable, config::MemoryBufferSize};
+
+/// The alpha value for the Exponentially Weighted Moving Average (EWMA) calculation. This is a
+/// measure of how much weight to give to the current value versus the previous values. A value of
+/// 0.9 results in a "half life" of 6-7 measurements.
+pub const DEFAULT_EWMA_ALPHA: f64 = 0.9;
 
 /// Error returned by `LimitedSender::send` when the receiver has disconnected.
 #[derive(Debug, PartialEq, Eq)]
@@ -109,7 +114,8 @@ impl ChannelMetricMetadata {
 struct Metrics {
     histogram: Histogram,
     gauge: Gauge,
-    mean_gauge: EwmaGauge,
+    mean_gauge: Gauge,
+    ewma: Arc<AtomicEwma>,
     // We hold a handle to the max gauge to avoid it being dropped by the metrics collector, but
     // since the value is static, we never need to update it. The compiler detects this as an unused
     // field, so we need to suppress the warning here.
@@ -144,20 +150,21 @@ impl Metrics {
         let histogram_name = format!("{prefix}_utilization");
         let gauge_name = format!("{prefix}_utilization_level");
         let mean_name = format!("{prefix}_utilization_mean");
+        let ewma = Arc::new(AtomicEwma::new(ewma_alpha.unwrap_or(DEFAULT_EWMA_ALPHA)));
         #[cfg(test)]
         let recorded_values = Arc::new(Mutex::new(Vec::new()));
         if let Some(label_value) = output {
             let max_gauge = gauge!(max_gauge_name, "output" => label_value.clone());
             max_gauge.set(max_value);
-            let mean_gauge_handle = gauge!(mean_name, "output" => label_value.clone());
             // DEPRECATED: buffer-bytes-events-metrics
             let legacy_max_gauge = gauge!(legacy_max_gauge_name, "output" => label_value.clone());
             legacy_max_gauge.set(max_value);
             Self {
                 histogram: histogram!(histogram_name, "output" => label_value.clone()),
                 gauge: gauge!(gauge_name, "output" => label_value.clone()),
-                mean_gauge: EwmaGauge::new(mean_gauge_handle, ewma_alpha),
+                mean_gauge: gauge!(mean_name, "output" => label_value.clone()),
                 max_gauge,
+                ewma,
                 legacy_max_gauge,
                 #[cfg(test)]
                 recorded_values,
@@ -165,15 +172,15 @@ impl Metrics {
         } else {
             let max_gauge = gauge!(max_gauge_name);
             max_gauge.set(max_value);
-            let mean_gauge_handle = gauge!(mean_name);
             // DEPRECATED: buffer-bytes-events-metrics
             let legacy_max_gauge = gauge!(legacy_max_gauge_name);
             legacy_max_gauge.set(max_value);
             Self {
                 histogram: histogram!(histogram_name),
                 gauge: gauge!(gauge_name),
-                mean_gauge: EwmaGauge::new(mean_gauge_handle, ewma_alpha),
+                mean_gauge: gauge!(mean_name),
                 max_gauge,
+                ewma,
                 legacy_max_gauge,
                 #[cfg(test)]
                 recorded_values,
@@ -185,7 +192,8 @@ impl Metrics {
     fn record(&self, value: usize) {
         self.histogram.record(value as f64);
         self.gauge.set(value as f64);
-        self.mean_gauge.record(value as f64);
+        let avg = self.ewma.update(value as f64);
+        self.mean_gauge.set(avg);
         #[cfg(test)]
         if let Ok(mut recorded) = self.recorded_values.lock() {
             recorded.push(value);

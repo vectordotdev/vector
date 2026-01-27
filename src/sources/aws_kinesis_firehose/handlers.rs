@@ -92,7 +92,6 @@ pub(super) async fn firehose(
                             event.add_batch_notifier(batch.clone());
                         }
                         if let Event::Log(log) = event {
-                            log.metadata_mut().set_ingest_timestamp(now);
                             log_namespace.insert_vector_metadata(
                                 log,
                                 log_schema().source_type_key(),
