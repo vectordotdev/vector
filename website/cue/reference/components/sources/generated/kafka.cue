@@ -644,6 +644,19 @@ generated: components: sources: kafka: configuration: {
 			type: bool: default: false
 		}
 	}
+	multithreading: {
+		description: """
+			Configuration for multithreaded message processing.
+
+			By default, multithreaded message processing is disabled.
+			"""
+		required: false
+		type: object: options: max_message_handling_tasks: {
+			description: "Number of messages may be processed in parallel for message processing."
+			required:    false
+			type: uint: default: 4
+		}
+	}
 	offset_key: {
 		description: """
 			Overrides the name of the log field used to add the offset to each event.
