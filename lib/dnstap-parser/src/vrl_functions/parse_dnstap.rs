@@ -39,6 +39,7 @@ impl Function for ParseDnstap {
                         "extraInfo": "",
                         "messageType": "ResolverQuery",
                         "messageTypeId": 3,
+                        "rawDataSize": 274,
                         "queryZone": "com.",
                         "requestData": {
                             "fullRcode": 0,
@@ -215,6 +216,7 @@ mod tests {
                     extraInfo: "",
                     messageType: "ResolverQuery",
                     messageTypeId: 3,
+                    rawDataSize: 274,
                     queryZone: "com.",
                     requestData: {
                         fullRcode: 0,
@@ -329,6 +331,7 @@ mod tests {
                     dataTypeId: 1,
                     messageType: "UpdateResponse",
                     messageTypeId: 14,
+                    rawDataSize: 147,
                     requestData: {
                         fullRcode: 0,
                         header: {

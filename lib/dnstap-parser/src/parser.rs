@@ -158,6 +158,7 @@ impl DnstapParser {
             need_raw_data = true;
         }
 
+        DnstapParser::insert(event, &root, &DNSTAP_VALUE_PATHS.raw_data_size, frame.len());
         if need_raw_data {
             DnstapParser::insert(
                 event,
@@ -514,6 +515,12 @@ impl DnstapParser {
             prefix.clone(),
             &DNSTAP_VALUE_PATHS.raw_data,
             BASE64_STANDARD.encode(raw_dns_message),
+        );
+        DnstapParser::insert(
+            event,
+            prefix.clone(),
+            &DNSTAP_VALUE_PATHS.raw_data_size,
+            raw_dns_message.len(),
         );
     }
 
@@ -1048,6 +1055,7 @@ mod tests {
         let dnstap_data = BASE64_STANDARD
             .decode(raw_dnstap_data)
             .expect("Invalid base64 encoded data.");
+        let len = dnstap_data.len();
         let parse_result = DnstapParser::parse(
             &mut log_event,
             Bytes::from(dnstap_data),
@@ -1060,6 +1068,7 @@ mod tests {
             ("dataTypeId", Value::Integer(1)),
             ("messageType", Value::Bytes(Bytes::from("ResolverQuery"))),
             ("messageTypeId", Value::Integer(3)),
+            ("rawDataSize", len.into()),
             ("queryZone", Value::Bytes(Bytes::from("com."))),
             ("requestData.fullRcode", Value::Integer(0)),
             ("requestData.header.aa", Value::Boolean(false)),
@@ -1244,6 +1253,7 @@ mod tests {
         let dnstap_data = BASE64_STANDARD
             .decode(raw_dnstap_data)
             .expect("Invalid base64 encoded data.");
+        let len = dnstap_data.len();
         let parse_result = DnstapParser::parse(
             &mut log_event,
             Bytes::from(dnstap_data),
@@ -1256,6 +1266,7 @@ mod tests {
             ("dataTypeId", Value::Integer(1)),
             ("messageType", Value::Bytes(Bytes::from("UpdateResponse"))),
             ("messageTypeId", Value::Integer(14)),
+            ("rawDataSize", len.into()),
             ("requestData.fullRcode", Value::Integer(0)),
             ("requestData.header.adCount", Value::Integer(0)),
             ("requestData.header.id", Value::Integer(28811)),
