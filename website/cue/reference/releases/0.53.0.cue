@@ -258,5 +258,6 @@ releases: "0.53.0": {
 		{sha: "7e0cef1cfe162f870060ae195fa34d6be5a95cc6", date: "2026-01-27 00:22:37 UTC", description: "bump lodash from 4.17.21 to 4.17.23 in /website", pr_number: 24529, scopes: ["website deps"], type: "chore", breaking_change: false, author: "dependabot[bot]", files_count: 1, insertions_count: 3, deletions_count: 3},
 		{sha: "f5632b6529ebbb236bfe8aef4831b8c13c66eee8", date: "2026-01-27 18:49:58 UTC", description: "respect DISABLE_MOLD in setup action", pr_number: 24548, scopes: ["ci"], type: "fix", breaking_change: false, author: "Thomas", files_count: 2, insertions_count: 2, deletions_count: 2},
 		{sha: "6f6b7ab07af4f4256d272bb8f1910027df98b195", date: "2026-01-27 20:25:56 UTC", description: "Add metrics to measure total event processing time", pr_number: 24546, scopes: ["observability"], type: "revert", breaking_change: false, author: "Thomas", files_count: 42, insertions_count: 67, deletions_count: 673},
+		{sha: "049748ed86ba014996da6e469a4deacdaa7121e0", date: "2026-01-27 19:23:43 UTC", description: "count individual items in OTLP batches for component_received_events_total metric", pr_number: 24537, scopes: ["opentelemetry source"], type: "fix", breaking_change: false, author: "Thomas", files_count: 6, insertions_count: 153, deletions_count: 2},
 	]
 }
