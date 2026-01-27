@@ -16,13 +16,13 @@ use chrono::{DateTime, TimeZone, Utc};
 use futures::{Stream, StreamExt, stream::FuturesOrdered};
 use futures_util::future::OptionFuture;
 use rdkafka::{
-    ClientConfig, ClientContext, Statistics, TopicPartitionList,
+    ClientConfig, ClientContext, Statistics, Timestamp, TopicPartitionList,
     consumer::{
         BaseConsumer, CommitMode, Consumer, ConsumerContext, Rebalance, StreamConsumer,
         stream_consumer::StreamPartitionQueue,
     },
     error::KafkaError,
-    message::{Headers as _, Message, OwnedMessage},
+    message::{BorrowedHeaders, BorrowedMessage, Headers as _, Message, OwnedHeaders},
     types::RDKafkaErrorCode,
 };
 use serde_with::serde_as;
@@ -697,8 +697,15 @@ impl ConsumerStateInner<Consuming> {
                                 },
                                 _ => emit!(KafkaReadError { error }),
                             },
-                            Ok(msg) => {
-                                let msg = msg.into_iter().map(|b| b.detach()).collect();
+                            Ok(msgs) => {
+                                // Detach messages from rdkafka early - this duplicates some memory,
+                                // but is needed for multithreading. Parsing has to copy data
+                                // anyways, so it just takes data from the detached message.
+                                let msgs = msgs.into_iter().filter_map(|b|
+                                    // The only case TryInto will fail if the message is empty
+                                    // And we want to ignore empty messages
+                                    b.try_into().ok()
+                                ).collect();
                                 if let Some(multithreading) = &multithreading_config {
                                     let decoder = decoder.clone();
                                     let keys = keys.clone();
@@ -706,18 +713,20 @@ impl ConsumerStateInner<Consuming> {
                                     let active_message_handling_tasks = Arc::clone(&active_message_handling_tasks);
                                     Self::wait_for_task_quota(multithreading, &active_message_handling_tasks).await;
                                     processing_futures.push_back(tokio::spawn(async move {
-                                        let result = parse_message(msg, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
+                                        let result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
                                         active_message_handling_tasks.fetch_sub(1, Ordering::AcqRel);
                                         result
                                     }.instrument(span.clone())));
                                 } else {
-                                    let batch_result = parse_message(msg, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
+                                    let batch_result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
                                     Self::finalize_batch(batch_result, finalizer.as_ref());
                                 }
                             }
                         }
                     },
 
+                    // This has to be the lowest priority future, because it will be ready with None even if
+                    // no futures are available
                     res = processing_futures.next(), if finalizer.is_some() => if let Some(Ok(batch_result)) = res {
                         Self::finalize_batch(batch_result, finalizer.as_ref());
                     },
@@ -1048,11 +1057,12 @@ async fn parse_message(
 ) -> Option<(OwnedMessage, BatchStatusReceiver)> {
     let (batch, receiver) = BatchNotifier::new_with_receiver();
     let last = messages.last().cloned()?;
+    let size = messages.len();
     let (count, streams) = messages
-        .iter()
+        .into_iter()
         .filter_map(|msg| parse_stream(msg, decoder.clone(), keys, log_namespace))
         .fold(
-            (0usize, Vec::with_capacity(messages.len())),
+            (0usize, Vec::with_capacity(size)),
             |(lc, mut ls), (rc, rs)| {
                 ls.push(rs);
                 (lc + rc, ls)
@@ -1079,23 +1089,21 @@ async fn parse_message(
 
 // Turn the received message into a stream of parsed events.
 fn parse_stream<'a>(
-    msg: &OwnedMessage,
+    msg: OwnedMessage,
     decoder: Decoder,
     keys: &'a Keys,
     log_namespace: LogNamespace,
 ) -> Option<(usize, impl Stream<Item = Event> + 'a + use<'a>)> {
-    let payload = msg.payload()?; // skip messages with empty payload
-
-    let size = payload.len();
+    let size = msg.payload.len();
     emit!(KafkaBytesReceived {
         byte_size: size,
         protocol: "tcp",
-        topic: msg.topic(),
-        partition: msg.partition(),
+        topic: &msg.topic,
+        partition: msg.partition,
     });
-    let rmsg = ReceivedMessage::from(msg);
+    let rmsg = ReceivedMessage::from(&msg);
 
-    let payload = Cursor::new(Bytes::copy_from_slice(payload));
+    let payload = Cursor::new(Bytes::from_owner(msg.payload));
 
     let mut stream = FramedRead::with_capacity(payload, decoder, size);
     let (count, _) = stream.size_hint();
@@ -1164,17 +1172,18 @@ impl ReceivedMessage {
     fn from(msg: &OwnedMessage) -> Self {
         // Extract timestamp from kafka message
         let timestamp = msg
-            .timestamp()
+            .timestamp
             .to_millis()
             .and_then(|millis| Utc.timestamp_millis_opt(millis).latest());
 
         let key = msg
-            .key()
+            .key
+            .as_ref()
             .map(|key| Value::from(Bytes::from(key.to_owned())))
             .unwrap_or(Value::Null);
 
         let mut headers_map = ObjectMap::new();
-        if let Some(headers) = msg.headers() {
+        if let Some(headers) = &msg.headers {
             for header in headers.iter() {
                 if let Some(value) = header.value {
                     headers_map.insert(
@@ -1189,9 +1198,9 @@ impl ReceivedMessage {
             timestamp,
             key,
             headers: headers_map,
-            topic: msg.topic().to_string(),
-            partition: msg.partition(),
-            offset: msg.offset(),
+            topic: msg.topic.to_string(),
+            partition: msg.partition,
+            offset: msg.offset,
         }
     }
 
@@ -1277,9 +1286,9 @@ struct FinalizerEntry {
 impl From<OwnedMessage> for FinalizerEntry {
     fn from(msg: OwnedMessage) -> Self {
         Self {
-            topic: msg.topic().into(),
-            partition: msg.partition(),
-            offset: msg.offset(),
+            topic: msg.topic,
+            partition: msg.partition,
+            offset: msg.offset,
         }
     }
 }
@@ -1627,6 +1636,40 @@ mod test {
             ..make_config("topic", "group", LogNamespace::Legacy, None)
         };
         assert!(create_consumer(&config, true).is_err());
+    }
+}
+
+/// Our implementation of [rdkafka::message::OwnedMessage].
+///
+/// Needed to be able to take the payload from it, without copying it again.
+#[derive(Debug, Clone)]
+struct OwnedMessage {
+    payload: Vec<u8>,
+    key: Option<Vec<u8>>,
+    topic: String,
+    timestamp: Timestamp,
+    partition: i32,
+    offset: i64,
+    headers: Option<OwnedHeaders>,
+}
+
+impl TryFrom<BorrowedMessage<'_>> for OwnedMessage {
+    type Error = ();
+
+    fn try_from(value: BorrowedMessage<'_>) -> Result<Self, Self::Error> {
+        let payload = value.payload();
+        match payload {
+            None => Err(()),
+            Some(payload) => Ok(OwnedMessage {
+                key: value.key().map(|k| k.to_vec()),
+                payload: payload.to_vec(),
+                topic: value.topic().to_owned(),
+                timestamp: value.timestamp(),
+                partition: value.partition(),
+                offset: value.offset(),
+                headers: value.headers().map(BorrowedHeaders::detach),
+            }),
+        }
     }
 }
 
