@@ -13,6 +13,10 @@ impl Function for ParseDnstap {
         "parse_dnstap"
     }
 
+    fn usage(&self) -> &'static str {
+        "Parses the `value` as base64 encoded DNSTAP data."
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {

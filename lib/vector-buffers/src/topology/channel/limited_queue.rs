@@ -121,6 +121,8 @@ struct Metrics {
     // field, so we need to suppress the warning here.
     #[expect(dead_code)]
     max_gauge: Gauge,
+    #[expect(dead_code)]
+    legacy_max_gauge: Gauge,
     #[cfg(test)]
     recorded_values: Arc<Mutex<Vec<usize>>>,
 }
@@ -133,11 +135,18 @@ impl Metrics {
         ewma_alpha: Option<f64>,
     ) -> Self {
         let ChannelMetricMetadata { prefix, output } = metadata;
-        let (gauge_suffix, max_value) = match limit {
-            MemoryBufferSize::MaxEvents(max_events) => ("_max_event_size", max_events.get() as f64),
-            MemoryBufferSize::MaxSize(max_bytes) => ("_max_byte_size", max_bytes.get() as f64),
+        let (legacy_suffix, gauge_suffix, max_value) = match limit {
+            MemoryBufferSize::MaxEvents(max_events) => (
+                "_max_event_size",
+                "_max_size_events",
+                max_events.get() as f64,
+            ),
+            MemoryBufferSize::MaxSize(max_bytes) => {
+                ("_max_byte_size", "_max_size_bytes", max_bytes.get() as f64)
+            }
         };
         let max_gauge_name = format!("{prefix}{gauge_suffix}");
+        let legacy_max_gauge_name = format!("{prefix}{legacy_suffix}");
         let histogram_name = format!("{prefix}_utilization");
         let gauge_name = format!("{prefix}_utilization_level");
         let mean_name = format!("{prefix}_utilization_mean");
@@ -147,24 +156,32 @@ impl Metrics {
         if let Some(label_value) = output {
             let max_gauge = gauge!(max_gauge_name, "output" => label_value.clone());
             max_gauge.set(max_value);
+            // DEPRECATED: buffer-bytes-events-metrics
+            let legacy_max_gauge = gauge!(legacy_max_gauge_name, "output" => label_value.clone());
+            legacy_max_gauge.set(max_value);
             Self {
                 histogram: histogram!(histogram_name, "output" => label_value.clone()),
                 gauge: gauge!(gauge_name, "output" => label_value.clone()),
                 mean_gauge: gauge!(mean_name, "output" => label_value.clone()),
                 max_gauge,
                 ewma,
+                legacy_max_gauge,
                 #[cfg(test)]
                 recorded_values,
             }
         } else {
             let max_gauge = gauge!(max_gauge_name);
             max_gauge.set(max_value);
+            // DEPRECATED: buffer-bytes-events-metrics
+            let legacy_max_gauge = gauge!(legacy_max_gauge_name);
+            legacy_max_gauge.set(max_value);
             Self {
                 histogram: histogram!(histogram_name),
                 gauge: gauge!(gauge_name),
                 mean_gauge: gauge!(mean_name),
                 max_gauge,
                 ewma,
+                legacy_max_gauge,
                 #[cfg(test)]
                 recorded_values,
             }

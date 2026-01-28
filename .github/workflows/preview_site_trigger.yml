@@ -12,8 +12,9 @@ jobs:
       # Validate branch name
       - name: Validate branch name and set output
         id: validate
+        env:
+          BRANCH: ${{ github.head_ref }}
         run: |
-          BRANCH="${{ github.head_ref }}"
           if [[ ! "$BRANCH" =~ ^[a-zA-Z0-9_-]+$ ]]; then
             echo "valid=false" >> $GITHUB_OUTPUT
           else

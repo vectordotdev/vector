@@ -31,15 +31,15 @@ impl<K> Storage<K> for VectorStorage {
 
 #[derive(Debug)]
 pub(super) struct Histogram {
-    buckets: Box<[(f64, AtomicU32); 20]>,
+    buckets: Box<[(f64, AtomicU32); 26]>,
     count: AtomicU64,
     sum: AtomicF64,
 }
 
 impl Histogram {
-    const MIN_BUCKET: f64 = 0.015_625; // (-6_f64).exp2() is not const yet
-    const MIN_BUCKET_EXP: f64 = -6.0;
-    const BUCKETS: usize = 20;
+    const MIN_BUCKET: f64 = 1.0 / (1 << 12) as f64; // f64::powi() is not const yet
+    const MIN_BUCKET_EXP: f64 = -12.0;
+    const BUCKETS: usize = 26;
 
     pub(crate) fn new() -> Self {
         // Box to avoid having this large array inline to the structure, blowing
@@ -52,25 +52,31 @@ impl Histogram {
         // long-tail. This also lets us find the right bucket to record into using simple
         // constant-time math operations instead of a loop-and-compare construct.
         let buckets = Box::new([
-            ((-6_f64).exp2(), AtomicU32::new(0)),
-            ((-5_f64).exp2(), AtomicU32::new(0)),
-            ((-4_f64).exp2(), AtomicU32::new(0)),
-            ((-3_f64).exp2(), AtomicU32::new(0)),
-            ((-2_f64).exp2(), AtomicU32::new(0)),
-            ((-1_f64).exp2(), AtomicU32::new(0)),
-            (0_f64.exp2(), AtomicU32::new(0)),
-            (1_f64.exp2(), AtomicU32::new(0)),
-            (2_f64.exp2(), AtomicU32::new(0)),
-            (3_f64.exp2(), AtomicU32::new(0)),
-            (4_f64.exp2(), AtomicU32::new(0)),
-            (5_f64.exp2(), AtomicU32::new(0)),
-            (6_f64.exp2(), AtomicU32::new(0)),
-            (7_f64.exp2(), AtomicU32::new(0)),
-            (8_f64.exp2(), AtomicU32::new(0)),
-            (9_f64.exp2(), AtomicU32::new(0)),
-            (10_f64.exp2(), AtomicU32::new(0)),
-            (11_f64.exp2(), AtomicU32::new(0)),
-            (12_f64.exp2(), AtomicU32::new(0)),
+            (2.0f64.powi(-12), AtomicU32::new(0)),
+            (2.0f64.powi(-11), AtomicU32::new(0)),
+            (2.0f64.powi(-10), AtomicU32::new(0)),
+            (2.0f64.powi(-9), AtomicU32::new(0)),
+            (2.0f64.powi(-8), AtomicU32::new(0)),
+            (2.0f64.powi(-7), AtomicU32::new(0)),
+            (2.0f64.powi(-6), AtomicU32::new(0)),
+            (2.0f64.powi(-5), AtomicU32::new(0)),
+            (2.0f64.powi(-4), AtomicU32::new(0)),
+            (2.0f64.powi(-3), AtomicU32::new(0)),
+            (2.0f64.powi(-2), AtomicU32::new(0)),
+            (2.0f64.powi(-1), AtomicU32::new(0)),
+            (2.0f64.powi(0), AtomicU32::new(0)),
+            (2.0f64.powi(1), AtomicU32::new(0)),
+            (2.0f64.powi(2), AtomicU32::new(0)),
+            (2.0f64.powi(3), AtomicU32::new(0)),
+            (2.0f64.powi(4), AtomicU32::new(0)),
+            (2.0f64.powi(5), AtomicU32::new(0)),
+            (2.0f64.powi(6), AtomicU32::new(0)),
+            (2.0f64.powi(7), AtomicU32::new(0)),
+            (2.0f64.powi(8), AtomicU32::new(0)),
+            (2.0f64.powi(9), AtomicU32::new(0)),
+            (2.0f64.powi(10), AtomicU32::new(0)),
+            (2.0f64.powi(11), AtomicU32::new(0)),
+            (2.0f64.powi(12), AtomicU32::new(0)),
             (f64::INFINITY, AtomicU32::new(0)),
         ]);
         Self {
