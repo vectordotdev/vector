@@ -26,11 +26,11 @@ directories = "6.0.0"
 glob.workspace = true
 hex = "0.4.3"
 indexmap.workspace = true
-indicatif = { version = "0.18.0", features = ["improved_unicode"] }
+indicatif = { version = "0.18.3", features = ["improved_unicode"] }
 itertools.workspace = true
-log = "0.4.27"
+log = "0.4.29"
 # watch https://github.com/epage/anstyle for official interop with Clap
-owo-colors = { version = "4.2.2", features = ["supports-colors"] }
+owo-colors = { version = "4.2.3", features = ["supports-colors"] }
 paste.workspace = true
 regex.workspace = true
 reqwest = { workspace = true, features = ["blocking"] }
@@ -43,7 +43,7 @@ toml.workspace = true
 toml_edit = "0.22"
 semver.workspace = true
 indoc.workspace = true
-git2 = { version = "0.20.2" }
+git2 = { version = "0.20.3" }
 cfg-if.workspace = true
 
 [package.metadata.binstall]
