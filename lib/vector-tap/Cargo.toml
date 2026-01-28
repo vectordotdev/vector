@@ -16,8 +16,8 @@ futures.workspace = true
 glob.workspace = true
 serde_yaml.workspace = true
 tokio = { workspace = true, features = ["time"] }
-tokio-stream = { version = "0.1.17", default-features = false, features = ["sync"] }
-tokio-tungstenite = { version = "0.20.1", default-features = false }
+tokio-stream = { version = "0.1.18", default-features = false, features = ["sync"] }
+tokio-tungstenite = { version = "0.21.0", default-features = false }
 tracing.workspace = true
 url = { version = "2.5.4", default-features = false }
 uuid.workspace = true
