@@ -174,7 +174,16 @@ impl DnstapEventSchema {
                 Kind::object(self.request_message_schema_definition()),
                 None,
             )
-            .optional_field(&DNSTAP_VALUE_PATHS.message_size, Kind::integer(), None)
+            .optional_field(
+                &DNSTAP_VALUE_PATHS.request_message_size,
+                Kind::integer(),
+                None,
+            )
+            .optional_field(
+                &DNSTAP_VALUE_PATHS.response_message_size,
+                Kind::integer(),
+                None,
+            )
     }
 
     /// The schema definition for a dns tap message.
@@ -212,7 +221,8 @@ pub struct DnstapPaths {
     pub message_type_id: OwnedValuePath,
     pub request_message: OwnedValuePath,
     pub response_message: OwnedValuePath,
-    pub message_size: OwnedValuePath,
+    pub request_message_size: OwnedValuePath,
+    pub response_message_size: OwnedValuePath,
 
     // DnsQueryMessageSchema
     pub response_code: OwnedValuePath,
@@ -313,7 +323,8 @@ pub static DNSTAP_VALUE_PATHS: LazyLock<DnstapPaths> = LazyLock::new(|| DnstapPa
     message_type_id: owned_value_path!("messageTypeId"),
     request_message: owned_value_path!("requestData"),
     response_message: owned_value_path!("responseData"),
-    message_size: owned_value_path!("messageSize"),
+    request_message_size: owned_value_path!("requestMessageSize"),
+    response_message_size: owned_value_path!("responseMessageSize"),
     response_code: owned_value_path!("fullRcode"),
     response: owned_value_path!("rcodeName"),
     header: owned_value_path!("header"),
