@@ -4,14 +4,15 @@
 //! This implements the streaming variant of the Arrow IPC protocol, which writes
 //! a continuous stream of record batches without a file footer.
 
-mod builder;
-mod types;
+mod serializer;
 
+#[cfg(test)]
+mod _ignore_bench_test;
 #[cfg(test)]
 mod tests;
 
 use arrow::{
-    datatypes::{DataType, FieldRef, Schema, SchemaRef},
+    datatypes::{DataType, Fields, Schema, SchemaRef},
     ipc::writer::StreamWriter,
 };
 use async_trait::async_trait;
@@ -20,7 +21,7 @@ use snafu::Snafu;
 use std::sync::Arc;
 use vector_config::configurable_component;
 
-use builder::build_record_batch;
+use serializer::build_record_batch;
 
 /// Provides Arrow schema for encoding.
 ///
@@ -108,11 +109,7 @@ impl ArrowStreamSerializer {
         // instead of on every batch encoding
         let schema = if config.allow_nullable_fields {
             Schema::new_with_metadata(
-                schema
-                    .fields()
-                    .iter()
-                    .map(|f| make_field_nullable(f).into())
-                    .collect::<Vec<FieldRef>>(),
+                Fields::from_iter(schema.fields().iter().map(|f| make_field_nullable(f))),
                 schema.metadata().clone(),
             )
         } else {
@@ -202,6 +199,61 @@ pub enum ArrowEncodingError {
         /// The underlying IO error
         source: std::io::Error,
     },
+
+    /// Serde Arrow serialization error
+    #[snafu(display("Serde Arrow error: {}", source))]
+    SerdeArrow {
+        /// The underlying serde_arrow error
+        source: serde_arrow::Error,
+    },
+
+    /// Invalid timestamp value could not be parsed
+    #[snafu(display("Invalid timestamp value for field '{}': {}", field_name, value))]
+    InvalidTimestamp {
+        /// The field name
+        field_name: String,
+        /// The invalid value
+        value: String,
+    },
+
+    /// Invalid type for Decimal128 field
+    #[snafu(display(
+        "Invalid type for Decimal128 field '{}': expected Float, got {:?}",
+        field_name,
+        actual_type
+    ))]
+    InvalidDecimalType {
+        /// The field name
+        field_name: String,
+        /// The actual type received
+        actual_type: String,
+    },
+
+    /// Invalid Map structure in schema
+    #[snafu(display(
+        "Invalid Map structure for field '{}': expected 2 entry fields (key, value), got {}",
+        field_name,
+        num_fields
+    ))]
+    InvalidMapStructure {
+        /// The field name
+        field_name: String,
+        /// The number of fields found
+        num_fields: usize,
+    },
+
+    /// Timestamp value overflows the representable range
+    #[snafu(display(
+        "Timestamp overflow for field '{}': value '{}' cannot be represented as i64 nanoseconds",
+        field_name,
+        timestamp
+    ))]
+    TimestampOverflow {
+        /// The field name
+        field_name: String,
+        /// The timestamp value that overflowed
+        timestamp: String,
+    },
 }
 
 impl From<std::io::Error> for ArrowEncodingError {
@@ -238,9 +290,9 @@ pub fn encode_events_to_arrow_ipc_stream(
 fn make_field_nullable(field: &arrow::datatypes::Field) -> arrow::datatypes::Field {
     let new_data_type = match field.data_type() {
         DataType::List(inner_field) => DataType::List(make_field_nullable(inner_field).into()),
-        DataType::Struct(fields) => {
-            DataType::Struct(fields.iter().map(|f| make_field_nullable(f)).collect())
-        }
+        DataType::Struct(fields) => DataType::Struct(Fields::from_iter(
+            fields.iter().map(|f| make_field_nullable(f)),
+        )),
         DataType::Map(inner, sorted) => {
             // A Map's inner field is typically a "entries" Struct<Key, Value>
             let DataType::Struct(fields) = inner.data_type() else {
