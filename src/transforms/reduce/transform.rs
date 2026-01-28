@@ -1141,46 +1141,71 @@ max_bytes = 1
     }
 
     #[tokio::test]
-    async fn max_bytes_first_event_exceeds() {
-        // Set max_bytes very small - first event should still be processed
-        let reduce_config = toml::from_str::<ReduceConfig>(
+    async fn max_bytes_flushes_after_multiple_events() {
+        let mut e_1 = LogEvent::from("msg1");
+        e_1.insert("id", "1");
+        let mut e_2 = LogEvent::from("msg2");
+        e_2.insert("id", "1");
+        let mut e_3 = LogEvent::from("msg3");
+        e_3.insert("id", "1");
+        let mut e_4 = LogEvent::from("msg4");
+        e_4.insert("id", "1");
+
+        let size_1 = e_1.size_of();
+        let size_2 = e_2.size_of();
+        let size_3 = e_3.size_of();
+        let size_4 = e_4.size_of();
+
+        // Set max_bytes to allow e_1 + e_2 + e_3, but adding e_4 exceeds the limit
+        let max_bytes = size_1 + size_2 + size_3 + (size_4 / 2);
+
+        let config_str = format!(
             r#"
 group_by = [ "id" ]
 merge_strategies.id = "retain"
 merge_strategies.message = "array"
-max_bytes = 1
+max_bytes = {}
 
 [ends_when]
   type = "vrl"
   source = "exists(.test_end)"
             "#,
-        )
-        .unwrap();
+            max_bytes
+        );
+        let reduce_config = toml::from_str::<ReduceConfig>(&config_str).unwrap();
 
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
             let (topology, mut out) = create_topology(ReceiverStream::new(rx), reduce_config).await;
 
-            // First event exceeds max_bytes but should still be accepted
-            let mut e_1 = LogEvent::from("test message 1");
+            // Recreate events (the originals were moved for size measurement)
+            let mut e_1 = LogEvent::from("msg1");
             e_1.insert("id", "1");
 
-            // Second event should trigger flush of first, then be processed
-            let mut e_2 = LogEvent::from("test message 2");
+            let mut e_2 = LogEvent::from("msg2");
             e_2.insert("id", "1");
-            e_2.insert("test_end", "yep");
 
-            for event in [e_1.into(), e_2.into()] {
+            let mut e_3 = LogEvent::from("msg3");
+            e_3.insert("id", "1");
+
+            let mut e_4 = LogEvent::from("msg4");
+            e_4.insert("id", "1");
+
+            let mut e_5 = LogEvent::from("msg5");
+            e_5.insert("id", "1");
+            e_5.insert("test_end", "yep");
+
+            for event in [e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into()] {
                 tx.send(event).await.unwrap();
             }
 
-            // First event flushed when second arrives (since it exceeds max_bytes)
+            // First output: events 1+2+3 flushed when event 4 arrives
             let output_1 = out.recv().await.unwrap().into_log();
-            assert_eq!(output_1["message"], vec!["test message 1"].into());
+            assert_eq!(output_1["message"], vec!["msg1", "msg2", "msg3"].into());
 
-            // Second event flushed due to ends_when
+            // Second output: events 4+5 flushed due to ends_when
             let output_2 = out.recv().await.unwrap().into_log();
-            assert_eq!(output_2["message"], vec!["test message 2"].into());
+            assert_eq!(output_2["message"], vec!["msg4", "msg5"].into());
 
             drop(tx);
             topology.stop().await;
