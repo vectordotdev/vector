@@ -76,6 +76,8 @@ mod internal_logs;
 mod journald;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 mod kafka;
+#[cfg(feature = "sources-kubernetes_events")]
+mod kubernetes_events;
 #[cfg(feature = "sources-kubernetes_logs")]
 mod kubernetes_logs;
 #[cfg(feature = "transforms-log_to_metric")]
@@ -233,6 +235,8 @@ pub(crate) use self::internal_logs::*;
 pub(crate) use self::journald::*;
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub(crate) use self::kafka::*;
+#[cfg(feature = "sources-kubernetes_events")]
+pub(crate) use self::kubernetes_events::*;
 #[cfg(feature = "sources-kubernetes_logs")]
 pub(crate) use self::kubernetes_logs::*;
 #[cfg(feature = "transforms-log_to_metric")]
