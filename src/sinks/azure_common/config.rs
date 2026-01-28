@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use azure_core::error::HttpError;
 use azure_core_for_storage::RetryOptions;
-use azure_storage::{CloudLocation, ConnectionString};
+use azure_storage::{CloudLocation, ConnectionString, StorageCredentials};
 use azure_storage_blobs::{blob::operations::PutBlockBlobResponse, prelude::*};
 use bytes::Bytes;
 use futures::FutureExt;
@@ -16,8 +16,13 @@ use vector_lib::{
 
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
-    sinks::{Healthcheck, util::retries::RetryLogic},
+    sinks::{
+        Healthcheck, azure_common::environment_credentials::EnvironmentCredential,
+        util::retries::RetryLogic,
+    },
 };
+
+use super::azure_credential_interop::TokenCredentialInterop;
 
 #[derive(Debug, Clone)]
 pub struct AzureBlobRequest {
@@ -125,35 +130,74 @@ pub fn build_healthcheck(
 }
 
 pub fn build_client(
-    connection_string: String,
+    connection_string: Option<String>,
+    storage_account: Option<String>,
     container_name: String,
+    endpoint: Option<String>,
 ) -> crate::Result<Arc<ContainerClient>> {
-    let client = {
-        let connection_string = ConnectionString::new(&connection_string)?;
-        let account_name = connection_string
-            .account_name
-            .ok_or("Account name missing in connection string")?;
+    let client = match (connection_string, storage_account) {
+        (Some(connection_string_p), None) => {
+            let connection_string = ConnectionString::new(&connection_string_p)?;
+            let account_name = connection_string
+                .account_name
+                .ok_or("Account name missing in connection string")?;
 
-        match connection_string.blob_endpoint {
-            // When the blob_endpoint is provided, we use the Custom CloudLocation since it is
-            // required to contain the full URI to the blob storage API endpoint, this means
-            // that account_name is not required to exist in the connection_string since
-            // account_name is only used with the default CloudLocation in the Azure SDK to
-            // generate the storage API endpoint
-            Some(uri) => ClientBuilder::with_location(
-                CloudLocation::Custom {
-                    uri: uri.to_string(),
-                    account: account_name.to_string(),
-                },
-                connection_string.storage_credentials()?,
-            ),
-            // Without a valid blob_endpoint in the connection_string, assume we are in Azure
-            // Commercial (AzureCloud location) and create a default Blob Storage Client that
-            // builds the API endpoint location using the account_name as input
-            None => ClientBuilder::new(account_name, connection_string.storage_credentials()?),
+            match connection_string.blob_endpoint {
+                // When the blob_endpoint is provided, we use the Custom CloudLocation since it is
+                // required to contain the full URI to the blob storage API endpoint, this means
+                // that account_name is not required to exist in the connection_string since
+                // account_name is only used with the default CloudLocation in the Azure SDK to
+                // generate the storage API endpoint
+                Some(uri) => ClientBuilder::with_location(
+                    CloudLocation::Custom {
+                        uri: uri.to_string(),
+                        account: account_name.to_string(),
+                    },
+                    connection_string.storage_credentials()?,
+                ),
+                // Without a valid blob_endpoint in the connection_string, assume we are in Azure
+                // Commercial (AzureCloud location) and create a default Blob Storage Client that
+                // builds the API endpoint location using the account_name as input
+                None => ClientBuilder::new(account_name, connection_string.storage_credentials()?),
+            }
+            .retry(RetryOptions::none())
+            .container_client(container_name)
         }
-        .retry(RetryOptions::none())
-        .container_client(container_name)
+        (None, Some(storage_account_p)) => {
+            let environment_credential = EnvironmentCredential::default();
+            let creds = TokenCredentialInterop::new(Arc::new(environment_credential));
+            let storage_credentials = StorageCredentials::token_credential(Arc::new(creds));
+
+            match endpoint {
+                // If a blob_endpoint is provided in the configuration, use it with a Custom
+                // CloudLocation, to allow overriding the blob storage API endpoint
+                Some(endpoint) => ClientBuilder::with_location(
+                    CloudLocation::Custom {
+                        uri: endpoint,
+                        account: storage_account_p,
+                    },
+                    storage_credentials,
+                ),
+                // Use the storage_account configuration parameter and assume we are in Azure
+                // Commercial (AzureCloud location) and build the blob storage API endpoint using
+                // the storage_account as input.
+                None => ClientBuilder::new(storage_account_p, storage_credentials),
+            }
+            .retry(RetryOptions::none())
+            .container_client(container_name)
+        }
+        (None, None) => {
+            return Err(
+                "Either `connection_string` or `storage_account` has to be provided".into(),
+            );
+        }
+        (Some(_), Some(_)) => {
+            return Err(
+                "`connection_string` and `storage_account` can't be provided at the same time"
+                    .into(),
+            );
+        }
     };
+
     Ok(Arc::new(client))
 }

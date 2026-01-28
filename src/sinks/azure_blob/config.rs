@@ -55,13 +55,38 @@ pub struct AzureBlobSinkConfig {
     /// | Allowed services       | Blob               |
     /// | Allowed resource types | Container & Object |
     /// | Allowed permissions    | Read & Create      |
+    ///
+    /// Either `storage_account`, or this field, must be specified.
     #[configurable(metadata(
         docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
     ))]
     #[configurable(metadata(
         docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
     ))]
-    pub connection_string: SensitiveString,
+    pub connection_string: Option<SensitiveString>,
+
+    /// The Azure Blob Storage Account name.
+    ///
+    /// Attempts to load credentials for the account via environment variables ([more information][env_cred_docs])
+    ///
+    /// Either `connection_string`, or this field, must be specified.
+    ///
+    /// [env_cred_docs]: https://docs.rs/azure_identity/0.17.0/azure_identity/struct.EnvironmentCredential.html
+    #[configurable(metadata(docs::examples = "mylogstorage"))]
+    pub storage_account: Option<String>,
+
+    /// The Azure Blob Storage Endpoint URL.
+    ///
+    /// This is used to override the default blob storage endpoint URL in cases where you are using
+    /// credentials read from the environment/managed identities or access tokens without using an
+    /// explicit connection_string (which already explicitly supports overriding the blob endpoint
+    /// URL).
+    ///
+    /// This may only be used with `storage_account` and is ignored when used with
+    /// `connection_string`.
+    #[configurable(metadata(docs::examples = "https://test.blob.core.usgovcloudapi.net/"))]
+    #[configurable(metadata(docs::examples = "https://test.blob.core.windows.net/"))]
+    pub endpoint: Option<String>,
 
     /// The Azure Blob Storage Account container name.
     #[configurable(metadata(docs::examples = "my-logs"))]
@@ -147,8 +172,10 @@ pub fn default_blob_prefix() -> Template {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            connection_string: String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into(),
+            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
+            storage_account: Some(String::from("some-account-name")),
             container_name: String::from("logs"),
+            endpoint: None,
             blob_prefix: default_blob_prefix(),
             blob_time_format: Some(String::from("%s")),
             blob_append_uuid: Some(true),
@@ -167,8 +194,12 @@ impl GenerateConfig for AzureBlobSinkConfig {
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(
-            self.connection_string.clone().into(),
+            self.connection_string
+                .as_ref()
+                .map(|v| v.inner().to_string()),
+            self.storage_account.as_ref().map(|v| v.to_string()),
             self.container_name.clone(),
+            self.endpoint.clone(),
         )?;
 
         let healthcheck = azure_common::config::build_healthcheck(
