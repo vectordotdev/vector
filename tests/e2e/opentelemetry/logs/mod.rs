@@ -141,3 +141,15 @@ fn vector_sink_otel_sink_logs_match() {
         "Collector and Vector log requests should match"
     );
 }
+
+#[test]
+fn vector_component_received_events_total_counts_individual_log_records() {
+    // This test verifies that when use_otlp_decoding is enabled, the
+    // component_received_events_total metric counts individual log records
+    // within OTLP batches, not the number of batch requests.
+    // This ensures consistency with other Vector sources and with the same
+    // OpenTelemetry source when use_otlp_decoding is disabled.
+    use crate::opentelemetry::assert_component_received_events_total;
+
+    assert_component_received_events_total("logs", EXPECTED_LOG_COUNT);
+}

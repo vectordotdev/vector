@@ -129,7 +129,7 @@ pub struct MetricMetadataMetricDetailsNotFoundError {}
 
 impl InternalEvent for MetricMetadataMetricDetailsNotFoundError {
     fn emit(self) {
-        let reason = "Missing required metric details. Required one of gauge, distribution, histogram, summary, counter";
+        let reason = "Missing required metric details. Required one of gauge, distribution, aggregated_histogram, aggregated_summary, counter";
         error!(
             message = reason,
             error_code = "missing_metric_details",

@@ -132,7 +132,13 @@ impl Service {
         mut events: Vec<Event>,
         log_name: &'static str,
     ) -> Result<(), Status> {
-        let count = events.len();
+        // When using OTLP decoding, count individual items within the batch
+        // to maintain consistency with other Vector sources
+        let count = if self.deserializer.is_some() {
+            super::count_otlp_items(&events)
+        } else {
+            events.len()
+        };
         let byte_size = events.estimated_json_encoded_size_of();
         self.events_received.emit(CountByteSize(count, byte_size));
 
