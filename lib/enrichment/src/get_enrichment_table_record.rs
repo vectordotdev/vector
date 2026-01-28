@@ -29,14 +29,16 @@ fn get_enrichment_table_record(
         })
         .transpose()?;
 
-    let data = enrichment_tables.find_table_row(
-        table,
-        case_sensitive,
-        condition,
-        select.as_ref().map(|select| select.as_ref()),
-        wildcard.as_ref(),
-        index,
-    )?;
+    let data = enrichment_tables
+        .find_table_row(
+            table,
+            case_sensitive,
+            condition,
+            select.as_ref().map(|select| select.as_ref()),
+            wildcard.as_ref(),
+            index,
+        )
+        .map_err(Into::<ExpressionError>::into)?;
 
     Ok(Value::Object(data))
 }
