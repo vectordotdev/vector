@@ -18,7 +18,7 @@ impl DnstapEventSchema {
         let mut result: BTreeMap<Field, Kind> = BTreeMap::new();
         result.insert(
             DNSTAP_VALUE_PATHS.time.to_string().into(),
-            Kind::integer().or_undefwithined(),
+            Kind::integer().or_undefined(),
         );
 
         result.insert(
@@ -106,11 +106,6 @@ impl DnstapEventSchema {
         );
 
         result.insert(
-            DNSTAP_VALUE_PATHS.raw_data_size.to_string().into(),
-            Kind::integer(),
-        );
-
-        result.insert(
             DNSTAP_VALUE_PATHS.prerequisite_section.to_string().into(),
             Kind::array(Collection::from_unknown(Kind::object(
                 DnsRecordSchema::schema_definition(),
@@ -150,7 +145,6 @@ impl DnstapEventSchema {
             .optional_field(&DNSTAP_VALUE_PATHS.data_type, Kind::bytes(), None)
             .optional_field(&DNSTAP_VALUE_PATHS.error, Kind::bytes(), None)
             .optional_field(&DNSTAP_VALUE_PATHS.raw_data, Kind::bytes(), None)
-            .with_event_field(&DNSTAP_VALUE_PATHS.raw_data_size, Kind::integer(), None)
             .optional_field(&DNSTAP_VALUE_PATHS.time, Kind::integer(), None)
             .optional_field(&DNSTAP_VALUE_PATHS.time_precision, Kind::bytes(), None)
     }
@@ -180,6 +174,7 @@ impl DnstapEventSchema {
                 Kind::object(self.request_message_schema_definition()),
                 None,
             )
+            .optional_field(&DNSTAP_VALUE_PATHS.message_size, Kind::integer(), None)
     }
 
     /// The schema definition for a dns tap message.
@@ -204,7 +199,6 @@ pub struct DnstapPaths {
     pub time_precision: OwnedValuePath,
     pub error: OwnedValuePath,
     pub raw_data: OwnedValuePath,
-    pub raw_data_size: OwnedValuePath,
 
     // DnstapMessageSchema
     pub socket_family: OwnedValuePath,
@@ -218,6 +212,7 @@ pub struct DnstapPaths {
     pub message_type_id: OwnedValuePath,
     pub request_message: OwnedValuePath,
     pub response_message: OwnedValuePath,
+    pub message_size: OwnedValuePath,
 
     // DnsQueryMessageSchema
     pub response_code: OwnedValuePath,
@@ -307,7 +302,6 @@ pub static DNSTAP_VALUE_PATHS: LazyLock<DnstapPaths> = LazyLock::new(|| DnstapPa
     time_precision: owned_value_path!("timePrecision"),
     error: owned_value_path!("error"),
     raw_data: owned_value_path!("rawData"),
-    raw_data_size: owned_value_path!("rawDataSize"),
     socket_family: owned_value_path!("socketFamily"),
     socket_protocol: owned_value_path!("socketProtocol"),
     query_address: owned_value_path!("sourceAddress"),
@@ -319,6 +313,7 @@ pub static DNSTAP_VALUE_PATHS: LazyLock<DnstapPaths> = LazyLock::new(|| DnstapPa
     message_type_id: owned_value_path!("messageTypeId"),
     request_message: owned_value_path!("requestData"),
     response_message: owned_value_path!("responseData"),
+    message_size: owned_value_path!("messageSize"),
     response_code: owned_value_path!("fullRcode"),
     response: owned_value_path!("rcodeName"),
     header: owned_value_path!("header"),

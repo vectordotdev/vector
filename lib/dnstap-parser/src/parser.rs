@@ -158,7 +158,6 @@ impl DnstapParser {
             need_raw_data = true;
         }
 
-        DnstapParser::insert(event, &root, &DNSTAP_VALUE_PATHS.raw_data_size, frame.len());
         if need_raw_data {
             DnstapParser::insert(
                 event,
@@ -261,6 +260,13 @@ impl DnstapParser {
         match dnstap_message_type_id {
             1..=12 => {
                 if let Some(query_message) = dnstap_message.query_message {
+                    DnstapParser::insert(
+                        event,
+                        prefix.clone(),
+                        &DNSTAP_VALUE_PATHS.message_size,
+                        query_message.len(),
+                    );
+
                     let mut query_message_parser =
                         DnsMessageParser::with_options(query_message, parsing_options.clone());
                     if let Err(error) = DnstapParser::parse_dns_query_message(
@@ -279,6 +285,12 @@ impl DnstapParser {
                 }
 
                 if let Some(response_message) = dnstap_message.response_message {
+                    DnstapParser::insert(
+                        event,
+                        prefix.clone(),
+                        &DNSTAP_VALUE_PATHS.message_size,
+                        response_message.len(),
+                    );
                     let mut response_message_parser =
                         DnsMessageParser::with_options(response_message, parsing_options);
                     if let Err(error) = DnstapParser::parse_dns_query_message(
@@ -298,6 +310,12 @@ impl DnstapParser {
             }
             13 | 14 => {
                 if let Some(update_request_message) = dnstap_message.query_message {
+                    DnstapParser::insert(
+                        event,
+                        prefix.clone(),
+                        &DNSTAP_VALUE_PATHS.message_size,
+                        update_request_message.len(),
+                    );
                     let mut update_request_message_parser = DnsMessageParser::with_options(
                         update_request_message,
                         parsing_options.clone(),
@@ -318,6 +336,12 @@ impl DnstapParser {
                 }
 
                 if let Some(update_response_message) = dnstap_message.response_message {
+                    DnstapParser::insert(
+                        event,
+                        prefix.clone(),
+                        &DNSTAP_VALUE_PATHS.message_size,
+                        update_response_message.len(),
+                    );
                     let mut update_response_message_parser =
                         DnsMessageParser::with_options(update_response_message, parsing_options);
                     if let Err(error) = DnstapParser::parse_dns_update_message(
@@ -515,12 +539,6 @@ impl DnstapParser {
             prefix.clone(),
             &DNSTAP_VALUE_PATHS.raw_data,
             BASE64_STANDARD.encode(raw_dns_message),
-        );
-        DnstapParser::insert(
-            event,
-            prefix.clone(),
-            &DNSTAP_VALUE_PATHS.raw_data_size,
-            raw_dns_message.len(),
         );
     }
 
@@ -1055,7 +1073,6 @@ mod tests {
         let dnstap_data = BASE64_STANDARD
             .decode(raw_dnstap_data)
             .expect("Invalid base64 encoded data.");
-        let len = dnstap_data.len();
         let parse_result = DnstapParser::parse(
             &mut log_event,
             Bytes::from(dnstap_data),
@@ -1068,7 +1085,7 @@ mod tests {
             ("dataTypeId", Value::Integer(1)),
             ("messageType", Value::Bytes(Bytes::from("ResolverQuery"))),
             ("messageTypeId", Value::Integer(3)),
-            ("rawDataSize", len.into()),
+            ("messageSize", Value::Integer(54)),
             ("queryZone", Value::Bytes(Bytes::from("com."))),
             ("requestData.fullRcode", Value::Integer(0)),
             ("requestData.header.aa", Value::Boolean(false)),
@@ -1253,7 +1270,6 @@ mod tests {
         let dnstap_data = BASE64_STANDARD
             .decode(raw_dnstap_data)
             .expect("Invalid base64 encoded data.");
-        let len = dnstap_data.len();
         let parse_result = DnstapParser::parse(
             &mut log_event,
             Bytes::from(dnstap_data),
@@ -1266,7 +1282,7 @@ mod tests {
             ("dataTypeId", Value::Integer(1)),
             ("messageType", Value::Bytes(Bytes::from("UpdateResponse"))),
             ("messageTypeId", Value::Integer(14)),
-            ("rawDataSize", len.into()),
+            ("messageSize", Value::Integer(29)),
             ("requestData.fullRcode", Value::Integer(0)),
             ("requestData.header.adCount", Value::Integer(0)),
             ("requestData.header.id", Value::Integer(28811)),
