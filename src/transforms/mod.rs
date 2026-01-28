@@ -27,6 +27,8 @@ pub mod metric_to_log;
 pub mod remap;
 #[cfg(feature = "transforms-route")]
 pub mod route;
+#[cfg(feature = "transforms-stdio")]
+pub mod stdio;
 #[cfg(feature = "transforms-tag_cardinality_limit")]
 pub mod tag_cardinality_limit;
 #[cfg(feature = "transforms-throttle")]
