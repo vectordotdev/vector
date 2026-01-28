@@ -652,9 +652,12 @@ generated: components: sources: kafka: configuration: {
 			"""
 		required: false
 		type: object: options: max_message_handling_tasks: {
-			description: "Number of messages may be processed in parallel for message processing."
-			required:    false
-			type: uint: default: 4
+			description: """
+				Number of messages may be processed in parallel for message processing.
+				Defaults to number of available cores.
+				"""
+			required: false
+			type: uint: {}
 		}
 	}
 	offset_key: {

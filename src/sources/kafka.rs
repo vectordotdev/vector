@@ -277,8 +277,9 @@ impl KafkaSourceConfig {
 #[serde(deny_unknown_fields)]
 pub struct MultithreadingConfig {
     /// Number of messages may be processed in parallel for message processing.
-    #[serde(default = "default_max_message_handling_tasks")]
-    max_message_handling_tasks: usize,
+    /// Defaults to number of available cores.
+    #[serde(default)]
+    max_message_handling_tasks: Option<usize>,
 }
 
 const fn default_session_timeout_ms() -> Duration {
@@ -295,10 +296,6 @@ const fn default_fetch_wait_max_ms() -> Duration {
 
 const fn default_commit_interval_ms() -> Duration {
     Duration::from_millis(5000)
-}
-
-const fn default_max_message_handling_tasks() -> usize {
-    4
 }
 
 fn default_auto_offset_reset() -> String {
@@ -640,7 +637,10 @@ impl ConsumerStateInner<Consuming> {
         let mut out = self.out.clone();
 
         let (end_tx, mut end_signal) = oneshot::channel::<()>();
-        let multithreading_config = self.config.multithreading.clone();
+        let max_message_handling_tasks = self.config.multithreading.as_ref().map(|c| {
+            c.max_message_handling_tasks
+                .unwrap_or_else(crate::num_threads)
+        });
         let active_message_handling_tasks =
             Arc::clone(&self.consumer_state.active_message_handling_tasks);
 
@@ -706,12 +706,12 @@ impl ConsumerStateInner<Consuming> {
                                     // And we want to ignore empty messages
                                     b.try_into().ok()
                                 ).collect();
-                                if let Some(multithreading) = &multithreading_config {
+                                if let Some(max_message_handling_tasks) = max_message_handling_tasks {
                                     let decoder = decoder.clone();
                                     let keys = keys.clone();
                                     let mut out = out.clone();
                                     let active_message_handling_tasks = Arc::clone(&active_message_handling_tasks);
-                                    Self::wait_for_task_quota(multithreading, &active_message_handling_tasks).await;
+                                    Self::wait_for_task_quota(max_message_handling_tasks, &active_message_handling_tasks).await;
                                     processing_futures.push_back(tokio::spawn(async move {
                                         let result = parse_message(msgs, &decoder, &keys, &mut out, acknowledgements, log_namespace).await;
                                         active_message_handling_tasks.fetch_sub(1, Ordering::AcqRel);
@@ -773,9 +773,12 @@ impl ConsumerStateInner<Consuming> {
         }
     }
 
-    async fn wait_for_task_quota(config: &MultithreadingConfig, active_tasks: &Arc<AtomicUsize>) {
-        while config.max_message_handling_tasks > 0
-            && config.max_message_handling_tasks < active_tasks.load(Ordering::Acquire)
+    async fn wait_for_task_quota(
+        max_message_handling_tasks: usize,
+        active_tasks: &Arc<AtomicUsize>,
+    ) {
+        while max_message_handling_tasks > 0
+            && max_message_handling_tasks < active_tasks.load(Ordering::Acquire)
         {
             tokio::time::sleep(Duration::from_millis(3)).await;
         }
