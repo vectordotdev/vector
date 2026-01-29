@@ -19,7 +19,7 @@ use crate::{
             http::HttpMethod,
             http_client::{
                 GenericHttpClientInputs, HttpClientBuilder, HttpClientContext, build_url, call,
-                default_interval, default_timeout, warn_if_interval_too_low,
+                default_interval, default_max_redirects, default_timeout, warn_if_interval_too_low,
             },
         },
     },
@@ -95,6 +95,16 @@ pub struct PrometheusScrapeConfig {
     #[configurable(metadata(docs::examples = "query_example()"))]
     query: QueryParameters,
 
+    /// Whether to follow HTTP redirects for scrape requests.
+    #[serde(default = "crate::serde::default_true")]
+    #[configurable(metadata(docs::advanced))]
+    follow_redirects: bool,
+
+    /// Maximum number of redirects to follow when enabled.
+    #[serde(default = "default_max_redirects")]
+    #[configurable(metadata(docs::advanced))]
+    max_redirects: usize,
+
     #[configurable(derived)]
     tls: Option<TlsConfig>,
 
@@ -122,6 +132,8 @@ impl GenerateConfig for PrometheusScrapeConfig {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            follow_redirects: true,
+            max_redirects: default_max_redirects(),
             tls: None,
             auth: None,
         })
@@ -154,6 +166,8 @@ impl SourceConfig for PrometheusScrapeConfig {
             interval: self.interval,
             timeout: self.timeout,
             headers: HashMap::new(),
+            follow_redirects: self.follow_redirects,
+            max_redirects: self.max_redirects,
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
             tls,
@@ -365,6 +379,8 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            follow_redirects: true,
+            max_redirects: default_max_redirects(),
             auth: None,
             tls: None,
         };
@@ -399,6 +415,8 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            follow_redirects: true,
+            max_redirects: default_max_redirects(),
             auth: None,
             tls: None,
         };
@@ -451,6 +469,8 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            follow_redirects: true,
+            max_redirects: default_max_redirects(),
             auth: None,
             tls: None,
         };
@@ -517,6 +537,8 @@ mod test {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: true,
             query: HashMap::new(),
+            follow_redirects: true,
+            max_redirects: default_max_redirects(),
             auth: None,
             tls: None,
         };
@@ -586,6 +608,8 @@ mod test {
                     ]),
                 ),
             ]),
+            follow_redirects: true,
+            max_redirects: default_max_redirects(),
             auth: None,
             tls: None,
         };
@@ -625,6 +649,62 @@ mod test {
             }
             assert_eq!(got, expected);
         }
+    }
+
+    #[tokio::test]
+    async fn test_prometheus_follows_redirects() {
+        let (_guard, in_addr) = next_addr();
+
+        let redirect_endpoint = warp::path!("metrics").map(|| {
+            warp::redirect::temporary("/metrics/real".parse::<Uri>().expect("valid redirect"))
+        });
+        let metrics_endpoint = warp::path!("metrics" / "real").map(|| {
+            r#"
+                promhttp_metric_handler_requests_total{code="200"} 100 1612411516789
+            "#
+        });
+
+        let routes = redirect_endpoint.or(metrics_endpoint);
+
+        tokio::spawn(warp::serve(routes).run(in_addr));
+        wait_for_tcp(in_addr).await;
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            interval: Duration::from_secs(1),
+            timeout: default_timeout(),
+            instance_tag: Some("instance".to_string()),
+            endpoint_tag: Some("endpoint".to_string()),
+            honor_labels: false,
+            query: HashMap::new(),
+            follow_redirects: true,
+            max_redirects: default_max_redirects(),
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(3),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+
+        let metrics: Vec<_> = events
+            .into_iter()
+            .map(|event| event.into_metric())
+            .collect();
+
+        let metric = metrics
+            .iter()
+            .find(|metric| metric.name() == "promhttp_metric_handler_requests_total")
+            .expect("missing redirected metric");
+
+        assert_eq!(
+            metric.tag_value("endpoint"),
+            Some(format!("http://{}/metrics", in_addr))
+        );
     }
 
     // Intentially not using assert_source_compliance here because this is a round-trip test which
@@ -688,6 +768,8 @@ mod test {
                 query: HashMap::new(),
                 interval: Duration::from_secs(1),
                 timeout: default_timeout(),
+                follow_redirects: true,
+                max_redirects: default_max_redirects(),
                 tls: None,
                 auth: None,
             },
@@ -780,6 +862,8 @@ mod integration_tests {
             endpoint_tag: Some("endpoint".to_string()),
             honor_labels: false,
             query: HashMap::new(),
+            follow_redirects: true,
+            max_redirects: default_max_redirects(),
             auth: None,
             tls: None,
         };
