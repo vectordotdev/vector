@@ -88,7 +88,7 @@ fn parse_schema_from_response(response: &str) -> crate::Result<Schema> {
     let mut fields = Vec::new();
     for column in columns {
         let (arrow_type, nullable) = parse_ch_type(&column.column_type)
-            .to_arrow()
+            .and_then(|t| t.to_arrow())
             .map_err(|e| format!("Failed to convert column '{}': {}", column.name, e))?;
         fields.push(Field::new(&column.name, arrow_type, nullable));
     }
