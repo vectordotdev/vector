@@ -272,19 +272,43 @@ impl TransformOutputs {
         &mut self,
         buf: &mut TransformOutputsBuf,
     ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
-        if let Some(primary) = self.primary_output.as_mut() {
-            let buf = buf
-                .primary_buffer
-                .as_mut()
-                .unwrap_or_else(|| unreachable!("mismatched outputs"));
-            Self::send_single_buffer(buf, primary).await?;
+        futures::future::try_join(
+            Self::send_primary_buffer(&mut buf.primary_buffer, &mut self.primary_output),
+            Self::send_named_buffers(&mut buf.named_buffers, &mut self.named_outputs),
+        )
+        .await
+        .map(|((), ())| ())
+    }
+
+    async fn send_primary_buffer(
+        buffer: &mut Option<OutputBuffer>,
+        output: &mut Option<TransformOutput>,
+    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+        if let Some(buffer) = buffer.as_mut() {
+            let Some(output) = output.as_mut() else {
+                unreachable!("mismatched primary output");
+            };
+            Self::send_single_buffer(buffer, output).await
+        } else {
+            Ok(())
         }
-        for (key, buf) in &mut buf.named_buffers {
-            let output = self
-                .named_outputs
-                .get_mut(key)
-                .unwrap_or_else(|| unreachable!("unknown output"));
-            Self::send_single_buffer(buf, output).await?;
+    }
+
+    async fn send_named_buffers(
+        buffers: &mut HashMap<String, OutputBuffer>,
+        outputs: &mut HashMap<String, TransformOutput>,
+    ) -> Result<(), Box<dyn error::Error + Send + Sync>> {
+        // For transforms other than `route`, the `buffers` and `outputs` will have either zero or
+        // one entries, and so this reduces to a single send as in the previous function. Otherwise,
+        // we send and buffer sequentially which may cause delays for everything but the first
+        // buffer. Unfortunately, we cannot easily do concurrent sends with the current data model
+        // as it requires concurrent mutable borrows to the same `outputs` hashmap, which goes
+        // against Rust's borrow rules.
+        for (key, buffer) in buffers {
+            let Some(output) = outputs.get_mut(key) else {
+                unreachable!("mismatched named output");
+            };
+            Self::send_single_buffer(buffer, output).await?;
         }
         Ok(())
     }
