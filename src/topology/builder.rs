@@ -22,7 +22,7 @@ use vector_lib::{
         BufferType, WhenFull,
         topology::{
             builder::TopologyBuilder,
-            channel::{BufferReceiver, BufferSender, ChannelMetricMetadata},
+            channel::{BufferReceiver, BufferSender, ChannelMetricMetadata, LimitedReceiver},
         },
     },
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
@@ -272,34 +272,13 @@ impl<'a> Builder<'a> {
             let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
             for output in source_outputs.into_iter() {
-                let mut rx = builder.add_source_output(output.clone(), key.clone());
+                let rx = builder.add_source_output(output.clone(), key.clone());
 
-                let (mut fanout, control) = Fanout::new();
+                let (fanout, control) = Fanout::new();
                 let source_type = source.inner.get_component_name();
                 let source = Arc::new(key.clone());
 
-                let pump = async move {
-                    debug!("Source pump starting.");
-
-                    while let Some(SourceSenderItem {
-                        events: mut array,
-                        send_reference,
-                    }) = rx.next().await
-                    {
-                        array.set_output_id(&source);
-                        array.set_source_type(source_type);
-                        fanout
-                            .send(array, Some(send_reference))
-                            .await
-                            .map_err(|e| {
-                                debug!("Source pump finished with an error.");
-                                TaskError::wrapped(e)
-                            })?;
-                    }
-
-                    debug!("Source pump finished normally.");
-                    Ok(TaskOutput::Source)
-                };
+                let pump = run_source_output_pump(rx, fanout, source, source_type);
 
                 pumps.push(pump.instrument(span.clone()));
                 controls.insert(
@@ -877,6 +856,42 @@ impl<'a> Builder<'a> {
 
         (task, outputs)
     }
+}
+
+async fn run_source_output_pump(
+    mut rx: LimitedReceiver<SourceSenderItem>,
+    mut fanout: Fanout,
+    source: Arc<ComponentKey>,
+    source_type: &'static str,
+) -> TaskResult {
+    debug!("Source pump starting.");
+
+    while let Some(SourceSenderItem {
+        events: mut array,
+        send_reference,
+    }) = rx.next().await
+    {
+        array.set_output_id(&source);
+        array.set_source_type(source_type);
+        // Even though we have a `send_reference` timestamp here, that reference
+        // time is when the events were enqueued in the `SourceSender`, not when
+        // they were pulled out of the `rx` stream on this end. Since those times
+        // can be quite different (due to blocking inherent to the fanout send
+        // operation), we set the `last_transform_timestamp` to the current time
+        // instead to get an accurate reference for when the events started waiting
+        // for the first transform.
+        array.set_last_transform_timestamp(Instant::now());
+        fanout
+            .send(array, Some(send_reference))
+            .await
+            .map_err(|e| {
+                debug!("Source pump finished with an error.");
+                TaskError::wrapped(e)
+            })?;
+    }
+
+    debug!("Source pump finished normally.");
+    Ok(TaskOutput::Source)
 }
 
 pub async fn reload_enrichment_tables(config: &Config) {
