@@ -147,7 +147,9 @@ cfg-if = { version = "1.0.3", default-features = false }
 chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"] }
 clap = { version = "4.5.53", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap_complete = "4.5.65"
 colored = { version = "3.0.0", default-features = false }
+const-str = { version = "1.0.0", default-features = false }
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
@@ -180,7 +182,7 @@ prost-types = { version = "0.12", default-features = false }
 rand = { version = "0.9.2", default-features = false, features = ["small_rng", "thread_rng"] }
 rand_distr = { version = "0.5.1", default-features = false }
 regex = { version = "1.11.2", default-features = false, features = ["std", "perf"] }
-reqwest = { version = "0.12", features = ["json"] }
+reqwest = { version = "0.11", features = ["json"] }
 rust_decimal = { version = "1.37.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.26", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
@@ -210,7 +212,10 @@ serial_test = { version = "3.2" }
 [dependencies]
 cfg-if.workspace = true
 reqwest.workspace = true
+reqwest_12 = { package = "reqwest", version = "0.12", features = ["json"] }
 clap.workspace = true
+clap_complete.workspace = true
+dashmap.workspace = true
 indoc.workspace = true
 paste.workspace = true
 pin-project.workspace = true
@@ -384,7 +389,7 @@ itertools.workspace = true
 k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26"], optional = true }
 kube = { version = "0.93.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
-lru = { version = "0.16.0", default-features = false }
+lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
 md-5 = { version = "0.10", default-features = false, optional = true }
 mongodb = { version = "3.3.0", default-features = false, optional = true, features = ["compat-3-0-0", "dns-resolver", "rustls-tls"] }
@@ -411,7 +416,7 @@ seahash = { version = "4.1.0", default-features = false }
 smallvec = { version = "1", default-features = false, features = ["union", "serde"] }
 snap = { version = "1.1.1", default-features = false }
 socket2.workspace = true
-sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio"], optional = true }
+sqlx = { version = "0.8.6", default-features = false, features = ["derive", "postgres", "chrono", "runtime-tokio", "tls-rustls-ring"], optional = true }
 stream-cancel = { version = "0.8.2", default-features = false }
 strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }

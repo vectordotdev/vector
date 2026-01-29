@@ -701,6 +701,20 @@ generated: configuration: configuration: {
 			type: bool: {}
 		}
 	}
+	buffer_utilization_ewma_alpha: {
+		description: """
+			The alpha value for the exponential weighted moving average (EWMA) of source and transform
+			buffer utilization metrics.
+
+			This controls how quickly the `*_buffer_utilization_mean` gauges respond to new
+			observations. Values closer to 1.0 retain more of the previous value, leading to slower
+			adjustments. The default value of 0.9 is equivalent to a "half life" of 6-7 measurements.
+
+			Must be between 0 and 1 exclusively (0 < alpha < 1).
+			"""
+		required: false
+		type: float: {}
+	}
 	data_dir: {
 		common: false
 		description: """
@@ -880,6 +894,20 @@ generated: configuration: configuration: {
 
 			Higher values lead to stale metric values from `get_vector_metric`,
 			`find_vector_metrics`, and `aggregate_vector_metrics` functions.
+			"""
+		required: false
+		type: float: {}
+	}
+	processing_time_ewma_alpha: {
+		description: """
+			The alpha value for the exponential weighted moving average (EWMA) of transform processing
+			time metrics.
+
+			This controls how quickly the `event_processing_time_mean_seconds` gauge responds to new
+			observations. Values closer to 1.0 retain more of the previous value, leading to slower
+			adjustments. The default value of 0.9 is equivalent to a "half life" of 6-7 measurements.
+
+			Must be between 0 and 1 exclusively (0 < alpha < 1).
 			"""
 		required: false
 		type: float: {}

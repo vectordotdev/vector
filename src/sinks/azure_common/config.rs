@@ -165,7 +165,7 @@ pub fn build_client(
 
     // Use reqwest v0.12 since Azure SDK only implements HttpClient for reqwest::Client v0.12.
     options.client_options.transport = Some(azure_core::http::Transport::new(std::sync::Arc::new(
-        reqwest::ClientBuilder::new()
+        reqwest_12::ClientBuilder::new()
             .build()
             .map_err(|e| format!("Failed to build reqwest client: {e}"))?,
     )));
