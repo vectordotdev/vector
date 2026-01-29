@@ -43,6 +43,10 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
+/// UNIX specific imports for file ownership retrieval
+#[cfg(unix)]
+use std::os::unix::fs::MetadataExt;
+
 #[derive(Debug, Snafu)]
 enum BuildError {
     #[snafu(display(
@@ -147,6 +151,20 @@ pub struct FileConfig {
     #[serde(default)]
     #[configurable(metadata(docs::examples = "offset"))]
     pub offset_key: Option<OptionalValuePath>,
+
+    /// Overrides the name of the log field used to add the file owner to each event.
+    ///
+    /// The value is the owner (user) of the file where the event was read.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "owner"))]
+    pub owner_key: Option<OptionalValuePath>,
+
+    /// Overrides the name of the log field used to add the file owner group to each event.
+    ///
+    /// The value is the group owner of the file where the event was read.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "group"))]
+    pub group_key: Option<OptionalValuePath>,
 
     /// The delay between file discovery calls.
     ///
@@ -369,6 +387,8 @@ impl Default for FileConfig {
             ignore_not_found: false,
             host_key: None,
             offset_key: None,
+            owner_key: None,
+            group_key: None,
             data_dir: None,
             glob_minimum_cooldown_ms: default_glob_minimum_cooldown_ms(),
             message_start_indicator: None,
@@ -444,6 +464,18 @@ impl SourceConfig for FileConfig {
             .and_then(|k| k.path)
             .map(LegacyKey::Overwrite);
 
+        let owner_key = self
+            .owner_key
+            .clone()
+            .and_then(|k| k.path)
+            .map(LegacyKey::Overwrite);
+
+        let group_key = self
+            .group_key
+            .clone()
+            .and_then(|k| k.path)
+            .map(LegacyKey::Overwrite);
+
         let schema_definition = BytesDeserializerConfig
             .schema_definition(global_log_namespace.merge(self.log_namespace))
             .with_standard_vector_source_metadata()
@@ -466,6 +498,20 @@ impl SourceConfig for FileConfig {
                 file_key,
                 &owned_value_path!("path"),
                 Kind::bytes(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                owner_key,
+                &owned_value_path!("owner"),
+                Kind::bytes().or_undefined(),
+                None,
+            )
+            .with_source_metadata(
+                Self::NAME,
+                group_key,
+                &owned_value_path!("group"),
+                Kind::bytes().or_undefined(),
                 None,
             );
 
@@ -560,6 +606,8 @@ pub fn file_source(
         hostname: crate::get_hostname().ok(),
         file_key: config.file_key.clone().path,
         offset_key: config.offset_key.clone().and_then(|k| k.path),
+        owner_key: config.owner_key.clone().and_then(|k| k.path),
+        group_key: config.group_key.clone().and_then(|k| k.path),
     };
 
     let include = config.include.clone();
@@ -724,6 +772,32 @@ fn reconcile_position_options(
     }
 }
 
+#[cfg(unix)]
+fn get_file_ownership(file_path: &str) -> (Option<String>, Option<String>) {
+    use std::fs::metadata;
+
+    match metadata(file_path) {
+        Ok(meta) => {
+            let uid = meta.uid();
+            let gid = meta.gid();
+
+            let owner =
+                users::get_user_by_uid(uid).map(|user| user.name().to_string_lossy().into_owned());
+
+            let group =
+                users::get_group_by_gid(gid).map(|grp| grp.name().to_string_lossy().into_owned());
+
+            (owner, group)
+        }
+        Err(_) => (None, None),
+    }
+}
+
+#[cfg(not(unix))]
+fn get_file_ownership(_file_path: &str) -> (Option<String>, Option<String>) {
+    (None, None)
+}
+
 fn wrap_with_line_agg(
     rx: impl Stream<Item = Line> + Send + std::marker::Unpin + 'static,
     config: line_agg::Config,
@@ -759,6 +833,8 @@ struct EventMetadata {
     hostname: Option<String>,
     file_key: Option<OwnedValuePath>,
     offset_key: Option<OwnedValuePath>,
+    owner_key: Option<OwnedValuePath>,
+    group_key: Option<OwnedValuePath>,
 }
 
 fn create_event(
@@ -814,6 +890,30 @@ fn create_event(
         path!("path"),
         file,
     );
+
+    let (owner, group) = get_file_ownership(file);
+
+    if let Some(owner_name) = owner {
+        let legacy_owner_key = meta.owner_key.as_ref().map(LegacyKey::Overwrite);
+        log_namespace.insert_source_metadata(
+            FileConfig::NAME,
+            &mut event,
+            legacy_owner_key,
+            path!("owner"),
+            owner_name,
+        );
+    }
+
+    if let Some(group_name) = group {
+        let legacy_group_key = meta.group_key.as_ref().map(LegacyKey::Overwrite);
+        log_namespace.insert_source_metadata(
+            FileConfig::NAME,
+            &mut event,
+            legacy_group_key,
+            path!("group"),
+            group_name,
+        );
+    }
 
     emit!(FileEventsReceived {
         count: 1,
