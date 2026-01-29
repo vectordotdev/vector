@@ -6,7 +6,7 @@ use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        Decoder, DecodingConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace},
@@ -19,7 +19,6 @@ use vector_lib::{
 use vrl::value::Kind;
 
 use crate::{
-    codecs::{Decoder, DecodingConfig},
     config::{GenerateConfig, SourceConfig, SourceContext, SourceOutput, log_schema},
     event::Event,
     internal_events::{EventsReceived, StreamClosedError},
@@ -284,7 +283,7 @@ impl InputHandler {
                     }
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

@@ -582,7 +582,7 @@ fn build_outputs(
             .iter()
             .enumerate()
         {
-            match condition.build(&Default::default()) {
+            match condition.build(&Default::default(), &Default::default()) {
                 Ok(condition) => conditions.push(condition),
                 Err(error) => errors.push(format!(
                     "failed to create test condition '{index}': {error}"
@@ -611,8 +611,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
         },
         "vrl" => {
             if let Some(source) = &input.source {
-                let fns = vrl::stdlib::all();
-                let result = vrl::compiler::compile(source, &fns)
+                let result = vrl::compiler::compile(source, &vector_vrl_functions::all())
                     .map_err(|e| Formatter::new(source, e.clone()).to_string())?;
 
                 let mut target = TargetValue {

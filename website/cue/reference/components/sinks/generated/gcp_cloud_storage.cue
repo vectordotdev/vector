@@ -172,6 +172,17 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 			}
 		}
 	}
+	content_type: {
+		description: """
+			Overrides the MIME type of the created objects.
+
+			Directly comparable to the `Content-Type` HTTP header.
+
+			If not specified, defaults to the encoder's content type.
+			"""
+		required: false
+		type: string: examples: ["text/plain; charset=utf-8", "application/gzip"]
+	}
 	credentials_path: {
 		description: """
 			Path to a [service account][gcp_service_account_credentials] credentials JSON file.
@@ -372,6 +383,10 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 						transform) and removing the message field while doing additional parsing on it, as this
 						could lead to the encoding emitting empty strings for the given event.
 						"""
+					syslog: """
+						Syslog encoding
+						RFC 3164 and 5424 are supported
+						"""
 					text: """
 						Plain text encoding.
 
@@ -554,6 +569,54 @@ generated: components: sinks: gcp_cloud_storage: configuration: {
 																"""
 						required: false
 						type: bool: default: false
+					}
+				}
+			}
+			syslog: {
+				description:   "Options for the Syslog serializer."
+				relevant_when: "codec = \"syslog\""
+				required:      false
+				type: object: options: {
+					app_name: {
+						description: """
+																Path to a field in the event to use for the app name.
+
+																If not provided, the encoder checks for a semantic "service" field.
+																If that is also missing, it defaults to "vector".
+																"""
+						required: false
+						type: string: {}
+					}
+					facility: {
+						description: "Path to a field in the event to use for the facility. Defaults to \"user\"."
+						required:    false
+						type: string: {}
+					}
+					msg_id: {
+						description: "Path to a field in the event to use for the msg ID."
+						required:    false
+						type: string: {}
+					}
+					proc_id: {
+						description: "Path to a field in the event to use for the proc ID."
+						required:    false
+						type: string: {}
+					}
+					rfc: {
+						description: "RFC to use for formatting."
+						required:    false
+						type: string: {
+							default: "rfc5424"
+							enum: {
+								rfc3164: "The legacy RFC3164 syslog format."
+								rfc5424: "The modern RFC5424 syslog format."
+							}
+						}
+					}
+					severity: {
+						description: "Path to a field in the event to use for the severity. Defaults to \"informational\"."
+						required:    false
+						type: string: {}
 					}
 				}
 			}

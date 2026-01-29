@@ -1,14 +1,12 @@
 use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
-#[cfg(feature = "codecs-arrow")]
-use vector_lib::codecs::encoding::ArrowStreamSerializer;
-use vector_lib::codecs::{
-    CharacterDelimitedEncoder, NewlineDelimitedEncoder, TextSerializerConfig,
-    encoding::{Error, Framer, Serializer},
-};
+use vector_common::internal_event::emit;
+use vector_core::event::Event;
 
+#[cfg(feature = "arrow")]
+use crate::encoding::ArrowStreamSerializer;
 use crate::{
-    event::Event,
+    encoding::{Error, Framer, Serializer},
     internal_events::{EncoderFramingError, EncoderSerializeError},
 };
 
@@ -16,7 +14,7 @@ use crate::{
 #[derive(Debug, Clone)]
 pub enum BatchSerializer {
     /// Arrow IPC stream format serializer.
-    #[cfg(feature = "codecs-arrow")]
+    #[cfg(feature = "arrow")]
     Arrow(ArrowStreamSerializer),
 }
 
@@ -38,7 +36,7 @@ impl BatchEncoder {
     }
 
     /// Get the HTTP content type.
-    #[cfg(feature = "codecs-arrow")]
+    #[cfg(feature = "arrow")]
     pub const fn content_type(&self) -> &'static str {
         match &self.serializer {
             BatchSerializer::Arrow(_) => "application/vnd.apache.arrow.stream",
@@ -53,10 +51,10 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         #[allow(unreachable_patterns)]
         match &mut self.serializer {
-            #[cfg(feature = "codecs-arrow")]
+            #[cfg(feature = "arrow")]
             BatchSerializer::Arrow(serializer) => {
                 serializer.encode(events, buffer).map_err(|err| {
-                    use vector_lib::codecs::encoding::ArrowEncodingError;
+                    use crate::encoding::ArrowEncodingError;
                     match err {
                         ArrowEncodingError::NullConstraint { .. } => {
                             Error::SchemaConstraintViolation(Box::new(err))
@@ -76,7 +74,7 @@ pub enum EncoderKind {
     /// Uses framing to encode individual events
     Framed(Box<Encoder<Framer>>),
     /// Encodes events in batches without framing
-    #[cfg(feature = "codecs-arrow")]
+    #[cfg(feature = "arrow")]
     Batch(BatchEncoder),
 }
 
@@ -92,6 +90,8 @@ where
 
 impl Default for Encoder<Framer> {
     fn default() -> Self {
+        use crate::encoding::{NewlineDelimitedEncoder, TextSerializerConfig};
+
         Self {
             framer: NewlineDelimitedEncoder::default().into(),
             serializer: TextSerializerConfig::default().build().into(),
@@ -101,6 +101,8 @@ impl Default for Encoder<Framer> {
 
 impl Default for Encoder<()> {
     fn default() -> Self {
+        use crate::encoding::TextSerializerConfig;
+
         Self {
             framer: (),
             serializer: TextSerializerConfig::default().build().into(),
@@ -127,7 +129,7 @@ where
     /// Serialize the event without applying framing, at the start of the provided buffer.
     fn serialize_at_start(&mut self, event: Event, buffer: &mut BytesMut) -> Result<(), Error> {
         self.serializer.encode(event, buffer).map_err(|error| {
-            emit!(EncoderSerializeError { error: &error });
+            emit(EncoderSerializeError { error: &error });
             Error::SerializingError(error)
         })
     }
@@ -155,7 +157,9 @@ impl Encoder<Framer> {
     pub const fn batch_prefix(&self) -> &[u8] {
         match (&self.framer, &self.serializer) {
             (
-                Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
+                Framer::CharacterDelimited(crate::encoding::CharacterDelimitedEncoder {
+                    delimiter: b',',
+                }),
                 Serializer::Json(_) | Serializer::NativeJson(_),
             ) => b"[",
             _ => &[],
@@ -166,7 +170,9 @@ impl Encoder<Framer> {
     pub const fn batch_suffix(&self, empty: bool) -> &[u8] {
         match (&self.framer, &self.serializer, empty) {
             (
-                Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
+                Framer::CharacterDelimited(crate::encoding::CharacterDelimitedEncoder {
+                    delimiter: b',',
+                }),
                 Serializer::Json(_) | Serializer::NativeJson(_),
                 _,
             ) => b"]",
@@ -183,7 +189,9 @@ impl Encoder<Framer> {
             }
             (
                 Serializer::Gelf(_) | Serializer::Json(_) | Serializer::NativeJson(_),
-                Framer::CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' }),
+                Framer::CharacterDelimited(crate::encoding::CharacterDelimitedEncoder {
+                    delimiter: b',',
+                }),
             ) => "application/json",
             (Serializer::Native(_), _) | (Serializer::Protobuf(_), _) => "application/octet-stream",
             (
@@ -198,7 +206,9 @@ impl Encoder<Framer> {
                 | Serializer::Text(_),
                 _,
             ) => "text/plain",
-            #[cfg(feature = "codecs-opentelemetry")]
+            #[cfg(feature = "syslog")]
+            (Serializer::Syslog(_), _) => "text/plain",
+            #[cfg(feature = "opentelemetry")]
             (Serializer::Otlp(_), _) => "application/x-protobuf",
         }
     }
@@ -231,7 +241,7 @@ impl tokio_util::codec::Encoder<Event> for Encoder<Framer> {
 
         // Frame the serialized event.
         self.framer.encode((), &mut payload).map_err(|error| {
-            emit!(EncoderFramingError { error: &error });
+            emit(EncoderFramingError { error: &error });
             Error::FramingError(error)
         })?;
 
@@ -259,11 +269,12 @@ impl tokio_util::codec::Encoder<Event> for Encoder<()> {
 #[cfg(test)]
 mod tests {
     use bytes::BufMut;
-    use futures_util::{SinkExt, StreamExt};
+    use futures::{SinkExt, StreamExt};
     use tokio_util::codec::FramedWrite;
-    use vector_lib::{codecs::encoding::BoxedFramingError, event::LogEvent};
+    use vector_core::event::LogEvent;
 
     use super::*;
+    use crate::encoding::BoxedFramingError;
 
     #[derive(Debug, Clone)]
     struct ParenEncoder;
@@ -323,7 +334,9 @@ mod tests {
     async fn test_encode_events_sink_empty() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ParenEncoder::new())),
-            TextSerializerConfig::default().build().into(),
+            crate::encoding::TextSerializerConfig::default()
+                .build()
+                .into(),
         );
         let source = futures::stream::iter(vec![
             Event::Log(LogEvent::from("foo")),
@@ -342,7 +355,9 @@ mod tests {
     async fn test_encode_events_sink_non_empty() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ParenEncoder::new())),
-            TextSerializerConfig::default().build().into(),
+            crate::encoding::TextSerializerConfig::default()
+                .build()
+                .into(),
         );
         let source = futures::stream::iter(vec![
             Event::Log(LogEvent::from("bar")),
@@ -361,7 +376,9 @@ mod tests {
     async fn test_encode_events_sink_empty_handle_framing_error() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
-            TextSerializerConfig::default().build().into(),
+            crate::encoding::TextSerializerConfig::default()
+                .build()
+                .into(),
         );
         let source = futures::stream::iter(vec![
             Event::Log(LogEvent::from("foo")),
@@ -381,7 +398,9 @@ mod tests {
     async fn test_encode_events_sink_non_empty_handle_framing_error() {
         let encoder = Encoder::<Framer>::new(
             Framer::Boxed(Box::new(ErrorNthEncoder::new(ParenEncoder::new(), 1))),
-            TextSerializerConfig::default().build().into(),
+            crate::encoding::TextSerializerConfig::default()
+                .build()
+                .into(),
         );
         let source = futures::stream::iter(vec![
             Event::Log(LogEvent::from("bar")),
@@ -400,8 +419,10 @@ mod tests {
     #[tokio::test]
     async fn test_encode_batch_newline() {
         let encoder = Encoder::<Framer>::new(
-            Framer::NewlineDelimited(NewlineDelimitedEncoder::default()),
-            TextSerializerConfig::default().build().into(),
+            Framer::NewlineDelimited(crate::encoding::NewlineDelimitedEncoder::default()),
+            crate::encoding::TextSerializerConfig::default()
+                .build()
+                .into(),
         );
         let source = futures::stream::iter(vec![
             Event::Log(LogEvent::from("bar")),

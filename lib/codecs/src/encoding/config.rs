@@ -1,14 +1,13 @@
-use crate::codecs::{Encoder, EncoderKind, Transformer};
-use vector_lib::{
-    codecs::{
-        CharacterDelimitedEncoder, LengthDelimitedEncoder, NewlineDelimitedEncoder,
-        encoding::{Framer, FramingConfig, Serializer, SerializerConfig},
-    },
-    configurable::configurable_component,
+use vector_config::configurable_component;
+
+use super::{Encoder, EncoderKind, Transformer};
+use crate::encoding::{
+    CharacterDelimitedEncoder, Framer, FramingConfig, LengthDelimitedEncoder,
+    NewlineDelimitedEncoder, Serializer, SerializerConfig,
 };
 
-#[cfg(feature = "codecs-opentelemetry")]
-use vector_lib::codecs::BytesEncoder;
+#[cfg(feature = "opentelemetry")]
+use crate::encoding::BytesEncoder;
 
 /// Encoding configuration.
 #[configurable_component]
@@ -43,7 +42,7 @@ impl EncodingConfig {
     }
 
     /// Build the `Serializer` for this config.
-    pub fn build(&self) -> crate::Result<Serializer> {
+    pub fn build(&self) -> vector_common::Result<Serializer> {
         self.encoding.build()
     }
 }
@@ -100,7 +99,7 @@ impl EncodingConfigWithFraming {
     }
 
     /// Build the `Framer` and `Serializer` for this config.
-    pub fn build(&self, sink_type: SinkType) -> crate::Result<(Framer, Serializer)> {
+    pub fn build(&self, sink_type: SinkType) -> vector_common::Result<(Framer, Serializer)> {
         let framer = self.framing.as_ref().map(|framing| framing.build());
         let serializer = self.encoding.build()?;
 
@@ -132,7 +131,9 @@ impl EncodingConfigWithFraming {
                 | Serializer::RawMessage(_)
                 | Serializer::Text(_),
             ) => NewlineDelimitedEncoder::default().into(),
-            #[cfg(feature = "codecs-opentelemetry")]
+            #[cfg(feature = "syslog")]
+            (None, Serializer::Syslog(_)) => NewlineDelimitedEncoder::default().into(),
+            #[cfg(feature = "opentelemetry")]
             (None, Serializer::Otlp(_)) => BytesEncoder.into(),
         };
 
@@ -140,7 +141,10 @@ impl EncodingConfigWithFraming {
     }
 
     /// Build the `Transformer` and `EncoderKind` for this config.
-    pub fn build_encoder(&self, sink_type: SinkType) -> crate::Result<(Transformer, EncoderKind)> {
+    pub fn build_encoder(
+        &self,
+        sink_type: SinkType,
+    ) -> vector_common::Result<(Transformer, EncoderKind)> {
         let (framer, serializer) = self.build(sink_type)?;
         let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(framer, serializer)));
         Ok((self.transformer(), encoder))
@@ -170,10 +174,10 @@ where
 
 #[cfg(test)]
 mod test {
-    use vector_lib::lookup::lookup_v2::{ConfigValuePath, parse_value_path};
+    use lookup::lookup_v2::{ConfigValuePath, parse_value_path};
 
     use super::*;
-    use crate::codecs::encoding::TimestampFormat;
+    use crate::encoding::TimestampFormat;
 
     #[test]
     fn deserialize_encoding_config() {

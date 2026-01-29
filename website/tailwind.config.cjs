@@ -1,4 +1,4 @@
-const colors = require('tailwindcss/colors')
+const colors = require('tailwindcss/colors');
 
 module.exports = {
   purge: [],
@@ -28,7 +28,6 @@ module.exports = {
         'secondary': '#f44af5', // Vector magenta
         'purple-v': '#98f', // Vector purple
         // Brand colors
-        'twitter-blue': '#1DA1F2',
         'discord-purple': '#7289DA',
         'rss-orange': '#f26522'
       },

@@ -419,7 +419,10 @@ components: sources: [Name=string]: {
 		source_lag_time_seconds:              components.sources.internal_metrics.output.metrics.source_lag_time_seconds
 		source_buffer_max_byte_size:          components.sources.internal_metrics.output.metrics.source_buffer_max_byte_size
 		source_buffer_max_event_size:         components.sources.internal_metrics.output.metrics.source_buffer_max_event_size
+		source_buffer_max_size_bytes:         components.sources.internal_metrics.output.metrics.source_buffer_max_size_bytes
+		source_buffer_max_size_events:        components.sources.internal_metrics.output.metrics.source_buffer_max_size_events
 		source_buffer_utilization:            components.sources.internal_metrics.output.metrics.source_buffer_utilization
 		source_buffer_utilization_level:      components.sources.internal_metrics.output.metrics.source_buffer_utilization_level
+		source_buffer_utilization_mean:       components.sources.internal_metrics.output.metrics.source_buffer_utilization_mean
 	}
 }

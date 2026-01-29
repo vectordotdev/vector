@@ -70,6 +70,8 @@ pub struct RunningTopology {
     utilization_registry: Option<UtilizationRegistry>,
     utilization_task: Option<TaskHandle>,
     utilization_task_shutdown_trigger: Option<Trigger>,
+    metrics_task: Option<TaskHandle>,
+    metrics_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
 }
 
@@ -92,6 +94,8 @@ impl RunningTopology {
             utilization_registry: None,
             utilization_task: None,
             utilization_task_shutdown_trigger: None,
+            metrics_task: None,
+            metrics_task_shutdown_trigger: None,
             pending_reload: None,
         }
     }
@@ -164,6 +168,10 @@ impl RunningTopology {
 
         if let Some(utilization_task) = self.utilization_task {
             wait_handles.push(utilization_task.map(map_closure).shared());
+        }
+
+        if let Some(metrics_task) = self.metrics_task {
+            wait_handles.push(metrics_task.map(map_closure).shared());
         }
 
         // If we reach this, we will forcefully shutdown the sources. If None, we will never force shutdown.
@@ -255,6 +263,9 @@ impl RunningTopology {
         // Now kick off the shutdown process by shutting down the sources.
         let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
         if let Some(trigger) = self.utilization_task_shutdown_trigger {
+            trigger.cancel();
+        }
+        if let Some(trigger) = self.metrics_task_shutdown_trigger {
             trigger.cancel();
         }
 
@@ -1318,6 +1329,11 @@ impl RunningTopology {
             .utilization
             .take()
             .expect("Topology is missing the utilization metric emitter!");
+        let metrics_storage = pieces.metrics_storage.clone();
+        let metrics_refresh_period = config
+            .global
+            .metrics_storage_refresh_period
+            .map(Duration::from_secs_f64);
         let mut running_topology = Self::new(config, abort_tx);
 
         if !running_topology
@@ -1341,11 +1357,24 @@ impl RunningTopology {
                 utilization_emitter
                     .run_utilization(utilization_shutdown_signal)
                     .await;
-                // TODO: new task output type for this? Or handle this task in a completely
-                // different way
                 Ok(TaskOutput::Healthcheck)
             },
         )));
+        if let Some(metrics_refresh_period) = metrics_refresh_period {
+            let (metrics_task_shutdown_trigger, metrics_shutdown_signal, _) =
+                ShutdownSignal::new_wired();
+            running_topology.metrics_task_shutdown_trigger = Some(metrics_task_shutdown_trigger);
+            running_topology.metrics_task = Some(tokio::spawn(Task::new(
+                "metrics_heartbeat".into(),
+                "",
+                async move {
+                    metrics_storage
+                        .run_periodic_refresh(metrics_refresh_period, metrics_shutdown_signal)
+                        .await;
+                    Ok(TaskOutput::Healthcheck)
+                },
+            )));
+        }
 
         Some((running_topology, abort_rx))
     }
