@@ -1,6 +1,6 @@
 //! ClickHouse type parsing and conversion to Arrow types.
 
-use arrow::datatypes::{DataType, TimeUnit};
+use arrow::datatypes::{DataType, Field, Fields, TimeUnit};
 
 const DECIMAL32_PRECISION: u8 = 9;
 const DECIMAL64_PRECISION: u8 = 18;
@@ -16,6 +16,12 @@ pub enum ClickHouseType<'a> {
     Nullable(Box<ClickHouseType<'a>>),
     /// LowCardinality(T)
     LowCardinality(Box<ClickHouseType<'a>>),
+    /// Array(T)
+    Array(Box<ClickHouseType<'a>>),
+    /// Tuple(T1, T2, ...) or Tuple(name1 T1, name2 T2, ...)
+    Tuple(Vec<(Option<&'a str>, ClickHouseType<'a>)>),
+    /// Map(K, V)
+    Map(Box<ClickHouseType<'a>>, Box<ClickHouseType<'a>>),
 }
 
 impl<'a> ClickHouseType<'a> {
@@ -38,99 +44,207 @@ impl<'a> ClickHouseType<'a> {
             _ => self,
         }
     }
+
+    /// Converts this structured ClickHouseType to an Arrow DataType.
+    /// Returns a tuple of (DataType, is_nullable).
+    pub fn to_arrow(&self) -> Result<(DataType, bool), String> {
+        let is_nullable = self.is_nullable();
+
+        let data_type = match self.base_type() {
+            ClickHouseType::Primitive(name) => {
+                let (type_name, _) = extract_identifier(name);
+                match type_name {
+                    // Numeric
+                    "Int8" => DataType::Int8,
+                    "Int16" => DataType::Int16,
+                    "Int32" => DataType::Int32,
+                    "Int64" => DataType::Int64,
+                    "UInt8" => DataType::UInt8,
+                    "UInt16" => DataType::UInt16,
+                    "UInt32" => DataType::UInt32,
+                    "UInt64" => DataType::UInt64,
+                    "Float32" => DataType::Float32,
+                    "Float64" => DataType::Float64,
+                    "Bool" => DataType::Boolean,
+                    "Decimal" | "Decimal32" | "Decimal64" | "Decimal128" | "Decimal256" => {
+                        parse_decimal_type(name)?
+                    }
+
+                    // Strings
+                    "String" | "FixedString" => DataType::Utf8,
+
+                    // Date and time
+                    "Date" | "Date32" => DataType::Date32,
+                    "DateTime" => DataType::Timestamp(TimeUnit::Second, None),
+                    "DateTime64" => parse_datetime64_precision(name)?,
+
+                    _ => return Err(format!("Unknown ClickHouse type '{}'", type_name)),
+                }
+            }
+            ClickHouseType::Array(inner) => {
+                let (inner_arrow, inner_nullable) = inner.to_arrow()?;
+                DataType::List(Field::new("item", inner_arrow, inner_nullable).into())
+            }
+            ClickHouseType::Tuple(elements) => {
+                let fields: Vec<Field> = elements
+                    .iter()
+                    .enumerate()
+                    .map(|(i, (name_opt, elem))| {
+                        let (dt, nullable) = elem.to_arrow()?;
+
+                        let name = name_opt
+                            .as_deref()
+                            .filter(|s| !s.is_empty())
+                            .map(|s| s.to_string())
+                            .unwrap_or_else(|| format!("f{}", i));
+
+                        Ok(Field::new(name, dt, nullable))
+                    })
+                    .collect::<Result<_, String>>()?;
+
+                DataType::Struct(Fields::from(fields))
+            }
+            ClickHouseType::Map(key_type, value_type) => {
+                let (key_arrow, _) = key_type.to_arrow()?;
+
+                if !matches!(key_arrow, DataType::Utf8) {
+                    return Err("Map keys must be String type.".to_string());
+                }
+
+                let (value_arrow, value_nullable) = value_type.to_arrow()?;
+
+                let entries = DataType::Struct(Fields::from(vec![
+                    Field::new("keys", DataType::Utf8, false),
+                    Field::new("values", value_arrow, value_nullable),
+                ]));
+
+                DataType::Map(Field::new("entries", entries, false).into(), false)
+            }
+            _ => return Err("Unsupported ClickHouse type".to_string()),
+        };
+
+        Ok((data_type, is_nullable))
+    }
 }
 
 /// Parses a ClickHouse type string into a structured representation.
 pub fn parse_ch_type(ty: &str) -> ClickHouseType<'_> {
     let ty = ty.trim();
 
-    // Recursively strip and parse type modifiers
-    if let Some(inner) = strip_wrapper(ty, "Nullable") {
-        return ClickHouseType::Nullable(Box::new(parse_ch_type(inner)));
-    }
-    if let Some(inner) = strip_wrapper(ty, "LowCardinality") {
-        return ClickHouseType::LowCardinality(Box::new(parse_ch_type(inner)));
+    // Try to match type_name(args) pattern
+    if let Some((type_name, args_str)) = try_parse_wrapper(ty) {
+        match type_name {
+            "Nullable" => {
+                return ClickHouseType::Nullable(Box::new(parse_ch_type(args_str)));
+            }
+            "LowCardinality" => {
+                return ClickHouseType::LowCardinality(Box::new(parse_ch_type(args_str)));
+            }
+            "Array" => {
+                return ClickHouseType::Array(Box::new(parse_ch_type(args_str)));
+            }
+            "Tuple" => {
+                let elements = parse_args(args_str)
+                    .into_iter()
+                    .map(|arg| parse_tuple_element(arg))
+                    .collect();
+                return ClickHouseType::Tuple(elements);
+            }
+            "Map" => {
+                let args = parse_args(args_str);
+                if args.len() == 2 {
+                    return ClickHouseType::Map(
+                        Box::new(parse_ch_type(args[0])),
+                        Box::new(parse_ch_type(args[1])),
+                    );
+                }
+            }
+            _ => {} // Fall through to primitive
+        }
     }
 
-    // Base case: return primitive type for anything without modifiers
+    // Base case: return primitive type
     ClickHouseType::Primitive(ty)
 }
 
-/// Helper function to strip a wrapper from a type string.
-/// Returns the inner content if the type matches the wrapper pattern.
-fn strip_wrapper<'a>(ty: &'a str, wrapper_name: &str) -> Option<&'a str> {
-    ty.strip_prefix(wrapper_name)?
-        .trim_start()
-        .strip_prefix('(')?
-        .strip_suffix(')')
-}
+/// Helper: Finds the index of a delimiter, respecting nested parentheses/quotes.
+fn find_delimiter(input: &str, delimiter: char) -> Option<usize> {
+    let mut depth = 0;
+    let mut in_quotes = false;
 
-/// Unwraps ClickHouse type modifiers like Nullable() and LowCardinality().
-/// Returns a tuple of (base_type, is_nullable).
-/// For example: "LowCardinality(Nullable(String))" -> ("String", true)
-pub fn unwrap_type_modifiers(ch_type: &str) -> (&str, bool) {
-    let parsed = parse_ch_type(ch_type);
-    let is_nullable = parsed.is_nullable();
-
-    match parsed.base_type() {
-        ClickHouseType::Primitive(base) => (base, is_nullable),
-        _ => (ch_type, is_nullable),
+    for (i, c) in input.char_indices() {
+        match c {
+            '\'' => in_quotes = !in_quotes,
+            '(' if !in_quotes => depth += 1,
+            ')' if !in_quotes => depth -= 1,
+            c if c == delimiter && depth == 0 && !in_quotes => return Some(i),
+            _ => {}
+        }
     }
+    None
 }
 
-fn unsupported(ch_type: &str, kind: &str) -> String {
-    format!(
-        "{kind} type '{ch_type}' is not supported. \
-         ClickHouse {kind} types cannot be automatically converted to Arrow format."
-    )
+/// Parses a Tuple element which can be:
+/// - Just a type: "String" -> (None, ClickHouseType::Primitive("String"))
+/// - Named field: "category String" -> (Some("category"), ClickHouseType::Primitive("String"))
+fn parse_tuple_element(element: &str) -> (Option<&str>, ClickHouseType<'_>) {
+    let element = element.trim();
+
+    // Use the helper to find the first space
+    if let Some(pos) = find_delimiter(element, ' ') {
+        let name = element[..pos].trim();
+        let type_str = element[pos + 1..].trim();
+        if !name.is_empty() && !type_str.is_empty() {
+            return (Some(name), parse_ch_type(type_str));
+        }
+    }
+
+    // No named field found, treat entire element as a type
+    (None, parse_ch_type(element))
 }
 
-/// Converts a ClickHouse type string to an Arrow DataType.
-/// Returns a tuple of (DataType, is_nullable).
-pub fn clickhouse_type_to_arrow(ch_type: &str) -> Result<(DataType, bool), String> {
-    let (base_type, is_nullable) = unwrap_type_modifiers(ch_type);
-    let (type_name, _) = extract_identifier(base_type);
+/// Tries to parse "TypeName(args)" into ("TypeName", "args").
+fn try_parse_wrapper(ty: &str) -> Option<(&str, &str)> {
+    let paren_pos = ty.find('(')?;
+    if !ty.ends_with(')') {
+        return None;
+    }
 
-    let data_type = match type_name {
-        // Numeric
-        "Int8" => DataType::Int8,
-        "Int16" => DataType::Int16,
-        "Int32" => DataType::Int32,
-        "Int64" => DataType::Int64,
-        "UInt8" => DataType::UInt8,
-        "UInt16" => DataType::UInt16,
-        "UInt32" => DataType::UInt32,
-        "UInt64" => DataType::UInt64,
-        "Float32" => DataType::Float32,
-        "Float64" => DataType::Float64,
-        "Bool" => DataType::Boolean,
-        "Decimal" | "Decimal32" | "Decimal64" | "Decimal128" | "Decimal256" => {
-            parse_decimal_type(base_type)?
-        }
+    let type_name = ty[..paren_pos].trim();
+    let args = &ty[paren_pos + 1..ty.len() - 1];
 
-        // Strings
-        "String" | "FixedString" => DataType::Utf8,
+    Some((type_name, args))
+}
 
-        // Date and time types (timezones not currently handled, defaults to UTC)
-        "Date" | "Date32" => DataType::Date32,
-        "DateTime" => DataType::Timestamp(TimeUnit::Second, None),
-        "DateTime64" => parse_datetime64_precision(base_type)?,
+/// Parses comma-separated arguments, respecting nesting and quotes.
+/// Handles input with or without surrounding parentheses.
+/// Examples: "Int32, String" or "(Int32, String)" both work.
+fn parse_args(input: &str) -> Vec<&str> {
+    let input = input.trim();
 
-        // Unsupported
-        "Array" => return Err(unsupported(ch_type, "Array")),
-        "Tuple" => return Err(unsupported(ch_type, "Tuple")),
-        "Map" => return Err(unsupported(ch_type, "Map")),
-
-        // Unknown
-        _ => {
-            return Err(format!(
-                "Unknown ClickHouse type '{}'. This type cannot be automatically converted.",
-                type_name
-            ));
-        }
+    // Strip outer parens
+    let input = if input.starts_with('(') && input.ends_with(')') {
+        &input[1..input.len() - 1]
+    } else {
+        input
     };
 
-    Ok((data_type, is_nullable))
+    if input.is_empty() {
+        return vec![];
+    }
+
+    let mut args = Vec::new();
+    let mut current = input;
+
+    // Use the same helper to loop through commas
+    while let Some(pos) = find_delimiter(current, ',') {
+        args.push(current[..pos].trim());
+        current = &current[pos + 1..];
+    }
+    // Push the remainder
+    args.push(current.trim());
+
+    args
 }
 
 /// Extracts an identifier from the start of a string.
@@ -143,52 +257,6 @@ fn extract_identifier(input: &str) -> (&str, &str) {
         return (&input[..i], &input[i..]);
     }
     (input, "")
-}
-
-/// Parses comma-separated arguments from a parenthesized string.
-/// Input: "(arg1, arg2, arg3)" -> Output: Ok(vec!["arg1".to_string(), "arg2".to_string(), "arg3".to_string()])
-/// Returns an error if parentheses are malformed.
-fn parse_args(input: &str) -> Result<Vec<String>, String> {
-    let trimmed = input.trim();
-    if !trimmed.starts_with('(') || !trimmed.ends_with(')') {
-        return Err(format!(
-            "Expected parentheses around arguments in '{}'",
-            input
-        ));
-    }
-
-    let inner = trimmed[1..trimmed.len() - 1].trim();
-    if inner.is_empty() {
-        return Ok(vec![]);
-    }
-
-    // Split by comma, handling nested parentheses and quotes
-    let mut args = Vec::new();
-    let mut current_arg = String::new();
-    let mut depth = 0;
-    let mut in_quotes = false;
-
-    for c in inner.chars() {
-        match c {
-            '\'' if !in_quotes => in_quotes = true,
-            '\'' if in_quotes => in_quotes = false,
-            '(' if !in_quotes => depth += 1,
-            ')' if !in_quotes => depth -= 1,
-            ',' if depth == 0 && !in_quotes => {
-                args.push(current_arg.trim().to_string());
-                current_arg = String::new();
-                continue;
-            }
-            _ => {}
-        }
-        current_arg.push(c);
-    }
-
-    if !current_arg.trim().is_empty() {
-        args.push(current_arg.trim().to_string());
-    }
-
-    Ok(args)
 }
 
 /// Parses ClickHouse Decimal types and returns the appropriate Arrow decimal type.
@@ -204,7 +272,8 @@ fn parse_decimal_type(ch_type: &str) -> Result<DataType, String> {
     // Parse from type string
     let (type_name, args_str) = extract_identifier(ch_type);
 
-    let result = parse_args(args_str).ok().and_then(|args| match type_name {
+    let args = parse_args(args_str);
+    let result = match type_name {
         "Decimal" if args.len() == 2 => args[0].parse::<u8>().ok().zip(args[1].parse::<i8>().ok()),
         "Decimal32" | "Decimal64" | "Decimal128" | "Decimal256" if args.len() == 1 => {
             args[0].parse::<i8>().ok().map(|scale| {
@@ -219,7 +288,7 @@ fn parse_decimal_type(ch_type: &str) -> Result<DataType, String> {
             })
         }
         _ => None,
-    });
+    };
 
     result
         .map(|(precision, scale)| {
@@ -242,12 +311,7 @@ fn parse_datetime64_precision(ch_type: &str) -> Result<DataType, String> {
     // Parse from type string
     let (_type_name, args_str) = extract_identifier(ch_type);
 
-    let args = parse_args(args_str).map_err(|e| {
-        format!(
-            "Could not parse DateTime64 arguments from '{}': {}. Expected format: DateTime64(0-9) or DateTime64(0-9, 'timezone')",
-            ch_type, e
-        )
-    })?;
+    let args = parse_args(args_str);
 
     // DateTime64(precision) or DateTime64(precision, 'timezone')
     if args.is_empty() {
@@ -276,7 +340,7 @@ mod tests {
 
     // Helper function for tests that don't need metadata
     fn convert_type_no_metadata(ch_type: &str) -> Result<(DataType, bool), String> {
-        clickhouse_type_to_arrow(ch_type)
+        parse_ch_type(ch_type).to_arrow()
     }
 
     #[test]
@@ -502,82 +566,87 @@ mod tests {
 
     #[test]
     fn test_parse_args() {
-        // Simple cases
-        assert_eq!(
-            parse_args("(10, 2)").unwrap(),
-            vec!["10".to_string(), "2".to_string()]
-        );
-        assert_eq!(parse_args("(3)").unwrap(), vec!["3".to_string()]);
-        assert_eq!(parse_args("()").unwrap(), Vec::<String>::new());
+        // Simple cases with parentheses
+        assert_eq!(parse_args("(10, 2)"), vec!["10", "2"]);
+        assert_eq!(parse_args("(3)"), vec!["3"]);
+        assert_eq!(parse_args("()"), Vec::<&str>::new());
+
+        // Simple cases without parentheses (now supported)
+        assert_eq!(parse_args("10, 2"), vec!["10", "2"]);
+        assert_eq!(parse_args("3"), vec!["3"]);
 
         // With spaces
-        assert_eq!(
-            parse_args("( 10 , 2 )").unwrap(),
-            vec!["10".to_string(), "2".to_string()]
-        );
+        assert_eq!(parse_args("( 10 , 2 )"), vec!["10", "2"]);
 
         // With nested parentheses
+        assert_eq!(parse_args("(Nullable(String))"), vec!["Nullable(String)"]);
         assert_eq!(
-            parse_args("(Nullable(String))").unwrap(),
-            vec!["Nullable(String)".to_string()]
-        );
-        assert_eq!(
-            parse_args("(Array(Int32), String)").unwrap(),
-            vec!["Array(Int32)".to_string(), "String".to_string()]
+            parse_args("(Array(Int32), String)"),
+            vec!["Array(Int32)", "String"]
         );
 
         // With quotes
+        assert_eq!(parse_args("(3, 'UTC')"), vec!["3", "'UTC'"]);
         assert_eq!(
-            parse_args("(3, 'UTC')").unwrap(),
-            vec!["3".to_string(), "'UTC'".to_string()]
-        );
-        assert_eq!(
-            parse_args("(9, 'America/New_York')").unwrap(),
-            vec!["9".to_string(), "'America/New_York'".to_string()]
+            parse_args("(9, 'America/New_York')"),
+            vec!["9", "'America/New_York'"]
         );
 
-        // Complex nested case
+        // Complex nested case with multiple levels, modifiers, named tuples, and quotes
         assert_eq!(
-            parse_args("(Tuple(Int32, String), Array(Float64))").unwrap(),
+            parse_args(
+                "(Array(Tuple(id Int64, tags Array(String))), Map(String, Tuple(Nullable(Float64), LowCardinality(String))), String, DateTime('America/New_York'))"
+            ),
             vec![
-                "Tuple(Int32, String)".to_string(),
-                "Array(Float64)".to_string()
+                "Array(Tuple(id Int64, tags Array(String)))",
+                "Map(String, Tuple(Nullable(Float64), LowCardinality(String)))",
+                "String",
+                "DateTime('America/New_York')"
             ]
         );
-
-        // Error cases
-        assert!(parse_args("10, 2").is_err()); // Missing parentheses
-        assert!(parse_args("(10, 2").is_err()); // Missing closing paren
     }
 
     #[test]
-    fn test_array_type_not_supported() {
-        // Array types should return an error
+    fn test_array_type() {
         let result = convert_type_no_metadata("Array(Int32)");
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.contains("Array type"));
-        assert!(err.contains("not supported"));
+        assert!(result.is_ok());
+        let (data_type, is_nullable) = result.unwrap();
+        assert!(!is_nullable);
+        match data_type {
+            DataType::List(field) => {
+                assert_eq!(field.data_type(), &DataType::Int32);
+                assert!(!field.is_nullable());
+            }
+            _ => panic!("Expected List type"),
+        }
     }
 
     #[test]
-    fn test_tuple_type_not_supported() {
-        // Tuple types should return an error
+    fn test_tuple_type() {
         let result = convert_type_no_metadata("Tuple(String, Int64)");
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.contains("Tuple type"));
-        assert!(err.contains("not supported"));
+        assert!(result.is_ok());
+        let (data_type, is_nullable) = result.unwrap();
+        assert!(!is_nullable);
+        match data_type {
+            DataType::Struct(fields) => {
+                assert_eq!(fields.len(), 2);
+                assert_eq!(fields[0].data_type(), &DataType::Utf8);
+                assert_eq!(fields[1].data_type(), &DataType::Int64);
+            }
+            _ => panic!("Expected Struct type"),
+        }
     }
 
     #[test]
-    fn test_map_type_not_supported() {
-        // Map types should return an error
+    fn test_map_type() {
         let result = convert_type_no_metadata("Map(String, Int64)");
-        assert!(result.is_err());
-        let err = result.unwrap_err();
-        assert!(err.contains("Map type"));
-        assert!(err.contains("not supported"));
+        assert!(result.is_ok());
+        let (data_type, is_nullable) = result.unwrap();
+        assert!(!is_nullable);
+        match data_type {
+            DataType::Map(_, _) => {}
+            _ => panic!("Expected Map type"),
+        }
     }
 
     #[test]
@@ -643,5 +712,185 @@ mod tests {
 
         let parsed = parse_ch_type("String");
         assert_eq!(parsed.base_type(), &ClickHouseType::Primitive("String"));
+    }
+
+    #[test]
+    fn test_array_type_parsing() {
+        // Simple array
+        let result = convert_type_no_metadata("Array(Int32)");
+        assert!(result.is_ok());
+        let (dtype, nullable) = result.unwrap();
+        assert!(matches!(dtype, DataType::List(_)));
+        assert!(!nullable);
+
+        // Nested array
+        let result = convert_type_no_metadata("Array(Array(String))");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::List(inner) = dtype {
+            assert!(matches!(inner.data_type(), DataType::List(_)));
+        } else {
+            panic!("Expected List type");
+        }
+
+        // Nullable array
+        let result = convert_type_no_metadata("Nullable(Array(Int64))");
+        assert!(result.is_ok());
+        let (_, nullable) = result.unwrap();
+        assert!(nullable);
+    }
+
+    #[test]
+    fn test_tuple_type_parsing() {
+        // Simple tuple
+        let result = convert_type_no_metadata("Tuple(String, Int64)");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::Struct(fields) = dtype {
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name(), "f0");
+            assert_eq!(fields[1].name(), "f1");
+            assert!(matches!(fields[0].data_type(), DataType::Utf8));
+            assert!(matches!(fields[1].data_type(), DataType::Int64));
+        } else {
+            panic!("Expected Struct type");
+        }
+
+        // Nested tuple
+        let result = convert_type_no_metadata("Tuple(Int32, Tuple(String, Float64))");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::Struct(fields) = dtype {
+            assert_eq!(fields.len(), 2);
+            assert!(matches!(fields[1].data_type(), DataType::Struct(_)));
+        } else {
+            panic!("Expected Struct type");
+        }
+    }
+
+    #[test]
+    fn test_map_type_parsing() {
+        // Simple map
+        let result = convert_type_no_metadata("Map(String, Int64)");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        assert!(matches!(dtype, DataType::Map(_, _)));
+
+        // Map with complex value
+        let result = convert_type_no_metadata("Map(String, Array(Int32))");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::Map(entries, _) = dtype
+            && let DataType::Struct(fields) = entries.data_type()
+        {
+            let value_field = &fields[1];
+            assert!(matches!(value_field.data_type(), DataType::List(_)));
+        }
+
+        // Non-string key should error
+        let result = convert_type_no_metadata("Map(Int32, String)");
+        assert!(result.is_err());
+        let err = result.unwrap_err();
+        assert!(err.contains("Map keys must be String"));
+    }
+
+    #[test]
+    fn test_complex_nested_types() {
+        // Array of tuples
+        let result = convert_type_no_metadata("Array(Tuple(String, Int64))");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::List(inner) = dtype {
+            assert!(matches!(inner.data_type(), DataType::Struct(_)));
+        } else {
+            panic!("Expected List type");
+        }
+
+        // Tuple with array and map
+        let result = convert_type_no_metadata("Tuple(Array(Int32), Map(String, Float64))");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::Struct(fields) = dtype {
+            assert_eq!(fields.len(), 2);
+            assert!(matches!(fields[0].data_type(), DataType::List(_)));
+            assert!(matches!(fields[1].data_type(), DataType::Map(_, _)));
+        } else {
+            panic!("Expected Struct type");
+        }
+
+        // Map with tuple values
+        let result = convert_type_no_metadata("Map(String, Tuple(Int64, String))");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::Map(entries, _) = dtype
+            && let DataType::Struct(fields) = entries.data_type()
+        {
+            let value_field = &fields[1];
+            assert!(matches!(value_field.data_type(), DataType::Struct(_)));
+        }
+    }
+
+    #[test]
+    fn test_named_tuple_fields() {
+        // Simple named tuple
+        let result = convert_type_no_metadata("Tuple(category String, tag String)");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::Struct(fields) = dtype {
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name(), "category");
+            assert_eq!(fields[1].name(), "tag");
+            assert!(matches!(fields[0].data_type(), DataType::Utf8));
+            assert!(matches!(fields[1].data_type(), DataType::Utf8));
+        } else {
+            panic!("Expected Struct type");
+        }
+
+        // Array of named tuples (the original failing case)
+        let result = convert_type_no_metadata("Array(Tuple(category String, tag String))");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::List(inner) = dtype {
+            if let DataType::Struct(fields) = inner.data_type() {
+                assert_eq!(fields.len(), 2);
+                assert_eq!(fields[0].name(), "category");
+                assert_eq!(fields[1].name(), "tag");
+                assert!(matches!(fields[0].data_type(), DataType::Utf8));
+                assert!(matches!(fields[1].data_type(), DataType::Utf8));
+            } else {
+                panic!("Expected Struct type inside List");
+            }
+        } else {
+            panic!("Expected List type");
+        }
+
+        // Mixed named and unnamed (named fields take precedence)
+        let result = convert_type_no_metadata("Tuple(id Int64, data String)");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::Struct(fields) = dtype {
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name(), "id");
+            assert_eq!(fields[1].name(), "data");
+            assert!(matches!(fields[0].data_type(), DataType::Int64));
+            assert!(matches!(fields[1].data_type(), DataType::Utf8));
+        } else {
+            panic!("Expected Struct type");
+        }
+
+        // Named tuple with complex types
+        let result =
+            convert_type_no_metadata("Tuple(items Array(Int32), metadata Map(String, String))");
+        assert!(result.is_ok());
+        let (dtype, _) = result.unwrap();
+        if let DataType::Struct(fields) = dtype {
+            assert_eq!(fields.len(), 2);
+            assert_eq!(fields[0].name(), "items");
+            assert_eq!(fields[1].name(), "metadata");
+            assert!(matches!(fields[0].data_type(), DataType::List(_)));
+            assert!(matches!(fields[1].data_type(), DataType::Map(_, _)));
+        } else {
+            panic!("Expected Struct type");
+        }
     }
 }

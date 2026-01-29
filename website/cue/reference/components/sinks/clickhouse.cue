@@ -142,9 +142,6 @@ components: sinks: clickhouse: {
 
 				The following ClickHouse column types are **not yet supported** by Vector's
 				ArrowStream implementation:
-				- `Array`
-				- `Tuple`
-				- `Map`
 				- `IPv4`
 				- `IPv6`
 
