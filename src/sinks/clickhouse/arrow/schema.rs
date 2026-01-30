@@ -69,28 +69,21 @@ pub async fn fetch_table_schema(
 
 /// Parses the JSON response from ClickHouse and builds an Arrow schema.
 fn parse_schema_from_response(response: &str) -> crate::Result<Schema> {
-    let mut columns: Vec<ColumnInfo> = Vec::new();
+    let fields: Vec<Field> = response
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            let column: ColumnInfo = serde_json::from_str(line)
+                .map_err(|e| format!("Failed to parse column info: {e}"))?;
+            let (arrow_type, nullable) = parse_ch_type(&column.column_type)
+                .and_then(|t| (&t).try_into())
+                .map_err(|e| format!("Failed to convert column '{}': {e}", column.name))?;
+            Ok(Field::new(&column.name, arrow_type, nullable))
+        })
+        .collect::<crate::Result<Vec<_>>>()?;
 
-    for line in response.lines() {
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        let column: ColumnInfo = serde_json::from_str(line)
-            .map_err(|e| format!("Failed to parse column info: {}", e))?;
-        columns.push(column);
-    }
-
-    if columns.is_empty() {
+    if fields.is_empty() {
         return Err("No columns found in table schema".into());
-    }
-
-    let mut fields = Vec::new();
-    for column in columns {
-        let (arrow_type, nullable) = parse_ch_type(&column.column_type)
-            .and_then(|t| (&t).try_into())
-            .map_err(|e| format!("Failed to convert column '{}': {}", column.name, e))?;
-        fields.push(Field::new(&column.name, arrow_type, nullable));
     }
 
     Ok(Schema::new(fields))
