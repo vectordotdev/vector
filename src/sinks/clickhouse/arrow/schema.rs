@@ -21,6 +21,18 @@ struct ColumnInfo {
     column_type: String,
 }
 
+impl TryFrom<ColumnInfo> for Field {
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+
+    fn try_from(column: ColumnInfo) -> Result<Self, Self::Error> {
+        let ch_type = ClickHouseType::from_str(&column.column_type)?;
+        let (dt, nullable) = (&ch_type)
+            .try_into()
+            .map_err(|e| format!("Failed to convert column '{}': {e}", column.name))?;
+        Ok(Field::new(column.name, dt, nullable))
+    }
+}
+
 /// URL-encodes a string for use in HTTP query parameters.
 fn url_encode(s: &str) -> String {
     percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
@@ -74,24 +86,18 @@ pub async fn fetch_table_schema(
 
 /// Parses the JSON response from ClickHouse and builds an Arrow schema.
 fn parse_schema_from_response(response: &str) -> crate::Result<Schema> {
-    let fields: Vec<Field> = response
-        .lines()
-        .filter(|line| !line.trim().is_empty())
-        .map(|line| -> crate::Result<Field> {
-            let column: ColumnInfo = serde_json::from_str(line)
-                .map_err(|e| format!("Failed to parse column info: {e}"))?;
-            let (arrow_type, nullable) = ClickHouseType::from_str(&column.column_type)
-                .and_then(|t| (&t).try_into())
-                .map_err(|e| format!("Failed to convert column '{}': {e}", column.name))?;
-            Ok(Field::new(&column.name, arrow_type, nullable))
-        })
-        .try_collect()?;
+    let mut lines = response.lines().filter(|line| !line.is_empty()).peekable();
 
-    if fields.is_empty() {
-        return Err("No columns found in table schema".into());
+    if lines.peek().is_none() {
+        return Err("Table does not exist or has no columns".into());
     }
 
-    Ok(Schema::new(fields))
+    lines
+        .map(|line| -> crate::Result<Field> {
+            serde_json::from_str::<ColumnInfo>(line)?.try_into()
+        })
+        .try_collect::<_, Vec<Field>, _>()
+        .map(Schema::new)
 }
 
 /// Schema provider implementation for ClickHouse tables.
