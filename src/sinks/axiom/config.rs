@@ -249,7 +249,7 @@ mod test {
 
     #[test]
     fn test_default_no_config() {
-        // Without URL or edge deployment, defaults to US cloud endpoint.
+        // Without URL or edge deployment, defaults to `https://api.axiom.co/v1/datasets/DATASET_NAME/ingest`.
         let config = super::AxiomConfig {
             dataset: "foo".to_string(),
             ..Default::default()
