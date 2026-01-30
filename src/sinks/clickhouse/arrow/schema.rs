@@ -45,7 +45,9 @@ pub async fn fetch_table_schema(
         url_encode(database),
         url_encode(table)
     );
-    let mut request = Request::get(&uri).body(Body::empty()).unwrap();
+    let mut request = Request::get(&uri)
+        .body(Body::empty())
+        .map_err(|e| format!("Failed to build request: {e}"))?;
 
     if let Some(auth) = auth {
         auth.apply(&mut request);
@@ -59,11 +61,11 @@ pub async fn fetch_table_schema(
                 .await?
                 .to_bytes();
             let body_str = String::from_utf8(body_bytes.into())
-                .map_err(|e| format!("Failed to parse response as UTF-8: {}", e))?;
+                .map_err(|e| format!("Failed to parse response as UTF-8: {e}"))?;
 
             parse_schema_from_response(&body_str)
         }
-        status => Err(format!("Failed to fetch schema from ClickHouse: HTTP {}", status).into()),
+        status => Err(format!("Failed to fetch schema from ClickHouse: HTTP {status}").into()),
     }
 }
 
