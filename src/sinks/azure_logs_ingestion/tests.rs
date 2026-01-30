@@ -1,3 +1,4 @@
+use azure_core::http::ClientOptions;
 use bytes::Bytes;
 use futures::stream;
 use http::Response;
@@ -5,10 +6,11 @@ use std::time::Duration;
 use tokio::time::timeout;
 use vector_lib::config::log_schema;
 
+use azure_core::cloud::{Audiences, CloudConfiguration, CustomConfiguration};
 use azure_core::credentials::{AccessToken, TokenCredential};
-use azure_core::date::OffsetDateTime;
+use azure_core::time::OffsetDateTime;
 use azure_identity::{
-    ClientSecretCredential, ClientSecretCredentialOptions, TokenCredentialOptions,
+    ClientSecretCredential, ClientSecretCredentialOptions,
 };
 
 use super::config::AzureLogsIngestionConfig;
@@ -198,15 +200,24 @@ async fn correct_request() {
     })
     .await;
 
-    let mut credential_options = TokenCredentialOptions::default();
-    //credential_options.set_authority_host("http://127.0.0.1:9001".into());
-    credential_options.set_authority_host(mock_token_authority.to_string());
+    let mut mock_cloud_configuration: CustomConfiguration = CustomConfiguration::default();
+    mock_cloud_configuration.audiences = Audiences::new().with::<String>("http://mock.invalid".to_string());
+    mock_cloud_configuration.authority_host = mock_token_authority.to_string();
+    let cloud_configuration: CloudConfiguration = mock_cloud_configuration.into();
 
     let credential: std::sync::Arc<dyn TokenCredential> = ClientSecretCredential::new(
         "00000000-0000-0000-0000-000000000000",
         "mock-client-id".into(),
         "mock-client-secret".into(),
-        Some(ClientSecretCredentialOptions { credential_options }),
+        Some(ClientSecretCredentialOptions
+            {
+                client_options: ClientOptions
+                {
+                    cloud: Some(std::sync::Arc::new(cloud_configuration)),
+                    ..Default::default()
+                }
+            }
+        ),
     )
     .expect("failed to create ClientSecretCredential");
 
@@ -301,7 +312,7 @@ fn create_mock_credential() -> impl TokenCredential {
         async fn get_token(
             &self,
             _scopes: &[&str],
-            _options: Option<azure_core::credentials::TokenRequestOptions>,
+            _options: Option<azure_core::credentials::TokenRequestOptions<'_>>,
         ) -> azure_core::Result<AccessToken> {
             Ok(AccessToken::new(
                 "mock-access-token".to_string(),

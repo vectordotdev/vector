@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
-use azure_core::credentials::TokenCredential;
+use azure_core::credentials::{TokenCredential, TokenRequestOptions};
+use azure_core::http::ClientMethodOptions;
 use azure_core::{Error, error::ErrorKind};
 
 use azure_identity::{
@@ -193,10 +194,15 @@ struct ManagedIdentityClientAssertion {
 #[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
 #[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
 impl ClientAssertion for ManagedIdentityClientAssertion {
-    async fn secret(&self) -> azure_core::Result<String> {
+    async fn secret(
+        &self,
+        options: Option<ClientMethodOptions<'_>>,
+    ) -> azure_core::Result<String> {
         Ok(self
             .credential
-            .get_token(&[&self.scope], None)
+            .get_token(&[&self.scope], Some(TokenRequestOptions {
+                method_options: options.unwrap_or_default(),
+            }))
             .await?
             .token
             .secret()
@@ -214,22 +220,22 @@ impl AzureAuthentication {
                 azure_client_secret,
             } => {
                 if azure_tenant_id.is_empty() {
-                    return Err(Error::with_message(ErrorKind::Credential, || {
+                    return Err(Error::with_message(ErrorKind::Credential, 
                         "`auth.azure_tenant_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
-                    }));
+                    ));
                 }
                 if azure_client_id.is_empty() {
-                    return Err(Error::with_message(ErrorKind::Credential, || {
+                    return Err(Error::with_message(ErrorKind::Credential, 
                         "`auth.azure_client_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
-                    }));
+                    ));
                 }
                 if azure_client_secret.inner().is_empty() {
-                    return Err(Error::with_message(ErrorKind::Credential, || {
+                    return Err(Error::with_message(ErrorKind::Credential, 
                         "`auth.azure_client_secret` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
-                    }));
+                    ));
                 }
                 let secret: String = azure_client_secret.inner().into();
-                let credential = ClientSecretCredential::new(
+                let credential: Arc<dyn TokenCredential> = ClientSecretCredential::new(
                     &azure_tenant_id.clone(),
                     azure_client_id.clone(),
                     secret.into(),
@@ -265,9 +271,9 @@ impl AzureAuthentication {
                         if client_assertion_tenant_id.is_none()
                             || client_assertion_client_id.is_none()
                         {
-                            return Err(Error::with_message(ErrorKind::Credential, || {
+                            return Err(Error::with_message(ErrorKind::Credential, 
                                 "`auth.client_assertion_tenant_id` and `auth.client_assertion_client_id` must be set when using `auth.azure_credential_kind` of `managedidentityclientassertion`".to_string()
-                            }));
+                            ));
                         }
 
                         let mut options = ManagedIdentityCredentialOptions::default();
@@ -295,11 +301,11 @@ impl AzureAuthentication {
                         WorkloadIdentityCredential::new(None)?
                     }
                     _ => {
-                        return Err(Error::with_message(ErrorKind::Credential, || {
+                        return Err(Error::with_message(ErrorKind::Credential, 
                             format!(
                                 "`auth.azure_credential_kind` `{azure_credential_kind}` is unknown/unsupported"
                             )
-                        }));
+                        ));
                     }
                 };
                 Ok(credential)
