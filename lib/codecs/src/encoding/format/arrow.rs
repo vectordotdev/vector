@@ -165,19 +165,6 @@ pub enum ArrowEncodingError {
         message: String,
     },
 
-    /// Unsupported Arrow data type for field
-    #[snafu(display(
-        "Unsupported Arrow data type for field '{}': {:?}",
-        field_name,
-        data_type
-    ))]
-    UnsupportedType {
-        /// The field name
-        field_name: String,
-        /// The unsupported data type
-        data_type: DataType,
-    },
-
     /// Null value encountered for non-nullable field
     #[snafu(display("Null value for non-nullable field '{}'", field_name))]
     NullConstraint {
@@ -197,41 +184,6 @@ pub enum ArrowEncodingError {
     SerdeArrow {
         /// The underlying serde_arrow error
         source: serde_arrow::Error,
-    },
-
-    /// Invalid timestamp value could not be parsed
-    #[snafu(display("Invalid timestamp value for field '{}': {}", field_name, value))]
-    InvalidTimestamp {
-        /// The field name
-        field_name: String,
-        /// The invalid value
-        value: String,
-    },
-
-    /// Invalid type for Decimal128 field
-    #[snafu(display(
-        "Invalid type for Decimal128 field '{}': expected Float, got {:?}",
-        field_name,
-        actual_type
-    ))]
-    InvalidDecimalType {
-        /// The field name
-        field_name: String,
-        /// The actual type received
-        actual_type: String,
-    },
-
-    /// Invalid Map structure in schema
-    #[snafu(display(
-        "Invalid Map structure for field '{}': expected 2 entry fields (key, value), got {}",
-        field_name,
-        num_fields
-    ))]
-    InvalidMapStructure {
-        /// The field name
-        field_name: String,
-        /// The number of fields found
-        num_fields: usize,
     },
 
     /// Timestamp value overflows the representable range
@@ -324,8 +276,17 @@ fn build_record_batch(
         .map(|log| convert_timestamps(log, &schema))
         .collect::<Result<Vec<_>, _>>()?;
 
-    let batch = serde_arrow::to_record_batch(schema.fields(), &log_events)
-        .map_err(|source| ArrowEncodingError::SerdeArrow { source })?;
+    let batch = serde_arrow::to_record_batch(schema.fields(), &log_events).map_err(|source| {
+        // serde_arrow doesn't expose structured error variants (see
+        // https://docs.rs/serde_arrow/latest/serde_arrow/enum.Error.html), so we string-match on
+        // the message to detect null constraint violations, then find the actual field ourselves.
+        if source.message().contains("non-nullable")
+            && let Some(field_name) = find_null_field(&log_events, &schema)
+        {
+            return ArrowEncodingError::NullConstraint { field_name };
+        }
+        ArrowEncodingError::SerdeArrow { source }
+    })?;
 
     // Post-process: use Arrow's cast for any remaining type mismatches.
     // serde_arrow serializes Vector's Value types using fixed Arrow types (e.g., Int64
@@ -347,6 +308,22 @@ fn build_record_batch(
 
     RecordBatch::try_new(schema, columns?)
         .map_err(|source| ArrowEncodingError::RecordBatchCreation { source })
+}
+
+/// Find which non-nullable field has a missing value (called only on error).
+fn find_null_field(events: &[LogEvent], schema: &SchemaRef) -> Option<String> {
+    for field in schema.fields() {
+        if !field.is_nullable() {
+            let name = field.name();
+            if events
+                .iter()
+                .any(|e| e.get(lookup::event_path!(name)).is_none())
+            {
+                return Some(name.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Convert Value::Timestamp to Value::Integer for timestamp columns.
@@ -684,6 +661,26 @@ mod tests {
             let result = encode_events_to_arrow_ipc_stream(&events, None);
             assert!(result.is_err());
             assert!(matches!(result.unwrap_err(), ArrowEncodingError::NoEvents));
+        }
+
+        #[test]
+        fn test_null_constraint_error() {
+            let events = vec![create_event(vec![("other_field", "value")])];
+
+            let schema = SchemaRef::new(Schema::new(vec![Field::new(
+                "required_field",
+                DataType::Utf8,
+                false, // non-nullable
+            )]));
+
+            let result = encode_events_to_arrow_ipc_stream(&events, Some(schema));
+            assert!(result.is_err());
+            match result.unwrap_err() {
+                ArrowEncodingError::NullConstraint { field_name } => {
+                    assert_eq!(field_name, "required_field");
+                }
+                other => panic!("Expected NullConstraint error, got: {:?}", other),
+            }
         }
     }
 
