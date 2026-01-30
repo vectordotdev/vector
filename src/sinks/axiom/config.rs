@@ -46,7 +46,7 @@ pub struct UrlOrRegion {
     /// Specify the domain name only without the scheme or path.
     /// Vector sends data to `https://{region}/v1/ingest/{dataset}`.
     /// Don’t set both `url` and `region`.
-    #[configurable(metadata(docs::examples = "${AXIOM_REGION}"))]
+    #[configurable(metadata(docs::examples = "${AXIOM_DOMAIN}"))]
     #[configurable(metadata(docs::examples = "eu-central-1.aws.edge.axiom.co"))]
     #[configurable(metadata(docs::examples = "us-east-1.aws.edge.axiom.co"))]
     pub region: Option<String>,
