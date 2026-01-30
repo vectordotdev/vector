@@ -74,13 +74,15 @@ impl<'a> ClickHouseType<'a> {
             _ => self,
         }
     }
+}
 
-    /// Converts this structured ClickHouseType to an Arrow DataType.
-    /// Returns a tuple of (DataType, is_nullable).
-    pub fn to_arrow(&self) -> Result<(DataType, bool), String> {
-        let is_nullable = self.is_nullable();
+impl TryFrom<&ClickHouseType<'_>> for (DataType, bool) {
+    type Error = String;
 
-        let data_type = match self.base_type() {
+    fn try_from(ch_type: &ClickHouseType<'_>) -> Result<Self, Self::Error> {
+        let is_nullable = ch_type.is_nullable();
+
+        let data_type = match ch_type.base_type() {
             // Numeric types
             ClickHouseType::Int8 => DataType::Int8,
             ClickHouseType::Int16 => DataType::Int16,
@@ -124,7 +126,7 @@ impl<'a> ClickHouseType<'a> {
 
             // Container types
             ClickHouseType::Array(inner) => {
-                let (inner_arrow, inner_nullable) = inner.to_arrow()?;
+                let (inner_arrow, inner_nullable) = inner.as_ref().try_into()?;
                 DataType::List(Field::new("item", inner_arrow, inner_nullable).into())
             }
             ClickHouseType::Tuple(elements) => {
@@ -132,7 +134,7 @@ impl<'a> ClickHouseType<'a> {
                     .iter()
                     .enumerate()
                     .map(|(i, (name_opt, elem))| {
-                        let (dt, nullable) = elem.to_arrow()?;
+                        let (dt, nullable) = elem.try_into()?;
                         let name = name_opt.map_or_else(|| format!("f{i}"), str::to_owned);
                         Ok::<_, String>(Field::new(name, dt, nullable))
                     })
@@ -140,11 +142,11 @@ impl<'a> ClickHouseType<'a> {
                 DataType::Struct(Fields::from(fields))
             }
             ClickHouseType::Map(key_type, value_type) => {
-                let (key_arrow, _) = key_type.to_arrow()?;
+                let (key_arrow, _): (DataType, bool) = key_type.as_ref().try_into()?;
                 if !matches!(key_arrow, DataType::Utf8) {
                     return Err("Map keys must be String type.".to_string());
                 }
-                let (value_arrow, value_nullable) = value_type.to_arrow()?;
+                let (value_arrow, value_nullable) = value_type.as_ref().try_into()?;
                 let entries = DataType::Struct(Fields::from(vec![
                     Field::new("keys", DataType::Utf8, false),
                     Field::new("values", value_arrow, value_nullable),
@@ -291,7 +293,7 @@ mod tests {
 
     // Helper function for tests
     fn convert_type(ch_type: &str) -> Result<(DataType, bool), String> {
-        parse_ch_type(ch_type)?.to_arrow()
+        (&parse_ch_type(ch_type)?).try_into()
     }
 
     #[test]
