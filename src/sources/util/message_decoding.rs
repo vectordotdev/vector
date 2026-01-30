@@ -12,10 +12,10 @@ use vector_lib::{
 };
 
 use crate::{
-    codecs::Decoder,
     config::log_schema,
     event::{BatchNotifier, Event},
 };
+use vector_lib::codecs::Decoder;
 
 pub fn decode_message<'a>(
     mut decoder: Decoder,
@@ -67,7 +67,7 @@ pub fn decode_message<'a>(
                     event
                 })),
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further handling
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further handling
                     // is needed here.
                     if error.can_continue() {
                         continue;

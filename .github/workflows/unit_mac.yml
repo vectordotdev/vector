@@ -2,9 +2,15 @@ name: Unit - Mac
 
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
+
 
 permissions:
-  statuses: write
+  contents: read
 
 jobs:
   unit-mac:
@@ -13,40 +19,16 @@ jobs:
     env:
       CARGO_INCREMENTAL: 0
     steps:
-      - name: (PR review) Set latest commit status as pending
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: Unit - Mac
-          status: pending
-
-      - name: (PR review) Checkout PR branch
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          ref: ${{ github.event.review.commit_id }}
-
       - name: Checkout branch
-        if: ${{ github.event_name != 'pull_request_review' }}
         uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
-        name: Cache Cargo registry + index
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          ref: ${{ inputs.ref }}
 
-      - run: bash scripts/environment/bootstrap-macos.sh
-      - run: bash scripts/environment/prepare.sh --modules=cargo-nextest
-      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-nextest: true
+          protoc: true
 
       # Some tests e.g. `reader_exits_cleanly_when_writer_done_and_in_flight_acks` are flaky.
       - name: Run tests
@@ -57,12 +39,3 @@ jobs:
           command: make test
 
       - run: make test-behavior
-
-      - name: (PR review) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        if: always() && github.event_name == 'pull_request_review'
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: Unit - Mac
-          status: ${{ job.status }}

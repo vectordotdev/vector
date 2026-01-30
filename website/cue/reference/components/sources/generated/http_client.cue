@@ -180,6 +180,38 @@ generated: components: sources: http_client: configuration: {
 			}
 		}
 	}
+	body: {
+		description: """
+			Raw data to send as the HTTP request body.
+
+			Can be a static string or a VRL expression.
+
+			When a body is provided, the `Content-Type` header is automatically set to
+			`application/json` unless explicitly overridden in the `headers` configuration.
+			"""
+		required: false
+		type: {
+			object: options: {
+				type: {
+					description: "The parameter type, indicating how the `value` should be treated."
+					required:    false
+					type: string: {
+						default: "string"
+						enum: {
+							string: "The parameter value is a plain string."
+							vrl:    "The parameter value is a VRL expression that is evaluated before each request."
+						}
+					}
+				}
+				value: {
+					description: "The raw value of the parameter."
+					required:    true
+					type: string: {}
+				}
+			}
+			string: {}
+		}
+	}
 	decoding: {
 		description: """
 			Configures how events are decoded from raw bytes. Note some decoders can also determine the event output
@@ -750,13 +782,13 @@ generated: components: sources: http_client: configuration: {
 				type: {
 					object: options: {
 						type: {
-							description: "The type of the parameter, indicating how the `value` should be treated."
+							description: "The parameter type, indicating how the `value` should be treated."
 							required:    false
 							type: string: {
 								default: "string"
 								enum: {
 									string: "The parameter value is a plain string."
-									vrl:    "The parameter value is a VRL expression that will be evaluated before each request."
+									vrl:    "The parameter value is a VRL expression that is evaluated before each request."
 								}
 							}
 						}

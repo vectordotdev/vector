@@ -1,7 +1,7 @@
 use std::{collections::HashMap, pin::Pin, time::Duration};
 
 use futures::{Stream, StreamExt};
-use vector_lib::{config::LogNamespace, configurable::configurable_component};
+use vector_lib::configurable::configurable_component;
 
 use crate::internal_events::incremental_to_absolute::IncrementalToAbsoluteMetricsCache;
 
@@ -59,9 +59,8 @@ impl TransformConfig for IncrementalToAbsoluteConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         _: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }

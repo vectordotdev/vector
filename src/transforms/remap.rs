@@ -18,6 +18,7 @@ use vector_lib::{
     schema::Definition,
 };
 use vector_vrl_functions::set_semantic_meaning::MeaningList;
+use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     compiler::{
         CompileConfig, ExpressionError, Program, TypeState, VrlRuntime,
@@ -183,6 +184,7 @@ impl RemapConfig {
     fn compile_vrl_program(
         &self,
         enrichment_tables: TableRegistry,
+        metrics_storage: MetricsStorage,
         merged_schema_definition: schema::Definition,
     ) -> Result<(Program, String, MeaningList)> {
         if let Some((_, res)) = self
@@ -210,12 +212,6 @@ impl RemapConfig {
             _ => return Err(Box::new(BuildError::SourceAndOrFileOrFiles)),
         };
 
-        let mut functions = vrl::stdlib::all();
-        functions.append(&mut vector_lib::enrichment::vrl_functions());
-        #[cfg(feature = "sources-dnstap")]
-        functions.append(&mut dnstap_parser::vrl_functions());
-        functions.append(&mut vector_vrl_functions::all());
-
         let state = TypeState {
             local: Default::default(),
             external: ExternalEnv::new_with_kind(
@@ -226,9 +222,10 @@ impl RemapConfig {
         let mut config = CompileConfig::default();
 
         config.set_custom(enrichment_tables.clone());
+        config.set_custom(metrics_storage);
         config.set_custom(MeaningList::default());
 
-        let res = compile_vrl(&source, &functions, &state, config)
+        let res = compile_vrl(&source, &vector_vrl_functions::all(), &state, config)
             .map_err(|diagnostics| format_vrl_diagnostics(&source, diagnostics))
             .map(|result| {
                 (
@@ -286,9 +283,8 @@ impl TransformConfig for RemapConfig {
 
     fn outputs(
         &self,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        context: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         let merged_definition: Definition = input_definitions
             .iter()
@@ -300,7 +296,11 @@ impl TransformConfig for RemapConfig {
         // transform. We ignore any compilation errors, as those are caught by the transform build
         // step.
         let compiled = self
-            .compile_vrl_program(enrichment_tables, merged_definition)
+            .compile_vrl_program(
+                context.enrichment_tables.clone(),
+                context.metrics_storage.clone(),
+                merged_definition,
+            )
             .map(|(program, _, meaning_list)| (program.final_type_info().state, meaning_list.0))
             .map_err(|_| ());
 
@@ -454,6 +454,7 @@ impl Remap<AstRunner> {
     ) -> crate::Result<(Self, String)> {
         let (program, warnings, _) = config.compile_vrl_program(
             context.enrichment_tables.clone(),
+            context.metrics_storage.clone(),
             context.merged_schema_definition.clone(),
         )?;
 
@@ -497,8 +498,7 @@ where
         let message = error
             .notes()
             .iter()
-            .filter(|note| matches!(note, Note::UserErrorMessage(_)))
-            .next_back()
+            .rfind(|note| matches!(note, Note::UserErrorMessage(_)))
             .map(|note| note.to_string())
             .unwrap_or_else(|| error.to_string());
         serde_json::json!({
@@ -677,9 +677,7 @@ mod tests {
     use indoc::{formatdoc, indoc};
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::{
-        config::GlobalOptions, enrichment::TableRegistry, event::EventMetadata, metric_tags,
-    };
+    use vector_lib::{config::GlobalOptions, event::EventMetadata, metric_tags};
     use vrl::{btreemap, event_path, value::kind::Collection};
 
     use super::*;
@@ -834,9 +832,8 @@ mod tests {
         assert_eq!(get_field_string(&result, "."), "root string");
 
         let mut outputs = conf.outputs(
-            TableRegistry::default(),
+            &Default::default(),
             &[(OutputId::dummy(), initial_definition)],
-            LogNamespace::Vector,
         );
 
         assert_eq!(outputs.len(), 1);
@@ -1506,7 +1503,7 @@ mod tests {
 
         assert_eq!(
             conf.outputs(
-                vector_lib::enrichment::TableRegistry::default(),
+                &Default::default(),
                 &[(
                     "test".into(),
                     schema::Definition::new_with_default_metadata(
@@ -1514,7 +1511,6 @@ mod tests {
                         [LogNamespace::Legacy]
                     )
                 )],
-                LogNamespace::Legacy
             ),
             vec![TransformOutput::new(
                 DataType::all_bits(),
@@ -1669,12 +1665,9 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
-
         let outputs1 = transform1.outputs(
-            enrichment_tables.clone(),
+            &Default::default(),
             &[("in".into(), schema::Definition::default_legacy_namespace())],
-            LogNamespace::Legacy,
         );
 
         assert_eq!(
@@ -1695,12 +1688,11 @@ mod tests {
         );
 
         let outputs2 = transform2.outputs(
-            enrichment_tables,
+            &Default::default(),
             &[(
                 "in1".into(),
                 outputs1[0].schema_definitions(true)[&"in".into()].clone(),
             )],
-            LogNamespace::Legacy,
         );
 
         assert_eq!(
@@ -1742,10 +1734,8 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
-
         let outputs1 = transform1.outputs(
-            enrichment_tables.clone(),
+            &Default::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1753,7 +1743,6 @@ mod tests {
                     [LogNamespace::Legacy],
                 ),
             )],
-            LogNamespace::Legacy,
         );
 
         assert_eq!(
@@ -1780,12 +1769,11 @@ mod tests {
         );
 
         let outputs2 = transform2.outputs(
-            enrichment_tables,
+            &Default::default(),
             &[(
                 "in1".into(),
                 outputs1[0].schema_definitions(true)[&"in".into()].clone(),
             )],
-            LogNamespace::Legacy,
         );
 
         assert_eq!(
@@ -1823,10 +1811,8 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
-
         let outputs1 = transform1.outputs(
-            enrichment_tables,
+            &Default::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1834,7 +1820,6 @@ mod tests {
                     [LogNamespace::Legacy],
                 ),
             )],
-            LogNamespace::Legacy,
         );
 
         assert_eq!(
@@ -1866,10 +1851,8 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
-
         let outputs1 = transform1.outputs(
-            enrichment_tables,
+            &Default::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1877,7 +1860,6 @@ mod tests {
                     [LogNamespace::Legacy],
                 ),
             )],
-            LogNamespace::Legacy,
         );
 
         assert_eq!(
@@ -1897,10 +1879,8 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
-
         let outputs1 = transform1.outputs(
-            enrichment_tables,
+            &Default::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1908,7 +1888,6 @@ mod tests {
                     [LogNamespace::Legacy],
                 ),
             )],
-            LogNamespace::Legacy,
         );
 
         let wanted = schema::Definition::new_with_default_metadata(
@@ -1940,10 +1919,8 @@ mod tests {
             ..Default::default()
         };
 
-        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
-
         let outputs1 = transform1.outputs(
-            enrichment_tables,
+            &Default::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -1951,7 +1928,6 @@ mod tests {
                     [LogNamespace::Legacy],
                 ),
             )],
-            LogNamespace::Legacy,
         );
 
         let wanted = schema::Definition::new_with_default_metadata(
@@ -2004,9 +1980,8 @@ mod tests {
         // Legacy namespace nests this under "message", Vector should set it as the root
         assert_eq!(result.as_log().get("."), Some(&Value::Null));
 
-        let enrichment_tables = vector_lib::enrichment::TableRegistry::default();
         let outputs1 = conf.outputs(
-            enrichment_tables,
+            &Default::default(),
             &[(
                 "in".into(),
                 schema::Definition::new_with_default_metadata(
@@ -2014,7 +1989,6 @@ mod tests {
                     [LogNamespace::Vector],
                 ),
             )],
-            LogNamespace::Vector,
         );
 
         let wanted =

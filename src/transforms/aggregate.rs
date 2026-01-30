@@ -7,7 +7,6 @@ use std::{
 use async_stream::stream;
 use futures::{Stream, StreamExt};
 use vector_lib::{
-    config::LogNamespace,
     configurable::configurable_component,
     event::{
         MetricValue,
@@ -98,9 +97,8 @@ impl TransformConfig for AggregateConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         _: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }
@@ -365,7 +363,7 @@ mod tests {
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::config::ComponentKey;
+    use vector_lib::config::{ComponentKey, LogNamespace};
     use vrl::value::Kind;
 
     use super::*;
