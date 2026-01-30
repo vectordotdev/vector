@@ -6,6 +6,7 @@ use arrow::datatypes::{Field, Schema};
 use async_trait::async_trait;
 use http::{Request, StatusCode};
 use hyper::Body;
+use itertools::Itertools;
 use serde::Deserialize;
 use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
@@ -76,7 +77,7 @@ fn parse_schema_from_response(response: &str) -> crate::Result<Schema> {
     let fields: Vec<Field> = response
         .lines()
         .filter(|line| !line.trim().is_empty())
-        .map(|line| {
+        .map(|line| -> crate::Result<Field> {
             let column: ColumnInfo = serde_json::from_str(line)
                 .map_err(|e| format!("Failed to parse column info: {e}"))?;
             let (arrow_type, nullable) = ClickHouseType::from_str(&column.column_type)
@@ -84,7 +85,7 @@ fn parse_schema_from_response(response: &str) -> crate::Result<Schema> {
                 .map_err(|e| format!("Failed to convert column '{}': {e}", column.name))?;
             Ok(Field::new(&column.name, arrow_type, nullable))
         })
-        .collect::<crate::Result<Vec<_>>>()?;
+        .try_collect()?;
 
     if fields.is_empty() {
         return Err("No columns found in table schema".into());
