@@ -8,6 +8,7 @@ use http::{Request, StatusCode};
 use hyper::Body;
 use itertools::Itertools;
 use serde::Deserialize;
+use url::form_urlencoded;
 use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
 use crate::http::{Auth, HttpClient};
@@ -33,11 +34,6 @@ impl TryFrom<ColumnInfo> for Field {
     }
 }
 
-/// URL-encodes a string for use in HTTP query parameters.
-fn url_encode(s: &str) -> String {
-    percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
-}
-
 /// Fetches the schema for a ClickHouse table and converts it to an Arrow schema.
 pub async fn fetch_table_schema(
     client: &HttpClient,
@@ -53,13 +49,12 @@ pub async fn fetch_table_schema(
                  FORMAT JSONEachRow";
 
     // Build URI with query and parameters
-    let uri = format!(
-        "{}?query={}&param_db={}&param_tbl={}",
-        endpoint,
-        url_encode(query),
-        url_encode(database),
-        url_encode(table)
-    );
+    let query_string = form_urlencoded::Serializer::new(String::new())
+        .append_pair("query", query)
+        .append_pair("param_db", database)
+        .append_pair("param_tbl", table)
+        .finish();
+    let uri = format!("{endpoint}?{query_string}");
     let mut request = Request::get(&uri)
         .body(Body::empty())
         .map_err(|e| format!("Failed to build request: {e}"))?;
