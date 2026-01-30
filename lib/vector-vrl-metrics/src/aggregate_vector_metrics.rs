@@ -47,6 +47,13 @@ impl Function for AggregateVectorMetrics {
         "aggregate_vector_metrics"
     }
 
+    fn usage(&self) -> &'static str {
+        const_str::concat!(
+            "Aggregates internal Vector metrics, using one of 4 aggregation functions, filtering by name and optionally by tags. Returns the aggregated value. Only includes counter and gauge metrics.\n\n",
+            crate::VECTOR_METRICS_EXPLAINER
+        )
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {

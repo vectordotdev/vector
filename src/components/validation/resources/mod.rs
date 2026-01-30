@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc};
 use vector_lib::{
     codecs::{
-        BytesEncoder,
+        BytesEncoder, Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming,
         decoding::{self, DeserializerConfig},
         encoding::{
             self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig,
@@ -26,7 +26,6 @@ use super::{
     RunnerMetrics,
     sync::{Configuring, TaskCoordinator},
 };
-use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
 /// The codec used by the external resource.
 ///
