@@ -1,4 +1,3 @@
-use azure_core::http::ClientOptions;
 use bytes::Bytes;
 use futures::stream;
 use http::Response;
@@ -6,12 +5,8 @@ use std::time::Duration;
 use tokio::time::timeout;
 use vector_lib::config::log_schema;
 
-use azure_core::cloud::{Audiences, CloudConfiguration, CustomConfiguration};
 use azure_core::credentials::{AccessToken, TokenCredential};
 use azure_core::time::OffsetDateTime;
-use azure_identity::{
-    ClientSecretCredential, ClientSecretCredentialOptions,
-};
 
 use super::config::AzureLogsIngestionConfig;
 
@@ -179,47 +174,7 @@ fn insert_timestamp_kv(log: &mut LogEvent) -> (String, String) {
 
 #[tokio::test]
 async fn correct_request() {
-    // Other tests can use `create_mock_credential`, we're going to run this end-to-end test with our own mock OAuth endpoint as well
-    let (authority_tx, mut _authority_rx) = tokio::sync::mpsc::channel(1);
-    let mock_token_authority = spawn_blackhole_http_server(move |request| {
-        let authority_tx = authority_tx.clone();
-        async move {
-            authority_tx.send(request).await.unwrap();
-            let body = serde_json::json!({
-                "access_token": "mock-access-token",
-                "token_type": "Bearer",
-                "expires_in": 3600
-            })
-            .to_string();
-
-            Ok(Response::builder()
-                .header("Content-Type", "application/json")
-                .body(body.into())
-                .unwrap())
-        }
-    })
-    .await;
-
-    let mut mock_cloud_configuration: CustomConfiguration = CustomConfiguration::default();
-    mock_cloud_configuration.audiences = Audiences::new().with::<String>("http://mock.invalid".to_string());
-    mock_cloud_configuration.authority_host = mock_token_authority.to_string();
-    let cloud_configuration: CloudConfiguration = mock_cloud_configuration.into();
-
-    let credential: std::sync::Arc<dyn TokenCredential> = ClientSecretCredential::new(
-        "00000000-0000-0000-0000-000000000000",
-        "mock-client-id".into(),
-        "mock-client-secret".into(),
-        Some(ClientSecretCredentialOptions
-            {
-                client_options: ClientOptions
-                {
-                    cloud: Some(std::sync::Arc::new(cloud_configuration)),
-                    ..Default::default()
-                }
-            }
-        ),
-    )
-    .expect("failed to create ClientSecretCredential");
+    let credential = std::sync::Arc::new(create_mock_credential());
 
     let config: AzureLogsIngestionConfig = toml::from_str(
         r#"
