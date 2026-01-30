@@ -1,5 +1,7 @@
 //! ClickHouse type parsing and conversion to Arrow types.
 
+use std::str::FromStr;
+
 use arrow::datatypes::{DataType, Field, Fields, TimeUnit};
 use itertools::Itertools;
 use nom::{
@@ -7,11 +9,10 @@ use nom::{
     bytes::complete::{tag, take_till, take_while1},
     character::complete::{char, i8 as parse_i8, u8 as parse_u8, u32 as parse_u32},
     combinator::{all_consuming, cut, opt},
+    error::{Error, ErrorKind},
     multi::separated_list0,
     sequence::{delimited, preceded, separated_pair, terminated},
 };
-
-use nom::error::{Error, ErrorKind};
 
 const DECIMAL32_PRECISION: u8 = 9;
 const DECIMAL64_PRECISION: u8 = 18;
@@ -20,7 +21,7 @@ const DECIMAL256_PRECISION: u8 = 76;
 
 /// Represents a ClickHouse type with its modifiers and nested structure.
 #[derive(Debug, PartialEq, Clone)]
-pub enum ClickHouseType<'a> {
+pub enum ClickHouseType {
     // Numeric types
     Int8,
     Int16,
@@ -47,14 +48,14 @@ pub enum ClickHouseType<'a> {
     DateTime64 { precision: u8 },
 
     // Wrapper types
-    Nullable(Box<ClickHouseType<'a>>),
-    LowCardinality(Box<ClickHouseType<'a>>),
-    Array(Box<ClickHouseType<'a>>),
-    Tuple(Vec<(Option<&'a str>, ClickHouseType<'a>)>),
-    Map(Box<ClickHouseType<'a>>, Box<ClickHouseType<'a>>),
+    Nullable(Box<ClickHouseType>),
+    LowCardinality(Box<ClickHouseType>),
+    Array(Box<ClickHouseType>),
+    Tuple(Vec<(Option<std::string::String>, ClickHouseType)>),
+    Map(Box<ClickHouseType>, Box<ClickHouseType>),
 }
 
-impl<'a> ClickHouseType<'a> {
+impl ClickHouseType {
     /// Returns true if this type or any of its nested types is Nullable.
     pub fn is_nullable(&self) -> bool {
         match self {
@@ -66,7 +67,7 @@ impl<'a> ClickHouseType<'a> {
 
     /// Returns the innermost base type, unwrapping all modifiers.
     /// For example: LowCardinality(Nullable(String)) -> String
-    pub fn base_type(&self) -> &ClickHouseType<'a> {
+    pub fn base_type(&self) -> &ClickHouseType {
         match self {
             ClickHouseType::Nullable(inner) | ClickHouseType::LowCardinality(inner) => {
                 inner.base_type()
@@ -76,10 +77,10 @@ impl<'a> ClickHouseType<'a> {
     }
 }
 
-impl TryFrom<&ClickHouseType<'_>> for (DataType, bool) {
-    type Error = String;
+impl TryFrom<&ClickHouseType> for (DataType, bool) {
+    type Error = std::string::String;
 
-    fn try_from(ch_type: &ClickHouseType<'_>) -> Result<Self, Self::Error> {
+    fn try_from(ch_type: &ClickHouseType) -> Result<Self, Self::Error> {
         let is_nullable = ch_type.is_nullable();
 
         let data_type = match ch_type.base_type() {
@@ -135,8 +136,8 @@ impl TryFrom<&ClickHouseType<'_>> for (DataType, bool) {
                     .enumerate()
                     .map(|(i, (name_opt, elem))| {
                         let (dt, nullable) = elem.try_into()?;
-                        let name = name_opt.map_or_else(|| format!("f{i}"), str::to_owned);
-                        Ok::<_, String>(Field::new(name, dt, nullable))
+                        let name = name_opt.clone().unwrap_or_else(|| format!("f{i}"));
+                        Ok::<_, std::string::String>(Field::new(name, dt, nullable))
                     })
                     .try_collect()?;
                 DataType::Struct(Fields::from(fields))
@@ -175,12 +176,12 @@ fn identifier(input: &str) -> IResult<&str, &str> {
 }
 
 /// Parses a single tuple element (either "Type" or "name Type").
-fn tuple_element(input: &str) -> IResult<&str, (Option<&str>, ClickHouseType<'_>)> {
+fn tuple_element(input: &str) -> IResult<&str, (Option<std::string::String>, ClickHouseType)> {
     let (rest, name) = identifier(input)?;
     match rest.strip_prefix(' ') {
         Some(after_space) => {
             let (rest, ty) = ch_type(after_space)?;
-            Ok((rest, (Some(name), ty)))
+            Ok((rest, (Some(name.to_owned()), ty)))
         }
         None => {
             // No space after identifier, so re-parse as a type
@@ -196,7 +197,7 @@ fn tuple_element(input: &str) -> IResult<&str, (Option<&str>, ClickHouseType<'_>
 /// For example, parsing `"Array(String)"`:
 ///   - `identifier` consumes `"Array"`, returns `rest = "(String)"`, `name = "Array"`
 ///   - The `"Array"` match arm then parses `rest` with `parens(ch_type)`
-fn ch_type(input: &str) -> IResult<&str, ClickHouseType<'_>> {
+fn ch_type(input: &str) -> IResult<&str, ClickHouseType> {
     let (rest, name) = identifier(input)?;
 
     match name {
@@ -279,12 +280,15 @@ fn ch_type(input: &str) -> IResult<&str, ClickHouseType<'_>> {
     }
 }
 
-/// Parses a ClickHouse type string into a structured representation.
-pub fn parse_ch_type(ty: &str) -> Result<ClickHouseType<'_>, String> {
-    all_consuming(ch_type)
-        .parse(ty)
-        .map(|(_, parsed)| parsed)
-        .map_err(|e| format!("Failed to parse ClickHouse type '{}': {}", ty, e))
+impl FromStr for ClickHouseType {
+    type Err = std::string::String;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        all_consuming(ch_type)
+            .parse(s)
+            .map(|(_, parsed)| parsed)
+            .map_err(|e| format!("Failed to parse ClickHouse type '{s}': {e}"))
+    }
 }
 
 #[cfg(test)]
@@ -292,8 +296,8 @@ mod tests {
     use super::*;
 
     // Helper function for tests
-    fn convert_type(ch_type: &str) -> Result<(DataType, bool), String> {
-        (&parse_ch_type(ch_type)?).try_into()
+    fn convert_type(s: &str) -> Result<(DataType, bool), String> {
+        (&ClickHouseType::from_str(s)?).try_into()
     }
 
     #[test]
@@ -471,66 +475,72 @@ mod tests {
     }
 
     #[test]
-    fn test_parse_ch_type_primitives() {
-        assert_eq!(parse_ch_type("String").unwrap(), ClickHouseType::String);
-        assert_eq!(parse_ch_type("Int64").unwrap(), ClickHouseType::Int64);
+    fn test_parse_primitives() {
+        assert_eq!("String".parse(), Ok(ClickHouseType::String));
+        assert_eq!("Int64".parse(), Ok(ClickHouseType::Int64));
         assert_eq!(
-            parse_ch_type("DateTime64(3)").unwrap(),
-            ClickHouseType::DateTime64 { precision: 3 }
+            "DateTime64(3)".parse(),
+            Ok(ClickHouseType::DateTime64 { precision: 3 })
         );
     }
 
     #[test]
-    fn test_parse_ch_type_nullable() {
+    fn test_parse_nullable() {
         assert_eq!(
-            parse_ch_type("Nullable(String)").unwrap(),
-            ClickHouseType::Nullable(Box::new(ClickHouseType::String))
+            "Nullable(String)".parse(),
+            Ok(ClickHouseType::Nullable(Box::new(ClickHouseType::String)))
         );
         assert_eq!(
-            parse_ch_type("Nullable(Int64)").unwrap(),
-            ClickHouseType::Nullable(Box::new(ClickHouseType::Int64))
+            "Nullable(Int64)".parse(),
+            Ok(ClickHouseType::Nullable(Box::new(ClickHouseType::Int64)))
         );
     }
 
     #[test]
-    fn test_parse_ch_type_lowcardinality() {
+    fn test_parse_lowcardinality() {
         assert_eq!(
-            parse_ch_type("LowCardinality(String)").unwrap(),
-            ClickHouseType::LowCardinality(Box::new(ClickHouseType::String))
-        );
-        assert_eq!(
-            parse_ch_type("LowCardinality(Nullable(String))").unwrap(),
-            ClickHouseType::LowCardinality(Box::new(ClickHouseType::Nullable(Box::new(
+            "LowCardinality(String)".parse(),
+            Ok(ClickHouseType::LowCardinality(Box::new(
                 ClickHouseType::String
-            ))))
+            )))
+        );
+        assert_eq!(
+            "LowCardinality(Nullable(String))".parse(),
+            Ok(ClickHouseType::LowCardinality(Box::new(
+                ClickHouseType::Nullable(Box::new(ClickHouseType::String))
+            )))
         );
     }
 
     #[test]
-    fn test_parse_ch_type_is_nullable() {
-        assert!(!parse_ch_type("String").unwrap().is_nullable());
-        assert!(parse_ch_type("Nullable(String)").unwrap().is_nullable());
+    fn test_is_nullable() {
+        assert!(!ClickHouseType::from_str("String").unwrap().is_nullable());
         assert!(
-            parse_ch_type("LowCardinality(Nullable(String))")
+            ClickHouseType::from_str("Nullable(String)")
                 .unwrap()
                 .is_nullable()
         );
         assert!(
-            !parse_ch_type("LowCardinality(String)")
+            ClickHouseType::from_str("LowCardinality(Nullable(String))")
+                .unwrap()
+                .is_nullable()
+        );
+        assert!(
+            !ClickHouseType::from_str("LowCardinality(String)")
                 .unwrap()
                 .is_nullable()
         );
     }
 
     #[test]
-    fn test_parse_ch_type_base_type() {
-        let parsed = parse_ch_type("LowCardinality(Nullable(String))").unwrap();
+    fn test_base_type() {
+        let parsed = ClickHouseType::from_str("LowCardinality(Nullable(String))").unwrap();
         assert_eq!(parsed.base_type(), &ClickHouseType::String);
 
-        let parsed = parse_ch_type("Nullable(Int64)").unwrap();
+        let parsed = ClickHouseType::from_str("Nullable(Int64)").unwrap();
         assert_eq!(parsed.base_type(), &ClickHouseType::Int64);
 
-        let parsed = parse_ch_type("String").unwrap();
+        let parsed = ClickHouseType::from_str("String").unwrap();
         assert_eq!(parsed.base_type(), &ClickHouseType::String);
     }
 

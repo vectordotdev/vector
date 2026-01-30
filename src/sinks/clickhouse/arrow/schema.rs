@@ -1,5 +1,7 @@
 //! Schema fetching and Arrow schema construction for ClickHouse tables.
 
+use std::str::FromStr;
+
 use arrow::datatypes::{Field, Schema};
 use async_trait::async_trait;
 use http::{Request, StatusCode};
@@ -9,7 +11,7 @@ use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
 use crate::http::{Auth, HttpClient};
 
-use super::parser::parse_ch_type;
+use super::parser::ClickHouseType;
 
 #[derive(Debug, Deserialize)]
 struct ColumnInfo {
@@ -77,7 +79,7 @@ fn parse_schema_from_response(response: &str) -> crate::Result<Schema> {
         .map(|line| {
             let column: ColumnInfo = serde_json::from_str(line)
                 .map_err(|e| format!("Failed to parse column info: {e}"))?;
-            let (arrow_type, nullable) = parse_ch_type(&column.column_type)
+            let (arrow_type, nullable) = ClickHouseType::from_str(&column.column_type)
                 .and_then(|t| (&t).try_into())
                 .map_err(|e| format!("Failed to convert column '{}': {e}", column.name))?;
             Ok(Field::new(&column.name, arrow_type, nullable))
