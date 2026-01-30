@@ -40,9 +40,9 @@ jobs:
           branch: 'vector'
           remote-repository-name: cla-signatures
           remote-organization-name: DataDog
+          allowlist: step-security-bot
 
          # the followings are the optional inputs - If the optional inputs are not given, then default values will be taken
-          #allowlist: user1,bot*
           #create-file-commit-message: 'For example: Creating file for storing CLA Signatures'
           #signed-commit-message: 'For example: $contributorName has signed the CLA in $owner/$repo#$pullRequestNo'
           #custom-notsigned-prcomment: 'pull request comment with Introductory message to ask new contributors to sign'

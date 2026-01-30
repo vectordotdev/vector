@@ -701,6 +701,20 @@ generated: configuration: configuration: {
 			type: bool: {}
 		}
 	}
+	buffer_utilization_ewma_alpha: {
+		description: """
+			The alpha value for the exponential weighted moving average (EWMA) of source and transform
+			buffer utilization metrics.
+
+			This value specifies how much of the existing value is retained when each update is made.
+			Values closer to 1.0 result in the value adjusting slower to changes. The default value of
+			0.9 is equivalent to a "half life" of 6-7 measurements.
+
+			Must be between 0 and 1 exclusive (0 < alpha < 1).
+			"""
+		required: false
+		type: float: {}
+	}
 	data_dir: {
 		common: false
 		description: """

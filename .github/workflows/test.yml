@@ -47,7 +47,7 @@ jobs:
         with:
           rust: true
           protoc: true
-      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+          libsasl2: true
       - run: make check-clippy
 
   test:
@@ -63,7 +63,7 @@ jobs:
           cargo-nextest: true
           datadog-ci: true
           protoc: true
-      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+          libsasl2: true
       - name: Unit Test
         run: make test
         env:
@@ -153,12 +153,12 @@ jobs:
     needs: changes
     steps:
       - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-      - run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
       - uses: ./.github/actions/setup
         with:
           rust: true
           protoc: true
           cue: true
+          libsasl2: true
       - run: make check-component-docs
 
   check-rust-docs:

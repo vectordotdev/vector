@@ -8,6 +8,7 @@ license = "MPL-2.0"
 
 [dependencies]
 arc-swap.workspace = true
+const-str.workspace = true
 vrl.workspace = true
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 vector-common = { path = "../vector-common", default-features = false }

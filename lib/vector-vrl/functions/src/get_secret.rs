@@ -17,6 +17,10 @@ impl Function for GetSecret {
         "get_secret"
     }
 
+    fn usage(&self) -> &'static str {
+        "Returns the value of the given secret from an event."
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "key",
