@@ -51,7 +51,7 @@ pub enum ClickHouseType {
     Nullable(Box<ClickHouseType>),
     LowCardinality(Box<ClickHouseType>),
     Array(Box<ClickHouseType>),
-    Tuple(Vec<(Option<std::string::String>, ClickHouseType)>),
+    Tuple(Vec<(Option<String>, ClickHouseType)>),
     Map(Box<ClickHouseType>, Box<ClickHouseType>),
 }
 
@@ -78,7 +78,7 @@ impl ClickHouseType {
 }
 
 impl TryFrom<&ClickHouseType> for (DataType, bool) {
-    type Error = std::string::String;
+    type Error = String;
 
     fn try_from(ch_type: &ClickHouseType) -> Result<Self, Self::Error> {
         let is_nullable = ch_type.is_nullable();
@@ -137,7 +137,7 @@ impl TryFrom<&ClickHouseType> for (DataType, bool) {
                     .map(|(i, (name_opt, elem))| {
                         let (dt, nullable) = elem.try_into()?;
                         let name = name_opt.clone().unwrap_or_else(|| format!("f{i}"));
-                        Ok::<_, std::string::String>(Field::new(name, dt, nullable))
+                        Ok::<_, String>(Field::new(name, dt, nullable))
                     })
                     .try_collect()?;
                 DataType::Struct(Fields::from(fields))
@@ -176,7 +176,7 @@ fn identifier(input: &str) -> IResult<&str, &str> {
 }
 
 /// Parses a single tuple element (either "Type" or "name Type").
-fn tuple_element(input: &str) -> IResult<&str, (Option<std::string::String>, ClickHouseType)> {
+fn tuple_element(input: &str) -> IResult<&str, (Option<String>, ClickHouseType)> {
     let (rest, name) = identifier(input)?;
     match rest.strip_prefix(' ') {
         Some(after_space) => {
@@ -281,7 +281,7 @@ fn ch_type(input: &str) -> IResult<&str, ClickHouseType> {
 }
 
 impl FromStr for ClickHouseType {
-    type Err = std::string::String;
+    type Err = String;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         all_consuming(ch_type)
