@@ -80,6 +80,8 @@ impl ClickHouseType {
 impl TryFrom<&ClickHouseType> for (DataType, bool) {
     type Error = String;
 
+    /// This function will recurse to be able to find out the `DataType` of `ClickHouseType`s with inner
+    /// types such as `Map`s, `Array`s, and `Tuple`s
     fn try_from(ch_type: &ClickHouseType) -> Result<Self, Self::Error> {
         let is_nullable = ch_type.is_nullable();
 
