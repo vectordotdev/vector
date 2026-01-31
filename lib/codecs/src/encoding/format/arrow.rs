@@ -104,10 +104,13 @@ impl ArrowStreamSerializer {
         // If allow_nullable_fields is enabled, transform the schema once here
         // instead of on every batch encoding
         let schema = if config.allow_nullable_fields {
-            Schema::new_with_metadata(
-                Fields::from_iter(schema.fields().iter().map(|f| make_field_nullable(f))),
-                schema.metadata().clone(),
-            )
+            let nullable_fields: Fields = schema
+                .fields()
+                .iter()
+                .map(|f| make_field_nullable(f).map(Into::into))
+                .collect::<Result<_, _>>()
+                .map_err(|e| vector_common::Error::from(e.to_string()))?;
+            Schema::new_with_metadata(nullable_fields, schema.metadata().clone())
         } else {
             schema
         };
@@ -198,6 +201,15 @@ pub enum ArrowEncodingError {
         /// The timestamp value that overflowed
         timestamp: String,
     },
+
+    /// Invalid Map schema structure
+    #[snafu(display("Invalid Map schema for field '{}': {}", field_name, reason))]
+    InvalidMapSchema {
+        /// The field name
+        field_name: String,
+        /// Description of the schema violation
+        reason: String,
+    },
 }
 
 impl From<std::io::Error> for ArrowEncodingError {
@@ -231,27 +243,42 @@ pub fn encode_events_to_arrow_ipc_stream(
 }
 
 /// Recursively makes a Field and all its nested fields nullable
-fn make_field_nullable(field: &Field) -> Field {
+fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
     let new_data_type = match field.data_type() {
-        DataType::List(inner_field) => DataType::List(make_field_nullable(inner_field).into()),
-        DataType::Struct(fields) => DataType::Struct(Fields::from_iter(
-            fields.iter().map(|f| make_field_nullable(f)),
-        )),
+        DataType::List(inner_field) => DataType::List(make_field_nullable(inner_field)?.into()),
+        DataType::Struct(fields) => DataType::Struct(
+            fields
+                .iter()
+                .map(|f| make_field_nullable(f).map(Into::into))
+                .collect::<Result<_, _>>()?,
+        ),
         DataType::Map(inner, sorted) => {
-            // A Map's inner field is typically a "entries" Struct<Key, Value>
+            // A Map's inner field is a "entries" Struct<Key, Value>
             let DataType::Struct(fields) = inner.data_type() else {
-                // Fallback for invalid Map structures (preserves original)
-                return field.clone().with_nullable(true);
+                return Err(ArrowEncodingError::InvalidMapSchema {
+                    field_name: field.name().to_string(),
+                    reason: format!("inner type must be Struct, found {:?}", inner.data_type()),
+                });
             };
 
-            let new_struct_fields = vec![fields[0].clone(), make_field_nullable(&fields[1]).into()];
+            if fields.len() != 2 {
+                return Err(ArrowEncodingError::InvalidMapSchema {
+                    field_name: field.name().to_string(),
+                    reason: format!("expected 2 fields (key, value), found {}", fields.len()),
+                });
+            }
+            let key_field = &fields[0];
+            let value_field = &fields[1];
+
+            let new_struct_fields: Fields =
+                [key_field.clone(), make_field_nullable(value_field)?.into()].into();
 
             // Reconstruct the inner "entries" field
             // The inner field itself must be non-nullable (only the Map wrapper is nullable)
             let new_inner_field = inner
                 .as_ref()
                 .clone()
-                .with_data_type(DataType::Struct(new_struct_fields.into()))
+                .with_data_type(DataType::Struct(new_struct_fields))
                 .with_nullable(false);
 
             DataType::Map(new_inner_field.into(), *sorted)
@@ -259,10 +286,10 @@ fn make_field_nullable(field: &Field) -> Field {
         other => other.clone(),
     };
 
-    field
+    Ok(field
         .clone()
         .with_data_type(new_data_type)
-        .with_nullable(true)
+        .with_nullable(true))
 }
 
 /// Build an Arrow RecordBatch from a slice of events using the provided schema.
@@ -877,7 +904,7 @@ mod tests {
             let outer_struct = DataType::Struct(arrow::datatypes::Fields::from(vec![outer_field]));
 
             let original_field = Field::new("root", outer_struct, false);
-            let nullable_field = make_field_nullable(&original_field);
+            let nullable_field = make_field_nullable(&original_field).unwrap();
 
             assert!(
                 nullable_field.is_nullable(),
@@ -915,7 +942,7 @@ mod tests {
             let map_type = DataType::Map(entries_field.into(), false);
 
             let original_field = Field::new("my_map", map_type, false);
-            let nullable_field = make_field_nullable(&original_field);
+            let nullable_field = make_field_nullable(&original_field).unwrap();
 
             assert!(
                 nullable_field.is_nullable(),
