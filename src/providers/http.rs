@@ -148,8 +148,8 @@ async fn http_request_to_config_builder(
     let env_vars = std::env::vars_os()
         .map(|(k, v)| {
             (
-                k.into_string().unwrap_or_default(),
-                v.into_string().unwrap_or_default(),
+                k.as_os_str().to_string_lossy().to_string(),
+                v.as_os_str().to_string_lossy().to_string(),
             )
         })
         .collect::<std::collections::HashMap<String, String>>();
