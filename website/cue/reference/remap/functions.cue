@@ -113,6 +113,15 @@ remap: {
 			* `connection_type`
 			* `network`
 
+		* Anonymous-IP databases:
+			* `is_anonymous`
+			* `is_anonymous_vpn`
+			* `is_hosting_provider`
+			* `is_public_proxy`
+			* `is_residential_proxy`
+			* `is_tor_exit_node`
+			* `network`
+
 		To use this function, you need to update your configuration to
 		include an
 		[`enrichment_tables`](\(urls.vector_configuration_global)/#enrichment_tables)
