@@ -93,6 +93,7 @@ remap: {
 			* `autonomous_system_organization`
 			* `isp`
 			* `organization`
+			* `network`
 
 		* City databases:
 			* `city_name`
@@ -106,9 +107,11 @@ remap: {
 			* `longitude`
 			* `postal_code`
 			* `timezone`
+			* `network`
 
 		* Connection-Type databases:
 			* `connection_type`
+			* `network`
 
 		To use this function, you need to update your configuration to
 		include an
