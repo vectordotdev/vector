@@ -12,5 +12,5 @@ const-str.workspace = true
 vrl.workspace = true
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 vector-common = { path = "../vector-common", default-features = false }
-tokio = { version = "1.45.1", default-features = false }
-tokio-stream = { version = "0.1.17", default-features = false }
+tokio = { version = "1.49.0", default-features = false }
+tokio-stream = { version = "0.1.18", default-features = false }
