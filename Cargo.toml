@@ -332,6 +332,10 @@ deadpool = { version = "0.12.2", default-features = false, features = ["managed"
 async-graphql = { version = "7.0.17", default-features = false, optional = true, features = ["chrono", "playground"] }
 async-graphql-warp = { version = "7.0.17", default-features = false, optional = true }
 
+# ODBC
+odbc-api = { version = "19.1.0", optional = true }
+cron = { version = "0.15.0", features = ["serde"], optional = true }
+
 # Opentelemetry
 
 hex = { version = "0.4.3", default-features = false, optional = true }
@@ -616,6 +620,7 @@ sources-logs = [
   "sources-logstash",
   "sources-mqtt",
   "sources-nats",
+  "sources-odbc",
   "sources-okta",
   "sources-opentelemetry",
   "sources-pulsar",
@@ -676,6 +681,7 @@ sources-mongodb_metrics = ["dep:mongodb"]
 sources-mqtt = ["dep:rumqttc"]
 sources-nats = ["dep:async-nats", "dep:nkeys"]
 sources-nginx_metrics = ["dep:nom"]
+sources-odbc = ["dep:odbc-api", "dep:cron"]
 sources-okta = ["sources-utils-http-client"]
 sources-opentelemetry = [
   "dep:hex",
@@ -931,6 +937,7 @@ all-integration-tests = [
   "mqtt-integration-tests",
   "nats-integration-tests",
   "nginx-integration-tests",
+  "odbc-integration-tests",
   "opentelemetry-integration-tests",
   "postgresql_metrics-integration-tests",
   "postgres_sink-integration-tests",
@@ -997,6 +1004,7 @@ mongodb_metrics-integration-tests = ["sources-mongodb_metrics"]
 mqtt-integration-tests = ["sinks-mqtt", "sources-mqtt"]
 nats-integration-tests = ["sinks-nats", "sources-nats"]
 nginx-integration-tests = ["sources-nginx_metrics"]
+odbc-integration-tests = ["sources-odbc"]
 opentelemetry-integration-tests = ["sources-opentelemetry", "dep:prost"]
 postgresql_metrics-integration-tests = ["sources-postgresql_metrics"]
 postgres_sink-integration-tests = ["sinks-postgres"]
