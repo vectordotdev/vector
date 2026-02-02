@@ -18,7 +18,7 @@ anyhow.workspace = true
 # Tokio / Futures
 futures.workspace = true
 tokio = { workspace = true, features = ["macros", "rt", "sync"] }
-tokio-stream = { version = "0.1.18", default-features = false, features = ["sync"] }
+tokio-stream = { workspace = true, features = ["sync"] }
 
 # GraphQL
 graphql_client = { version = "0.14.0", default-features = false, features = ["graphql_query_derive"] }
