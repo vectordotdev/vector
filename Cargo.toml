@@ -146,7 +146,7 @@ bytes = { version = "1.10.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.3", default-features = false }
 chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"] }
-clap = { version = "4.5.53", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap = { version = "4.5.56", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 clap_complete = "4.5.65"
 colored = { version = "3.0.0", default-features = false }
 const-str = { version = "1.0.0", default-features = false }
