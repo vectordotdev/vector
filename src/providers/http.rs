@@ -9,7 +9,7 @@ use vector_lib::configurable::configurable_component;
 
 use super::BuildResult;
 use crate::{
-    config::{self, interpolate, Format, ProxyConfig, provider::ProviderConfig},
+    config::{self, Format, ProxyConfig, interpolate, provider::ProviderConfig},
     http::HttpClient,
     signal,
     tls::{TlsConfig, TlsSettings},
@@ -154,9 +154,10 @@ async fn http_request_to_config_builder(
         })
         .collect::<std::collections::HashMap<String, String>>();
 
-    let config_str = interpolate(std::str::from_utf8(&config_str)
-        .map_err(|e| vec![e.to_string()])?,
-        &env_vars)?;
+    let config_str = interpolate(
+        std::str::from_utf8(&config_str).map_err(|e| vec![e.to_string()])?,
+        &env_vars,
+    )?;
 
     config::load(config_str.as_bytes().chunk(), *config_format)
 }
