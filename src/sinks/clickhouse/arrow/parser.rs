@@ -59,80 +59,69 @@ impl ClickHouseType {
     /// Returns true if this type or any of its nested types is Nullable.
     pub fn is_nullable(&self) -> bool {
         match self {
-            ClickHouseType::Nullable(_) => true,
-            ClickHouseType::LowCardinality(inner) => inner.is_nullable(),
+            Self::Nullable(_) => true,
+            Self::LowCardinality(inner) => inner.is_nullable(),
             _ => false,
         }
     }
 
-    /// Returns the innermost base type, unwrapping all modifiers.
-    /// For example: LowCardinality(Nullable(String)) -> String
-    pub fn base_type(&self) -> &ClickHouseType {
+    /// Converts this ClickHouse type to an Arrow DataType.
+    /// Recursively handles nested types including Nullable/LowCardinality wrappers.
+    fn to_data_type(&self) -> Result<DataType, String> {
         match self {
-            ClickHouseType::Nullable(inner) | ClickHouseType::LowCardinality(inner) => {
-                inner.base_type()
-            }
-            _ => self,
-        }
-    }
-}
+            // Wrapper types - recurse to inner type
+            Self::Nullable(inner) | Self::LowCardinality(inner) => inner.to_data_type(),
 
-impl TryFrom<&ClickHouseType> for (DataType, bool) {
-    type Error = String;
-
-    /// This function will recurse to be able to find out the `DataType` of `ClickHouseType`s with inner
-    /// types such as `Map`s, `Array`s, and `Tuple`s
-    fn try_from(ch_type: &ClickHouseType) -> Result<Self, Self::Error> {
-        let is_nullable = ch_type.is_nullable();
-
-        let data_type = match ch_type.base_type() {
             // Numeric types
-            ClickHouseType::Int8 => DataType::Int8,
-            ClickHouseType::Int16 => DataType::Int16,
-            ClickHouseType::Int32 => DataType::Int32,
-            ClickHouseType::Int64 => DataType::Int64,
-            ClickHouseType::UInt8 => DataType::UInt8,
-            ClickHouseType::UInt16 => DataType::UInt16,
-            ClickHouseType::UInt32 => DataType::UInt32,
-            ClickHouseType::UInt64 => DataType::UInt64,
-            ClickHouseType::Float32 => DataType::Float32,
-            ClickHouseType::Float64 => DataType::Float64,
-            ClickHouseType::Bool => DataType::Boolean,
+            Self::Int8 => Ok(DataType::Int8),
+            Self::Int16 => Ok(DataType::Int16),
+            Self::Int32 => Ok(DataType::Int32),
+            Self::Int64 => Ok(DataType::Int64),
+            Self::UInt8 => Ok(DataType::UInt8),
+            Self::UInt16 => Ok(DataType::UInt16),
+            Self::UInt32 => Ok(DataType::UInt32),
+            Self::UInt64 => Ok(DataType::UInt64),
+            Self::Float32 => Ok(DataType::Float32),
+            Self::Float64 => Ok(DataType::Float64),
+            Self::Bool => Ok(DataType::Boolean),
 
             // Decimal
-            ClickHouseType::Decimal { precision, scale } => {
+            Self::Decimal { precision, scale } => Ok(
                 if *precision <= DECIMAL128_PRECISION {
                     DataType::Decimal128(*precision, *scale)
                 } else {
                     DataType::Decimal256(*precision, *scale)
                 }
-            }
+            ),
 
             // String types
-            ClickHouseType::String | ClickHouseType::FixedString(_) => DataType::Utf8,
+            Self::String | Self::FixedString(_) => Ok(DataType::Utf8),
 
             // Date/time types
-            ClickHouseType::Date => DataType::Date32,
-            ClickHouseType::DateTime => DataType::Timestamp(TimeUnit::Second, None),
-            ClickHouseType::DateTime64 { precision } => match precision {
-                0 => DataType::Timestamp(TimeUnit::Second, None),
-                1..=3 => DataType::Timestamp(TimeUnit::Millisecond, None),
-                4..=6 => DataType::Timestamp(TimeUnit::Microsecond, None),
-                7..=9 => DataType::Timestamp(TimeUnit::Nanosecond, None),
-                _ => {
-                    return Err(format!(
+            Self::Date => Ok(DataType::Date32),
+            Self::DateTime => Ok(DataType::Timestamp(TimeUnit::Second, None)),
+            Self::DateTime64 { precision } => {
+                let unit = match precision {
+                    0 => TimeUnit::Second,
+                    1..=3 => TimeUnit::Millisecond,
+                    4..=6 => TimeUnit::Microsecond,
+                    7..=9 => TimeUnit::Nanosecond,
+                    _ => return Err(format!(
                         "Unsupported DateTime64 precision {}. Must be 0-9",
                         precision
-                    ));
-                }
-            },
+                    )),
+                };
+                Ok(DataType::Timestamp(unit, None))
+            }
 
             // Container types
-            ClickHouseType::Array(inner) => {
+            Self::Array(inner) => {
                 let (inner_arrow, inner_nullable) = inner.as_ref().try_into()?;
-                DataType::List(Field::new("item", inner_arrow, inner_nullable).into())
+                Ok(DataType::List(
+                    Field::new("item", inner_arrow, inner_nullable).into(),
+                ))
             }
-            ClickHouseType::Tuple(elements) => {
+            Self::Tuple(elements) => {
                 let fields: Vec<Field> = elements
                     .iter()
                     .enumerate()
@@ -142,9 +131,9 @@ impl TryFrom<&ClickHouseType> for (DataType, bool) {
                         Ok::<_, String>(Field::new(name, dt, nullable))
                     })
                     .try_collect()?;
-                DataType::Struct(Fields::from(fields))
+                Ok(DataType::Struct(Fields::from(fields)))
             }
-            ClickHouseType::Map(key_type, value_type) => {
+            Self::Map(key_type, value_type) => {
                 let (key_arrow, _): (DataType, bool) = key_type.as_ref().try_into()?;
                 if !matches!(key_arrow, DataType::Utf8) {
                     return Err("Map keys must be String type.".to_string());
@@ -154,14 +143,20 @@ impl TryFrom<&ClickHouseType> for (DataType, bool) {
                     Field::new("keys", DataType::Utf8, false),
                     Field::new("values", value_arrow, value_nullable),
                 ]));
-                DataType::Map(Field::new("entries", entries, false).into(), false)
+                Ok(DataType::Map(
+                    Field::new("entries", entries, false).into(),
+                    false,
+                ))
             }
+        }
+    }
+}
 
-            // base_type() always unwraps Nullable/LowCardinality
-            ClickHouseType::Nullable(_) | ClickHouseType::LowCardinality(_) => unreachable!(),
-        };
+impl TryFrom<&ClickHouseType> for (DataType, bool) {
+    type Error = String;
 
-        Ok((data_type, is_nullable))
+    fn try_from(ch_type: &ClickHouseType) -> Result<Self, Self::Error> {
+        Ok((ch_type.to_data_type()?, ch_type.is_nullable()))
     }
 }
 
@@ -532,18 +527,6 @@ mod tests {
                 .unwrap()
                 .is_nullable()
         );
-    }
-
-    #[test]
-    fn test_base_type() {
-        let parsed = ClickHouseType::from_str("LowCardinality(Nullable(String))").unwrap();
-        assert_eq!(parsed.base_type(), &ClickHouseType::String);
-
-        let parsed = ClickHouseType::from_str("Nullable(Int64)").unwrap();
-        assert_eq!(parsed.base_type(), &ClickHouseType::Int64);
-
-        let parsed = ClickHouseType::from_str("String").unwrap();
-        assert_eq!(parsed.base_type(), &ClickHouseType::String);
     }
 
     #[test]
