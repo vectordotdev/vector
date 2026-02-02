@@ -17,7 +17,7 @@ glob.workspace = true
 serde_yaml.workspace = true
 tokio = { workspace = true, features = ["time"] }
 tokio-stream = { workspace = true, features = ["sync"] }
-tokio-tungstenite = { version = "0.21.0", default-features = false }
+tokio-tungstenite.workspace = true
 tracing.workspace = true
 url = { version = "2.5.4", default-features = false }
 uuid.workspace = true

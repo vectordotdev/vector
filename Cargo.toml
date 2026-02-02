@@ -193,6 +193,7 @@ socket2 = { version = "0.5.10", default-features = false }
 tempfile = "3.23.0"
 tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
+tokio-tungstenite = { version = "0.21.0", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
@@ -422,7 +423,7 @@ strip-ansi-escapes = { version = "0.2.1", default-features = false }
 syslog = { version = "6.1.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 tokio-postgres = { version = "0.7.13", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
-tokio-tungstenite = { version = "0.20.1", default-features = false, features = ["connect"], optional = true }
+tokio-tungstenite = { workspace = true, features = ["connect"], optional = true }
 toml.workspace = true
 hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
