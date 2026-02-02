@@ -194,7 +194,7 @@ tempfile = "3.23.0"
 tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
 tokio-test = "0.4.5"
-tokio-tungstenite = { version = "0.21.0", default-features = false }
+tokio-tungstenite = { version = "0.20.1", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
