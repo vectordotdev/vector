@@ -107,9 +107,10 @@ impl ArrowStreamSerializer {
             let nullable_fields: Fields = schema
                 .fields()
                 .iter()
-                .map(|f| make_field_nullable(f).map(Into::into))
-                .collect::<Result<_, _>>()
-                .map_err(|e| vector_common::Error::from(e.to_string()))?;
+                .map(|f| make_field_nullable(f))
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(|e| vector_common::Error::from(e.to_string()))?
+                .into();
             Schema::new_with_metadata(nullable_fields, schema.metadata().clone())
         } else {
             schema
@@ -249,8 +250,9 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
         DataType::Struct(fields) => DataType::Struct(
             fields
                 .iter()
-                .map(|f| make_field_nullable(f).map(Into::into))
-                .collect::<Result<_, _>>()?,
+                .map(|f| make_field_nullable(f))
+                .collect::<Result<Vec<_>, _>>()?
+                .into(),
         ),
         DataType::Map(inner, sorted) => {
             // A Map's inner field is a "entries" Struct<Key, Value>

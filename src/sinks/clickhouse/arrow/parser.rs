@@ -86,13 +86,11 @@ impl ClickHouseType {
             Self::Bool => Ok(DataType::Boolean),
 
             // Decimal
-            Self::Decimal { precision, scale } => Ok(
-                if *precision <= DECIMAL128_PRECISION {
-                    DataType::Decimal128(*precision, *scale)
-                } else {
-                    DataType::Decimal256(*precision, *scale)
-                }
-            ),
+            Self::Decimal { precision, scale } => Ok(if *precision <= DECIMAL128_PRECISION {
+                DataType::Decimal128(*precision, *scale)
+            } else {
+                DataType::Decimal256(*precision, *scale)
+            }),
 
             // String types
             Self::String | Self::FixedString(_) => Ok(DataType::Utf8),
@@ -106,10 +104,12 @@ impl ClickHouseType {
                     1..=3 => TimeUnit::Millisecond,
                     4..=6 => TimeUnit::Microsecond,
                     7..=9 => TimeUnit::Nanosecond,
-                    _ => return Err(format!(
-                        "Unsupported DateTime64 precision {}. Must be 0-9",
-                        precision
-                    )),
+                    _ => {
+                        return Err(format!(
+                            "Unsupported DateTime64 precision {}. Must be 0-9",
+                            precision
+                        ));
+                    }
                 };
                 Ok(DataType::Timestamp(unit, None))
             }
