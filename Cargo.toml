@@ -193,6 +193,7 @@ socket2 = { version = "0.5.10", default-features = false }
 tempfile = "3.23.0"
 tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
+tokio-test = "0.4.5"
 tokio-tungstenite = { version = "0.21.0", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
@@ -479,7 +480,7 @@ similar-asserts = "1.7.0"
 tempfile.workspace = true
 test-generator = "0.3.1"
 tokio = { workspace = true, features = ["test-util"] }
-tokio-test = "0.4.4"
+tokio-test.workspace = true
 tower-test = "0.4.0"
 vector-lib = { workspace = true, features = ["test"] }
 vrl.workspace = true
