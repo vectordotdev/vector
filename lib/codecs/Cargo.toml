@@ -74,6 +74,7 @@ similar-asserts = "2.0.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["test"] }
 rstest = "0.26.1"
 tracing-test = "0.2.6"
+tempfile.workspace = true
 uuid.workspace = true
 vrl.workspace = true
 

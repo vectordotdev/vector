@@ -9,8 +9,9 @@ use std::{
 
 use bytes::{Bytes, BytesMut};
 use codecs::{
+    avro::{AvroEncoding, AvroSchemaSource},
     decoding::format::{AvroDeserializerConfig, Deserializer},
-    encoding::format::AvroSerializerConfig,
+    encoding::format::{AvroSerializerConfig, AvroSerializerOptions},
 };
 use rstest::*;
 use similar_asserts::assert_eq;
@@ -22,7 +23,7 @@ use vector_core::{config::LogNamespace, event::Event};
 #[case(false)]
 fn roundtrip_avro_fixtures(
     #[files("tests/data/avro/generated/*.avro")]
-    #[exclude(".*(date|fixed|time_millis).avro")]
+    #[exclude(".*(date|decimal|duration|fixed|time_millis|ocf).avro")]
     path: PathBuf,
     #[case] reserialize: bool,
 ) {
@@ -38,7 +39,11 @@ fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
     let deserializer = AvroDeserializerConfig::new(schema.clone(), false)
         .build()
         .unwrap();
-    let mut serializer = AvroSerializerConfig::new(schema.clone()).build().unwrap();
+    let options = AvroSerializerOptions {
+        schema: schema.clone(),
+        encoding: AvroEncoding::Datum,
+    };
+    let mut serializer = AvroSerializerConfig::new(options).build().unwrap();
 
     let (buf, event) = load_deserialize(&data_path, &deserializer);
 
@@ -56,6 +61,66 @@ fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
         assert_eq!(new_events[0], event);
     } else {
         // Ensure that the parsed event is serialized to the same bytes
+        let mut new_buf = BytesMut::new();
+        serializer.encode(event.clone(), &mut new_buf).unwrap();
+        assert_eq!(buf, new_buf);
+    }
+}
+
+#[rstest]
+#[case(true)]
+fn roundtrip_avro_ocf_fixtures(
+    #[files("tests/data/avro/generated/*.ocf.avro")]
+    #[exclude(".*(date|decimal|duration|fixed|time_millis).ocf.avro")]
+    path: PathBuf,
+    #[case] reserialize: bool,
+) {
+    // OCF files share the same .avsc schema as their datum counterparts
+    let schema_path = path.as_path().with_file_name(
+        path.file_name()
+            .unwrap()
+            .to_str()
+            .unwrap()
+            .replace(".ocf.avro", ".avsc"),
+    );
+    assert!(schema_path.exists());
+
+    roundtrip_avro_ocf(path, schema_path, reserialize);
+}
+
+fn roundtrip_avro_ocf(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
+    let schema = load_file(&schema_path);
+    let schema = from_utf8(&schema).unwrap().to_string();
+    let deserializer = AvroDeserializerConfig::new_with_options(
+        schema.clone(),
+        false,
+        AvroEncoding::ObjectContainerFile,
+        AvroSchemaSource::Provided,
+    )
+    .build()
+    .unwrap();
+    let options = AvroSerializerOptions {
+        schema: schema.clone(),
+        encoding: AvroEncoding::ObjectContainerFile,
+    };
+    let mut serializer = AvroSerializerConfig::new(options).build().unwrap();
+
+    let (buf, event) = load_deserialize(&data_path, &deserializer);
+
+    if reserialize {
+        // Serialize the parsed event in OCF format
+        let mut buf = BytesMut::new();
+        serializer.encode(event.clone(), &mut buf).unwrap();
+        // Deserialize the event from these OCF bytes
+        let new_events = deserializer
+            .parse(buf.into(), LogNamespace::Vector)
+            .unwrap();
+
+        // Ensure we have the same event.
+        assert_eq!(new_events.len(), 1);
+        assert_eq!(new_events[0], event);
+    } else {
+        // Ensure that the parsed event is serialized to the same OCF bytes
         let mut new_buf = BytesMut::new();
         serializer.encode(event.clone(), &mut new_buf).unwrap();
         assert_eq!(buf, new_buf);

@@ -5,6 +5,7 @@
 #![deny(warnings)]
 #![deny(clippy::unwrap_used)]
 
+pub mod avro;
 mod common;
 mod decoder_framed_read;
 pub mod decoding;
