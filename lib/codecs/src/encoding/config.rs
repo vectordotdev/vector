@@ -2,12 +2,9 @@ use vector_config::configurable_component;
 
 use super::{Encoder, EncoderKind, Transformer};
 use crate::encoding::{
-    CharacterDelimitedEncoder, Framer, FramingConfig, LengthDelimitedEncoder,
+    BytesEncoder, CharacterDelimitedEncoder, Framer, FramingConfig, LengthDelimitedEncoder,
     NewlineDelimitedEncoder, Serializer, SerializerConfig,
 };
-
-#[cfg(feature = "opentelemetry")]
-use crate::encoding::BytesEncoder;
 
 /// Encoding configuration.
 #[configurable_component]
@@ -109,9 +106,17 @@ impl EncodingConfigWithFraming {
                 SinkType::StreamBased => NewlineDelimitedEncoder::default().into(),
                 SinkType::MessageBased => CharacterDelimitedEncoder::new(b',').into(),
             },
-            (None, Serializer::Avro(_) | Serializer::Native(_)) => {
-                LengthDelimitedEncoder::default().into()
+            (None, Serializer::Avro(avro_serializer)) => {
+                // OCF (Object Container File) format is self-describing and includes its own
+                // framing/structure, so we must not add additional framing on top of it.
+                // For regular Datum encoding, we use length-delimited framing for compatibility.
+                if avro_serializer.is_ocf() {
+                    BytesEncoder.into()
+                } else {
+                    LengthDelimitedEncoder::default().into()
+                }
             }
+            (None, Serializer::Native(_)) => LengthDelimitedEncoder::default().into(),
             (None, Serializer::Gelf(_)) => {
                 // Graylog/GELF always uses null byte delimiter on TCP, see
                 // https://github.com/Graylog2/graylog2-server/issues/1240
