@@ -106,6 +106,11 @@ impl AvroSerializer {
         }
     }
 
+    /// Returns true if this serializer uses OCF format.
+    pub const fn is_ocf(&self) -> bool {
+        matches!(self.encoding, AvroEncoding::ObjectContainerFile)
+    }
+
     /// Writes the OCF file header to the buffer.
     fn write_ocf_header(&mut self, buffer: &mut BytesMut) -> Result<(), vector_common::Error> {
         // Write header only once per encoder instance
