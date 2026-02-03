@@ -1,3 +1,3 @@
 The Avro codec now supports reading and writing Avro OCF files.
 
-author: jlambatl
+authors: jlambatl
