@@ -1,8 +1,8 @@
 use metrics::{counter, gauge};
-use vector_lib::internal_event::InternalEvent;
+use vector_lib::{NamedInternalEvent, internal_event::InternalEvent};
 
 /// Emitted to track the current size of the metrics cache in bytes
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct IncrementalToAbsoluteMetricsCache {
     pub size: usize,
     pub count: usize,
