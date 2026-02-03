@@ -54,7 +54,7 @@ vector-config = { path = "../vector-config", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 vector-vrl-functions.workspace = true
-toml = { version = "0.9.8", optional = true }
+toml = { version = "0.9.11", optional = true }
 
 [dev-dependencies]
 futures.workspace = true
