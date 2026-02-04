@@ -251,6 +251,36 @@ fn render_dot_edge(into: &mut String, id: &ComponentKey, input: &OutputId, graph
 fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
     let mut mermaid = String::from("flowchart TD;\n");
 
+    writeln!(mermaid, "\n  %% Enrichment tables").unwrap();
+    let mut written_tables = HashSet::<ComponentKey>::new();
+
+    for (id, _) in config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_source(key))
+    {
+        writeln!(mermaid, "  {id}[({id})]").unwrap();
+        written_tables.insert(id);
+    }
+
+    for (id, table) in config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_sink(key))
+    {
+        if !written_tables.contains(&id) {
+            writeln!(mermaid, "  {id}[({id})]").unwrap();
+        }
+
+        for input in table.inputs.iter() {
+            if let Some(port) = &input.port {
+                writeln!(mermaid, "  {0} -->|{port}| {id}", input.component).unwrap();
+            } else {
+                writeln!(mermaid, "  {0} --> {id}", input.component).unwrap();
+            }
+        }
+    }
+
     writeln!(mermaid, "\n  %% Sources").unwrap();
     for (id, _) in config.sources() {
         writeln!(mermaid, "  {id}[/{id}/]").unwrap();
