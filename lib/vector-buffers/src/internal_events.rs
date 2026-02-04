@@ -18,19 +18,34 @@ pub struct BufferCreated {
 impl InternalEvent for BufferCreated {
     #[expect(clippy::cast_precision_loss)]
     fn emit(self) {
+        let stage = self.idx.to_string();
         if self.max_size_events != 0 {
+            gauge!(
+                "buffer_max_size_events",
+                "buffer_id" => self.buffer_id.clone(),
+                "stage" => stage.clone(),
+            )
+            .set(self.max_size_events as f64);
+            // DEPRECATED: buffer-bytes-events-metrics
             gauge!(
                 "buffer_max_event_size",
                 "buffer_id" => self.buffer_id.clone(),
-                "stage" => self.idx.to_string(),
+                "stage" => stage.clone(),
             )
             .set(self.max_size_events as f64);
         }
         if self.max_size_bytes != 0 {
             gauge!(
+                "buffer_max_size_bytes",
+                "buffer_id" => self.buffer_id.clone(),
+                "stage" => stage.clone(),
+            )
+            .set(self.max_size_bytes as f64);
+            // DEPRECATED: buffer-bytes-events-metrics
+            gauge!(
                 "buffer_max_byte_size",
                 "buffer_id" => self.buffer_id,
-                "stage" => self.idx.to_string(),
+                "stage" => stage,
             )
             .set(self.max_size_bytes as f64);
         }
@@ -63,12 +78,26 @@ impl InternalEvent for BufferEventsReceived {
             "stage" => self.idx.to_string()
         )
         .increment(self.byte_size);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_events",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_events",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_bytes",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_byte_size as f64);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,
@@ -103,12 +132,26 @@ impl InternalEvent for BufferEventsSent {
             "stage" => self.idx.to_string()
         )
         .increment(self.byte_size);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_events",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_events",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_bytes",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_byte_size as f64);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,
@@ -170,12 +213,26 @@ impl InternalEvent for BufferEventsDropped {
             "intentional" => intentional_str,
         )
         .increment(self.byte_size);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_events",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_events",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_bytes",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_byte_size as f64);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,

@@ -9,13 +9,58 @@ use vector_lib::{NamedInternalEvent, internal_event::InternalEvent};
 
 #[cfg(feature = "sources-aws_s3")]
 mod s3 {
+    use std::time::Duration;
+
     use aws_sdk_sqs::types::{
         BatchResultErrorEntry, DeleteMessageBatchRequestEntry, DeleteMessageBatchResultEntry,
         SendMessageBatchRequestEntry, SendMessageBatchResultEntry,
     };
+    use metrics::histogram;
 
     use super::*;
     use crate::sources::aws_s3::sqs::ProcessingError;
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct S3ObjectProcessingSucceeded<'a> {
+        pub bucket: &'a str,
+        pub duration: Duration,
+    }
+
+    impl InternalEvent for S3ObjectProcessingSucceeded<'_> {
+        fn emit(self) {
+            debug!(
+                message = "S3 object processing succeeded.",
+                bucket = %self.bucket,
+                duration_ms = %self.duration.as_millis(),
+            );
+            histogram!(
+                "s3_object_processing_succeeded_duration_seconds",
+                "bucket" => self.bucket.to_owned(),
+            )
+            .record(self.duration);
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct S3ObjectProcessingFailed<'a> {
+        pub bucket: &'a str,
+        pub duration: Duration,
+    }
+
+    impl InternalEvent for S3ObjectProcessingFailed<'_> {
+        fn emit(self) {
+            debug!(
+                message = "S3 object processing failed.",
+                bucket = %self.bucket,
+                duration_ms = %self.duration.as_millis(),
+            );
+            histogram!(
+                "s3_object_processing_failed_duration_seconds",
+                "bucket" => self.bucket.to_owned(),
+            )
+            .record(self.duration);
+        }
+    }
 
     #[derive(Debug, NamedInternalEvent)]
     pub struct SqsMessageProcessingError<'a> {

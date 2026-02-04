@@ -14,17 +14,21 @@ path = "tests/bin/generate-avro-fixtures.rs"
 
 [dependencies]
 apache-avro = { version = "0.20.0", default-features = false }
-arrow = { version = "56.2.0", default-features = false, features = ["ipc"] }
+arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
+async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
-rust_decimal = { version = "1.37", default-features = false, features = ["std"] }
+rust_decimal.workspace = true
 csv-core = { version = "0.1.12", default-features = false }
 derivative.workspace = true
+derive_more = { version = "2.0.1", optional = true, features = ["from", "display"] }
 dyn-clone = { version = "1", default-features = false }
 flate2.workspace = true
+futures.workspace = true
 influxdb-line-protocol = { version = "2", default-features = false }
 lookup = { package = "vector-lookup", path = "../vector-lookup", default-features = false, features = ["test"] }
 memchr = { version = "2", default-features = false }
+metrics.workspace = true
 opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
 ordered-float.workspace = true
 prost.workspace = true
@@ -34,17 +38,23 @@ regex.workspace = true
 serde.workspace = true
 serde_with = { version = "3.14.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_json.workspace = true
+serde_arrow = { version = "0.13", features = ["arrow-56"], optional = true }
+serde-aux = { version = "4.5", optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu.workspace = true
+strum = { version = "0.26.3", features = ["derive"], optional = true }
 syslog_loose = { version = "0.23", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tokio = { workspace = true, features = ["full"] }
 tracing.workspace = true
 vrl.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
+vector-common-macros.workspace = true
 vector-config = { path = "../vector-config", default-features = false }
 vector-config-macros = { path = "../vector-config-macros", default-features = false }
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
+vector-vrl-functions.workspace = true
+toml = { version = "0.9.8", optional = true }
 
 [dev-dependencies]
 futures.workspace = true
@@ -58,6 +68,7 @@ uuid.workspace = true
 vrl.workspace = true
 
 [features]
-arrow = []
+arrow = ["dep:arrow", "dep:serde_arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
-syslog = ["dep:syslog_loose"]
+syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux", "dep:toml"]
+test = []

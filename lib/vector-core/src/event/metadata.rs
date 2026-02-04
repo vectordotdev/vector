@@ -40,7 +40,7 @@ pub(super) struct Inner {
     pub(crate) secrets: Secrets,
 
     #[serde(default, skip)]
-    finalizers: EventFinalizers,
+    pub(crate) finalizers: EventFinalizers,
 
     /// The id of the source
     pub(crate) source_id: Option<Arc<ComponentKey>>,
@@ -60,7 +60,7 @@ pub(super) struct Inner {
     ///
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
     #[serde(default = "default_schema_definition", skip)]
-    schema_definition: Arc<schema::Definition>,
+    pub(crate) schema_definition: Arc<schema::Definition>,
 
     /// A store of values that may be dropped during the encoding process but may be needed
     /// later on. The map is indexed by meaning.
@@ -68,7 +68,7 @@ pub(super) struct Inner {
     /// we need to ensure it is still available later on for emitting metrics tagged by the service.
     /// This field could almost be keyed by `&'static str`, but because it needs to be deserializable
     /// we have to use `String`.
-    dropped_fields: ObjectMap,
+    pub(crate) dropped_fields: ObjectMap,
 
     /// Metadata to track the origin of metrics. This is always `None` for log and trace events.
     /// Only a small set of Vector sources and transforms explicitly set this field.
@@ -253,7 +253,7 @@ impl Default for Inner {
             upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
-            source_event_id: Some(Uuid::now_v7()),
+            source_event_id: Some(Uuid::new_v4()),
         }
     }
 }
@@ -264,7 +264,7 @@ impl Default for EventMetadata {
     }
 }
 
-fn default_schema_definition() -> Arc<schema::Definition> {
+pub(super) fn default_schema_definition() -> Arc<schema::Definition> {
     Arc::new(schema::Definition::new_with_default_metadata(
         Kind::any(),
         [LogNamespace::Legacy, LogNamespace::Vector],
@@ -348,14 +348,8 @@ impl EventMetadata {
         inner.secrets.merge(other.secrets);
 
         // Update `source_event_id` if necessary.
-        match (inner.source_event_id, other.source_event_id) {
-            (None, Some(id)) => {
-                inner.source_event_id = Some(id);
-            }
-            (Some(uuid1), Some(uuid2)) if uuid2 < uuid1 => {
-                inner.source_event_id = Some(uuid2);
-            }
-            _ => {} // Keep the existing value.
+        if inner.source_event_id.is_none() {
+            inner.source_event_id = other.source_event_id;
         }
     }
 
@@ -561,6 +555,7 @@ mod test {
         let m1 = EventMetadata::default();
         let m2 = EventMetadata::default();
 
+        // Always maintain the original source event id when merging, similar to how we handle other metadata.
         {
             let mut merged = m1.clone();
             merged.merge(m2.clone());
@@ -570,7 +565,7 @@ mod test {
         {
             let mut merged = m2.clone();
             merged.merge(m1.clone());
-            assert_eq!(merged.source_event_id(), m1.source_event_id());
+            assert_eq!(merged.source_event_id(), m2.source_event_id());
         }
     }
 }
