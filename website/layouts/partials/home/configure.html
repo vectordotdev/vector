@@ -5,19 +5,27 @@
   <div class="text-center">
     {{ partial "home/heading.html" (dict "title" $configure.title) }}
 
+
     <p class="mt-4 text-xl md:text-2xl font-light text-gray-700 dark:text-gray-200">
       {{ $configure.description }}
     </p>
   </div>
 
-  <div x-data="{ config: '{{ $defaultConfig }}' }" class="mt-8 max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 items-start">
+  <div
+    x-data="{ config: '{{ $defaultConfig }}' }"
+    class="mt-8 max-w-5xl grid grid-cols-1 md:grid-cols-2 gap-x-10 gap-y-4 items-start"
+  >
     <div class="md:pt-2 flex flex-col items-start md:items-end space-y-1 md:space-y-2">
       {{ range $configs }}
-      <button @click="config = '{{ .title }}'" :class="{ 'font-semibold dark:text-primary': config === '{{ .title }}', 'text-gray-400 font-light hover:text-secondary dark:hover:text-primary': config != '{{ .title }}' }" class="flex items-center space-x-2 md:text-lg">
-        <span>
-          {{ .title }}
-        </span>
-      </button>
+        <button
+          @click="config = '{{ .title }}'"
+          :class="{ 'font-semibold dark:text-primary': config === '{{ .title }}', 'text-gray-400 font-light hover:text-secondary dark:hover:text-primary': config != '{{ .title }}' }"
+          class="flex items-center space-x-2 md:text-lg"
+        >
+          <span>
+            {{ .title }}
+          </span>
+        </button>
       {{ end }}
     </div>
 
@@ -38,10 +46,10 @@
 
       <div class="p-4 overflow-x-scroll">
         {{ range $configs }}
-        {{ $code := highlight .example "toml" "" }}
-        <div x-show="config === '{{ .title }}'" class="text-sm">
-          {{ $code }}
-        </div>
+          {{ $code := highlight .example "toml" "" }}
+          <div x-show="config === '{{ .title }}'" class="text-sm">
+            {{ $code }}
+          </div>
         {{ end }}
       </div>
     </div>
@@ -55,5 +63,5 @@
 </div>
 
 {{ define "dot" }}
-<span class="h-3 w-3 bg-{{ . }} rounded-full"></span>
+  <span class="h-3 w-3 bg-{{ . }} rounded-full"></span>
 {{ end }}

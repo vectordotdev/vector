@@ -6,14 +6,14 @@
 {{ $imgAlt := printf "Logo for %s" site.Title }}
 {{ $twitter := printf "@%s" site.Params.social.twitter_handle }}
 {{ $title := cond (eq .Layout "component") (printf "%s %s" .Title .Params.component_kind) .Title }}
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no">
-<meta http-equiv="x-ua-compatible" content="id=edge">
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1,shrink-to-fit=no" />
+<meta http-equiv="x-ua-compatible" content="id=edge" />
 {{ with $desc }}
-<meta name="description" content="{{ . }}">
+  <meta name="description" content="{{ . }}" />
 {{ end }}
 {{ with $author }}
-<meta name="author" content="{{ . }}">
+  <meta name="author" content="{{ . }}" />
 {{ end }}
 
 {{/* TrustArc */}}
@@ -22,33 +22,35 @@
 
 {{ hugo.Generator }}
 
-<link rel="shortcut icon" href="{{ $favicon }}">
-<link rel="canonical" href="{{ $url }}">
+
+<link rel="shortcut icon" href="{{ $favicon }}" />
+<link rel="canonical" href="{{ $url }}" />
 
 {{/* Twitter Card metadata */}}
-<meta name="twitter:card" content="summary">
-<meta name="twitter:image" content="{{ $img }}">
-<meta name="twitter:image:alt" content="{{ $imgAlt }}">
-<meta name="twitter:site" content="{{ $twitter }}">
-<meta name="twitter:creator" content="{{ $twitter }}">
+<meta name="twitter:card" content="summary" />
+<meta name="twitter:image" content="{{ $img }}" />
+<meta name="twitter:image:alt" content="{{ $imgAlt }}" />
+<meta name="twitter:site" content="{{ $twitter }}" />
+<meta name="twitter:creator" content="{{ $twitter }}" />
 
 {{/* OpenGraph metadata */}}
-<meta property="og:title" content="{{ $title }}">
-<meta property="og:image" content="{{ $img }}">
-<meta property="og:url" content="{{ $url }}">
+<meta property="og:title" content="{{ $title }}" />
+<meta property="og:image" content="{{ $img }}" />
+<meta property="og:url" content="{{ $url }}" />
 {{ with $desc }}
-<meta property="og:description" content="{{ . }}">
+  <meta property="og:description" content="{{ . }}" />
 {{ end }}
 
 {{/* For Algolia search */}}
-<meta name="algolia:title" content="{{ $title }}">
+<meta name="algolia:title" content="{{ $title }}" />
 {{ with .Params.tags }}
-<meta name="keywords" content="{{ delimit . "," }}">
+  <meta name="keywords" content="{{ delimit . "," }}" />
 {{ end }}
 
-{{/*  facebook domain verification  */}}
+{{/* facebook domain verification */}}
 {{ if .IsHome }}
-<meta name="facebook-domain-verification" content="tlh9a8wkkmmawf51fhpt6bwsnrn3wz" />
+  <meta name="facebook-domain-verification" content="tlh9a8wkkmmawf51fhpt6bwsnrn3wz" />
 {{ end }}
 
-<link rel="manifest" href="/manifest.json">
+
+<link rel="manifest" href="/manifest.json" />

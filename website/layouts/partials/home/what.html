@@ -3,6 +3,7 @@
   <div class="text-center">
     {{ partial "home/heading.html" (dict "title" $what.title) }}
 
+
     <p class="mt-4 text-xl md:text-2xl font-light text-gray-700 dark:text-gray-200">
       {{ $what.description | markdownify }}
     </p>

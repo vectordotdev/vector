@@ -85,3 +85,15 @@ local-preview-build: clean setup cargo-data structured-data preview-build run-li
 # Generate Lighthouse scores locally
 lighthouse-report:
 	yarn lighthouse
+
+# Format all files with Prettier
+format:
+	yarn format
+
+# Check formatting without making changes
+format-check:
+	yarn format:check
+
+# Format only HTML template files
+format-html:
+	yarn format:html

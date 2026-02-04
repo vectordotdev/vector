@@ -8,85 +8,85 @@
 {{ $input := $config.input }}
 {{ $output := $config.output }}
 
+
 <div class="block space-y-1">
   {{ if eq $classes.development "beta" }}
-  {{ partial "badge.html" (dict "prefix" "status" "word" "beta" "color" "red" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "status" "word" "beta" "color" "red" "inline" true) }}
   {{ end }}
 
   {{ if eq $classes.development "stable" }}
-  {{ partial "badge.html" (dict "prefix" "status" "word" "stable" "color" "green" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "status" "word" "stable" "color" "green" "inline" true) }}
   {{ end }}
 
   {{ range $classes.deployment_roles }}
-  {{ partial "badge.html" (dict "prefix" "role" "word" . "color" "gray" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "role" "word" . "color" "gray" "inline" true) }}
   {{ end }}
 
   {{ if eq $classes.delivery "best_effort" }}
-  {{ partial "badge.html" (dict "prefix" "delivery" "word" "best effort" "color" "blue" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "delivery" "word" "best effort" "color" "blue" "inline" true) }}
   {{ end }}
 
   {{ if eq $classes.delivery "at_least_once" }}
-  {{ partial "badge.html" (dict "prefix" "delivery" "word" "at-least-once" "color" "blue" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "delivery" "word" "at-least-once" "color" "blue" "inline" true) }}
   {{ end }}
-  
+
   {{ if eq $classes.delivery "exactly_once" }}
-  {{ partial "badge.html" (dict "prefix" "delivery" "word" "exactly-once" "color" "blue" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "delivery" "word" "exactly-once" "color" "blue" "inline" true) }}
   {{ end }}
 
   {{ if eq $features.acknowledgements true }}
-  {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "yes" "color" "green" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "yes" "color" "green" "inline" true) }}
   {{ end }}
 
   {{ if eq $features.acknowledgements false }}
-  {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "no" "color" "yellow" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "acknowledgements" "word" "no" "color" "yellow" "inline" true) }}
   {{ end }}
 
   {{ with $classes.egress_method }}
-  {{ partial "badge.html" (dict "prefix" "egress" "word" . "color" "indigo" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "egress" "word" . "color" "indigo" "inline" true) }}
   {{ end }}
 
   {{ if eq $classes.stateful false }}
-  {{ partial "badge.html" (dict "prefix" "state" "word" "stateless" "color" "indigo" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "state" "word" "stateless" "color" "indigo" "inline" true) }}
   {{ else }}
-  {{ partial "badge.html" (dict "prefix" "state" "word" "stateful" "color" "indigo" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "state" "word" "stateful" "color" "indigo" "inline" true) }}
   {{ end }}
 
   {{ with $alias }}
-  {{ partial "badge.html" (dict "prefix" "previously known as" "word" . "color" "yellow" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "previously known as" "word" . "color" "yellow" "inline" true) }}
   {{ end }}
 </div>
 
 <div class="w-full mt-4">
   {{ if $input.logs }}
-  {{ partial "badge.html" (dict "prefix" "input" "word" "logs" "color" "blue" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "input" "word" "logs" "color" "blue" "inline" true) }}
   {{ end }}
   {{ if $input.metrics }}
-  {{ partial "badge.html" (dict "prefix" "input" "word" "metrics" "color" "blue" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "input" "word" "metrics" "color" "blue" "inline" true) }}
   {{ end }}
   {{ if $input.traces }}
-  {{ partial "badge.html" (dict "prefix" "input" "word" "traces" "color" "blue" "inline" true) }}
+    {{ partial "badge.html" (dict "prefix" "input" "word" "traces" "color" "blue" "inline" true) }}
   {{ end }}
 </div>
 
 <div class="w-full mt-4">
   {{ range $k, $v := $output }}
-  {{ if eq $k "logs" }}
-  {{ partial "badge.html" (dict "prefix" "output" "word" "logs" "color" "yellow" "inline" true) }}
-  {{ end }}
+    {{ if eq $k "logs" }}
+      {{ partial "badge.html" (dict "prefix" "output" "word" "logs" "color" "yellow" "inline" true) }}
+    {{ end }}
 
-  {{ if eq $k "metrics" }}
-  {{ partial "badge.html" (dict "prefix" "output" "word" "metrics" "color" "yellow" "inline" true) }}
-  {{ end }}
+    {{ if eq $k "metrics" }}
+      {{ partial "badge.html" (dict "prefix" "output" "word" "metrics" "color" "yellow" "inline" true) }}
+    {{ end }}
 
-  {{ if eq $k "traces" }}
-  {{ partial "badge.html" (dict "prefix" "output" "word" "traces" "color" "yellow" "inline" true) }}
-  {{ end }}
+    {{ if eq $k "traces" }}
+      {{ partial "badge.html" (dict "prefix" "output" "word" "traces" "color" "yellow" "inline" true) }}
+    {{ end }}
   {{ end }}
 </div>
-
 
 {{ if .Params.deprecated }}
-<div class="mt-4">
-  {{ partial "badge.html" (dict "prefix" "status" "word" "deprecated" "color" "red" "inline" true) }}
-</div>
+  <div class="mt-4">
+    {{ partial "badge.html" (dict "prefix" "status" "word" "deprecated" "color" "red" "inline" true) }}
+  </div>
 {{ end }}

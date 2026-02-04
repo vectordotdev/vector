@@ -71,7 +71,7 @@ function getItemUrl(file: string, { level, domId }: Payload[0]) {
 
 // Hash the file name to create a unique ID for the record using the same hash function as the one used in the synapse stream package.
 function hashString(fileName: string) {
-  return crypto.createHash('md5').update(fileName).digest('hex')
+  return crypto.createHash("md5").update(fileName).digest("hex");
 }
 
 async function indexHTMLFiles(
@@ -88,8 +88,8 @@ async function indexHTMLFiles(
     const $ = cheerio.load(html);
     const containers = $("#page-content");
     const pageTitle = $("meta[name='algolia:title']").attr("content") || "";
-    const pageTagsString = $("meta[name='keywords']").attr('content') || "";
-    const pageTags: string[] = (pageTagsString === "") ? [] : pageTagsString.split(",");
+    const pageTagsString = $("meta[name='keywords']").attr("content") || "";
+    const pageTags: string[] = pageTagsString === "" ? [] : pageTagsString.split(",");
 
     // @ts-ignore
     $(".algolia-no-index").each((_, d) => $(d).remove());
@@ -144,7 +144,8 @@ async function indexHTMLFiles(
           tags: pageTags,
           content: "",
         };
-      } else if (item.level === 1) { // h1 logic
+      } else if (item.level === 1) {
+        // h1 logic
         activeRecord.content += item.content;
       } else if (item.level < activeRecord.level) {
         algoliaRecords.push({ ...activeRecord });
@@ -162,7 +163,8 @@ async function indexHTMLFiles(
           tags: pageTags,
           content: "",
         };
-      } else { // h2-h6 logic
+      } else {
+        // h2-h6 logic
         algoliaRecords.push({ ...activeRecord });
 
         const hierarchySize = activeRecord.hierarchy.length;
@@ -185,7 +187,7 @@ async function indexHTMLFiles(
       }
 
       if (activeRecord) {
-        algoliaRecords.push({ ...activeRecord })
+        algoliaRecords.push({ ...activeRecord });
       }
 
       for (const rec of algoliaRecords) {
@@ -207,9 +209,7 @@ async function indexHTMLFiles(
     }
   }
 
-  console.log(
-    chalk.green(`Success. Updated records for ${files.length} file(s).`)
-  );
+  console.log(chalk.green(`Success. Updated records for ${files.length} file(s).`));
 
   records.push(...algoliaRecords);
 }
@@ -282,7 +282,7 @@ async function buildIndex() {
 
     // We shouldn't index upgrade guides
     if (section.name === "Vector highlights") {
-      files = files.filter((path) => !path.includes("-upgrade-guide"))
+      files = files.filter((path) => !path.includes("-upgrade-guide"));
     }
 
     console.log(chalk.blue(`Indexing ${section.displayPath}...`));

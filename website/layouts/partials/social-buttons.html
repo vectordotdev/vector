@@ -1,19 +1,27 @@
 {{ $colored := .color }}
 <div class="flex items-center gap-3.5">
   {{ range site.Menus.comms }}
-  {{ $color := .Params.color }}
-  {{ $iconColor := cond $colored $color "gray-300" }}
-  {{ $hoverColor := cond $colored "gray-500" $color }}
-  {{ $nudge := "" }}
-  {{ if eq .Params.icon "x" }}{{ $nudge = "pt-px" }}{{ end }}
-  {{ if eq .Params.icon "discord" }}{{ $nudge = "pt-px" }}{{ end }}
-  <a href="{{ .URL }}" rel="noopener" target="_blank" class="flex items-center {{ $nudge }} {{ with .Params.dark }}dark:text-{{ . }} dark:hover:text-{{ $hoverColor }} {{ end }}text-{{ $iconColor }} hover:text-{{ $hoverColor }}">
-    <span class="sr-only">{{ .Name }}</span>
-    {{ if eq .Params.icon "x" }}
-    <span class="text-lg font-bold leading-none">𝕏</span>
-    {{ else }}
-    <ion-icon name="logo-{{ .Params.icon }}"></ion-icon>
-    {{ end }}
-  </a>
+    {{ $color := .Params.color }}
+    {{ $iconColor := cond $colored $color "gray-300" }}
+    {{ $hoverColor := cond $colored "gray-500" $color }}
+    {{ $nudge := "" }}
+    {{ if eq .Params.icon "x" }}{{ $nudge = "pt-px" }}{{ end }}
+    {{ if eq .Params.icon "discord" }}{{ $nudge = "pt-px" }}{{ end }}
+    <a
+      href="{{ .URL }}"
+      rel="noopener"
+      target="_blank"
+      class="flex items-center {{ $nudge }} {{ with .Params.dark }}
+        dark:text-{{ . }}
+        dark:hover:text-{{ $hoverColor }}
+      {{ end }}text-{{ $iconColor }} hover:text-{{ $hoverColor }}"
+    >
+      <span class="sr-only">{{ .Name }}</span>
+      {{ if eq .Params.icon "x" }}
+        <span class="text-lg font-bold leading-none">𝕏</span>
+      {{ else }}
+        <ion-icon name="logo-{{ .Params.icon }}"></ion-icon>
+      {{ end }}
+    </a>
   {{ end }}
 </div>
