@@ -62,26 +62,31 @@ impl Function for GetEnrichmentTableRecord {
                 keyword: "table",
                 kind: kind::BYTES,
                 required: true,
+                description: "The enrichment table to search: /docs/reference/glossary/#enrichment-tables.",
             },
             Parameter {
                 keyword: "condition",
                 kind: kind::OBJECT,
                 required: true,
+                description: "The condition to search on. Since the condition is used at boot time to create indices into the data, these conditions must be statically defined.",
             },
             Parameter {
                 keyword: "select",
                 kind: kind::ARRAY,
                 required: false,
+                description: "A subset of fields from the enrichment table to return. If not specified, all fields are returned.",
             },
             Parameter {
                 keyword: "case_sensitive",
                 kind: kind::BOOLEAN,
                 required: false,
+                description: "Whether the text fields match the case exactly.",
             },
             Parameter {
                 keyword: "wildcard",
                 kind: kind::BYTES,
                 required: false,
+                description: "Value to use for wildcard matching in the search.",
             },
         ]
     }
