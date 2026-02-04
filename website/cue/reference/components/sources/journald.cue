@@ -31,7 +31,11 @@ components: sources: journald: {
 
 	support: {
 		targets: {
-			"x86_64-pc-windows-msv": false
+			"x86_64-pc-windows-msv":        false
+			"x86_64-unknown-linux-musl":    false
+			"aarch64-unknown-linux-musl":   false
+			"armv7-unknown-linux-musleabihf": false
+			"arm-unknown-linux-musleabi":   false
 		}
 
 		requirements: [
@@ -40,7 +44,13 @@ components: sources: journald: {
 				handled automatically, otherwise ensure the running user is part of the `systemd-journal` group.
 				""",
 		]
-		warnings: []
+		warnings: [
+			"""
+				The `journald` source is not available in Alpine/musl-based Vector images because Alpine Linux uses
+				OpenRC instead of systemd. Neither the journald daemon nor the `journalctl` binary are available on
+				Alpine. Use the Debian-based Vector images instead if you need to collect journald logs.
+				""",
+		]
 		notices: []
 	}
 
