@@ -14,11 +14,12 @@ use crate::{
         util::test::{build_test_server_status, load_sink},
     },
     test_util::{
+        addr::next_addr,
         components::{
             COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, assert_sink_compliance, assert_sink_error,
             run_and_assert_sink_compliance,
         },
-        generate_lines_with_stream, map_event_batch_stream, next_addr,
+        generate_lines_with_stream, map_event_batch_stream,
     },
 };
 
@@ -29,7 +30,7 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
     "#};
     let config = config.replace("${TEST_APPSIGNAL_PUSH_API_KEY}", &push_api_key());
     let (mut config, cx) = load_sink::<AppsignalConfig>(config.as_str()).unwrap();
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Set the endpoint to a local server so we can fetch the sent events later
     config.endpoint = format!("http://{addr}");
 

@@ -10,14 +10,13 @@ use arc_swap::ArcSwap;
 use bytes::Bytes;
 use futures::{Stream, StreamExt};
 use http::{Request, StatusCode, Uri, uri::PathAndQuery};
-use hyper::{Body, body::to_bytes as body_to_bytes};
+use hyper::Body;
 use serde::Deserialize;
 use serde_with::serde_as;
 use snafu::ResultExt as _;
 use tokio::time::{Duration, Instant, sleep};
 use tracing::Instrument;
 use vector_lib::{
-    config::LogNamespace,
     configurable::configurable_component,
     lookup::{
         OwnedTargetPath,
@@ -255,9 +254,8 @@ impl TransformConfig for Ec2Metadata {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         let added_keys = Keys::new(self.namespace.clone());
 
@@ -433,7 +431,7 @@ impl MetadataClient {
                 .into()),
             })?;
 
-        let token = body_to_bytes(res.into_body()).await?;
+        let token = http_body::Body::collect(res.into_body()).await?.to_bytes();
 
         let next_refresh = Instant::now() + Duration::from_secs(21600);
         self.token = Some((token.clone(), next_refresh));
@@ -619,7 +617,7 @@ impl MetadataClient {
                 .into()),
             })? {
             Some(res) => {
-                let body = body_to_bytes(res.into_body()).await?;
+                let body = http_body::Body::collect(res.into_body()).await?.to_bytes();
                 Ok(Some(body))
             }
             None => Ok(None),
@@ -714,7 +712,7 @@ enum Ec2MetadataError {
 
 #[cfg(test)]
 mod test {
-    use vector_lib::{enrichment::TableRegistry, lookup::OwnedTargetPath};
+    use vector_lib::lookup::OwnedTargetPath;
     use vrl::{owned_value_path, value::Kind};
 
     use crate::{
@@ -733,9 +731,8 @@ mod test {
             Definition::new(Kind::bytes(), Kind::any_object(), [LogNamespace::Vector]);
 
         let mut outputs = transform_config.outputs(
-            TableRegistry::default(),
+            &Default::default(),
             &[(OutputId::dummy(), input_definition)],
-            LogNamespace::Vector,
         );
         assert_eq!(outputs.len(), 1);
         let output = outputs.pop().unwrap();
@@ -762,7 +759,7 @@ mod integration_tests {
     use super::*;
     use crate::{
         event::{LogEvent, Metric, metric},
-        test_util::{components::assert_transform_compliance, next_addr},
+        test_util::{addr::next_addr, components::assert_transform_compliance},
         transforms::test::create_topology,
     };
 
@@ -902,7 +899,7 @@ mod integration_tests {
 
     #[tokio::test(flavor = "multi_thread")]
     async fn timeout() {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
 
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
             tokio::time::sleep(Duration::from_secs(3)).await;
@@ -933,7 +930,7 @@ mod integration_tests {
     // validates the configuration setting 'required'=false allows vector to run
     #[tokio::test(flavor = "multi_thread")]
     async fn not_required() {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
 
         async fn sleepy() -> Result<impl warp::Reply, std::convert::Infallible> {
             tokio::time::sleep(Duration::from_secs(3)).await;

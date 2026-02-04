@@ -16,11 +16,12 @@ use crate::{
     event::{ObjectMap, TraceEvent, Value},
     sinks::{postgres::PostgresConfig, util::test::load_sink},
     test_util::{
+        addr::next_addr,
         components::{
             COMPONENT_ERROR_TAGS, run_and_assert_sink_compliance, run_and_assert_sink_error,
         },
         integration::postgres::pg_url,
-        next_addr, random_table_name, trace_init,
+        random_table_name, trace_init,
     },
 };
 
@@ -202,7 +203,7 @@ async fn healthcheck_fails_unknown_host() {
 async fn healthcheck_fails_timed_out() {
     trace_init();
 
-    let free_addr = next_addr();
+    let (_guard, free_addr) = next_addr();
     let endpoint = format!("postgres://{free_addr}");
     let table = random_table_name();
     let config_str = format!(

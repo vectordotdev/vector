@@ -147,19 +147,38 @@ pub fn spawn_thread<'a>(
                                 .all(|(_, t)| *t == ComponentType::EnrichmentTable)
                             {
                                 info!("Only enrichment tables have changed.");
-                                _ = signal_tx.send(crate::signal::SignalTo::ReloadEnrichmentTables).map_err(|error| {
-                                error!(message = "Unable to reload enrichment tables.", cause = %error)
-                            });
+                                _ = signal_tx
+                                    .send(crate::signal::SignalTo::ReloadEnrichmentTables)
+                                    .map_err(|error| {
+                                        error!(
+                                            message = "Unable to reload enrichment tables.",
+                                            cause = %error,
+                                            internal_log_rate_limit = false,
+                                        )
+                                    });
                             } else {
-                                _ = signal_tx.send(crate::signal::SignalTo::ReloadComponents(changed_components.into_keys().collect())).map_err(|error| {
-                                error!(message = "Unable to reload component configuration. Restart Vector to reload it.", cause = %error)
-                            });
+                                _ = signal_tx
+                                    .send(crate::signal::SignalTo::ReloadComponents(
+                                        changed_components.into_keys().collect(),
+                                    ))
+                                    .map_err(|error| {
+                                        error!(
+                                            message = "Unable to reload component configuration. Restart Vector to reload it.",
+                                            cause = %error,
+                                            internal_log_rate_limit = false,
+                                        )
+                                    });
                             }
                         } else {
-                            _ = signal_tx.send(crate::signal::SignalTo::ReloadFromDisk)
-                            .map_err(|error| {
-                                error!(message = "Unable to reload configuration file. Restart Vector to reload it.", cause = %error)
-                            });
+                            _ = signal_tx
+                                .send(crate::signal::SignalTo::ReloadFromDisk)
+                                .map_err(|error| {
+                                    error!(
+                                        message = "Unable to reload configuration file. Restart Vector to reload it.",
+                                        cause = %error,
+                                        internal_log_rate_limit = false,
+                                    )
+                                });
                         }
                     } else {
                         debug!(message = "Ignoring event.", event = ?event)

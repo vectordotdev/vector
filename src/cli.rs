@@ -12,8 +12,8 @@ use crate::tap;
 use crate::top;
 
 use crate::{
-    config, convert_config, generate, generate_schema, get_version, graph, list, signal, unit_test,
-    validate,
+    completion, config, convert_config, generate, generate_schema, get_version, graph, list,
+    signal, unit_test, validate,
 };
 
 #[derive(Parser, Debug)]
@@ -136,6 +136,14 @@ pub struct RootOpts {
     /// Reduce detail of internal logging. Repeat to reduce further. Overrides `--verbose`.
     #[arg(short, long, action = ArgAction::Count)]
     pub quiet: u8,
+
+    /// Disable interpolation of environment variables in configuration files.
+    #[arg(
+        long,
+        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub disable_env_var_interpolation: bool,
 
     /// Set the logging format
     #[arg(long, default_value = "text", env = "VECTOR_LOG_FORMAT")]
@@ -310,6 +318,10 @@ pub enum SubCommand {
     /// By default all output is writen to stdout. The `output_path` option can be used to redirect to a file.
     GenerateSchema(generate_schema::Opts),
 
+    /// Generate shell completion, then exit.
+    #[command(hide = true)]
+    Completion(completion::Opts),
+
     /// Output a provided Vector configuration file/dir as a single JSON object, useful for checking in to version control.
     #[command(hide = true)]
     Config(config::Opts),
@@ -347,6 +359,7 @@ impl SubCommand {
         color: bool,
     ) -> exitcode::ExitCode {
         match self {
+            Self::Completion(s) => completion::cmd(s),
             Self::Config(c) => config::cmd(c),
             Self::ConvertConfig(opts) => convert_config::cmd(opts),
             Self::Generate(g) => generate::cmd(g),
@@ -361,11 +374,7 @@ impl SubCommand {
             #[cfg(feature = "top")]
             Self::Top(t) => top::cmd(t).await,
             Self::Validate(v) => validate::validate(v, color).await,
-            Self::Vrl(s) => {
-                let mut functions = vrl::stdlib::all();
-                functions.extend(vector_vrl_functions::all());
-                vrl::cli::cmd::cmd(s, functions)
-            }
+            Self::Vrl(s) => vrl::cli::cmd::cmd(s, vector_vrl_functions::all()),
         }
     }
 }

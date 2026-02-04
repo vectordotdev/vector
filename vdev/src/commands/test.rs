@@ -2,8 +2,7 @@ use anyhow::Result;
 use clap::Args;
 use std::collections::BTreeMap;
 
-use crate::testing::runner::get_agent_test_runner;
-use crate::utils::platform;
+use crate::{testing::runner::get_agent_test_runner, utils::platform};
 
 /// Execute tests
 #[derive(Args, Debug)]
@@ -15,10 +14,6 @@ pub struct Cli {
     /// Whether to run tests in a container
     #[arg(short = 'C', long)]
     container: bool,
-
-    /// Reuse existing test runner image instead of rebuilding (useful in CI)
-    #[arg(long)]
-    reuse_image: bool,
 
     /// Environment variables in the form KEY[=VALUE]
     #[arg(short, long)]
@@ -57,7 +52,6 @@ impl Cli {
             &BTreeMap::default(),
             None,
             &args,
-            self.reuse_image,
             false, // Don't pre-build Vector for direct test runs
         )
     }

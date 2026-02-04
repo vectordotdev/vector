@@ -6,14 +6,6 @@ use std::{
 
 use directories::ProjectDirs;
 
-pub fn canonicalize_path(path: impl AsRef<Path>) -> String {
-    let path = path.as_ref();
-    dunce::canonicalize(path)
-        .unwrap_or_else(|err| panic!("Could not canonicalize path {}: {err}", path.display()))
-        .display()
-        .to_string()
-}
-
 pub fn data_dir() -> &'static Path {
     static DATA_DIR: OnceLock<PathBuf> = OnceLock::new();
     DATA_DIR.get_or_init(|| {

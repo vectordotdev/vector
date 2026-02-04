@@ -2,11 +2,10 @@ use std::{path::Path, process::Command};
 
 use anyhow::Result;
 
-use crate::testing::test_runner_dockerfile;
 use crate::{
     app,
     app::CommandExt,
-    testing::{config::RustToolchainConfig, docker::docker_command},
+    testing::{config::RustToolchainConfig, docker::docker_command, test_runner_dockerfile},
     utils::{
         self,
         environment::{Environment, extract_present},

@@ -51,6 +51,13 @@ impl Function for FindEnrichmentTableRecords {
         "find_enrichment_table_records"
     }
 
+    fn usage(&self) -> &'static str {
+        const_str::concat!(
+            "Searches an [enrichment table](/docs/reference/glossary/#enrichment-tables) for rows that match the provided condition.\n\n",
+            super::ENRICHMENT_TABLE_EXPLAINER
+        )
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {
@@ -82,7 +89,7 @@ impl Function for FindEnrichmentTableRecords {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "find records",
             source: r#"find_enrichment_table_records!("test", {"surname": "Smith"})"#,
             result: Ok(
@@ -90,7 +97,7 @@ impl Function for FindEnrichmentTableRecords {
                              {"id": 2, "firstname": "Fred", "surname": "Smith"}]"#,
                 },
             ),
-        }]
+        )]
     }
 
     fn compile(

@@ -15,20 +15,15 @@ use vector_lib::{
 use vrl::core::Value;
 use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
 
+use super::{ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg, RequestHandler};
 use crate::{
-    SourceSender,
     common::{datadog::DDTAGS, http::ErrorMessage},
     event::Event,
     internal_events::DatadogAgentJsonParseError,
-    sources::datadog_agent::{
-        ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg, handle_request,
-    },
 };
 
-pub(crate) fn build_warp_filter(
-    acknowledgements: bool,
-    multiple_outputs: bool,
-    out: SourceSender,
+pub(super) fn build_warp_filter(
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
@@ -58,9 +53,7 @@ pub(crate) fn build_warp_filter(
                             &source,
                         )
                     });
-
-                let output = multiple_outputs.then_some(super::LOGS);
-                handle_request(events, acknowledgements, out.clone(), output)
+                handler.clone().handle_request(events, super::LOGS)
             },
         )
         .boxed()
@@ -190,7 +183,7 @@ pub(crate) fn decode_log_body(
                 }
                 Ok(None) => break,
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

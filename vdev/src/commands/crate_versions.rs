@@ -1,4 +1,7 @@
-use std::{collections::HashMap, collections::HashSet, process::Command};
+use std::{
+    collections::{HashMap, HashSet},
+    process::Command,
+};
 
 use anyhow::Result;
 use clap::Args;

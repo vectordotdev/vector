@@ -13,8 +13,9 @@ use vector_lib::{
 };
 use warp::{Filter, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
+use super::ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_payload};
+use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler};
 use crate::{
-    SourceSender,
     common::{
         datadog::{DatadogMetricType, DatadogSeriesMetric},
         http::ErrorMessage,
@@ -26,14 +27,7 @@ use crate::{
     },
     internal_events::EventsReceived,
     schema,
-    sources::{
-        datadog_agent::{
-            ApiKeyQueryParams, DatadogAgentSource,
-            ddmetric_proto::{Metadata, MetricPayload, SketchPayload, metric_payload},
-            handle_request,
-        },
-        util::extract_tag_key_and_value,
-    },
+    sources::util::extract_tag_key_and_value,
 };
 
 #[derive(Deserialize, Serialize)]
@@ -41,17 +35,13 @@ pub(crate) struct DatadogSeriesRequest {
     pub(crate) series: Vec<DatadogSeriesMetric>,
 }
 
-pub(crate) fn build_warp_filter(
-    acknowledgements: bool,
-    multiple_outputs: bool,
-    out: SourceSender,
+pub(super) fn build_warp_filter(
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
-    let output = multiple_outputs.then_some(super::METRICS);
-    let sketches_service = sketches_service(acknowledgements, output, out.clone(), source.clone());
-    let series_v1_service =
-        series_v1_service(acknowledgements, output, out.clone(), source.clone());
-    let series_v2_service = series_v2_service(acknowledgements, output, out, source);
+    let sketches_service = sketches_service(handler.clone(), source.clone());
+    let series_v1_service = series_v1_service(handler.clone(), source.clone());
+    let series_v2_service = series_v2_service(handler, source);
     sketches_service
         .or(series_v1_service)
         .unify()
@@ -61,9 +51,7 @@ pub(crate) fn build_warp_filter(
 }
 
 fn sketches_service(
-    acknowledgements: bool,
-    output: Option<&'static str>,
-    out: SourceSender,
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
@@ -73,7 +61,7 @@ fn sketches_service(
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
         .and(warp::body::bytes())
-        .and_then(
+        .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,
                   api_token: Option<String>,
@@ -93,16 +81,14 @@ fn sketches_service(
                             &source.events_received,
                         )
                     });
-                handle_request(events, acknowledgements, out.clone(), output)
-            },
-        )
+                handler.clone().handle_request(events, super::METRICS)
+            }
+        })
         .boxed()
 }
 
 fn series_v1_service(
-    acknowledgements: bool,
-    output: Option<&'static str>,
-    out: SourceSender,
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
@@ -112,7 +98,7 @@ fn series_v1_service(
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
         .and(warp::body::bytes())
-        .and_then(
+        .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,
                   api_token: Option<String>,
@@ -135,16 +121,14 @@ fn series_v1_service(
                             &source.events_received,
                         )
                     });
-                handle_request(events, acknowledgements, out.clone(), output)
-            },
-        )
+                handler.clone().handle_request(events, super::METRICS)
+            }
+        })
         .boxed()
 }
 
 fn series_v2_service(
-    acknowledgements: bool,
-    output: Option<&'static str>,
-    out: SourceSender,
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
@@ -154,7 +138,7 @@ fn series_v2_service(
         .and(warp::header::optional::<String>("dd-api-key"))
         .and(warp::query::<ApiKeyQueryParams>())
         .and(warp::body::bytes())
-        .and_then(
+        .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,
                   api_token: Option<String>,
@@ -174,9 +158,9 @@ fn series_v2_service(
                             &source.events_received,
                         )
                     });
-                handle_request(events, acknowledgements, out.clone(), output)
-            },
-        )
+                handler.clone().handle_request(events, super::METRICS)
+            }
+        })
         .boxed()
 }
 

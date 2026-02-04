@@ -14,6 +14,10 @@ impl Function for RemoveSecret {
         "remove_secret"
     }
 
+    fn usage(&self) -> &'static str {
+        "Removes a secret from an event."
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "key",
@@ -23,11 +27,11 @@ impl Function for RemoveSecret {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "Remove the datadog api key",
             source: r#"remove_secret("datadog_api_key")"#,
             result: Ok("null"),
-        }]
+        )]
     }
 
     fn compile(

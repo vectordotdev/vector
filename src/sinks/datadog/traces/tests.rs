@@ -19,8 +19,9 @@ use crate::{
     extra_context::ExtraContext,
     sinks::util::test::{build_test_server_status, load_sink, load_sink_with_context},
     test_util::{
+        addr::next_addr,
         components::{SINK_TAGS, assert_sink_compliance, run_and_assert_sink_compliance},
-        map_event_batch_stream, next_addr,
+        map_event_batch_stream,
     },
 };
 
@@ -31,7 +32,7 @@ async fn start_test(
     events: Vec<Event>,
 ) -> Receiver<(http::request::Parts, Bytes)> {
     assert_sink_compliance(&SINK_TAGS, async {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = format!(
             indoc! {r#"
             default_api_key = "atoken"
@@ -324,7 +325,7 @@ async fn global_options() {
     };
     let (mut config, cx) = load_sink_with_context::<DatadogTracesConfig>(config, cx).unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{addr}");
@@ -369,7 +370,7 @@ async fn override_global_options() {
     };
     let (mut config, cx) = load_sink_with_context::<DatadogTracesConfig>(config, cx).unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
     let endpoint = format!("http://{addr}");

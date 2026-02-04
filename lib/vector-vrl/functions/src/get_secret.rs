@@ -17,6 +17,10 @@ impl Function for GetSecret {
         "get_secret"
     }
 
+    fn usage(&self) -> &'static str {
+        "Returns the value of the given secret from an event."
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "key",
@@ -26,11 +30,11 @@ impl Function for GetSecret {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "Get the datadog api key",
             source: r#"get_secret("datadog_api_key")"#,
             result: Ok("secret value"),
-        }]
+        )]
     }
 
     fn compile(

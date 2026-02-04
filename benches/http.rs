@@ -15,7 +15,7 @@ use vector::{
     },
     sources,
     template::Template,
-    test_util::{next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
+    test_util::{addr::next_addr, random_lines, runtime, send_lines, start_topology, wait_for_tcp},
 };
 use vector_lib::codecs::{TextSerializerConfig, encoding::FramingConfig};
 
@@ -23,8 +23,8 @@ fn benchmark_http(c: &mut Criterion) {
     let num_lines: usize = 1_000;
     let line_size: usize = 100;
 
-    let in_addr = next_addr();
-    let out_addr = next_addr();
+    let (_guard_0, in_addr) = next_addr();
+    let (_guard_1, out_addr) = next_addr();
 
     let _srv = serve(out_addr);
 

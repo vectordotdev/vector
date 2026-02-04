@@ -28,7 +28,6 @@ mod aws_kinesis_firehose;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
 mod batch;
-mod codecs;
 mod common;
 mod conditions;
 #[cfg(feature = "sources-datadog_agent")]
@@ -45,6 +44,8 @@ mod demo_logs;
 mod dnstap;
 #[cfg(feature = "sources-docker_logs")]
 mod docker_logs;
+#[cfg(feature = "sinks-doris")]
+mod doris;
 mod encoding_transcode;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 mod eventstoredb_metrics;
@@ -152,7 +153,6 @@ mod file;
 #[cfg(windows)]
 mod windows;
 
-pub mod config;
 #[cfg(any(feature = "transforms-log_to_metric", feature = "sinks-loki"))]
 mod expansion;
 #[cfg(feature = "sources-mongodb_metrics")]
@@ -183,7 +183,6 @@ pub(crate) use self::aws_kinesis::*;
 pub(crate) use self::aws_kinesis_firehose::*;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 pub(crate) use self::aws_sqs::*;
-pub(crate) use self::codecs::*;
 #[cfg(feature = "sources-datadog_agent")]
 pub(crate) use self::datadog_agent::*;
 #[cfg(feature = "sinks-datadog_metrics")]
@@ -198,6 +197,8 @@ pub(crate) use self::demo_logs::*;
 pub(crate) use self::dnstap::*;
 #[cfg(feature = "sources-docker_logs")]
 pub(crate) use self::docker_logs::*;
+#[cfg(feature = "sinks-doris")]
+pub(crate) use self::doris::*;
 #[cfg(feature = "sources-eventstoredb_metrics")]
 pub(crate) use self::eventstoredb_metrics::*;
 #[cfg(feature = "sources-exec")]

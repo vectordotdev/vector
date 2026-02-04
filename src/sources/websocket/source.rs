@@ -1,6 +1,6 @@
 use std::pin::Pin;
 
-use chrono::Utc;
+use chrono::{DateTime, Utc};
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt};
 use snafu::Snafu;
 use tokio::time;
@@ -21,10 +21,9 @@ use crate::{
     common::websocket::{PingInterval, WebSocketConnector, is_closed},
     config::SourceContext,
     internal_events::{
-        ConnectionOpen, OpenGauge, PROTOCOL, WebSocketBytesReceived, WebSocketConnectionError,
-        WebSocketConnectionEstablished, WebSocketConnectionFailedError,
-        WebSocketConnectionShutdown, WebSocketKind, WebSocketMessageReceived,
-        WebSocketReceiveError, WebSocketSendError,
+        ConnectionOpen, OpenGauge, PROTOCOL, WebSocketBytesReceived,
+        WebSocketConnectionFailedError, WebSocketConnectionShutdown, WebSocketKind,
+        WebSocketMessageReceived, WebSocketReceiveError, WebSocketSendError,
     },
     sources::websocket::config::WebSocketConfig,
     vector_lib::codecs::StreamDecodingError,
@@ -236,9 +235,10 @@ impl WebSocketSource {
                         kind,
                     });
 
+                    let now = Utc::now();
                     let events_with_meta = events.into_iter().map(|mut event| {
                         if let Event::Log(event) = &mut event {
-                            self.add_metadata(event);
+                            self.add_metadata(event, now);
                         }
                         event
                     });
@@ -256,10 +256,10 @@ impl WebSocketSource {
         }
     }
 
-    fn add_metadata(&self, event: &mut LogEvent) {
+    fn add_metadata(&self, event: &mut LogEvent, now: DateTime<Utc>) {
         self.params
             .log_namespace
-            .insert_standard_vector_source_metadata(event, WebSocketConfig::NAME, Utc::now());
+            .insert_standard_vector_source_metadata(event, WebSocketConfig::NAME, now);
     }
 
     async fn reconnect(
@@ -297,23 +297,12 @@ impl WebSocketSource {
     async fn try_create_sink_and_stream(
         &self,
     ) -> Result<(WebSocketSink, WebSocketStream), WebSocketSourceError> {
-        let connect_future = self.params.connector.connect_backoff();
-        let timeout = self.config.connect_timeout_secs;
+        let ws_stream = self
+            .params
+            .connector
+            .connect_backoff_with_timeout(self.config.connect_timeout_secs)
+            .await;
 
-        let ws_stream = match time::timeout(timeout, connect_future).await {
-            Ok(ws) => ws,
-            Err(_) => {
-                emit!(WebSocketConnectionError {
-                    error: TungsteniteError::Io(std::io::Error::new(
-                        std::io::ErrorKind::TimedOut,
-                        "Connection attempt timed out",
-                    ))
-                });
-                return Err(WebSocketSourceError::ConnectTimeout);
-            }
-        };
-
-        emit!(WebSocketConnectionEstablished {});
         let (sink, stream) = ws_stream.split();
 
         Ok((Box::pin(sink), Box::pin(stream)))
@@ -462,10 +451,10 @@ mod tests {
         common::websocket::WebSocketCommonConfig,
         sources::websocket::config::{PongMessage, WebSocketConfig},
         test_util::{
+            addr::next_addr,
             components::{
                 SOURCE_TAGS, run_and_assert_source_compliance, run_and_assert_source_error,
             },
-            next_addr,
         },
     };
 
@@ -481,7 +470,7 @@ mod tests {
 
     /// Starts a WebSocket server that pushes a binary message to the first client.
     async fn start_binary_push_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -501,7 +490,7 @@ mod tests {
 
     /// Starts a WebSocket server that pushes a message to the first client that connects.
     async fn start_push_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -523,7 +512,7 @@ mod tests {
     /// Starts a WebSocket server that waits for an initial message from the client,
     /// and upon receiving it, sends a confirmation message back.
     async fn start_subscribe_server(initial_message: String, response_message: String) -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -547,7 +536,7 @@ mod tests {
     }
 
     async fn start_reconnect_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -647,7 +636,7 @@ mod tests {
     }
 
     async fn start_reject_initial_message_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -679,7 +668,7 @@ mod tests {
     }
 
     async fn start_unresponsive_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 
@@ -712,7 +701,7 @@ mod tests {
     }
 
     async fn start_blackhole_server() -> String {
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let listener = TcpListener::bind(&addr).await.expect("Failed to bind");
         let server_addr = format!("ws://{}", listener.local_addr().unwrap());
 

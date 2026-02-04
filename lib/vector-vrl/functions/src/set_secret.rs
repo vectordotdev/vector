@@ -21,6 +21,10 @@ impl Function for SetSecret {
         "set_secret"
     }
 
+    fn usage(&self) -> &'static str {
+        "Sets the given secret in the event."
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {
@@ -37,11 +41,11 @@ impl Function for SetSecret {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "Set the datadog api key",
             source: r#"set_secret("datadog_api_key", "secret-value")"#,
             result: Ok("null"),
-        }]
+        )]
     }
 
     fn compile(

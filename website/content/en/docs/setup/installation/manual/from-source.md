@@ -18,49 +18,47 @@ We recommend installing Vector through a supported platform, package manager, or
 
 ### Linux
 
-Install Rust:
+Install compilation dependencies for your distribution, if they aren't pre-installed on your system:
 
 ```shell
+# Install Rust
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain stable
+
+# Install protoc
+./scripts/environment/install-protoc.sh
+
+# Install other dependencies, example for Ubuntu/Debian:
+sudo apt-get update
+sudo apt-get install -y build-essential cmake curl git
 ```
 
-Install compilation dependencies, specifically C and C++ compilers (GCC or Clang) and GNU `make` if they aren't pre-installed on your system.
-
-Download Vector's source:
+Clone Vector's source:
 
 ```shell
-# Latest ({{< version >}})
-mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/vectordotdev/vector/tarball/v{{< version >}} | \
-  tar xzf - -C vector --strip-components=1
-
-# Master
-mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://github.com/vectordotdev/vector/archive/master.tar.gz | \
-  tar xzf - -C vector --strip-components=1
-```
-
-Change into your Vector directory:
-
-```shell
+git clone https://github.com/vectordotdev/vector
 cd vector
+
+# (Optional) Check out a specific version
+# git checkout v0.51.1
+
+# Or use the latest release tag
+# git checkout $(git describe --tags --abbrev=0)
 ```
 
-Compile Vector:
+Compile and run Vector:
 
 ```shell
-[FEATURES="<flag1>,<flag2>,..."] make build
+make build
+
+# Or specify with custom features
+# FEATURES="<flag1>,<flag2>,..." make build
+
+# Run your custom build
+target/release/vector --config config/vector.yaml
 ```
 
-The `FEATURES` environment variable is optional. You can override the default features using this variable. See [feature flags](#feature-flags) for more info.
-
-When finished, the Vector binary is placed in `target/<target>/release/vector`. If you're building Vector on your Mac, for example, the target triple is `arm64-apple-darwin` and the Vector binary will be located at `target/arm64-apple-darwin/release/vector`.
-
-Finally, you can start Vector:
-
-```shell
-target/<target>/release/vector --config config/vector.yaml
-```
+The `FEATURES` environment variable is optional. You can override the default features using this variable.
+See [feature flags](#feature-flags) for more info.
 
 ### Windows
 
@@ -106,38 +104,76 @@ Start Vector. After these steps, a binary `vector.exe` in `target\release` would
 
 ### Docker
 
-You can build statically linked binaries of Vector for Linux using [cross][] in Docker. If you do so, the dependencies listed in the previous section aren't needed, as all of them would be automatically pulled by Docker.
+You can build statically linked binaries of Vector for Linux using [cross][] in Docker. If you do so, the dependencies listed in the
+previous section aren't needed, as all of them would be automatically pulled by Docker.
 
-First, download Vector's source:
+First, clone Vector's source:
 
 ```shell
-# Latest ({{< version >}})
-mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/vectordotdev/vector/tarball/v{{< version >}} | \
-  tar xzf - -C vector --strip-components=1
+git clone https://github.com/vectordotdev/vector
+cd vector
 
-# Master
-mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://github.com/vectordotdev/vector/archive/master.tar.gz | \
-  tar xzf - -C vector --strip-components=1
+# (Optional) Check out a specific version
+# git checkout v{{< version >}}
+
+# Alternative: Download tarball
+# mkdir -p vector && \
+#   curl -sSfL --proto '=https' --tlsv1.2 https://api.github.com/repos/vectordotdev/vector/tarball/v{{< version >}} | \
+#   tar xzf - -C vector --strip-components=1 && cd vector
 ```
 
 Second, [install cross][cross].
 
-And then build Vector using [cross]:
+Then build Vector using cross for your target architecture:
 
 ```shell
-# Linux (x86_64)
+# Linux x86_64 (musl - fully static)
 make package-x86_64-unknown-linux-musl-all
 
-# Linux (ARM64)
+# Linux x86_64 (glibc - standard)
+make package-x86_64-unknown-linux-gnu-all
+
+# Linux ARM64 (musl)
 make package-aarch64-unknown-linux-musl-all
 
-# Linux (ARMv7)
-make package-armv7-unknown-linux-muslueabihf-all
+# Linux ARM64 (glibc)
+make package-aarch64-unknown-linux-gnu-all
+
+# Linux ARMv7
+make package-armv7-unknown-linux-musleabihf-all
 ```
 
-The command above builds a Docker image with a Rust toolchain for a Linux target for the corresponding architecture using `musl` as the C library, then starts a container from this image, and then builds inside the container. The target binary is located at `target/<target triple>/release/vector` as in the previous case.
+These commands build a Docker image with a Rust toolchain for the target architecture, start a container from this image, and build Vector
+inside the container. The musl targets create fully static binaries, while gnu targets link against glibc.
+
+The compiled packages will be located in `target/artifacts/`.
+
+#### Building Custom Docker Images
+
+You can build custom Docker images with Vector. The repository includes Dockerfiles for different base images in the `distribution/docker/`
+directory.
+
+**Using the Alpine Dockerfile (smallest image, musl-based):**
+
+```shell
+# First build the musl binary
+make package-x86_64-unknown-linux-musl-all
+
+# Then build the Docker image
+cd distribution/docker/alpine
+docker build -t my-vector:alpine .
+```
+
+**Using the Debian Dockerfile (glibc-based):**
+
+```shell
+# First build the deb package
+make package-x86_64-unknown-linux-gnu-all
+
+# Then build the Docker image
+cd distribution/docker/debian
+docker build -t my-vector:debian .
+```
 
 ## Next steps
 
@@ -200,6 +236,13 @@ To update Vector, follow the same [installation](#installation) instructions abo
 Vector supports many feature flags to customize which features are included in a build. By default,
 all sources, transforms, and sinks are enabled. To view a complete list of features, they are listed
 under "[features]" [here](https://github.com/vectordotdev/vector/blob/master/Cargo.toml).
+
+Example of building with only specific components:
+
+```shell
+# Build with only file source, remap transform, and console sink
+FEATURES="api,sources-file,transforms-remap,sinks-console" make build
+```
 
 [buffer]: /docs/reference/glossary/#buffer
 [cmake]: https://cmake.org/
