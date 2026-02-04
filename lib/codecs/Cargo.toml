@@ -57,6 +57,7 @@ vector-vrl-functions.workspace = true
 toml = { version = "0.9.8", optional = true }
 
 [dev-dependencies]
+criterion.workspace = true
 futures.workspace = true
 indoc.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
@@ -67,6 +68,10 @@ rstest = "0.26.1"
 tracing-test = "0.2.6"
 uuid.workspace = true
 vrl.workspace = true
+
+[[bench]]
+name = "json_decimal_bench"
+harness = false
 
 [features]
 arrow = ["dep:arrow"]

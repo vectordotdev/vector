@@ -61,6 +61,7 @@ fn value_eq(this: &Value, other: &Value) -> bool {
         (Value::Bytes(this), Value::Bytes(other)) => this.eq(other),
         (Value::Boolean(this), Value::Boolean(other)) => this.eq(other),
         (Value::Integer(this), Value::Integer(other)) => this.eq(other),
+        (Value::Decimal(this), Value::Decimal(other)) => this.eq(other),
         (Value::Timestamp(this), Value::Timestamp(other)) => this.eq(other),
         (Value::Null, Value::Null) => true,
         // Non-trivial.
@@ -136,6 +137,7 @@ fn hash_value<H: Hasher>(hasher: &mut H, value: &Value) {
         Value::Array(val) => hash_array(hasher, val),
         Value::Object(val) => hash_map(hasher, val),
         Value::Null => hash_null(hasher),
+        Value::Decimal(val) => val.hash(hasher),
     }
 }
 

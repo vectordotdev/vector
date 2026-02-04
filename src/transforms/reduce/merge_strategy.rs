@@ -588,6 +588,7 @@ impl From<Value> for Box<dyn ReduceValueMerger> {
             Value::Bytes(_) => Box::new(DiscardMerger::new(v)),
             Value::Regex(_) => Box::new(DiscardMerger::new(v)),
             Value::Array(_) => Box::new(DiscardMerger::new(v)),
+            Value::Decimal(_) => Box::new(DiscardMerger::new(v)),
         }
     }
 }

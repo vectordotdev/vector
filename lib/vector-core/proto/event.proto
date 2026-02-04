@@ -68,6 +68,7 @@ message Value {
     ValueMap map = 7;
     ValueArray array = 8;
     ValueNull null = 9;
+    string decimal = 10;
   }
 }
 
