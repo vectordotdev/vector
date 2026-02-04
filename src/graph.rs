@@ -1,9 +1,14 @@
-use std::{collections::HashMap, fmt::Write as _, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Write as _,
+    path::PathBuf,
+};
 
 use clap::Parser;
 use itertools::Itertools;
+use vector_lib::{config::OutputId, id::ComponentKey};
 
-use crate::config;
+use crate::config::{self, dot_graph::GraphConfig};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -135,6 +140,43 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
 fn render_dot(config: config::Config) -> exitcode::ExitCode {
     let mut dot = String::from("digraph {\n");
 
+    let mut written_tables = HashSet::<ComponentKey>::new();
+
+    for (id, table) in config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_source(key))
+    {
+        writeln!(
+            dot,
+            "  \"{}\" [{}]",
+            id,
+            node_attributes_to_string(&table.graph.node_attributes, "cylinder")
+        )
+        .expect("write to String never fails");
+        written_tables.insert(id);
+    }
+
+    for (id, table) in config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_sink(key))
+    {
+        if !written_tables.contains(&id) {
+            writeln!(
+                dot,
+                "  \"{}\" [{}]",
+                id,
+                node_attributes_to_string(&table.graph.node_attributes, "cylinder")
+            )
+            .expect("write to String never fails");
+        }
+
+        for input in table.inputs.iter() {
+            render_dot_edge(&mut dot, &id, input, &table.graph);
+        }
+    }
+
     for (id, source) in config.sources() {
         writeln!(
             dot,
@@ -155,36 +197,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
         .expect("write to String never fails");
 
         for input in transform.inputs.iter() {
-            if let Some(port) = &input.port {
-                writeln!(
-                    dot,
-                    "  \"{}\" -> \"{}\" [{}]",
-                    input.component,
-                    id,
-                    edge_attributes_to_string(
-                        transform
-                            .graph
-                            .edge_attributes
-                            .get(&input.component.to_string())
-                            .unwrap_or(&HashMap::default()),
-                        Some(port)
-                    )
-                )
-                .expect("write to String never fails");
-            } else if let Some(edge_attributes) = transform
-                .graph
-                .edge_attributes
-                .get(&input.component.to_string())
-            {
-                writeln!(
-                    dot,
-                    "  \"{input}\" -> \"{id}\" [{}]",
-                    edge_attributes_to_string(edge_attributes, None)
-                )
-                .expect("write to String never fails");
-            } else {
-                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
-            }
+            render_dot_edge(&mut dot, id, input, &transform.graph);
         }
     }
 
@@ -198,33 +211,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
         .expect("write to String never fails");
 
         for input in &sink.inputs {
-            if let Some(port) = &input.port {
-                writeln!(
-                    dot,
-                    "  \"{}\" -> \"{}\" [{}]",
-                    input.component,
-                    id,
-                    edge_attributes_to_string(
-                        sink.graph
-                            .edge_attributes
-                            .get(&input.component.to_string())
-                            .unwrap_or(&HashMap::default()),
-                        Some(port)
-                    )
-                )
-                .expect("write to String never fails");
-            } else if let Some(edge_attributes) =
-                sink.graph.edge_attributes.get(&input.component.to_string())
-            {
-                writeln!(
-                    dot,
-                    "  \"{input}\" -> \"{id}\" [{}]",
-                    edge_attributes_to_string(edge_attributes, None)
-                )
-                .expect("write to String never fails");
-            } else {
-                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
-            }
+            render_dot_edge(&mut dot, id, input, &sink.graph);
         }
     }
 
@@ -236,6 +223,29 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
     }
 
     exitcode::OK
+}
+
+fn render_dot_edge(into: &mut String, id: &ComponentKey, input: &OutputId, graph: &GraphConfig) {
+    let edge_attributes = graph.edge_attributes.get(&input.component.to_string());
+    if let Some(port) = &input.port {
+        writeln!(
+            into,
+            "  \"{}\" -> \"{}\" [{}]",
+            input.component,
+            id,
+            edge_attributes_to_string(edge_attributes.unwrap_or(&HashMap::default()), Some(port))
+        )
+        .expect("write to String never fails");
+    } else if let Some(edge_attributes) = edge_attributes {
+        writeln!(
+            into,
+            "  \"{input}\" -> \"{id}\" [{}]",
+            edge_attributes_to_string(edge_attributes, None)
+        )
+        .expect("write to String never fails");
+    } else {
+        writeln!(into, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
+    }
 }
 
 fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
