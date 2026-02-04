@@ -8,7 +8,10 @@ use clap::Parser;
 use itertools::Itertools;
 use vector_lib::{config::OutputId, id::ComponentKey};
 
-use crate::config::{self, dot_graph::GraphConfig};
+use crate::config::{
+    self,
+    dot_graph::{EdgeAttributes, GraphConfig},
+};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -99,11 +102,8 @@ fn node_attributes_to_string(attributes: &HashMap<String, String>, default_shape
     attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
 }
 
-fn edge_attributes_to_string(
-    attributes: &HashMap<String, String>,
-    default_label: Option<&str>,
-) -> String {
-    let mut attrs = attributes.clone();
+fn edge_attributes_to_string(attributes: &EdgeAttributes, default_label: Option<&str>) -> String {
+    let mut attrs = attributes.0.clone();
     if let Some(default_label) = default_label
         && !attrs.contains_key("label")
     {
@@ -233,7 +233,10 @@ fn render_dot_edge(into: &mut String, id: &ComponentKey, input: &OutputId, graph
             "  \"{}\" -> \"{}\" [{}]",
             input.component,
             id,
-            edge_attributes_to_string(edge_attributes.unwrap_or(&HashMap::default()), Some(port))
+            edge_attributes_to_string(
+                edge_attributes.unwrap_or(&EdgeAttributes::default()),
+                Some(port)
+            )
         )
         .expect("write to String never fails");
     } else if let Some(edge_attributes) = edge_attributes {

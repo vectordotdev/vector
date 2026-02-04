@@ -24,12 +24,26 @@ pub struct GraphConfig {
     ///
     /// They are added to the edge as provided
     #[configurable(metadata(
+        docs::additional_props_description = "A collection of graph edge attributes in graphviz DOT language, related to a single input component.",
+        docs::examples = "example_edges_options()"
+    ))]
+    #[serde(default)]
+    pub edge_attributes: HashMap<String, EdgeAttributes>,
+}
+
+#[configurable_component]
+#[configurable(metadata(docs::advanced))]
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+/// A collection of graph edge attributes in graphviz DOT language, related to a single input
+/// component.
+pub struct EdgeAttributes(
+    #[configurable(metadata(
         docs::additional_props_description = "A single graph edge attribute in graphviz DOT language.",
         docs::examples = "example_edge_options()"
     ))]
-    #[serde(default)]
-    pub edge_attributes: HashMap<String, HashMap<String, String>>,
-}
+    pub HashMap<String, String>,
+);
 
 fn example_node_options() -> HashMap<String, String> {
     HashMap::<_, _>::from_iter([
@@ -39,13 +53,14 @@ fn example_node_options() -> HashMap<String, String> {
     ])
 }
 
-fn example_edge_options() -> HashMap<String, HashMap<String, String>> {
-    HashMap::<_, _>::from_iter([(
-        "example_input".to_string(),
-        HashMap::<_, _>::from_iter([
-            ("label".to_string(), "Example Edge".to_string()),
-            ("color".to_string(), "red".to_string()),
-            ("width".to_string(), "5.0".to_string()),
-        ]),
-    )])
+fn example_edges_options() -> HashMap<String, HashMap<String, String>> {
+    HashMap::<_, _>::from_iter([("example_input".to_string(), example_edge_options())])
+}
+
+fn example_edge_options() -> HashMap<String, String> {
+    HashMap::<_, _>::from_iter([
+        ("label".to_string(), "Example Edge".to_string()),
+        ("color".to_string(), "red".to_string()),
+        ("width".to_string(), "5.0".to_string()),
+    ])
 }
