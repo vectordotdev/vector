@@ -62,7 +62,7 @@ impl Function for GetEnrichmentTableRecord {
                 keyword: "table",
                 kind: kind::BYTES,
                 required: true,
-                description: "The enrichment table to search: /docs/reference/glossary/#enrichment-tables.",
+                description: "The [enrichment table](/docs/reference/glossary/#enrichment-tables) to search.",
             },
             Parameter {
                 keyword: "condition",
