@@ -94,6 +94,19 @@ fn node_attributes_to_string(attributes: &HashMap<String, String>, default_shape
     attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
 }
 
+fn edge_attributes_to_string(
+    attributes: &HashMap<String, String>,
+    default_label: Option<&str>,
+) -> String {
+    let mut attrs = attributes.clone();
+    if let Some(default_label) = default_label
+        && !attrs.contains_key("label")
+    {
+        attrs.insert("label".to_string(), default_label.to_string());
+    }
+    attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
+}
+
 pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
@@ -145,8 +158,28 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
             if let Some(port) = &input.port {
                 writeln!(
                     dot,
-                    "  \"{}\" -> \"{}\" [label=\"{}\"]",
-                    input.component, id, port
+                    "  \"{}\" -> \"{}\" [{}]",
+                    input.component,
+                    id,
+                    edge_attributes_to_string(
+                        transform
+                            .graph
+                            .edge_attributes
+                            .get(&input.component.to_string())
+                            .unwrap_or(&HashMap::default()),
+                        Some(port)
+                    )
+                )
+                .expect("write to String never fails");
+            } else if let Some(edge_attributes) = transform
+                .graph
+                .edge_attributes
+                .get(&input.component.to_string())
+            {
+                writeln!(
+                    dot,
+                    "  \"{input}\" -> \"{id}\" [{}]",
+                    edge_attributes_to_string(edge_attributes, None)
                 )
                 .expect("write to String never fails");
             } else {
@@ -168,8 +201,25 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
             if let Some(port) = &input.port {
                 writeln!(
                     dot,
-                    "  \"{}\" -> \"{}\" [label=\"{}\"]",
-                    input.component, id, port
+                    "  \"{}\" -> \"{}\" [{}]",
+                    input.component,
+                    id,
+                    edge_attributes_to_string(
+                        sink.graph
+                            .edge_attributes
+                            .get(&input.component.to_string())
+                            .unwrap_or(&HashMap::default()),
+                        Some(port)
+                    )
+                )
+                .expect("write to String never fails");
+            } else if let Some(edge_attributes) =
+                sink.graph.edge_attributes.get(&input.component.to_string())
+            {
+                writeln!(
+                    dot,
+                    "  \"{input}\" -> \"{id}\" [{}]",
+                    edge_attributes_to_string(edge_attributes, None)
                 )
                 .expect("write to String never fails");
             } else {
