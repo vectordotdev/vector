@@ -138,7 +138,7 @@ where
         )
     }
 
-    fn as_error_code(&self) -> &'static str {
+    pub fn as_error_code(&self) -> &'static str {
         match self {
             ReaderError::Io { .. } => "io_error",
             ReaderError::Deserialization { .. } => "deser_failed",
