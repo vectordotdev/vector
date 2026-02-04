@@ -196,8 +196,8 @@ tokio-stream = { version = "0.1.18", default-features = false }
 tokio-test = "0.4.5"
 tokio-tungstenite = { version = "0.20.1", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
-tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
-tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
+tonic = { version = "0.12", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
+tonic-build = { version = "0.13", default-features = false, features = ["transport", "prost"] }
 tracing = { version = "0.1.34", default-features = false }
 tracing-subscriber = { version = "0.3.20", default-features = false, features = ["fmt"]  }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
