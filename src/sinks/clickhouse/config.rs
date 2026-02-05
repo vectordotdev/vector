@@ -1,5 +1,6 @@
 //! Configuration for the `Clickhouse` sink.
 
+use futures::{FutureExt, TryFutureExt};
 use std::fmt;
 
 use http::{Request, StatusCode, Uri};
@@ -9,14 +10,18 @@ use vector_lib::codecs::encoding::{ArrowStreamSerializerConfig, BatchSerializerC
 
 use super::{
     request_builder::ClickhouseRequestBuilder,
-    service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
+    service::{ClickhouseHealthLogic, ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
     sink::{ClickhouseSink, PartitionKey},
 };
 use crate::{
     http::{Auth, HttpClient, MaybeAuth},
     sinks::{
+        clickhouse::ParseError,
         prelude::*,
-        util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService},
+        util::{
+            RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpService,
+            service::HealthConfig,
+        },
     },
 };
 
@@ -64,8 +69,22 @@ impl fmt::Display for Format {
 pub struct ClickhouseConfig {
     /// The endpoint of the ClickHouse server.
     #[serde(alias = "host")]
+    #[configurable(
+        deprecated = "This option has been deprecated, the `endpoints` option should be used instead."
+    )]
     #[configurable(metadata(docs::examples = "http://localhost:8123"))]
-    pub endpoint: UriSerde,
+    pub endpoint: Option<UriSerde>,
+
+    /// A list of ClickHouse endpoints to send logs to.
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = "http://10.24.32.122:8123"))]
+    #[configurable(metadata(docs::examples = "https://example.com:8123"))]
+    pub endpoints: Vec<String>,
+
+    #[serde(default)]
+    #[configurable(derived)]
+    #[serde(rename = "distribution")]
+    pub endpoint_health: Option<HealthConfig>,
 
     /// The table that data is inserted into.
     #[configurable(metadata(docs::examples = "mytable"))]
@@ -194,13 +213,15 @@ impl_generate_config_from_default!(ClickhouseConfig);
 #[typetag::serde(name = "clickhouse")]
 impl SinkConfig for ClickhouseConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let endpoint = self.endpoint.with_default_parts().uri;
-
-        let auth = self.auth.choose_one(&self.endpoint.auth)?;
+        let commons = self.parse_endpoints()?;
+        let common = &commons[0];
+        let endpoint = common.with_default_parts().uri.clone();
+        let auth = self.auth.choose_one(&common.auth)?;
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
 
         let client = HttpClient::new(tls_settings, &cx.proxy)?;
+        let health_config = self.endpoint_health.clone().unwrap_or_default();
 
         let clickhouse_service_request_builder = ClickhouseServiceRequestBuilder {
             auth: auth.clone(),
@@ -212,14 +233,7 @@ impl SinkConfig for ClickhouseConfig {
             query_settings: self.query_settings,
         };
 
-        let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
-            HttpService::new(client.clone(), clickhouse_service_request_builder);
-
         let request_limits = self.request.into_settings();
-
-        let service = ServiceBuilder::new()
-            .settings(request_limits, ClickhouseRetryLogic::default())
-            .service(service);
 
         let batch_settings = self.batch.into_batcher_settings()?;
 
@@ -239,6 +253,32 @@ impl SinkConfig for ClickhouseConfig {
             encoder: (self.encoding.clone(), encoder_kind),
         };
 
+        let services = commons
+            .iter()
+            .map(|common| {
+                let endpoint = common.with_default_parts().uri;
+                let auth = self.auth.choose_one(&common.auth)?;
+
+                let service_request_builder = ClickhouseServiceRequestBuilder {
+                    endpoint,
+                    auth,
+                    ..clickhouse_service_request_builder.clone()
+                };
+
+                let service: HttpService<ClickhouseServiceRequestBuilder, PartitionKey> =
+                    HttpService::new(client.clone(), service_request_builder);
+                Ok((common.to_string(), service))
+            })
+            .collect::<crate::Result<Vec<_>>>()?;
+
+        let service = request_limits.distributed_service(
+            ClickhouseRetryLogic::default(),
+            services,
+            health_config,
+            ClickhouseHealthLogic,
+            1,
+        );
+
         let sink = ClickhouseSink::new(
             batch_settings,
             service,
@@ -248,7 +288,19 @@ impl SinkConfig for ClickhouseConfig {
             request_builder,
         );
 
-        let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
+        let healthcheck = futures::future::select_ok(commons.into_iter().map(move |common| {
+            let endpoint = common.with_default_parts().uri;
+            let auth_result = self.auth.choose_one(&common.auth);
+            let client = client.clone();
+
+            async move {
+                let auth = auth_result?;
+                healthcheck(client, endpoint, auth).await
+            }
+            .boxed()
+        }))
+        .map_ok(|((), _)| ())
+        .boxed();
 
         Ok((VectorSink::from_event_streamsink(sink), healthcheck))
     }
@@ -263,6 +315,31 @@ impl SinkConfig for ClickhouseConfig {
 }
 
 impl ClickhouseConfig {
+    /// Parses endpoints into a vector of UriSerde. The resulting vector is guaranteed to not be empty.
+    pub fn parse_endpoints(&self) -> crate::Result<Vec<UriSerde>> {
+        if !self.endpoints.is_empty() {
+            return self
+                .endpoints
+                .iter()
+                .map(|s| {
+                    s.parse::<http::Uri>()
+                        .map(UriSerde::from)
+                        .map_err(|_| ParseError::InvalidHost { host: s.into() }.into())
+                })
+                .collect();
+        }
+
+        warn!(message = "DEPRECATION: use 'endpoints' instead of 'endpoint'");
+
+        if let Some(endpoint) = &self.endpoint {
+            warn!(message = "DEPRECATION: use 'endpoints' instead of 'endpoint'");
+            Ok(vec![endpoint.clone()])
+        } else {
+            // Both endpoints and endpoint are empty/None
+            Err(ParseError::EndpointRequired.into())
+        }
+    }
+
     /// Resolves the encoding strategy (format + encoder) based on configuration.
     ///
     /// This method determines the appropriate ClickHouse format and Vector encoder
@@ -432,7 +509,7 @@ mod tests {
         batch_encoding: Option<BatchSerializerConfig>,
     ) -> ClickhouseConfig {
         ClickhouseConfig {
-            endpoint: "http://localhost:8123".parse::<http::Uri>().unwrap().into(),
+            endpoint: Some("http://localhost:8123".parse::<http::Uri>().unwrap().into()),
             table: "test_table".try_into().unwrap(),
             database: Some("test_db".try_into().unwrap()),
             format,
