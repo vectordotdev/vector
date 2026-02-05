@@ -689,6 +689,10 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
+.PHONY: generate-vrl-docs
+generate-vrl-docs: ## Generate VRL function documentation from Rust source.
+	$(VDEV) build vrl-docs
+
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
 	scripts/signoff.sh
