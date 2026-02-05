@@ -315,7 +315,10 @@ impl Aggregate {
             }
         }
 
-        self.prev_map = map;
+        // Only diff aggregation mode makes use of previous values
+        if matches!(self.mode, AggregationMode::Diff) {
+            self.prev_map = map;
+        }
         emit!(AggregateFlushed);
     }
 }
