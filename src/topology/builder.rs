@@ -26,6 +26,7 @@ use vector_lib::{
         },
     },
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
+    latency::LatencyRecorder,
     schema::Definition,
     source_sender::{CHUNK_SIZE, SourceSenderItem},
     transform::update_runtime_schema_definition,
@@ -742,7 +743,14 @@ impl<'a> Builder<'a> {
         let sender = self
             .utilization_registry
             .add_component(node.key.clone(), gauge!("utilization"));
-        let runner = Runner::new(t, input_rx, sender, node.input_details.data_type(), outputs);
+        let runner = Runner::new(
+            t,
+            input_rx,
+            sender,
+            node.input_details.data_type(),
+            outputs,
+            LatencyRecorder::new(self.config.global.latency_ewma_alpha),
+        );
         let transform = if node.enable_concurrency {
             runner.run_concurrently().boxed()
         } else {
@@ -807,6 +815,7 @@ impl<'a> Builder<'a> {
             component: key.clone(),
             port: None,
         });
+        let latency_recorder = LatencyRecorder::new(self.config.global.latency_ewma_alpha);
 
         // Task transforms can only write to the default output, so only a single schema def map is needed
         let schema_definition_map = outputs
@@ -825,6 +834,7 @@ impl<'a> Builder<'a> {
                 for event in events.iter_events_mut() {
                     update_runtime_schema_definition(event, &output_id, &schema_definition_map);
                 }
+                latency_recorder.on_send(&mut events);
                 (events, Instant::now())
             })
             .inspect(move |(events, _): &(EventArray, Instant)| {
@@ -1110,6 +1120,7 @@ struct Runner {
     input_type: DataType,
     outputs: TransformOutputs,
     timer_tx: UtilizationComponentSender,
+    latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
 }
 
@@ -1120,6 +1131,7 @@ impl Runner {
         timer_tx: UtilizationComponentSender,
         input_type: DataType,
         outputs: TransformOutputs,
+        latency_recorder: LatencyRecorder,
     ) -> Self {
         Self {
             transform,
@@ -1127,6 +1139,7 @@ impl Runner {
             input_type,
             outputs,
             timer_tx,
+            latency_recorder,
             events_received: register!(EventsReceived),
         }
     }
@@ -1142,6 +1155,7 @@ impl Runner {
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) -> crate::Result<()> {
         self.timer_tx.try_send_start_wait();
+        outputs_buf.for_each_array_mut(|array| self.latency_recorder.on_send(array));
         self.outputs.send(outputs_buf).await
     }
 

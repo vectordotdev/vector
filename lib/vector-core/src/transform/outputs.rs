@@ -220,6 +220,19 @@ impl TransformOutputsBuf {
     pub fn take_all_named(&mut self) -> HashMap<String, OutputBuffer> {
         std::mem::take(&mut self.named_buffers)
     }
+
+    /// Applies `f` to each [`EventArray`] currently buffered in this outputs buffer.
+    ///
+    /// This is useful for cross-cutting instrumentation (e.g. latency timestamp propagation)
+    /// that needs mutable access to the buffered arrays before they are sent.
+    pub fn for_each_array_mut(&mut self, mut f: impl FnMut(&mut EventArray)) {
+        if let Some(primary) = self.primary_buffer.as_mut() {
+            primary.for_each_array_mut(&mut f);
+        }
+        for buf in self.named_buffers.values_mut() {
+            buf.for_each_array_mut(&mut f);
+        }
+    }
 }
 
 impl ByteSizeOf for TransformOutputsBuf {
@@ -293,6 +306,13 @@ impl OutputBuffer {
 
     pub fn drain(&mut self) -> impl Iterator<Item = Event> + '_ {
         self.0.drain(..).flat_map(EventArray::into_events)
+    }
+
+    /// Applies `f` to each [`EventArray`] currently held by this buffer.
+    pub fn for_each_array_mut(&mut self, mut f: impl FnMut(&mut EventArray)) {
+        for array in &mut self.0 {
+            f(array);
+        }
     }
 
     async fn send(
