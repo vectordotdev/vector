@@ -9,6 +9,7 @@ use crate::utils::cargo::CargoToml;
 pub struct Cli {}
 
 impl Cli {
+    #[allow(clippy::unnecessary_wraps)]
     pub fn exec(self) -> Result<()> {
         let mut contexts = vec![];
 
