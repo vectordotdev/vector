@@ -46,7 +46,8 @@ indoc.workspace = true
 git2 = { version = "0.20.4" }
 cfg-if.workspace = true
 vector-vrl-functions = { path = "../lib/vector-vrl/functions" }
-vrl.workspace = true
+# Only here for docs generation. Using vrl with this feature enabled will be severely broken
+vrl = { workspace = true, features = ["__mock_return_values_for_tests"] }
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/vdev-v{ version }/{ name }-{ target }-v{ version }.tgz"
