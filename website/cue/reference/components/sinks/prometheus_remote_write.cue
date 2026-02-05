@@ -34,7 +34,7 @@ components: sinks: prometheus_remote_write: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
-				headers:                    false
+				headers:                    true
 			}
 			tls: {
 				enabled:                true
