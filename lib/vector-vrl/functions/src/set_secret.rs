@@ -21,6 +21,10 @@ impl Function for SetSecret {
         "set_secret"
     }
 
+    fn usage(&self) -> &'static str {
+        "Sets the given secret in the event."
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {

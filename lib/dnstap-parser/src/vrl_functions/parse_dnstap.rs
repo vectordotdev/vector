@@ -1,6 +1,6 @@
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
-use vector_lib::event::LogEvent;
+use vector_core::event::LogEvent;
 use vrl::prelude::*;
 
 use crate::{parser::DnstapParser, schema::DnstapEventSchema};
@@ -11,6 +11,10 @@ pub struct ParseDnstap;
 impl Function for ParseDnstap {
     fn identifier(&self) -> &'static str {
         "parse_dnstap"
+    }
+
+    fn usage(&self) -> &'static str {
+        "Parses the `value` as base64 encoded DNSTAP data."
     }
 
     fn parameters(&self) -> &'static [Parameter] {

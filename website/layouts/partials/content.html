@@ -39,15 +39,12 @@
           {{ $apiUrl := printf "https://api.github.com/users/%s" $handle }}
           {{ $name := $handle }}
           {{ $displayName := $handle }}
-          {{ with resources.GetRemote $apiUrl }}
-            {{ with .Err }}
-              {{/* Silently fall back to GitHub handle on error */}}
-            {{ else }}
-              {{ $data := . | transform.Unmarshal }}
-              {{ if $data.name }}
-                {{ $name = $data.name }}
-                {{ $displayName = $data.name }}
-              {{ end }}
+          {{ $result := try (resources.GetRemote $apiUrl) }}
+          {{ with $result.Value }}
+            {{ $data := . | transform.Unmarshal }}
+            {{ if $data.name }}
+              {{ $name = $data.name }}
+              {{ $displayName = $data.name }}
             {{ end }}
           {{ end }}
           {{ if gt $index 0 }}<span class="text-sm">,</span>{{ end }}

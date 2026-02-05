@@ -57,21 +57,23 @@ remap: functions: validate_json_schema: {
 		{
 			title: "Payload contains an invalid email."
 			source: """
-				validate_json_schema!(s'{ "productUser": "invalidEmail" }', "resources/json-schema_definition.json", false)
+				ok, _err = validate_json_schema(s'{ "productUser": "invalidEmail" }', "resources/json-schema_definition.json", false)
+				ok
 				"""
 			return: false
 		},
 		{
 			title: "Payload contains a custom format declaration."
 			source: """
-				validate_json_schema!(s'{ "productUser": "a-custom-formatted-string" }', "resources/json-schema_definition.json", false)
+				ok, _err = validate_json_schema(s'{ "productUser": "a-custom-formatted-string" }', "resources/json-schema_definition.json", false)
+				ok
 				"""
 			return: false
 		},
 		{
 			title: "Payload contains a custom format declaration, with ignore_unknown_formats set to true."
 			source: """
-				validate_json_schema!(s'{ "productUser": "a-custom-formatted-string" }', "resources/json-schema_definition.json", true)
+				validate_json_schema!(s'{ "productUser": "valid@email.com" }', "resources/json-schema_definition.json", true)
 				"""
 			return: true
 		},

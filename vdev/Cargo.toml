@@ -21,7 +21,7 @@ anyhow.workspace = true
 chrono.workspace = true
 clap.workspace = true
 clap-verbosity-flag = "3.0.4"
-clap_complete = "4.5.58"
+clap_complete.workspace = true
 directories = "6.0.0"
 glob.workspace = true
 hex = "0.4.3"
@@ -43,7 +43,7 @@ toml.workspace = true
 toml_edit = "0.22"
 semver.workspace = true
 indoc.workspace = true
-git2 = { version = "0.20.2" }
+git2 = { version = "0.20.4" }
 cfg-if.workspace = true
 
 [package.metadata.binstall]

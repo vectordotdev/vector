@@ -22,15 +22,15 @@ use vector_lib::{
         BufferType, WhenFull,
         topology::{
             builder::TopologyBuilder,
-            channel::{BufferReceiver, BufferSender},
+            channel::{BufferReceiver, BufferSender, ChannelMetricMetadata},
         },
     },
-    config::LogNamespace,
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
     schema::Definition,
     source_sender::{CHUNK_SIZE, SourceSenderItem},
     transform::update_runtime_schema_definition,
 };
+use vector_vrl_metrics::MetricsStorage;
 
 use super::{
     BuiltBuffer, ConfigDiff,
@@ -56,12 +56,14 @@ use crate::{
 
 static ENRICHMENT_TABLES: LazyLock<vector_lib::enrichment::TableRegistry> =
     LazyLock::new(vector_lib::enrichment::TableRegistry::default);
+static METRICS_STORAGE: LazyLock<MetricsStorage> = LazyLock::new(MetricsStorage::default);
 
 pub(crate) static SOURCE_SENDER_BUFFER_SIZE: LazyLock<usize> =
     LazyLock::new(|| *TRANSFORM_CONCURRENCY_LIMIT * CHUNK_SIZE);
 
 const READY_ARRAY_CAPACITY: NonZeroUsize = NonZeroUsize::new(CHUNK_SIZE * 4).unwrap();
 pub(crate) const TOPOLOGY_BUFFER_SIZE: NonZeroUsize = NonZeroUsize::new(100).unwrap();
+const TRANSFORM_CHANNEL_METRIC_PREFIX: &str = "transform_buffer";
 
 static TRANSFORM_CONCURRENCY_LIMIT: LazyLock<usize> = LazyLock::new(|| {
     crate::app::worker_threads()
@@ -140,6 +142,7 @@ impl<'a> Builder<'a> {
                 healthchecks: self.healthchecks,
                 shutdown_coordinator: self.shutdown_coordinator,
                 detach_triggers: self.detach_triggers,
+                metrics_storage: METRICS_STORAGE.clone(),
                 utilization: self
                     .utilization_emitter
                     .map(|e| (e, self.utilization_registry)),
@@ -262,7 +265,8 @@ impl<'a> Builder<'a> {
 
             let mut builder = SourceSender::builder()
                 .with_buffer(*SOURCE_SENDER_BUFFER_SIZE)
-                .with_timeout(source.inner.send_timeout());
+                .with_timeout(source.inner.send_timeout())
+                .with_ewma_alpha(self.config.global.buffer_utilization_ewma_alpha);
             let mut pumps = Vec::new();
             let mut controls = HashMap::new();
             let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
@@ -353,6 +357,7 @@ impl<'a> Builder<'a> {
                 key: key.clone(),
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 shutdown: shutdown_signal,
                 out: builder.build(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, &source.proxy),
@@ -470,14 +475,19 @@ impl<'a> Builder<'a> {
                 component_id = %key.id(),
                 component_type = %transform.inner.get_component_name(),
             );
+            let _span = span.enter();
 
             // Create a map of the outputs to the list of possible definitions from those outputs.
             let schema_definitions = transform
                 .inner
                 .outputs(
-                    enrichment_tables.clone(),
+                    &TransformContext {
+                        enrichment_tables: enrichment_tables.clone(),
+                        metrics_storage: METRICS_STORAGE.clone(),
+                        schema: self.config.schema,
+                        ..Default::default()
+                    },
                     &input_definitions,
-                    self.config.schema.log_namespace(),
                 )
                 .into_iter()
                 .map(|output| {
@@ -490,19 +500,15 @@ impl<'a> Builder<'a> {
                 key: Some(key.clone()),
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 schema_definitions,
                 merged_schema_definition: merged_definition.clone(),
                 schema: self.config.schema,
                 extra_context: self.extra_context.clone(),
             };
 
-            let node = TransformNode::from_parts(
-                key.clone(),
-                enrichment_tables.clone(),
-                transform,
-                &input_definitions,
-                self.config.schema.log_namespace(),
-            );
+            let node =
+                TransformNode::from_parts(key.clone(), &context, transform, &input_definitions);
 
             let transform = match transform
                 .inner
@@ -517,17 +523,20 @@ impl<'a> Builder<'a> {
                 Ok(transform) => transform,
             };
 
-            let (input_tx, input_rx) =
-                TopologyBuilder::standalone_memory(TOPOLOGY_BUFFER_SIZE, WhenFull::Block, &span)
-                    .await;
+            let metrics = ChannelMetricMetadata::new(TRANSFORM_CHANNEL_METRIC_PREFIX, None);
+            let (input_tx, input_rx) = TopologyBuilder::standalone_memory(
+                TOPOLOGY_BUFFER_SIZE,
+                WhenFull::Block,
+                &span,
+                Some(metrics),
+                self.config.global.buffer_utilization_ewma_alpha,
+            );
 
             self.inputs
                 .insert(key.clone(), (input_tx, node.inputs.clone()));
 
-            let (transform_task, transform_outputs) = {
-                let _span = span.enter();
-                build_transform(transform, node, input_rx, &self.utilization_registry)
-            };
+            let (transform_task, transform_outputs) =
+                build_transform(transform, node, input_rx, &self.utilization_registry);
 
             self.outputs.extend(transform_outputs);
             self.tasks.insert(key.clone(), transform_task);
@@ -613,6 +622,7 @@ impl<'a> Builder<'a> {
                 healthcheck,
                 globals: self.config.global.clone(),
                 enrichment_tables: enrichment_tables.clone(),
+                metrics_storage: METRICS_STORAGE.clone(),
                 proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
                 schema: self.config.schema,
                 app_name: crate::get_app_name().to_string(),
@@ -775,6 +785,7 @@ pub struct TopologyPieces {
     pub(super) healthchecks: HashMap<ComponentKey, Task>,
     pub(crate) shutdown_coordinator: SourceShutdownCoordinator,
     pub(crate) detach_triggers: HashMap<ComponentKey, Trigger>,
+    pub(crate) metrics_storage: MetricsStorage,
     pub(crate) utilization: Option<(UtilizationEmitter, UtilizationRegistry)>,
 }
 
@@ -914,21 +925,16 @@ struct TransformNode {
 impl TransformNode {
     pub fn from_parts(
         key: ComponentKey,
-        enrichment_tables: vector_lib::enrichment::TableRegistry,
+        context: &TransformContext,
         transform: &TransformOuter<OutputId>,
         schema_definition: &[(OutputId, Definition)],
-        global_log_namespace: LogNamespace,
     ) -> Self {
         Self {
             key,
             typetag: transform.inner.get_component_name(),
             inputs: transform.inputs.clone(),
             input_details: transform.inner.input(),
-            outputs: transform.inner.outputs(
-                enrichment_tables,
-                schema_definition,
-                global_log_namespace,
-            ),
+            outputs: transform.inner.outputs(context, schema_definition),
             enable_concurrency: transform.inner.enable_concurrency(),
         }
     }
