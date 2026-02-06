@@ -1,6 +1,6 @@
 #![deny(missing_docs)]
 
-use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc, time::Instant};
 
 use derivative::Derivative;
 use lookup::OwnedTargetPath;
@@ -78,6 +78,11 @@ pub(super) struct Inner {
     /// An internal vector id that can be used to identify this event across all components.
     #[derivative(PartialEq = "ignore")]
     pub(crate) source_event_id: Option<Uuid>,
+
+    /// The timestamp when the event last entered a transform buffer.
+    #[derivative(PartialEq = "ignore")]
+    #[serde(default, skip)]
+    pub(crate) last_transform_timestamp: Option<Instant>,
 }
 
 /// Metric Origin metadata for submission to Datadog.
@@ -239,6 +244,17 @@ impl EventMetadata {
     pub fn source_event_id(&self) -> Option<Uuid> {
         self.0.source_event_id
     }
+
+    /// Returns the timestamp of the last transform buffer enqueue operation, if it exists.
+    #[must_use]
+    pub fn last_transform_timestamp(&self) -> Option<Instant> {
+        self.0.last_transform_timestamp
+    }
+
+    /// Sets the transform enqueue timestamp to the provided value.
+    pub fn set_last_transform_timestamp(&mut self, timestamp: Instant) {
+        self.get_mut().last_transform_timestamp = Some(timestamp);
+    }
 }
 
 impl Default for Inner {
@@ -254,6 +270,7 @@ impl Default for Inner {
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
             source_event_id: Some(Uuid::new_v4()),
+            last_transform_timestamp: None,
         }
     }
 }
