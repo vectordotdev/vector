@@ -60,16 +60,19 @@ impl Function for AggregateVectorMetrics {
                 keyword: "function",
                 kind: kind::BYTES,
                 required: true,
+                description: "The metric name to search.",
             },
             Parameter {
                 keyword: "key",
                 kind: kind::BYTES,
                 required: true,
+                description: "The metric name to aggregate.",
             },
             Parameter {
                 keyword: "tags",
                 kind: kind::OBJECT,
                 required: false,
+                description: "Tags to filter the results on. Values in this object support wildcards ('*') to match on parts of the tag value.",
             },
         ]
     }

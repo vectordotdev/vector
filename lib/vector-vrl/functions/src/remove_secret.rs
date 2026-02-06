@@ -23,6 +23,7 @@ impl Function for RemoveSecret {
             keyword: "key",
             kind: kind::BYTES,
             required: true,
+            description: "The name of the secret to remove.",
         }]
     }
 
