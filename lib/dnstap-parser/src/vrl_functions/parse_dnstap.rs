@@ -40,6 +40,13 @@ impl Function for ParseDnstap {
         "Parses the `value` as base64 encoded DNSTAP data."
     }
 
+    fn internal_failure_reasons(&self) -> &'static [&'static str] {
+        &[
+            "`value` is not a valid base64 encoded string.",
+            "dnstap parsing failed for `value`",
+        ]
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &PARAMETERS
     }

@@ -96,6 +96,13 @@ impl Function for GetEnrichmentTableRecord {
         USAGE
     }
 
+    fn internal_failure_reasons(&self) -> &'static [&'static str] {
+        &[
+            "The row is not found.",
+            "Multiple rows are found that match the condition.",
+        ]
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &PARAMETERS
     }
