@@ -43,7 +43,7 @@ toml.workspace = true
 toml_edit = "0.22"
 semver.workspace = true
 indoc.workspace = true
-git2 = { version = "0.20.2" }
+git2 = { version = "0.20.4" }
 cfg-if.workspace = true
 
 [package.metadata.binstall]
