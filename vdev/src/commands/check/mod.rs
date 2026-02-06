@@ -1,8 +1,8 @@
-mod component_docs;
 mod component_features;
 mod deny;
 mod examples;
 mod fmt;
+mod generated_docs;
 mod licenses;
 mod markdown;
 mod rust;
@@ -10,7 +10,7 @@ mod scripts;
 
 crate::cli_subcommands! {
     "Check parts of the Vector code base..."
-    component_docs,
+    generated_docs,
     component_features,
     deny,
     docs,

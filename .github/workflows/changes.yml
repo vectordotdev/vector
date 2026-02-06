@@ -225,7 +225,8 @@ jobs:
           component_docs:
             - 'scripts/generate-component-docs.rb'
             - "vdev/**"
-            - 'website/cue/**/base/**.cue'
+            - 'website/cue/**/generated/**.cue'
+            - 'website/cue/**/functions/*.cue'
             - ".github/workflows/changes.yml"
           markdown:
             - '**/**.md'
