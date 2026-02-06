@@ -23,11 +23,13 @@ impl Function for ParseDnstap {
                 keyword: "value",
                 kind: kind::BYTES,
                 required: true,
+                description: "The base64 encoded representation of the DNSTAP data to parse.",
             },
             Parameter {
                 keyword: "lowercase_hostnames",
                 kind: kind::BOOLEAN,
                 required: false,
+                description: "Whether to turn all hostnames found in resulting data lowercase, for consistency.",
             },
         ]
     }
