@@ -1,12 +1,15 @@
 use std::sync::Arc;
 
-use azure_core::error::HttpError;
-use azure_core_for_storage::RetryOptions;
-use azure_storage::{CloudLocation, ConnectionString};
-use azure_storage_blobs::{blob::operations::PutBlockBlobResponse, prelude::*};
+use azure_core::error::Error as AzureCoreError;
+
+use crate::sinks::azure_common::connection_string::{Auth, ParsedConnectionString};
+use crate::sinks::azure_common::shared_key_policy::SharedKeyAuthorizationPolicy;
+use azure_core::http::Url;
+use azure_storage_blob::{BlobContainerClient, BlobContainerClientOptions};
+
+use azure_core::http::StatusCode;
 use bytes::Bytes;
 use futures::FutureExt;
-use http::StatusCode;
 use snafu::Snafu;
 use vector_lib::{
     json_size::JsonSize,
@@ -56,19 +59,20 @@ pub struct AzureBlobMetadata {
 pub struct AzureBlobRetryLogic;
 
 impl RetryLogic for AzureBlobRetryLogic {
-    type Error = HttpError;
+    type Error = AzureCoreError;
     type Request = AzureBlobRequest;
     type Response = AzureBlobResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
-        error.status().is_server_error()
-            || StatusCode::TOO_MANY_REQUESTS.as_u16() == Into::<u16>::into(error.status())
+        match error.http_status() {
+            Some(code) => code.is_server_error() || code == StatusCode::TooManyRequests,
+            None => false,
+        }
     }
 }
 
 #[derive(Debug)]
 pub struct AzureBlobResponse {
-    pub inner: PutBlockBlobResponse,
     pub events_byte_size: GroupedCountByteSize,
     pub byte_size: usize,
 }
@@ -99,24 +103,22 @@ pub enum HealthcheckError {
 
 pub fn build_healthcheck(
     container_name: String,
-    client: Arc<ContainerClient>,
+    client: Arc<BlobContainerClient>,
 ) -> crate::Result<Healthcheck> {
     let healthcheck = async move {
-        let response = client.get_properties().into_future().await;
-
-        let resp: crate::Result<()> = match response {
+        let resp: crate::Result<()> = match client.get_properties(None).await {
             Ok(_) => Ok(()),
-            Err(error) => Err(match error.as_http_error() {
-                Some(err) => match StatusCode::from_u16(err.status().into()) {
-                    Ok(StatusCode::FORBIDDEN) => Box::new(HealthcheckError::InvalidCredentials),
-                    Ok(StatusCode::NOT_FOUND) => Box::new(HealthcheckError::UnknownContainer {
+            Err(error) => {
+                let code = error.http_status();
+                Err(match code {
+                    Some(StatusCode::Forbidden) => Box::new(HealthcheckError::InvalidCredentials),
+                    Some(StatusCode::NotFound) => Box::new(HealthcheckError::UnknownContainer {
                         container: container_name,
                     }),
-                    Ok(status) => Box::new(HealthcheckError::Unknown { status }),
-                    Err(_) => "unknown status code".into(),
-                },
-                _ => error.into(),
-            }),
+                    Some(status) => Box::new(HealthcheckError::Unknown { status }),
+                    None => "unknown status code".into(),
+                })
+            }
         };
         resp
     };
@@ -127,33 +129,47 @@ pub fn build_healthcheck(
 pub fn build_client(
     connection_string: String,
     container_name: String,
-) -> crate::Result<Arc<ContainerClient>> {
-    let client = {
-        let connection_string = ConnectionString::new(&connection_string)?;
-        let account_name = connection_string
-            .account_name
-            .ok_or("Account name missing in connection string")?;
+) -> crate::Result<Arc<BlobContainerClient>> {
+    // Parse connection string without legacy SDK
+    let parsed = ParsedConnectionString::parse(&connection_string)
+        .map_err(|e| format!("Invalid connection string: {e}"))?;
+    // Compose container URL (SAS appended if present)
+    let container_url = parsed
+        .container_url(&container_name)
+        .map_err(|e| format!("Failed to build container URL: {e}"))?;
+    let url = Url::parse(&container_url).map_err(|e| format!("Invalid container URL: {e}"))?;
 
-        match connection_string.blob_endpoint {
-            // When the blob_endpoint is provided, we use the Custom CloudLocation since it is
-            // required to contain the full URI to the blob storage API endpoint, this means
-            // that account_name is not required to exist in the connection_string since
-            // account_name is only used with the default CloudLocation in the Azure SDK to
-            // generate the storage API endpoint
-            Some(uri) => ClientBuilder::with_location(
-                CloudLocation::Custom {
-                    uri: uri.to_string(),
-                    account: account_name.to_string(),
-                },
-                connection_string.storage_credentials()?,
-            ),
-            // Without a valid blob_endpoint in the connection_string, assume we are in Azure
-            // Commercial (AzureCloud location) and create a default Blob Storage Client that
-            // builds the API endpoint location using the account_name as input
-            None => ClientBuilder::new(account_name, connection_string.storage_credentials()?),
+    // Prepare options; attach Shared Key policy if needed
+    let mut options = BlobContainerClientOptions::default();
+    match parsed.auth() {
+        Auth::Sas { .. } | Auth::None => {
+            // No extra policy; SAS is in the URL already (or anonymous)
         }
-        .retry(RetryOptions::none())
-        .container_client(container_name)
-    };
+        Auth::SharedKey {
+            account_name,
+            account_key,
+        } => {
+            let policy = SharedKeyAuthorizationPolicy::new(
+                account_name,
+                account_key,
+                // Use an Azurite-supported storage service version
+                String::from("2025-11-05"),
+            )
+            .map_err(|e| format!("Failed to create SharedKey policy: {e}"))?;
+            options
+                .client_options
+                .per_call_policies
+                .push(Arc::new(policy));
+        }
+    }
+
+    // Use reqwest v0.12 since Azure SDK only implements HttpClient for reqwest::Client v0.12.
+    options.client_options.transport = Some(azure_core::http::Transport::new(std::sync::Arc::new(
+        reqwest_12::ClientBuilder::new()
+            .build()
+            .map_err(|e| format!("Failed to build reqwest client: {e}"))?,
+    )));
+    let client =
+        BlobContainerClient::from_url(url, None, Some(options)).map_err(|e| format!("{e}"))?;
     Ok(Arc::new(client))
 }
