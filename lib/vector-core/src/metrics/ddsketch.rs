@@ -800,10 +800,9 @@ impl AgentDDSketch {
                 if let Ok(count) = u32::try_from(*count)
                     && count > 0
                 {
-                    let orig_sum = *sum;
                     sketch.count = count;
-                    sketch.sum = orig_sum;
-                    sketch.avg = orig_sum / f64::from(count);
+                    sketch.sum = *sum;
+                    sketch.avg = *sum / f64::from(count); // or sketch.sum
                 }
 
                 Some(sketch)
