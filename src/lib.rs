@@ -85,6 +85,7 @@ pub mod gcp;
 pub(crate) mod graph;
 pub mod heartbeat;
 pub mod http;
+pub mod http_1;
 #[allow(unreachable_pub)]
 #[cfg(any(feature = "sources-kafka", feature = "sinks-kafka"))]
 pub mod kafka;

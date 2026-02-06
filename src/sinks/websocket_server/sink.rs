@@ -11,7 +11,9 @@ use super::{
 };
 use crate::{
     codecs::{Encoder, Transformer},
-    common::http::server_auth::HttpServerAuthMatcher,
+    common::{
+        http::server_auth_http1::HttpServerAuthMatcher, websocket::WebSocketCompressionConfig,
+    },
     internal_events::{
         ConnectionOpen, OpenGauge, WebSocketListenerConnectionEstablished,
         WebSocketListenerConnectionFailedError, WebSocketListenerConnectionShutdown,
@@ -30,7 +32,7 @@ use futures::{
     future, pin_mut,
     stream::BoxStream,
 };
-use http::StatusCode;
+use http_1::StatusCode;
 use tokio::net::TcpStream;
 use tokio_tungstenite::tungstenite::{
     Message,
@@ -38,6 +40,7 @@ use tokio_tungstenite::tungstenite::{
 };
 use tokio_util::codec::Encoder as _;
 use tracing::Instrument;
+use tungstenite::{extensions::DeflateConfig, protocol::WebSocketConfig};
 use url::Url;
 use uuid::Uuid;
 use vector_lib::{
@@ -60,6 +63,7 @@ pub struct WebSocketListenerSink {
     extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
     message_buffering: Option<MessageBufferingConfig>,
     subprotocol: SubProtocolConfig,
+    compression: Option<WebSocketCompressionConfig>,
 }
 
 impl WebSocketListenerSink {
@@ -82,6 +86,7 @@ impl WebSocketListenerSink {
             extra_tags_config: config.internal_metrics.extra_tags,
             message_buffering: config.message_buffering,
             subprotocol: config.subprotocol,
+            compression: config.websocket_compression,
         })
     }
 
@@ -120,6 +125,7 @@ impl WebSocketListenerSink {
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
         subprotocol: SubProtocolConfig,
+        compression: Option<WebSocketCompressionConfig>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
         client_checkpoints: Arc<Mutex<HashMap<String, Uuid>>>,
@@ -134,6 +140,7 @@ impl WebSocketListenerSink {
                     auth.clone(),
                     message_buffering.clone(),
                     subprotocol.clone(),
+                    compression.clone(),
                     Arc::clone(&peers),
                     Arc::clone(&client_checkpoints),
                     Arc::clone(&buffer),
@@ -151,6 +158,7 @@ impl WebSocketListenerSink {
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
         subprotocol: SubProtocolConfig,
+        compression: Option<WebSocketCompressionConfig>,
         peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
         client_checkpoints: Arc<Mutex<HashMap<String, Uuid>>>,
         buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
@@ -249,15 +257,28 @@ impl WebSocketListenerSink {
             }
         };
 
-        let ws_stream = tokio_tungstenite::accept_hdr_async(stream, header_callback)
-            .await
-            .map_err(|err| {
-                debug!("Error during websocket handshake: {}", err);
-                emit!(WebSocketListenerConnectionFailedError {
-                    error: Box::new(err),
-                    extra_tags: extra_tags.clone()
-                })
-            })?;
+        let mut config = WebSocketConfig::default();
+        if let Some(websocket_compression) = compression {
+            let mut deflate = DeflateConfig::default();
+            if let Some(level) = websocket_compression.level {
+                deflate.compression = flate2::Compression::new(level);
+            }
+            deflate.client_no_context_takeover = websocket_compression.client_no_context_takeover;
+            deflate.server_no_context_takeover = websocket_compression.server_no_context_takeover;
+
+            config.compression = Some(deflate);
+        }
+
+        let ws_stream =
+            tokio_tungstenite::accept_hdr_async_with_config(stream, header_callback, Some(config))
+                .await
+                .map_err(|err| {
+                    debug!("Error during websocket handshake: {}", err);
+                    emit!(WebSocketListenerConnectionFailedError {
+                        error: Box::new(err),
+                        extra_tags: extra_tags.clone()
+                    })
+                })?;
 
         let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
 
@@ -365,6 +386,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
                 self.auth,
                 self.message_buffering.clone(),
                 self.subprotocol.clone(),
+                self.compression.clone(),
                 Arc::clone(&peers),
                 self.extra_tags_config,
                 Arc::clone(&client_checkpoints),
@@ -394,7 +416,7 @@ impl StreamSink<Event> for WebSocketListenerSink {
                     let message = if encode_as_binary {
                         Message::binary(bytes)
                     } else {
-                        Message::text(String::from_utf8_lossy(&bytes))
+                        Message::text(String::from_utf8_lossy(&bytes).into_owned())
                     };
                     let message_len = message.len();
 

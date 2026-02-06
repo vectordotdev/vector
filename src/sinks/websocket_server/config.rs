@@ -5,7 +5,9 @@ use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_compon
 use super::{buffering::MessageBufferingConfig, sink::WebSocketListenerSink};
 use crate::{
     codecs::EncodingConfig,
-    common::http::server_auth::HttpServerAuthConfig,
+    common::{
+        http::server_auth_http1::HttpServerAuthConfig, websocket::WebSocketCompressionConfig,
+    },
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     sinks::{Healthcheck, VectorSink},
     tls::TlsEnableableConfig,
@@ -48,6 +50,9 @@ pub struct WebSocketListenerSinkConfig {
 
     #[configurable(derived)]
     pub auth: Option<HttpServerAuthConfig>,
+
+    #[configurable(derived)]
+    pub websocket_compression: Option<WebSocketCompressionConfig>,
 
     /// Configuration of internal metrics
     #[configurable(derived)]
@@ -136,6 +141,7 @@ impl Default for WebSocketListenerSinkConfig {
             message_buffering: None,
             subprotocol: Default::default(),
             auth: None,
+            websocket_compression: None,
             internal_metrics: InternalMetricsConfig::default(),
         }
     }
