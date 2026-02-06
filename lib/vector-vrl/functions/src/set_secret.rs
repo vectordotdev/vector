@@ -32,12 +32,14 @@ impl Function for SetSecret {
                 kind: kind::BYTES,
                 required: true,
                 description: "The name of the secret.",
+                default: None,
             },
             Parameter {
                 keyword: "secret",
                 kind: kind::BYTES,
                 required: true,
                 description: "The secret value.",
+                default: None,
             },
         ]
     }

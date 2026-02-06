@@ -53,12 +53,14 @@ impl Function for SetSemanticMeaning {
                 kind: kind::ANY,
                 required: true,
                 description: "The path of the value that is assigned a meaning.",
+                default: None,
             },
             Parameter {
                 keyword: "meaning",
                 kind: kind::BYTES,
                 required: true,
                 description: "The name of the meaning to assign.",
+                default: None,
             },
         ]
     }
