@@ -155,6 +155,11 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
 }
 
 fn kind_to_types(kind_bits: u16) -> Vec<String> {
+    // All type bits combined
+    if (kind_bits & kind::ANY) == kind::ANY {
+        return vec!["any".to_string()];
+    }
+
     let mut types = Vec::new();
 
     if (kind_bits & kind::BYTES) == kind::BYTES {
@@ -185,9 +190,7 @@ fn kind_to_types(kind_bits: u16) -> Vec<String> {
         types.push("null".to_string());
     }
 
-    if types.is_empty() {
-        types.push("any".to_string());
-    }
+    assert!(!types.is_empty(), "kind_bits {kind_bits} produced no types");
 
     types
 }
