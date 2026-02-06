@@ -38,7 +38,7 @@ static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
             kind: kind::OBJECT,
             required: false,
             description: "Tags to filter the results on. Values in this object support wildcards ('*') to match on parts of the tag value.",
-            default: DEFAULT_TAGS,
+            default: Some(&DEFAULT_TAGS),
         },
     ]
 });
