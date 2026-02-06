@@ -8,8 +8,6 @@ mod aggregate;
 mod amqp;
 #[cfg(feature = "sources-apache_metrics")]
 mod apache_metrics;
-#[cfg(feature = "api")]
-mod api;
 #[cfg(feature = "aws-core")]
 mod aws;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]
@@ -164,8 +162,6 @@ pub(crate) use self::aggregate::*;
 pub(crate) use self::amqp::*;
 #[cfg(feature = "sources-apache_metrics")]
 pub(crate) use self::apache_metrics::*;
-#[cfg(feature = "api")]
-pub(crate) use self::api::*;
 #[cfg(feature = "aws-core")]
 pub(crate) use self::aws::*;
 #[cfg(feature = "sinks-aws_cloudwatch_logs")]

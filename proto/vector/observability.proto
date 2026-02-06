@@ -1,0 +1,209 @@
+syntax = "proto3";
+package vector.observability;
+
+import "google/protobuf/timestamp.proto";
+
+// Observability service for monitoring Vector instances.
+// This replaces the GraphQL API with a more efficient gRPC interface.
+service Observability {
+  // ========== Simple Queries ==========
+
+  // Check if the API server is healthy and responding
+  rpc Health(HealthRequest) returns (HealthResponse);
+
+  // Get metadata about the Vector instance (version, hostname)
+  rpc GetMeta(MetaRequest) returns (MetaResponse);
+
+  // Get information about configured components (sources, transforms, sinks)
+  rpc GetComponents(ComponentsRequest) returns (ComponentsResponse);
+
+  // ========== Real-time Metric Streams ==========
+  // All streaming RPCs send periodic updates at the specified interval
+
+  // Stream periodic heartbeat timestamps
+  rpc StreamHeartbeat(HeartbeatRequest) returns (stream HeartbeatResponse);
+
+  // Stream uptime in seconds
+  rpc StreamUptime(UptimeRequest) returns (stream UptimeResponse);
+
+  // Stream memory allocated per component
+  rpc StreamComponentAllocatedBytes(MetricStreamRequest) returns (stream ComponentAllocatedBytesResponse);
+
+  // Stream throughput metrics (events/sec)
+  rpc StreamComponentReceivedEventsThroughput(MetricStreamRequest) returns (stream ComponentThroughputResponse);
+  rpc StreamComponentSentEventsThroughput(MetricStreamRequest) returns (stream ComponentThroughputResponse);
+
+  // Stream throughput metrics (bytes/sec)
+  rpc StreamComponentReceivedBytesThroughput(MetricStreamRequest) returns (stream ComponentThroughputResponse);
+  rpc StreamComponentSentBytesThroughput(MetricStreamRequest) returns (stream ComponentThroughputResponse);
+
+  // Stream cumulative total metrics (events)
+  rpc StreamComponentReceivedEventsTotal(MetricStreamRequest) returns (stream ComponentTotalsResponse);
+  rpc StreamComponentSentEventsTotal(MetricStreamRequest) returns (stream ComponentTotalsResponse);
+
+  // Stream cumulative total metrics (bytes)
+  rpc StreamComponentReceivedBytesTotal(MetricStreamRequest) returns (stream ComponentTotalsResponse);
+  rpc StreamComponentSentBytesTotal(MetricStreamRequest) returns (stream ComponentTotalsResponse);
+
+  // Stream error counts per component
+  rpc StreamComponentErrorsTotal(MetricStreamRequest) returns (stream ComponentTotalsResponse);
+
+  // ========== Event Tapping ==========
+
+  // Stream events from components matching the specified patterns (replaces vector tap)
+  rpc StreamOutputEvents(OutputEventsRequest) returns (stream OutputEvent);
+}
+
+// ========== Health & Meta Messages ==========
+
+message HealthRequest {}
+
+message HealthResponse {
+  bool healthy = 1;
+}
+
+message MetaRequest {}
+
+message MetaResponse {
+  string version = 1;
+  string hostname = 2;
+}
+
+// ========== Component Messages ==========
+
+message ComponentsRequest {
+  // Maximum number of components to return (0 = no limit)
+  int32 limit = 1;
+}
+
+message ComponentsResponse {
+  repeated Component components = 1;
+}
+
+message Component {
+  string component_id = 1;
+  ComponentType component_type = 2;
+  string on_type = 3; // The specific component type name (e.g., "file", "http")
+  repeated Output outputs = 4;
+  ComponentMetrics metrics = 5;
+}
+
+enum ComponentType {
+  SOURCE = 0;
+  TRANSFORM = 1;
+  SINK = 2;
+}
+
+message Output {
+  string output_id = 1;
+  int64 sent_events_total = 2;
+}
+
+message ComponentMetrics {
+  optional int64 received_bytes_total = 1;
+  optional int64 received_events_total = 2;
+  optional int64 sent_bytes_total = 3;
+  optional int64 sent_events_total = 4;
+}
+
+// ========== Streaming Metrics Messages ==========
+
+message MetricStreamRequest {
+  // Update interval in milliseconds
+  int32 interval_ms = 1;
+}
+
+message HeartbeatRequest {
+  // Update interval in milliseconds
+  int32 interval_ms = 1;
+}
+
+message HeartbeatResponse {
+  google.protobuf.Timestamp utc = 1;
+}
+
+message UptimeRequest {
+  // Update interval in milliseconds
+  int32 interval_ms = 1;
+}
+
+message UptimeResponse {
+  int64 uptime_seconds = 1;
+}
+
+message ComponentAllocatedBytesResponse {
+  string component_id = 1;
+  int64 allocated_bytes = 2;
+}
+
+message ComponentThroughputResponse {
+  string component_id = 1;
+  double throughput = 2;  // events/sec or bytes/sec depending on the stream
+}
+
+message ComponentTotalsResponse {
+  string component_id = 1;
+  int64 total = 2;
+}
+
+// ========== Event Tapping Messages ==========
+
+message OutputEventsRequest {
+  // Glob patterns for output component IDs to match
+  repeated string outputs_patterns = 1;
+
+  // Glob patterns for input component IDs to match (optional)
+  repeated string inputs_patterns = 2;
+
+  // Maximum number of events to buffer
+  int32 limit = 3;
+
+  // Sampling interval in milliseconds
+  int32 interval_ms = 4;
+
+  // Encoding format for event serialization
+  EventEncoding encoding = 5;
+}
+
+enum EventEncoding {
+  JSON = 0;
+  YAML = 1;
+  LOGFMT = 2;
+}
+
+message OutputEvent {
+  oneof event {
+    LogEvent log = 1;
+    MetricEvent metric = 2;
+    TraceEvent trace = 3;
+    EventNotification notification = 4;
+  }
+}
+
+message LogEvent {
+  string component_id = 1;
+  string component_type = 2;
+  string component_kind = 3;
+  string message = 4;
+  google.protobuf.Timestamp timestamp = 5;
+  string encoded_string = 6;  // Serialized according to requested encoding
+}
+
+message MetricEvent {
+  string component_id = 1;
+  string component_type = 2;
+  string component_kind = 3;
+  google.protobuf.Timestamp timestamp = 4;
+  string encoded_string = 5;  // Serialized according to requested encoding
+}
+
+message TraceEvent {
+  string component_id = 1;
+  string component_type = 2;
+  string component_kind = 3;
+  string encoded_string = 4;  // Serialized according to requested encoding
+}
+
+message EventNotification {
+  string message = 1;
+}

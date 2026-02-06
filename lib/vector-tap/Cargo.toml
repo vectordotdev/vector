@@ -11,6 +11,7 @@ api = ["dep:async-graphql"]
 
 [dependencies]
 async-graphql = { version = "7.0.17", default-features = false, features = ["playground"], optional = true }
+clap.workspace = true
 colored.workspace = true
 futures.workspace = true
 glob.workspace = true
