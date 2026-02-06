@@ -788,10 +788,23 @@ impl AgentDDSketch {
                 }
                 Some(sketch)
             }
-            MetricValue::AggregatedHistogram { buckets, .. } => {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                sum,
+                count,
+            } => {
                 let delta_buckets = mem::take(buckets);
                 let mut sketch = AgentDDSketch::with_agent_defaults();
                 sketch.insert_interpolate_buckets(delta_buckets)?;
+
+                if let Ok(count) = u32::try_from(*count)
+                    && count > 0
+                {
+                    sketch.count = count;
+                    sketch.sum = *sum;
+                    sketch.avg = *sum / f64::from(count); // or sketch.sum
+                }
+
                 Some(sketch)
             }
             // We can't convert from any other metric value.
