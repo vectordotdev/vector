@@ -27,6 +27,7 @@ impl Function for GetSecret {
             kind: kind::BYTES,
             required: true,
             description: "The name of the secret.",
+            default: None,
         }]
     }
 
