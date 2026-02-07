@@ -3,9 +3,6 @@
 //! These tests verify that the GraphQL API (which `vector top` depends on)
 //! correctly exposes component metrics for pipeline monitoring.
 
-mod util;
-pub(crate) use util::*;
-
-// Test submodules
+mod harness;
 mod metrics;
 mod reload;
