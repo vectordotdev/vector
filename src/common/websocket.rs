@@ -23,7 +23,7 @@ use vector_config_macros::configurable_component;
 use crate::{
     common::backoff::ExponentialBackoff,
     dns,
-    http::Auth,
+    http_1::Auth,
     internal_events::{WebSocketConnectionEstablished, WebSocketConnectionFailedError},
     tls::{MaybeTlsSettings, MaybeTlsStream, TlsEnableableConfig, TlsError},
 };
@@ -101,7 +101,10 @@ impl WebSocketConnector {
             .context(ConnectSnafu)
     }
 
-    async fn connect(&self) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, WebSocketError> {
+    async fn connect(
+        &self,
+        ws_config: WebSocketConfig,
+    ) -> Result<WebSocketStream<MaybeTlsStream<TcpStream>>, WebSocketError> {
         let mut request = (&self.uri)
             .into_client_request()
             .context(CreateFailedSnafu)?;
@@ -112,8 +115,6 @@ impl WebSocketConnector {
 
         let maybe_tls = self.tls_connect().await?;
 
-        let ws_config = WebSocketConfig::default();
-
         let (ws_stream, _response) = client_async_with_config(request, maybe_tls, Some(ws_config))
             .await
             .context(CreateFailedSnafu)?;
@@ -122,11 +123,14 @@ impl WebSocketConnector {
     }
 
     #[cfg(feature = "sinks-websocket")]
-    pub(crate) async fn connect_backoff(&self) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
+    pub(crate) async fn connect_backoff_with_config(
+        &self,
+        ws_config: WebSocketConfig,
+    ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
         let mut backoff = ExponentialBackoff::default();
 
         loop {
-            match self.connect().await {
+            match self.connect(ws_config).await {
                 Ok(ws_stream) => {
                     emit!(WebSocketConnectionEstablished {});
                     return ws_stream;
@@ -144,14 +148,15 @@ impl WebSocketConnector {
     /// Connects with exponential backoff, applying a timeout to each individual connection attempt.
     /// This will retry forever until a connection is established.
     #[cfg(feature = "sources-websocket")]
-    pub(crate) async fn connect_backoff_with_timeout(
+    pub(crate) async fn connect_backoff_with_timeout_and_config(
         &self,
         timeout_duration: Duration,
+        config: WebSocketConfig,
     ) -> WebSocketStream<MaybeTlsStream<TcpStream>> {
         let mut backoff = ExponentialBackoff::default();
 
         loop {
-            match time::timeout(timeout_duration, self.connect()).await {
+            match time::timeout(timeout_duration, self.connect(config)).await {
                 Ok(Ok(ws_stream)) => {
                     emit!(WebSocketConnectionEstablished {});
                     return ws_stream;
@@ -179,7 +184,10 @@ impl WebSocketConnector {
 
     #[cfg(feature = "sinks-websocket")]
     pub(crate) async fn healthcheck(&self) -> crate::Result<()> {
-        self.connect().await.map(|_| ()).map_err(Into::into)
+        self.connect(WebSocketConfig::default())
+            .await
+            .map(|_| ())
+            .map_err(Into::into)
     }
 }
 
@@ -259,6 +267,12 @@ pub struct WebSocketCommonConfig {
     /// HTTP Authentication.
     #[configurable(derived)]
     pub auth: Option<Auth>,
+
+    /// WebSocket compression ([permessage-deflate RFC7692][RFC7692])
+    ///
+    /// [RFC7692]: https://datatracker.ietf.org/doc/html/rfc7692
+    #[configurable(derived)]
+    pub websocket_compression: Option<WebSocketCompressionConfig>,
 }
 
 impl Default for WebSocketCommonConfig {
@@ -269,6 +283,25 @@ impl Default for WebSocketCommonConfig {
             ping_timeout: None,
             tls: None,
             auth: None,
+            websocket_compression: None,
         }
     }
+}
+
+/// WebSocket compression configuration ([permessage-deflate RFC7692][RFC7692])
+///
+/// [RFC7692]: https://datatracker.ietf.org/doc/html/rfc7692
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct WebSocketCompressionConfig {
+    /// Compression level (0-9).
+    #[serde(default)]
+    pub level: Option<u32>,
+    /// Hint that context takeover is not used.
+    #[serde(default = "crate::serde::default_false")]
+    pub client_no_context_takeover: bool,
+    /// Request the peer server not to use context takeover.
+    #[serde(default = "crate::serde::default_false")]
+    pub server_no_context_takeover: bool,
 }

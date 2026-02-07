@@ -6,7 +6,7 @@ use std::{
 
 use crate::{
     codecs::{Encoder, Transformer},
-    common::websocket::{PingInterval, WebSocketConnector, is_closed},
+    common::websocket::{PingInterval, WebSocketCompressionConfig, WebSocketConnector, is_closed},
     event::{Event, EventStatus, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
@@ -18,6 +18,7 @@ use bytes::BytesMut;
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt, stream::BoxStream};
 use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
 use tokio_util::codec::Encoder as _;
+use tungstenite::{extensions::DeflateConfig, protocol::WebSocketConfig};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, emit,
     internal_event::{
@@ -31,6 +32,7 @@ pub struct WebSocketSink {
     connector: WebSocketConnector,
     ping_interval: Option<NonZeroU64>,
     ping_timeout: Option<NonZeroU64>,
+    websocket_compression: Option<WebSocketCompressionConfig>,
 }
 
 impl WebSocketSink {
@@ -48,6 +50,7 @@ impl WebSocketSink {
             connector,
             ping_interval: config.common.ping_interval,
             ping_timeout: config.common.ping_timeout,
+            websocket_compression: config.common.websocket_compression.clone(),
         })
     }
 
@@ -57,7 +60,18 @@ impl WebSocketSink {
         impl Sink<Message, Error = TungsteniteError> + use<>,
         impl Stream<Item = Result<Message, TungsteniteError>> + use<>,
     ) {
-        let ws_stream = self.connector.connect_backoff().await;
+        let mut config = WebSocketConfig::default();
+        if let Some(websocket_compression) = &self.websocket_compression {
+            let mut deflate = DeflateConfig::default();
+            if let Some(level) = websocket_compression.level {
+                deflate.compression = flate2::Compression::new(level);
+            }
+            deflate.client_no_context_takeover = websocket_compression.client_no_context_takeover;
+            deflate.server_no_context_takeover = websocket_compression.server_no_context_takeover;
+
+            config.compression = Some(deflate);
+        }
+        let ws_stream = self.connector.connect_backoff_with_config(config).await;
         ws_stream.split()
     }
 
@@ -91,7 +105,7 @@ impl WebSocketSink {
         // using NonZeroU64 that is not something we need to account for.
         let mut ping_interval = PingInterval::new(self.ping_interval.map(u64::from));
 
-        if let Err(error) = ws_sink.send(Message::Ping(PING.to_vec())).await {
+        if let Err(error) = ws_sink.send(Message::Ping(PING.into())).await {
             emit!(WebSocketConnectionError { error });
             return Err(());
         }
@@ -105,7 +119,7 @@ impl WebSocketSink {
             let result = tokio::select! {
                 _ = ping_interval.tick() => {
                     match self.check_received_pong_time(last_pong) {
-                        Ok(()) => ws_sink.send(Message::Ping(PING.to_vec())).await.map(|_| ()),
+                        Ok(()) => ws_sink.send(Message::Ping(PING.into())).await.map(|_| ()),
                         Err(e) => Err(e)
                     }
                 },
@@ -144,7 +158,7 @@ impl WebSocketSink {
                                 Message::binary(bytes)
                             }
                             else {
-                                Message::text(String::from_utf8_lossy(&bytes))
+                                Message::text(String::from_utf8_lossy(&bytes).into_owned())
                             };
                             let message_len = message.len();
 
@@ -213,6 +227,7 @@ mod tests {
     use tokio_tungstenite::{
         accept_async, accept_hdr_async,
         tungstenite::{
+            Utf8Bytes,
             error::ProtocolError,
             handshake::server::{Request, Response},
         },
@@ -245,6 +260,7 @@ mod tests {
                 ping_interval: None,
                 ping_timeout: None,
                 auth: None,
+                websocket_compression: None,
             },
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: Default::default(),
@@ -270,6 +286,7 @@ mod tests {
                 ping_interval: None,
                 ping_timeout: None,
                 auth: None,
+                websocket_compression: None,
             },
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: Default::default(),
@@ -302,6 +319,7 @@ mod tests {
                 ping_timeout: None,
                 ping_interval: None,
                 auth: None,
+                websocket_compression: None,
             },
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: Default::default(),
@@ -322,6 +340,7 @@ mod tests {
                 ping_interval: None,
                 ping_timeout: None,
                 auth: None,
+                websocket_compression: None,
             },
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: Default::default(),
@@ -386,7 +405,7 @@ mod tests {
         tls: MaybeTlsSettings,
         interrupt_stream: bool,
         auth: Option<Auth>,
-    ) -> CountReceiver<String> {
+    ) -> CountReceiver<Utf8Bytes> {
         CountReceiver::receive_items_stream(move |tripwire, connected| async move {
             let listener = tls.bind(&addr).await.unwrap();
             let stream = listener.accept_stream();

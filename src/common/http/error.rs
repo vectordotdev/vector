@@ -25,6 +25,15 @@ impl ErrorMessage {
         }
     }
 
+    /// Create a new `ErrorMessage` from HTTP status code and a message
+    #[allow(unused)] // triggered by check-component-features
+    pub fn new_http_1(code: http_1::StatusCode, message: String) -> Self {
+        ErrorMessage {
+            code: code.as_u16(),
+            message,
+        }
+    }
+
     /// Returns the HTTP status code
     #[allow(unused)] // triggered by check-component-features
     pub fn status_code(&self) -> http::StatusCode {

@@ -194,7 +194,8 @@ tempfile = "3.23.0"
 tokio = { version = "1.49.0", default-features = false }
 tokio-stream = { version = "0.1.18", default-features = false }
 tokio-test = "0.4.5"
-tokio-tungstenite = { version = "0.20.1", default-features = false }
+tokio-tungstenite = { version = "0.28.0", default-features = false }
+tungstenite = { git = "https://github.com/danielsufrindisler/tungstenite-rs.git", branch = "permessage-deflate" , default-features = false, features = ["deflate"] }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
@@ -375,6 +376,7 @@ h2 = { version = "0.4.11", default-features = false, optional = true }
 hash_hasher = { version = "2.0.4", default-features = false }
 hashbrown = { version = "0.14.5", default-features = false, optional = true, features = ["ahash"] }
 headers = { version = "0.3.9", default-features = false }
+headers-04 = { version = "0.4.1", package = "headers", default-features = false }
 hostname = { version = "0.4.0", default-features = false }
 http = { version = "0.2.9", default-features = false }
 http-1 = { package = "http", version = "1.0", default-features = false, features = ["std"] }
@@ -425,6 +427,7 @@ syslog = { version = "6.1.1", default-features = false, optional = true }
 tikv-jemallocator = { version = "0.6.0", default-features = false, features = ["unprefixed_malloc_on_supported_platforms"], optional = true }
 tokio-postgres = { version = "0.7.13", default-features = false, features = ["runtime", "with-chrono-0_4"], optional = true }
 tokio-tungstenite = { workspace = true, features = ["connect"], optional = true }
+tungstenite = { workspace = true, optional = true }
 toml.workspace = true
 hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
@@ -495,6 +498,7 @@ nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/mus
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
+tungstenite = { git = "https://github.com/danielsufrindisler/tungstenite-rs.git", branch = "permessage-deflate" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -894,7 +898,7 @@ sinks-statsd = ["sinks-utils-udp", "tokio-util/net"]
 sinks-utils-udp = []
 sinks-vector = ["sinks-utils-udp", "dep:tonic", "protobuf-build", "dep:prost"]
 sinks-websocket = ["dep:tokio-tungstenite"]
-sinks-websocket-server = ["dep:tokio-tungstenite", "sources-utils-http-auth", "sources-utils-http-error", "sources-utils-http-prelude"]
+sinks-websocket-server = ["dep:tokio-tungstenite", "dep:tungstenite", "sources-utils-http-auth", "sources-utils-http-error", "sources-utils-http-prelude"]
 sinks-webhdfs = ["dep:opendal"]
 
 # Identifies that the build is a nightly build
