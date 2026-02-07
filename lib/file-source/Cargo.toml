@@ -21,7 +21,7 @@ futures = { version = "0.3.31", default-features = false, features = ["executor"
 futures-util.workspace = true
 vector-common = { path = "../vector-common", default-features = false }
 file-source-common = { path = "../file-source-common" }
-async-compression = { version = "0.4.27", features = ["tokio", "gzip"] }
+async-compression = { version = "0.4.33", features = ["tokio", "gzip"] }
 
 [dev-dependencies]
 tokio = { workspace = true, features = ["full"] }
