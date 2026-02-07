@@ -18,12 +18,17 @@ impl Function for RemoveSecret {
         "Removes a secret from an event."
     }
 
+    fn return_kind(&self) -> u16 {
+        kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "key",
             kind: kind::BYTES,
             required: true,
             description: "The name of the secret to remove.",
+            default: None,
         }]
     }
 
