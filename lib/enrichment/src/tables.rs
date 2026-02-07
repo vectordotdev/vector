@@ -37,7 +37,7 @@ use std::{
 use arc_swap::ArcSwap;
 use vrl::value::{ObjectMap, Value};
 
-use super::{Condition, IndexHandle, Table};
+use super::{Condition, Error, IndexHandle, Table};
 use crate::Case;
 
 /// A hashmap of name => implementation of an enrichment table.
@@ -151,13 +151,13 @@ impl TableRegistry {
         table: &str,
         case: Case,
         fields: &[&str],
-    ) -> Result<IndexHandle, String> {
+    ) -> Result<IndexHandle, Error> {
         let mut locked = self.loading.lock().unwrap();
 
         match *locked {
-            None => Err("finish_load has been called".to_string()),
+            None => Err(Error::TableError("finish_load has been called".into())),
             Some(ref mut tables) => match tables.get_mut(table) {
-                None => Err(format!("table '{table}' not loaded")),
+                None => Err(Error::TableError(format!("table '{table}' not loaded"))),
                 Some(table) => table.add_index(case, fields),
             },
         }
@@ -218,15 +218,15 @@ impl TableSearch {
         select: Option<&[String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, String> {
+    ) -> Result<ObjectMap, Error> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
-                None => Err(format!("table {table} not loaded")),
+                None => Err(Error::TableError(format!("table {table} not loaded"))),
                 Some(table) => table.find_table_row(case, condition, select, wildcard, index),
             }
         } else {
-            Err("finish_load not called".to_string())
+            Err(Error::TableError("finish_load not called".into()))
         }
     }
 
@@ -241,15 +241,15 @@ impl TableSearch {
         select: Option<&[String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String> {
+    ) -> Result<Vec<ObjectMap>, Error> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
-                None => Err(format!("table {table} not loaded")),
+                None => Err(Error::TableError(format!("table {table} not loaded"))),
                 Some(table) => table.find_table_rows(case, condition, select, wildcard, index),
             }
         } else {
-            Err("finish_load not called".to_string())
+            Err(Error::TableError("finish_load not called".into()))
         }
     }
 }
@@ -331,7 +331,7 @@ mod tests {
         let tables = registry.as_readonly();
 
         assert_eq!(
-            Err("finish_load not called".to_string()),
+            Err(Error::TableError("finish_load not called".to_string())),
             tables.find_table_row(
                 "dummy1",
                 Case::Sensitive,
@@ -355,7 +355,7 @@ mod tests {
         registry.load(tables);
         registry.finish_load();
         assert_eq!(
-            Err("finish_load has been called".to_string()),
+            Err(Error::TableError("finish_load has been called".into())),
             registry.add_index("dummy1", Case::Sensitive, &["erk"])
         );
     }

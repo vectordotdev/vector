@@ -22,7 +22,7 @@ use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
     config::LogNamespace,
-    enrichment::{Case, Condition, IndexHandle, Table},
+    enrichment::{Case, Condition, Error, IndexHandle, Table},
     event::{Event, EventStatus, Finalizable},
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle, Output, Protocol,
@@ -321,13 +321,13 @@ impl Table for Memory {
         select: Option<&'a [String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, String> {
+    ) -> Result<ObjectMap, Error> {
         let mut rows = self.find_table_rows(case, condition, select, wildcard, index)?;
 
         match rows.pop() {
             Some(row) if rows.is_empty() => Ok(row),
-            Some(_) => Err("More than 1 row found".to_string()),
-            None => Err("Key not found".to_string()),
+            Some(_) => Err(Error::MoreThanOneRowFound("More than 1 row found".into())),
+            None => Err(Error::NoRowsFound("Key not found".into())),
         }
     }
 
@@ -338,9 +338,11 @@ impl Table for Memory {
         _select: Option<&'a [String]>,
         _wildcard: Option<&Value>,
         _index: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String> {
+    ) -> Result<Vec<ObjectMap>, Error> {
         match condition.first() {
-            Some(_) if condition.len() > 1 => Err("Only one condition is allowed".to_string()),
+            Some(_) if condition.len() > 1 => {
+                Err(Error::InvalidInput("Only one condition is allowed".into()))
+            }
             Some(Condition::Equals { value, .. }) => {
                 let key = value.to_string_lossy();
                 match self.get_read_handle().get_one(key.as_ref()) {
@@ -349,7 +351,9 @@ impl Table for Memory {
                             key: &key,
                             include_key_metric_tag: self.config.internal_metrics.include_key_tag
                         });
-                        row.as_object_map(Instant::now(), &key).map(|r| vec![r])
+                        row.as_object_map(Instant::now(), &key)
+                            .map(|r| vec![r])
+                            .map_err(Error::TableError)
                     }
                     None => {
                         emit!(MemoryEnrichmentTableReadFailed {
@@ -360,16 +364,20 @@ impl Table for Memory {
                     }
                 }
             }
-            Some(_) => Err("Only equality condition is allowed".to_string()),
-            None => Err("Key condition must be specified".to_string()),
+            Some(_) => Err(Error::InvalidInput(
+                "Only equality condition is allowed".into(),
+            )),
+            None => Err(Error::InvalidInput(
+                "Key condition must be specified".into(),
+            )),
         }
     }
 
-    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, String> {
+    fn add_index(&mut self, _case: Case, fields: &[&str]) -> Result<IndexHandle, Error> {
         match fields.len() {
-            0 => Err("Key field is required".to_string()),
+            0 => Err(Error::InvalidInput("Key field is required".into())),
             1 => Ok(IndexHandle(0)),
-            _ => Err("Only one field is allowed".to_string()),
+            _ => Err(Error::InvalidInput("Only one field is allowed".into())),
         }
     }
 
