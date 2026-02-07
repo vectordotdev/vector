@@ -58,6 +58,10 @@ impl Function for FindVectorMetrics {
         )
     }
 
+    fn return_kind(&self) -> u16 {
+        kind::ARRAY
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &PARAMETERS
     }

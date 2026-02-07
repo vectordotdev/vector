@@ -21,6 +21,10 @@ impl Function for GetSecret {
         "Returns the value of the given secret from an event."
     }
 
+    fn return_kind(&self) -> u16 {
+        kind::BYTES | kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[Parameter {
             keyword: "key",

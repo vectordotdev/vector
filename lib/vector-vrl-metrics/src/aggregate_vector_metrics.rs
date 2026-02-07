@@ -82,6 +82,10 @@ impl Function for AggregateVectorMetrics {
         )
     }
 
+    fn return_kind(&self) -> u16 {
+        kind::FLOAT | kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &PARAMETERS
     }

@@ -47,6 +47,10 @@ impl Function for ParseDnstap {
         ]
     }
 
+    fn return_kind(&self) -> u16 {
+        kind::OBJECT
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &PARAMETERS
     }

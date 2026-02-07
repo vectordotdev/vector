@@ -55,6 +55,10 @@ impl Function for GetVectorMetric {
         )
     }
 
+    fn return_kind(&self) -> u16 {
+        kind::OBJECT | kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &PARAMETERS
     }

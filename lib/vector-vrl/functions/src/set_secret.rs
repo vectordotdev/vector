@@ -25,6 +25,10 @@ impl Function for SetSecret {
         "Sets the given secret in the event."
     }
 
+    fn return_kind(&self) -> u16 {
+        kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {
