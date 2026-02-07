@@ -46,6 +46,10 @@ impl Function for SetSemanticMeaning {
         "}
     }
 
+    fn return_kind(&self) -> u16 {
+        kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {

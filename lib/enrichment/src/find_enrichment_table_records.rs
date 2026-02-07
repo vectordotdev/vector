@@ -98,6 +98,10 @@ impl Function for FindEnrichmentTableRecords {
         )
     }
 
+    fn return_kind(&self) -> u16 {
+        kind::ARRAY
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &PARAMETERS
     }
