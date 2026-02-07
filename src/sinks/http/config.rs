@@ -4,8 +4,6 @@ use std::{collections::BTreeMap, path::PathBuf};
 
 #[cfg(feature = "aws-core")]
 use aws_config::meta::region::ProvideRegion;
-#[cfg(feature = "aws-core")]
-use aws_types::region::Region;
 use http::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
 use hyper::Body;
 use vector_lib::codecs::{
@@ -19,8 +17,6 @@ use super::{
     encoder::HttpEncoder, request_builder::HttpRequestBuilder, service::HttpSinkRequestBuilder,
     sink::HttpSink,
 };
-#[cfg(feature = "aws-core")]
-use crate::aws::AwsAuthentication;
 #[cfg(feature = "aws-core")]
 use crate::sinks::util::http::SigV4Config;
 use crate::{
@@ -312,14 +308,10 @@ impl SinkConfig for HttpSinkConfig {
                 let default_region = crate::aws::region_provider(&ProxyConfig::default(), None)?
                     .region()
                     .await;
-                let region = (match &auth {
-                    AwsAuthentication::AccessKey { region, .. } => region.clone(),
-                    AwsAuthentication::File { .. } => None,
-                    AwsAuthentication::Role { region, .. } => region.clone(),
-                    AwsAuthentication::Default { region, .. } => region.clone(),
-                })
-                .map_or(default_region, |r| Some(Region::new(r.to_string())))
-                .expect("Region must be specified");
+                let region = auth
+                    .region()
+                    .or(default_region)
+                    .expect("Region must be specified");
 
                 HttpService::new_with_sig_v4(
                     client,
