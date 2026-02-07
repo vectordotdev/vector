@@ -178,9 +178,14 @@ impl SinkConfig for RemoteWriteConfig {
             None => None,
         };
 
+        let healthcheck_endpoint = match cx.healthcheck.uri {
+            Some(uri) => uri.uri,
+            None => endpoint.clone(),
+        };
+
         let healthcheck = healthcheck(
             client.clone(),
-            endpoint.clone(),
+            healthcheck_endpoint,
             self.compression,
             auth.clone(),
         )
