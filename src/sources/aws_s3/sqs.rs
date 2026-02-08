@@ -43,7 +43,7 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    aws::AwsTimeout,
+    aws::{AwsAuthentication, AwsTimeout},
     codecs::Decoder,
     common::backoff::ExponentialBackoff,
     config::{SourceAcknowledgementsConfig, SourceContext},
@@ -83,6 +83,15 @@ pub(super) struct DeferredConfig {
     #[configurable(metadata(docs::type_unit = "seconds"))]
     #[configurable(metadata(docs::examples = 3600))]
     pub(super) max_age_secs: u64,
+
+    /// Authentication configuration for the deferred queue.
+    ///
+    /// If not specified, the main `auth` configuration will be used.
+    ///
+    /// This allows the deferred queue to be in a different AWS account or use different credentials.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub(super) auth: Option<AwsAuthentication>,
 }
 
 /// SQS configuration options.
@@ -179,6 +188,16 @@ pub(super) struct Config {
     #[serde(default)]
     #[serde(flatten)]
     pub(super) timeout: Option<AwsTimeout>,
+
+    /// Authentication configuration for SQS.
+    ///
+    /// If not specified, the main `auth` configuration will be used.
+    ///
+    /// This allows SQS to use different credentials than S3, enabling cross-account scenarios
+    /// where the S3 bucket and SQS queue are in different AWS accounts.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub(super) auth: Option<AwsAuthentication>,
 
     /// Configuration for deferring events to another queue based on their age.
     #[configurable(derived)]
@@ -279,6 +298,7 @@ pub struct State {
 
     s3_client: S3Client,
     sqs_client: SqsClient,
+    deferred_sqs_client: Option<SqsClient>,
 
     multiline: Option<line_agg::Config>,
     compression: super::Compression,
@@ -303,6 +323,7 @@ impl Ingestor {
     pub(super) async fn new(
         region: Region,
         sqs_client: SqsClient,
+        deferred_sqs_client: Option<SqsClient>,
         s3_client: S3Client,
         config: Config,
         compression: super::Compression,
@@ -319,6 +340,7 @@ impl Ingestor {
 
             s3_client,
             sqs_client,
+            deferred_sqs_client,
 
             compression,
             multiline,
@@ -896,8 +918,14 @@ impl IngestorProcess {
         entries: Vec<SendMessageBatchRequestEntry>,
         queue_url: String,
     ) -> Result<SendMessageBatchOutput, SdkError<SendMessageBatchError, HttpResponse>> {
-        self.state
-            .sqs_client
+        // Use deferred SQS client if available, otherwise use main client
+        let client = self
+            .state
+            .deferred_sqs_client
+            .as_ref()
+            .unwrap_or(&self.state.sqs_client);
+
+        client
             .send_message_batch()
             .queue_url(queue_url.clone())
             .set_entries(Some(entries))
@@ -1298,4 +1326,122 @@ fn parse_sqs_config() {
         "#,
     );
     assert!(test.is_err());
+}
+
+#[test]
+fn parse_sqs_config_with_custom_auth() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [auth]
+            access_key_id = "AKIAIOSFODNN7EXAMPLE"
+            secret_access_key = "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    assert!(config.auth.is_some());
+
+    // Verify the auth was parsed correctly
+    match config.auth.unwrap() {
+        AwsAuthentication::AccessKey {
+            access_key_id,
+            secret_access_key,
+            ..
+        } => {
+            assert_eq!(access_key_id.inner(), "AKIAIOSFODNN7EXAMPLE");
+            assert_eq!(
+                secret_access_key.inner(),
+                "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+            );
+        }
+        _ => panic!("Expected AccessKey auth variant"),
+    }
+}
+
+#[test]
+fn parse_sqs_config_with_assume_role() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [auth]
+            assume_role = "arn:aws:iam::123456789012:role/SQSRole"
+            external_id = "external123"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    assert!(config.auth.is_some());
+
+    // Verify role assumption was parsed correctly
+    match config.auth.unwrap() {
+        AwsAuthentication::Role {
+            assume_role,
+            external_id,
+            ..
+        } => {
+            assert_eq!(assume_role, "arn:aws:iam::123456789012:role/SQSRole");
+            assert_eq!(external_id, Some("external123".to_string()));
+        }
+        _ => panic!("Expected Role auth variant"),
+    }
+}
+
+#[test]
+fn parse_sqs_config_without_auth_uses_default() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+        "#,
+    )
+    .unwrap();
+    assert_eq!(
+        config.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+    );
+    // Auth should be None, allowing fallback to main auth
+    assert!(config.auth.is_none());
+}
+
+#[test]
+fn parse_deferred_config_with_custom_auth() {
+    let config: Config = toml::from_str(
+        r#"
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyQueue"
+            [deferred]
+            queue_url = "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+            max_age_secs = 3600
+            [deferred.auth]
+            access_key_id = "AKIADEFERREDEXAMPLE"
+            secret_access_key = "deferredSecretKeyExample"
+        "#,
+    )
+    .unwrap();
+
+    let deferred = config.deferred.expect("Expected deferred config");
+    assert_eq!(
+        deferred.queue_url,
+        "https://sqs.us-east-1.amazonaws.com/123456789012/MyDeferredQueue"
+    );
+    assert_eq!(deferred.max_age_secs, 3600);
+    assert!(deferred.auth.is_some());
+
+    // Verify deferred auth was parsed correctly
+    match deferred.auth.unwrap() {
+        AwsAuthentication::AccessKey {
+            access_key_id,
+            secret_access_key,
+            ..
+        } => {
+            assert_eq!(access_key_id.inner(), "AKIADEFERREDEXAMPLE");
+            assert_eq!(secret_access_key.inner(), "deferredSecretKeyExample");
+        }
+        _ => panic!("Expected AccessKey auth variant"),
+    }
 }
