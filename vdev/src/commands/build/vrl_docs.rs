@@ -4,6 +4,7 @@ use std::fs;
 use std::path::PathBuf;
 use vrl::compiler::Function;
 use vrl::compiler::value::kind;
+use vrl::core::Value;
 
 /// Generate VRL function documentation as JSON files.
 ///
@@ -36,10 +37,12 @@ struct FunctionDoc {
     description: String,
     arguments: Vec<ArgumentDoc>,
     r#return: ReturnDoc,
-    internal_failure_reasons: Vec<String>,
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    internal_failure_reasons: &'static [&'static str],
     #[serde(skip_serializing_if = "Vec::is_empty")]
     examples: Vec<ExampleDoc>,
-    deprecated: bool,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    notices: Vec<String>,
     pure: bool,
 }
 
@@ -49,13 +52,15 @@ struct ArgumentDoc {
     description: String,
     required: bool,
     r#type: Vec<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default: Option<String>,
 }
 
 #[derive(Serialize)]
 struct ReturnDoc {
     types: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    rules: Vec<String>,
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    rules: &'static [&'static str],
 }
 
 #[derive(Serialize)]
@@ -108,10 +113,11 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
         .parameters()
         .iter()
         .map(|param| ArgumentDoc {
-            name: param.keyword.to_string(),
-            description: param.description.to_string(),
+            name: param.keyword.trim().to_string(),
+            description: param.description.trim().to_string(),
             required: param.required,
             r#type: kind_to_types(param.kind),
+            default: param.default.map(pretty_value),
         })
         .collect();
 
@@ -119,7 +125,7 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
         .examples()
         .iter()
         .map(|example| {
-            let (return_value, raises) = match &example.result {
+            let (r#return, raises) = match &example.result {
                 Ok(result) => {
                     // Try to parse as JSON, otherwise treat as string
                     let value = serde_json::from_str(result)
@@ -128,10 +134,13 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
                 }
                 Err(error) => (None, Some(error.to_string())),
             };
+
+            let source = example.source.to_string();
+            let title = example.title.to_string();
             ExampleDoc {
-                title: example.title.to_string(),
-                source: example.source.to_string(),
-                r#return: return_value,
+                title,
+                source,
+                r#return,
                 raises,
             }
         })
@@ -144,13 +153,13 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
         description: func.usage().to_string(),
         arguments,
         r#return: ReturnDoc {
-            types: vec!["any".to_string()], // Stub - could derive from TypeDef later
-            rules: vec![],
+            types: kind_to_types(func.return_kind()),
+            rules: func.return_rules(),
         },
-        internal_failure_reasons: vec![], // Stub
+        internal_failure_reasons: func.internal_failure_reasons(),
         examples,
-        deprecated: false, // Stub
-        pure: true,        // Stub - default true
+        notices: vec![], // Stub
+        pure: true,      // Stub - default true
     }
 }
 
@@ -193,6 +202,16 @@ fn kind_to_types(kind_bits: u16) -> Vec<String> {
     assert!(!types.is_empty(), "kind_bits {kind_bits} produced no types");
 
     types
+}
+
+fn pretty_value(v: &Value) -> String {
+    if let Value::Bytes(b) = v {
+        str::from_utf8(&b)
+            .map(String::from)
+            .unwrap_or_else(|_| v.to_string())
+    } else {
+        v.to_string()
+    }
 }
 
 fn infer_category(name: &str) -> &'static str {
