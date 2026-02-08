@@ -45,7 +45,7 @@ semver.workspace = true
 indoc.workspace = true
 git2 = { version = "0.20.4" }
 cfg-if.workspace = true
-vector-vrl-functions = { path = "../lib/vector-vrl/functions" }
+vector-vrl-functions = { path = "../lib/vector-vrl/functions", features = ["dnstap", "vrl-metrics"] }
 # Only here for docs generation. Using vrl with this feature enabled will be severely broken
 vrl = { workspace = true, features = ["__mock_return_values_for_tests"] }
 
