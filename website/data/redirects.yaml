@@ -1,74 +1,74 @@
 platforms:
-- docker
-- kubernetes
+  - docker
+  - kubernetes
 
 sinks:
-- aws_sqs
-- aws_cloudwatch_logs
-- aws_cloudwatch_metrics
-- aws_kinesis_firehose
-- aws_kinesis_streams
-- aws_s3
-- axiom
-- azure_monitor_logs
-- clickhouse
-- databend
-- datadog_logs
-- datadog_metrics
-- elasticsearch
-- file
-- gcp_cloud_storage
-- gcp_pubsub
-- gcp_stackdriver_logs
-- gcp_stackdriver_metrics
-- honeycomb
-- http
-- humio_logs
-- humio_metrics
-- influxdb_logs
-- influxdb_metrics
-- kafka
-- keep
-- mezmo
-- loki
-- nats
-- new_relic_logs
-- new_relic
-- papertrail
-- postgres
-- prometheus_exporter
-- prometheus_remote_write
-- pulsar
-- sematext_logs
-- sematext_metrics
-- socket
-- splunk_hec
-- statsd
+  - aws_sqs
+  - aws_cloudwatch_logs
+  - aws_cloudwatch_metrics
+  - aws_kinesis_firehose
+  - aws_kinesis_streams
+  - aws_s3
+  - axiom
+  - azure_monitor_logs
+  - clickhouse
+  - databend
+  - datadog_logs
+  - datadog_metrics
+  - elasticsearch
+  - file
+  - gcp_cloud_storage
+  - gcp_pubsub
+  - gcp_stackdriver_logs
+  - gcp_stackdriver_metrics
+  - honeycomb
+  - http
+  - humio_logs
+  - humio_metrics
+  - influxdb_logs
+  - influxdb_metrics
+  - kafka
+  - keep
+  - mezmo
+  - loki
+  - nats
+  - new_relic_logs
+  - new_relic
+  - papertrail
+  - postgres
+  - prometheus_exporter
+  - prometheus_remote_write
+  - pulsar
+  - sematext_logs
+  - sematext_metrics
+  - socket
+  - splunk_hec
+  - statsd
 
 sources:
-- apache_metrics
-- aws_ecs_metrics
-- aws_kinesis_firehose
-- aws_s3
-- datadog_logs
-- exec
-- file
-- heroku_logs
-- host_metrics
-- http
-- journald
-- kafka
-- mongodb_metrics
-- nginx_metrics
-- postgresql_metrics
-- prometheus_remote_write
-- prometheus_scrape
-- pulsar
-- socket
-- splunk_hec
-- statsd
-- stdin
-- syslog
+  - apache_metrics
+  - aws_ecs_metrics
+  - aws_kinesis_firehose
+  - aws_s3
+  - datadog_logs
+  - exec
+  - file
+  - heroku_logs
+  - host_metrics
+  - http
+  - journald
+  - kafka
+  - mongodb_metrics
+  - nginx_metrics
+  - postgresql_metrics
+  - prometheus_remote_write
+  - prometheus_scrape
+  - pulsar
+  - socket
+  - splunk_hec
+  - statsd
+  - stdin
+  - syslog
 
 # /guides/integrate/platforms/${key}/*  /docs/reference/configuration/sources/${source}
 multi:

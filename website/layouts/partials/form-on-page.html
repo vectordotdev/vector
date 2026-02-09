@@ -1,16 +1,17 @@
-{{/*  form-on-page takes in one arg, "form", that is a DICT: { form_id, form_title, and form_thankyou } */}}
+{{/* form-on-page takes in one arg, "form", that is a DICT: { form_id, form_title, and form_thankyou } */}}
 
 {{ $form := .form }}
 
+
 <h2 class="dark:text-gray-50 font-secondary font-extrabold text-lg leading-tight tracking-tight">
-    {{ $form.form_title }}
+  {{ $form.form_title }}
 </h2>
 
 <div class="relative flex pb-16 mt-5">
-    <form id="mktoForm_{{ $form.form_id }}"></form>
-    <p id="thankyou--{{ $form.form_id }}" class="hidden pt-10 pb-14">
-        {{ $form.form_thankyou }}
-    </p>
+  <form id="mktoForm_{{ $form.form_id }}"></form>
+  <p id="thankyou--{{ $form.form_id }}" class="hidden pt-10 pb-14">
+    {{ $form.form_thankyou }}
+  </p>
 </div>
 
 <script>

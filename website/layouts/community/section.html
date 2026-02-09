@@ -1,21 +1,22 @@
 {{ define "title" }}
-Community | {{ site.Title }}
+  Community |
+  {{ site.Title }}
 {{ end }}
 
 {{ define "main" }}
-{{ $buttons := .Params.buttons }}
-{{ $faq := .Params.faq }}
-<div class="max-w-5xl lg:max-w-7xl px-6 lg:px-8 mx-auto">
-  <div class="my-16">
-    <div class="pb-0">
-      {{ partial "hero.html" . }}
-    </div>
+  {{ $buttons := .Params.buttons }}
+  {{ $faq := .Params.faq }}
+  <div class="max-w-5xl lg:max-w-7xl px-6 lg:px-8 mx-auto">
+    <div class="my-16">
+      <div class="pb-0">
+        {{ partial "hero.html" . }}
+      </div>
 
-    <div class="mt-6 flex flex-col space-y-6">
-      <div>
-        {{ partial "inner-content.html" . }}
+      <div class="mt-6 flex flex-col space-y-6">
+        <div>
+          {{ partial "inner-content.html" . }}
+        </div>
       </div>
     </div>
   </div>
-</div>
 {{ end }}
