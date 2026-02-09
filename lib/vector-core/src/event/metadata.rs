@@ -24,7 +24,10 @@ const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
 /// The event metadata structure is a `Arc` wrapper around the actual metadata to avoid cloning the
 /// underlying data until it becomes necessary to provide a `mut` copy.
 #[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct EventMetadata(pub(super) Arc<Inner>);
+pub struct EventMetadata {
+    #[serde(flatten)]
+    pub(super) inner: Arc<Inner>,
+}
 
 /// The actual metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
@@ -129,23 +132,25 @@ fn default_metadata_value() -> Value {
 impl EventMetadata {
     /// Creates `EventMetadata` with the given `Value`, and the rest of the fields with default values
     pub fn default_with_value(value: Value) -> Self {
-        Self(Arc::new(Inner {
-            value,
-            ..Default::default()
-        }))
+        Self {
+            inner: Arc::new(Inner {
+                value,
+                ..Default::default()
+            }),
+        }
     }
 
     fn get_mut(&mut self) -> &mut Inner {
-        Arc::make_mut(&mut self.0)
+        Arc::make_mut(&mut self.inner)
     }
 
     pub(super) fn into_owned(self) -> Inner {
-        Arc::unwrap_or_clone(self.0)
+        Arc::unwrap_or_clone(self.inner)
     }
 
     /// Returns a reference to the metadata value
     pub fn value(&self) -> &Value {
-        &self.0.value
+        &self.inner.value
     }
 
     /// Returns a mutable reference to the metadata value
@@ -155,7 +160,7 @@ impl EventMetadata {
 
     /// Returns a reference to the secrets
     pub fn secrets(&self) -> &Secrets {
-        &self.0.secrets
+        &self.inner.secrets
     }
 
     /// Returns a mutable reference to the secrets
@@ -166,20 +171,20 @@ impl EventMetadata {
     /// Returns a reference to the metadata source id.
     #[must_use]
     pub fn source_id(&self) -> Option<&Arc<ComponentKey>> {
-        self.0.source_id.as_ref()
+        self.inner.source_id.as_ref()
     }
 
     /// Returns a reference to the metadata source type.
     #[must_use]
     pub fn source_type(&self) -> Option<&str> {
-        self.0.source_type.as_deref()
+        self.inner.source_type.as_deref()
     }
 
     /// Returns a reference to the metadata parent id. This is the `OutputId`
     /// of the previous component the event was sent through (if any).
     #[must_use]
     pub fn upstream_id(&self) -> Option<&OutputId> {
-        self.0.upstream_id.as_deref()
+        self.inner.upstream_id.as_deref()
     }
 
     /// Sets the `source_id` in the metadata to the provided value.
@@ -199,7 +204,7 @@ impl EventMetadata {
 
     /// Return the datadog API key, if it exists
     pub fn datadog_api_key(&self) -> Option<Arc<str>> {
-        self.0.secrets.get(DATADOG_API_KEY).cloned()
+        self.inner.secrets.get(DATADOG_API_KEY).cloned()
     }
 
     /// Set the datadog API key to passed value
@@ -209,7 +214,7 @@ impl EventMetadata {
 
     /// Return the splunk hec token, if it exists
     pub fn splunk_hec_token(&self) -> Option<Arc<str>> {
-        self.0.secrets.get(SPLUNK_HEC_TOKEN).cloned()
+        self.inner.secrets.get(SPLUNK_HEC_TOKEN).cloned()
     }
 
     /// Set the splunk hec token to passed value
@@ -227,17 +232,17 @@ impl EventMetadata {
 
     /// Fetches the dropped field by meaning.
     pub fn dropped_field(&self, meaning: impl AsRef<str>) -> Option<&Value> {
-        self.0.dropped_fields.get(meaning.as_ref())
+        self.inner.dropped_fields.get(meaning.as_ref())
     }
 
     /// Returns a reference to the `DatadogMetricOriginMetadata`.
     pub fn datadog_origin_metadata(&self) -> Option<&DatadogMetricOriginMetadata> {
-        self.0.datadog_origin_metadata.as_ref()
+        self.inner.datadog_origin_metadata.as_ref()
     }
 
     /// Returns a reference to the event id.
     pub fn source_event_id(&self) -> Option<Uuid> {
-        self.0.source_event_id
+        self.inner.source_event_id
     }
 }
 
@@ -260,7 +265,9 @@ impl Default for Inner {
 
 impl Default for EventMetadata {
     fn default() -> Self {
-        Self(Arc::new(Inner::default()))
+        Self {
+            inner: Arc::new(Inner::default()),
+        }
     }
 }
 
@@ -276,7 +283,7 @@ impl ByteSizeOf for EventMetadata {
         // NOTE we don't count the `str` here because it's allocated somewhere
         // else. We're just moving around the pointer, which is already captured
         // by `ByteSizeOf::size_of`.
-        self.0.finalizers.allocated_bytes()
+        self.inner.finalizers.allocated_bytes()
     }
 }
 
@@ -355,7 +362,7 @@ impl EventMetadata {
 
     /// Update the finalizer(s) status.
     pub fn update_status(&self, status: EventStatus) {
-        self.0.finalizers.update_status(status);
+        self.inner.finalizers.update_status(status);
     }
 
     /// Update the finalizers' sources.
@@ -365,7 +372,7 @@ impl EventMetadata {
 
     /// Gets a reference to the event finalizers.
     pub fn finalizers(&self) -> &EventFinalizers {
-        &self.0.finalizers
+        &self.inner.finalizers
     }
 
     /// Add a new event finalizer to the existing list of event finalizers.
@@ -385,7 +392,7 @@ impl EventMetadata {
 
     /// Get the schema definition.
     pub fn schema_definition(&self) -> &Arc<schema::Definition> {
-        &self.0.schema_definition
+        &self.inner.schema_definition
     }
 
     /// Set the schema definition.
