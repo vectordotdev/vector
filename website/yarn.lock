@@ -3614,15 +3614,14 @@ typescript@^5.9.3:
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.9.3.tgz#5b4f59e15310ab17a216f5d6cf53ee476ede670f"
   integrity sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==
 
-"typesense-sync@https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v1.1.0.tgz":
-  version "1.1.0"
-  resolved "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v1.1.0.tgz"
-  integrity sha512-w1b1aWpiXHOF/VK9SpzsH1B4yVRcyn0EJGQDEoDL5a6R/iD3y+HvG93UGBKlwYCnjv3E5woxXOgYNIE0MqP2Kg==
+"typesense-sync@https://s3.amazonaws.com/origin-static-assets/corp-node-packages/reda.elissati/web-8162-upgrade-typesense-to-v30/typesense-sync-v2.0.0.tgz":
+  version "2.0.0"
+  resolved "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/reda.elissati/web-8162-upgrade-typesense-to-v30/typesense-sync-v2.0.0.tgz#a0ff019ded9778bc28d5b362df5a2514d77484d3"
   dependencies:
     "@babel/runtime" "^7.25.0"
-    crypto "^1.0.1"
     dotenv "^16.4.5"
-    typesense "^2.0.3"
+    lodash "^4.17.21"
+    typesense "^3.0.1"
     winston "^3.14.2"
     yargs "^17.7.2"
 
@@ -3634,10 +3633,10 @@ typesense@^1.8.2:
     axios "^1.6.0"
     loglevel "^1.8.1"
 
-typesense@^2.0.3:
-  version "2.1.0"
-  resolved "https://registry.npmjs.org/typesense/-/typesense-2.1.0.tgz"
-  integrity sha512-a/IRTL+dRXlpRDU4UodyGj8hl5xBz3nKihVRd/KfSFAfFPGcpdX6lxIgwdXy3O6VLNNiEsN8YwIsPHQPVT0vNw==
+typesense@^3.0.1:
+  version "3.0.1"
+  resolved "https://registry.yarnpkg.com/typesense/-/typesense-3.0.1.tgz#fbbfef3383d983fb58e97b78a236047843cc69ca"
+  integrity sha512-aRzuDQlwR7s2sWw+JiR3CufrMWpzH5UAJ4XlybYczD02QPy5jCsEQiueqUu0Wiai4zW/RGYRruF3XrdEXPgPJA==
   dependencies:
     axios "^1.8.4"
     loglevel "^1.8.1"

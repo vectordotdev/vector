@@ -57,7 +57,7 @@
     "ts-node": "^10.9.2",
     "typescript": "^5.9.3",
     "typesense": "^1.8.2",
-    "typesense-sync": "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v1.1.0.tgz"
+    "typesense-sync": "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/reda.elissati/web-8162-upgrade-typesense-to-v30/typesense-sync-v2.0.0.tgz"
   },
   "browserslist": [
     "since 2017-06"
