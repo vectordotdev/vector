@@ -244,7 +244,16 @@ impl<'a> Widgets<'a> {
                     .map(|c| c.matches_header(s))
                     .unwrap_or_default()
                 {
-                    c = c.add_modifier(Modifier::REVERSED);
+                    c = c
+                        .content(format!(
+                            "{s} {}",
+                            if state.sort_state.reverse {
+                                "▼"
+                            } else {
+                                "▲"
+                            }
+                        ))
+                        .add_modifier(Modifier::REVERSED);
                 }
                 c
             })
