@@ -613,7 +613,7 @@ fn handle_ui_event(event: UiEventType, state: &mut State) {
             if state.ui.filter_menu_state.input.is_empty() {
                 state.filter_state.pattern = None;
             } else {
-                // display errors?
+                // display errors (https://github.com/vectordotdev/vector/issues/24620)?
                 state.filter_state.pattern = Regex::new(&state.ui.filter_menu_state.input).ok();
             }
             if let Some(selected) = state.ui.filter_menu_state.column_selection.selected() {
