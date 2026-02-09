@@ -41,8 +41,8 @@ struct FunctionDoc {
     internal_failure_reasons: &'static [&'static str],
     #[serde(skip_serializing_if = "Vec::is_empty")]
     examples: Vec<ExampleDoc>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    notices: Vec<String>,
+    #[serde(skip_serializing_if = "<[_]>::is_empty")]
+    notices: &'static [&'static str],
     pure: bool,
 }
 
@@ -158,7 +158,7 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
         },
         internal_failure_reasons: func.internal_failure_reasons(),
         examples,
-        notices: vec![], // Stub
+        notices: func.notices(),
         pure: func.pure(),
     }
 }
