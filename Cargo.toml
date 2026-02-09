@@ -208,7 +208,7 @@ vector-config-macros = { path = "lib/vector-config-macros" }
 vector-common-macros = { path = "lib/vector-common-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
-vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "compiler","value", "diagnostic", "path", "parser", "stdlib", "datadog", "core" ] }
 mock_instant = { version = "0.6" }
 serial_test = { version = "3.2" }
 
@@ -498,7 +498,7 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
+default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets", "vrl-functions-env", "vrl-functions-system", "vrl-functions-network"]
 # Default features for `cargo docs`. The same as `default` but without `rdkafka?/gssapi-vendored` which would require installing libsasl in our doc build environment.
 docs = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
@@ -510,6 +510,11 @@ default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build"
 default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 default-no-vrl-cli = ["api", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
+
+# VRL functions control features
+vrl-functions-env = ["vrl/enable_env_functions"]
+vrl-functions-system = ["vrl/enable_system_functions"]
+vrl-functions-network = ["vrl/enable_network_functions"]
 
 # Enables the binary secret-backend-example
 secret-backend-example = ["transforms"]
