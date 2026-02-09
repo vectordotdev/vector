@@ -368,6 +368,7 @@ impl EventMetadata {
     /// If a Datadog API key is not set in `self`, the one from `other` will be used.
     /// If a Splunk HEC token is not set in `self`, the one from `other` will be used.
     pub fn merge(&mut self, other: Self) {
+        let other_timestamp = other.last_transform_timestamp;
         let inner = self.get_mut();
         let other = other.into_owned();
         inner.finalizers.merge(other.finalizers);
@@ -376,6 +377,19 @@ impl EventMetadata {
         // Update `source_event_id` if necessary.
         if inner.source_event_id.is_none() {
             inner.source_event_id = other.source_event_id;
+        }
+
+        // Keep the earliest `last_transform_timestamp` for accurate latency measurement.
+        match (self.last_transform_timestamp, other_timestamp) {
+            (Some(self_ts), Some(other_ts)) => {
+                if other_ts < self_ts {
+                    self.last_transform_timestamp = Some(other_ts);
+                }
+            }
+            (None, Some(other_ts)) => {
+                self.last_transform_timestamp = Some(other_ts);
+            }
+            _ => {}
         }
     }
 
