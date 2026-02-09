@@ -881,6 +881,7 @@ async fn run_source_output_pump(
         array.for_each_metadata_mut(|metadata| {
             metadata.set_source_id(Arc::clone(&source));
             metadata.set_source_type(source_type);
+            metadata.set_last_transform_timestamp(Instant::now());
         });
         fanout
             .send(array, Some(send_reference))
