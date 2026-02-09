@@ -37,6 +37,12 @@ pub const fn is_allocation_tracing_enabled() -> bool {
     cfg!(feature = "allocation-tracing")
 }
 
+macro_rules! row_comparator {
+    ($field:ident) => {
+        |l: &ComponentRow, r: &ComponentRow| l.$field.cmp(&r.$field)
+    };
+}
+
 /// Format metrics, with thousands separation
 trait ThousandsFormatter {
     fn thousands_format(&self) -> String;
@@ -268,44 +274,20 @@ impl<'a> Widgets<'a> {
         let mut sorted = state.components.iter().collect::<Vec<_>>();
         if let Some(column) = state.sort_state.column {
             let sort_fn = match column {
-                SortColumn::Id => |l: &ComponentRow, r: &ComponentRow| l.key.cmp(&r.key),
-                SortColumn::Kind => |l: &ComponentRow, r: &ComponentRow| l.kind.cmp(&r.kind),
-                SortColumn::Type => {
-                    |l: &ComponentRow, r: &ComponentRow| l.component_type.cmp(&r.component_type)
-                }
-                SortColumn::EventsIn => |l: &ComponentRow, r: &ComponentRow| {
-                    l.received_events_throughput_sec
-                        .cmp(&r.received_events_throughput_sec)
-                },
-                SortColumn::EventsInTotal => |l: &ComponentRow, r: &ComponentRow| {
-                    l.received_events_total.cmp(&r.received_events_total)
-                },
-                SortColumn::BytesIn => |l: &ComponentRow, r: &ComponentRow| {
-                    l.received_bytes_throughput_sec
-                        .cmp(&r.received_bytes_throughput_sec)
-                },
-                SortColumn::BytesInTotal => |l: &ComponentRow, r: &ComponentRow| {
-                    l.received_bytes_total.cmp(&r.received_bytes_total)
-                },
-                SortColumn::EventsOut => |l: &ComponentRow, r: &ComponentRow| {
-                    l.sent_events_throughput_sec
-                        .cmp(&r.sent_events_throughput_sec)
-                },
-                SortColumn::EventsOutTotal => |l: &ComponentRow, r: &ComponentRow| {
-                    l.sent_events_total.cmp(&r.sent_events_total)
-                },
-                SortColumn::BytesOut => |l: &ComponentRow, r: &ComponentRow| {
-                    l.sent_bytes_throughput_sec
-                        .cmp(&r.sent_bytes_throughput_sec)
-                },
-                SortColumn::BytesOutTotal => {
-                    |l: &ComponentRow, r: &ComponentRow| l.sent_bytes_total.cmp(&r.sent_bytes_total)
-                }
-                SortColumn::Errors => |l: &ComponentRow, r: &ComponentRow| l.errors.cmp(&r.errors),
+                SortColumn::Id => row_comparator!(key),
+                SortColumn::Kind => row_comparator!(kind),
+                SortColumn::Type => row_comparator!(component_type),
+                SortColumn::EventsIn => row_comparator!(received_events_throughput_sec),
+                SortColumn::EventsInTotal => row_comparator!(received_events_total),
+                SortColumn::BytesIn => row_comparator!(received_bytes_throughput_sec),
+                SortColumn::BytesInTotal => row_comparator!(received_bytes_total),
+                SortColumn::EventsOut => row_comparator!(sent_events_throughput_sec),
+                SortColumn::EventsOutTotal => row_comparator!(sent_events_total),
+                SortColumn::BytesOut => row_comparator!(sent_bytes_throughput_sec),
+                SortColumn::BytesOutTotal => row_comparator!(sent_bytes_total),
+                SortColumn::Errors => row_comparator!(errors),
                 #[cfg(feature = "allocation-tracing")]
-                SortColumn::MemoryUsed => {
-                    |l: &ComponentRow, r: &ComponentRow| l.allocated_bytes.cmp(&r.allocated_bytes)
-                }
+                SortColumn::MemoryUsed => row_comparator!(allocated_bytes),
             };
             if state.sort_state.reverse {
                 sorted.sort_by(|a, b| sort_fn(a.1, b.1).reverse())
