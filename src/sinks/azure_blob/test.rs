@@ -22,7 +22,10 @@ use crate::{
 
 fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {
     AzureBlobSinkConfig {
-        connection_string: Default::default(),
+        connection_string: None,
+        storage_account: None,
+        endpoint: None,
+        auth: Default::default(),
         container_name: Default::default(),
         blob_prefix: Default::default(),
         blob_time_format: Default::default(),
