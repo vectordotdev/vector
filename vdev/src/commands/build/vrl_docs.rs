@@ -37,12 +37,12 @@ struct FunctionDoc {
     description: String,
     arguments: Vec<ArgumentDoc>,
     r#return: ReturnDoc,
-    #[serde(skip_serializing_if = "<[_]>::is_empty")]
-    internal_failure_reasons: &'static [&'static str],
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    internal_failure_reasons: Vec<String>,
     #[serde(skip_serializing_if = "Vec::is_empty")]
     examples: Vec<ExampleDoc>,
-    #[serde(skip_serializing_if = "<[_]>::is_empty")]
-    notices: &'static [&'static str],
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    notices: Vec<String>,
     pure: bool,
 }
 
@@ -59,8 +59,8 @@ struct ArgumentDoc {
 #[derive(Serialize)]
 struct ReturnDoc {
     types: Vec<String>,
-    #[serde(skip_serializing_if = "<[_]>::is_empty")]
-    rules: &'static [&'static str],
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    rules: Vec<String>,
 }
 
 #[derive(Serialize)]
@@ -150,15 +150,15 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
         anchor: name.clone(),
         name,
         category: category.to_string(),
-        description: func.usage().to_string(),
+        description: trim_str(func.usage()),
         arguments,
         r#return: ReturnDoc {
             types: kind_to_types(func.return_kind()),
-            rules: func.return_rules(),
+            rules: trim_slice(func.return_rules()),
         },
-        internal_failure_reasons: func.internal_failure_reasons(),
+        internal_failure_reasons: trim_slice(func.internal_failure_reasons()),
         examples,
-        notices: func.notices(),
+        notices: trim_slice(func.notices()),
         pure: func.pure(),
     }
 }
@@ -212,6 +212,14 @@ fn pretty_value(v: &Value) -> String {
     } else {
         v.to_string()
     }
+}
+
+fn trim_str(s: &'static str) -> String {
+    s.trim().to_string()
+}
+
+fn trim_slice(slice: &'static [&'static str]) -> Vec<String> {
+    slice.iter().map(|s| s.trim().to_string()).collect()
 }
 
 fn infer_category(name: &str) -> &'static str {
