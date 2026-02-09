@@ -124,26 +124,6 @@ pub struct State {
     pub ui: UiState,
 }
 
-impl State {
-    /// Syncs current state to the UI state, so that all the menus match the current state
-    /// (sorting, filters).
-    pub fn sync_to_ui_state(&mut self) {
-        self.ui
-            .sort_menu_state
-            .select(self.sort_state.column.map(|c| c as usize));
-        self.ui
-            .filter_menu_state
-            .column_selection
-            .select(Some(self.filter_state.column as usize));
-        self.ui.filter_menu_state.input = self
-            .filter_state
-            .pattern
-            .as_ref()
-            .map(|r| r.as_str().to_string())
-            .unwrap_or("".to_string());
-    }
-}
-
 #[derive(Debug, Clone, Copy)]
 pub enum SortColumn {
     Id = 0,
@@ -357,7 +337,27 @@ impl State {
             filter_state: FilterState::default(),
         }
     }
+
+    pub fn apply_sort_state_to_ui(&mut self) {
+        self.ui
+            .sort_menu_state
+            .select(self.sort_state.column.map(|c| c as usize));
+    }
+
+    pub fn apply_filter_state_to_ui(&mut self) {
+        self.ui
+            .filter_menu_state
+            .column_selection
+            .select(Some(self.filter_state.column as usize));
+        self.ui.filter_menu_state.input = self
+            .filter_state
+            .pattern
+            .as_ref()
+            .map(|r| r.as_str().to_string())
+            .unwrap_or("".to_string());
+    }
 }
+
 pub type EventTx = mpsc::Sender<EventType>;
 pub type EventRx = mpsc::Receiver<EventType>;
 pub type StateRx = mpsc::Receiver<State>;
@@ -550,11 +550,8 @@ fn handle_ui_event(event: UiEventType, state: &mut State) {
         }
         UiEventType::ToggleSortMenu => {
             state.ui.sort_visible = !state.ui.sort_visible;
-            state
-                .ui
-                .sort_menu_state
-                .select(state.sort_state.column.map(|c| c as usize));
             if state.ui.sort_visible {
+                state.apply_sort_state_to_ui();
                 state.ui.help_visible = false;
                 state.ui.filter_visible = false;
             }
@@ -577,6 +574,7 @@ fn handle_ui_event(event: UiEventType, state: &mut State) {
         UiEventType::ToggleFilterMenu => {
             state.ui.filter_visible = !state.ui.filter_visible;
             if state.ui.filter_visible {
+                state.apply_filter_state_to_ui();
                 state.ui.help_visible = false;
                 state.ui.sort_visible = false;
             }

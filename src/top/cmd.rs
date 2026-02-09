@@ -64,9 +64,6 @@ pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> e
         .as_deref()
         .map(Regex::new)
         .and_then(Result::ok);
-    // Apply changes to sort and filter state to the UI state too, so that filter and sort menus are
-    // prepopulated with selected values
-    starting_state.sync_to_ui_state();
     let state_rx = state::updater(rx, starting_state).await;
     // Channel for shutdown signal
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
