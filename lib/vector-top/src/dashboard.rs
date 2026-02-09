@@ -237,25 +237,29 @@ impl<'a> Widgets<'a> {
         let header = HEADER
             .iter()
             .map(|s| {
-                let mut c = Cell::from(*s).style(Style::default().add_modifier(Modifier::BOLD));
+                let mut content_line = Line::from(*s);
+                let c = Cell::default().style(Style::default().add_modifier(Modifier::BOLD));
+                if state.filter_state.column.matches_header(s)
+                    && let Some(pattern) = state.filter_state.pattern.as_ref().map(|p| p.as_str())
+                {
+                    content_line.push_span(" ");
+                    let filter_span =
+                        Span::styled(format!("/{pattern}/"), Style::default().fg(Color::Yellow));
+                    content_line.push_span(filter_span);
+                };
                 if state
                     .sort_state
                     .column
                     .map(|c| c.matches_header(s))
                     .unwrap_or_default()
                 {
-                    c = c
-                        .content(format!(
-                            "{s} {}",
-                            if state.sort_state.reverse {
-                                "▼"
-                            } else {
-                                "▲"
-                            }
-                        ))
-                        .add_modifier(Modifier::REVERSED);
-                }
-                c
+                    content_line.push_span(if state.sort_state.reverse {
+                        " ▼"
+                    } else {
+                        " ▲"
+                    });
+                };
+                c.content(content_line)
             })
             .collect::<Vec<_>>();
 

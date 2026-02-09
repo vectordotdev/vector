@@ -187,6 +187,14 @@ impl SortColumn {
 }
 
 impl FilterColumn {
+    pub fn matches_header(&self, header: &str) -> bool {
+        match self {
+            FilterColumn::Id => header == columns::ID,
+            FilterColumn::Kind => header == columns::KIND,
+            FilterColumn::Type => header == columns::TYPE,
+        }
+    }
+
     pub fn items() -> Vec<&'static str> {
         vec![columns::ID, columns::KIND, columns::TYPE]
     }
