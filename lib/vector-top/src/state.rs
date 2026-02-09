@@ -17,6 +17,8 @@ use vector_common::internal_event::DEFAULT_OUTPUT;
 
 use vector_common::config::ComponentKey;
 
+use crate::dashboard::columns;
+
 type IdentifiedMetric = (ComponentKey, i64);
 
 #[derive(Debug)]
@@ -171,42 +173,42 @@ pub enum FilterColumn {
 impl SortColumn {
     pub fn matches_header(&self, header: &str) -> bool {
         match self {
-            SortColumn::Id => header == "ID",
-            SortColumn::Kind => header == "Kind",
-            SortColumn::Type => header == "Type",
-            SortColumn::EventsIn | SortColumn::EventsInTotal => header == "Events In",
-            SortColumn::BytesIn | SortColumn::BytesInTotal => header == "Bytes In",
-            SortColumn::EventsOut | SortColumn::EventsOutTotal => header == "Events Out",
-            SortColumn::BytesOut | SortColumn::BytesOutTotal => header == "Bytes Out",
-            SortColumn::Errors => header == "Errors",
+            SortColumn::Id => header == columns::ID,
+            SortColumn::Kind => header == columns::KIND,
+            SortColumn::Type => header == columns::TYPE,
+            SortColumn::EventsIn | SortColumn::EventsInTotal => header == columns::EVENTS_IN,
+            SortColumn::BytesIn | SortColumn::BytesInTotal => header == columns::BYTES_IN,
+            SortColumn::EventsOut | SortColumn::EventsOutTotal => header == columns::EVENTS_OUT,
+            SortColumn::BytesOut | SortColumn::BytesOutTotal => header == columns::BYTES_OUT,
+            SortColumn::Errors => header == columns::ERRORS,
             #[cfg(feature = "allocation-tracing")]
-            SortColumn::MemoryUsed => header == "Memory Used",
+            SortColumn::MemoryUsed => header == columns::MEMORY_USED,
         }
     }
 
     pub fn items() -> Vec<&'static str> {
         vec![
-            "ID",
-            "Kind",
-            "Type",
-            "Events In",
-            "Events In Total",
-            "Bytes In",
-            "Bytes In Total",
-            "Events Out",
-            "Events Out Total",
-            "Bytes Out",
-            "Bytes Out Total",
-            "Errors",
+            columns::ID,
+            columns::KIND,
+            columns::TYPE,
+            columns::EVENTS_IN,
+            columns::EVENTS_IN_TOTAL,
+            columns::BYTES_IN,
+            columns::BYTES_IN_TOTAL,
+            columns::EVENTS_OUT,
+            columns::EVENTS_OUT_TOTAL,
+            columns::BYTES_OUT,
+            columns::BYTES_OUT_TOTAL,
+            columns::ERRORS,
             #[cfg(feature = "allocation-tracing")]
-            "Memory Used",
+            columns::MEMORY_USED,
         ]
     }
 }
 
 impl FilterColumn {
     pub fn items() -> Vec<&'static str> {
-        vec!["ID", "Kind", "Type"]
+        vec![columns::ID, columns::KIND, columns::TYPE]
     }
 }
 

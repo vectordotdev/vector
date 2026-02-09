@@ -137,18 +137,36 @@ const NUM_COLUMNS: usize = if is_allocation_tracing_enabled() {
     9
 };
 
-static HEADER: [&str; NUM_COLUMNS] = [
-    "ID",
-    "Output",
-    "Kind",
-    "Type",
-    "Events In",
-    "Bytes In",
-    "Events Out",
-    "Bytes Out",
-    "Errors",
+pub mod columns {
+    pub const ID: &str = "ID";
+    pub const OUTPUT: &str = "Output";
+    pub const KIND: &str = "Kind";
+    pub const TYPE: &str = "Type";
+    pub const EVENTS_IN: &str = "Events In";
+    pub const EVENTS_IN_TOTAL: &str = "Events In Total";
+    pub const BYTES_IN: &str = "Bytes In";
+    pub const BYTES_IN_TOTAL: &str = "Bytes In Total";
+    pub const EVENTS_OUT: &str = "Events Out";
+    pub const EVENTS_OUT_TOTAL: &str = "Events Out Total";
+    pub const BYTES_OUT: &str = "Bytes Out";
+    pub const BYTES_OUT_TOTAL: &str = "Bytes Out Total";
+    pub const ERRORS: &str = "Errors";
     #[cfg(feature = "allocation-tracing")]
-    "Memory Used",
+    pub const MEMORY_USED: &str = "Memory Used";
+}
+
+static HEADER: [&str; NUM_COLUMNS] = [
+    columns::ID,
+    columns::OUTPUT,
+    columns::KIND,
+    columns::TYPE,
+    columns::EVENTS_IN,
+    columns::BYTES_IN,
+    columns::EVENTS_OUT,
+    columns::BYTES_OUT,
+    columns::ERRORS,
+    #[cfg(feature = "allocation-tracing")]
+    columns::MEMORY_USED,
 ];
 
 struct Widgets<'a> {
