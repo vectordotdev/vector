@@ -7,3 +7,5 @@ Supported sources include OTLP receiver with `use_otlp_decoding: false` (flat de
 Field mapping: `.message`/`.body`/`.msg` maps to `logRecords[].body`, `.timestamp` to `timeUnixNano`, `.attributes.*` to `logRecords[].attributes[]`, `.resources.*` to `resource.attributes[]`, `.severity_text` to `severityText`, and `.scope.name/version` to `scopeLogs[].scope`.
 
 Invalid fields are handled gracefully with warnings and sensible defaults rather than errors. Events already in OTLP format (containing `resourceLogs`) continue to work unchanged.
+
+authors: szibis
