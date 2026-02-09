@@ -159,7 +159,7 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
         internal_failure_reasons: func.internal_failure_reasons(),
         examples,
         notices: vec![], // Stub
-        pure: true,      // Stub - default true
+        pure: func.pure(),
     }
 }
 
