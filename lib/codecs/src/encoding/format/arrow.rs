@@ -173,7 +173,7 @@ pub enum ArrowEncodingError {
     },
 
     /// IO error during encoding
-    #[snafu(display("IO error: {}", source))]
+    #[snafu(display("IO error: {}", source), context(false))]
     Io {
         /// The underlying IO error
         source: std::io::Error,
@@ -194,12 +194,6 @@ pub enum ArrowEncodingError {
         /// Description of the schema violation
         reason: String,
     },
-}
-
-impl From<std::io::Error> for ArrowEncodingError {
-    fn from(error: std::io::Error) -> Self {
-        Self::Io { source: error }
-    }
 }
 
 /// Encodes a batch of events into Arrow IPC streaming format
