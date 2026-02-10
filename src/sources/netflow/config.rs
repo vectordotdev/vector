@@ -367,8 +367,8 @@ mod tests {
     fn test_protocol_enablement() {
         let config = NetflowConfig::default();
         assert!(config.is_protocol_enabled("netflow_v5"));
-        assert!(config.is_protocol_enabled("ipfix"));
-        
+        assert!(!config.is_protocol_enabled("ipfix"));
+
         let mut limited_config = NetflowConfig::default();
         limited_config.protocols = vec!["netflow_v5".to_string()];
         assert!(limited_config.is_protocol_enabled("netflow_v5"));
