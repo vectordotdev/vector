@@ -160,6 +160,7 @@ jobs:
             logstash source
             mongodb_metrics source
             nats source
+            netflow source
             new source
             nginx_metrics source
             okta source
