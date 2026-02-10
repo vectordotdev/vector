@@ -323,7 +323,7 @@ fn validate_non_nullable_fields(
     schema: &SchemaRef,
 ) -> Result<(), ArrowEncodingError> {
     for field in schema.fields().iter().filter(|f| !f.is_nullable()) {
-        let name = field.name().as_str();
+        let name = field.name();
         ensure!(
             !events
                 .iter()
