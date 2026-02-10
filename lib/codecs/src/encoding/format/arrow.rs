@@ -358,11 +358,7 @@ fn decode_events(
 mod tests {
     use super::*;
     use arrow::{
-        array::{
-            Array, BinaryArray, BooleanArray, Float64Array, Int64Array, StringArray,
-            TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
-            TimestampSecondArray,
-        },
+        array::{Array, AsArray},
         datatypes::TimeUnit,
         ipc::reader::StreamReader,
     };
@@ -393,29 +389,14 @@ mod tests {
         Event::Log(log)
     }
 
-    /// Assert a primitive value at a specific column and row
-    macro_rules! assert_primitive_value {
-        ($batch:expr, $col:expr, $row:expr, $array_type:ty, $expected:expr) => {
-            assert_eq!(
-                $batch
-                    .column($col)
-                    .as_any()
-                    .downcast_ref::<$array_type>()
-                    .unwrap()
-                    .value($row),
-                $expected
-            )
-        };
-    }
-
     mod comprehensive {
         use super::*;
 
         #[test]
         fn test_encode_all_types() {
-            use arrow::array::{
-                Decimal128Array, ListArray, MapArray, UInt8Array, UInt16Array, UInt32Array,
-                UInt64Array,
+            use arrow::datatypes::{
+                Decimal128Type, Float32Type, Float64Type, Int8Type, Int16Type, Int32Type,
+                Int64Type, TimestampMillisecondType, UInt8Type, UInt16Type, UInt32Type, UInt64Type,
             };
             use vrl::value::ObjectMap;
 
@@ -528,102 +509,48 @@ mod tests {
             assert_eq!(batch.num_columns(), 19);
 
             // Verify all primitive types
+            assert_eq!(batch.column(0).as_string::<i32>().value(0), "test");
+            assert_eq!(batch.column(1).as_primitive::<Int8Type>().value(0), 127);
+            assert_eq!(batch.column(2).as_primitive::<Int16Type>().value(0), 32000);
+            assert_eq!(batch.column(3).as_primitive::<Int32Type>().value(0), 1000000);
+            assert_eq!(batch.column(4).as_primitive::<Int64Type>().value(0), 42);
+            assert_eq!(batch.column(5).as_primitive::<UInt8Type>().value(0), 255);
+            assert_eq!(batch.column(6).as_primitive::<UInt16Type>().value(0), 65535);
+            assert_eq!(batch.column(7).as_primitive::<UInt32Type>().value(0), 4000000);
+            assert_eq!(batch.column(8).as_primitive::<UInt64Type>().value(0), 9000000000);
+            assert!((batch.column(9).as_primitive::<Float32Type>().value(0) - 3.15).abs() < 0.001);
+            assert!((batch.column(10).as_primitive::<Float64Type>().value(0) - 3.15).abs() < 0.001);
+            assert!(batch.column(11).as_boolean().value(0));
+            assert_eq!(batch.column(12).as_binary::<i32>().value(0), b"binary");
             assert_eq!(
-                batch
-                    .column(0)
-                    .as_any()
-                    .downcast_ref::<StringArray>()
-                    .unwrap()
-                    .value(0),
-                "test"
-            );
-            assert_primitive_value!(batch, 1, 0, arrow::array::Int8Array, 127);
-            assert_primitive_value!(batch, 2, 0, arrow::array::Int16Array, 32000);
-            assert_primitive_value!(batch, 3, 0, arrow::array::Int32Array, 1000000);
-            assert_primitive_value!(batch, 4, 0, Int64Array, 42);
-            assert_primitive_value!(batch, 5, 0, UInt8Array, 255);
-            assert_primitive_value!(batch, 6, 0, UInt16Array, 65535);
-            assert_primitive_value!(batch, 7, 0, UInt32Array, 4000000);
-            assert_primitive_value!(batch, 8, 0, UInt64Array, 9000000000);
-            assert!(
-                (batch
-                    .column(9)
-                    .as_any()
-                    .downcast_ref::<arrow::array::Float32Array>()
-                    .unwrap()
-                    .value(0)
-                    - 3.15)
-                    .abs()
-                    < 0.001
-            );
-            assert!(
-                (batch
-                    .column(10)
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .unwrap()
-                    .value(0)
-                    - 3.15)
-                    .abs()
-                    < 0.001
-            );
-            assert!(
-                batch
-                    .column(11)
-                    .as_any()
-                    .downcast_ref::<BooleanArray>()
-                    .unwrap()
-                    .value(0)
-            );
-            assert_primitive_value!(batch, 12, 0, BinaryArray, b"binary");
-            assert_primitive_value!(
-                batch,
-                13,
-                0,
-                TimestampMillisecondArray,
+                batch.column(13).as_primitive::<TimestampMillisecondType>().value(0),
                 now.timestamp_millis()
             );
-            assert_primitive_value!(batch, 14, 0, Decimal128Array, 9999);
+            assert_eq!(batch.column(14).as_primitive::<Decimal128Type>().value(0), 9999);
 
-            let list_array = batch
-                .column(15)
-                .as_any()
-                .downcast_ref::<ListArray>()
-                .unwrap();
+            let list_array = batch.column(15).as_list::<i32>();
             assert!(!list_array.is_null(0));
-            let list_value = list_array.value(0);
-            assert_eq!(list_value.len(), 3);
-            let int_array = list_value.as_any().downcast_ref::<Int64Array>().unwrap();
+            let list_values = list_array.value(0);
+            assert_eq!(list_values.len(), 3);
+            let int_array = list_values.as_primitive::<Int64Type>();
             assert_eq!(int_array.value(0), 1);
             assert_eq!(int_array.value(1), 2);
             assert_eq!(int_array.value(2), 3);
 
             // Verify struct field (unnamed)
-            let struct_array = batch
-                .column(16)
-                .as_any()
-                .downcast_ref::<arrow::array::StructArray>()
-                .unwrap();
+            let struct_array = batch.column(16).as_struct();
             assert!(!struct_array.is_null(0));
-            assert_primitive_value!(struct_array, 0, 0, StringArray, "nested_str");
-            assert_primitive_value!(struct_array, 1, 0, Int64Array, 999);
+            assert_eq!(struct_array.column(0).as_string::<i32>().value(0), "nested_str");
+            assert_eq!(struct_array.column(1).as_primitive::<Int64Type>().value(0), 999);
 
             // Verify named struct field (named tuple)
-            let named_struct_array = batch
-                .column(17)
-                .as_any()
-                .downcast_ref::<arrow::array::StructArray>()
-                .unwrap();
+            let named_struct_array = batch.column(17).as_struct();
             assert!(!named_struct_array.is_null(0));
-            assert_primitive_value!(named_struct_array, 0, 0, StringArray, "test_category");
-            assert_primitive_value!(named_struct_array, 1, 0, StringArray, "test_tag");
+            assert_eq!(named_struct_array.column(0).as_string::<i32>().value(0), "test_category");
+            assert_eq!(named_struct_array.column(1).as_string::<i32>().value(0), "test_tag");
 
             // Verify map field
-            let map_array = batch
-                .column(18)
-                .as_any()
-                .downcast_ref::<MapArray>()
-                .unwrap();
+            let map_array = batch.column(18).as_map();
             assert!(!map_array.is_null(0));
             let map_value = map_array.value(0);
             assert_eq!(map_value.len(), 2);
@@ -665,6 +592,10 @@ mod tests {
 
     mod temporal_types {
         use super::*;
+        use arrow::datatypes::{
+            TimestampMicrosecondType, TimestampMillisecondType, TimestampNanosecondType,
+            TimestampSecondType,
+        };
 
         #[test]
         fn test_encode_timestamp_precisions() {
@@ -705,35 +636,19 @@ mod tests {
             assert_eq!(batch.num_rows(), 1);
             assert_eq!(batch.num_columns(), 4);
 
-            let ts_second = batch
-                .column(0)
-                .as_any()
-                .downcast_ref::<TimestampSecondArray>()
-                .unwrap();
+            let ts_second = batch.column(0).as_primitive::<TimestampSecondType>();
             assert!(!ts_second.is_null(0));
             assert_eq!(ts_second.value(0), now.timestamp());
 
-            let ts_milli = batch
-                .column(1)
-                .as_any()
-                .downcast_ref::<TimestampMillisecondArray>()
-                .unwrap();
+            let ts_milli = batch.column(1).as_primitive::<TimestampMillisecondType>();
             assert!(!ts_milli.is_null(0));
             assert_eq!(ts_milli.value(0), now.timestamp_millis());
 
-            let ts_micro = batch
-                .column(2)
-                .as_any()
-                .downcast_ref::<TimestampMicrosecondArray>()
-                .unwrap();
+            let ts_micro = batch.column(2).as_primitive::<TimestampMicrosecondType>();
             assert!(!ts_micro.is_null(0));
             assert_eq!(ts_micro.value(0), now.timestamp_micros());
 
-            let ts_nano = batch
-                .column(3)
-                .as_any()
-                .downcast_ref::<TimestampNanosecondArray>()
-                .unwrap();
+            let ts_nano = batch.column(3).as_primitive::<TimestampNanosecondType>();
             assert!(!ts_nano.is_null(0));
             assert_eq!(ts_nano.value(0), now.timestamp_nanos_opt().unwrap());
         }
@@ -763,11 +678,7 @@ mod tests {
 
             assert_eq!(batch.num_rows(), 3);
 
-            let ts_array = batch
-                .column(0)
-                .as_any()
-                .downcast_ref::<TimestampNanosecondArray>()
-                .unwrap();
+            let ts_array = batch.column(0).as_primitive::<TimestampNanosecondType>();
 
             // All three should be non-null
             assert!(!ts_array.is_null(0));
@@ -826,11 +737,7 @@ mod tests {
                 "The output schema field should have been transformed to nullable=true"
             );
 
-            let array = batch
-                .column(0)
-                .as_any()
-                .downcast_ref::<Int64Array>()
-                .unwrap();
+            let array = batch.column(0).as_primitive::<arrow::datatypes::Int64Type>();
 
             assert_eq!(array.value(0), 42);
             assert!(!array.is_null(0));
