@@ -881,16 +881,15 @@ async fn run_source_output_pump(
         send_reference,
     }) = rx.next().await
     {
-        // Even though we have a `send_reference` timestamp here, that reference
-        // time is when the events were enqueued in the `SourceSender`, not when
-        // they were pulled out of the `rx` stream on this end. Since those times
-        // can be quite different (due to blocking inherent to the fanout send
-        // operation), we set the `last_transform_timestamp` to the current time
-        // instead to get an accurate reference for when the events started waiting
-        // for the first transform.
         array.for_each_metadata_mut(|metadata| {
             metadata.set_source_id(Arc::clone(&source));
             metadata.set_source_type(source_type);
+            // Even though we have a `send_reference` timestamp here, that reference time is when
+            // the events were enqueued in the `SourceSender`, not when they were pulled out of the
+            // `rx` stream on this end. Since those times can be quite different (due to blocking
+            // inherent to the fanout send operation), we set the `last_transform_timestamp` to the
+            // current time instead to get an accurate reference for when the events started waiting
+            // for the first transform.
             metadata.set_last_transform_timestamp(Instant::now());
         });
         fanout
