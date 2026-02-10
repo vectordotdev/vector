@@ -299,6 +299,7 @@ killall
 kinesisfirehose
 kinit
 klog
+kvlist
 labelmap
 lalrpop
 Lamport
@@ -660,6 +661,7 @@ wtimeout
 WTS
 xact
 xlarge
+xychart
 xxs
 YAMLs
 YBv
