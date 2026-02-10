@@ -7,17 +7,17 @@
 use arrow::{
     array::ArrayRef,
     compute::{CastOptions, cast_with_options},
-    datatypes::{DataType, Field, Fields, Schema, SchemaRef, TimeUnit},
+    datatypes::{DataType, Field, Fields, Schema, SchemaRef},
     ipc::writer::StreamWriter,
+    json::reader::{Decoder, ReaderBuilder},
     record_batch::RecordBatch,
 };
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
-use chrono::{DateTime, Utc};
 use snafu::Snafu;
 use std::sync::Arc;
 use vector_config::configurable_component;
-use vector_core::event::{Event, LogEvent, Value};
+use vector_core::event::Event;
 
 /// Provides Arrow schema for encoding.
 ///
@@ -183,24 +183,11 @@ pub enum ArrowEncodingError {
         source: std::io::Error,
     },
 
-    /// Serde Arrow serialization error
-    #[snafu(display("Serde Arrow error: {}", source))]
-    SerdeArrow {
-        /// The underlying serde_arrow error
-        source: serde_arrow::Error,
-    },
-
-    /// Timestamp value overflows the representable range
-    #[snafu(display(
-        "Timestamp overflow for field '{}': value '{}' cannot be represented as i64 nanoseconds",
-        field_name,
-        timestamp
-    ))]
-    TimestampOverflow {
-        /// The field name
-        field_name: String,
-        /// The timestamp value that overflowed
-        timestamp: String,
+    /// Arrow JSON decoding error
+    #[snafu(display("Arrow JSON decoding error: {}", source))]
+    ArrowJsonDecode {
+        /// The underlying Arrow error
+        source: arrow::error::ArrowError,
     },
 
     /// Invalid Map schema structure
@@ -294,33 +281,36 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
         .with_nullable(true))
 }
 
+/// Build a decoder schema: swap Binary fields to Utf8 so arrow-json can decode
+/// Vector's UTF-8 serialized bytes (arrow-json expects hex-encoded strings for Binary).
+fn build_decoder_schema(schema: &Schema) -> Schema {
+    let fields: Vec<Field> = schema
+        .fields()
+        .iter()
+        .map(|f| match f.data_type() {
+            DataType::Binary => f.as_ref().clone().with_data_type(DataType::Utf8),
+            _ => f.as_ref().clone(),
+        })
+        .collect();
+    Schema::new_with_metadata(Fields::from(fields), schema.metadata().clone())
+}
+
 /// Build an Arrow RecordBatch from a slice of events using the provided schema.
 fn build_record_batch(
     schema: SchemaRef,
     events: &[Event],
 ) -> Result<RecordBatch, ArrowEncodingError> {
-    let log_events: Vec<LogEvent> = events
-        .iter()
-        .filter_map(Event::maybe_as_log)
-        .map(|log| convert_timestamps(log, &schema))
-        .collect::<Result<Vec<_>, _>>()?;
+    // Pre-validate non-nullable fields (arrow-json silently writes defaults for missing fields)
+    validate_non_nullable_fields(events, &schema)?;
 
-    let batch = serde_arrow::to_record_batch(schema.fields(), &log_events).map_err(|source| {
-        // serde_arrow doesn't expose structured error variants (see
-        // https://docs.rs/serde_arrow/latest/serde_arrow/enum.Error.html), so we string-match on
-        // the message to detect null constraint violations, then find the actual field ourselves.
-        if source.message().contains("non-nullable")
-            && let Some(field_name) = find_null_field(&log_events, &schema)
-        {
-            return ArrowEncodingError::NullConstraint { field_name };
-        }
-        ArrowEncodingError::SerdeArrow { source }
-    })?;
+    let decoder_schema = build_decoder_schema(&schema);
+    let decoder = ReaderBuilder::new(Arc::new(decoder_schema))
+        .build_decoder()
+        .map_err(|source| ArrowEncodingError::RecordBatchCreation { source })?;
 
-    // Post-process: use Arrow's cast for any remaining type mismatches.
-    // serde_arrow serializes Vector's Value types using fixed Arrow types (e.g., Int64
-    // for all integers, Float64 for floats, LargeUtf8 for strings), but the target schema
-    // may specify narrower types. Arrow's cast handles these conversions safely.
+    let batch = decode_events(decoder, events)?;
+
+    // Post-process: cast columns that were swapped for decoder compatibility
     let columns: Result<Vec<ArrayRef>, _> = batch
         .columns()
         .iter()
@@ -339,61 +329,51 @@ fn build_record_batch(
         .map_err(|source| ArrowEncodingError::RecordBatchCreation { source })
 }
 
-/// Find which non-nullable field has a missing value (called only on error).
-fn find_null_field(events: &[LogEvent], schema: &SchemaRef) -> Option<String> {
-    for field in schema.fields() {
-        if !field.is_nullable() {
-            let name = field.name();
-            if events
-                .iter()
-                .any(|e| e.get(lookup::event_path!(name)).is_none())
-            {
-                return Some(name.to_string());
-            }
-        }
-    }
-    None
-}
-
-/// Convert Value::Timestamp to Value::Integer for timestamp columns.
-///
-/// This is necessary because serde_arrow's string parsing expects specific formats
-/// based on the timezone setting, but Vector's timestamps always serialize as RFC 3339
-/// with 'Z' suffix. Converting to i64 directly avoids this format mismatch.
-fn convert_timestamps(
-    event: &LogEvent,
+/// Validate that non-nullable fields are present in all events.
+fn validate_non_nullable_fields(
+    events: &[Event],
     schema: &SchemaRef,
-) -> Result<LogEvent, ArrowEncodingError> {
-    let mut result = event.clone();
+) -> Result<(), ArrowEncodingError> {
+    let required_fields: Vec<&str> = schema
+        .fields()
+        .iter()
+        .filter(|f| !f.is_nullable())
+        .map(|f| f.name().as_str())
+        .collect();
 
-    for field in schema.fields() {
-        if let DataType::Timestamp(unit, _) = field.data_type() {
-            let field_name = field.name().as_str();
-
-            if let Some(Value::Timestamp(ts)) = event.get(lookup::event_path!(field_name)) {
-                let val = timestamp_to_unit(ts, unit).ok_or_else(|| {
-                    ArrowEncodingError::TimestampOverflow {
-                        field_name: field_name.to_string(),
-                        timestamp: ts.to_rfc3339(),
-                    }
-                })?;
-                result.insert(field_name, Value::Integer(val));
-            }
+    for name in required_fields {
+        if events
+            .iter()
+            .filter_map(Event::maybe_as_log)
+            .any(|log| log.get(lookup::event_path!(name)).is_none())
+        {
+            return Err(ArrowEncodingError::NullConstraint {
+                field_name: name.to_string(),
+            });
         }
     }
-
-    Ok(result)
+    Ok(())
 }
 
-/// Convert a DateTime<Utc> to i64 in the specified Arrow TimeUnit.
-/// Returns None if the value would overflow (only possible for nanoseconds).
-fn timestamp_to_unit(ts: &DateTime<Utc>, unit: &TimeUnit) -> Option<i64> {
-    match unit {
-        TimeUnit::Second => Some(ts.timestamp()),
-        TimeUnit::Millisecond => Some(ts.timestamp_millis()),
-        TimeUnit::Microsecond => Some(ts.timestamp_micros()),
-        TimeUnit::Nanosecond => ts.timestamp_nanos_opt(),
-    }
+/// Serialize events as JSON and decode them into a RecordBatch using the arrow-json Decoder.
+fn decode_events(
+    mut decoder: Decoder,
+    events: &[Event],
+) -> Result<RecordBatch, ArrowEncodingError> {
+    let values: Vec<&vrl::value::Value> = events
+        .iter()
+        .filter_map(Event::maybe_as_log)
+        .map(|log| log.value())
+        .collect();
+
+    decoder
+        .serialize(&values)
+        .map_err(|source| ArrowEncodingError::ArrowJsonDecode { source })?;
+
+    decoder
+        .flush()
+        .map_err(|source| ArrowEncodingError::ArrowJsonDecode { source })?
+        .ok_or(ArrowEncodingError::NoEvents)
 }
 
 #[cfg(test)]
@@ -405,9 +385,12 @@ mod tests {
             TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
             TimestampSecondArray,
         },
+        datatypes::TimeUnit,
         ipc::reader::StreamReader,
     };
+    use chrono::Utc;
     use std::io::Cursor;
+    use vector_core::event::{LogEvent, Value};
 
     /// Helper to encode events and return the decoded RecordBatch
     fn encode_and_decode(
@@ -790,10 +773,6 @@ mod tests {
 
         #[test]
         fn test_encode_mixed_timestamp_string_native_and_integer() {
-            // Test mixing RFC3339 string timestamps, native Timestamp values, and integers.
-            // Note: String timestamps require the schema to have Some("UTC") timezone for
-            // serde_arrow to parse them correctly. Native Value::Timestamp values are
-            // converted to integers internally, so they work with any timezone setting.
             let now = Utc::now();
 
             let mut log1 = LogEvent::default();
@@ -807,10 +786,9 @@ mod tests {
 
             let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
-            // Use Some("UTC") to enable serde_arrow's RFC3339 string parsing
             let schema = SchemaRef::new(Schema::new(vec![Field::new(
                 "ts",
-                DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
+                DataType::Timestamp(TimeUnit::Nanosecond, Some("+00:00".into())),
                 true,
             )]));
 
