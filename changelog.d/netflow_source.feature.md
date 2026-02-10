@@ -1,3 +1,3 @@
-Add NetFlow source implementation supporting NetFlow v5, NetFlow v9, IPFIX, and sFlow protocols. The implementation includes sophisticated template management, enterprise field support, template buffering for missing templates, and comprehensive error handling. Supports all major flow protocols with configurable enterprise field parsing and template caching.
+Add `netflow` source that receives NetFlow v5 flow records over UDP. Listens on a configurable address with optional strict validation and raw data inclusion. NetFlow v9, IPFIX, and sFlow support will follow in later releases.
 
 authors: modev2301
