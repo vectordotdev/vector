@@ -14,7 +14,7 @@ use arrow::{
 };
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use std::sync::Arc;
 use vector_config::configurable_component;
 use vector_core::event::Event;
@@ -219,13 +219,11 @@ pub fn encode_events_to_arrow_ipc_stream(
 
     let record_batch = build_record_batch(schema_ref, events)?;
 
-    let ipc_err = |source| ArrowEncodingError::IpcWrite { source };
-
     let mut buffer = BytesMut::new().writer();
     let mut writer =
-        StreamWriter::try_new(&mut buffer, record_batch.schema_ref()).map_err(ipc_err)?;
-    writer.write(&record_batch).map_err(ipc_err)?;
-    writer.finish().map_err(ipc_err)?;
+        StreamWriter::try_new(&mut buffer, record_batch.schema_ref()).context(IpcWriteSnafu)?;
+    writer.write(&record_batch).context(IpcWriteSnafu)?;
+    writer.finish().context(IpcWriteSnafu)?;
 
     Ok(buffer.into_inner().freeze())
 }
@@ -306,7 +304,7 @@ fn build_record_batch(
     let decoder_schema = build_decoder_schema(&schema);
     let decoder = ReaderBuilder::new(Arc::new(decoder_schema))
         .build_decoder()
-        .map_err(|source| ArrowEncodingError::RecordBatchCreation { source })?;
+        .context(RecordBatchCreationSnafu)?;
 
     let batch = decode_events(decoder, events)?;
 
@@ -320,13 +318,12 @@ fn build_record_batch(
                 Ok(col.clone())
             } else {
                 cast_with_options(col, field.data_type(), &CastOptions::default())
-                    .map_err(|source| ArrowEncodingError::RecordBatchCreation { source })
+                    .context(RecordBatchCreationSnafu)
             }
         })
         .collect();
 
-    RecordBatch::try_new(schema, columns?)
-        .map_err(|source| ArrowEncodingError::RecordBatchCreation { source })
+    RecordBatch::try_new(schema, columns?).context(RecordBatchCreationSnafu)
 }
 
 /// Validate that non-nullable fields are present in all events.
@@ -368,11 +365,9 @@ fn decode_events(
 
     decoder
         .serialize(&values)
-        .map_err(|source| ArrowEncodingError::ArrowJsonDecode { source })?;
+        .context(ArrowJsonDecodeSnafu)?;
 
-    decoder
-        .flush()
-        .map_err(|source| ArrowEncodingError::ArrowJsonDecode { source })?
+    decoder.flush().context(ArrowJsonDecodeSnafu)?
         .ok_or(ArrowEncodingError::NoEvents)
 }
 
