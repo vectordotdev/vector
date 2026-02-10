@@ -130,7 +130,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ArrowStreamSerializer {
             return Err(ArrowEncodingError::NoEvents);
         }
 
-        let bytes = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&self.schema)))?;
+        let bytes = encode_events_to_arrow_ipc_stream(&events, Arc::clone(&self.schema))?;
 
         buffer.extend_from_slice(&bytes);
         Ok(())
@@ -157,10 +157,6 @@ pub enum ArrowEncodingError {
     /// No events provided for encoding
     #[snafu(display("No events provided for encoding"))]
     NoEvents,
-
-    /// Schema must be provided before encoding
-    #[snafu(display("Schema must be provided before encoding"))]
-    NoSchemaProvided,
 
     /// Failed to fetch schema from provider
     #[snafu(display("Failed to fetch schema from provider: {}", message))]
@@ -209,15 +205,13 @@ impl From<std::io::Error> for ArrowEncodingError {
 /// Encodes a batch of events into Arrow IPC streaming format
 pub fn encode_events_to_arrow_ipc_stream(
     events: &[Event],
-    schema: Option<SchemaRef>,
+    schema: SchemaRef,
 ) -> Result<Bytes, ArrowEncodingError> {
     if events.is_empty() {
         return Err(ArrowEncodingError::NoEvents);
     }
 
-    let schema_ref = schema.ok_or(ArrowEncodingError::NoSchemaProvided)?;
-
-    let record_batch = build_record_batch(schema_ref, events)?;
+    let record_batch = build_record_batch(schema, events)?;
 
     let mut buffer = BytesMut::new().writer();
     let mut writer =
@@ -392,7 +386,7 @@ mod tests {
         events: Vec<Event>,
         schema: SchemaRef,
     ) -> Result<RecordBatch, Box<dyn std::error::Error>> {
-        let bytes = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)))?;
+        let bytes = encode_events_to_arrow_ipc_stream(&events, Arc::clone(&schema))?;
         let cursor = Cursor::new(bytes);
         let mut reader = StreamReader::try_new(cursor, None)?;
         Ok(reader.next().unwrap()?)
@@ -651,22 +645,14 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_encode_without_schema_fails() {
-            let events = vec![create_event(vec![("message", "hello")])];
-
-            let result = encode_events_to_arrow_ipc_stream(&events, None);
-            assert!(result.is_err());
-            assert!(matches!(
-                result.unwrap_err(),
-                ArrowEncodingError::NoSchemaProvided
-            ));
-        }
-
-        #[test]
         fn test_encode_empty_events() {
+            let schema = SchemaRef::new(Schema::new(vec![Field::new(
+                "message",
+                DataType::Utf8,
+                true,
+            )]));
             let events: Vec<Event> = vec![];
-            let result = encode_events_to_arrow_ipc_stream(&events, None);
-            assert!(result.is_err());
+            let result = encode_events_to_arrow_ipc_stream(&events, schema);
             assert!(matches!(result.unwrap_err(), ArrowEncodingError::NoEvents));
         }
 
@@ -680,14 +666,11 @@ mod tests {
                 false, // non-nullable
             )]));
 
-            let result = encode_events_to_arrow_ipc_stream(&events, Some(schema));
-            assert!(result.is_err());
-            match result.unwrap_err() {
-                ArrowEncodingError::NullConstraint { field_name } => {
-                    assert_eq!(field_name, "required_field");
-                }
-                other => panic!("Expected NullConstraint error, got: {:?}", other),
-            }
+            let result = encode_events_to_arrow_ipc_stream(&events, schema);
+            assert!(matches!(
+                result.unwrap_err(),
+                ArrowEncodingError::NullConstraint { field_name } if field_name == "required_field"
+            ));
         }
     }
 
