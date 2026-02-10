@@ -508,7 +508,6 @@ default-cmake = ["api", "api-client", "enrichment-tables", "sinks", "sources", "
 default-msvc =          ["api", "api-client", "enrichment-tables", "sinks", "sources", "transforms", "secrets",                                                       "rdkafka?/cmake_build"]
 default-musl =          ["api", "api-client", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "sources-dnstap", "unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build"]
 default-no-api-client = ["api",               "enrichment-tables", "sinks", "sources", "transforms", "secrets", "sources-dnstap", "unix", "rdkafka?/gssapi-vendored"]
-default-no-vrl-cli =    ["api",                                    "sinks", "sources", "transforms", "secrets", "sources-dnstap", "unix", "rdkafka?/gssapi-vendored"]
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
 # Enables the binary secret-backend-example
