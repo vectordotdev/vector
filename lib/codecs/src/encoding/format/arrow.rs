@@ -96,10 +96,8 @@ pub struct ArrowStreamSerializer {
 
 impl ArrowStreamSerializer {
     /// Create a new ArrowStreamSerializer with the given configuration
-    pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, vector_common::Error> {
-        let schema = config
-            .schema
-            .ok_or_else(|| vector_common::Error::from("Arrow serializer requires a schema."))?;
+    pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, ArrowEncodingError> {
+        let schema = config.schema.ok_or(ArrowEncodingError::MissingSchema)?;
 
         // If allow_nullable_fields is enabled, transform the schema once here
         // instead of on every batch encoding
@@ -108,8 +106,7 @@ impl ArrowStreamSerializer {
                 .fields()
                 .iter()
                 .map(|f| make_field_nullable(f))
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| vector_common::Error::from(e.to_string()))?
+                .collect::<Result<Vec<_>, _>>()?
                 .into();
             Schema::new_with_metadata(nullable_fields, schema.metadata().clone())
         } else {
@@ -171,6 +168,10 @@ pub enum ArrowEncodingError {
         /// The field name
         field_name: String,
     },
+
+    /// Arrow serializer requires a schema
+    #[snafu(display("Arrow serializer requires a schema"))]
+    MissingSchema,
 
     /// IO error during encoding
     #[snafu(display("IO error: {}", source), context(false))]
