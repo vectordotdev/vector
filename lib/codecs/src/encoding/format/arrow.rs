@@ -319,14 +319,8 @@ fn validate_non_nullable_fields(
     events: &[Event],
     schema: &SchemaRef,
 ) -> Result<(), ArrowEncodingError> {
-    let required_fields: Vec<&str> = schema
-        .fields()
-        .iter()
-        .filter(|f| !f.is_nullable())
-        .map(|f| f.name().as_str())
-        .collect();
-
-    for name in required_fields {
+    for field in schema.fields().iter().filter(|f| !f.is_nullable()) {
+        let name = field.name().as_str();
         if events
             .iter()
             .filter_map(Event::maybe_as_log)
