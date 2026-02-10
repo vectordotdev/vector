@@ -14,7 +14,7 @@ use arrow::{
 };
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
-use snafu::{ResultExt, Snafu};
+use snafu::{ensure, ResultExt, Snafu};
 use std::sync::Arc;
 use vector_config::configurable_component;
 use vector_core::event::Event;
@@ -230,18 +230,20 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
         DataType::Map(inner, sorted) => {
             // A Map's inner field is a "entries" Struct<Key, Value>
             let DataType::Struct(fields) = inner.data_type() else {
-                return Err(ArrowEncodingError::InvalidMapSchema {
-                    field_name: field.name().to_string(),
+                return InvalidMapSchemaSnafu {
+                    field_name: field.name(),
                     reason: format!("inner type must be Struct, found {:?}", inner.data_type()),
-                });
+                }
+                .fail();
             };
 
-            if fields.len() != 2 {
-                return Err(ArrowEncodingError::InvalidMapSchema {
-                    field_name: field.name().to_string(),
+            ensure!(
+                fields.len() == 2,
+                InvalidMapSchemaSnafu {
+                    field_name: field.name(),
                     reason: format!("expected 2 fields (key, value), found {}", fields.len()),
-                });
-            }
+                },
+            );
             let key_field = &fields[0];
             let value_field = &fields[1];
 
@@ -321,15 +323,13 @@ fn validate_non_nullable_fields(
 ) -> Result<(), ArrowEncodingError> {
     for field in schema.fields().iter().filter(|f| !f.is_nullable()) {
         let name = field.name().as_str();
-        if events
-            .iter()
-            .filter_map(Event::maybe_as_log)
-            .any(|log| log.get(lookup::event_path!(name)).is_none())
-        {
-            return Err(ArrowEncodingError::NullConstraint {
-                field_name: name.to_string(),
-            });
-        }
+        ensure!(
+            !events
+                .iter()
+                .filter_map(Event::maybe_as_log)
+                .any(|log| log.get(lookup::event_path!(name)).is_none()),
+            NullConstraintSnafu { field_name: name },
+        );
     }
     Ok(())
 }
