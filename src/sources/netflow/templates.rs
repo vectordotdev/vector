@@ -89,11 +89,20 @@ impl CacheStats {
 }
 
 /// Minimal template cache for NetFlow v5. No templates are stored; the cache is a no-op.
-#[derive(Clone)]
 pub struct TemplateCache {
     max_size: usize,
-    max_buffered_records: usize,
+    _max_buffered_records: usize,
     stats: Arc<RwLock<CacheStats>>,
+}
+
+impl Clone for TemplateCache {
+    fn clone(&self) -> Self {
+        Self {
+            max_size: self.max_size,
+            _max_buffered_records: self._max_buffered_records,
+            stats: Arc::clone(&self.stats),
+        }
+    }
 }
 
 impl TemplateCache {
@@ -104,7 +113,7 @@ impl TemplateCache {
     pub fn new_with_buffering(max_size: usize, max_buffered_records: usize) -> Self {
         Self {
             max_size,
-            max_buffered_records,
+            _max_buffered_records: max_buffered_records,
             stats: Arc::new(RwLock::new(CacheStats::default())),
         }
     }
