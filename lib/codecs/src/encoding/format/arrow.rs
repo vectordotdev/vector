@@ -273,7 +273,7 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
 /// Build a decoder schema: swap Binary fields to Utf8 so arrow-json can decode
 /// Vector's UTF-8 serialized bytes (arrow-json expects hex-encoded strings for Binary).
 fn build_decoder_schema(schema: &Schema) -> Schema {
-    let fields: Vec<Field> = schema
+    let fields: Fields = schema
         .fields()
         .iter()
         .map(|f| match f.data_type() {
@@ -281,7 +281,7 @@ fn build_decoder_schema(schema: &Schema) -> Schema {
             _ => f.as_ref().clone(),
         })
         .collect();
-    Schema::new_with_metadata(Fields::from(fields), schema.metadata().clone())
+    Schema::new_with_metadata(fields, schema.metadata().clone())
 }
 
 /// Build an Arrow RecordBatch from a slice of events using the provided schema.
