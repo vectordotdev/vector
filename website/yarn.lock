@@ -3614,9 +3614,9 @@ typescript@^5.9.3:
   resolved "https://registry.yarnpkg.com/typescript/-/typescript-5.9.3.tgz#5b4f59e15310ab17a216f5d6cf53ee476ede670f"
   integrity sha512-jl1vZzPDinLr9eUt3J/t7V6FgNEw9QjvBPdysz9KfQDD41fQrC2Y4vKQdiaUpFT4bXlb1RHhLpp8wtm6M5TgSw==
 
-"typesense-sync@https://s3.amazonaws.com/origin-static-assets/corp-node-packages/reda.elissati/web-8162-upgrade-typesense-to-v30/typesense-sync-v2.0.0.tgz":
+"typesense-sync@https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v2.0.0.tgz":
   version "2.0.0"
-  resolved "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/reda.elissati/web-8162-upgrade-typesense-to-v30/typesense-sync-v2.0.0.tgz#a0ff019ded9778bc28d5b362df5a2514d77484d3"
+  resolved "https://s3.amazonaws.com/origin-static-assets/corp-node-packages/master/typesense-sync-v2.0.0.tgz#eb267fc50527ed69ce272cef03ca61017bb20f9c"
   dependencies:
     "@babel/runtime" "^7.25.0"
     dotenv "^16.4.5"
