@@ -26,8 +26,7 @@ impl LatencyRecorder {
         }
     }
 
-    pub fn on_send(&self, events: &mut EventArray) {
-        let now = Instant::now();
+    pub fn on_send(&self, events: &mut EventArray, now: Instant) {
         let mut sum = 0.0;
         let mut count = 0usize;
 

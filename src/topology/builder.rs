@@ -834,8 +834,9 @@ impl<'a> Builder<'a> {
                 for event in events.iter_events_mut() {
                     update_runtime_schema_definition(event, &output_id, &schema_definition_map);
                 }
-                latency_recorder.on_send(&mut events);
-                (events, Instant::now())
+                let now = Instant::now();
+                latency_recorder.on_send(&mut events, now);
+                (events, now)
             })
             .inspect(move |(events, _): &(EventArray, Instant)| {
                 events_sent.emit(CountByteSize(
@@ -881,16 +882,17 @@ async fn run_source_output_pump(
         send_reference,
     }) = rx.next().await
     {
+        // Even though we have a `send_reference` timestamp above, that reference time is when
+        // the events were enqueued in the `SourceSender`, not when they were pulled out of the
+        // `rx` stream on this end. Since those times can be quite different (due to blocking
+        // inherent to the fanout send operation), we set the `last_transform_timestamp` to the
+        // current time instead to get an accurate reference for when the events started waiting
+        // for the first transform.
+        let now = Instant::now();
         array.for_each_metadata_mut(|metadata| {
             metadata.set_source_id(Arc::clone(&source));
             metadata.set_source_type(source_type);
-            // Even though we have a `send_reference` timestamp here, that reference time is when
-            // the events were enqueued in the `SourceSender`, not when they were pulled out of the
-            // `rx` stream on this end. Since those times can be quite different (due to blocking
-            // inherent to the fanout send operation), we set the `last_transform_timestamp` to the
-            // current time instead to get an accurate reference for when the events started waiting
-            // for the first transform.
-            metadata.set_last_transform_timestamp(Instant::now());
+            metadata.set_last_transform_timestamp(now);
         });
         fanout
             .send(array, Some(send_reference))
@@ -1154,7 +1156,8 @@ impl Runner {
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) -> crate::Result<()> {
         self.timer_tx.try_send_start_wait();
-        outputs_buf.for_each_array_mut(|array| self.latency_recorder.on_send(array));
+        let now = Instant::now();
+        outputs_buf.for_each_array_mut(|array| self.latency_recorder.on_send(array, now));
         self.outputs.send(outputs_buf).await
     }
 
