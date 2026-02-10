@@ -37,12 +37,9 @@ pub struct NetflowConfig {
     pub template_timeout: u64,
 
 
-    /// Protocols to accept (netflow_v5, netflow_v9, ipfix, sflow).
+    /// Protocols to accept. This release supports `netflow_v5`.
     #[configurable(metadata(docs::examples = "protocols"))]
     #[configurable(metadata(docs::examples = "netflow_v5"))]
-    #[configurable(metadata(docs::examples = "netflow_v9"))]
-    #[configurable(metadata(docs::examples = "ipfix"))]
-    #[configurable(metadata(docs::examples = "sflow"))]
     #[serde(default = "default_protocols")]
     pub protocols: Vec<String>,
 
@@ -166,7 +163,7 @@ const fn default_template_timeout() -> u64 {
 }
 
 fn default_protocols() -> Vec<String> {
-    vec!["netflow_v5".to_string(), "netflow_v9".to_string(), "ipfix".to_string(), "sflow".to_string()]
+    vec!["netflow_v5".to_string()]
 }
 
 const fn default_max_buffered_records() -> usize {
