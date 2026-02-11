@@ -22,10 +22,11 @@ use vector_lib::{
         BufferType, WhenFull,
         topology::{
             builder::TopologyBuilder,
-            channel::{BufferReceiver, BufferSender, ChannelMetricMetadata},
+            channel::{BufferReceiver, BufferSender, ChannelMetricMetadata, LimitedReceiver},
         },
     },
     internal_event::{self, CountByteSize, EventsSent, InternalEventHandle as _, Registered},
+    latency::LatencyRecorder,
     schema::Definition,
     source_sender::{CHUNK_SIZE, SourceSenderItem},
     transform::update_runtime_schema_definition,
@@ -272,34 +273,13 @@ impl<'a> Builder<'a> {
             let mut schema_definitions = HashMap::with_capacity(source_outputs.len());
 
             for output in source_outputs.into_iter() {
-                let mut rx = builder.add_source_output(output.clone(), key.clone());
+                let rx = builder.add_source_output(output.clone(), key.clone());
 
-                let (mut fanout, control) = Fanout::new();
+                let (fanout, control) = Fanout::new();
                 let source_type = source.inner.get_component_name();
                 let source = Arc::new(key.clone());
 
-                let pump = async move {
-                    debug!("Source pump starting.");
-
-                    while let Some(SourceSenderItem {
-                        events: mut array,
-                        send_reference,
-                    }) = rx.next().await
-                    {
-                        array.set_output_id(&source);
-                        array.set_source_type(source_type);
-                        fanout
-                            .send(array, Some(send_reference))
-                            .await
-                            .map_err(|e| {
-                                debug!("Source pump finished with an error.");
-                                TaskError::wrapped(e)
-                            })?;
-                    }
-
-                    debug!("Source pump finished normally.");
-                    Ok(TaskOutput::Source)
-                };
+                let pump = run_source_output_pump(rx, fanout, source, source_type);
 
                 pumps.push(pump.instrument(span.clone()));
                 controls.insert(
@@ -763,7 +743,14 @@ impl<'a> Builder<'a> {
         let sender = self
             .utilization_registry
             .add_component(node.key.clone(), gauge!("utilization"));
-        let runner = Runner::new(t, input_rx, sender, node.input_details.data_type(), outputs);
+        let runner = Runner::new(
+            t,
+            input_rx,
+            sender,
+            node.input_details.data_type(),
+            outputs,
+            LatencyRecorder::new(self.config.global.latency_ewma_alpha),
+        );
         let transform = if node.enable_concurrency {
             runner.run_concurrently().boxed()
         } else {
@@ -828,6 +815,7 @@ impl<'a> Builder<'a> {
             component: key.clone(),
             port: None,
         });
+        let latency_recorder = LatencyRecorder::new(self.config.global.latency_ewma_alpha);
 
         // Task transforms can only write to the default output, so only a single schema def map is needed
         let schema_definition_map = outputs
@@ -846,7 +834,9 @@ impl<'a> Builder<'a> {
                 for event in events.iter_events_mut() {
                     update_runtime_schema_definition(event, &output_id, &schema_definition_map);
                 }
-                (events, Instant::now())
+                let now = Instant::now();
+                latency_recorder.on_send(&mut events, now);
+                (events, now)
             })
             .inspect(move |(events, _): &(EventArray, Instant)| {
                 events_sent.emit(CountByteSize(
@@ -877,6 +867,44 @@ impl<'a> Builder<'a> {
 
         (task, outputs)
     }
+}
+
+async fn run_source_output_pump(
+    mut rx: LimitedReceiver<SourceSenderItem>,
+    mut fanout: Fanout,
+    source: Arc<ComponentKey>,
+    source_type: &'static str,
+) -> TaskResult {
+    debug!("Source pump starting.");
+
+    while let Some(SourceSenderItem {
+        events: mut array,
+        send_reference,
+    }) = rx.next().await
+    {
+        // Even though we have a `send_reference` timestamp above, that reference time is when
+        // the events were enqueued in the `SourceSender`, not when they were pulled out of the
+        // `rx` stream on this end. Since those times can be quite different (due to blocking
+        // inherent to the fanout send operation), we set the `last_transform_timestamp` to the
+        // current time instead to get an accurate reference for when the events started waiting
+        // for the first transform.
+        let now = Instant::now();
+        array.for_each_metadata_mut(|metadata| {
+            metadata.set_source_id(Arc::clone(&source));
+            metadata.set_source_type(source_type);
+            metadata.set_last_transform_timestamp(now);
+        });
+        fanout
+            .send(array, Some(send_reference))
+            .await
+            .map_err(|e| {
+                debug!("Source pump finished with an error.");
+                TaskError::wrapped(e)
+            })?;
+    }
+
+    debug!("Source pump finished normally.");
+    Ok(TaskOutput::Source)
 }
 
 pub async fn reload_enrichment_tables(config: &Config) {
@@ -1093,6 +1121,7 @@ struct Runner {
     input_type: DataType,
     outputs: TransformOutputs,
     timer_tx: UtilizationComponentSender,
+    latency_recorder: LatencyRecorder,
     events_received: Registered<EventsReceived>,
 }
 
@@ -1103,6 +1132,7 @@ impl Runner {
         timer_tx: UtilizationComponentSender,
         input_type: DataType,
         outputs: TransformOutputs,
+        latency_recorder: LatencyRecorder,
     ) -> Self {
         Self {
             transform,
@@ -1110,6 +1140,7 @@ impl Runner {
             input_type,
             outputs,
             timer_tx,
+            latency_recorder,
             events_received: register!(EventsReceived),
         }
     }
@@ -1125,6 +1156,8 @@ impl Runner {
 
     async fn send_outputs(&mut self, outputs_buf: &mut TransformOutputsBuf) -> crate::Result<()> {
         self.timer_tx.try_send_start_wait();
+        let now = Instant::now();
+        outputs_buf.for_each_array_mut(|array| self.latency_recorder.on_send(array, now));
         self.outputs.send(outputs_buf).await
     }
 
