@@ -1,5 +1,5 @@
 import chalk from "chalk";
-import cheerio from "cheerio";
+import * as cheerio from "cheerio";
 import { Element } from "domhandler";
 import dotEnv from "dotenv-defaults";
 import fs from "fs";
