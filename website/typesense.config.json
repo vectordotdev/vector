@@ -15,6 +15,7 @@
             "optional": true,
             "sort": false,
             "stem": false,
+            "type": "string",
             "stem_dictionary": "",
             "store": true
           },
