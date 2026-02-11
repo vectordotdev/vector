@@ -146,15 +146,12 @@ fn basic_config_with_managed_identity() {
     assert_eq!(config.timestamp_field, "TimeGenerated");
 
     match &config.auth {
-        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::SpecificAzureCredential {
-            azure_credential_kind,
-            user_assigned_managed_identity_id: _,
-            client_assertion_tenant_id: _,
-            client_assertion_client_id: _,
-        } => {
-            assert_eq!(azure_credential_kind, "managedidentity");
+        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::Specific(
+            crate::sinks::azure_logs_ingestion::config::SpecificAzureCredential::ManagedIdentity { .. }
+        ) => {
+            // Expected variant
         }
-        _ => panic!("Expected SpecificAzureCredential variant"),
+        _ => panic!("Expected Specific(ManagedIdentity) variant"),
     }
 }
 
