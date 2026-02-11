@@ -1,15 +1,19 @@
 //! Schema fetching and Arrow schema construction for ClickHouse tables.
 
+use std::str::FromStr;
+
 use arrow::datatypes::{Field, Schema};
 use async_trait::async_trait;
 use http::{Request, StatusCode};
 use hyper::Body;
+use itertools::Itertools;
 use serde::Deserialize;
+use url::form_urlencoded;
 use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
 
 use crate::http::{Auth, HttpClient};
 
-use super::parser::clickhouse_type_to_arrow;
+use super::parser::ClickHouseType;
 
 #[derive(Debug, Deserialize)]
 struct ColumnInfo {
@@ -18,9 +22,16 @@ struct ColumnInfo {
     column_type: String,
 }
 
-/// URL-encodes a string for use in HTTP query parameters.
-fn url_encode(s: &str) -> String {
-    percent_encoding::utf8_percent_encode(s, percent_encoding::NON_ALPHANUMERIC).to_string()
+impl TryFrom<ColumnInfo> for Field {
+    type Error = Box<dyn std::error::Error + Send + Sync>;
+
+    fn try_from(column: ColumnInfo) -> Result<Self, Self::Error> {
+        let ch_type = ClickHouseType::from_str(&column.column_type)?;
+        let (dt, nullable) = (&ch_type)
+            .try_into()
+            .map_err(|e| format!("Failed to convert column '{}': {e}", column.name))?;
+        Ok(Field::new(column.name, dt, nullable))
+    }
 }
 
 /// Fetches the schema for a ClickHouse table and converts it to an Arrow schema.
@@ -38,14 +49,15 @@ pub async fn fetch_table_schema(
                  FORMAT JSONEachRow";
 
     // Build URI with query and parameters
-    let uri = format!(
-        "{}?query={}&param_db={}&param_tbl={}",
-        endpoint,
-        url_encode(query),
-        url_encode(database),
-        url_encode(table)
-    );
-    let mut request = Request::get(&uri).body(Body::empty()).unwrap();
+    let query_string = form_urlencoded::Serializer::new(String::new())
+        .append_pair("query", query)
+        .append_pair("param_db", database)
+        .append_pair("param_tbl", table)
+        .finish();
+    let uri = format!("{endpoint}?{query_string}");
+    let mut request = Request::get(&uri)
+        .body(Body::empty())
+        .map_err(|e| format!("Failed to build request: {e}"))?;
 
     if let Some(auth) = auth {
         auth.apply(&mut request);
@@ -59,40 +71,28 @@ pub async fn fetch_table_schema(
                 .await?
                 .to_bytes();
             let body_str = String::from_utf8(body_bytes.into())
-                .map_err(|e| format!("Failed to parse response as UTF-8: {}", e))?;
+                .map_err(|e| format!("Failed to parse response as UTF-8: {e}"))?;
 
             parse_schema_from_response(&body_str)
         }
-        status => Err(format!("Failed to fetch schema from ClickHouse: HTTP {}", status).into()),
+        status => Err(format!("Failed to fetch schema from ClickHouse: HTTP {status}").into()),
     }
 }
 
 /// Parses the JSON response from ClickHouse and builds an Arrow schema.
 fn parse_schema_from_response(response: &str) -> crate::Result<Schema> {
-    let mut columns: Vec<ColumnInfo> = Vec::new();
+    let mut lines = response.lines().filter(|line| !line.is_empty()).peekable();
 
-    for line in response.lines() {
-        if line.trim().is_empty() {
-            continue;
-        }
-
-        let column: ColumnInfo = serde_json::from_str(line)
-            .map_err(|e| format!("Failed to parse column info: {}", e))?;
-        columns.push(column);
+    if lines.peek().is_none() {
+        return Err("Table does not exist or has no columns".into());
     }
 
-    if columns.is_empty() {
-        return Err("No columns found in table schema".into());
-    }
-
-    let mut fields = Vec::new();
-    for column in columns {
-        let (arrow_type, nullable) = clickhouse_type_to_arrow(&column.column_type)
-            .map_err(|e| format!("Failed to convert column '{}': {}", column.name, e))?;
-        fields.push(Field::new(&column.name, arrow_type, nullable));
-    }
-
-    Ok(Schema::new(fields))
+    lines
+        .map(|line| -> crate::Result<Field> {
+            serde_json::from_str::<ColumnInfo>(line)?.try_into()
+        })
+        .try_collect::<_, Vec<Field>, _>()
+        .map(Schema::new)
 }
 
 /// Schema provider implementation for ClickHouse tables.

@@ -273,22 +273,27 @@ components: sources: internal_metrics: {
 				reason: _reason
 			}
 		}
-		event_processing_time_seconds: {
+		component_latency_seconds: {
 			description: """
-				The elapsed time, in fractional seconds, between when a source ingests an event and when a sink receives it.
+				The elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
 				"""
 			type:              "histogram"
 			default_namespace: "vector"
-			tags:              _processing_time_tags
+			tags:              _internal_metrics_tags
 		}
-		event_processing_time_mean_seconds: {
+		component_latency_mean_seconds: {
 			description: """
-				The mean elapsed time, in fractional seconds, between when a source ingests an event and when a sink receives it.
+				The mean elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
+
 				This value is smoothed over time using an exponentially weighted moving average (EWMA).
 				"""
 			type:              "gauge"
 			default_namespace: "vector"
-			tags:              _processing_time_tags
+			tags:              _internal_metrics_tags
 		}
 		buffer_byte_size: {
 			description:        "The number of bytes currently in the buffer."
@@ -1116,10 +1121,6 @@ components: sources: internal_metrics: {
 			component_id:   _component_id
 			component_type: _component_type
 		}
-		_processing_time_tags: _internal_metrics_tags & {
-			sink_component_id:   _sink_component_id
-			source_component_id: _source_component_id
-		}
 
 		// All available tags
 		_collector: {
@@ -1144,16 +1145,6 @@ components: sources: internal_metrics: {
 			description: "The Vector component type."
 			required:    true
 			examples: ["file", "http", "honeycomb", "splunk_hec"]
-		}
-		_sink_component_id: {
-			description: "The sink component ID that emitted the event."
-			required:    true
-			examples: ["out_http", "out_console"]
-		}
-		_source_component_id: {
-			description: "The source component ID that originally ingested the event."
-			required:    true
-			examples: ["in_kafka", "in_file"]
 		}
 		_endpoint: {
 			description: "The absolute path of originating file."
