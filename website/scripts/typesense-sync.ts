@@ -1,6 +1,6 @@
 import process from 'node:process';
 import { typesenseSync } from 'typesense-sync';
-const configFilePath = '../typesense.config.json';
+const configFilePath = './typesense.config.json';
 
 const config = {
   configFilePath,
