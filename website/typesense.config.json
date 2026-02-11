@@ -15,9 +15,7 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string",
-            "stem_dictionary": "",
-            "store": true
+            "type": "string"
           },
           {
             "facet": false,
@@ -28,9 +26,7 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string",
-            "stem_dictionary": "",
-            "store": true
+            "type": "string"
           },
           {
             "facet": false,
@@ -41,9 +37,7 @@
             "optional": true,
             "sort": true,
             "stem": false,
-            "type": "int64",
-            "stem_dictionary": "",
-            "store": true
+            "type": "int64"
           },
           {
             "facet": false,
@@ -54,9 +48,7 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string",
-            "stem_dictionary": "",
-            "store": true
+            "type": "string"
           },
           {
             "facet": false,
@@ -67,9 +59,7 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string",
-            "stem_dictionary": "",
-            "store": true
+            "type": "string"
           },
           {
             "facet": false,
@@ -80,9 +70,7 @@
             "optional": true,
             "sort": true,
             "stem": false,
-            "type": "int64",
-            "stem_dictionary": "",
-            "store": true
+            "type": "int64"
           },
           {
             "facet": false,
@@ -93,9 +81,7 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string",
-            "stem_dictionary": "",
-            "store": true
+            "type": "string"
           },
           {
             "facet": false,
@@ -106,9 +92,7 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string[]",
-            "stem_dictionary": "",
-            "store": true
+            "type": "string[]"
           },
           {
             "facet": false,
@@ -119,9 +103,7 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string",
-            "stem_dictionary": "",
-            "store": true
+            "type": "string"
           },
           {
             "facet": false,
@@ -132,9 +114,7 @@
             "optional": true,
             "sort": false,
             "stem": false,
-            "type": "string[]",
-            "stem_dictionary": "",
-            "store": true
+            "type": "string[]"
           }
         ]
       },
