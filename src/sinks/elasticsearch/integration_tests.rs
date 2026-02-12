@@ -31,6 +31,12 @@ use crate::{
     tls::{self, TlsConfig},
 };
 
+const INITIAL_ADMIN_PASSWORD: &str = "Vector2026!";
+
+fn http_username() -> String {
+    std::env::var("ELASTICSEARCH_USERNAME").unwrap_or_else(|_| "elastic".into())
+}
+
 fn aws_server() -> String {
     std::env::var("ELASTICSEARCH_AWS_ADDRESS").unwrap_or_else(|_| "http://localhost:4571".into())
 }
@@ -271,8 +277,8 @@ async fn auto_version_https() {
 
     let config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuthConfig::Basic {
-            user: "elastic".to_string(),
-            password: "vector".to_string().into(),
+            user: http_username(),
+            password: INITIAL_ADMIN_PASSWORD.to_string().into(),
         }),
         endpoints: vec![https_server()],
         doc_type: "log_lines".to_string(),
@@ -376,8 +382,8 @@ async fn insert_events_over_https() {
     run_insert_tests(
         ElasticsearchConfig {
             auth: Some(ElasticsearchAuthConfig::Basic {
-                user: "elastic".to_string(),
-                password: "vector".to_string().into(),
+                user: http_username(),
+                password: INITIAL_ADMIN_PASSWORD.to_string().into(),
             }),
             endpoints: vec![https_server()],
             doc_type: "log_lines".into(),
@@ -522,8 +528,8 @@ async fn distributed_insert_events() {
     // Assumes that behind https_server and http_server addresses lies the same server
     let mut config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuthConfig::Basic {
-            user: "elastic".into(),
-            password: "vector".to_string().into(),
+            user: http_username(),
+            password: INITIAL_ADMIN_PASSWORD.to_string().into(),
         }),
         endpoints: vec![https_server(), http_server()],
         doc_type: "log_lines".into(),
@@ -548,8 +554,8 @@ async fn distributed_insert_events_failover() {
 
     let mut config = ElasticsearchConfig {
         auth: Some(ElasticsearchAuthConfig::Basic {
-            user: "elastic".into(),
-            password: "vector".to_string().into(),
+            user: http_username(),
+            password: INITIAL_ADMIN_PASSWORD.to_string().into(),
         }),
         // Valid endpoints and some random non elasticsearch endpoint
         endpoints: vec![
@@ -681,7 +687,7 @@ async fn run_insert_tests_with_config(
     let client = create_http_client();
     let mut response = client
         .get(format!("{base_url}/{index}/_search"))
-        .basic_auth("elastic", Some("vector"))
+        .basic_auth(http_username(), Some(INITIAL_ADMIN_PASSWORD))
         .json(&json!({
             "query": { "query_string": { "query": "*" } }
         }))
@@ -770,7 +776,7 @@ async fn run_insert_tests_with_multiple_endpoints(config: &ElasticsearchConfig) 
     for base_url in base_urls {
         if let Ok(response) = client
             .get(format!("{base_url}/{index}/_search"))
-            .basic_auth("elastic", Some("vector"))
+            .basic_auth(http_username(), Some(INITIAL_ADMIN_PASSWORD))
             .json(&json!({
                 "query": { "query_string": { "query": "*" } }
             }))
