@@ -1,4 +1,5 @@
 use std::{collections::BTreeMap, sync::LazyLock};
+use vector_vrl_category::Category;
 use vrl::prelude::expression::Expr;
 
 use vrl::prelude::*;
@@ -56,6 +57,10 @@ impl Function for FindVectorMetrics {
             "Searches internal Vector metrics by name and optionally by tags. Returns all matching metrics.\n\n",
             crate::VECTOR_METRICS_EXPLAINER
         )
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Metrics.as_ref()
     }
 
     fn return_kind(&self) -> u16 {
