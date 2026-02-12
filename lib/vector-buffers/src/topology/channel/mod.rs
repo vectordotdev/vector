@@ -3,10 +3,11 @@ mod receiver;
 mod sender;
 
 pub use limited_queue::{
-    ChannelMetricMetadata, DEFAULT_EWMA_ALPHA, LimitedReceiver, LimitedSender, SendError, limited,
+    ChannelMetricMetadata, LimitedReceiver, LimitedSender, SendError, limited,
 };
 pub use receiver::*;
 pub use sender::*;
+pub use vector_common::stats::DEFAULT_EWMA_ALPHA;
 
 #[cfg(test)]
 mod tests;

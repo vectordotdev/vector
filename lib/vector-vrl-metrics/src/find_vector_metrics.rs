@@ -30,6 +30,13 @@ impl Function for FindVectorMetrics {
         "find_vector_metrics"
     }
 
+    fn usage(&self) -> &'static str {
+        const_str::concat!(
+            "Searches internal Vector metrics by name and optionally by tags. Returns all matching metrics.\n\n",
+            crate::VECTOR_METRICS_EXPLAINER
+        )
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {

@@ -2708,9 +2708,9 @@ lodash.uniq@^4.5.0:
   integrity sha512-xfBaXQd9ryd9dlSDvnvI0lvxfLJlYAZzXomUYzLKtUeOQvOP5piqAWuGtrhWeqaXK9hhoM/iyJc5AV+XfsX3HQ==
 
 lodash@^4.17.21:
-  version "4.17.21"
-  resolved "https://registry.npmjs.org/lodash/-/lodash-4.17.21.tgz"
-  integrity sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==
+  version "4.17.23"
+  resolved "https://registry.yarnpkg.com/lodash/-/lodash-4.17.23.tgz#f113b0378386103be4f6893388c73d0bde7f2c5a"
+  integrity sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w==
 
 logform@^2.6.0, logform@^2.6.1:
   version "2.6.1"
@@ -3053,9 +3053,9 @@ postcss@^8.1.6, postcss@^8.3.5:
     source-map-js "^1.2.1"
 
 preact@^10.13.2:
-  version "10.28.0"
-  resolved "https://registry.yarnpkg.com/preact/-/preact-10.28.0.tgz#a851300df42842797046545e4172a4128d158755"
-  integrity sha512-rytDAoiXr3+t6OIP3WGlDd0ouCUG1iCWzkcY3++Nreuoi17y6T5i/zRhe6uYfoVcxq6YU+sBtJouuRDsq8vvqA==
+  version "10.28.2"
+  resolved "https://registry.yarnpkg.com/preact/-/preact-10.28.2.tgz#4b668383afa4b4a2546bbe4bd1747e02e2360138"
+  integrity sha512-lbteaWGzGHdlIuiJ0l2Jq454m6kcpI1zNje6d8MlGAFlYvP2GO4ibnat7P74Esfz4sPTdM6UxtTwh/d3pwM9JA==
 
 prettier-plugin-go-template@^0.0.15:
   version "0.0.15"
