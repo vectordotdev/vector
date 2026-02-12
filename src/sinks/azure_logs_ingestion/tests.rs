@@ -198,14 +198,17 @@ async fn correct_request() {
         let endpoint_tx = endpoint_tx.clone();
         async move {
             endpoint_tx.send(request).await.unwrap();
-            Ok(Response::new(hyper::Body::empty()))
+            Ok(Response::builder()
+                .status(204)
+                .body(hyper::Body::empty())
+                .unwrap())
         }
     })
     .await;
 
     let context = SinkContext::default();
 
-    let (sink, _healthcheck) = config
+    let (sink, healthcheck) = config
         .build_inner(
             context,
             mock_endpoint.into(),
@@ -244,6 +247,8 @@ async fn correct_request() {
         }
     ]);
     assert_eq!(body_json, expected_json);
+
+    let _healthcheck_message = healthcheck.await.expect("Healthcheck failed");
 
     let headers = parts.headers;
     let authorization = headers.get("Authorization").unwrap();
