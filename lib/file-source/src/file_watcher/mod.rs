@@ -78,11 +78,8 @@ pub struct FileWatcher {
     line_delimiter: Bytes,
     buf: BytesMut,
     /// The file size when the watcher was created. Used to calculate
-    /// bytes remaining when the file is unwatched.
+    /// bytes dropped when the file is unwatched.
     initial_file_size: u64,
-    /// The file position when the watcher started reading. This differs from 0
-    /// when resuming from a checkpoint or when `read_from: end` is configured.
-    initial_file_position: FilePosition,
 }
 
 impl FileWatcher {
@@ -195,7 +192,6 @@ impl FileWatcher {
             line_delimiter,
             buf: BytesMut::new(),
             initial_file_size,
-            initial_file_position: file_position,
         })
     }
 
@@ -204,9 +200,6 @@ impl FileWatcher {
     /// If the file at the new path has a different inode, this indicates the file
     /// was replaced (not just renamed). In this case, returns `FileUnwatchInfo`
     /// containing metrics about the old file so the caller can emit appropriate events.
-    ///
-    /// When an inode change occurs, the tracking metrics (initial_file_size,
-    /// initial_file_position) are reset for the new file.
     pub async fn update_path(&mut self, path: PathBuf) -> io::Result<Option<FileUnwatchInfo>> {
         let file_handle = File::open(&path).await?;
 
@@ -219,41 +212,21 @@ impl FileWatcher {
 
             let mut reader = BufReader::new(File::open(&path).await?);
             let gzipped = is_gzipped(&mut reader).await?;
-
-            // Get new file metadata for tracking
-            let new_file_size = file_handle.metadata().await?.len();
-
-            let (new_reader, new_position): (Box<dyn AsyncBufRead + Send + Unpin>, FilePosition) =
-                if gzipped {
-                    if self.file_position != 0 {
-                        // Can't seek in gzipped file, use null reader
-                        (Box::new(null_reader()), self.file_position)
-                    } else {
-                        (Box::new(BufReader::new(GzipDecoder::new(reader))), 0)
-                    }
+            let new_reader: Box<dyn AsyncBufRead + Send + Unpin> = if gzipped {
+                if self.file_position != 0 {
+                    Box::new(null_reader())
                 } else {
-                    // For the new file, seek to stored position if possible
-                    let seek_pos = if self.file_position <= new_file_size {
-                        self.file_position
-                    } else {
-                        // New file is smaller than our position, start from end
-                        new_file_size
-                    };
-                    reader.seek(io::SeekFrom::Start(seek_pos)).await?;
-                    (Box::new(reader), seek_pos)
-                };
-
+                    Box::new(BufReader::new(GzipDecoder::new(reader)))
+                }
+            } else {
+                reader.seek(io::SeekFrom::Start(self.file_position)).await?;
+                Box::new(reader)
+            };
             self.reader = new_reader;
 
             let file_info = file_handle.file_info().await?;
             self.devno = file_info.portable_dev();
             self.inode = file_info.portable_ino();
-
-            // Reset tracking for the new file
-            self.initial_file_size = new_file_size;
-            self.initial_file_position = new_position;
-            self.file_position = new_position;
-            self.reached_eof = false;
 
             Some(old_info)
         } else {
