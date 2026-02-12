@@ -11,9 +11,10 @@
 // Okta source only imports defaults but doesn't use the rest of the client
 #![cfg_attr(feature = "sources-okta", allow(dead_code))]
 
-use std::{collections::HashMap, future::ready, time::Duration};
+use std::{collections::HashMap, future::ready, io::Read as _, time::Duration};
 
 use bytes::Bytes;
+use flate2::read::MultiGzDecoder;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
 use http::{Uri, response::Parts};
 use hyper::{Body, Request, Response};
@@ -132,8 +133,30 @@ pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
         .expect("Failed to build URI from parsed arguments")
 }
 
-/// Maximum number of HTTP redirects to follow per request
+/// Maximum number of HTTP redirects to follow per request.
 const MAX_REDIRECTS: usize = 10;
+
+/// Decompress a response body based on the Content-Encoding header.
+fn maybe_decompress(header: &Parts, body: Bytes) -> Bytes {
+    let encoding = header
+        .headers
+        .get(http::header::CONTENT_ENCODING)
+        .and_then(|v| v.to_str().ok());
+
+    match encoding {
+        Some("gzip" | "x-gzip") => {
+            let mut decoded = Vec::new();
+            match MultiGzDecoder::new(&body[..]).read_to_end(&mut decoded) {
+                Ok(_) => Bytes::from(decoded),
+                Err(error) => {
+                    warn!(message = "Failed to decompress gzip response, using raw body.", %error);
+                    body
+                }
+            }
+        }
+        _ => body,
+    }
+}
 
 /// Sends an HTTP request, following redirects up to `MAX_REDIRECTS` times.
 ///
@@ -283,10 +306,7 @@ pub(crate) async fn call<
             // building the request should be infallible
             let request = builder.body(body).expect("error creating request");
 
-            tokio::time::timeout(
-                inputs.timeout,
-                send_with_redirects(client, request, auth),
-            )
+            tokio::time::timeout(inputs.timeout, send_with_redirects(client, request, auth))
                 .then(move |result| async move {
                     match result {
                         Ok(Ok(response)) => Ok(response),
@@ -300,7 +320,8 @@ pub(crate) async fn call<
                 })
                 .and_then(|response| async move {
                     let (header, body) = response.into_parts();
-                    let body = http_body::Body::collect(body).await?.to_bytes();
+                    let raw = http_body::Body::collect(body).await?.to_bytes();
+                    let body = maybe_decompress(&header, raw);
                     emit!(EndpointBytesReceived {
                         byte_size: body.len(),
                         protocol: "http",
