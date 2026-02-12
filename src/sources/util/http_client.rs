@@ -16,7 +16,7 @@ use std::{collections::HashMap, future::ready, time::Duration};
 use bytes::Bytes;
 use futures_util::{FutureExt, StreamExt, TryFutureExt, stream};
 use http::{Uri, response::Parts};
-use hyper::{Body, Request};
+use hyper::{Body, Request, Response};
 use tokio_stream::wrappers::IntervalStream;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, config::proxy::ProxyConfig, event::Event, json_size::JsonSize,
@@ -132,6 +132,74 @@ pub(crate) fn build_url(uri: &Uri, query: &QueryParameters) -> Uri {
         .expect("Failed to build URI from parsed arguments")
 }
 
+/// Maximum number of HTTP redirects to follow per request
+const MAX_REDIRECTS: usize = 10;
+
+/// Sends an HTTP request, following redirects up to `MAX_REDIRECTS` times.
+///
+/// For 301/302 redirects the method is changed to GET (per RFC 7231).
+/// For 307/308 redirects the original method is preserved.
+/// The `Host` header is stripped on redirect to allow hyper to set it correctly.
+async fn send_with_redirects(
+    client: HttpClient,
+    request: Request<Body>,
+    auth: Option<Auth>,
+) -> Result<Response<Body>, crate::Error> {
+    // extract the parts we need to reconstruct requests on redirect
+    let (parts, body) = request.into_parts();
+    let mut method = parts.method;
+    let mut uri = parts.uri;
+    let mut headers = parts.headers;
+    let mut body = Some(body);
+
+    for _i in 0..=MAX_REDIRECTS {
+        let mut builder = Request::builder().method(&method).uri(&uri);
+        for (key, value) in &headers {
+            builder = builder.header(key, value);
+        }
+
+        let mut req = builder
+            .body(body.take().unwrap_or_default())
+            .map_err(|e| format!("error building request: {e}"))?;
+
+        if let Some(ref auth) = auth {
+            auth.apply(&mut req);
+        }
+
+        let response = client.send(req).await?;
+
+        if !response.status().is_redirection() {
+            return Ok(response);
+        }
+
+        let location = response
+            .headers()
+            .get(http::header::LOCATION)
+            .and_then(|v| v.to_str().ok())
+            .ok_or("redirect response missing Location header")?
+            .to_string();
+
+        uri = location
+            .parse()
+            .map_err(|e| format!("invalid redirect Location: {e}"))?;
+
+        // 307/308 preserve the original method; 301/302 switch to GET
+        if response.status() != hyper::StatusCode::TEMPORARY_REDIRECT
+            && response.status() != hyper::StatusCode::PERMANENT_REDIRECT
+        {
+            method = http::Method::GET;
+        }
+
+        // drop Host so hyper sets it for the new URI
+        headers.remove(http::header::HOST);
+
+        // redirect body is always empty
+        body = Some(Body::empty());
+    }
+
+    Err("too many redirects".into())
+}
+
 /// Warns if the scrape timeout is greater than the scrape interval.
 pub(crate) fn warn_if_interval_too_low(timeout: Duration, interval: Duration) {
     if timeout > interval {
@@ -166,6 +234,7 @@ pub(crate) async fn call<
         .flatten()
         .map(move |base_url| {
             let client = client.clone();
+            let auth = inputs.auth.clone();
             let endpoint = base_url.to_string();
 
             let context_builder = context_builder.clone();
@@ -212,13 +281,12 @@ pub(crate) async fn call<
             };
 
             // building the request should be infallible
-            let mut request = builder.body(body).expect("error creating request");
+            let request = builder.body(body).expect("error creating request");
 
-            if let Some(auth) = &inputs.auth {
-                auth.apply(&mut request);
-            }
-
-            tokio::time::timeout(inputs.timeout, client.send(request))
+            tokio::time::timeout(
+                inputs.timeout,
+                send_with_redirects(client, request, auth),
+            )
                 .then(move |result| async move {
                     match result {
                         Ok(Ok(response)) => Ok(response),
