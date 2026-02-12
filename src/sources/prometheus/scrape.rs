@@ -102,7 +102,9 @@ pub struct PrometheusScrapeConfig {
     ///
     /// One or more values for the same header can be provided.
     #[serde(default)]
-    #[configurable(metadata(docs::additional_props_description = "An HTTP request header and its value(s)."))]
+    #[configurable(metadata(
+        docs::additional_props_description = "An HTTP request header and its value(s)."
+    ))]
     #[configurable(metadata(docs::examples = "headers_example()"))]
     #[configurable(metadata(docs::advanced))]
     headers: HashMap<String, Vec<String>>,
@@ -113,10 +115,7 @@ pub struct PrometheusScrapeConfig {
 }
 
 fn headers_example() -> HashMap<String, Vec<String>> {
-    HashMap::<_, _>::from_iter([(
-        "Accept".to_owned(),
-        vec!["text/plain".to_owned()],
-    )])
+    HashMap::<_, _>::from_iter([("Accept".to_owned(), vec!["text/plain".to_owned()])])
 }
 
 fn query_example() -> serde_json::Value {
@@ -166,11 +165,17 @@ impl SourceConfig for PrometheusScrapeConfig {
 
         warn_if_interval_too_low(self.timeout, self.interval);
 
+        // default Accept-Encoding to gzip like prometheus does, unless overridden
+        let mut headers = self.headers.clone();
+        headers
+            .entry(http::header::ACCEPT_ENCODING.as_str().to_string())
+            .or_insert_with(|| vec!["gzip".to_string()]);
+
         let inputs = GenericHttpClientInputs {
             urls,
             interval: self.interval,
             timeout: self.timeout,
-            headers: self.headers.clone(),
+            headers,
             content_type: "text/plain".to_string(),
             auth: self.auth.clone(),
             tls,
@@ -402,10 +407,7 @@ mod test {
 
         // endpoint requires a custom header
         let dummy_endpoint = warp::path!("metrics")
-            .and(warp::header::exact(
-                "X-Custom-Header",
-                "custom-value",
-            ))
+            .and(warp::header::exact("X-Custom-Header", "custom-value"))
             .map(|| {
                 r#"
                     custom_metric{code="200"} 42 1612411516789
@@ -492,6 +494,56 @@ mod test {
 
         let metric = events[0].as_metric();
         assert_eq!(metric.name(), "redirected_metric");
+    }
+
+    #[tokio::test]
+    async fn test_prometheus_gzip_response() {
+        use flate2::{Compression, write::GzEncoder};
+        use std::io::Write;
+
+        let (_guard, in_addr) = next_addr();
+
+        let dummy_endpoint = warp::path!("metrics")
+            .and(warp::header::exact("accept-encoding", "gzip"))
+            .map(|| {
+                let body = b"gzip_metric{code=\"200\"} 77 1612411516789\n";
+                let mut encoder = GzEncoder::new(Vec::new(), Compression::fast());
+                encoder.write_all(body).unwrap();
+                let compressed = encoder.finish().unwrap();
+
+                http::Response::builder()
+                    .header("content-type", "text/plain")
+                    .header("content-encoding", "gzip")
+                    .body(compressed)
+                    .unwrap()
+            });
+
+        tokio::spawn(warp::serve(dummy_endpoint).run(in_addr));
+        wait_for_tcp(in_addr).await;
+
+        let config = PrometheusScrapeConfig {
+            endpoints: vec![format!("http://{}/metrics", in_addr)],
+            interval: Duration::from_secs(1),
+            timeout: default_timeout(),
+            instance_tag: None,
+            endpoint_tag: None,
+            honor_labels: false,
+            query: HashMap::new(),
+            headers: HashMap::new(),
+            auth: None,
+            tls: None,
+        };
+
+        let events = run_and_assert_source_compliance(
+            config,
+            Duration::from_secs(3),
+            &HTTP_PULL_SOURCE_TAGS,
+        )
+        .await;
+        assert!(!events.is_empty());
+
+        let metric = events[0].as_metric();
+        assert_eq!(metric.name(), "gzip_metric");
     }
 
     #[tokio::test]
