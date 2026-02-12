@@ -612,7 +612,7 @@ impl ConsumerStateInner<Consuming> {
             // Track the last successfully committed offset for this partition.
             // Initialize to None - will be set to the first message's offset - 1 when we consume the first message.
             // This ensures we can always seek back, even for the first message.
-            let mut last_committed_offset: Option<i64> = None;
+            let mut last_committed_offset = None;
 
             // Track if we need to seek back due to a rejected message
             let mut need_seek_back = false;
