@@ -1,5 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::LazyLock;
+use vector_vrl_category::Category;
 use vrl::prelude::expression::Expr;
 use vrl::value;
 
@@ -80,6 +81,10 @@ impl Function for AggregateVectorMetrics {
             "Aggregates internal Vector metrics, using one of 4 aggregation functions, filtering by name and optionally by tags. Returns the aggregated value. Only includes counter and gauge metrics.\n\n",
             crate::VECTOR_METRICS_EXPLAINER
         )
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Metrics.as_ref()
     }
 
     fn return_kind(&self) -> u16 {

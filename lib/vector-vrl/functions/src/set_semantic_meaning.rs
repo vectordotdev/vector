@@ -3,6 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use vector_vrl_category::Category;
 use vrl::{
     diagnostic::Label,
     path::{OwnedTargetPath, PathPrefix},
@@ -44,6 +45,10 @@ impl Function for SetSemanticMeaning {
             cannot be conditionally called. For example, using an if statement cannot stop the meaning
             from being assigned.
         "}
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Event.as_ref()
     }
 
     fn return_kind(&self) -> u16 {

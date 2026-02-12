@@ -14,3 +14,4 @@ vector-core = { path = "../vector-core", default-features = false, features = ["
 vector-common = { path = "../vector-common", default-features = false }
 tokio.workspace = true
 tokio-stream.workspace = true
+vector-vrl-category.workspace = true
