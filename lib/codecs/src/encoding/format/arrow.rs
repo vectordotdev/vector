@@ -5,8 +5,6 @@
 //! a continuous stream of record batches without a file footer.
 
 use arrow::{
-    array::ArrayRef,
-    compute::{CastOptions, cast_with_options},
     datatypes::{DataType, Field, Fields, Schema, SchemaRef},
     ipc::writer::StreamWriter,
     json::reader::{Decoder, ReaderBuilder},
@@ -14,7 +12,7 @@ use arrow::{
 };
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
-use snafu::{ensure, ResultExt, Snafu};
+use snafu::{ResultExt, Snafu, ensure};
 use std::sync::Arc;
 use vector_config::configurable_component;
 use vector_core::event::Event;
@@ -270,20 +268,6 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
         .with_nullable(true))
 }
 
-/// Build a decoder schema: swap Binary fields to Utf8 so arrow-json can decode
-/// Vector's UTF-8 serialized bytes (arrow-json expects hex-encoded strings for Binary).
-fn build_decoder_schema(schema: &Schema) -> Schema {
-    let fields: Fields = schema
-        .fields()
-        .iter()
-        .map(|f| match f.data_type() {
-            DataType::Binary => f.as_ref().clone().with_data_type(DataType::Utf8),
-            _ => f.as_ref().clone(),
-        })
-        .collect();
-    Schema::new_with_metadata(fields, schema.metadata().clone())
-}
-
 /// Build an Arrow RecordBatch from a slice of events using the provided schema.
 fn build_record_batch(
     schema: SchemaRef,
@@ -292,29 +276,11 @@ fn build_record_batch(
     // Pre-validate non-nullable fields (arrow-json silently writes defaults for missing fields)
     validate_non_nullable_fields(events, &schema)?;
 
-    let decoder_schema = build_decoder_schema(&schema);
-    let decoder = ReaderBuilder::new(Arc::new(decoder_schema))
+    let decoder = ReaderBuilder::new(Arc::clone(&schema))
         .build_decoder()
         .context(RecordBatchCreationSnafu)?;
 
-    let batch = decode_events(decoder, events)?;
-
-    // Post-process: cast columns that were swapped for decoder compatibility
-    let columns: Result<Vec<ArrayRef>, _> = batch
-        .columns()
-        .iter()
-        .zip(schema.fields())
-        .map(|(col, field)| {
-            if col.data_type() == field.data_type() {
-                Ok(col.clone())
-            } else {
-                cast_with_options(col, field.data_type(), &CastOptions::default())
-                    .context(RecordBatchCreationSnafu)
-            }
-        })
-        .collect();
-
-    RecordBatch::try_new(schema, columns?).context(RecordBatchCreationSnafu)
+    decode_events(decoder, events)
 }
 
 /// Validate that non-nullable fields are present in all events.
@@ -346,11 +312,11 @@ fn decode_events(
         .map(|log| log.value())
         .collect();
 
-    decoder
-        .serialize(&values)
-        .context(ArrowJsonDecodeSnafu)?;
+    decoder.serialize(&values).context(ArrowJsonDecodeSnafu)?;
 
-    decoder.flush().context(ArrowJsonDecodeSnafu)?
+    decoder
+        .flush()
+        .context(ArrowJsonDecodeSnafu)?
         .ok_or(ArrowEncodingError::NoEvents)
 }
 
@@ -438,7 +404,6 @@ mod tests {
             log.insert("float32_field", 3.15);
             log.insert("float64_field", 3.15);
             log.insert("bool_field", true);
-            log.insert("bytes_field", bytes::Bytes::from("binary"));
             log.insert("timestamp_field", now);
             log.insert("decimal_field", 99.99);
             // Complex types
@@ -482,7 +447,6 @@ mod tests {
                 Field::new("float32_field", DataType::Float32, true),
                 Field::new("float64_field", DataType::Float64, true),
                 Field::new("bool_field", DataType::Boolean, true),
-                Field::new("bytes_field", DataType::Binary, true),
                 Field::new(
                     "timestamp_field",
                     DataType::Timestamp(TimeUnit::Millisecond, None),
@@ -506,29 +470,43 @@ mod tests {
             let batch = encode_and_decode(events, schema).expect("Failed to encode");
 
             assert_eq!(batch.num_rows(), 1);
-            assert_eq!(batch.num_columns(), 19);
+            assert_eq!(batch.num_columns(), 18);
 
             // Verify all primitive types
             assert_eq!(batch.column(0).as_string::<i32>().value(0), "test");
             assert_eq!(batch.column(1).as_primitive::<Int8Type>().value(0), 127);
             assert_eq!(batch.column(2).as_primitive::<Int16Type>().value(0), 32000);
-            assert_eq!(batch.column(3).as_primitive::<Int32Type>().value(0), 1000000);
+            assert_eq!(
+                batch.column(3).as_primitive::<Int32Type>().value(0),
+                1000000
+            );
             assert_eq!(batch.column(4).as_primitive::<Int64Type>().value(0), 42);
             assert_eq!(batch.column(5).as_primitive::<UInt8Type>().value(0), 255);
             assert_eq!(batch.column(6).as_primitive::<UInt16Type>().value(0), 65535);
-            assert_eq!(batch.column(7).as_primitive::<UInt32Type>().value(0), 4000000);
-            assert_eq!(batch.column(8).as_primitive::<UInt64Type>().value(0), 9000000000);
+            assert_eq!(
+                batch.column(7).as_primitive::<UInt32Type>().value(0),
+                4000000
+            );
+            assert_eq!(
+                batch.column(8).as_primitive::<UInt64Type>().value(0),
+                9000000000
+            );
             assert!((batch.column(9).as_primitive::<Float32Type>().value(0) - 3.15).abs() < 0.001);
             assert!((batch.column(10).as_primitive::<Float64Type>().value(0) - 3.15).abs() < 0.001);
             assert!(batch.column(11).as_boolean().value(0));
-            assert_eq!(batch.column(12).as_binary::<i32>().value(0), b"binary");
             assert_eq!(
-                batch.column(13).as_primitive::<TimestampMillisecondType>().value(0),
+                batch
+                    .column(12)
+                    .as_primitive::<TimestampMillisecondType>()
+                    .value(0),
                 now.timestamp_millis()
             );
-            assert_eq!(batch.column(14).as_primitive::<Decimal128Type>().value(0), 9999);
+            assert_eq!(
+                batch.column(13).as_primitive::<Decimal128Type>().value(0),
+                9999
+            );
 
-            let list_array = batch.column(15).as_list::<i32>();
+            let list_array = batch.column(14).as_list::<i32>();
             assert!(!list_array.is_null(0));
             let list_values = list_array.value(0);
             assert_eq!(list_values.len(), 3);
@@ -538,19 +516,31 @@ mod tests {
             assert_eq!(int_array.value(2), 3);
 
             // Verify struct field (unnamed)
-            let struct_array = batch.column(16).as_struct();
+            let struct_array = batch.column(15).as_struct();
             assert!(!struct_array.is_null(0));
-            assert_eq!(struct_array.column(0).as_string::<i32>().value(0), "nested_str");
-            assert_eq!(struct_array.column(1).as_primitive::<Int64Type>().value(0), 999);
+            assert_eq!(
+                struct_array.column(0).as_string::<i32>().value(0),
+                "nested_str"
+            );
+            assert_eq!(
+                struct_array.column(1).as_primitive::<Int64Type>().value(0),
+                999
+            );
 
             // Verify named struct field (named tuple)
-            let named_struct_array = batch.column(17).as_struct();
+            let named_struct_array = batch.column(16).as_struct();
             assert!(!named_struct_array.is_null(0));
-            assert_eq!(named_struct_array.column(0).as_string::<i32>().value(0), "test_category");
-            assert_eq!(named_struct_array.column(1).as_string::<i32>().value(0), "test_tag");
+            assert_eq!(
+                named_struct_array.column(0).as_string::<i32>().value(0),
+                "test_category"
+            );
+            assert_eq!(
+                named_struct_array.column(1).as_string::<i32>().value(0),
+                "test_tag"
+            );
 
             // Verify map field
-            let map_array = batch.column(18).as_map();
+            let map_array = batch.column(17).as_map();
             assert!(!map_array.is_null(0));
             let map_value = map_array.value(0);
             assert_eq!(map_value.len(), 2);
@@ -737,7 +727,9 @@ mod tests {
                 "The output schema field should have been transformed to nullable=true"
             );
 
-            let array = batch.column(0).as_primitive::<arrow::datatypes::Int64Type>();
+            let array = batch
+                .column(0)
+                .as_primitive::<arrow::datatypes::Int64Type>();
 
             assert_eq!(array.value(0), 42);
             assert!(!array.is_null(0));
