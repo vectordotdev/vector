@@ -139,12 +139,18 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
         if self.expose_lag_metrics {
             for (topic_id, topic) in &self.statistics.topics {
                 for (partition_id, partition) in &topic.partitions {
+                    // Non-owned partitions emit -1 to prevent stale lag inflation after rebalance.
+                    let lag = if partition.desired {
+                        partition.consumer_lag
+                    } else {
+                        -1
+                    };
                     gauge!(
                         "kafka_consumer_lag",
                         "topic_id" => topic_id.clone(),
                         "partition_id" => partition_id.to_string(),
                     )
-                    .set(partition.consumer_lag as f64);
+                    .set(lag as f64);
                 }
             }
         }
