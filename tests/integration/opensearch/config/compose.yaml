@@ -1,0 +1,27 @@
+services:
+  opensearch:
+    image: docker.io/opensearchproject/opensearch:${CONFIG_VERSION}
+    environment:
+      - discovery.type=single-node
+      - DISABLE_SECURITY_PLUGIN=true
+      - DISABLE_PERFORMANCE_ANALYZER_AGENT_CLI=true
+      - OPENSEARCH_JAVA_OPTS=-Xms400m -Xmx400m
+  opensearch-secure:
+    image: docker.io/opensearchproject/opensearch:${CONFIG_VERSION}
+    environment:
+      - discovery.type=single-node
+      - http.port=9201
+      - plugins.anomaly_detection.enabled=false
+      - plugins.security.ssl.http.enabled=true
+      - plugins.security.ssl.http.keystore_type=PKCS12
+      # needs to have "changeit" as keystore and key password
+      - plugins.security.ssl.http.keystore_filepath=certs/intermediate_server/private/opensearch-secure.p12
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=Vector2026!
+      - DISABLE_PERFORMANCE_ANALYZER_AGENT_CLI=true
+      - OPENSEARCH_JAVA_OPTS=-Xms400m -Xmx400m
+    volumes:
+      - ../../../data/ca:/usr/share/opensearch/config/certs:ro
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true
