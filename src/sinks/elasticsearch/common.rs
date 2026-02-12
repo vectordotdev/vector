@@ -151,6 +151,8 @@ impl ElasticsearchCommon {
                 ElasticsearchApiVersion::V6 => 6,
                 ElasticsearchApiVersion::V7 => 7,
                 ElasticsearchApiVersion::V8 => 8,
+                // Opensearch 3.x is incompatible with Elasticsearch 8.x APIs
+                ElasticsearchApiVersion::OS3 => 7,
                 ElasticsearchApiVersion::Auto => {
                     match get_version(
                         &base_url,
@@ -381,6 +383,7 @@ async fn get_version(
 ) -> crate::Result<usize> {
     #[derive(Deserialize)]
     struct Version {
+        distribution: Option<String>,
         number: Option<String>,
     }
     #[derive(Deserialize)]
@@ -405,6 +408,13 @@ async fn get_version(
     let mut body = body.collect().await?.aggregate();
     let body = body.copy_to_bytes(body.remaining());
     let ResponsePayload { version } = serde_json::from_slice(&body)?;
+    if let Some(version) = version.as_ref()
+        && let Some(distribution) = version.distribution.as_ref()
+        && distribution == "opensearch"
+    {
+        // OpenSearch versions 1.x and 2.x are compatible with Elasticsearch API version 7.x
+        return Ok(7);
+    }
     if let Some(version) = version
         && let Some(number) = version.number
     {
