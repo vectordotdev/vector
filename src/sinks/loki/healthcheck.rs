@@ -37,7 +37,7 @@ pub async fn healthcheck(
     let status = match fetch_status(&endpoint.uri, &config, &client).await? {
         // Issue https://github.com/vectordotdev/vector/issues/6463
         http::StatusCode::NOT_FOUND => {
-            error!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
+            debug!("Endpoint `/ready` not found. Retrying healthcheck with top level query.");
             fetch_status(&config.endpoint.uri, &config, &client).await?
         }
         status => status,
