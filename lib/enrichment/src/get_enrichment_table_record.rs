@@ -103,6 +103,10 @@ impl Function for GetEnrichmentTableRecord {
         ]
     }
 
+    fn return_kind(&self) -> u16 {
+        kind::OBJECT
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &PARAMETERS
     }
