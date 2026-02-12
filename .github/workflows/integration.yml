@@ -72,19 +72,19 @@ jobs:
         # If you modify this list, please also update the `int_tests` job in changes.yml.
         service: [
           "amqp", "appsignal", "axiom", "aws", "azure", "clickhouse", "databend", "datadog-agent",
-          "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "elasticsearch",
+          "datadog-logs", "datadog-metrics", "datadog-traces", "dnstap", "docker-logs", "doris", "elasticsearch",
           "eventstoredb", "fluent", "gcp", "greptimedb", "http-client", "influxdb", "kafka", "logstash",
           "loki", "mqtt", "mongodb", "nats", "nginx", "opentelemetry", "postgres", "prometheus", "pulsar",
           "redis", "webhdfs"
         ]
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: "recursive"
 
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         if: github.event_name == 'merge_group'
         with:
           name: int_tests_changes
@@ -140,12 +140,12 @@ jobs:
     timeout-minutes: 90
 
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: "recursive"
 
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         if: github.event_name == 'merge_group'
         with:
           name: e2e_tests_changes

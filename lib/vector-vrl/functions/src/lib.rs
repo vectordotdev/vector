@@ -46,5 +46,8 @@ pub fn all() -> Vec<Box<dyn Function>> {
     #[cfg(feature = "dnstap")]
     let functions = functions.chain(dnstap_parser::vrl_functions());
 
+    #[cfg(feature = "vrl-metrics")]
+    let functions = functions.chain(vector_vrl_metrics::all());
+
     functions.collect()
 }

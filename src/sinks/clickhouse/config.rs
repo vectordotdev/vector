@@ -350,14 +350,14 @@ impl ClickhouseConfig {
         endpoint: &Uri,
         database: &Template,
         auth: Option<&Auth>,
-    ) -> crate::Result<(Format, crate::codecs::EncoderKind)> {
-        use crate::codecs::EncoderKind;
+    ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind)> {
+        use vector_lib::codecs::EncoderKind;
         use vector_lib::codecs::{
             JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer,
         };
 
         if let Some(batch_encoding) = &self.batch_encoding {
-            use crate::codecs::{BatchEncoder, BatchSerializer};
+            use vector_lib::codecs::{BatchEncoder, BatchSerializer};
 
             // Validate that batch_encoding is only compatible with ArrowStream format
             if self.format != Format::ArrowStream {

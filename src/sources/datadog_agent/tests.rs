@@ -101,7 +101,7 @@ fn test_decode_log_body() {
     fn inner(msgs: Vec<LogMsg>) -> TestResult {
         let body = Bytes::from(serde_json::to_string(&msgs).unwrap());
         let api_key = None;
-        let decoder = crate::codecs::Decoder::new(
+        let decoder = vector_lib::codecs::Decoder::new(
             Framer::Bytes(BytesDecoder::new()),
             Deserializer::Bytes(BytesDeserializer),
         );
@@ -157,7 +157,7 @@ fn test_decode_log_body_parse_ddtags() {
 
     let body = Bytes::from(serde_json::to_string(&log_msgs).unwrap());
     let api_key = None;
-    let decoder = crate::codecs::Decoder::new(
+    let decoder = vector_lib::codecs::Decoder::new(
         Framer::Bytes(BytesDecoder::new()),
         Deserializer::Bytes(BytesDeserializer),
     );
@@ -194,7 +194,7 @@ fn test_decode_log_body_parse_ddtags() {
 fn test_decode_log_body_empty_object() {
     let body = Bytes::from("{}");
     let api_key = None;
-    let decoder = crate::codecs::Decoder::new(
+    let decoder = vector_lib::codecs::Decoder::new(
         Framer::Bytes(BytesDecoder::new()),
         Deserializer::Bytes(BytesDeserializer),
     );
@@ -2714,7 +2714,7 @@ async fn sketches_split_metric_namespace_false() {
 
 impl ValidatableComponent for DatadogAgentConfig {
     fn validation_configuration() -> ValidationConfiguration {
-        use crate::codecs::DecodingConfig;
+        use vector_lib::codecs::DecodingConfig;
 
         let config = DatadogAgentConfig {
             address: "0.0.0.0:9007".parse().unwrap(),

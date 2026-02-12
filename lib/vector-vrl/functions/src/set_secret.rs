@@ -21,17 +21,25 @@ impl Function for SetSecret {
         "set_secret"
     }
 
+    fn usage(&self) -> &'static str {
+        "Sets the given secret in the event."
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {
                 keyword: "key",
                 kind: kind::BYTES,
                 required: true,
+                description: "The name of the secret.",
+                default: None,
             },
             Parameter {
                 keyword: "secret",
                 kind: kind::BYTES,
                 required: true,
+                description: "The secret value.",
+                default: None,
             },
         ]
     }

@@ -6,7 +6,9 @@ edition = "2024"
 publish = false
 
 [dependencies]
-arc-swap = { version = "1.7.1", default-features = false }
+arc-swap.workspace = true
 chrono.workspace = true
+const-str.workspace = true
 dyn-clone = { version = "1.0.20", default-features = false }
+indoc.workspace = true
 vrl.workspace = true
