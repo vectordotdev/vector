@@ -270,7 +270,6 @@ async fn auto_version_http() {
         .expect("Config error");
 }
 
-#[cfg(feature = "aws-core")]
 #[tokio::test]
 async fn auto_version_https() {
     trace_init();
@@ -297,6 +296,7 @@ async fn auto_version_https() {
 }
 
 #[cfg(feature = "aws-core")]
+#[cfg_attr(feature = "opensearch-integration-tests", ignore)]
 #[tokio::test]
 async fn auto_version_aws() {
     trace_init();
@@ -402,6 +402,7 @@ async fn insert_events_over_https() {
 }
 
 #[cfg(feature = "aws-core")]
+#[cfg_attr(feature = "opensearch-integration-tests", ignore)]
 #[tokio::test]
 async fn insert_events_on_aws() {
     trace_init();
@@ -428,6 +429,7 @@ async fn insert_events_on_aws() {
 }
 
 #[cfg(feature = "aws-core")]
+#[cfg_attr(feature = "opensearch-integration-tests", ignore)]
 #[tokio::test]
 async fn insert_events_on_aws_with_compression() {
     trace_init();
