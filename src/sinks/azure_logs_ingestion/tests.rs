@@ -147,7 +147,9 @@ fn basic_config_with_managed_identity() {
 
     match &config.auth {
         crate::sinks::azure_logs_ingestion::config::AzureAuthentication::Specific(
-            crate::sinks::azure_logs_ingestion::config::SpecificAzureCredential::ManagedIdentity { .. }
+            crate::sinks::azure_logs_ingestion::config::SpecificAzureCredential::ManagedIdentity {
+                ..
+            },
         ) => {
             // Expected variant
         }
@@ -248,7 +250,7 @@ async fn correct_request() {
     ]);
     assert_eq!(body_json, expected_json);
 
-    let _healthcheck_message = healthcheck.await.expect("Healthcheck failed");
+    healthcheck.await.expect("Healthcheck failed");
 
     let headers = parts.headers;
     let authorization = headers.get("Authorization").unwrap();
