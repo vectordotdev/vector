@@ -495,8 +495,9 @@ async fn insert_events_with_failure_and_gzip_compression() {
 #[tokio::test]
 async fn insert_events_in_data_stream() {
     trace_init();
-    let template_index = format!("my-template-{}", gen_index());
-    let stream_index = format!("my-stream-{}", gen_index());
+    let index = gen_index();
+    let template_index = format!("my-template-{}", index);
+    let stream_index = format!("my-stream-{}", index);
 
     let cfg = ElasticsearchConfig {
         endpoints: vec![http_server()],
@@ -505,6 +506,10 @@ async fn insert_events_in_data_stream() {
             index: Template::try_from(stream_index.clone()).expect("unable to parse template"),
             ..Default::default()
         },
+        data_stream: Some(DataStreamConfig {
+            namespace: index,
+            ..Default::default()
+        }),
         batch: batch_settings(),
         ..Default::default()
     };
@@ -635,14 +640,6 @@ async fn run_insert_tests_with_config(
     let common = ElasticsearchCommon::parse_single(config)
         .await
         .expect("Config error");
-    let index = match config.mode {
-        // Data stream mode uses an index name generated from the event.
-        ElasticsearchMode::DataStream => format!(
-            "{}",
-            Utc::now().format(".ds-logs-generic-default-%Y.%m.%d-000001")
-        ),
-        ElasticsearchMode::Bulk => config.bulk.index.to_string(),
-    };
     let base_url = common.base_url.clone();
 
     let cx = SinkContext::default();
@@ -685,6 +682,15 @@ async fn run_insert_tests_with_config(
 
     // make sure writes are all visible
     flush(common).await.expect("Flushing writes failed");
+
+    let index = match config.mode {
+        ElasticsearchMode::DataStream => config
+            .data_stream
+            .as_ref()
+            .map(|ds| format!("logs-generic-{}", ds.namespace))
+            .unwrap(),
+        ElasticsearchMode::Bulk => config.bulk.index.to_string(),
+    };
 
     let client = create_http_client();
     let mut response = client
