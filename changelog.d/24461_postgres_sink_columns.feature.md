@@ -1,17 +1,13 @@
-## Add columns configuration to PostgreSQL sink
+Add columns configuration to PostgreSQL sink that allows users to explicitly specify which columns to insert data into. This addresses the issue where PostgreSQL's default values and serial columns are not supported, as described in issue #24461.
 
-Adds a new `columns` configuration option to the PostgreSQL sink that allows users to explicitly specify which columns to insert data into. This addresses the issue where PostgreSQL's default values and serial columns are not supported, as described in issue #24461.
-
-### Key Changes
-
-- Added `columns` parameter to `PostgresConfig` as an optional `Vec<String>`
-- Modified `PostgresService` to accept and use the columns configuration
+Key changes:
+- Added columns parameter to PostgresConfig as an optional Vec<String>
+- Modified PostgresService to accept and use the columns configuration
 - Updated SQL query generation to use specified columns when provided
 - Updated documentation warnings to mention the new columns feature
 - Added test coverage for the new configuration option
 
-### Usage Example
-
+Usage example:
 ```yaml
 sinks:
   my_sink_id:
