@@ -8,9 +8,7 @@ use vector_lib::{
 
 use crate::{
     event::{self, Event, Value},
-    internal_events::{
-        DROP_EVENT, ParserConversionError, ParserMatchError, ParserMissingFieldError,
-    },
+    internal_events::{DROP_EVENT, ParserConversionError, ParserMissingFieldError},
     sources::kubernetes_logs::{Config, transform_utils::get_message_path},
     transforms::{FunctionTransform, OutputBuffer},
 };
@@ -58,8 +56,9 @@ impl FunctionTransform for Cri {
             }
             Some(s) => match parse_log_line(&s) {
                 None => {
-                    emit!(ParserMatchError { value: &s[..] });
-                    return;
+                    // TODO: fix it until `FunctionTransform` supports Api logs
+                    // emit!(ParserMatchError { value: &s[..] });
+                    drop(log.insert(&message_path, Value::Bytes(s)));
                 }
                 Some(parsed_log) => {
                     // For all fields except `timestamp`, simply treat them as `Value::Bytes`. For
