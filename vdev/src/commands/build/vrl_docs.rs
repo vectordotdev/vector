@@ -107,7 +107,6 @@ impl Cli {
 
 fn build_function_doc(func: &dyn Function) -> FunctionDoc {
     let name = func.identifier().to_string();
-    let category = infer_category(&name);
 
     let arguments: Vec<ArgumentDoc> = func
         .parameters()
@@ -149,7 +148,7 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
     FunctionDoc {
         anchor: name.clone(),
         name,
-        category: category.to_string(),
+        category: func.category().to_string(),
         description: trim_str(func.usage()),
         arguments,
         r#return: ReturnDoc {
@@ -220,124 +219,4 @@ fn trim_str(s: &'static str) -> String {
 
 fn trim_slice(slice: &'static [&'static str]) -> Vec<String> {
     slice.iter().map(|s| s.trim().to_string()).collect()
-}
-
-fn infer_category(name: &str) -> &'static str {
-    match name {
-        // Exact matches first (before patterns that might match them)
-
-        // Debug functions (log is a debug function, not number)
-        "log" | "assert" | "assert_eq" | "abort" => "Debug",
-
-        // Timestamp - exact matches before patterns
-        "now" | "from_unix_timestamp" | "format_timestamp" => "Timestamp",
-
-        // Cryptography - exact matches
-        "encrypt" | "decrypt" | "md5" => "Cryptography",
-
-        // String functions - exact matches (including case conversion variants)
-        "upcase" | "downcase" | "camelcase" | "snakecase" | "kebabcase" => "String",
-        "screaming_snakecase" | "screamingsnakecase" | "pascalcase" => "String",
-        "capitalize" | "strip_whitespace" | "truncate" | "trim" => "String",
-        "strip_ansi_escape_codes" | "starts_with" | "ends_with" | "contains" | "contains_all" => {
-            "String"
-        }
-        "slice" | "split" | "join" | "replace" | "replace_with" => "String",
-        "redact" | "find" | "substring" | "strlen" | "sieve" => "String",
-        "match_datadog_query" => "String",
-
-        // Array functions - exact matches (reverse is Array, not String)
-        "append" | "push" | "pop" | "shift" | "unshift" => "Array",
-        "flatten" | "chunks" | "unique" | "includes" | "reverse" => "Array",
-        "tally" | "tally_value" | "unnest" => "Array",
-
-        // Object functions
-        "keys" | "values" | "object" | "merge" | "compact" => "Object",
-        "remove" | "set" | "get" => "Object",
-        "object_from_array" | "unflatten" => "Object",
-
-        // Number functions
-        "abs" | "ceil" | "floor" | "round" | "mod" => "Number",
-        "int" | "float" | "haversine" => "Number",
-        "format_int" | "format_number" => "Number",
-
-        // System functions
-        "get_env_var" | "get_hostname" | "get_timezone_name" => "System",
-        "http_request" => "System",
-
-        // Secret/Event functions
-        "get_secret" | "set_secret" | "remove_secret" => "Event",
-
-        // Enumerate functions
-        "for_each" | "filter" | "map_keys" | "map_values" => "Enumerate",
-
-        // Checksum functions
-        "crc" | "seahash" | "xxhash" => "Checksum",
-
-        // Coerce by name
-        "bool" | "string" | "array" => "Coerce",
-
-        // Path functions
-        "exists" | "path_matches" | "length" => "Path",
-        "basename" | "dirname" | "split_path" => "Path",
-
-        // Convert functions
-        "type_def" | "typeof" | "set_semantic_meaning" => "Convert",
-        "tag_types_externally" => "Convert",
-
-        // IP functions
-        "community_id" | "dns_lookup" | "reverse_dns" => "IP",
-
-        // Random/UUID functions
-        "uuid_from_friendly_id" => "Random",
-
-        // Type/validation functions
-        "validate_json_schema" => "Type",
-
-        // Now the pattern matches
-
-        // Parse functions
-        n if n.starts_with("parse_") => "Parse",
-
-        // Codec functions
-        n if n.starts_with("encode_") => "Codec",
-        n if n.starts_with("decode_") => "Codec",
-
-        // Type checking functions
-        n if n.starts_with("is_") => "Type",
-
-        // Coerce functions
-        n if n.starts_with("to_") => "Coerce",
-
-        // IP functions
-        n if n.contains("ip") || n.contains("cidr") => "IP",
-
-        // Timestamp functions
-        n if n.contains("timestamp") => "Timestamp",
-
-        // Cryptography functions
-        n if n.starts_with("sha") || n.contains("hmac") => "Cryptography",
-
-        // String matching functions
-        n if n.starts_with("match") => "String",
-
-        // Object functions with del prefix
-        n if n.starts_with("del") => "Object",
-
-        // Enrichment functions
-        n if n.starts_with("get_enrichment_table_record")
-            || n.starts_with("find_enrichment_table") =>
-        {
-            "Enrichment"
-        }
-
-        // Random functions
-        n if n.starts_with("random") || n.starts_with("uuid") => "Random",
-
-        // Metrics
-        n if n.contains("metric") => "Metrics",
-
-        // Default to String as a reasonable fallback (most new functions are string manipulation)
-        _ => "String",
-    }
 }
