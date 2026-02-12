@@ -659,7 +659,10 @@ async fn run_insert_tests_with_config(
             let events = events.map(move |mut events| {
                 if doit {
                     events.iter_logs_mut().for_each(|log| {
+                        // _type: 1 is invalid for elasticsearch
                         log.insert("_type", 1);
+                        // opensearch has a 512 character limit on _id
+                        log.insert("_id", "invalid id because it is too long".repeat(16));
                     });
                 }
                 doit = true;
