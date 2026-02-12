@@ -207,7 +207,14 @@ where
                                     path = ?path,
                                     old_path = ?watcher.path
                                 );
-                                watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
+                                    // Inode changed - emit metrics for the old file
+                                    self.emitter.emit_file_unwatched(
+                                        &unwatch_info.path,
+                                        unwatch_info.reached_eof,
+                                        unwatch_info.bytes_dropped,
+                                    );
+                                }
                             } else {
                                 info!(
                                     message = "More than one file has the same fingerprint.",
@@ -225,7 +232,14 @@ where
                                         new_modified_time = ?new_modified_time,
                                         old_modified_time = ?old_modified_time,
                                     );
-                                    watcher.update_path(path).await.ok(); // ok if this fails: might fix next cycle
+                                    if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
+                                        // Inode changed - emit metrics for the old file
+                                        self.emitter.emit_file_unwatched(
+                                            &unwatch_info.path,
+                                            unwatch_info.reached_eof,
+                                            unwatch_info.bytes_dropped,
+                                        );
+                                    }
                                 }
                             }
                         } else {
@@ -364,8 +378,12 @@ where
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
             fp_map.retain(|file_id, watcher| {
                 if watcher.dead() {
-                    self.emitter
-                        .emit_file_unwatched(&watcher.path, watcher.reached_eof());
+                    let unwatch_info = watcher.get_unwatch_info();
+                    self.emitter.emit_file_unwatched(
+                        &unwatch_info.path,
+                        unwatch_info.reached_eof,
+                        unwatch_info.bytes_dropped,
+                    );
                     checkpoints.set_dead(*file_id);
                     false
                 } else {
