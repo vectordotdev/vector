@@ -139,14 +139,20 @@ pub enum AzureAuthentication {
     #[derivative(Default)]
     ClientSecretCredential {
         /// The [Azure Tenant ID][azure_tenant_id].
+        /// 
+        /// [azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
         #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
         azure_tenant_id: String,
 
         /// The [Azure Client ID][azure_client_id].
+        /// 
+        /// [azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
         #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
         azure_client_id: String,
 
         /// The [Azure Client Secret][azure_client_secret].
+        /// 
+        /// [azure_client_secret]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
         #[configurable(metadata(docs::examples = "00-00~000000-0000000~0000000000000000000"))]
         azure_client_secret: SensitiveString,
     },
