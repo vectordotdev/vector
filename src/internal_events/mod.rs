@@ -57,6 +57,8 @@ mod file_descriptor;
 mod filter;
 #[cfg(feature = "sources-fluent")]
 mod fluent;
+#[cfg(feature = "sources-gcp_cloud_storage")]
+mod gcp_cloud_storage;
 #[cfg(feature = "sources-gcp_pubsub")]
 mod gcp_pubsub;
 #[cfg(any(feature = "sources-vector", feature = "sources-opentelemetry"))]
