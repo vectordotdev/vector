@@ -47,6 +47,14 @@ impl Function for ParseDnstap {
         ]
     }
 
+    fn category(&self) -> &'static str {
+        Category::Parse.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::OBJECT
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &PARAMETERS
     }

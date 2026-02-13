@@ -3738,6 +3738,7 @@ dependencies = [
  "const-str",
  "dyn-clone",
  "indoc",
+ "vector-vrl-category",
  "vrl",
 ]
 
@@ -13017,6 +13018,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "vector-vrl-category"
+version = "0.1.0"
+dependencies = [
+ "strum 0.27.2",
+]
+
+[[package]]
 name = "vector-vrl-cli"
 version = "0.1.0"
 dependencies = [
@@ -13032,6 +13040,7 @@ dependencies = [
  "dnstap-parser",
  "enrichment",
  "indoc",
+ "vector-vrl-category",
  "vector-vrl-metrics",
  "vrl",
 ]
@@ -13046,6 +13055,7 @@ dependencies = [
  "tokio-stream",
  "vector-common",
  "vector-core",
+ "vector-vrl-category",
  "vrl",
 ]
 
@@ -13097,7 +13107,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.30.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#6d4e44ee26eb92578bae81d07868e5211ee4184f"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#7830c051501a08a328c53033364af55fd898aa86"
 dependencies = [
  "aes",
  "aes-siv",
@@ -13189,6 +13199,8 @@ dependencies = [
  "snafu 0.8.9",
  "snap",
  "strip-ansi-escapes",
+ "strum 0.26.3",
+ "strum_macros 0.26.4",
  "syslog_loose 0.22.0",
  "termcolor",
  "thiserror 2.0.17",
