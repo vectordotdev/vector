@@ -2,7 +2,6 @@ use std::{collections::VecDeque, net::SocketAddr, num::NonZeroUsize};
 
 use bytes::Bytes;
 use derivative::Derivative;
-use tokio_tungstenite::tungstenite::{Message, handshake::server::Request};
 use url::Url;
 use uuid::Uuid;
 use vector_config::configurable_component;
@@ -12,6 +11,7 @@ use vector_lib::{
     lookup::lookup_v2::ConfigValuePath,
 };
 use vrl::prelude::VrlValueConvert;
+use yawc::Frame;
 
 use crate::serde::default_decoding;
 
@@ -115,8 +115,8 @@ impl BufferReplayRequest {
 
     pub fn replay_messages(
         &self,
-        buffer: &VecDeque<(Uuid, Message)>,
-        replay: impl FnMut(&(Uuid, Message)),
+        buffer: &VecDeque<(Uuid, Frame)>,
+        replay: impl FnMut(&(Uuid, Frame)),
     ) {
         if self.should_replay {
             buffer
@@ -130,22 +130,22 @@ impl BufferReplayRequest {
 pub trait WsMessageBufferConfig {
     /// Returns true if this configuration enables buffering.
     fn should_buffer(&self) -> bool;
-    /// Generates key for a client based on connection request and address.
+    /// Generates key for a client based on connection request headers and address.
     /// This key should be used for storing client checkpoints (last ACKed message).
-    fn client_key(&self, request: &Request, client_address: &SocketAddr) -> Option<String>;
+    fn client_key<B>(&self, request: &http_1::Request<B>, client_address: &SocketAddr) -> Option<String>;
     /// Returns configured size of the buffer.
     fn buffer_capacity(&self) -> usize;
     /// Extracts buffer replay request from the given connection request, based on configuration.
-    fn extract_message_replay_request(
+    fn extract_message_replay_request<B>(
         &self,
-        request: &Request,
+        request: &http_1::Request<B>,
         client_checkpoint: Option<Uuid>,
     ) -> BufferReplayRequest;
     /// Adds a message ID that can be used for requesting replay into the event.
     /// Created ID is returned to be stored in the buffer.
     fn add_replay_message_id_to_event(&self, event: &mut Event) -> Uuid;
     /// Handles ACK request and returns message ID, if available.
-    fn handle_ack_request(&self, request: Message) -> Option<Uuid>;
+    fn handle_ack_request(&self, request: Frame) -> Option<Uuid>;
 }
 
 impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
@@ -153,7 +153,7 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
         self.is_some()
     }
 
-    fn client_key(&self, request: &Request, client_address: &SocketAddr) -> Option<String> {
+    fn client_key<B>(&self, request: &http_1::Request<B>, client_address: &SocketAddr) -> Option<String> {
         self.as_ref()
             .and_then(|mb| mb.client_ack_config.as_ref())
             .and_then(|ack| match &ack.client_key {
@@ -174,9 +174,9 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
         self.as_ref().map_or(0, |mb| mb.max_events.get())
     }
 
-    fn extract_message_replay_request(
+    fn extract_message_replay_request<B>(
         &self,
-        request: &Request,
+        request: &http_1::Request<B>,
         client_checkpoint: Option<Uuid>,
     ) -> BufferReplayRequest {
         // Early return if buffering is disabled
@@ -247,14 +247,14 @@ impl WsMessageBufferConfig for Option<MessageBufferingConfig> {
         message_id
     }
 
-    fn handle_ack_request(&self, request: Message) -> Option<Uuid> {
+    fn handle_ack_request(&self, request: Frame) -> Option<Uuid> {
         let ack_config = self.as_ref().and_then(|mb| mb.client_ack_config.as_ref())?;
 
         let parsed_message = ack_config
             .ack_decoding
             .build()
             .expect("Invalid `ack_decoding` config.")
-            .parse(request.into_data().into(), Default::default())
+            .parse(request.into_payload(), Default::default())
             .inspect_err(|err| {
                 debug!(message = "Parsing ACK request failed.", %err);
             })
