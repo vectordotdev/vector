@@ -16,7 +16,10 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         azure_common::{
-            self, config::AzureBlobRetryLogic, service::AzureBlobService, sink::AzureBlobSink,
+            self,
+            config::{AzureBlobAuthConfig, AzureBlobRetryLogic},
+            service::AzureBlobService,
+            sink::AzureBlobSink,
         },
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
@@ -55,13 +58,36 @@ pub struct AzureBlobSinkConfig {
     /// | Allowed services       | Blob               |
     /// | Allowed resource types | Container & Object |
     /// | Allowed permissions    | Read & Create      |
+    ///
+    /// When set, `auth` and `endpoint` are ignored.
+    /// `storage_account` must be unset.
     #[configurable(metadata(
         docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
     ))]
     #[configurable(metadata(
         docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
     ))]
-    pub connection_string: SensitiveString,
+    pub connection_string: Option<SensitiveString>,
+
+    /// The Azure Blob Storage Account name.
+    ///
+    /// Authentication for this account is configured via `auth`, and defaults to the
+    /// DefaultAzureCredential chain (environment -> managed identity -> Azure CLI).
+    ///
+    /// Either `connection_string`, or this field, must be specified.
+    #[configurable(metadata(docs::examples = "some-account-name"))]
+    pub storage_account: Option<String>,
+
+    /// The Azure Blob Storage Account endpoint.
+    #[configurable(metadata(docs::examples = "https://test.blob.core.windows.net/"))]
+    pub endpoint: Option<String>,
+
+    /// Authentication strategy to use when `storage_account` is set.
+    ///
+    /// When `connection_string` is set, this field is ignored.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub auth: AzureBlobAuthConfig,
 
     /// The Azure Blob Storage Account container name.
     #[configurable(metadata(docs::examples = "my-logs"))]
@@ -147,7 +173,10 @@ pub fn default_blob_prefix() -> Template {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            connection_string: String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into(),
+            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
+            storage_account: None,
+            endpoint: None,
+            auth: Default::default(),
             container_name: String::from("logs"),
             blob_prefix: default_blob_prefix(),
             blob_time_format: Some(String::from("%s")),
@@ -167,8 +196,11 @@ impl GenerateConfig for AzureBlobSinkConfig {
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(
-            self.connection_string.clone().into(),
+            self.connection_string.clone().map(Into::into),
+            self.storage_account.clone(),
             self.container_name.clone(),
+            self.endpoint.clone(),
+            &self.auth,
         )?;
 
         let healthcheck = azure_common::config::build_healthcheck(

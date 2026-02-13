@@ -27,11 +27,127 @@ use crate::{
 };
 
 #[tokio::test]
+async fn azure_blob_rejects_both_connection_string_and_storage_account() {
+    let result = azure_common::config::build_client(
+        Some("ignored".to_string()),
+        Some("devstoreaccount1".to_string()),
+        "logs".to_string(),
+        None,
+        &azure_common::config::AzureBlobAuthConfig::Default,
+    );
+    let err = match result {
+        Ok(_) => panic!("expected mutually exclusive auth config to fail"),
+        Err(err) => err,
+    };
+
+    assert_eq!(
+        err.to_string(),
+        "only one of `connection_string` or `storage_account` may be set"
+    );
+}
+
+#[tokio::test]
+async fn azure_blob_requires_connection_string_or_storage_account() {
+    let result = azure_common::config::build_client(
+        None,
+        None,
+        "logs".to_string(),
+        None,
+        &azure_common::config::AzureBlobAuthConfig::Default,
+    );
+    let err = match result {
+        Ok(_) => panic!("expected missing auth config to fail"),
+        Err(err) => err,
+    };
+
+    assert_eq!(
+        err.to_string(),
+        "either `connection_string` or `storage_account` must be set"
+    );
+}
+
+#[tokio::test]
+async fn azure_blob_rejects_invalid_storage_account_endpoint() {
+    let result = azure_common::config::build_client(
+        None,
+        Some("devstoreaccount1".to_string()),
+        "logs".to_string(),
+        Some("not-a-valid-url".to_string()),
+        &azure_common::config::AzureBlobAuthConfig::Default,
+    );
+    let err = match result {
+        Ok(_) => panic!("expected invalid endpoint to fail"),
+        Err(err) => err,
+    };
+
+    assert!(
+        err.to_string().starts_with("Invalid container URL:"),
+        "unexpected error: {err}"
+    );
+}
+
+#[tokio::test]
 async fn azure_blob_healthcheck_passed() {
     let config = AzureBlobSinkConfig::new_emulator().await;
     let client = azure_common::config::build_client(
-        config.connection_string.clone().into(),
+        config.connection_string.clone().map(Into::into),
+        config.storage_account.clone(),
         config.container_name.clone(),
+        config.endpoint.clone(),
+        &config.auth,
+    )
+    .expect("Failed to create client");
+
+    azure_common::config::build_healthcheck(config.container_name, client)
+        .expect("Failed to build healthcheck")
+        .await
+        .expect("Failed to pass healthcheck");
+}
+
+#[tokio::test]
+async fn azure_blob_connection_string_ignores_invalid_auth_config() {
+    // Azurite tests validate connection-string precedence; AAD token flows require external identity infra.
+    let config = AzureBlobSinkConfig::new_emulator().await;
+    let config = AzureBlobSinkConfig {
+        auth: azure_common::config::AzureBlobAuthConfig::WorkloadIdentity {
+            tenant_id: "fake-tenant".to_string(),
+            client_id: "fake-client".to_string(),
+            token: None,
+            token_file: None,
+            authority_host: None,
+        },
+        ..config
+    };
+
+    let client = azure_common::config::build_client(
+        config.connection_string.clone().map(Into::into),
+        config.storage_account.clone(),
+        config.container_name.clone(),
+        config.endpoint.clone(),
+        &config.auth,
+    )
+    .expect("Failed to create client");
+
+    azure_common::config::build_healthcheck(config.container_name, client)
+        .expect("Failed to build healthcheck")
+        .await
+        .expect("Failed to pass healthcheck");
+}
+
+#[tokio::test]
+async fn azure_blob_connection_string_ignores_endpoint_override() {
+    let config = AzureBlobSinkConfig::new_emulator().await;
+    let config = AzureBlobSinkConfig {
+        endpoint: Some("http://invalid-hostname.invalid:10000/devstoreaccount1".to_string()),
+        ..config
+    };
+
+    let client = azure_common::config::build_client(
+        config.connection_string.clone().map(Into::into),
+        config.storage_account.clone(),
+        config.container_name.clone(),
+        config.endpoint.clone(),
+        &config.auth,
     )
     .expect("Failed to create client");
 
@@ -49,8 +165,11 @@ async fn azure_blob_healthcheck_unknown_container() {
         ..config
     };
     let client = azure_common::config::build_client(
-        config.connection_string.clone().into(),
+        config.connection_string.clone().map(Into::into),
+        config.storage_account.clone(),
         config.container_name.clone(),
+        config.endpoint.clone(),
+        &config.auth,
     )
     .expect("Failed to create client");
 
@@ -213,17 +332,20 @@ impl AzureBlobSinkConfig {
     pub async fn new_emulator() -> AzureBlobSinkConfig {
         let address = std::env::var("AZURE_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
-            connection_string: format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{address}:10000/devstoreaccount1;QueueEndpoint=http://{address}:10001/devstoreaccount1;TableEndpoint=http://{address}:10002/devstoreaccount1;").into(),
-                container_name: "logs".to_string(),
-                blob_prefix: Default::default(),
-                blob_time_format: None,
-                blob_append_uuid: None,
-                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
-                compression: Compression::None,
-                batch: Default::default(),
-                request: TowerRequestConfig::default(),
-                acknowledgements: Default::default(),
-            };
+            connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{address}:10000/devstoreaccount1;QueueEndpoint=http://{address}:10001/devstoreaccount1;TableEndpoint=http://{address}:10002/devstoreaccount1;").into()),
+            storage_account: None,
+            endpoint: None,
+            auth: Default::default(),
+            container_name: "logs".to_string(),
+            blob_prefix: Default::default(),
+            blob_time_format: None,
+            blob_append_uuid: None,
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            compression: Compression::None,
+            batch: Default::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
+        };
 
         config.ensure_container().await;
 
@@ -232,8 +354,11 @@ impl AzureBlobSinkConfig {
 
     fn to_sink(&self) -> VectorSink {
         let client = azure_common::config::build_client(
-            self.connection_string.clone().into(),
+            self.connection_string.clone().map(Into::into),
+            self.storage_account.clone(),
             self.container_name.clone(),
+            self.endpoint.clone(),
+            &self.auth,
         )
         .expect("Failed to create client");
 
@@ -249,8 +374,11 @@ impl AzureBlobSinkConfig {
 
     pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
         let client = azure_common::config::build_client(
-            self.connection_string.clone().into(),
+            self.connection_string.clone().map(Into::into),
+            self.storage_account.clone(),
             self.container_name.clone(),
+            self.endpoint.clone(),
+            &self.auth,
         )
         .unwrap();
 
@@ -273,8 +401,11 @@ impl AzureBlobSinkConfig {
 
     pub async fn get_blob(&self, blob: String) -> (Option<String>, Option<String>, Vec<String>) {
         let client = azure_common::config::build_client(
-            self.connection_string.clone().into(),
+            self.connection_string.clone().map(Into::into),
+            self.storage_account.clone(),
             self.container_name.clone(),
+            self.endpoint.clone(),
+            &self.auth,
         )
         .unwrap();
 
@@ -333,8 +464,11 @@ impl AzureBlobSinkConfig {
 
     async fn ensure_container(&self) {
         let client = azure_common::config::build_client(
-            self.connection_string.clone().into(),
+            self.connection_string.clone().map(Into::into),
+            self.storage_account.clone(),
             self.container_name.clone(),
+            self.endpoint.clone(),
+            &self.auth,
         )
         .unwrap();
         let result = client.create_container(None).await;
