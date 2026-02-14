@@ -118,9 +118,15 @@ pub struct Geoip {
 fn lookup_value<'de, A: Deserialize<'de>>(
     dbreader: &'de Reader<Vec<u8>>,
     address: IpAddr,
-) -> crate::Result<Option<A>> {
+) -> crate::Result<Option<(A, String)>> {
     let result = dbreader.lookup(address)?;
-    Ok(result.decode::<A>()?)
+    match result.decode::<A>()? {
+        Some(data) => {
+            let network = result.network()?.to_string();
+            Ok(Some((data, network)))
+        }
+        None => Ok(None),
+    }
 }
 
 impl Geoip {
@@ -174,7 +180,7 @@ impl Geoip {
 
         match self.dbkind {
             DatabaseKind::Asn | DatabaseKind::Isp => {
-                let data = lookup_value::<Isp>(&self.dbreader, ip).ok()??;
+                let (data, network) = lookup_value::<Isp>(&self.dbreader, ip).ok()??;
 
                 add_field!("autonomous_system_number", data.autonomous_system_number);
                 add_field!(
@@ -183,9 +189,11 @@ impl Geoip {
                 );
                 add_field!("isp", data.isp);
                 add_field!("organization", data.organization);
+                add_field!("network", Some(network));
             }
             DatabaseKind::City => {
-                let data: City = lookup_value::<City>(&self.dbreader, ip).ok()??;
+                let (data, network): (City, String) =
+                    lookup_value::<City>(&self.dbreader, ip).ok()??;
 
                 add_field!("city_name", self.take_translation(&data.city.names));
 
@@ -223,14 +231,16 @@ impl Geoip {
                     subdivision.and_then(|subdivision| subdivision.iso_code)
                 );
                 add_field!("postal_code", data.postal.code);
+                add_field!("network", Some(network));
             }
             DatabaseKind::ConnectionType => {
-                let data = lookup_value::<ConnectionType>(&self.dbreader, ip).ok()??;
+                let (data, network) = lookup_value::<ConnectionType>(&self.dbreader, ip).ok()??;
 
                 add_field!("connection_type", data.connection_type);
+                add_field!("network", Some(network));
             }
             DatabaseKind::AnonymousIp => {
-                let data = lookup_value::<AnonymousIp>(&self.dbreader, ip).ok()??;
+                let (data, network) = lookup_value::<AnonymousIp>(&self.dbreader, ip).ok()??;
 
                 add_field!("is_anonymous", data.is_anonymous);
                 add_field!("is_anonymous_vpn", data.is_anonymous_vpn);
@@ -238,6 +248,7 @@ impl Geoip {
                 add_field!("is_public_proxy", data.is_public_proxy);
                 add_field!("is_residential_proxy", data.is_residential_proxy);
                 add_field!("is_tor_exit_node", data.is_tor_exit_node);
+                add_field!("network", Some(network));
             }
         }
 
@@ -367,6 +378,7 @@ mod tests {
         expected.insert("longitude".into(), Value::from(-1.25));
         expected.insert("postal_code".into(), "OX1".into());
         expected.insert("metro_code".into(), Value::Null);
+        expected.insert("network".into(), "2.125.160.216/29".into());
 
         assert_eq!(values, expected);
     }
@@ -403,6 +415,7 @@ mod tests {
         expected.insert("longitude".into(), Value::from(90.5));
         expected.insert("postal_code".into(), Value::Null);
         expected.insert("metro_code".into(), Value::Null);
+        expected.insert("network".into(), "67.43.156.0/24".into());
 
         assert_eq!(values, expected);
     }
@@ -426,6 +439,7 @@ mod tests {
         );
         expected.insert("isp".into(), "Verizon Business".into());
         expected.insert("organization".into(), "Verizon Business".into());
+        expected.insert("network".into(), "208.192.0.0/10".into());
 
         assert_eq!(values, expected);
     }
@@ -442,6 +456,7 @@ mod tests {
         );
         expected.insert("isp".into(), Value::Null);
         expected.insert("organization".into(), Value::Null);
+        expected.insert("network".into(), "2600:7000::/24".into());
 
         assert_eq!(values, expected);
     }
@@ -463,6 +478,7 @@ mod tests {
 
         let mut expected = ObjectMap::new();
         expected.insert("connection_type".into(), "Corporate".into());
+        expected.insert("network".into(), "201.243.200.0/24".into());
 
         assert_eq!(values, expected);
     }
@@ -494,6 +510,7 @@ mod tests {
         expected.insert("is_tor_exit_node".into(), true.into());
         expected.insert("is_public_proxy".into(), Value::Null);
         expected.insert("is_residential_proxy".into(), Value::Null);
+        expected.insert("network".into(), "101.99.92.179/32".into());
 
         assert_eq!(values, expected);
     }
