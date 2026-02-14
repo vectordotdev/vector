@@ -609,7 +609,7 @@ impl ConsumerStateInner<Consuming> {
 
             let mut status = PartitionConsumerStatus::NormalExit;
 
-            let mut smallest_failed_offset = None;
+            let mut failed_msg_offset = None;
 
             loop {
                 tokio::select!(
@@ -632,12 +632,8 @@ impl ConsumerStateInner<Consuming> {
                                     }
                                 }
                                 BatchStatus::Errored | BatchStatus::Rejected => {
-                                    if acknowledgements {
-                                        smallest_failed_offset = Some(match smallest_failed_offset {
-                                            None => entry.offset,
-                                            Some(current) if entry.offset < current => entry.offset,
-                                            Some(current) => current,
-                                        });
+                                    if acknowledgements && failed_msg_offset.is_none() {
+                                        failed_msg_offset = Some(entry.offset);
                                     }
                                 }
                             }
@@ -651,8 +647,8 @@ impl ConsumerStateInner<Consuming> {
                         }
                     },
 
-                    _ = tokio::time::sleep(fetch_wait_max_ms), if smallest_failed_offset.is_some() => {
-                        let offset = smallest_failed_offset.unwrap();
+                    _ = tokio::time::sleep(fetch_wait_max_ms), if failed_msg_offset.is_some() => {
+                        let offset = failed_msg_offset.unwrap();
                         match consumer.seek(&tp.0, tp.1, Offset::Offset(offset), socket_timeout) {
                             Ok(_) => {
                                 debug!("Seeked back to offset {} for {}:{}", offset, &tp.0, tp.1);
@@ -661,7 +657,7 @@ impl ConsumerStateInner<Consuming> {
                                 emit!(KafkaSeekError { error });
                             }
                         }
-                        smallest_failed_offset = None;
+                        failed_msg_offset = None;
                     },
 
                     message = messages.next(), if finalizer.is_some() => match message {
