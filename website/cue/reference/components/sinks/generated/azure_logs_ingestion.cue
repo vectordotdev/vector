@@ -32,16 +32,24 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 		required:    false
 		type: object: options: {
 			azure_client_id: {
-				description: "The [Azure Client ID][azure_client_id]."
-				required:    false
+				description: """
+					The [Azure Client ID][azure_client_id].
+
+					[azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				required: false
 				type: string: {
 					default: ""
 					examples: ["00000000-0000-0000-0000-000000000000"]
 				}
 			}
 			azure_client_secret: {
-				description: "The [Azure Client Secret][azure_client_secret]."
-				required:    false
+				description: """
+					The [Azure Client Secret][azure_client_secret].
+
+					[azure_client_secret]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				required: false
 				type: string: {
 					default: ""
 					examples: ["00-00~000000-0000000~0000000000000000000"]
@@ -58,8 +66,12 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 				}
 			}
 			azure_tenant_id: {
-				description: "The [Azure Tenant ID][azure_tenant_id]."
-				required:    false
+				description: """
+					The [Azure Tenant ID][azure_tenant_id].
+
+					[azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				required: false
 				type: string: {
 					default: ""
 					examples: ["00000000-0000-0000-0000-000000000000"]
