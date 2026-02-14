@@ -1,12 +1,11 @@
 use std::{
-    io,
     num::NonZeroU64,
     time::{Duration, Instant},
 };
 
 use crate::{
     codecs::{Encoder, Transformer},
-    common::websocket::{PingInterval, WebSocketConnector, is_closed},
+    common::websocket::{PingInterval, WebSocketConnector},
     event::{Event, EventStatus, Finalizable},
     internal_events::{
         ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
@@ -16,7 +15,6 @@ use crate::{
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt, stream::BoxStream};
-use tokio_tungstenite::tungstenite::{error::Error as TungsteniteError, protocol::Message};
 use tokio_util::codec::Encoder as _;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf, emit,
@@ -24,6 +22,7 @@ use vector_lib::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
 };
+use yawc::{Frame, OpCode, WebSocketError};
 
 pub struct WebSocketSink {
     transformer: Transformer,
@@ -54,21 +53,18 @@ impl WebSocketSink {
     async fn create_sink_and_stream(
         &self,
     ) -> (
-        impl Sink<Message, Error = TungsteniteError> + use<>,
-        impl Stream<Item = Result<Message, TungsteniteError>> + use<>,
+        impl Sink<Frame, Error = WebSocketError> + use<>,
+        impl Stream<Item = Frame> + use<>,
     ) {
         let ws_stream = self.connector.connect_backoff().await;
         ws_stream.split()
     }
 
-    fn check_received_pong_time(&self, last_pong: Instant) -> Result<(), TungsteniteError> {
+    fn check_received_pong_time(&self, last_pong: Instant) -> Result<(), WebSocketError> {
         if let Some(ping_timeout) = self.ping_timeout
             && last_pong.elapsed() > Duration::from_secs(ping_timeout.into())
         {
-            return Err(TungsteniteError::Io(io::Error::new(
-                io::ErrorKind::TimedOut,
-                "Pong not received in time",
-            )));
+            return Err(WebSocketError::ConnectionClosed);
         }
 
         Ok(())
@@ -82,8 +78,8 @@ impl WebSocketSink {
     ) -> Result<(), ()>
     where
         I: Stream<Item = Event> + Unpin,
-        WS: Stream<Item = Result<Message, TungsteniteError>> + Unpin,
-        O: Sink<Message, Error = TungsteniteError> + Unpin,
+        WS: Stream<Item = Frame> + Unpin,
+        O: Sink<Frame, Error = WebSocketError> + Unpin,
     {
         const PING: &[u8] = b"PING";
 
@@ -91,7 +87,7 @@ impl WebSocketSink {
         // using NonZeroU64 that is not something we need to account for.
         let mut ping_interval = PingInterval::new(self.ping_interval.map(u64::from));
 
-        if let Err(error) = ws_sink.send(Message::Ping(PING.to_vec())).await {
+        if let Err(error) = ws_sink.send(Frame::ping(PING)).await {
             emit!(WebSocketConnectionError { error });
             return Err(());
         }
@@ -102,23 +98,30 @@ impl WebSocketSink {
         let encode_as_binary = self.encoder.serializer().is_binary();
 
         loop {
-            let result = tokio::select! {
+            let result: Result<(), WebSocketError> = tokio::select! {
                 _ = ping_interval.tick() => {
                     match self.check_received_pong_time(last_pong) {
-                        Ok(()) => ws_sink.send(Message::Ping(PING.to_vec())).await.map(|_| ()),
+                        Ok(()) => ws_sink.send(Frame::ping(PING)).await.map(|_| ()),
                         Err(e) => Err(e)
                     }
                 },
 
-                Some(msg) = ws_stream.next() => {
-                    // Pongs are sent automatically by tungstenite during reading from the stream.
-                    match msg {
-                        Ok(Message::Pong(_)) => {
+                maybe_frame = ws_stream.next() => {
+                    match maybe_frame {
+                        Some(frame) if frame.opcode() == OpCode::Pong => {
+                            // Pongs are sent automatically by yawc during reading from the stream.
                             last_pong = Instant::now();
                             Ok(())
                         },
-                        Ok(_) => Ok(()),
-                        Err(e) => Err(e)
+                        Some(frame) if frame.opcode() == OpCode::Close => {
+                            // Remote closed the connection
+                            Err(WebSocketError::ConnectionClosed)
+                        },
+                        Some(_) => Ok(()),
+                        None => {
+                            // Stream ended — connection lost
+                            Err(WebSocketError::ConnectionClosed)
+                        }
                     }
                 },
 
@@ -140,17 +143,17 @@ impl WebSocketSink {
                         Ok(()) => {
                             finalizers.update_status(EventStatus::Delivered);
 
-                            let message = if encode_as_binary {
-                                Message::binary(bytes)
+                            let frame = if encode_as_binary {
+                                Frame::binary(bytes.freeze())
                             }
                             else {
-                                Message::text(String::from_utf8_lossy(&bytes))
+                                Frame::text(String::from_utf8_lossy(&bytes).into_owned())
                             };
-                            let message_len = message.len();
+                            let frame_len = frame.payload().len();
 
-                            ws_sink.send(message).await.map(|_| {
+                            ws_sink.send(frame).await.map(|_| {
                                 events_sent.emit(CountByteSize(1, event_byte_size));
-                                bytes_sent.emit(ByteSize(message_len));
+                                bytes_sent.emit(ByteSize(frame_len));
                             })
                         },
                         Err(_) => {
@@ -164,7 +167,7 @@ impl WebSocketSink {
             };
 
             if let Err(error) = result {
-                if is_closed(&error) {
+                if error.is_closed() {
                     emit!(WebSocketConnectionShutdown);
                 } else {
                     emit!(WebSocketConnectionError { error });
@@ -207,17 +210,15 @@ impl StreamSink<Event> for WebSocketSink {
 mod tests {
     use std::net::SocketAddr;
 
-    use futures::{FutureExt, StreamExt, future};
+    use bytes::Bytes;
+    use futures::{FutureExt, StreamExt};
+    use http_body_util::Empty;
+    use hyper1::{body::Incoming, service::service_fn};
+    use hyper_util::rt::TokioIo;
     use serde_json::Value as JsonValue;
     use tokio::{time, time::timeout};
-    use tokio_tungstenite::{
-        accept_async, accept_hdr_async,
-        tungstenite::{
-            error::ProtocolError,
-            handshake::server::{Request, Response},
-        },
-    };
     use vector_lib::codecs::JsonSerializerConfig;
+    use yawc::{OpCode, WebSocket as YawcWebSocket};
 
     use super::*;
     use crate::{
@@ -245,6 +246,7 @@ mod tests {
                 ping_interval: None,
                 ping_timeout: None,
                 auth: None,
+                compression: None,
             },
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: Default::default(),
@@ -270,6 +272,7 @@ mod tests {
                 ping_interval: None,
                 ping_timeout: None,
                 auth: None,
+                compression: None,
             },
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: Default::default(),
@@ -302,6 +305,7 @@ mod tests {
                 ping_timeout: None,
                 ping_interval: None,
                 auth: None,
+                compression: None,
             },
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: Default::default(),
@@ -322,6 +326,7 @@ mod tests {
                 ping_interval: None,
                 ping_timeout: None,
                 auth: None,
+                compression: None,
             },
             encoding: JsonSerializerConfig::default().into(),
             acknowledgements: Default::default(),
@@ -401,9 +406,17 @@ mod tests {
                     let au = auth.clone();
                     async move {
                         let maybe_tls_stream = maybe_tls_stream.unwrap();
-                        let ws_stream = match au {
-                            Some(a) => {
-                                let auth_callback = |req: &Request, res: Response| {
+                        let (tx, rx) = tokio::sync::mpsc::unbounded_channel::<String>();
+
+                        // Use hyper1 to handle the HTTP upgrade, then yawc for WebSocket
+                        let io = TokioIo::new(maybe_tls_stream);
+                        let au_clone = au.clone();
+                        let service = service_fn(move |mut req: hyper1::Request<Incoming>| {
+                            let tx = tx.clone();
+                            let au = au_clone.clone();
+                            async move {
+                                // Validate auth if required
+                                if let Some(a) = au {
                                     let hdr = req.headers().get("Authorization");
                                     if let Some(h) = hdr {
                                         match a {
@@ -411,46 +424,60 @@ mod tests {
                                                 if format!("Bearer {}", token.inner())
                                                     != h.to_str().unwrap()
                                                 {
-                                                    return Err(
-                                                        http::Response::<Option<String>>::new(None),
+                                                    return Ok::<_, hyper1::Error>(
+                                                        hyper1::Response::builder()
+                                                            .status(401)
+                                                            .body(Empty::<Bytes>::new())
+                                                            .unwrap(),
                                                     );
                                                 }
                                             }
-                                            Auth::Basic {
-                                                user: _user,
-                                                password: _password,
-                                            } => { /* Not needed for tests at the moment */ }
-                                            Auth::Custom { .. } => { /* Not needed for tests at the moment */ }
+                                            Auth::Basic { .. } => {}
+                                            Auth::Custom { .. } => {}
                                             #[cfg(feature = "aws-core")]
                                             _ => {}
                                         }
                                     }
-                                    Ok(res)
-                                };
-                                accept_hdr_async(maybe_tls_stream, auth_callback)
-                                    .await
-                                    .unwrap()
-                            }
-                            None => accept_async(maybe_tls_stream).await.unwrap(),
-                        };
+                                }
 
-                        Some(
-                            ws_stream
-                                .filter_map(|msg| {
-                                    future::ready(match msg {
-                                        Ok(msg) if msg.is_text() => {
-                                            Some(Ok(msg.into_text().unwrap()))
+                                let (response, upgrade_fut) =
+                                    YawcWebSocket::upgrade(&mut req).expect("upgrade failed");
+
+                                tokio::spawn(async move {
+                                    if let Ok(ws) = upgrade_fut.await {
+                                        let mut ws_stream =
+                                            futures::StreamExt::fuse(ws);
+                                        while let Some(frame) =
+                                            futures::StreamExt::next(&mut ws_stream).await
+                                        {
+                                            if frame.opcode() == OpCode::Text {
+                                                let text = std::str::from_utf8(
+                                                    frame.payload(),
+                                                )
+                                                .unwrap()
+                                                .to_string();
+                                                if tx.send(text).is_err() {
+                                                    break;
+                                                }
+                                            } else if frame.opcode() == OpCode::Close {
+                                                break;
+                                            }
                                         }
-                                        Err(TungsteniteError::Protocol(
-                                            ProtocolError::ResetWithoutClosingHandshake,
-                                        )) => None,
-                                        Err(e) => Some(Err(e)),
-                                        _ => None,
-                                    })
-                                })
-                                .take_while(|msg| future::ready(msg.is_ok()))
-                                .filter_map(|msg| future::ready(msg.ok())),
-                        )
+                                    }
+                                });
+
+                                Ok(response)
+                            }
+                        });
+
+                        tokio::spawn(async move {
+                            let _ = hyper1::server::conn::http1::Builder::new()
+                                .serve_connection(io, service)
+                                .with_upgrades()
+                                .await;
+                        });
+
+                        Some(tokio_stream::wrappers::UnboundedReceiverStream::new(rx))
                     }
                 })
                 .map(move |ws_stream| {
