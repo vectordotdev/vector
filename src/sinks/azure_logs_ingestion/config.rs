@@ -44,17 +44,23 @@ pub(super) fn default_timestamp_field() -> String {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureLogsIngestionConfig {
-    /// The [Data collection endpoint URI](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview) associated with the Log Analytics workspace.
+    /// The [Data collection endpoint URI][endpoint] associated with the Log Analytics workspace.
+    ///
+    /// [endpoint]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
     #[configurable(metadata(
         docs::examples = "https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"
     ))]
     pub endpoint: String,
 
-    /// The [Data collection rule immutable ID](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview) for the Data collection endpoint.
+    /// The [Data collection rule immutable ID][dcr_immutable_id] for the Data collection endpoint.
+    ///
+    /// [dcr_immutable_id]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
     #[configurable(metadata(docs::examples = "dcr-000a00a000a00000a000000aa000a0aa"))]
     pub dcr_immutable_id: String,
 
-    /// The [Stream name](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview) for the Data collection rule.
+    /// The [Stream name][stream_name] for the Data collection rule.
+    ///
+    /// [stream_name]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
     #[configurable(metadata(docs::examples = "Custom-MyTable"))]
     pub stream_name: String,
 
@@ -62,7 +68,9 @@ pub struct AzureLogsIngestionConfig {
     #[serde(default)]
     pub auth: AzureAuthentication,
 
-    /// [Token scope](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview) for dedicated Azure regions.
+    /// [Token scope][token_scope] for dedicated Azure regions.
+    ///
+    /// [token_scope]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
     #[configurable(metadata(docs::examples = "https://monitor.azure.us/.default"))]
     #[configurable(metadata(docs::examples = "https://monitor.azure.cn/.default"))]
     #[serde(default = "default_scope")]
@@ -71,8 +79,9 @@ pub struct AzureLogsIngestionConfig {
     /// The destination field (column) for the timestamp.
     ///
     /// The setting of `log_schema.timestamp_key`, usually `timestamp`, is used as the source.
-    /// Most schemas use [`TimeGenerated`](https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-standard-columns#timegenerated),
-    /// but some use `Timestamp` (legacy) or `EventStartTime` (ASIM)
+    /// Most schemas use `TimeGenerated`, but some use `Timestamp` (legacy) or `EventStartTime` (ASIM) [std_columns].
+    ///
+    /// [std_columns]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-standard-columns#timegenerated
     #[configurable(metadata(docs::examples = "EventStartTime"))]
     #[configurable(metadata(docs::examples = "Timestamp"))]
     #[serde(default = "default_timestamp_field")]
