@@ -109,8 +109,18 @@ pub struct NewRelicConfig {
     )]
     acknowledgements: AcknowledgementsConfig,
 
-    #[serde(skip)]
-    pub override_uri: Option<Uri>,
+    /// Override the default New Relic API endpoint.
+    ///
+    /// This is useful for sending data to a New Relic staging environment or other
+    /// non-production endpoints.
+    ///
+    /// When set, this URL takes precedence over the `region` and `api` settings for
+    /// determining the endpoint.
+    #[configurable(validation(format = "uri"))]
+    #[configurable(metadata(docs::examples = "https://staging-metric-api.newrelic.com/metric/v1"))]
+    #[configurable(metadata(docs::examples = "https://custom-endpoint.example.com/v1"))]
+    #[serde(default)]
+    pub override_endpoint: Option<String>,
 }
 
 impl_generate_config_from_default!(NewRelicConfig);
@@ -218,12 +228,17 @@ impl NewRelicCredentials {
 
 impl From<&NewRelicConfig> for NewRelicCredentials {
     fn from(config: &NewRelicConfig) -> Self {
+        let override_uri = config
+            .override_endpoint
+            .as_ref()
+            .map(|s| s.parse::<Uri>().expect("override_endpoint should be a valid URI"));
+
         Self {
             license_key: config.license_key.inner().to_string(),
             account_id: config.account_id.inner().to_string(),
             api: config.api,
             region: config.region.unwrap_or(NewRelicRegion::Us),
-            override_uri: config.override_uri.clone(),
+            override_uri,
         }
     }
 }
