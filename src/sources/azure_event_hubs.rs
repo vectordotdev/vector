@@ -148,14 +148,18 @@ impl SourceConfig for AzureEventHubsSourceConfig {
             DecodingConfig::new(self.framing.clone(), self.decoding.clone(), log_namespace)
                 .build()?;
 
-        let (namespace, event_hub_name, credential) = build_credential(
+        let (namespace, event_hub_name, credential, custom_endpoint) = build_credential(
             self.connection_string.as_ref(),
             self.namespace.as_deref(),
             self.event_hub_name.as_deref(),
         )?;
 
-        let client = ConsumerClient::builder()
-            .with_consumer_group(self.consumer_group.clone())
+        let mut builder = ConsumerClient::builder()
+            .with_consumer_group(self.consumer_group.clone());
+        if let Some(endpoint) = custom_endpoint {
+            builder = builder.with_custom_endpoint(endpoint);
+        }
+        let client = builder
             .open(&namespace, event_hub_name, credential)
             .await
             .map_err(|e| format!("Failed to open Event Hubs consumer: {e}"))?;
@@ -341,11 +345,12 @@ async fn azure_event_hubs_source(
 /// Builds a credential and resolves namespace + event hub name from config.
 ///
 /// Returns `(namespace, event_hub_name, credential)`.
+/// Result contains: (namespace, event_hub_name, credential, custom_endpoint_for_emulator)
 pub(crate) fn build_credential(
     connection_string: Option<&SensitiveString>,
     namespace: Option<&str>,
     event_hub_name: Option<&str>,
-) -> crate::Result<(String, String, Arc<dyn TokenCredential>)> {
+) -> crate::Result<(String, String, Arc<dyn TokenCredential>, Option<String>)> {
     if let Some(cs) = connection_string {
         // Connection string auth: parse and create SAS credential
         let parsed = ParsedEventHubsConnectionString::parse(cs.inner())?;
@@ -360,13 +365,23 @@ pub(crate) fn build_credential(
             .trim_end_matches('/')
             .to_string();
 
-        let credential: Arc<dyn TokenCredential> = Arc::new(EventHubsSasCredential::new(
-            &parsed.endpoint,
-            &parsed.shared_access_key_name,
-            &parsed.shared_access_key,
-        )?);
+        let (credential, custom_endpoint): (Arc<dyn TokenCredential>, Option<String>) =
+            if parsed.use_development_emulator {
+                // Emulator mode: use dummy credential and plain AMQP endpoint
+                let endpoint = format!("amqp://{}:5672", ns);
+                (Arc::new(EmulatorCredential), Some(endpoint))
+            } else {
+                (
+                    Arc::new(EventHubsSasCredential::new(
+                        &parsed.endpoint,
+                        &parsed.shared_access_key_name,
+                        &parsed.shared_access_key,
+                    )?),
+                    None,
+                )
+            };
 
-        Ok((ns, eh_name, credential))
+        Ok((ns, eh_name, credential, custom_endpoint))
     } else {
         // Azure Identity auth: use ManagedIdentityCredential
         let ns = namespace
@@ -380,7 +395,7 @@ pub(crate) fn build_credential(
             azure_identity::ManagedIdentityCredential::new(None)
                 .map_err(|e| format!("Failed to create ManagedIdentityCredential: {e}"))?;
 
-        Ok((ns, eh_name, credential))
+        Ok((ns, eh_name, credential, None))
     }
 }
 
@@ -392,6 +407,7 @@ pub(crate) struct ParsedEventHubsConnectionString {
     pub shared_access_key_name: String,
     pub shared_access_key: String,
     pub entity_path: Option<String>,
+    pub use_development_emulator: bool,
 }
 
 impl ParsedEventHubsConnectionString {
@@ -400,6 +416,7 @@ impl ParsedEventHubsConnectionString {
         let mut key_name = None;
         let mut key = None;
         let mut entity_path = None;
+        let mut use_dev_emulator = false;
 
         for part in connection_string.split(';') {
             let part = part.trim();
@@ -414,6 +431,9 @@ impl ParsedEventHubsConnectionString {
                     "Endpoint" => endpoint = Some(v.trim().to_string()),
                     "SharedAccessKeyName" => key_name = Some(v.trim().to_string()),
                     "EntityPath" => entity_path = Some(v.trim().to_string()),
+                    "UseDevelopmentEmulator" => {
+                        use_dev_emulator = v.trim().eq_ignore_ascii_case("true");
+                    }
                     _ => {}
                 }
             }
@@ -425,6 +445,7 @@ impl ParsedEventHubsConnectionString {
                 .ok_or("Missing 'SharedAccessKeyName' in connection string")?,
             shared_access_key: key.ok_or("Missing 'SharedAccessKey' in connection string")?,
             entity_path,
+            use_development_emulator: use_dev_emulator,
         })
     }
 }
@@ -432,6 +453,30 @@ impl ParsedEventHubsConnectionString {
 // --- SAS TokenCredential for connection string auth ---
 
 /// A `TokenCredential` that generates Event Hubs SAS tokens from a shared access key.
+// --- Emulator credential (dummy, no validation) ---
+
+/// A dummy `TokenCredential` for the Event Hubs emulator.
+///
+/// The emulator does not validate SAS tokens, so this returns a fixed token.
+#[derive(Debug)]
+pub(crate) struct EmulatorCredential;
+
+#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
+#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
+impl TokenCredential for EmulatorCredential {
+    async fn get_token(
+        &self,
+        _scopes: &[&str],
+        _options: Option<TokenRequestOptions<'_>>,
+    ) -> azure_core::Result<AccessToken> {
+        let expires_on =
+            azure_core::time::OffsetDateTime::now_utc() + std::time::Duration::from_secs(3600);
+        Ok(AccessToken::new("emulator-dummy-token", expires_on))
+    }
+}
+
+// --- SAS TokenCredential for connection string auth ---
+
 ///
 /// Used when authenticating via connection string. The generated SAS token is compatible
 /// with Event Hubs AMQP CBS (Claim-Based Security) authentication.
@@ -597,6 +642,15 @@ mod tests {
         let parsed = ParsedEventHubsConnectionString::parse(cs).unwrap();
         assert_eq!(parsed.endpoint, "sb://ns.servicebus.windows.net/");
         assert_eq!(parsed.shared_access_key_name, "key1");
+        assert!(!parsed.use_development_emulator);
+    }
+
+    #[test]
+    fn parse_connection_string_emulator_mode() {
+        let cs = "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true";
+        let parsed = ParsedEventHubsConnectionString::parse(cs).unwrap();
+        assert_eq!(parsed.endpoint, "sb://localhost");
+        assert!(parsed.use_development_emulator);
     }
 
     // --- SAS credential ---
@@ -675,9 +729,10 @@ mod tests {
         let cs = SensitiveString::from(
             "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=dGVzdA==;EntityPath=my-hub".to_string(),
         );
-        let (ns, eh, _cred) = build_credential(Some(&cs), None, None).unwrap();
+        let (ns, eh, _cred, custom_ep) = build_credential(Some(&cs), None, None).unwrap();
         assert_eq!(ns, "myns.servicebus.windows.net");
         assert_eq!(eh, "my-hub");
+        assert!(custom_ep.is_none());
     }
 
     #[test]
@@ -685,7 +740,7 @@ mod tests {
         let cs = SensitiveString::from(
             "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=dGVzdA==;EntityPath=from-cs".to_string(),
         );
-        let (_, eh, _) =
+        let (_, eh, _, _) =
             build_credential(Some(&cs), None, Some("override-hub")).unwrap();
         assert_eq!(eh, "override-hub");
     }
@@ -712,5 +767,16 @@ mod tests {
         let result = build_credential(None, Some("ns.servicebus.windows.net"), None);
         assert!(result.is_err());
         assert!(result.unwrap_err().to_string().contains("event_hub_name"));
+    }
+
+    #[test]
+    fn build_credential_emulator_mode() {
+        let cs = SensitiveString::from(
+            "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;EntityPath=eh1".to_string(),
+        );
+        let (ns, eh, _cred, custom_ep) = build_credential(Some(&cs), None, None).unwrap();
+        assert_eq!(ns, "localhost");
+        assert_eq!(eh, "eh1");
+        assert_eq!(custom_ep, Some("amqp://localhost:5672".to_string()));
     }
 }

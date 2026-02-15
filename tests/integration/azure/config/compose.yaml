@@ -3,9 +3,22 @@ version: '3'
 services:
   local-azure-blob:
     image: mcr.microsoft.com/azure-storage/azurite:${CONFIG_VERSION}
-    command: azurite --blobHost 0.0.0.0 --loose
+    command: azurite --blobHost 0.0.0.0 --tableHost 0.0.0.0 --queueHost 0.0.0.0 --loose
     volumes:
     - /var/run:/var/run
+
+  eventhubs-emulator:
+    image: mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest
+    volumes:
+      - ./eventhubs-config.json:/Eventhubs_Emulator/ConfigFiles/Config.json
+    ports:
+      - "5672:5672"
+    environment:
+      BLOB_SERVER: local-azure-blob
+      METADATA_SERVER: local-azure-blob
+      ACCEPT_EULA: "Y"
+    depends_on:
+      - local-azure-blob
 
 networks:
   default:

@@ -98,10 +98,14 @@ async fn run_healthcheck(
 ) -> crate::Result<()> {
     use azure_messaging_eventhubs::ProducerClient;
 
-    let (ns, eh_name, credential) =
+    let (ns, eh_name, credential, custom_endpoint) =
         build_credential(connection_string, namespace, event_hub_name)?;
 
-    let client = ProducerClient::builder()
+    let mut builder = ProducerClient::builder();
+    if let Some(endpoint) = custom_endpoint {
+        builder = builder.with_custom_endpoint(endpoint);
+    }
+    let client = builder
         .open(&ns, &eh_name, credential)
         .await
         .map_err(|e| format!("Event Hubs healthcheck: failed to create producer: {e}"))?;

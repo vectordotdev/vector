@@ -13,13 +13,17 @@ pub struct AzureEventHubsSink {
 
 impl AzureEventHubsSink {
     pub async fn new(config: &AzureEventHubsSinkConfig) -> crate::Result<Self> {
-        let (namespace, event_hub_name, credential) = build_credential(
+        let (namespace, event_hub_name, credential, custom_endpoint) = build_credential(
             config.connection_string.as_ref(),
             config.namespace.as_deref(),
             config.event_hub_name.as_deref(),
         )?;
 
-        let producer = azure_messaging_eventhubs::ProducerClient::builder()
+        let mut builder = azure_messaging_eventhubs::ProducerClient::builder();
+        if let Some(endpoint) = custom_endpoint {
+            builder = builder.with_custom_endpoint(endpoint);
+        }
+        let producer = builder
             .open(&namespace, &event_hub_name, credential)
             .await
             .map_err(|e| format!("Failed to create Event Hubs producer: {e}"))?;
