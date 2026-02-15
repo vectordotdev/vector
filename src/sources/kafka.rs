@@ -1720,11 +1720,15 @@ mod integration_test {
         let attempt_count_clone = attempt_count.clone();
 
         let error_fn = move |n: usize| {
+            eprintln!("TEST: error_fn called with batch index {}", n);
             if n == 2 {
                 let mut count = attempt_count_clone.lock().unwrap();
                 *count += 1;
+                eprintln!("TEST: Batch 2 - attempt count = {}", *count);
                 // Reject on first attempt, accept on retry
-                *count == 1
+                let should_reject = *count == 1;
+                eprintln!("TEST: Batch 2 - should_reject = {}", should_reject);
+                should_reject
             } else {
                 false
             }
