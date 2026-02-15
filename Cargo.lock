@@ -2563,7 +2563,7 @@ version = "3.0.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fde0e0ec90c9dfb3b4b1a0891a7dcd0e2bffde2f7efed5fe7c9bb00e5bfb915e"
 dependencies = [
- "windows-sys 0.59.0",
+ "windows-sys 0.48.0",
 ]
 
 [[package]]
@@ -3455,7 +3455,7 @@ dependencies = [
  "libc",
  "option-ext",
  "redox_users 0.5.0",
- "windows-sys 0.61.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -5332,7 +5332,7 @@ dependencies = [
  "libc",
  "percent-encoding",
  "pin-project-lite",
- "socket2 0.6.0",
+ "socket2 0.5.10",
  "system-configuration 0.6.1",
  "tokio",
  "tower-service",
@@ -7069,14 +7069,14 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.26.2"
-source = "git+https://github.com/vectordotdev/nix.git?branch=memfd%2Fgnu%2Fmusl#6c53a918d2d5bf4307fd60a19d9e10913ae71eeb"
+version = "0.26.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
 dependencies = [
  "bitflags 1.3.2",
  "cfg-if",
  "libc",
  "memoffset 0.7.1",
- "static_assertions",
 ]
 
 [[package]]
@@ -7192,7 +7192,8 @@ checksum = "5e0826a989adedc2a244799e823aece04662b66609d96af8dff7ac6df9a8925d"
 [[package]]
 name = "ntapi"
 version = "0.3.7"
-source = "git+https://github.com/MSxDOS/ntapi.git?rev=24fc1e47677fc9f6e38e5f154e6011dc9b270da6#24fc1e47677fc9f6e38e5f154e6011dc9b270da6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c28774a7fd2fbb4f0babd8237ce554b73af68021b5f695a3cebd6c59bac0980f"
 dependencies = [
  "winapi",
 ]
@@ -11098,7 +11099,7 @@ dependencies = [
  "getrandom 0.3.4",
  "once_cell",
  "rustix 1.0.1",
- "windows-sys 0.61.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -11495,8 +11496,9 @@ dependencies = [
 
 [[package]]
 name = "tokio-util"
-version = "0.7.13"
-source = "git+https://github.com/vectordotdev/tokio?branch=tokio-util-0.7.13-framed-read-continue-on-error#b4bdfda8fe8aa24eba36de0d60063b14f30c7fe7"
+version = "0.7.18"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9ae9cec805b01e8fc3fd2fe289f89149a9b66dd16786abd8b19cfa7b48cb0098"
 dependencies = [
  "bytes 1.11.1",
  "futures-core",
@@ -12574,7 +12576,7 @@ dependencies = [
  "netlink-packet-sock-diag",
  "netlink-packet-utils",
  "netlink-sys",
- "nix 0.26.2",
+ "nix 0.26.4",
  "nkeys",
  "nom 8.0.0",
  "notify",
