@@ -230,13 +230,14 @@ impl SinkConfig for ClickhouseConfig {
         });
 
         // Resolve the encoding strategy (format + encoder) based on configuration
-        let (format, encoder_kind) = self
+        let (format, encoder_kind, required_fields) = self
             .resolve_strategy(&client, &endpoint, &database, auth.as_ref())
             .await?;
 
         let request_builder = ClickhouseRequestBuilder {
             compression: self.compression,
             encoder: (self.encoding.clone(), encoder_kind),
+            required_fields,
         };
 
         let sink = ClickhouseSink::new(
@@ -273,7 +274,7 @@ impl ClickhouseConfig {
         endpoint: &Uri,
         database: &Template,
         auth: Option<&Auth>,
-    ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind)> {
+    ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind, Option<Vec<String>>)> {
         use vector_lib::codecs::EncoderKind;
         use vector_lib::codecs::{
             JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer,
@@ -304,12 +305,18 @@ impl ClickhouseConfig {
             )
             .await?;
 
+            let required_fields = arrow_config
+                .schema
+                .as_ref()
+                .map(extract_required_fields)
+                .filter(|fields| !fields.is_empty());
+
             let resolved_batch_config = BatchSerializerConfig::ArrowStream(arrow_config);
             let arrow_serializer = resolved_batch_config.build()?;
             let batch_serializer = BatchSerializer::Arrow(arrow_serializer);
             let encoder = EncoderKind::Batch(BatchEncoder::new(batch_serializer));
 
-            return Ok((Format::ArrowStream, encoder));
+            return Ok((Format::ArrowStream, encoder, required_fields));
         }
 
         let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(
@@ -317,7 +324,7 @@ impl ClickhouseConfig {
             JsonSerializerConfig::default().build().into(),
         )));
 
-        Ok((self.format, encoder))
+        Ok((self.format, encoder, None))
     }
 
     async fn resolve_arrow_schema(
@@ -373,6 +380,15 @@ impl ClickhouseConfig {
 
         Ok(())
     }
+}
+
+fn extract_required_fields(schema: &arrow::datatypes::Schema) -> Vec<String> {
+    schema
+        .fields()
+        .iter()
+        .filter(|field| !field.is_nullable())
+        .map(|field| field.name().to_string())
+        .collect()
 }
 
 fn get_healthcheck_uri(endpoint: &Uri) -> String {

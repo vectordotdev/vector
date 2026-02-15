@@ -273,9 +273,6 @@ fn build_record_batch(
     schema: SchemaRef,
     events: &[Event],
 ) -> Result<RecordBatch, ArrowEncodingError> {
-    // Pre-validate non-nullable fields (arrow-json silently writes defaults for missing fields)
-    validate_non_nullable_fields(events, &schema)?;
-
     let mut decoder = ReaderBuilder::new(Arc::clone(&schema))
         .build_decoder()
         .context(RecordBatchCreationSnafu)?;
@@ -292,24 +289,6 @@ fn build_record_batch(
         .flush()
         .context(ArrowJsonDecodeSnafu)?
         .ok_or(ArrowEncodingError::NoEvents)
-}
-
-/// Validate that non-nullable fields are present in all events.
-fn validate_non_nullable_fields(
-    events: &[Event],
-    schema: &SchemaRef,
-) -> Result<(), ArrowEncodingError> {
-    for field in schema.fields().iter().filter(|f| !f.is_nullable()) {
-        let name = field.name();
-        ensure!(
-            !events
-                .iter()
-                .filter_map(Event::maybe_as_log)
-                .any(|log| log.get(lookup::event_path!(name)).is_none()),
-            NullConstraintSnafu { field_name: name },
-        );
-    }
-    Ok(())
 }
 
 #[cfg(test)]
@@ -555,7 +534,7 @@ mod tests {
         }
 
         #[test]
-        fn test_null_constraint_error() {
+        fn test_missing_required_field_encodes_null() {
             let events = vec![create_event(vec![("other_field", "value")])];
 
             let schema = SchemaRef::new(Schema::new(vec![Field::new(
@@ -564,11 +543,10 @@ mod tests {
                 false, // non-nullable
             )]));
 
-            let result = encode_events_to_arrow_ipc_stream(&events, schema);
-            assert!(matches!(
-                result.unwrap_err(),
-                ArrowEncodingError::NullConstraint { field_name } if field_name == "required_field"
-            ));
+            let batch = encode_and_decode(events, schema).expect("Failed to encode");
+            assert_eq!(batch.num_rows(), 1);
+            assert!(!batch.schema().field(0).is_nullable());
+            assert!(batch.column(0).is_null(0));
         }
     }
 
