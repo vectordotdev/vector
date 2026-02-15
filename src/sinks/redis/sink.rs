@@ -272,6 +272,7 @@ impl RedisSink {
         };
 
         let data_type = match config.data_type {
+            DataTypeConfig::String => super::DataType::String,
             DataTypeConfig::Channel => super::DataType::Channel,
             DataTypeConfig::List => super::DataType::List(list_method.unwrap_or_default()),
             DataTypeConfig::SortedSet => {
