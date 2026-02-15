@@ -218,6 +218,7 @@ serial_test = { version = "3.2" }
 cfg-if.workspace = true
 reqwest.workspace = true
 reqwest_12 = { package = "reqwest", version = "0.12", features = ["json"] }
+reqwest_13 = { package = "reqwest", version = "0.13", features = ["stream"], optional = true }
 clap.workspace = true
 clap_complete.workspace = true
 indoc.workspace = true
@@ -297,10 +298,15 @@ aws-smithy-runtime-api = { version = "1.7.3", default-features = false, optional
 aws-smithy-types = { version = "1.2.11", default-features = false, features = ["rt-tokio"], optional = true }
 
 # Azure
-azure_core = { version = "0.30", features = ["reqwest", "hmac_openssl"], optional = true }
+azure_core = { version = "0.32", features = ["reqwest", "hmac_openssl"], optional = true }
+azure_core_amqp = { version = "0.11", optional = true }
+azure_identity = { version = "0.32", optional = true }
 
 # Azure Storage
-azure_storage_blob = { version = "0.7", optional = true }
+azure_storage_blob = { version = "0.9", optional = true }
+
+# Azure Messaging
+azure_messaging_eventhubs = { version = "0.11", optional = true }
 
 # OpenDAL
 opendal = { version = "0.54", default-features = false, features = ["services-webhdfs"], optional = true }
@@ -604,6 +610,7 @@ sources-logs = [
   "sources-aws_kinesis_firehose",
   "sources-aws_s3",
   "sources-aws_sqs",
+  "sources-azure_event_hubs",
   "sources-datadog_agent",
   "sources-demo_logs",
   "sources-docker_logs",
@@ -656,6 +663,7 @@ sources-aws_ecs_metrics = ["sources-utils-http-client"]
 sources-aws_kinesis_firehose = ["dep:base64"]
 sources-aws_s3 = ["aws-core", "dep:aws-sdk-sqs", "dep:aws-sdk-s3", "dep:async-compression", "sources-aws_sqs", "tokio-util/io"]
 sources-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
+sources-azure_event_hubs = ["dep:azure_core", "dep:azure_core_amqp", "dep:azure_identity", "dep:azure_messaging_eventhubs"]
 sources-datadog_agent = ["sources-utils-http-encoding", "protobuf-build", "dep:prost"]
 sources-demo_logs = ["dep:fakedata"]
 sources-dnstap = ["sources-utils-net-tcp", "dep:base64", "dep:hickory-proto", "dep:dnsmsg-parser", "dep:dnstap-parser", "protobuf-build", "dep:prost", "vector-vrl-functions/dnstap"]
@@ -787,6 +795,7 @@ sinks-logs = [
   "sinks-aws_sqs",
   "sinks-axiom",
   "sinks-azure_blob",
+  "sinks-azure_event_hubs",
   "sinks-azure_monitor_logs",
   "sinks-blackhole",
   "sinks-chronicle",
@@ -853,7 +862,8 @@ sinks-aws_s3 = ["dep:base64", "dep:md-5", "aws-core", "dep:aws-sdk-s3"]
 sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-http"]
-sinks-azure_blob = ["dep:azure_core", "dep:azure_storage_blob"]
+sinks-azure_blob = ["dep:azure_core", "dep:azure_storage_blob", "dep:reqwest_13"]
+sinks-azure_event_hubs = ["dep:azure_core", "dep:azure_core_amqp", "dep:azure_identity", "dep:azure_messaging_eventhubs"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
@@ -962,7 +972,8 @@ aws-integration-tests = [
 ]
 
 azure-integration-tests = [
-  "azure-blob-integration-tests"
+  "azure-blob-integration-tests",
+  "azure-event-hubs-integration-tests"
 ]
 
 aws-cloudwatch-logs-integration-tests = ["sinks-aws_cloudwatch_logs"]
@@ -976,6 +987,7 @@ aws-sqs-integration-tests = ["sinks-aws_sqs"]
 aws-sns-integration-tests = ["sinks-aws_sns"]
 axiom-integration-tests = ["sinks-axiom"]
 azure-blob-integration-tests = ["sinks-azure_blob"]
+azure-event-hubs-integration-tests = ["sources-azure_event_hubs", "sinks-azure_event_hubs"]
 chronicle-integration-tests = ["sinks-gcp"]
 clickhouse-integration-tests = ["sinks-clickhouse"]
 databend-integration-tests = ["sinks-databend"]
