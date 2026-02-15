@@ -243,6 +243,20 @@ generated: components: sources: file: configuration: {
 			unit:    "bytes"
 		}
 	}
+	max_read_backoff_ms: {
+		description: """
+			The maximum interval between checks for new content in inactive files.
+
+			Files are considered inactive when no new data has been read. Such files are then checked
+			less frequently for new data. This setting defines the upper limit on how long to wait
+			before rechecking, improving performance while still detecting changes.
+			"""
+		required: false
+		type: uint: {
+			default: 2048
+			unit:    "milliseconds"
+		}
+	}
 	max_read_bytes: {
 		description: """
 			Max amount of bytes to read from a single file before switching over to the next file.

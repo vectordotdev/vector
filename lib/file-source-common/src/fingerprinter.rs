@@ -201,19 +201,19 @@ impl Fingerprinter {
         path: &Path,
         known_small_files: &mut HashMap<PathBuf, time::Instant>,
         emitter: &impl FileSourceInternalEvents,
-    ) -> Option<FileFingerprint> {
-        let metadata = match fs::metadata(path).await {
+    ) -> Option<(FileFingerprint, Option<std::fs::Metadata>)> {
+        let (fingerprint, metadata) = match fs::metadata(path).await {
             Ok(metadata) => {
                 if !metadata.is_dir() {
-                    self.fingerprint(path).await.map(Some)
+                    (self.fingerprint(path).await.map(Some), Some(metadata))
                 } else {
-                    Ok(None)
+                    (Ok(None), Some(metadata))
                 }
             }
-            Err(e) => Err(e),
+            Err(e) => (Err(e), None),
         };
 
-        metadata
+        fingerprint
             .inspect(|_| {
                 // Drop the path from the small files map if we've got enough data to fingerprint it.
                 known_small_files.remove(&path.to_path_buf());
@@ -241,6 +241,7 @@ impl Fingerprinter {
             })
             .ok()
             .flatten()
+            .map(|fingerprint| (fingerprint, metadata))
     }
 }
 
