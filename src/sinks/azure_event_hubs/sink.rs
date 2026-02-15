@@ -1,14 +1,14 @@
-use azure_messaging_eventhubs::ProducerClient;
-use bytes::BytesMut;
-use tokio_util::codec::Encoder as _;
-
-use super::config::AzureEventHubsSinkConfig;
+use super::{
+    config::AzureEventHubsSinkConfig,
+    request_builder::AzureEventHubsRequestBuilder,
+    service::AzureEventHubsService,
+};
 use crate::{sinks::prelude::*, sources::azure_event_hubs::build_credential};
 
 pub struct AzureEventHubsSink {
-    producer: ProducerClient,
     transformer: Transformer,
-    encoder: crate::codecs::Encoder<()>,
+    encoder: Encoder<()>,
+    service: AzureEventHubsService,
 }
 
 impl AzureEventHubsSink {
@@ -19,52 +19,45 @@ impl AzureEventHubsSink {
             config.event_hub_name.as_deref(),
         )?;
 
-        let producer = ProducerClient::builder()
+        let producer = azure_messaging_eventhubs::ProducerClient::builder()
             .open(&namespace, &event_hub_name, credential)
             .await
             .map_err(|e| format!("Failed to create Event Hubs producer: {e}"))?;
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
-        let encoder = crate::codecs::Encoder::<()>::new(serializer);
+        let encoder = Encoder::<()>::new(serializer);
+
+        let request_limits = config.request.into_settings();
+        let max_in_flight = request_limits.concurrency.unwrap_or(100);
 
         Ok(Self {
-            producer,
             transformer,
             encoder,
+            service: AzureEventHubsService::new(producer, max_in_flight),
         })
     }
 
-    async fn run_inner(mut self: Box<Self>, mut input: BoxStream<'_, Event>) -> Result<(), ()> {
-        while let Some(mut event) = input.next().await {
-            let _byte_size = event.estimated_json_encoded_size_of();
-            let finalizers = event.take_finalizers();
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let request_builder = AzureEventHubsRequestBuilder {
+            encoder: (self.transformer, self.encoder),
+        };
 
-            self.transformer.transform(&mut event);
-
-            let mut body = BytesMut::new();
-            if self.encoder.encode(event, &mut body).is_err() {
-                error!(message = "Failed to encode event for Event Hubs.");
-                finalizers.update_status(EventStatus::Errored);
-                continue;
-            }
-
-            let event_data = azure_messaging_eventhubs::models::EventData::builder()
-                .with_body(body.freeze().to_vec())
-                .build();
-
-            match self.producer.send_event(event_data, None).await {
-                Ok(_) => {
-                    finalizers.update_status(EventStatus::Delivered);
+        input
+            .request_builder(default_request_builder_concurrency_limit(), request_builder)
+            .filter_map(|request| async {
+                match request {
+                    Err(error) => {
+                        emit!(SinkRequestBuildError { error });
+                        None
+                    }
+                    Ok(req) => Some(req),
                 }
-                Err(e) => {
-                    error!(message = "Failed to send event to Event Hubs.", error = %e);
-                    finalizers.update_status(EventStatus::Errored);
-                }
-            }
-        }
-
-        Ok(())
+            })
+            .into_driver(self.service)
+            .protocol("amqp")
+            .run()
+            .await
     }
 }
 

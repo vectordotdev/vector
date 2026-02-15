@@ -36,6 +36,10 @@ pub struct AzureEventHubsSinkConfig {
     pub encoding: EncodingConfig,
 
     #[configurable(derived)]
+    #[serde(default)]
+    pub request: TowerRequestConfig,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
@@ -48,7 +52,9 @@ impl GenerateConfig for AzureEventHubsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"connection_string = "Endpoint=sb://mynamespace.servicebus.windows.net/;SharedAccessKeyName=mykeyname;SharedAccessKey=mykey;EntityPath=my-event-hub"
-            encoding.codec = "json""#,
+            encoding.codec = "json"
+            [request]
+            concurrency = 10"#,
         )
         .unwrap()
     }
