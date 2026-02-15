@@ -2,6 +2,17 @@
 # Based on cleanup script from: https://github.com/apache/flink
 # Licensed under Apache License 2.0
 
+# Parse command line arguments
+SKIP_DOCKER=false
+for arg in "$@"; do
+  case $arg in
+    --no-docker)
+      SKIP_DOCKER=true
+      shift
+      ;;
+  esac
+done
+
 echo "=============================================================================="
 echo "Freeing up disk space on GitHub Actions runner"
 echo "=============================================================================="
@@ -27,8 +38,12 @@ sudo rm -rf /usr/share/dotnet/ \
   /usr/share/swift \
   /opt/az
 
-echo "Cleaning Docker artifacts..."
-docker system prune -af --volumes || true
+if [[ "$SKIP_DOCKER" == "false" ]]; then
+  echo "Cleaning Docker artifacts..."
+  docker system prune -af --volumes || true
+else
+  echo "Skipping Docker cleanup (--no-docker flag provided)"
+fi
 
 echo "Cleaning swap..."
 sudo swapoff -a || true
