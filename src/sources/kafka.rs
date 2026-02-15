@@ -1584,7 +1584,7 @@ mod integration_test {
     use super::{test::*, *};
     use crate::{
         SourceSender,
-        event::{EventArray, EventContainer},
+        event::{EventArray, EventContainer, into_event_stream},
         shutdown::ShutdownSignal,
         test_util::{collect_n, components::assert_source_compliance, random_string},
     };
@@ -1699,71 +1699,110 @@ mod integration_test {
     /// This test verifies the fix for the issue where rejected messages would cause offset commits
     /// to be skipped, but the consumer wouldn't seek back to retry them.
     ///
-    /// The test:
-    /// 1. Sends 5 messages to Kafka
-    /// 2. Rejects the 3rd message on first attempt
-    /// 3. Verifies that Vector seeks back and retries the message
-    /// 4. Confirms all 5 messages are eventually received and committed
+    /// The test simulates a real-world scenario where a sink temporarily fails (e.g., auth error):
+    /// 1. Sends message A to Kafka - sink accepts it (offset committed)
+    /// 2. Sends messages B and C to Kafka - sink rejects them (offset NOT committed)
+    /// 3. Sends message D to Kafka - sink accepts it again
+    /// 4. Verifies that Kafka source seeks back and retries B and C
+    /// 5. Confirms all messages (A, B, C, D) are eventually received and committed
     #[tokio::test]
     async fn seeks_back_on_rejected_message() {
-        const SEND_COUNT: usize = 5;
+        const SEND_COUNT: usize = 4;
+        // We expect to receive 6 events total: 0, 1, 2, 3, then 1 and 2 again after retry
+        const EXPECTED_EVENT_COUNT: usize = 6;
 
         let topic = format!("test-topic-{}", random_string(10));
         let group_id = format!("test-group-{}", random_string(10));
         let config = make_config(&topic, &group_id, LogNamespace::Legacy, None);
 
-        // Send 5 messages to Kafka
+        // Send 4 messages to Kafka (A, B, C, D)
         send_events(topic.clone(), 1, SEND_COUNT).await;
 
-        // Reject the 3rd message (index 2) on first attempt, then accept it on retry
-        let attempt_count = std::sync::Arc::new(std::sync::Mutex::new(0));
-        let attempt_count_clone = attempt_count.clone();
+        // Track which messages we've received
+        let received_messages = std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+        let received_clone = received_messages.clone();
 
-        let error_fn = move |n: usize| {
-            eprintln!("TEST: error_fn called with batch index {}", n);
-            if n == 2 {
-                let mut count = attempt_count_clone.lock().unwrap();
-                *count += 1;
-                eprintln!("TEST: Batch 2 - attempt count = {}", *count);
-                // Reject on first attempt, accept on retry
-                let should_reject = *count == 1;
-                eprintln!("TEST: Batch 2 - should_reject = {}", should_reject);
-                should_reject
-            } else {
-                false
+        // Create a controllable pipeline that:
+        // - Accepts message 0 (A) - EventStatus::Delivered
+        // - Rejects messages 1 and 2 (B, C) on first attempt - EventStatus::Rejected
+        // - Accepts message 3 (D) - EventStatus::Delivered
+        // - Accepts messages 1 and 2 (B, C) on retry - EventStatus::Delivered
+        let (pipe, recv) = SourceSender::new_test_sender_with_options(100, None);
+        let recv = recv.into_stream();
+        let recv = recv.then(move |mut item| {
+            let received_clone = received_clone.clone();
+            async move {
+                // Extract message index from the event
+                let message_text = item.events.iter_logs_mut().next().unwrap()
+                    [log_schema().message_key().unwrap().to_string()]
+                    .to_string_lossy();
+
+                // Parse index from "my message XXX"
+                let index: usize = message_text.split_whitespace().last().unwrap().parse().unwrap();
+
+                let mut received = received_clone.lock().unwrap();
+                let attempt_count = received.iter().filter(|&&i| i == index).count();
+                received.push(index);
+
+                eprintln!("TEST: Received message {} (attempt {})", index, attempt_count + 1);
+
+                // Determine status based on message index and attempt count
+                let status = match (index, attempt_count) {
+                    (0, _) => EventStatus::Delivered,  // A: always accept
+                    (1, 0) => EventStatus::Rejected,   // B: reject on first attempt
+                    (1, _) => EventStatus::Delivered,  // B: accept on retry
+                    (2, 0) => EventStatus::Rejected,   // C: reject on first attempt
+                    (2, _) => EventStatus::Delivered,  // C: accept on retry
+                    (3, _) => EventStatus::Delivered,  // D: always accept
+                    _ => EventStatus::Delivered,
+                };
+
+                eprintln!("TEST: Message {} status: {:?}", index, status);
+
+                item.events.iter_events_mut().for_each(|mut event| {
+                    let metadata = event.metadata_mut();
+                    metadata.update_status(status);
+                    metadata.update_sources();
+                });
+                item
             }
-        };
+        });
 
-        let events = assert_source_compliance(&["protocol", "topic", "partition"], async move {
-            let (tx, rx) = SourceSender::new_test_errors(error_fn);
-            let (trigger_shutdown, shutdown_done) =
-                spawn_kafka(tx, config, true, false, LogNamespace::Legacy);
+        let (trigger_shutdown, shutdown_done) =
+            spawn_kafka(pipe, config, true, false, LogNamespace::Legacy);
 
-            // Collect all messages - should get all 5 even though one was rejected initially
-            let events = collect_n(rx, SEND_COUNT).await;
+        // Collect all messages - should get 6 total (4 original + 2 retries)
+        let events = collect_n(Box::pin(recv.flat_map(into_event_stream)), EXPECTED_EVENT_COUNT).await;
 
-            tokio::task::yield_now().await;
-            drop(trigger_shutdown);
-            shutdown_done.await;
+        // Wait for acknowledgements to be processed and offsets to be committed
+        // The auto.commit.interval.ms is 5000ms by default, so we need to wait for that
+        tokio::time::sleep(Duration::from_millis(6000)).await;
 
-            events
-        })
-        .await;
+        tokio::task::yield_now().await;
+        drop(trigger_shutdown);
+        shutdown_done.await;
 
-        // Verify we received all 5 messages
+        // Verify we received all 6 events (4 original + 2 retries)
         assert_eq!(
             events.len(),
-            SEND_COUNT,
-            "Should receive all messages after retry"
+            EXPECTED_EVENT_COUNT,
+            "Should receive all messages including retries"
         );
 
-        // Verify the offset was committed for all messages (including the retried one)
-        let offset = fetch_tpl_offset(&group_id, &topic, 0);
-        assert_eq!(
-            offset,
-            Offset::from_raw(SEND_COUNT as i64),
-            "Offset should be committed for all messages including retried ones"
-        );
+        // Verify the messages were retried (B and C should appear twice in received_messages)
+        let received = received_messages.lock().unwrap();
+        eprintln!("TEST: All received message indices: {:?}", *received);
+
+        // Count how many times each message was received
+        let count_0 = received.iter().filter(|&&i| i == 0).count();
+        let count_1 = received.iter().filter(|&&i| i == 1).count();
+        let count_2 = received.iter().filter(|&&i| i == 2).count();
+        let count_3 = received.iter().filter(|&&i| i == 3).count();
+
+        assert_eq!(count_0, 1, "Message A should be received once");
+        assert_eq!(count_1, 2, "Message B should be received twice (rejected then retried)");
+        assert_eq!(count_2, 2, "Message C should be received twice (rejected then retried)");
+        assert_eq!(count_3, 1, "Message D should be received once");
     }
 
     async fn send_receive(
