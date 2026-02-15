@@ -9,6 +9,8 @@ publish = false
 chrono-tz.workspace = true
 vector-vrl-functions = { workspace = true, features = ["dnstap"] }
 enrichment = { path = "../../enrichment" }
+vector-vrl-metrics = { path = "../../vector-vrl-metrics" }
+vector-core = { path = "../../vector-core", default-features = false, features = ["vrl"] }
 vrl.workspace = true
 
 clap.workspace = true

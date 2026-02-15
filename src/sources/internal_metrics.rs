@@ -256,7 +256,7 @@ mod tests {
                 // [`metrics::handle::Histogram::new`] are hard-coded. If this
                 // check fails you might look there and see if we've allowed
                 // users to set their own bucket widths.
-                assert_eq!(buckets[9].count, 2);
+                assert_eq!(buckets[15].count, 2);
                 assert_eq!(*count, 2);
                 assert_eq!(*sum, 11.0);
             }
@@ -273,8 +273,8 @@ mod tests {
                 // [`metrics::handle::Histogram::new`] are hard-coded. If this
                 // check fails you might look there and see if we've allowed
                 // users to set their own bucket widths.
-                assert_eq!(buckets[9].count, 1);
-                assert_eq!(buckets[10].count, 1);
+                assert_eq!(buckets[15].count, 1);
+                assert_eq!(buckets[16].count, 1);
                 assert_eq!(*count, 2);
                 assert_eq!(*sum, 16.1);
             }

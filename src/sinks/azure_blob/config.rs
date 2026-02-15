@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use azure_storage_blobs::prelude::*;
+use azure_storage_blob::BlobContainerClient;
 use tower::ServiceBuilder;
 use vector_lib::{
     codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer},
@@ -165,10 +165,11 @@ impl GenerateConfig for AzureBlobSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_blob")]
 impl SinkConfig for AzureBlobSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(
             self.connection_string.clone().into(),
             self.container_name.clone(),
+            cx.proxy(),
         )?;
 
         let healthcheck = azure_common::config::build_healthcheck(
@@ -193,7 +194,7 @@ const DEFAULT_FILENAME_TIME_FORMAT: &str = "%s";
 const DEFAULT_FILENAME_APPEND_UUID: bool = true;
 
 impl AzureBlobSinkConfig {
-    pub fn build_processor(&self, client: Arc<ContainerClient>) -> crate::Result<VectorSink> {
+    pub fn build_processor(&self, client: Arc<BlobContainerClient>) -> crate::Result<VectorSink> {
         let request_limits = self.request.into_settings();
         let service = ServiceBuilder::new()
             .settings(request_limits, AzureBlobRetryLogic)
