@@ -113,3 +113,64 @@ async fn run_healthcheck(
 
     Ok(())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AzureEventHubsSinkConfig>();
+    }
+
+    #[test]
+    fn config_from_toml_connection_string() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            encoding.codec = "json"
+        "#;
+        let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
+        assert!(config.connection_string.is_some());
+        assert!(config.namespace.is_none());
+        assert!(config.event_hub_name.is_none());
+    }
+
+    #[test]
+    fn config_from_toml_identity_auth() {
+        let toml_str = r#"
+            namespace = "myns.servicebus.windows.net"
+            event_hub_name = "my-hub"
+            encoding.codec = "text"
+        "#;
+        let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
+        assert!(config.connection_string.is_none());
+        assert_eq!(config.namespace.as_deref(), Some("myns.servicebus.windows.net"));
+        assert_eq!(config.event_hub_name.as_deref(), Some("my-hub"));
+    }
+
+    #[test]
+    fn config_from_toml_with_request_settings() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            encoding.codec = "json"
+            [request]
+            concurrency = 20
+            timeout_secs = 30
+        "#;
+        let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
+        let settings = config.request.into_settings();
+        assert_eq!(settings.concurrency, Some(20));
+        assert_eq!(settings.timeout, std::time::Duration::from_secs(30));
+    }
+
+    #[test]
+    fn config_defaults_acknowledgements() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            encoding.codec = "json"
+        "#;
+        let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
+        // Default acknowledgements should not be enabled
+        assert!(!config.acknowledgements.enabled());
+    }
+}

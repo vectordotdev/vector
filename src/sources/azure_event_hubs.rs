@@ -386,6 +386,7 @@ pub(crate) fn build_credential(
 
 // --- Connection string parsing ---
 
+#[derive(Debug)]
 pub(crate) struct ParsedEventHubsConnectionString {
     pub endpoint: String,
     pub shared_access_key_name: String,
@@ -509,5 +510,207 @@ impl TokenCredential for EventHubsSasCredential {
             azure_core::time::OffsetDateTime::now_utc() + std::time::Duration::from_secs(3600);
 
         Ok(AccessToken::new(token, expires_on))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn generate_config() {
+        crate::test_util::test_generate_config::<AzureEventHubsSourceConfig>();
+    }
+
+    // --- Connection string parsing ---
+
+    #[test]
+    fn parse_full_connection_string() {
+        let cs = "Endpoint=sb://mynamespace.servicebus.windows.net/;SharedAccessKeyName=mykeyname;SharedAccessKey=dGVzdGtleQ==;EntityPath=my-hub";
+        let parsed = ParsedEventHubsConnectionString::parse(cs).unwrap();
+        assert_eq!(
+            parsed.endpoint,
+            "sb://mynamespace.servicebus.windows.net/"
+        );
+        assert_eq!(parsed.shared_access_key_name, "mykeyname");
+        assert_eq!(parsed.shared_access_key, "dGVzdGtleQ==");
+        assert_eq!(parsed.entity_path, Some("my-hub".to_string()));
+    }
+
+    #[test]
+    fn parse_connection_string_without_entity_path() {
+        let cs = "Endpoint=sb://ns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc123==";
+        let parsed = ParsedEventHubsConnectionString::parse(cs).unwrap();
+        assert_eq!(parsed.endpoint, "sb://ns.servicebus.windows.net/");
+        assert_eq!(parsed.shared_access_key_name, "key1");
+        assert_eq!(parsed.shared_access_key, "abc123==");
+        assert!(parsed.entity_path.is_none());
+    }
+
+    #[test]
+    fn parse_connection_string_with_base64_padding() {
+        // SharedAccessKey values often contain '=' from base64 padding
+        let cs = "Endpoint=sb://ns.servicebus.windows.net/;SharedAccessKeyName=RootKey;SharedAccessKey=abc+def/ghi123jklMNO456pqr789stu0vwxyz12345A=";
+        let parsed = ParsedEventHubsConnectionString::parse(cs).unwrap();
+        assert_eq!(
+            parsed.shared_access_key,
+            "abc+def/ghi123jklMNO456pqr789stu0vwxyz12345A="
+        );
+    }
+
+    #[test]
+    fn parse_connection_string_missing_endpoint() {
+        let cs = "SharedAccessKeyName=key1;SharedAccessKey=abc==";
+        let result = ParsedEventHubsConnectionString::parse(cs);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Missing 'Endpoint'"));
+    }
+
+    #[test]
+    fn parse_connection_string_missing_key_name() {
+        let cs = "Endpoint=sb://ns.servicebus.windows.net/;SharedAccessKey=abc==";
+        let result = ParsedEventHubsConnectionString::parse(cs);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Missing 'SharedAccessKeyName'"));
+    }
+
+    #[test]
+    fn parse_connection_string_missing_key() {
+        let cs = "Endpoint=sb://ns.servicebus.windows.net/;SharedAccessKeyName=key1";
+        let result = ParsedEventHubsConnectionString::parse(cs);
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Missing 'SharedAccessKey'"));
+    }
+
+    #[test]
+    fn parse_connection_string_ignores_empty_segments() {
+        let cs = "Endpoint=sb://ns.servicebus.windows.net/;;SharedAccessKeyName=key1;;SharedAccessKey=dGVzdA==;;";
+        let parsed = ParsedEventHubsConnectionString::parse(cs).unwrap();
+        assert_eq!(parsed.endpoint, "sb://ns.servicebus.windows.net/");
+        assert_eq!(parsed.shared_access_key_name, "key1");
+    }
+
+    // --- SAS credential ---
+
+    #[test]
+    fn sas_credential_new_valid() {
+        let cred = EventHubsSasCredential::new(
+            "sb://mynamespace.servicebus.windows.net/",
+            "RootManageSharedAccessKey",
+            "dGVzdGtleQ==", // base64 of "testkey"
+        );
+        assert!(cred.is_ok());
+        let cred = cred.unwrap();
+        assert_eq!(cred.resource_uri, "mynamespace.servicebus.windows.net");
+        assert_eq!(cred.key_name, "RootManageSharedAccessKey");
+    }
+
+    #[test]
+    fn sas_credential_strips_scheme_and_trailing_slash() {
+        let cred = EventHubsSasCredential::new(
+            "sb://myns.servicebus.windows.net/",
+            "key1",
+            "dGVzdA==",
+        )
+        .unwrap();
+        assert_eq!(cred.resource_uri, "myns.servicebus.windows.net");
+    }
+
+    #[test]
+    fn sas_credential_invalid_base64() {
+        let result = EventHubsSasCredential::new(
+            "sb://ns.servicebus.windows.net/",
+            "key1",
+            "not-valid-base64!!!",
+        );
+        assert!(result.is_err());
+        assert!(result
+            .unwrap_err()
+            .to_string()
+            .contains("Invalid SharedAccessKey base64"));
+    }
+
+    #[test]
+    fn sas_token_generation() {
+        let cred = EventHubsSasCredential::new(
+            "sb://mynamespace.servicebus.windows.net/",
+            "mykeyname",
+            "dGVzdGtleQ==",
+        )
+        .unwrap();
+
+        let token = cred.generate_sas_token(3600).unwrap();
+        assert!(token.starts_with("SharedAccessSignature sr="));
+        assert!(token.contains("&sig="));
+        assert!(token.contains("&se="));
+        assert!(token.contains("&skn=mykeyname"));
+    }
+
+    #[tokio::test]
+    async fn sas_credential_get_token() {
+        let cred = EventHubsSasCredential::new(
+            "sb://mynamespace.servicebus.windows.net/",
+            "mykeyname",
+            "dGVzdGtleQ==",
+        )
+        .unwrap();
+
+        let token = cred.get_token(&["scope"], None).await.unwrap();
+        assert!(token.token.secret().starts_with("SharedAccessSignature"));
+    }
+
+    // --- build_credential ---
+
+    #[test]
+    fn build_credential_connection_string_with_entity_path() {
+        let cs = SensitiveString::from(
+            "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=dGVzdA==;EntityPath=my-hub".to_string(),
+        );
+        let (ns, eh, _cred) = build_credential(Some(&cs), None, None).unwrap();
+        assert_eq!(ns, "myns.servicebus.windows.net");
+        assert_eq!(eh, "my-hub");
+    }
+
+    #[test]
+    fn build_credential_connection_string_override_entity_path() {
+        let cs = SensitiveString::from(
+            "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=dGVzdA==;EntityPath=from-cs".to_string(),
+        );
+        let (_, eh, _) =
+            build_credential(Some(&cs), None, Some("override-hub")).unwrap();
+        assert_eq!(eh, "override-hub");
+    }
+
+    #[test]
+    fn build_credential_connection_string_missing_entity_path() {
+        let cs = SensitiveString::from(
+            "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=dGVzdA==".to_string(),
+        );
+        let result = build_credential(Some(&cs), None, None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("Event Hub name"));
+    }
+
+    #[test]
+    fn build_credential_identity_missing_namespace() {
+        let result = build_credential(None, None, Some("my-hub"));
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("namespace"));
+    }
+
+    #[test]
+    fn build_credential_identity_missing_event_hub_name() {
+        let result = build_credential(None, Some("ns.servicebus.windows.net"), None);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("event_hub_name"));
     }
 }

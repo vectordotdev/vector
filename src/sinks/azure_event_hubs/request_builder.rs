@@ -51,3 +51,52 @@ impl RequestBuilder<Event> for AzureEventHubsRequestBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::event::{Event, LogEvent};
+
+    fn make_builder() -> AzureEventHubsRequestBuilder {
+        let transformer = Transformer::default();
+        let serializer: vector_lib::codecs::encoding::Serializer =
+            vector_lib::codecs::encoding::format::JsonSerializerConfig::default()
+                .build()
+                .into();
+        let encoder = Encoder::<()>::new(serializer);
+        AzureEventHubsRequestBuilder {
+            encoder: (transformer, encoder),
+        }
+    }
+
+    #[test]
+    fn split_input_extracts_finalizers() {
+        let builder = make_builder();
+        let event = Event::Log(LogEvent::from("hello world"));
+        let (metadata, _request_metadata_builder, _events) = builder.split_input(event);
+        drop(metadata.finalizers);
+    }
+
+    #[test]
+    fn build_request_produces_correct_body() {
+        use vector_lib::config::telemetry;
+
+        let builder = make_builder();
+        let event = Event::Log(LogEvent::from("test message"));
+        let (metadata, request_metadata_builder, _events) = builder.split_input(event);
+
+        let payload_bytes = Bytes::from(r#"{"message":"test message"}"#);
+        let byte_size = telemetry().create_request_count_byte_size();
+        let payload = EncodeResult::uncompressed(payload_bytes.clone(), byte_size);
+        let request_metadata = request_metadata_builder.build(&payload);
+        let request = builder.build_request(metadata, request_metadata, payload);
+
+        assert_eq!(request.body, payload_bytes);
+    }
+
+    #[test]
+    fn compression_is_none() {
+        let builder = make_builder();
+        assert!(matches!(builder.compression(), Compression::None));
+    }
+}

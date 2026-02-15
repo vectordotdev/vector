@@ -130,3 +130,81 @@ impl Drop for InFlightGuard {
         self.0.fetch_sub(1, Ordering::Relaxed);
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn in_flight_guard_decrements_on_drop() {
+        let counter = Arc::new(AtomicUsize::new(5));
+        {
+            let _guard = InFlightGuard(Arc::clone(&counter));
+            assert_eq!(counter.load(Ordering::Relaxed), 5);
+        }
+        // After guard is dropped, counter should be decremented
+        assert_eq!(counter.load(Ordering::Relaxed), 4);
+    }
+
+    #[test]
+    fn in_flight_guard_multiple_guards() {
+        let counter = Arc::new(AtomicUsize::new(0));
+        counter.fetch_add(3, Ordering::Relaxed);
+
+        let g1 = InFlightGuard(Arc::clone(&counter));
+        let g2 = InFlightGuard(Arc::clone(&counter));
+        assert_eq!(counter.load(Ordering::Relaxed), 3);
+
+        drop(g1);
+        assert_eq!(counter.load(Ordering::Relaxed), 2);
+
+        drop(g2);
+        assert_eq!(counter.load(Ordering::Relaxed), 1);
+    }
+
+    #[test]
+    fn response_driver_response_delivered() {
+        let response = AzureEventHubsResponse {
+            event_byte_size: config::telemetry().create_request_count_byte_size(),
+            raw_byte_size: 42,
+            event_status: EventStatus::Delivered,
+        };
+        assert_eq!(response.event_status(), EventStatus::Delivered);
+        assert_eq!(response.bytes_sent(), Some(42));
+    }
+
+    #[test]
+    fn response_driver_response_errored() {
+        let response = AzureEventHubsResponse {
+            event_byte_size: config::telemetry().create_request_count_byte_size(),
+            raw_byte_size: 0,
+            event_status: EventStatus::Errored,
+        };
+        assert_eq!(response.event_status(), EventStatus::Errored);
+        assert_eq!(response.bytes_sent(), Some(0));
+    }
+
+    #[test]
+    fn request_finalizable() {
+        let mut request = AzureEventHubsRequest {
+            body: Bytes::from("test"),
+            metadata: AzureEventHubsRequestMetadata {
+                finalizers: EventFinalizers::default(),
+            },
+            request_metadata: RequestMetadata::default(),
+        };
+        let _finalizers = request.take_finalizers();
+    }
+
+    #[test]
+    fn request_meta_descriptive() {
+        let request = AzureEventHubsRequest {
+            body: Bytes::from("test"),
+            metadata: AzureEventHubsRequestMetadata {
+                finalizers: EventFinalizers::default(),
+            },
+            request_metadata: RequestMetadata::default(),
+        };
+        let _meta = request.get_metadata();
+    }
+}
