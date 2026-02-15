@@ -7,7 +7,7 @@
 use arrow::{
     datatypes::{DataType, Field, Fields, Schema, SchemaRef},
     ipc::writer::StreamWriter,
-    json::reader::{Decoder, ReaderBuilder},
+    json::reader::ReaderBuilder,
     record_batch::RecordBatch,
 };
 use async_trait::async_trait;
@@ -276,11 +276,22 @@ fn build_record_batch(
     // Pre-validate non-nullable fields (arrow-json silently writes defaults for missing fields)
     validate_non_nullable_fields(events, &schema)?;
 
-    let decoder = ReaderBuilder::new(Arc::clone(&schema))
+    let mut decoder = ReaderBuilder::new(Arc::clone(&schema))
         .build_decoder()
         .context(RecordBatchCreationSnafu)?;
 
-    decode_events(decoder, events)
+    let values: Vec<&vrl::value::Value> = events
+        .iter()
+        .filter_map(Event::maybe_as_log)
+        .map(|log| log.value())
+        .collect();
+
+    decoder.serialize(&values).context(ArrowJsonDecodeSnafu)?;
+
+    decoder
+        .flush()
+        .context(ArrowJsonDecodeSnafu)?
+        .ok_or(ArrowEncodingError::NoEvents)
 }
 
 /// Validate that non-nullable fields are present in all events.
@@ -299,25 +310,6 @@ fn validate_non_nullable_fields(
         );
     }
     Ok(())
-}
-
-/// Serialize events as JSON and decode them into a RecordBatch using the arrow-json Decoder.
-fn decode_events(
-    mut decoder: Decoder,
-    events: &[Event],
-) -> Result<RecordBatch, ArrowEncodingError> {
-    let values: Vec<&vrl::value::Value> = events
-        .iter()
-        .filter_map(Event::maybe_as_log)
-        .map(|log| log.value())
-        .collect();
-
-    decoder.serialize(&values).context(ArrowJsonDecodeSnafu)?;
-
-    decoder
-        .flush()
-        .context(ArrowJsonDecodeSnafu)?
-        .ok_or(ArrowEncodingError::NoEvents)
 }
 
 #[cfg(test)]
