@@ -1772,7 +1772,13 @@ mod integration_test {
             spawn_kafka(pipe, config, true, false, LogNamespace::Legacy);
 
         // Collect all messages - should get 6 total (4 original + 2 retries)
-        let events = collect_n(Box::pin(recv.flat_map(into_event_stream)), EXPECTED_EVENT_COUNT).await;
+        // Use a timeout to prevent hanging if the fix is not present
+        let events = tokio::time::timeout(
+            Duration::from_secs(5),
+            collect_n(Box::pin(recv.flat_map(into_event_stream)), EXPECTED_EVENT_COUNT)
+        )
+        .await
+        .expect("Test timed out waiting for events - messages were not retried!");
 
         // Wait for acknowledgements to be processed and offsets to be committed
         // The auto.commit.interval.ms is 5000ms by default, so we need to wait for that
