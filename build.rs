@@ -91,17 +91,30 @@ impl BuildConstants {
     }
 }
 
-fn git_short_hash() -> std::io::Result<String> {
-    let output_result = Command::new("git")
-        .args(["rev-parse", "--short", "HEAD"])
-        .output();
+fn git_short_hash() -> String {
+    /*
+        Why are we doing this whole handling of the environment variable?
+        Packagers often do not package from a git working copy? they grab a tarball and `cargo vendor`
+        the dependencies and then build in an offline environment. This allows them to give the value
+        of the hash (or an equivalent value like the tag) to the build from the build description.
+        If that value is not in the environment, we fall through to the old code that parses the
+        git rev-parse output.
 
-    output_result.map(|output| {
-        let mut hash = String::from_utf8(output.stdout).expect("valid UTF-8");
-        hash.retain(|c| !c.is_ascii_whitespace());
+        So from all the packagers: Thank you for keeping this code alive!
+    */
+    let out = match std::env::var("GIT_HASH_SHORT") {
+        Ok(v) => v,
+        Err(_) => {
+            let output = Command::new("git")
+                .args(["rev-parse", "--short", "HEAD"])
+                .output()
+                .expect("failed to execute git rev-parse to read the current git hash");
+            String::from_utf8(output.stdout).expect("non-utf8 found in git hash")
+        }
+    };
 
-        hash
-    })
+    assert!(!out.is_empty(), "attempting to embed empty git hash");
+    out
 }
 
 fn main() {
@@ -196,14 +209,15 @@ fn main() {
     // In CI build workflows this will have been pre-configured by running the command
     // "git config --global --add safe.directory /git/vectordotdev/vector", from the vdev package
     // subcommands.
-    let git_short_hash = git_short_hash()
-        .map_err(|e| {
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!("Unable to determine git short hash from rev-parse command: {e}");
-            }
-        })
-        .expect("git hash detection failed");
+    // let git_short_hash = git_short_hash()
+    //     .map_err(|e| {
+    //         #[allow(clippy::print_stderr)]
+    //         {
+    //             eprintln!("Unable to determine git short hash from rev-parse command: {e}");
+    //         }
+    //     })
+    //     .expect("git hash detection failed");
+    let git_short_hash = git_short_hash();
 
     // Gather up the constants and write them out to our build constants file.
     let mut constants = BuildConstants::new();
