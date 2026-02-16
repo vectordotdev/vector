@@ -5,6 +5,8 @@ use nkeys::error::Error as NKeysError;
 use snafu::{ResultExt, Snafu};
 use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
+use crate::internal_events::NatsSlowConsumerEventReceived;
+
 use crate::tls::TlsEnableableConfig;
 
 /// Errors that can occur during NATS configuration.
@@ -182,6 +184,28 @@ pub(crate) fn from_tls_auth_config(
             Ok(nats_options)
         }
     }
+}
+
+/// Apply event callback to suppress noisy NATS client events.
+///
+/// This prevents log flooding from high-frequency SlowConsumer events.
+/// The async_nats library logs these events outside of Vector's
+/// rate limiting system, so we handle them here instead.
+pub(crate) fn apply_event_callback(
+    options: async_nats::ConnectOptions,
+    component_id: String,
+) -> async_nats::ConnectOptions {
+    options.event_callback(move |event| {
+        let component_id = component_id.clone();
+        async move {
+            if let async_nats::Event::SlowConsumer(subscription_id) = event {
+                emit!(NatsSlowConsumerEventReceived {
+                    subscription_id,
+                    component_id
+                });
+            }
+        }
+    })
 }
 
 #[cfg(test)]
