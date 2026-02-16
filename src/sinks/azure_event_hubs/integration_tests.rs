@@ -5,7 +5,9 @@
 
 use std::time::Duration;
 
-use azure_messaging_eventhubs::{ConsumerClient, OpenReceiverOptions, StartLocation, StartPosition};
+use azure_messaging_eventhubs::{
+    ConsumerClient, OpenReceiverOptions, StartLocation, StartPosition,
+};
 use futures_util::StreamExt;
 use vector_lib::{
     codecs::TextSerializerConfig,
@@ -119,8 +121,7 @@ async fn azure_event_hubs_sink_non_batch_mode() {
         )
         .unwrap();
 
-    let mut builder = ConsumerClient::builder()
-        .with_consumer_group(CONSUMER_GROUP.to_string());
+    let mut builder = ConsumerClient::builder().with_consumer_group(CONSUMER_GROUP.to_string());
     if let Some(endpoint) = custom_endpoint {
         builder = builder.with_custom_endpoint(endpoint);
     }
@@ -204,8 +205,7 @@ async fn azure_event_hubs_sink_happy_path() {
         )
         .unwrap();
 
-    let mut builder = ConsumerClient::builder()
-        .with_consumer_group(CONSUMER_GROUP.to_string());
+    let mut builder = ConsumerClient::builder().with_consumer_group(CONSUMER_GROUP.to_string());
     if let Some(endpoint) = custom_endpoint {
         builder = builder.with_custom_endpoint(endpoint);
     }

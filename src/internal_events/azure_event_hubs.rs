@@ -115,7 +115,12 @@ pub mod sink {
     use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
     /// Emit Event Hubs-specific labeled metrics (separate from standard Vector sink telemetry).
-    pub fn emit_eventhubs_sent_metrics(count: usize, byte_size: usize, event_hub_name: &str, partition_id: &str) {
+    pub fn emit_eventhubs_sent_metrics(
+        count: usize,
+        byte_size: usize,
+        event_hub_name: &str,
+        partition_id: &str,
+    ) {
         counter!(
             "azure_event_hubs_events_sent_total",
             "event_hub_name" => event_hub_name.to_string(),

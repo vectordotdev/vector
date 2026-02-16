@@ -14,10 +14,7 @@ use vector_lib::internal_event::{
 use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 
 use super::config::AzureEventHubsSinkConfig;
-use crate::{
-    sinks::prelude::*,
-    sources::azure_event_hubs::build_credential,
-};
+use crate::{sinks::prelude::*, sources::azure_event_hubs::build_credential};
 
 pub struct AzureEventHubsSink {
     producer: Arc<ProducerClient>,
@@ -43,14 +40,17 @@ impl AzureEventHubsSink {
         let event_hub_name_for_metrics = event_hub_name.clone();
 
         let retry_options = azure_messaging_eventhubs::RetryOptions {
-            initial_delay: azure_core::time::Duration::milliseconds(config.retry_initial_delay_ms as i64),
+            initial_delay: azure_core::time::Duration::milliseconds(
+                config.retry_initial_delay_ms as i64,
+            ),
             max_delay: azure_core::time::Duration::seconds(30),
             max_retries: config.retry_max_retries,
-            max_total_elapsed: azure_core::time::Duration::seconds(config.retry_max_elapsed_secs as i64),
+            max_total_elapsed: azure_core::time::Duration::seconds(
+                config.retry_max_elapsed_secs as i64,
+            ),
         };
 
-        let mut builder = ProducerClient::builder()
-            .with_retry_options(retry_options);
+        let mut builder = ProducerClient::builder().with_retry_options(retry_options);
         if let Some(endpoint) = custom_endpoint {
             builder = builder.with_custom_endpoint(endpoint);
         }
@@ -79,7 +79,10 @@ impl AzureEventHubsSink {
 
     /// Encode an event to bytes and extract optional partition ID.
     /// Returns (partition_id, encoded_bytes, json_byte_size, finalizers).
-    fn encode_event(&mut self, mut event: Event) -> Option<(Option<String>, Bytes, JsonSize, EventFinalizers)> {
+    fn encode_event(
+        &mut self,
+        mut event: Event,
+    ) -> Option<(Option<String>, Bytes, JsonSize, EventFinalizers)> {
         let finalizers = event.take_finalizers();
 
         let partition_id = self.partition_id_field.as_ref().and_then(|field| {
@@ -118,7 +121,10 @@ impl AzureEventHubsSink {
         let mut by_partition: HashMap<Option<String>, Vec<(Bytes, JsonSize, EventFinalizers)>> =
             HashMap::new();
         for (pid, body, json_size, fins) in buffer.drain(..) {
-            by_partition.entry(pid).or_default().push((body, json_size, fins));
+            by_partition
+                .entry(pid)
+                .or_default()
+                .push((body, json_size, fins));
         }
 
         for (partition_id, events) in by_partition {
@@ -132,9 +138,11 @@ impl AzureEventHubsSink {
                 .create_batch(Some(batch_options))
                 .await
                 .map_err(|e| {
-                    emit!(crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
-                        error: format!("Failed to create batch: {e}"),
-                    });
+                    emit!(
+                        crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
+                            error: format!("Failed to create batch: {e}"),
+                        }
+                    );
                 })?;
 
             let mut all_finalizers = Vec::new();
@@ -196,7 +204,10 @@ impl AzureEventHubsSink {
 
             let pid_label = partition_id.as_deref().unwrap_or("");
             crate::internal_events::azure_event_hubs::sink::emit_eventhubs_sent_metrics(
-                event_count, total_bytes, &self.event_hub_name, pid_label,
+                event_count,
+                total_bytes,
+                &self.event_hub_name,
+                pid_label,
             );
 
             // Standard Vector sink telemetry
@@ -212,9 +223,11 @@ impl AzureEventHubsSink {
         batch: azure_messaging_eventhubs::EventDataBatch<'_>,
     ) -> Result<(), ()> {
         self.producer.send_batch(batch, None).await.map_err(|e| {
-            emit!(crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
-                error: e.to_string(),
-            });
+            emit!(
+                crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
+                    error: e.to_string(),
+                }
+            );
         })
     }
 
@@ -234,17 +247,18 @@ impl AzureEventHubsSink {
             .build();
 
         let pid_label = partition_id.as_deref().unwrap_or("").to_string();
-        let options = partition_id.map(|pid| {
-            azure_messaging_eventhubs::SendEventOptions {
-                partition_id: Some(pid),
-            }
+        let options = partition_id.map(|pid| azure_messaging_eventhubs::SendEventOptions {
+            partition_id: Some(pid),
         });
 
         match self.producer.send_event(event_data, options).await {
             Ok(_) => {
                 finalizers.update_status(EventStatus::Delivered);
                 crate::internal_events::azure_event_hubs::sink::emit_eventhubs_sent_metrics(
-                    1, byte_size, &self.event_hub_name, &pid_label,
+                    1,
+                    byte_size,
+                    &self.event_hub_name,
+                    &pid_label,
                 );
                 // Standard Vector sink telemetry
                 events_sent.emit(CountByteSize(1, json_byte_size));
@@ -252,9 +266,11 @@ impl AzureEventHubsSink {
                 Ok(())
             }
             Err(e) => {
-                emit!(crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
-                    error: e.to_string(),
-                });
+                emit!(
+                    crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
+                        error: e.to_string(),
+                    }
+                );
                 finalizers.update_status(EventStatus::Errored);
                 Ok(())
             }
@@ -273,13 +289,22 @@ impl AzureEventHubsSink {
             let mut window_start = tokio::time::Instant::now();
 
             while let Some(event) = input.next().await {
-                if let Some((partition_id, body, json_size, finalizers)) = self.encode_event(event) {
+                if let Some((partition_id, body, json_size, finalizers)) = self.encode_event(event)
+                {
                     if window_start.elapsed() >= self.rate_limit_duration {
                         sends_in_window = 0;
                         window_start = tokio::time::Instant::now();
                     }
                     if sends_in_window < self.rate_limit_num {
-                        self.send_single(partition_id, body, json_size, finalizers, &events_sent, &bytes_sent).await?;
+                        self.send_single(
+                            partition_id,
+                            body,
+                            json_size,
+                            finalizers,
+                            &events_sent,
+                            &bytes_sent,
+                        )
+                        .await?;
                         sends_in_window += 1;
                     }
                 }

@@ -1,17 +1,11 @@
 use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 
-use crate::{
-    sinks::prelude::*,
-    sources::azure_event_hubs::build_credential,
-};
+use crate::{sinks::prelude::*, sources::azure_event_hubs::build_credential};
 
 use super::sink::AzureEventHubsSink;
 
 /// Configuration for the `azure_event_hubs` sink.
-#[configurable_component(sink(
-    "azure_event_hubs",
-    "Send events to Azure Event Hubs."
-))]
+#[configurable_component(sink("azure_event_hubs", "Send events to Azure Event Hubs."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureEventHubsSinkConfig {
@@ -232,7 +226,10 @@ mod tests {
         "#;
         let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
         assert!(config.connection_string.is_none());
-        assert_eq!(config.namespace.as_deref(), Some("myns.servicebus.windows.net"));
+        assert_eq!(
+            config.namespace.as_deref(),
+            Some("myns.servicebus.windows.net")
+        );
         assert_eq!(config.event_hub_name.as_deref(), Some("my-hub"));
     }
 

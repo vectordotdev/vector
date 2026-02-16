@@ -10,7 +10,9 @@
 use std::sync::Arc;
 
 use azure_core::credentials::{AccessToken, TokenCredential, TokenRequestOptions};
-use azure_messaging_eventhubs::{ConsumerClient, OpenReceiverOptions, StartLocation, StartPosition};
+use azure_messaging_eventhubs::{
+    ConsumerClient, OpenReceiverOptions, StartLocation, StartPosition,
+};
 use futures_util::StreamExt;
 use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
 use tokio::time::{Duration, sleep};
@@ -37,10 +39,7 @@ use crate::{
 };
 
 /// Configuration for the `azure_event_hubs` source.
-#[configurable_component(source(
-    "azure_event_hubs",
-    "Collect events from Azure Event Hubs."
-))]
+#[configurable_component(source("azure_event_hubs", "Collect events from Azure Event Hubs."))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureEventHubsSourceConfig {
@@ -152,8 +151,8 @@ impl SourceConfig for AzureEventHubsSourceConfig {
 
         let event_hub_name_for_metrics = event_hub_name.clone();
 
-        let mut builder = ConsumerClient::builder()
-            .with_consumer_group(self.consumer_group.clone());
+        let mut builder =
+            ConsumerClient::builder().with_consumer_group(self.consumer_group.clone());
         if let Some(endpoint) = custom_endpoint {
             builder = builder.with_custom_endpoint(endpoint);
         }
@@ -207,7 +206,9 @@ impl SourceConfig for AzureEventHubsSourceConfig {
             )
             .with_source_metadata(
                 Self::NAME,
-                Some(LegacyKey::InsertIfEmpty(owned_value_path!("sequence_number"))),
+                Some(LegacyKey::InsertIfEmpty(owned_value_path!(
+                    "sequence_number"
+                ))),
                 &owned_value_path!("sequence_number"),
                 Kind::integer(),
                 Some("sequence_number"),
@@ -268,7 +269,10 @@ async fn azure_event_hubs_source(
     }
 
     // Wait for shutdown or any task to complete
-    futures_util::future::select_all(tasks).await.0.unwrap_or(Ok(()))
+    futures_util::future::select_all(tasks)
+        .await
+        .0
+        .unwrap_or(Ok(()))
 }
 
 const RECONNECT_BACKOFF_INITIAL: Duration = Duration::from_secs(1);
@@ -313,9 +317,11 @@ async fn partition_receiver(
                 r
             }
             Err(e) => {
-                emit!(crate::internal_events::azure_event_hubs::source::AzureEventHubsConnectError {
-                    error: e.to_string(),
-                });
+                emit!(
+                    crate::internal_events::azure_event_hubs::source::AzureEventHubsConnectError {
+                        error: e.to_string(),
+                    }
+                );
                 tokio::select! {
                     _ = &mut *shutdown => return Ok(()),
                     _ = sleep(backoff) => {}
@@ -617,8 +623,7 @@ impl EventHubsSasCredential {
 
         let string_to_sign = format!("{}\n{}", encoded_uri, expiry);
 
-        let pkey =
-            PKey::hmac(&self.key).map_err(|e| format!("Failed to create HMAC key: {e}"))?;
+        let pkey = PKey::hmac(&self.key).map_err(|e| format!("Failed to create HMAC key: {e}"))?;
         let mut signer = Signer::new(MessageDigest::sha256(), &pkey)
             .map_err(|e| format!("Failed to create signer: {e}"))?;
         signer
@@ -675,10 +680,7 @@ mod tests {
     fn parse_full_connection_string() {
         let cs = "Endpoint=sb://mynamespace.servicebus.windows.net/;SharedAccessKeyName=mykeyname;SharedAccessKey=dGVzdGtleQ==;EntityPath=my-hub";
         let parsed = ParsedEventHubsConnectionString::parse(cs).unwrap();
-        assert_eq!(
-            parsed.endpoint,
-            "sb://mynamespace.servicebus.windows.net/"
-        );
+        assert_eq!(parsed.endpoint, "sb://mynamespace.servicebus.windows.net/");
         assert_eq!(parsed.shared_access_key_name, "mykeyname");
         assert_eq!(parsed.shared_access_key, "dGVzdGtleQ==");
         assert_eq!(parsed.entity_path, Some("my-hub".to_string()));
@@ -710,10 +712,12 @@ mod tests {
         let cs = "SharedAccessKeyName=key1;SharedAccessKey=abc==";
         let result = ParsedEventHubsConnectionString::parse(cs);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Missing 'Endpoint'"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Missing 'Endpoint'")
+        );
     }
 
     #[test]
@@ -721,10 +725,12 @@ mod tests {
         let cs = "Endpoint=sb://ns.servicebus.windows.net/;SharedAccessKey=abc==";
         let result = ParsedEventHubsConnectionString::parse(cs);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Missing 'SharedAccessKeyName'"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Missing 'SharedAccessKeyName'")
+        );
     }
 
     #[test]
@@ -732,10 +738,12 @@ mod tests {
         let cs = "Endpoint=sb://ns.servicebus.windows.net/;SharedAccessKeyName=key1";
         let result = ParsedEventHubsConnectionString::parse(cs);
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Missing 'SharedAccessKey'"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Missing 'SharedAccessKey'")
+        );
     }
 
     #[test]
@@ -772,12 +780,9 @@ mod tests {
 
     #[test]
     fn sas_credential_strips_scheme_and_trailing_slash() {
-        let cred = EventHubsSasCredential::new(
-            "sb://myns.servicebus.windows.net/",
-            "key1",
-            "dGVzdA==",
-        )
-        .unwrap();
+        let cred =
+            EventHubsSasCredential::new("sb://myns.servicebus.windows.net/", "key1", "dGVzdA==")
+                .unwrap();
         assert_eq!(cred.resource_uri, "myns.servicebus.windows.net");
     }
 
@@ -789,10 +794,12 @@ mod tests {
             "not-valid-base64!!!",
         );
         assert!(result.is_err());
-        assert!(result
-            .unwrap_err()
-            .to_string()
-            .contains("Invalid SharedAccessKey base64"));
+        assert!(
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Invalid SharedAccessKey base64")
+        );
     }
 
     #[test]
@@ -842,8 +849,7 @@ mod tests {
         let cs = SensitiveString::from(
             "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=dGVzdA==;EntityPath=from-cs".to_string(),
         );
-        let (_, eh, _, _) =
-            build_credential(Some(&cs), None, Some("override-hub")).unwrap();
+        let (_, eh, _, _) = build_credential(Some(&cs), None, Some("override-hub")).unwrap();
         assert_eq!(eh, "override-hub");
     }
 
@@ -914,7 +920,10 @@ mod tests {
         "#;
         let config: AzureEventHubsSourceConfig = toml::from_str(toml_str).unwrap();
         assert!(config.connection_string.is_none());
-        assert_eq!(config.namespace.as_deref(), Some("myns.servicebus.windows.net"));
+        assert_eq!(
+            config.namespace.as_deref(),
+            Some("myns.servicebus.windows.net")
+        );
         assert_eq!(config.event_hub_name.as_deref(), Some("my-hub"));
     }
 
