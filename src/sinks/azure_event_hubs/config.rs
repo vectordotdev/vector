@@ -359,4 +359,15 @@ mod tests {
         let result = toml::from_str::<AzureEventHubsSinkConfig>(toml_str);
         assert!(result.is_err());
     }
+
+    #[test]
+    fn config_defaults_rate_limit() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            encoding.codec = "json"
+        "#;
+        let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.rate_limit_duration_secs, 1);
+        assert_eq!(config.rate_limit_num, i64::MAX as u64);
+    }
 }

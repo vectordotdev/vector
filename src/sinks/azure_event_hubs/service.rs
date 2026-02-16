@@ -58,6 +58,7 @@ impl Service<EventHubsRequest> for EventHubsService {
         Box::pin(async move {
             let raw_byte_size = request.body.len();
             let partition_id = request.metadata.partition_id.clone();
+            let finalizers = request.metadata.finalizers;
 
             let event_data = azure_messaging_eventhubs::models::EventData::builder()
                 .with_body(request.body.to_vec())
@@ -70,6 +71,7 @@ impl Service<EventHubsRequest> for EventHubsService {
 
             match producer.send_event(event_data, options).await {
                 Ok(_) => {
+                    finalizers.update_status(EventStatus::Delivered);
                     crate::internal_events::azure_event_hubs::sink::emit_eventhubs_sent_metrics(
                         1,
                         raw_byte_size,
@@ -81,6 +83,7 @@ impl Service<EventHubsRequest> for EventHubsService {
                     })
                 }
                 Err(e) => {
+                    finalizers.update_status(EventStatus::Errored);
                     emit!(
                         crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
                             error: e.to_string(),

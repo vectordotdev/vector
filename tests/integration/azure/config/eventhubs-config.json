@@ -6,7 +6,88 @@
                 "Name": "emulatorNs1",
                 "Entities": [
                     {
-                        "Name": "eh1",
+                        "Name": "eh-nonbatch",
+                        "PartitionCount": 2,
+                        "ConsumerGroups": [
+                            {
+                                "Name": "cg1"
+                            }
+                        ]
+                    },
+                    {
+                        "Name": "eh-happypath",
+                        "PartitionCount": 2,
+                        "ConsumerGroups": [
+                            {
+                                "Name": "cg1"
+                            }
+                        ]
+                    },
+                    {
+                        "Name": "eh-partition",
+                        "PartitionCount": 2,
+                        "ConsumerGroups": [
+                            {
+                                "Name": "cg1"
+                            }
+                        ]
+                    },
+                    {
+                        "Name": "eh-ratelimit",
+                        "PartitionCount": 2,
+                        "ConsumerGroups": [
+                            {
+                                "Name": "cg1"
+                            }
+                        ]
+                    },
+                    {
+                        "Name": "eh-json",
+                        "PartitionCount": 2,
+                        "ConsumerGroups": [
+                            {
+                                "Name": "cg1"
+                            }
+                        ]
+                    },
+                    {
+                        "Name": "eh-batchoverflow",
+                        "PartitionCount": 2,
+                        "ConsumerGroups": [
+                            {
+                                "Name": "cg1"
+                            }
+                        ]
+                    },
+                    {
+                        "Name": "eh-ack",
+                        "PartitionCount": 2,
+                        "ConsumerGroups": [
+                            {
+                                "Name": "cg1"
+                            }
+                        ]
+                    },
+                    {
+                        "Name": "eh-batchratelimit",
+                        "PartitionCount": 2,
+                        "ConsumerGroups": [
+                            {
+                                "Name": "cg1"
+                            }
+                        ]
+                    },
+                    {
+                        "Name": "eh-oversized",
+                        "PartitionCount": 2,
+                        "ConsumerGroups": [
+                            {
+                                "Name": "cg1"
+                            }
+                        ]
+                    },
+                    {
+                        "Name": "eh-batchpartition",
                         "PartitionCount": 2,
                         "ConsumerGroups": [
                             {
