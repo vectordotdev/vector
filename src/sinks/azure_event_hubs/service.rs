@@ -12,12 +12,14 @@ use crate::sinks::prelude::*;
 
 pub struct AzureEventHubsRequest {
     pub body: Bytes,
+    pub partition_id: Option<String>,
     pub metadata: AzureEventHubsRequestMetadata,
     pub request_metadata: RequestMetadata,
 }
 
 pub struct AzureEventHubsRequestMetadata {
     pub finalizers: EventFinalizers,
+    pub partition_id: Option<String>,
 }
 
 pub struct AzureEventHubsResponse {
@@ -90,6 +92,7 @@ impl Service<AzureEventHubsRequest> for AzureEventHubsService {
         let producer = Arc::clone(&self.producer);
         let in_flight = Arc::clone(&self.in_flight);
         let raw_byte_size = request.body.len();
+        let partition_id = request.partition_id;
         let event_byte_size = request
             .request_metadata
             .into_events_estimated_json_encoded_byte_size();
@@ -103,14 +106,22 @@ impl Service<AzureEventHubsRequest> for AzureEventHubsService {
                 .with_body(request.body.to_vec())
                 .build();
 
-            match producer.send_event(event_data, None).await {
+            let options = partition_id.map(|pid| {
+                azure_messaging_eventhubs::SendEventOptions {
+                    partition_id: Some(pid),
+                }
+            });
+
+            match producer.send_event(event_data, options).await {
                 Ok(_) => Ok(AzureEventHubsResponse {
                     event_byte_size,
                     raw_byte_size,
                     event_status: EventStatus::Delivered,
                 }),
                 Err(e) => {
-                    error!(message = "Failed to send event to Event Hubs.", error = %e);
+                    emit!(crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
+                        error: e.to_string(),
+                    });
                     Ok(AzureEventHubsResponse {
                         event_byte_size: config::telemetry().create_request_count_byte_size(),
                         raw_byte_size: 0,
@@ -188,8 +199,10 @@ mod tests {
     fn request_finalizable() {
         let mut request = AzureEventHubsRequest {
             body: Bytes::from("test"),
+            partition_id: None,
             metadata: AzureEventHubsRequestMetadata {
                 finalizers: EventFinalizers::default(),
+                partition_id: None,
             },
             request_metadata: RequestMetadata::default(),
         };
@@ -200,8 +213,10 @@ mod tests {
     fn request_meta_descriptive() {
         let request = AzureEventHubsRequest {
             body: Bytes::from("test"),
+            partition_id: Some("0".to_string()),
             metadata: AzureEventHubsRequestMetadata {
                 finalizers: EventFinalizers::default(),
+                partition_id: Some("0".to_string()),
             },
             request_metadata: RequestMetadata::default(),
         };

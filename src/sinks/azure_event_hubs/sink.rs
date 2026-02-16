@@ -1,3 +1,5 @@
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+
 use super::{
     config::AzureEventHubsSinkConfig,
     request_builder::AzureEventHubsRequestBuilder,
@@ -9,6 +11,7 @@ pub struct AzureEventHubsSink {
     transformer: Transformer,
     encoder: Encoder<()>,
     service: AzureEventHubsService,
+    partition_id_field: Option<OptionalTargetPath>,
 }
 
 impl AzureEventHubsSink {
@@ -39,12 +42,14 @@ impl AzureEventHubsSink {
             transformer,
             encoder,
             service: AzureEventHubsService::new(producer, max_in_flight),
+            partition_id_field: config.partition_id_field.clone(),
         })
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let request_builder = AzureEventHubsRequestBuilder {
             encoder: (self.transformer, self.encoder),
+            partition_id_field: self.partition_id_field,
         };
 
         input

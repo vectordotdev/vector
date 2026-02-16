@@ -44,6 +44,7 @@ fn make_config() -> AzureEventHubsSinkConfig {
         connection_string: Some(emulator_connection_string().into()),
         namespace: None,
         event_hub_name: Some(EVENT_HUB_NAME.to_string()),
+        partition_id_field: None,
         encoding: TextSerializerConfig::default().into(),
         request: TowerRequestConfig::default(),
         acknowledgements: Default::default(),

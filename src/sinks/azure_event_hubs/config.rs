@@ -1,3 +1,5 @@
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+
 use crate::{
     sinks::prelude::*,
     sources::azure_event_hubs::build_credential,
@@ -31,6 +33,12 @@ pub struct AzureEventHubsSinkConfig {
     /// The name of the Event Hub to send events to.
     #[configurable(metadata(docs::examples = "my-event-hub"))]
     pub event_hub_name: Option<String>,
+
+    /// The log field to use as the Event Hubs partition ID.
+    ///
+    /// If set, events are routed to the specified partition. If not set,
+    /// Event Hubs automatically selects a partition (round-robin).
+    pub partition_id_field: Option<OptionalTargetPath>,
 
     #[configurable(derived)]
     pub encoding: EncodingConfig,

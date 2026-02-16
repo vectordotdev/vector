@@ -13,6 +13,7 @@ use azure_core::credentials::{AccessToken, TokenCredential, TokenRequestOptions}
 use azure_messaging_eventhubs::{ConsumerClient, OpenReceiverOptions, StartLocation, StartPosition};
 use futures_util::StreamExt;
 use openssl::{hash::MessageDigest, pkey::PKey, sign::Signer};
+use tokio::time::{Duration, sleep};
 use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -76,10 +77,12 @@ pub struct AzureEventHubsSourceConfig {
     #[configurable(metadata(docs::examples = "$Default"))]
     pub consumer_group: String,
 
-    /// The partition ID to consume from.
-    #[serde(default = "default_partition_id")]
-    #[configurable(metadata(docs::examples = "0"))]
-    pub partition_id: String,
+    /// The partition IDs to consume from.
+    ///
+    /// If empty or not specified, all partitions are consumed automatically.
+    /// Provide specific IDs (e.g., `["0", "1"]`) to consume a subset.
+    #[serde(default)]
+    pub partition_ids: Vec<String>,
 
     /// Where to start reading events from.
     ///
@@ -115,7 +118,7 @@ impl Default for AzureEventHubsSourceConfig {
             namespace: None,
             event_hub_name: None,
             consumer_group: default_consumer_group(),
-            partition_id: default_partition_id(),
+            partition_ids: Vec::new(),
             start_position: default_start_position(),
             framing: default_framing_message_based(),
             decoding: default_decoding(),
@@ -127,10 +130,6 @@ impl Default for AzureEventHubsSourceConfig {
 
 fn default_consumer_group() -> String {
     "$Default".to_string()
-}
-
-fn default_partition_id() -> String {
-    "0".to_string()
 }
 
 fn default_start_position() -> String {
@@ -164,12 +163,26 @@ impl SourceConfig for AzureEventHubsSourceConfig {
             .await
             .map_err(|e| format!("Failed to open Event Hubs consumer: {e}"))?;
 
-        let partition_id = self.partition_id.clone();
+        let partition_ids = if self.partition_ids.is_empty() {
+            // Auto-discover all partitions
+            let props = client
+                .get_eventhub_properties()
+                .await
+                .map_err(|e| format!("Failed to get Event Hub properties: {e}"))?;
+            info!(
+                message = "Auto-discovered partitions.",
+                partitions = ?props.partition_ids,
+            );
+            props.partition_ids
+        } else {
+            self.partition_ids.clone()
+        };
+
         let start_position = self.start_position.clone();
 
         Ok(Box::pin(azure_event_hubs_source(
             client,
-            partition_id,
+            partition_ids,
             start_position,
             decoder,
             cx.shutdown,
@@ -219,11 +232,52 @@ impl SourceConfig for AzureEventHubsSourceConfig {
 
 async fn azure_event_hubs_source(
     client: ConsumerClient,
+    partition_ids: Vec<String>,
+    start_position: String,
+    decoder: Decoder,
+    shutdown: ShutdownSignal,
+    out: SourceSender,
+    log_namespace: LogNamespace,
+) -> Result<(), ()> {
+    let client = Arc::new(client);
+    let shutdown = shutdown;
+
+    let mut tasks = Vec::new();
+    for partition_id in partition_ids {
+        let client = Arc::clone(&client);
+        let decoder = decoder.clone();
+        let start_position = start_position.clone();
+        let mut out = out.clone();
+        let mut shutdown = shutdown.clone();
+
+        tasks.push(tokio::spawn(async move {
+            partition_receiver(
+                client,
+                partition_id,
+                start_position,
+                decoder,
+                &mut shutdown,
+                &mut out,
+                log_namespace,
+            )
+            .await
+        }));
+    }
+
+    // Wait for shutdown or any task to complete
+    futures_util::future::select_all(tasks).await.0.unwrap_or(Ok(()))
+}
+
+const RECONNECT_BACKOFF_INITIAL: Duration = Duration::from_secs(1);
+const RECONNECT_BACKOFF_MAX: Duration = Duration::from_secs(30);
+
+async fn partition_receiver(
+    client: Arc<ConsumerClient>,
     partition_id: String,
     start_position: String,
     decoder: Decoder,
-    mut shutdown: ShutdownSignal,
-    mut out: SourceSender,
+    shutdown: &mut ShutdownSignal,
+    out: &mut SourceSender,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
@@ -234,110 +288,146 @@ async fn azure_event_hubs_source(
         _ => StartLocation::Latest,
     };
 
-    let options = OpenReceiverOptions {
-        start_position: Some(StartPosition {
-            location: start_loc,
-            inclusive: false,
-        }),
-        ..Default::default()
-    };
-
-    let receiver = client
-        .open_receiver_on_partition(partition_id.clone(), Some(options))
-        .await
-        .map_err(|e| error!(message = "Failed to open Event Hubs receiver.", error = %e))?;
-
-    let mut stream = receiver.stream_events();
+    let mut backoff = RECONNECT_BACKOFF_INITIAL;
 
     loop {
-        tokio::select! {
-            _ = &mut shutdown => break,
-            msg = stream.next() => {
-                match msg {
-                    Some(Ok(received)) => {
-                        let body = received.event_data().body();
-                        let data = match body {
-                            Some(d) => d.to_vec(),
-                            None => continue,
-                        };
+        let options = OpenReceiverOptions {
+            start_position: Some(StartPosition {
+                location: start_loc.clone(),
+                inclusive: false,
+            }),
+            ..Default::default()
+        };
 
-                        bytes_received.emit(ByteSize(data.len()));
+        let receiver = match client
+            .open_receiver_on_partition(partition_id.clone(), Some(options))
+            .await
+        {
+            Ok(r) => {
+                backoff = RECONNECT_BACKOFF_INITIAL;
+                r
+            }
+            Err(e) => {
+                emit!(crate::internal_events::azure_event_hubs::source::AzureEventHubsConnectError {
+                    error: e.to_string(),
+                });
+                tokio::select! {
+                    _ = &mut *shutdown => return Ok(()),
+                    _ = sleep(backoff) => {}
+                }
+                backoff = (backoff * 2).min(RECONNECT_BACKOFF_MAX);
+                continue;
+            }
+        };
 
-                        let sequence_number = received.sequence_number();
-                        let offset = received.offset().clone();
+        let mut stream = receiver.stream_events();
 
-                        let mut framed = FramedRead::new(data.as_slice(), decoder.clone());
-                        while let Some(next) = framed.next().await {
-                            match next {
-                                Ok((events, _byte_size)) => {
-                                    events_received.emit(CountByteSize(
-                                        events.len(),
-                                        events.estimated_json_encoded_size_of(),
-                                    ));
+        loop {
+            tokio::select! {
+                _ = &mut *shutdown => return Ok(()),
+                msg = stream.next() => {
+                    match msg {
+                        Some(Ok(received)) => {
+                            let body = received.event_data().body();
+                            let data = match body {
+                                Some(d) => d.to_vec(),
+                                None => continue,
+                            };
 
-                                    let now = chrono::Utc::now();
-                                    let events: Vec<Event> = events.into_iter().map(|mut event| {
-                                        if let Event::Log(ref mut log) = event {
-                                            log_namespace.insert_standard_vector_source_metadata(
-                                                log,
-                                                AzureEventHubsSourceConfig::NAME,
-                                                now,
-                                            );
+                            bytes_received.emit(ByteSize(data.len()));
 
-                                            log_namespace.insert_source_metadata(
-                                                AzureEventHubsSourceConfig::NAME,
-                                                log,
-                                                Some(LegacyKey::InsertIfEmpty(path!("partition_id"))),
-                                                path!("partition_id"),
-                                                partition_id.clone(),
-                                            );
+                            let sequence_number = received.sequence_number();
+                            let offset = received.offset().clone();
 
-                                            if let Some(seq) = sequence_number {
+                            let mut framed = FramedRead::new(data.as_slice(), decoder.clone());
+                            while let Some(next) = framed.next().await {
+                                match next {
+                                    Ok((events, _byte_size)) => {
+                                        events_received.emit(CountByteSize(
+                                            events.len(),
+                                            events.estimated_json_encoded_size_of(),
+                                        ));
+
+                                        let now = chrono::Utc::now();
+                                        let events: Vec<Event> = events.into_iter().map(|mut event| {
+                                            if let Event::Log(ref mut log) = event {
+                                                log_namespace.insert_standard_vector_source_metadata(
+                                                    log,
+                                                    AzureEventHubsSourceConfig::NAME,
+                                                    now,
+                                                );
+
                                                 log_namespace.insert_source_metadata(
                                                     AzureEventHubsSourceConfig::NAME,
                                                     log,
-                                                    Some(LegacyKey::InsertIfEmpty(path!("sequence_number"))),
-                                                    path!("sequence_number"),
-                                                    seq,
+                                                    Some(LegacyKey::InsertIfEmpty(path!("partition_id"))),
+                                                    path!("partition_id"),
+                                                    partition_id.clone(),
                                                 );
-                                            }
 
-                                            if let Some(ref off) = offset {
-                                                log_namespace.insert_source_metadata(
-                                                    AzureEventHubsSourceConfig::NAME,
-                                                    log,
-                                                    Some(LegacyKey::InsertIfEmpty(path!("offset"))),
-                                                    path!("offset"),
-                                                    off.clone(),
-                                                );
+                                                if let Some(seq) = sequence_number {
+                                                    log_namespace.insert_source_metadata(
+                                                        AzureEventHubsSourceConfig::NAME,
+                                                        log,
+                                                        Some(LegacyKey::InsertIfEmpty(path!("sequence_number"))),
+                                                        path!("sequence_number"),
+                                                        seq,
+                                                    );
+                                                }
+
+                                                if let Some(ref off) = offset {
+                                                    log_namespace.insert_source_metadata(
+                                                        AzureEventHubsSourceConfig::NAME,
+                                                        log,
+                                                        Some(LegacyKey::InsertIfEmpty(path!("offset"))),
+                                                        path!("offset"),
+                                                        off.clone(),
+                                                    );
+                                                }
                                             }
+                                            event
+                                        }).collect();
+
+                                        if out.send_batch(events).await.is_err() {
+                                            emit!(StreamClosedError { count: 1 });
+                                            return Err(());
                                         }
-                                        event
-                                    }).collect();
-
-                                    if out.send_batch(events).await.is_err() {
-                                        emit!(StreamClosedError { count: 1 });
-                                        return Err(());
                                     }
-                                }
-                                Err(error) => {
-                                    if !error.can_continue() {
-                                        break;
+                                    Err(error) => {
+                                        if !error.can_continue() {
+                                            break;
+                                        }
                                     }
                                 }
                             }
                         }
+                        Some(Err(error)) => {
+                            emit!(crate::internal_events::azure_event_hubs::source::AzureEventHubsReceiveError {
+                                error: error.to_string(),
+                            });
+                            // Break inner loop to reconnect
+                            break;
+                        }
+                        None => {
+                            // Stream ended, try reconnecting
+                            info!(
+                                message = "Event Hubs stream ended, reconnecting.",
+                                partition_id = %partition_id,
+                            );
+                            break;
+                        }
                     }
-                    Some(Err(error)) => {
-                        error!(message = "Error receiving from Event Hubs.", error = %error);
-                    }
-                    None => break,
                 }
             }
         }
-    }
 
-    Ok(())
+        // Backoff before reconnecting
+        tokio::select! {
+            _ = &mut *shutdown => return Ok(()),
+            _ = sleep(backoff) => {}
+        }
+        backoff = (backoff * 2).min(RECONNECT_BACKOFF_MAX);
+    }
 }
 
 // --- Auth helpers ---

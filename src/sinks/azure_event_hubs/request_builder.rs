@@ -1,4 +1,5 @@
 use bytes::Bytes;
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 
 use crate::sinks::{
     azure_event_hubs::service::{AzureEventHubsRequest, AzureEventHubsRequestMetadata},
@@ -7,6 +8,7 @@ use crate::sinks::{
 
 pub struct AzureEventHubsRequestBuilder {
     pub encoder: (Transformer, Encoder<()>),
+    pub partition_id_field: Option<OptionalTargetPath>,
 }
 
 impl RequestBuilder<Event> for AzureEventHubsRequestBuilder {
@@ -31,8 +33,16 @@ impl RequestBuilder<Event> for AzureEventHubsRequestBuilder {
     ) -> (Self::Metadata, RequestMetadataBuilder, Self::Events) {
         let builder = RequestMetadataBuilder::from_event(&input);
 
+        let partition_id = self
+            .partition_id_field
+            .as_ref()
+            .and_then(|field| field.path.as_ref())
+            .and_then(|path| input.as_log().get(path))
+            .map(|v| v.to_string_lossy().into_owned());
+
         let metadata = AzureEventHubsRequestMetadata {
             finalizers: input.take_finalizers(),
+            partition_id,
         };
 
         (metadata, builder, input)
@@ -44,8 +54,10 @@ impl RequestBuilder<Event> for AzureEventHubsRequestBuilder {
         request_metadata: RequestMetadata,
         payload: EncodeResult<Self::Payload>,
     ) -> Self::Request {
+        let partition_id = metadata.partition_id.clone();
         AzureEventHubsRequest {
             body: payload.into_payload(),
+            partition_id,
             metadata,
             request_metadata,
         }
@@ -66,6 +78,7 @@ mod tests {
         let encoder = Encoder::<()>::new(serializer);
         AzureEventHubsRequestBuilder {
             encoder: (transformer, encoder),
+            partition_id_field: None,
         }
     }
 
