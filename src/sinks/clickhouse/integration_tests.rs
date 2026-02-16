@@ -1217,6 +1217,7 @@ async fn test_missing_required_field_emits_null_constraint_error() {
     // Create an event WITHOUT the required_field
     let (batch_notifier, mut receiver) = BatchNotifier::new_with_receiver();
     let mut event = LogEvent::from("test message").with_batch_notifier(&batch_notifier);
+    drop(batch_notifier);
     event.insert("host", "example.com");
     // Deliberately NOT inserting "required_field"
 

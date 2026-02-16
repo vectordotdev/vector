@@ -31,7 +31,7 @@ pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
 
 /// Configuration for Arrow IPC stream serialization
 #[configurable_component]
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ArrowStreamSerializerConfig {
     /// The Arrow schema to use for encoding
     #[serde(skip)]
@@ -61,6 +61,16 @@ pub struct ArrowStreamSerializerConfig {
     #[serde(default = "default_true")]
     #[configurable(derived)]
     pub validate_schema: bool,
+}
+
+impl Default for ArrowStreamSerializerConfig {
+    fn default() -> Self {
+        Self {
+            schema: None,
+            allow_nullable_fields: false,
+            validate_schema: true,
+        }
+    }
 }
 
 const fn default_true() -> bool {
