@@ -181,12 +181,14 @@ impl SourceConfig for AzureEventHubsSourceConfig {
         Ok(Box::pin(azure_event_hubs_source(
             client,
             partition_ids,
-            event_hub_name_for_metrics,
-            start_position,
-            decoder,
+            SourceParams {
+                event_hub_name: event_hub_name_for_metrics,
+                start_position,
+                decoder,
+                log_namespace,
+            },
             cx.shutdown,
             cx.out,
-            log_namespace,
         )))
     }
 
@@ -231,15 +233,19 @@ impl SourceConfig for AzureEventHubsSourceConfig {
     }
 }
 
-async fn azure_event_hubs_source(
-    client: ConsumerClient,
-    partition_ids: Vec<String>,
+struct SourceParams {
     event_hub_name: String,
     start_position: String,
     decoder: Decoder,
+    log_namespace: LogNamespace,
+}
+
+async fn azure_event_hubs_source(
+    client: ConsumerClient,
+    partition_ids: Vec<String>,
+    params: SourceParams,
     shutdown: ShutdownSignal,
     out: SourceSender,
-    log_namespace: LogNamespace,
 ) -> Result<(), ()> {
     let client = Arc::new(client);
     let shutdown = shutdown;
@@ -247,9 +253,10 @@ async fn azure_event_hubs_source(
     let mut tasks = Vec::new();
     for partition_id in partition_ids {
         let client = Arc::clone(&client);
-        let decoder = decoder.clone();
-        let start_position = start_position.clone();
-        let event_hub_name = event_hub_name.clone();
+        let decoder = params.decoder.clone();
+        let start_position = params.start_position.clone();
+        let event_hub_name = params.event_hub_name.clone();
+        let log_namespace = params.log_namespace;
         let mut out = out.clone();
         let mut shutdown = shutdown.clone();
 
@@ -278,6 +285,7 @@ async fn azure_event_hubs_source(
 const RECONNECT_BACKOFF_INITIAL: Duration = Duration::from_secs(1);
 const RECONNECT_BACKOFF_MAX: Duration = Duration::from_secs(30);
 
+#[allow(clippy::too_many_arguments)]
 async fn partition_receiver(
     client: Arc<ConsumerClient>,
     partition_id: String,
@@ -560,7 +568,6 @@ impl ParsedEventHubsConnectionString {
 
 // --- SAS TokenCredential for connection string auth ---
 
-/// A `TokenCredential` that generates Event Hubs SAS tokens from a shared access key.
 // --- Emulator credential (dummy, no validation) ---
 
 /// A dummy `TokenCredential` for the Event Hubs emulator.
@@ -585,6 +592,7 @@ impl TokenCredential for EmulatorCredential {
 
 // --- SAS TokenCredential for connection string auth ---
 
+/// A `TokenCredential` that generates Event Hubs SAS tokens from a shared access key.
 ///
 /// Used when authenticating via connection string. The generated SAS token is compatible
 /// with Event Hubs AMQP CBS (Claim-Based Security) authentication.
