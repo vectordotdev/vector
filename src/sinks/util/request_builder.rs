@@ -83,20 +83,10 @@ pub trait RequestBuilder<Input> {
     /// as-is, such as event finalizers, while the events are the actual events to process.
     fn split_input(&self, input: Input) -> (Self::Metadata, RequestMetadataBuilder, Self::Events);
 
-    /// Optional hook called before encoding events.
-    ///
-    /// Override this to perform validation or other pre-processing on events
-    /// before they are encoded. The default implementation is a no-op.
-    fn pre_encode(&self, _events: &Self::Events) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
     fn encode_events(
         &self,
         events: Self::Events,
     ) -> Result<EncodeResult<Self::Payload>, Self::Error> {
-        self.pre_encode(&events)?;
-
         // TODO: Should we add enough bounds on `Self::Events` that we could automatically derive event count/event byte
         // size, and then we could generate `BatchRequestMetadata` and pass it directly to `build_request`? That would
         // obviate needing to wrap `payload` in `EncodeResult`, although practically speaking.. the name would be kind

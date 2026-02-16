@@ -49,6 +49,22 @@ pub struct ArrowStreamSerializerConfig {
     #[serde(default)]
     #[configurable(derived)]
     pub allow_nullable_fields: bool,
+
+    /// Validate that events contain all non-nullable fields before encoding.
+    ///
+    /// When enabled (default), each batch is checked for missing non-nullable fields before
+    /// encoding. Batches with missing fields are rejected early with a clear error.
+    ///
+    /// Disable this to skip the per-batch validation for better throughput when you are
+    /// confident that events always contain all required fields. Has no effect when
+    /// `allow_nullable_fields` is true.
+    #[serde(default = "default_true")]
+    #[configurable(derived)]
+    pub validate_schema: bool,
+}
+
+const fn default_true() -> bool {
+    true
 }
 
 impl std::fmt::Debug for ArrowStreamSerializerConfig {
@@ -62,6 +78,7 @@ impl std::fmt::Debug for ArrowStreamSerializerConfig {
                     .map(|s| format!("{} fields", s.fields().len())),
             )
             .field("allow_nullable_fields", &self.allow_nullable_fields)
+            .field("validate_schema", &self.validate_schema)
             .finish()
     }
 }
@@ -72,6 +89,7 @@ impl ArrowStreamSerializerConfig {
         Self {
             schema: Some(schema),
             allow_nullable_fields: false,
+            validate_schema: true,
         }
     }
 
@@ -534,7 +552,7 @@ mod tests {
         }
 
         #[test]
-        fn test_missing_required_field_encodes_null() {
+        fn test_missing_non_nullable_field_errors() {
             let events = vec![create_event(vec![("other_field", "value")])];
 
             let schema = SchemaRef::new(Schema::new(vec![Field::new(
@@ -543,10 +561,8 @@ mod tests {
                 false, // non-nullable
             )]));
 
-            let batch = encode_and_decode(events, schema).expect("Failed to encode");
-            assert_eq!(batch.num_rows(), 1);
-            assert!(!batch.schema().field(0).is_nullable());
-            assert!(batch.column(0).is_null(0));
+            let result = encode_events_to_arrow_ipc_stream(&events, schema);
+            assert!(result.is_err());
         }
     }
 

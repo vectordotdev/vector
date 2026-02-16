@@ -237,7 +237,6 @@ impl SinkConfig for ClickhouseConfig {
         let request_builder = ClickhouseRequestBuilder {
             compression: self.compression,
             encoder: (self.encoding.clone(), encoder_kind),
-            required_fields,
         };
 
         let sink = ClickhouseSink::new(
@@ -247,6 +246,7 @@ impl SinkConfig for ClickhouseConfig {
             self.table.clone(),
             format,
             request_builder,
+            required_fields,
         );
 
         let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
@@ -305,11 +305,16 @@ impl ClickhouseConfig {
             )
             .await?;
 
-            let required_fields = arrow_config
-                .schema
-                .as_ref()
-                .map(extract_required_fields)
-                .filter(|fields| !fields.is_empty());
+            let required_fields =
+                if arrow_config.allow_nullable_fields || !arrow_config.validate_schema {
+                    None
+                } else {
+                    arrow_config
+                        .schema
+                        .as_ref()
+                        .map(extract_required_fields)
+                        .filter(|fields| !fields.is_empty())
+                };
 
             let resolved_batch_config = BatchSerializerConfig::ArrowStream(arrow_config);
             let arrow_serializer = resolved_batch_config.build()?;
