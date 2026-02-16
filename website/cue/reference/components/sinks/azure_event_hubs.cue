@@ -17,6 +17,11 @@ components: sinks: azure_event_hubs: {
 		acknowledgements: true
 		healthcheck: enabled: true
 		send: {
+			batch: {
+				enabled:      true
+				common:       true
+				timeout_secs: 1
+			}
 			compression: enabled: false
 			encoding: {
 				enabled: true
