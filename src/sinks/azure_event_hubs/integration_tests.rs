@@ -144,14 +144,11 @@ async fn azure_event_hubs_sink_non_batch_mode() {
             .await
             .expect("Failed to open receiver");
         let mut stream = receiver.stream_events();
-        loop {
-            match tokio::time::timeout(Duration::from_secs(5), stream.next()).await {
-                Ok(Some(Ok(event))) => {
-                    if let Some(body) = event.event_data().body() {
-                        received.push(String::from_utf8_lossy(body).to_string());
-                    }
-                }
-                _ => break,
+        while let Ok(Some(Ok(event))) =
+            tokio::time::timeout(Duration::from_secs(5), stream.next()).await
+        {
+            if let Some(body) = event.event_data().body() {
+                received.push(String::from_utf8_lossy(body).to_string());
             }
         }
     }
@@ -232,14 +229,11 @@ async fn azure_event_hubs_sink_happy_path() {
 
         let mut stream = receiver.stream_events();
         // Read with a timeout
-        loop {
-            match tokio::time::timeout(Duration::from_secs(5), stream.next()).await {
-                Ok(Some(Ok(event))) => {
-                    if let Some(body) = event.event_data().body() {
-                        received.push(String::from_utf8_lossy(body).to_string());
-                    }
-                }
-                _ => break,
+        while let Ok(Some(Ok(event))) =
+            tokio::time::timeout(Duration::from_secs(5), stream.next()).await
+        {
+            if let Some(body) = event.event_data().body() {
+                received.push(String::from_utf8_lossy(body).to_string());
             }
         }
     }
