@@ -29,6 +29,7 @@ jobs:
           - armv7-unknown-linux-musleabihf
           - arm-unknown-linux-gnueabi
           - arm-unknown-linux-musleabi
+          - s390x-unknown-linux-gnu
     steps:
       - name: Checkout branch
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
