@@ -25,10 +25,7 @@ components: sinks: azure_event_hubs: {
 			compression: enabled: false
 			encoding: {
 				enabled: true
-				codec: {
-					enabled: true
-					enum: ["json", "text"]
-				}
+				codec: enabled: true
 			}
 			request: enabled: false
 			tls: enabled: false
