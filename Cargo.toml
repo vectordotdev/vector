@@ -805,6 +805,7 @@ sinks-logs = [
   "sinks-http",
   "sinks-humio",
   "sinks-influxdb",
+  "sinks-journald",
   "sinks-kafka",
   "sinks-keep",
   "sinks-loki",
@@ -875,6 +876,7 @@ sinks-honeycomb = []
 sinks-http = []
 sinks-humio = ["sinks-splunk_hec", "transforms-metric_to_log"]
 sinks-influxdb = []
+sinks-journald = ["nix/fs", "nix/socket", "nix/uio"]
 sinks-kafka = ["dep:rdkafka"]
 sinks-keep = []
 sinks-mezmo = []
