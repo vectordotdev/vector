@@ -17,6 +17,7 @@ use crate::{
 
 pub struct AzureEventHubsSink {
     producer: Arc<ProducerClient>,
+    event_hub_name: String,
     transformer: Transformer,
     encoder: Encoder<()>,
     partition_id_field: Option<OptionalTargetPath>,
@@ -34,6 +35,8 @@ impl AzureEventHubsSink {
             config.namespace.as_deref(),
             config.event_hub_name.as_deref(),
         )?;
+
+        let event_hub_name_for_metrics = event_hub_name.clone();
 
         let retry_options = azure_messaging_eventhubs::RetryOptions {
             initial_delay: azure_core::time::Duration::milliseconds(config.retry_initial_delay_ms as i64),
@@ -58,6 +61,7 @@ impl AzureEventHubsSink {
 
         Ok(Self {
             producer: Arc::new(producer),
+            event_hub_name: event_hub_name_for_metrics,
             transformer,
             encoder,
             partition_id_field: config.partition_id_field.clone(),
@@ -175,15 +179,18 @@ impl AzureEventHubsSink {
             }
 
             // Mark all events in this partition as delivered
+            let event_count = all_finalizers.len();
             for finalizers in all_finalizers {
                 finalizers.update_status(EventStatus::Delivered);
             }
 
-            debug!(
-                message = "Batch sent.",
-                partition_id = ?partition_id,
-                bytes = total_bytes,
-            );
+            let pid_label = partition_id.as_deref().unwrap_or("");
+            emit!(crate::internal_events::azure_event_hubs::sink::AzureEventHubsEventsSent {
+                count: event_count,
+                byte_size: total_bytes,
+                event_hub_name: &self.event_hub_name,
+                partition_id: pid_label,
+            });
         }
 
         Ok(())
@@ -207,10 +214,12 @@ impl AzureEventHubsSink {
         body: Bytes,
         finalizers: EventFinalizers,
     ) -> Result<(), ()> {
+        let byte_size = body.len();
         let event_data = azure_messaging_eventhubs::models::EventData::builder()
             .with_body(body.to_vec())
             .build();
 
+        let pid_label = partition_id.as_deref().unwrap_or("").to_string();
         let options = partition_id.map(|pid| {
             azure_messaging_eventhubs::SendEventOptions {
                 partition_id: Some(pid),
@@ -220,6 +229,12 @@ impl AzureEventHubsSink {
         match self.producer.send_event(event_data, options).await {
             Ok(_) => {
                 finalizers.update_status(EventStatus::Delivered);
+                emit!(crate::internal_events::azure_event_hubs::sink::AzureEventHubsEventsSent {
+                    count: 1,
+                    byte_size,
+                    event_hub_name: &self.event_hub_name,
+                    partition_id: &pid_label,
+                });
                 Ok(())
             }
             Err(e) => {

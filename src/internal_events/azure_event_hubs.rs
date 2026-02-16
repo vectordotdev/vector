@@ -116,6 +116,38 @@ pub mod sink {
     use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
     #[derive(Debug, NamedInternalEvent)]
+    pub struct AzureEventHubsEventsSent<'a> {
+        pub count: usize,
+        pub byte_size: usize,
+        pub event_hub_name: &'a str,
+        pub partition_id: &'a str,
+    }
+
+    impl InternalEvent for AzureEventHubsEventsSent<'_> {
+        fn emit(self) {
+            trace!(
+                message = "Events sent.",
+                count = %self.count,
+                byte_size = %self.byte_size,
+                event_hub_name = self.event_hub_name,
+                partition_id = self.partition_id,
+            );
+            counter!(
+                "component_sent_events_total",
+                "event_hub_name" => self.event_hub_name.to_string(),
+                "partition_id" => self.partition_id.to_string(),
+            )
+            .increment(self.count as u64);
+            counter!(
+                "component_sent_bytes_total",
+                "event_hub_name" => self.event_hub_name.to_string(),
+                "partition_id" => self.partition_id.to_string(),
+            )
+            .increment(self.byte_size as u64);
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
     pub struct AzureEventHubsSendError {
         pub error: String,
     }
