@@ -40,12 +40,58 @@ pub struct AzureEventHubsSinkConfig {
     /// Event Hubs automatically selects a partition (round-robin).
     pub partition_id_field: Option<OptionalTargetPath>,
 
-    #[configurable(derived)]
-    pub encoding: EncodingConfig,
+    /// Whether to batch events before sending.
+    ///
+    /// When enabled, events are accumulated per partition and sent as an `EventDataBatch`,
+    /// preserving per-partition ordering. When disabled, each event is sent individually.
+    #[serde(default = "default_batch_enabled")]
+    pub batch_enabled: bool,
+
+    /// Maximum number of events to accumulate before flushing a batch.
+    ///
+    /// Only used when `batch_enabled` is `true`.
+    #[serde(default = "default_batch_max_events")]
+    #[configurable(metadata(docs::examples = 100))]
+    pub batch_max_events: usize,
+
+    /// Maximum time to wait before flushing a batch, in seconds.
+    ///
+    /// Only used when `batch_enabled` is `true`.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_batch_timeout_secs")]
+    pub batch_timeout_secs: u64,
+
+    /// The time window used for the `rate_limit_num` option.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[configurable(metadata(docs::human_name = "Rate Limit Duration"))]
+    #[serde(default = "default_rate_limit_duration_secs")]
+    pub rate_limit_duration_secs: u64,
+
+    /// The maximum number of requests allowed within the `rate_limit_duration_secs` time window.
+    #[configurable(metadata(docs::type_unit = "requests"))]
+    #[configurable(metadata(docs::human_name = "Rate Limit Number"))]
+    #[serde(default = "default_rate_limit_num")]
+    pub rate_limit_num: u64,
+
+    /// Maximum number of retry attempts for failed sends.
+    ///
+    /// The SDK uses exponential backoff between retries.
+    #[serde(default = "default_retry_max_retries")]
+    #[configurable(metadata(docs::examples = 8))]
+    pub retry_max_retries: u32,
+
+    /// Initial delay before the first retry, in milliseconds.
+    #[configurable(metadata(docs::type_unit = "milliseconds"))]
+    #[serde(default = "default_retry_initial_delay_ms")]
+    pub retry_initial_delay_ms: u64,
+
+    /// Maximum total time for all retry attempts, in seconds.
+    #[configurable(metadata(docs::type_unit = "seconds"))]
+    #[serde(default = "default_retry_max_elapsed_secs")]
+    pub retry_max_elapsed_secs: u64,
 
     #[configurable(derived)]
-    #[serde(default)]
-    pub request: TowerRequestConfig,
+    pub encoding: EncodingConfig,
 
     #[configurable(derived)]
     #[serde(
@@ -56,13 +102,43 @@ pub struct AzureEventHubsSinkConfig {
     pub acknowledgements: AcknowledgementsConfig,
 }
 
+const fn default_batch_enabled() -> bool {
+    true
+}
+
+const fn default_batch_max_events() -> usize {
+    100
+}
+
+const fn default_batch_timeout_secs() -> u64 {
+    1
+}
+
+const fn default_rate_limit_duration_secs() -> u64 {
+    1
+}
+
+const fn default_rate_limit_num() -> u64 {
+    i64::MAX as u64
+}
+
+const fn default_retry_max_retries() -> u32 {
+    8
+}
+
+const fn default_retry_initial_delay_ms() -> u64 {
+    200
+}
+
+const fn default_retry_max_elapsed_secs() -> u64 {
+    60
+}
+
 impl GenerateConfig for AzureEventHubsSinkConfig {
     fn generate_config() -> toml::Value {
         toml::from_str(
             r#"connection_string = "Endpoint=sb://mynamespace.servicebus.windows.net/;SharedAccessKeyName=mykeyname;SharedAccessKey=mykey;EntityPath=my-event-hub"
-            encoding.codec = "json"
-            [request]
-            concurrency = 10"#,
+            encoding.codec = "json""#,
         )
         .unwrap()
     }
@@ -161,18 +237,16 @@ mod tests {
     }
 
     #[test]
-    fn config_from_toml_with_request_settings() {
+    fn config_from_toml_with_rate_limit() {
         let toml_str = r#"
             connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
             encoding.codec = "json"
-            [request]
-            concurrency = 20
-            timeout_secs = 30
+            rate_limit_duration_secs = 2
+            rate_limit_num = 500
         "#;
         let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
-        let settings = config.request.into_settings();
-        assert_eq!(settings.concurrency, Some(20));
-        assert_eq!(settings.timeout, std::time::Duration::from_secs(30));
+        assert_eq!(config.rate_limit_duration_secs, 2);
+        assert_eq!(config.rate_limit_num, 500);
     }
 
     #[test]

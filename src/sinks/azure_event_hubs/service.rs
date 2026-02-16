@@ -1,7 +1,4 @@
-use std::sync::{
-    Arc,
-    atomic::{AtomicUsize, Ordering},
-};
+use std::sync::Arc;
 use std::task::{Context, Poll};
 
 use azure_messaging_eventhubs::ProducerClient;
@@ -61,16 +58,12 @@ impl MetaDescriptive for AzureEventHubsRequest {
 #[derive(Clone)]
 pub struct AzureEventHubsService {
     producer: Arc<ProducerClient>,
-    in_flight: Arc<AtomicUsize>,
-    max_in_flight: usize,
 }
 
 impl AzureEventHubsService {
-    pub fn new(producer: ProducerClient, max_in_flight: usize) -> Self {
+    pub fn new(producer: ProducerClient) -> Self {
         Self {
             producer: Arc::new(producer),
-            in_flight: Arc::new(AtomicUsize::new(0)),
-            max_in_flight,
         }
     }
 }
@@ -81,27 +74,18 @@ impl Service<AzureEventHubsRequest> for AzureEventHubsService {
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
     fn poll_ready(&mut self, _cx: &mut Context<'_>) -> Poll<Result<(), Self::Error>> {
-        if self.in_flight.load(Ordering::Relaxed) >= self.max_in_flight {
-            Poll::Pending
-        } else {
-            Poll::Ready(Ok(()))
-        }
+        Poll::Ready(Ok(()))
     }
 
     fn call(&mut self, request: AzureEventHubsRequest) -> Self::Future {
         let producer = Arc::clone(&self.producer);
-        let in_flight = Arc::clone(&self.in_flight);
         let raw_byte_size = request.body.len();
         let partition_id = request.partition_id;
         let event_byte_size = request
             .request_metadata
             .into_events_estimated_json_encoded_byte_size();
 
-        in_flight.fetch_add(1, Ordering::Relaxed);
-
         Box::pin(async move {
-            let _guard = InFlightGuard(in_flight);
-
             let event_data = azure_messaging_eventhubs::models::EventData::builder()
                 .with_body(request.body.to_vec())
                 .build();
@@ -133,45 +117,9 @@ impl Service<AzureEventHubsRequest> for AzureEventHubsService {
     }
 }
 
-/// RAII guard that decrements in-flight counter on drop.
-struct InFlightGuard(Arc<AtomicUsize>);
-
-impl Drop for InFlightGuard {
-    fn drop(&mut self) {
-        self.0.fetch_sub(1, Ordering::Relaxed);
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn in_flight_guard_decrements_on_drop() {
-        let counter = Arc::new(AtomicUsize::new(5));
-        {
-            let _guard = InFlightGuard(Arc::clone(&counter));
-            assert_eq!(counter.load(Ordering::Relaxed), 5);
-        }
-        // After guard is dropped, counter should be decremented
-        assert_eq!(counter.load(Ordering::Relaxed), 4);
-    }
-
-    #[test]
-    fn in_flight_guard_multiple_guards() {
-        let counter = Arc::new(AtomicUsize::new(0));
-        counter.fetch_add(3, Ordering::Relaxed);
-
-        let g1 = InFlightGuard(Arc::clone(&counter));
-        let g2 = InFlightGuard(Arc::clone(&counter));
-        assert_eq!(counter.load(Ordering::Relaxed), 3);
-
-        drop(g1);
-        assert_eq!(counter.load(Ordering::Relaxed), 2);
-
-        drop(g2);
-        assert_eq!(counter.load(Ordering::Relaxed), 1);
-    }
 
     #[test]
     fn response_driver_response_delivered() {

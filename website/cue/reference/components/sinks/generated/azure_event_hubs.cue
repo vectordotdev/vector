@@ -85,43 +85,20 @@ generated: components: sinks: azure_event_hubs: configuration: {
 			}
 		}
 	}
-	request: {
-		description: "Tower request configuration for controlling concurrency and rate limiting."
+	rate_limit_duration_secs: {
+		description: "The time window used for the `rate_limit_num` option."
 		required:    false
-		type: object: options: {
-			concurrency: {
-				description: "The maximum number of in-flight requests."
-				required:    false
-				type: uint: {
-					default: 5
-					examples: [5, 10, 20]
-					unit: "requests"
-				}
-			}
-			rate_limit_duration_secs: {
-				description: "The time window for the rate limiter."
-				required:    false
-				type: uint: {
-					default: 1
-					unit:    "seconds"
-				}
-			}
-			rate_limit_num: {
-				description: "The maximum number of requests in the rate limit window."
-				required:    false
-				type: uint: {
-					default: 100
-					unit:    "requests"
-				}
-			}
-			timeout_secs: {
-				description: "The maximum time a request can take before being aborted."
-				required:    false
-				type: uint: {
-					default: 60
-					unit:    "seconds"
-				}
-			}
+		type: uint: {
+			default: 1
+			unit:    "seconds"
+		}
+	}
+	rate_limit_num: {
+		description: "The maximum number of requests allowed within the `rate_limit_duration_secs` time window."
+		required:    false
+		type: uint: {
+			default: 9223372036854775807
+			unit:    "requests"
 		}
 	}
 }

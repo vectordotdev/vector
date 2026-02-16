@@ -25,13 +25,7 @@ components: sinks: azure_event_hubs: {
 					enum: ["json", "text"]
 				}
 			}
-			request: {
-				enabled:                    true
-				rate_limit_duration_secs:   1
-				rate_limit_num:             100
-				concurrency:               5
-				adaptive_concurrency:       true
-			}
+			request: enabled: false
 			tls: enabled: false
 			to: {
 				service: services.azure_event_hubs

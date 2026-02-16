@@ -45,8 +45,15 @@ fn make_config() -> AzureEventHubsSinkConfig {
         namespace: None,
         event_hub_name: Some(EVENT_HUB_NAME.to_string()),
         partition_id_field: None,
+        batch_enabled: true,
+        batch_max_events: 100,
+        batch_timeout_secs: 1,
+        rate_limit_duration_secs: 1,
+        rate_limit_num: i64::MAX as u64,
+        retry_max_retries: 8,
+        retry_initial_delay_ms: 200,
+        retry_max_elapsed_secs: 60,
         encoding: TextSerializerConfig::default().into(),
-        request: TowerRequestConfig::default(),
         acknowledgements: Default::default(),
     }
 }
