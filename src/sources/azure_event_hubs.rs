@@ -24,9 +24,6 @@ use vector_lib::{
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, SourceOutput},
     configurable::configurable_component,
     event::Event,
-    internal_event::{
-        ByteSize, BytesReceived, CountByteSize, EventsReceived, InternalEventHandle, Protocol,
-    },
     sensitive_string::SensitiveString,
     shutdown::ShutdownSignal,
 };
@@ -153,6 +150,8 @@ impl SourceConfig for AzureEventHubsSourceConfig {
             self.event_hub_name.as_deref(),
         )?;
 
+        let event_hub_name_for_metrics = event_hub_name.clone();
+
         let mut builder = ConsumerClient::builder()
             .with_consumer_group(self.consumer_group.clone());
         if let Some(endpoint) = custom_endpoint {
@@ -183,6 +182,7 @@ impl SourceConfig for AzureEventHubsSourceConfig {
         Ok(Box::pin(azure_event_hubs_source(
             client,
             partition_ids,
+            event_hub_name_for_metrics,
             start_position,
             decoder,
             cx.shutdown,
@@ -233,6 +233,7 @@ impl SourceConfig for AzureEventHubsSourceConfig {
 async fn azure_event_hubs_source(
     client: ConsumerClient,
     partition_ids: Vec<String>,
+    event_hub_name: String,
     start_position: String,
     decoder: Decoder,
     shutdown: ShutdownSignal,
@@ -247,6 +248,7 @@ async fn azure_event_hubs_source(
         let client = Arc::clone(&client);
         let decoder = decoder.clone();
         let start_position = start_position.clone();
+        let event_hub_name = event_hub_name.clone();
         let mut out = out.clone();
         let mut shutdown = shutdown.clone();
 
@@ -254,6 +256,7 @@ async fn azure_event_hubs_source(
             partition_receiver(
                 client,
                 partition_id,
+                event_hub_name,
                 start_position,
                 decoder,
                 &mut shutdown,
@@ -274,14 +277,16 @@ const RECONNECT_BACKOFF_MAX: Duration = Duration::from_secs(30);
 async fn partition_receiver(
     client: Arc<ConsumerClient>,
     partition_id: String,
+    event_hub_name: String,
     start_position: String,
     decoder: Decoder,
     shutdown: &mut ShutdownSignal,
     out: &mut SourceSender,
     log_namespace: LogNamespace,
 ) -> Result<(), ()> {
-    let bytes_received = register!(BytesReceived::from(Protocol::TCP));
-    let events_received = register!(EventsReceived);
+    use crate::internal_events::azure_event_hubs::source::{
+        AzureEventHubsBytesReceived, AzureEventHubsEventsReceived,
+    };
 
     let start_loc = match start_position.as_str() {
         "earliest" => StartLocation::Earliest,
@@ -334,7 +339,12 @@ async fn partition_receiver(
                                 None => continue,
                             };
 
-                            bytes_received.emit(ByteSize(data.len()));
+                            emit!(AzureEventHubsBytesReceived {
+                                byte_size: data.len(),
+                                protocol: "amqp",
+                                event_hub_name: &event_hub_name,
+                                partition_id: &partition_id,
+                            });
 
                             let sequence_number = received.sequence_number();
                             let offset = received.offset().clone();
@@ -343,10 +353,12 @@ async fn partition_receiver(
                             while let Some(next) = framed.next().await {
                                 match next {
                                     Ok((events, _byte_size)) => {
-                                        events_received.emit(CountByteSize(
-                                            events.len(),
-                                            events.estimated_json_encoded_size_of(),
-                                        ));
+                                        emit!(AzureEventHubsEventsReceived {
+                                            count: events.len(),
+                                            byte_size: events.estimated_json_encoded_size_of(),
+                                            event_hub_name: &event_hub_name,
+                                            partition_id: &partition_id,
+                                        });
 
                                         let now = chrono::Utc::now();
                                         let events: Vec<Event> = events.into_iter().map(|mut event| {

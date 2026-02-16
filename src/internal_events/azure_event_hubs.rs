@@ -3,6 +3,66 @@ pub mod source {
     use metrics::counter;
     use vector_lib::NamedInternalEvent;
     use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+    use vector_lib::json_size::JsonSize;
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct AzureEventHubsBytesReceived<'a> {
+        pub byte_size: usize,
+        pub protocol: &'static str,
+        pub event_hub_name: &'a str,
+        pub partition_id: &'a str,
+    }
+
+    impl InternalEvent for AzureEventHubsBytesReceived<'_> {
+        fn emit(self) {
+            trace!(
+                message = "Bytes received.",
+                byte_size = %self.byte_size,
+                protocol = %self.protocol,
+                event_hub_name = self.event_hub_name,
+                partition_id = self.partition_id,
+            );
+            counter!(
+                "component_received_bytes_total",
+                "protocol" => self.protocol,
+                "event_hub_name" => self.event_hub_name.to_string(),
+                "partition_id" => self.partition_id.to_string(),
+            )
+            .increment(self.byte_size as u64);
+        }
+    }
+
+    #[derive(Debug, NamedInternalEvent)]
+    pub struct AzureEventHubsEventsReceived<'a> {
+        pub byte_size: JsonSize,
+        pub count: usize,
+        pub event_hub_name: &'a str,
+        pub partition_id: &'a str,
+    }
+
+    impl InternalEvent for AzureEventHubsEventsReceived<'_> {
+        fn emit(self) {
+            trace!(
+                message = "Events received.",
+                count = %self.count,
+                byte_size = %self.byte_size,
+                event_hub_name = self.event_hub_name,
+                partition_id = self.partition_id,
+            );
+            counter!(
+                "component_received_events_total",
+                "event_hub_name" => self.event_hub_name.to_string(),
+                "partition_id" => self.partition_id.to_string(),
+            )
+            .increment(self.count as u64);
+            counter!(
+                "component_received_event_bytes_total",
+                "event_hub_name" => self.event_hub_name.to_string(),
+                "partition_id" => self.partition_id.to_string(),
+            )
+            .increment(self.byte_size.get() as u64);
+        }
+    }
 
     #[derive(Debug, NamedInternalEvent)]
     pub struct AzureEventHubsReceiveError {
