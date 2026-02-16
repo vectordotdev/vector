@@ -2,7 +2,7 @@
 
 use std::io;
 
-use super::{config::Format, request_builder::ClickhouseRequestBuilder};
+use super::{RequiredFields, config::Format, request_builder::ClickhouseRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
 #[cfg(feature = "codecs-arrow")]
 use vector_lib::codecs::internal_events::EncoderNullConstraintError;
@@ -15,7 +15,7 @@ pub struct ClickhouseSink<S> {
     table: Template,
     format: Format,
     request_builder: ClickhouseRequestBuilder,
-    required_fields: Option<Vec<String>>,
+    required_fields: RequiredFields,
 }
 
 impl<S> ClickhouseSink<S>
@@ -32,7 +32,7 @@ where
         table: Template,
         format: Format,
         request_builder: ClickhouseRequestBuilder,
-        required_fields: Option<Vec<String>>,
+        required_fields: RequiredFields,
     ) -> Self {
         Self {
             batch_settings,
@@ -155,7 +155,7 @@ impl Partitioner for KeyPartitioner {
 }
 
 fn validate_required_fields(
-    required_fields: &Option<Vec<String>>,
+    required_fields: &RequiredFields,
     events: &[Event],
 ) -> Result<(), io::Error> {
     let Some(required_fields) = required_fields else {

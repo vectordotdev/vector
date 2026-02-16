@@ -9,6 +9,9 @@
 //!
 //! This sink only supports logs for now but could support metrics and traces as well in the future.
 
+/// Non-nullable field names that must be present in events before encoding.
+pub type RequiredFields = Option<Vec<String>>;
+
 mod arrow;
 pub mod config;
 #[cfg(all(test, feature = "clickhouse-integration-tests"))]

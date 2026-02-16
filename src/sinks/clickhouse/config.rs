@@ -8,6 +8,7 @@ use vector_lib::codecs::encoding::format::SchemaProvider;
 use vector_lib::codecs::encoding::{ArrowStreamSerializerConfig, BatchSerializerConfig};
 
 use super::{
+    RequiredFields,
     request_builder::ClickhouseRequestBuilder,
     service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
     sink::{ClickhouseSink, PartitionKey},
@@ -274,7 +275,7 @@ impl ClickhouseConfig {
         endpoint: &Uri,
         database: &Template,
         auth: Option<&Auth>,
-    ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind, Option<Vec<String>>)> {
+    ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind, RequiredFields)> {
         use vector_lib::codecs::EncoderKind;
         use vector_lib::codecs::{
             JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer,
