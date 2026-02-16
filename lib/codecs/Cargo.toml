@@ -13,8 +13,8 @@ name = "generate-avro-fixtures"
 path = "tests/bin/generate-avro-fixtures.rs"
 
 [dependencies]
-apache-avro = { version = "0.20.0", default-features = false }
-arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
+apache-avro = { version = "0.21.0", default-features = false }
+arrow = { version = "56.2.0", default-features = false, features = ["ipc"] }
 async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
@@ -36,9 +36,9 @@ prost-reflect.workspace = true
 rand.workspace = true
 regex.workspace = true
 serde.workspace = true
+serde_arrow = { version = "0.13", default-features = false, features = ["arrow-56"], optional = true}
 serde_with = { version = "3.14.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_json.workspace = true
-serde_arrow = { version = "0.13", features = ["arrow-56"], optional = true }
 serde-aux = { version = "4.5", optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu.workspace = true
@@ -66,9 +66,11 @@ rstest = "0.26.1"
 tracing-test = "0.2.5"
 uuid.workspace = true
 vrl.workspace = true
+tempfile.workspace = true
+toml.workspace = true
 
 [features]
-arrow = ["dep:arrow", "dep:serde_arrow"]
+arrow = ["dep:serde_arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux", "dep:toml"]
 test = []

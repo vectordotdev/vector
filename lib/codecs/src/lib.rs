@@ -4,6 +4,7 @@
 #![deny(missing_docs)]
 #![deny(warnings)]
 
+pub mod avro;
 mod common;
 pub mod decoding;
 pub mod encoding;
