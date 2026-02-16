@@ -112,6 +112,7 @@ components: sinks: azure_event_hubs: {
 	telemetry: metrics: {
 		component_errors_total:                components.sources.internal_metrics.output.metrics.component_errors_total
 		component_sent_bytes_total:            components.sources.internal_metrics.output.metrics.component_sent_bytes_total
+		component_sent_event_bytes_total:      components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
 		component_sent_events_total:           components.sources.internal_metrics.output.metrics.component_sent_events_total
 		azure_event_hubs_events_sent_total:    components.sources.internal_metrics.output.metrics.azure_event_hubs_events_sent_total
 		azure_event_hubs_bytes_sent_total:     components.sources.internal_metrics.output.metrics.azure_event_hubs_bytes_sent_total
