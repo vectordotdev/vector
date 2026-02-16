@@ -881,4 +881,94 @@ mod tests {
         assert_eq!(eh, "eh1");
         assert_eq!(custom_ep, Some("amqp://localhost:5672".to_string()));
     }
+
+    // --- Source config defaults ---
+
+    #[test]
+    fn config_defaults() {
+        let config = AzureEventHubsSourceConfig::default();
+        assert_eq!(config.consumer_group, "$Default");
+        assert_eq!(config.start_position, "latest");
+        assert!(config.partition_ids.is_empty());
+        assert!(config.connection_string.is_none());
+        assert!(config.namespace.is_none());
+        assert!(config.event_hub_name.is_none());
+    }
+
+    #[test]
+    fn config_from_toml_connection_string() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+        "#;
+        let config: AzureEventHubsSourceConfig = toml::from_str(toml_str).unwrap();
+        assert!(config.connection_string.is_some());
+        assert_eq!(config.consumer_group, "$Default");
+        assert_eq!(config.start_position, "latest");
+    }
+
+    #[test]
+    fn config_from_toml_identity_auth() {
+        let toml_str = r#"
+            namespace = "myns.servicebus.windows.net"
+            event_hub_name = "my-hub"
+        "#;
+        let config: AzureEventHubsSourceConfig = toml::from_str(toml_str).unwrap();
+        assert!(config.connection_string.is_none());
+        assert_eq!(config.namespace.as_deref(), Some("myns.servicebus.windows.net"));
+        assert_eq!(config.event_hub_name.as_deref(), Some("my-hub"));
+    }
+
+    #[test]
+    fn config_custom_consumer_group_and_partitions() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            consumer_group = "my-cg"
+            partition_ids = ["0", "2"]
+            start_position = "earliest"
+        "#;
+        let config: AzureEventHubsSourceConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.consumer_group, "my-cg");
+        assert_eq!(config.partition_ids, vec!["0", "2"]);
+        assert_eq!(config.start_position, "earliest");
+    }
+
+    #[test]
+    fn config_rejects_unknown_fields() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            unknown_field = "bad"
+        "#;
+        let result = toml::from_str::<AzureEventHubsSourceConfig>(toml_str);
+        assert!(result.is_err());
+    }
+
+    // --- Output schema definition ---
+
+    #[test]
+    fn output_schema_definition_vector_namespace() {
+        let config = AzureEventHubsSourceConfig {
+            log_namespace: Some(true),
+            ..Default::default()
+        };
+
+        let definition = config
+            .outputs(LogNamespace::Vector)
+            .remove(0)
+            .schema_definition(true);
+
+        // Vector namespace: event root is bytes, metadata has source fields
+        assert!(definition.is_some());
+    }
+
+    #[test]
+    fn output_schema_definition_legacy_namespace() {
+        let config = AzureEventHubsSourceConfig::default();
+
+        let definition = config
+            .outputs(LogNamespace::Legacy)
+            .remove(0)
+            .schema_definition(true);
+
+        assert!(definition.is_some());
+    }
 }

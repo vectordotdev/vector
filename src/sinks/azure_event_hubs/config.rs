@@ -259,4 +259,107 @@ mod tests {
         // Default acknowledgements should not be enabled
         assert!(!config.acknowledgements.enabled());
     }
+
+    #[test]
+    fn config_defaults_batch() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            encoding.codec = "json"
+        "#;
+        let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
+        assert!(config.batch_enabled);
+        assert_eq!(config.batch_max_events, 100);
+        assert_eq!(config.batch_timeout_secs, 1);
+    }
+
+    #[test]
+    fn config_defaults_retry() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            encoding.codec = "json"
+        "#;
+        let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.retry_max_retries, 8);
+        assert_eq!(config.retry_initial_delay_ms, 200);
+        assert_eq!(config.retry_max_elapsed_secs, 60);
+    }
+
+    #[test]
+    fn config_custom_batch_settings() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            encoding.codec = "json"
+            batch_enabled = false
+            batch_max_events = 50
+            batch_timeout_secs = 5
+        "#;
+        let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
+        assert!(!config.batch_enabled);
+        assert_eq!(config.batch_max_events, 50);
+        assert_eq!(config.batch_timeout_secs, 5);
+    }
+
+    #[test]
+    fn config_custom_retry_settings() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            encoding.codec = "json"
+            retry_max_retries = 3
+            retry_initial_delay_ms = 500
+            retry_max_elapsed_secs = 30
+        "#;
+        let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
+        assert_eq!(config.retry_max_retries, 3);
+        assert_eq!(config.retry_initial_delay_ms, 500);
+        assert_eq!(config.retry_max_elapsed_secs, 30);
+    }
+
+    #[test]
+    fn config_partition_id_field() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            encoding.codec = "json"
+            partition_id_field = ".partition"
+        "#;
+        let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
+        assert!(config.partition_id_field.is_some());
+    }
+
+    #[test]
+    fn config_all_fields() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            encoding.codec = "json"
+            partition_id_field = ".pid"
+            batch_enabled = true
+            batch_max_events = 200
+            batch_timeout_secs = 3
+            rate_limit_duration_secs = 5
+            rate_limit_num = 100
+            retry_max_retries = 4
+            retry_initial_delay_ms = 300
+            retry_max_elapsed_secs = 120
+        "#;
+        let config: AzureEventHubsSinkConfig = toml::from_str(toml_str).unwrap();
+        assert!(config.partition_id_field.is_some());
+        assert!(config.batch_enabled);
+        assert_eq!(config.batch_max_events, 200);
+        assert_eq!(config.batch_timeout_secs, 3);
+        assert_eq!(config.rate_limit_duration_secs, 5);
+        assert_eq!(config.rate_limit_num, 100);
+        assert_eq!(config.retry_max_retries, 4);
+        assert_eq!(config.retry_initial_delay_ms, 300);
+        assert_eq!(config.retry_max_elapsed_secs, 120);
+    }
+
+    #[test]
+    fn config_rejects_unknown_fields() {
+        let toml_str = r#"
+            connection_string = "Endpoint=sb://myns.servicebus.windows.net/;SharedAccessKeyName=key1;SharedAccessKey=abc==;EntityPath=my-hub"
+            encoding.codec = "json"
+            unknown_field = "should_fail"
+        "#;
+        let result = toml::from_str::<AzureEventHubsSinkConfig>(toml_str);
+        assert!(result.is_err());
+    }
 }

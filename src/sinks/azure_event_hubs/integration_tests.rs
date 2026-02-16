@@ -87,6 +87,89 @@ async fn azure_event_hubs_sink_healthcheck() {
 }
 
 #[tokio::test]
+async fn azure_event_hubs_sink_non_batch_mode() {
+    crate::test_util::trace_init();
+    let mut config = make_config();
+    config.batch_enabled = false;
+
+    let num_events = 5;
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let (input_lines, events) = random_lines_with_stream(100, num_events, Some(batch));
+
+    assert_sink_compliance(&SINK_TAGS, async move {
+        let cx = SinkContext::default();
+        let (sink, _healthcheck) = config.build(cx).await.expect("Failed to build sink");
+        sink.run(events).await
+    })
+    .await
+    .expect("Running sink failed");
+
+    assert_eq!(
+        receiver.try_recv(),
+        Ok(BatchStatus::Delivered),
+        "Events should be acknowledged as delivered"
+    );
+
+    // Read events back
+    let (namespace, _, credential, custom_endpoint) =
+        crate::sources::azure_event_hubs::build_credential(
+            Some(&emulator_connection_string().into()),
+            None,
+            Some(EVENT_HUB_NAME),
+        )
+        .unwrap();
+
+    let mut builder = ConsumerClient::builder()
+        .with_consumer_group(CONSUMER_GROUP.to_string());
+    if let Some(endpoint) = custom_endpoint {
+        builder = builder.with_custom_endpoint(endpoint);
+    }
+    let consumer = builder
+        .open(&namespace, EVENT_HUB_NAME.to_string(), credential)
+        .await
+        .expect("Failed to create consumer");
+
+    let mut received = Vec::new();
+    for partition_id in &["0", "1"] {
+        let options = OpenReceiverOptions {
+            start_position: Some(StartPosition {
+                location: StartLocation::Earliest,
+                ..Default::default()
+            }),
+            ..Default::default()
+        };
+        let receiver = consumer
+            .open_receiver_on_partition(partition_id.to_string(), Some(options))
+            .await
+            .expect("Failed to open receiver");
+        let mut stream = receiver.stream_events();
+        loop {
+            match tokio::time::timeout(Duration::from_secs(5), stream.next()).await {
+                Ok(Some(Ok(event))) => {
+                    if let Some(body) = event.event_data().body() {
+                        received.push(String::from_utf8_lossy(body).to_string());
+                    }
+                }
+                _ => break,
+            }
+        }
+    }
+
+    assert_eq!(
+        received.len(),
+        num_events,
+        "Expected {num_events} events in non-batch mode, got {}",
+        received.len()
+    );
+
+    let mut received_sorted = received.clone();
+    received_sorted.sort();
+    let mut expected_sorted = input_lines.clone();
+    expected_sorted.sort();
+    assert_eq!(received_sorted, expected_sorted);
+}
+
+#[tokio::test]
 async fn azure_event_hubs_sink_happy_path() {
     crate::test_util::trace_init();
     let config = make_config();
