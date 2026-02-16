@@ -96,5 +96,24 @@ components: sinks: azure_event_hubs: {
 				or with an empty value are sent without partition affinity.
 				"""
 		}
+		metrics: {
+			title: "Metrics"
+			body: """
+				The sink emits standard Vector telemetry (`component_sent_events_total`,
+				`component_sent_bytes_total`, `component_sent_event_bytes_total`) as well as
+				Event Hubs-specific counters labeled by `event_hub_name` and `partition_id`:
+
+				- `azure_event_hubs_events_sent_total` — number of events sent per partition
+				- `azure_event_hubs_bytes_sent_total` — encoded bytes sent per partition
+				"""
+		}
+	}
+
+	telemetry: metrics: {
+		component_errors_total:                components.sources.internal_metrics.output.metrics.component_errors_total
+		component_sent_bytes_total:            components.sources.internal_metrics.output.metrics.component_sent_bytes_total
+		component_sent_events_total:           components.sources.internal_metrics.output.metrics.component_sent_events_total
+		azure_event_hubs_events_sent_total:    components.sources.internal_metrics.output.metrics.azure_event_hubs_events_sent_total
+		azure_event_hubs_bytes_sent_total:     components.sources.internal_metrics.output.metrics.azure_event_hubs_bytes_sent_total
 	}
 }

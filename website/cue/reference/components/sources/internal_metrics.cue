@@ -594,6 +594,36 @@ components: sources: internal_metrics: {
 				}
 			}
 		}
+		azure_event_hubs_events_sent_total: {
+			description:       "Total number of events sent to Azure Event Hubs."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				event_hub_name: {
+					description: "The Azure Event Hub name."
+					required:    true
+				}
+				partition_id: {
+					description: "The Event Hub partition ID."
+					required:    true
+				}
+			}
+		}
+		azure_event_hubs_bytes_sent_total: {
+			description:       "Total number of bytes sent to Azure Event Hubs."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				event_hub_name: {
+					description: "The Azure Event Hub name."
+					required:    true
+				}
+				partition_id: {
+					description: "The Event Hub partition ID."
+					required:    true
+				}
+			}
+		}
 		files_added_total: {
 			description:       "The total number of files Vector has found to watch."
 			type:              "counter"

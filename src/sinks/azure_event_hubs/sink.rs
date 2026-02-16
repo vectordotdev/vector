@@ -7,6 +7,10 @@ use bytes::{Bytes, BytesMut};
 use futures_util::StreamExt;
 use tokio::time::sleep;
 use tokio_util::codec::Encoder as _;
+use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::internal_event::{
+    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+};
 use vector_lib::lookup::lookup_v2::OptionalTargetPath;
 
 use super::config::AzureEventHubsSinkConfig;
@@ -74,7 +78,8 @@ impl AzureEventHubsSink {
     }
 
     /// Encode an event to bytes and extract optional partition ID.
-    fn encode_event(&mut self, mut event: Event) -> Option<(Option<String>, Bytes, EventFinalizers)> {
+    /// Returns (partition_id, encoded_bytes, json_byte_size, finalizers).
+    fn encode_event(&mut self, mut event: Event) -> Option<(Option<String>, Bytes, JsonSize, EventFinalizers)> {
         let finalizers = event.take_finalizers();
 
         let partition_id = self.partition_id_field.as_ref().and_then(|field| {
@@ -88,29 +93,32 @@ impl AzureEventHubsSink {
         });
 
         self.transformer.transform(&mut event);
+        let json_byte_size = event.estimated_json_encoded_size_of();
 
         let mut buf = BytesMut::new();
         if self.encoder.encode(event, &mut buf).is_err() {
             return None;
         }
 
-        Some((partition_id, buf.freeze(), finalizers))
+        Some((partition_id, buf.freeze(), json_byte_size, finalizers))
     }
 
     /// Flush buffered events as EventDataBatch per partition.
     async fn flush_batches(
         &self,
-        buffer: &mut Vec<(Option<String>, Bytes, EventFinalizers)>,
+        buffer: &mut Vec<(Option<String>, Bytes, JsonSize, EventFinalizers)>,
+        events_sent: &<EventsSent as vector_lib::internal_event::RegisterInternalEvent>::Handle,
+        bytes_sent: &<BytesSent as vector_lib::internal_event::RegisterInternalEvent>::Handle,
     ) -> Result<(), ()> {
         if buffer.is_empty() {
             return Ok(());
         }
 
         // Group by partition_id
-        let mut by_partition: HashMap<Option<String>, Vec<(Bytes, EventFinalizers)>> =
+        let mut by_partition: HashMap<Option<String>, Vec<(Bytes, JsonSize, EventFinalizers)>> =
             HashMap::new();
-        for (pid, body, fins) in buffer.drain(..) {
-            by_partition.entry(pid).or_default().push((body, fins));
+        for (pid, body, json_size, fins) in buffer.drain(..) {
+            by_partition.entry(pid).or_default().push((body, json_size, fins));
         }
 
         for (partition_id, events) in by_partition {
@@ -131,13 +139,15 @@ impl AzureEventHubsSink {
 
             let mut all_finalizers = Vec::new();
             let mut total_bytes = 0usize;
+            let mut total_json_size = JsonSize::zero();
 
-            for (body, finalizers) in events {
+            for (body, json_size, finalizers) in events {
                 let event_data = azure_messaging_eventhubs::models::EventData::builder()
                     .with_body(body.to_vec())
                     .build();
 
                 total_bytes += body.len();
+                total_json_size += json_size;
                 all_finalizers.push(finalizers);
 
                 match batch.try_add_event_data(event_data.clone(), None) {
@@ -185,12 +195,13 @@ impl AzureEventHubsSink {
             }
 
             let pid_label = partition_id.as_deref().unwrap_or("");
-            emit!(crate::internal_events::azure_event_hubs::sink::AzureEventHubsEventsSent {
-                count: event_count,
-                byte_size: total_bytes,
-                event_hub_name: &self.event_hub_name,
-                partition_id: pid_label,
-            });
+            crate::internal_events::azure_event_hubs::sink::emit_eventhubs_sent_metrics(
+                event_count, total_bytes, &self.event_hub_name, pid_label,
+            );
+
+            // Standard Vector sink telemetry
+            events_sent.emit(CountByteSize(event_count, total_json_size));
+            bytes_sent.emit(ByteSize(total_bytes));
         }
 
         Ok(())
@@ -212,7 +223,10 @@ impl AzureEventHubsSink {
         &self,
         partition_id: Option<String>,
         body: Bytes,
+        json_byte_size: JsonSize,
         finalizers: EventFinalizers,
+        events_sent: &<EventsSent as vector_lib::internal_event::RegisterInternalEvent>::Handle,
+        bytes_sent: &<BytesSent as vector_lib::internal_event::RegisterInternalEvent>::Handle,
     ) -> Result<(), ()> {
         let byte_size = body.len();
         let event_data = azure_messaging_eventhubs::models::EventData::builder()
@@ -229,12 +243,12 @@ impl AzureEventHubsSink {
         match self.producer.send_event(event_data, options).await {
             Ok(_) => {
                 finalizers.update_status(EventStatus::Delivered);
-                emit!(crate::internal_events::azure_event_hubs::sink::AzureEventHubsEventsSent {
-                    count: 1,
-                    byte_size,
-                    event_hub_name: &self.event_hub_name,
-                    partition_id: &pid_label,
-                });
+                crate::internal_events::azure_event_hubs::sink::emit_eventhubs_sent_metrics(
+                    1, byte_size, &self.event_hub_name, &pid_label,
+                );
+                // Standard Vector sink telemetry
+                events_sent.emit(CountByteSize(1, json_byte_size));
+                bytes_sent.emit(ByteSize(byte_size));
                 Ok(())
             }
             Err(e) => {
@@ -250,19 +264,22 @@ impl AzureEventHubsSink {
     async fn run_inner(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let mut input = input.fuse();
 
+        let events_sent = register!(EventsSent::from(Output(None)));
+        let bytes_sent = register!(BytesSent::from(Protocol("amqp".into())));
+
         if !self.batch_enabled {
             // Non-batch mode: send each event individually
             let mut sends_in_window: u64 = 0;
             let mut window_start = tokio::time::Instant::now();
 
             while let Some(event) = input.next().await {
-                if let Some((partition_id, body, finalizers)) = self.encode_event(event) {
+                if let Some((partition_id, body, json_size, finalizers)) = self.encode_event(event) {
                     if window_start.elapsed() >= self.rate_limit_duration {
                         sends_in_window = 0;
                         window_start = tokio::time::Instant::now();
                     }
                     if sends_in_window < self.rate_limit_num {
-                        self.send_single(partition_id, body, finalizers).await?;
+                        self.send_single(partition_id, body, json_size, finalizers, &events_sent, &bytes_sent).await?;
                         sends_in_window += 1;
                     }
                 }
@@ -271,7 +288,7 @@ impl AzureEventHubsSink {
         }
 
         // Batch mode
-        let mut buffer: Vec<(Option<String>, Bytes, EventFinalizers)> = Vec::new();
+        let mut buffer: Vec<(Option<String>, Bytes, JsonSize, EventFinalizers)> = Vec::new();
         let mut sends_in_window: u64 = 0;
         let mut window_start = tokio::time::Instant::now();
 
@@ -294,14 +311,14 @@ impl AzureEventHubsSink {
                                     window_start = tokio::time::Instant::now();
                                 }
                                 if sends_in_window < self.rate_limit_num {
-                                    self.flush_batches(&mut buffer).await?;
+                                    self.flush_batches(&mut buffer, &events_sent, &bytes_sent).await?;
                                     sends_in_window += 1;
                                 }
                             }
                         }
                         None => {
                             // Stream ended, flush remaining
-                            self.flush_batches(&mut buffer).await?;
+                            self.flush_batches(&mut buffer, &events_sent, &bytes_sent).await?;
                             return Ok(());
                         }
                     }
@@ -313,7 +330,7 @@ impl AzureEventHubsSink {
                         window_start = tokio::time::Instant::now();
                     }
                     if sends_in_window < self.rate_limit_num {
-                        self.flush_batches(&mut buffer).await?;
+                        self.flush_batches(&mut buffer, &events_sent, &bytes_sent).await?;
                         sends_in_window += 1;
                     }
                 }
