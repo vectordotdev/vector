@@ -57,158 +57,144 @@ generated: components: sinks: elasticsearch: configuration: {
 	auth: {
 		description: "Elasticsearch Authentication strategies."
 		required:    false
-		type: object: options: {
-			access_key_id: {
-				description:   "The AWS access key ID."
-				relevant_when: "strategy = \"aws\""
-				required:      true
-				type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
-			}
-			assume_role: {
-				description: """
-					The ARN of an [IAM role][iam_role] to assume.
+		type: {
+			object: options: {
+				access_key_id: {
+					description: "The AWS access key ID."
+					required:    true
+					type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
+				}
+				assume_role: {
+					description: """
+						The ARN of an [IAM role][iam_role] to assume.
 
-					[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
-					"""
-				relevant_when: "strategy = \"aws\""
-				required:      true
-				type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
-			}
-			credentials_file: {
-				description:   "Path to the credentials file."
-				relevant_when: "strategy = \"aws\""
-				required:      true
-				type: string: examples: ["/my/aws/credentials"]
-			}
-			external_id: {
-				description: """
-					The optional unique external ID in conjunction with role to assume.
+						[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
+						"""
+					required: true
+					type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
+				}
+				credentials_file: {
+					description: "Path to the credentials file."
+					required:    true
+					type: string: examples: ["/my/aws/credentials"]
+				}
+				external_id: {
+					description: """
+						The optional unique external ID in conjunction with role to assume.
 
-					[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
-					"""
-				relevant_when: "strategy = \"aws\""
-				required:      false
-				type: string: examples: ["randomEXAMPLEidString"]
-			}
-			imds: {
-				description:   "Configuration for authenticating with AWS through IMDS."
-				relevant_when: "strategy = \"aws\""
-				required:      false
-				type: object: options: {
-					connect_timeout_seconds: {
-						description: "Connect timeout for IMDS."
-						required:    false
-						type: uint: {
-							default: 1
-							unit:    "seconds"
+						[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
+						"""
+					required: false
+					type: string: examples: ["randomEXAMPLEidString"]
+				}
+				imds: {
+					description: "Configuration for authenticating with AWS through IMDS."
+					required:    false
+					type: object: options: {
+						connect_timeout_seconds: {
+							description: "Connect timeout for IMDS."
+							required:    false
+							type: uint: {
+								default: 1
+								unit:    "seconds"
+							}
 						}
-					}
-					max_attempts: {
-						description: "Number of IMDS retries for fetching tokens and metadata."
-						required:    false
-						type: uint: default: 4
-					}
-					read_timeout_seconds: {
-						description: "Read timeout for IMDS."
-						required:    false
-						type: uint: {
-							default: 1
-							unit:    "seconds"
+						max_attempts: {
+							description: "Number of IMDS retries for fetching tokens and metadata."
+							required:    false
+							type: uint: default: 4
+						}
+						read_timeout_seconds: {
+							description: "Read timeout for IMDS."
+							required:    false
+							type: uint: {
+								default: 1
+								unit:    "seconds"
+							}
 						}
 					}
 				}
-			}
-			load_timeout_secs: {
-				description: """
-					Timeout for successfully loading any credentials, in seconds.
+				load_timeout_secs: {
+					description: """
+						Timeout for successfully loading any credentials, in seconds.
 
-					Relevant when the default credentials chain or `assume_role` is used.
-					"""
-				relevant_when: "strategy = \"aws\""
-				required:      false
-				type: uint: {
-					examples: [30]
-					unit: "seconds"
+						Relevant when the default credentials chain or `assume_role` is used.
+						"""
+					required: false
+					type: uint: {
+						examples: [30]
+						unit: "seconds"
+					}
+				}
+				password: {
+					description: "Basic authentication password."
+					required:    true
+					type: string: examples: ["${ELASTICSEARCH_PASSWORD}", "password"]
+				}
+				profile: {
+					description: """
+						The credentials profile to use.
+
+						Used to select AWS credentials from a provided credentials file.
+						"""
+					required: false
+					type: string: {
+						default: "default"
+						examples: ["develop"]
+					}
+				}
+				region: {
+					description: """
+						The [AWS region][aws_region] to send STS requests to.
+
+						If not set, this defaults to the configured region
+						for the service itself.
+
+						[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
+						"""
+					required: false
+					type: string: examples: ["us-west-2"]
+				}
+				secret_access_key: {
+					description: "The AWS secret access key."
+					required:    true
+					type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+				}
+				session_name: {
+					description: """
+						The optional [RoleSessionName][role_session_name] is a unique session identifier for your assumed role.
+
+						Should be unique per principal or reason.
+						If not set, the session name is autogenerated like assume-role-provider-1736428351340
+
+						[role_session_name]: https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
+						"""
+					required: false
+					type: string: examples: ["vector-indexer-role"]
+				}
+				session_token: {
+					description: """
+						The AWS session token.
+						See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
+						"""
+					required: false
+					type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+				}
+				strategy: {
+					description: "Amazon OpenSearch Service-specific authentication."
+					required:    true
+					type: string: enum: {
+						aws:   "Amazon OpenSearch Service-specific authentication."
+						basic: "HTTP Basic Authentication."
+					}
+				}
+				user: {
+					description: "Basic authentication username."
+					required:    true
+					type: string: examples: ["${ELASTICSEARCH_USERNAME}", "username"]
 				}
 			}
-			password: {
-				description:   "Basic authentication password."
-				relevant_when: "strategy = \"basic\""
-				required:      true
-				type: string: examples: ["${ELASTICSEARCH_PASSWORD}", "password"]
-			}
-			profile: {
-				description: """
-					The credentials profile to use.
-
-					Used to select AWS credentials from a provided credentials file.
-					"""
-				relevant_when: "strategy = \"aws\""
-				required:      false
-				type: string: {
-					default: "default"
-					examples: ["develop"]
-				}
-			}
-			region: {
-				description: """
-					The [AWS region][aws_region] to send STS requests to.
-
-					If not set, this defaults to the configured region
-					for the service itself.
-
-					[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
-					"""
-				relevant_when: "strategy = \"aws\""
-				required:      false
-				type: string: examples: ["us-west-2"]
-			}
-			secret_access_key: {
-				description:   "The AWS secret access key."
-				relevant_when: "strategy = \"aws\""
-				required:      true
-				type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
-			}
-			session_name: {
-				description: """
-					The optional [RoleSessionName][role_session_name] is a unique session identifier for your assumed role.
-
-					Should be unique per principal or reason.
-					If not set, the session name is autogenerated like assume-role-provider-1736428351340
-
-					[role_session_name]: https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
-					"""
-				relevant_when: "strategy = \"aws\""
-				required:      false
-				type: string: examples: ["vector-indexer-role"]
-			}
-			session_token: {
-				description: """
-					The AWS session token.
-					See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
-					"""
-				relevant_when: "strategy = \"aws\""
-				required:      false
-				type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
-			}
-			strategy: {
-				description: """
-					The authentication strategy to use.
-
-					Amazon OpenSearch Serverless requires this option to be set to `aws`.
-					"""
-				required: true
-				type: string: enum: {
-					aws:   "Amazon OpenSearch Service-specific authentication."
-					basic: "HTTP Basic Authentication."
-				}
-			}
-			user: {
-				description:   "Basic authentication username."
-				relevant_when: "strategy = \"basic\""
-				required:      true
-				type: string: examples: ["${ELASTICSEARCH_USERNAME}", "username"]
-			}
+			string: {}
 		}
 	}
 	aws: {

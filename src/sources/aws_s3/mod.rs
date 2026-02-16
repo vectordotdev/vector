@@ -263,9 +263,15 @@ impl AwsS3Config {
 
         match self.sqs {
             Some(ref sqs) => {
+                let sqs_auth = match &sqs.auth {
+                    Some(AwsAuthentication::Fallback(_)) => AwsAuthentication::default(),
+                    Some(auth) => auth.clone(),
+                    None => self.auth.clone(),
+                };
+
                 let (sqs_client, region) = create_client_and_region::<SqsClientBuilder>(
                     &SqsClientBuilder {},
-                    &self.auth,
+                    &sqs_auth,
                     region.clone(),
                     endpoint,
                     proxy,
