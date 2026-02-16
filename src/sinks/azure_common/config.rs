@@ -130,9 +130,16 @@ pub fn build_client(
 ) -> crate::Result<Arc<ContainerClient>> {
     let client = {
         let connection_string = ConnectionString::new(&connection_string)?;
-        let account_name = connection_string
-            .account_name
-            .ok_or("Account name missing in connection string")?;
+
+        // Extract account name from connection string or blob endpoint
+        let account_name = match (&connection_string.account_name, &connection_string.blob_endpoint) {
+            // If account_name is provided in the connection string, use it
+            (Some(name), _) => name.to_string(),
+            // If blob_endpoint is provided but account_name is not, extract it from the endpoint URL
+            (None, Some(uri)) => extract_account_name_from_endpoint(&uri.to_string())?,
+            // If neither is provided, return an error
+            (None, None) => return Err("Account name missing in connection string and could not be extracted from blob endpoint".into()),
+        };
 
         match connection_string.blob_endpoint {
             // When the blob_endpoint is provided, we use the Custom CloudLocation since it is
@@ -156,4 +163,95 @@ pub fn build_client(
         .container_client(container_name)
     };
     Ok(Arc::new(client))
+}
+
+/// Extracts the account name from an Azure Blob Storage endpoint URL.
+///
+/// The account name is the subdomain before `.blob.core.windows.net` in the URL.
+/// For example, from `https://mystorageaccount.blob.core.windows.net/`,
+/// this function extracts `mystorageaccount`.
+fn extract_account_name_from_endpoint(endpoint: &str) -> crate::Result<String> {
+    // Parse the URL to extract the host
+    let url = url::Url::parse(endpoint)
+        .map_err(|e| format!("Failed to parse blob endpoint URL: {}", e))?;
+
+    let host = url.host_str()
+        .ok_or("Blob endpoint URL does not contain a valid host")?;
+
+    // Extract account name from host (e.g., "mystorageaccount.blob.core.windows.net")
+    // The account name is the first part before the first dot
+    let account_name = host.split('.')
+        .next()
+        .ok_or("Failed to extract account name from blob endpoint")?;
+
+    if account_name.is_empty() {
+        return Err("Account name extracted from blob endpoint is empty".into());
+    }
+
+    Ok(account_name.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_extract_account_name_from_endpoint() {
+        // Standard Azure blob endpoint
+        let result = extract_account_name_from_endpoint("https://mystorageaccount.blob.core.windows.net/");
+        assert_eq!(result.unwrap(), "mystorageaccount");
+
+        // Azure blob endpoint without trailing slash
+        let result = extract_account_name_from_endpoint("https://teststorage.blob.core.windows.net");
+        assert_eq!(result.unwrap(), "teststorage");
+
+        // Azure blob endpoint with path
+        let result = extract_account_name_from_endpoint("https://myaccount.blob.core.windows.net/container");
+        assert_eq!(result.unwrap(), "myaccount");
+
+        // HTTP endpoint (for emulator)
+        let result = extract_account_name_from_endpoint("http://127.0.0.1:10000/devstoreaccount1");
+        assert_eq!(result.unwrap(), "127");
+
+        // Invalid URL
+        let result = extract_account_name_from_endpoint("not-a-url");
+        assert!(result.is_err());
+
+        // Empty host
+        let result = extract_account_name_from_endpoint("https://");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_build_client_with_account_name_in_connection_string() {
+        // Connection string with AccountName explicitly provided
+        let connection_string = "DefaultEndpointsProtocol=https;AccountName=myaccount;AccountKey=YWNjb3VudGtleQ==;EndpointSuffix=core.windows.net".to_string();
+        let result = build_client(connection_string, "test-container".to_string());
+        assert!(result.is_ok(), "Should succeed when AccountName is provided");
+    }
+
+    #[test]
+    fn test_build_client_with_blob_endpoint_and_account_name() {
+        // Connection string with both BlobEndpoint and AccountName
+        let connection_string = "AccountName=myaccount;BlobEndpoint=https://myaccount.blob.core.windows.net/;SharedAccessSignature=sv=2021-01-01&sig=test".to_string();
+        let result = build_client(connection_string, "test-container".to_string());
+        assert!(result.is_ok(), "Should succeed when both AccountName and BlobEndpoint are provided");
+    }
+
+    #[test]
+    fn test_build_client_with_blob_endpoint_without_account_name() {
+        // Connection string with BlobEndpoint but no AccountName (the regression case)
+        let connection_string = "BlobEndpoint=https://mystorageaccount.blob.core.windows.net/;SharedAccessSignature=sv=2021-01-01&sig=test".to_string();
+        let result = build_client(connection_string, "test-container".to_string());
+        assert!(result.is_ok(), "Should succeed by extracting AccountName from BlobEndpoint");
+    }
+
+    #[test]
+    fn test_build_client_without_account_name_or_blob_endpoint() {
+        // Connection string with neither AccountName nor BlobEndpoint
+        let connection_string = "SharedAccessSignature=sv=2021-01-01&sig=test".to_string();
+        let result = build_client(connection_string, "test-container".to_string());
+        assert!(result.is_err(), "Should fail when neither AccountName nor BlobEndpoint is provided");
+        assert!(result.unwrap_err().to_string().contains("Account name missing"));
+    }
 }
