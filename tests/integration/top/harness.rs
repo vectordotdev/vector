@@ -4,7 +4,7 @@
 //! and helper functions for testing.
 
 use std::fs::{OpenOptions, create_dir};
-use std::io::{BufRead, BufReader, Write};
+use std::io::Write;
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::{Child, Command};
@@ -62,7 +62,7 @@ impl TestHarness {
                 Ok(runner) => {
                     return Ok(runner);
                 }
-                Err(e) if is_port_conflict_error(&e) => {
+                Err(e) if e.contains("Address already in use") => {
                     sleep(RETRY_DELAY).await;
                     continue;
                 }
@@ -281,16 +281,13 @@ pub async fn wait_for_startup(
     loop {
         // Check if Vector crashed
         if let Ok(Some(status)) = vector.try_wait() {
-            let stderr = read_stderr(vector);
             return if status.success() {
                 Err(
                     "Vector exited unexpectedly with success status (should stay running)"
                         .to_string(),
                 )
             } else {
-                Err(format!(
-                    "Vector failed to start with status {status}\nStderr: {stderr}"
-                ))
+                Err(format!("Vector failed to start with status {status}"))
             };
         }
 
@@ -310,31 +307,6 @@ pub async fn wait_for_startup(
     }
 }
 
-/// Reads stderr from a child process (non-blocking)
-fn read_stderr(child: &mut Child) -> String {
-    child
-        .stderr
-        .take()
-        .map(|stderr| {
-            let reader = BufReader::new(stderr);
-            reader
-                .lines()
-                .map_while(Result::ok)
-                .collect::<Vec<_>>()
-                .join("\n")
-        })
-        .unwrap_or_default()
-}
-
-/// Checks if an error message indicates a port conflict
-///
-/// Looks for stable error indicators that don't depend on locale:
-/// - "AddrInUse" (Rust's io::ErrorKind Debug representation)
-/// - "EADDRINUSE" (Unix errno name)
-fn is_port_conflict_error(error_message: &str) -> bool {
-    error_message.contains("AddrInUse") || error_message.contains("EADDRINUSE")
-}
-
 /// Waits for topology match while checking for process crashes
 ///
 /// Combines topology polling with crash detection for reload scenarios.
@@ -352,22 +324,22 @@ pub async fn wait_for_topology_match(
         }
 
         // Query components to see if topology matches
-        if let Ok(result) = client.components_query(100).await {
-            if let Some(data) = result.data {
-                let mut current_ids: Vec<&str> = data
-                    .components
-                    .edges
-                    .iter()
-                    .map(|e| e.node.component_id.as_str())
-                    .collect();
-                current_ids.sort_unstable();
+        if let Ok(result) = client.components_query(100).await
+            && let Some(data) = result.data
+        {
+            let mut current_ids: Vec<&str> = data
+                .components
+                .edges
+                .iter()
+                .map(|e| e.node.component_id.as_str())
+                .collect();
+            current_ids.sort_unstable();
 
-                let mut expected_sorted = expected_component_ids.to_vec();
-                expected_sorted.sort_unstable();
+            let mut expected_sorted = expected_component_ids.to_vec();
+            expected_sorted.sort_unstable();
 
-                if current_ids == expected_sorted {
-                    return Ok(());
-                }
+            if current_ids == expected_sorted {
+                return Ok(());
             }
         }
 
