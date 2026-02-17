@@ -62,7 +62,7 @@ flowchart LR
     style H fill:#ccffcc
 ```
 
-## Data Flow
+## Data flow
 
 ### Native Log Event Structure
 
