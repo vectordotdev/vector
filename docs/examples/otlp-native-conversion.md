@@ -64,7 +64,7 @@ flowchart LR
 
 ## Data flow
 
-### Native Log Event Structure
+### Native log event structure
 
 ```mermaid
 classDiagram
