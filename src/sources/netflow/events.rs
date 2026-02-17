@@ -20,7 +20,7 @@ pub struct NetflowEventsReceived {
 impl InternalEvent for NetflowEventsReceived {
     fn emit(self) {
         debug!(
-            message = "NetFlow events received",
+            message = "NetFlow events received.",
             count = self.count,
             byte_size = self.byte_size,
             peer_addr = %self.peer_addr,
@@ -53,7 +53,7 @@ impl<'a> InternalEvent for NetflowParseError<'a> {
         // Only log as error for critical parsing failures, not missing templates
         if self.error.contains("No template") {
             debug!(
-                message = "Template not yet available, data may be buffered",
+                message = "Template not yet available, data may be buffered.",
                 error = %self.error,
                 protocol = %self.protocol,
                 peer_addr = %self.peer_addr,
@@ -64,7 +64,7 @@ impl<'a> InternalEvent for NetflowParseError<'a> {
             );
         } else {
             error!(
-                message = "Failed to parse NetFlow packet",
+                message = "Failed to parse NetFlow packet.",
                 error = %self.error,
                 protocol = %self.protocol,
                 peer_addr = %self.peer_addr,
@@ -98,7 +98,7 @@ pub struct NetflowTemplateError<'a> {
 impl<'a> InternalEvent for NetflowTemplateError<'a> {
     fn emit(self) {
         error!(
-            message = "Failed to process NetFlow template",
+            message = "Failed to process NetFlow template.",
             error = %self.error,
             template_id = self.template_id,
             peer_addr = %self.peer_addr,
@@ -131,7 +131,7 @@ pub struct NetflowFieldParseError<'a> {
 impl<'a> InternalEvent for NetflowFieldParseError<'a> {
     fn emit(self) {
         error!(
-            message = "Failed to parse NetFlow field",
+            message = "Failed to parse NetFlow field.",
             error = %self.error,
             field_type = self.field_type,
             template_id = self.template_id,
@@ -166,7 +166,7 @@ impl InternalEvent for NetflowEventsDropped {
         // Reduce noise for template-related drops when buffering is enabled
         if self.reason.contains("No template") {
             debug!(
-                message = "NetFlow events dropped - template not available",
+                message = "NetFlow events dropped - template not available.",
                 count = self.count,
                 reason = %self.reason,
                 error_code = "template_missing",
@@ -176,7 +176,7 @@ impl InternalEvent for NetflowEventsDropped {
             );
         } else {
             warn!(
-                message = "NetFlow events dropped",
+                message = "NetFlow events dropped.",
                 count = self.count,
                 reason = %self.reason,
                 error_code = "events_dropped",
@@ -211,7 +211,7 @@ pub struct NetflowBindError {
 impl InternalEvent for NetflowBindError {
     fn emit(self) {
         error!(
-            message = "Failed to bind NetFlow socket",
+            message = "Failed to bind NetFlow socket.",
             address = %self.address,
             error = %self.error,
             error_code = "socket_bind_failed",
@@ -239,7 +239,7 @@ pub struct NetflowReceiveError {
 impl InternalEvent for NetflowReceiveError {
     fn emit(self) {
         error!(
-            message = "Failed to receive NetFlow packet",
+            message = "Failed to receive NetFlow packet.",
             error = %self.error,
             error_code = "socket_receive_failed",
             error_type = error_type::CONNECTION_FAILED,
@@ -268,7 +268,7 @@ pub struct NetflowMulticastJoinError {
 impl InternalEvent for NetflowMulticastJoinError {
     fn emit(self) {
         error!(
-            message = "Failed to join multicast group",
+            message = "Failed to join multicast group.",
             group = %self.group,
             interface = %self.interface,
             error = %self.error,
@@ -299,13 +299,13 @@ impl InternalEvent for TemplateCleanupCompleted {
     fn emit(self) {
         if self.removed_count > 0 {
             info!(
-                message = "Template cache cleanup completed",
+                message = "Template cache cleanup completed.",
                 removed_count = self.removed_count,
                 timeout_seconds = self.timeout_seconds,
             );
         } else {
             debug!(
-                message = "Template cache cleanup completed, no expired templates",
+                message = "Template cache cleanup completed, no expired templates.",
                 timeout_seconds = self.timeout_seconds,
             );
         }
@@ -344,7 +344,7 @@ pub struct BufferedRecordsProcessed {
 impl InternalEvent for TemplateReceived {
     fn emit(self) {
         debug!(
-            message = "Template received and cached",
+            message = "Template received and cached.",
             template_id = self.template_id,
             field_count = self.field_count,
             peer_addr = %self.peer_addr,
@@ -364,7 +364,7 @@ impl InternalEvent for TemplateReceived {
 impl InternalEvent for BufferedRecordsProcessed {
     fn emit(self) {
         debug!(
-            message = "Buffered records processed with new template",
+            message = "Buffered records processed with new template.",
             template_id = self.template_id,
             record_count = self.record_count,
             peer_addr = %self.peer_addr,
@@ -393,7 +393,7 @@ pub struct TemplateCacheStats {
 impl InternalEvent for TemplateCacheStats {
     fn emit(self) {
         debug!(
-            message = "Template cache statistics",
+            message = "Template cache statistics.",
             cache_size = self.cache_size,
             max_size = self.max_size,
             hit_ratio = self.hit_ratio,
@@ -426,7 +426,7 @@ pub struct DataRecordParsed {
 impl InternalEvent for DataRecordParsed {
     fn emit(self) {
         debug!(
-            message = "Data record parsed successfully",
+            message = "Data record parsed successfully.",
             template_id = self.template_id,
             fields_parsed = self.fields_parsed,
             record_size = self.record_size,
@@ -461,7 +461,7 @@ pub struct EnterpriseFieldEncountered {
 impl InternalEvent for EnterpriseFieldEncountered {
     fn emit(self) {
         debug!(
-            message = "Enterprise field encountered",
+            message = "Enterprise field encountered.",
             enterprise_id = self.enterprise_id,
             field_type = self.field_type,
             field_name = %self.field_name,
@@ -488,7 +488,7 @@ pub struct UnknownEnterpriseField {
 impl InternalEvent for UnknownEnterpriseField {
     fn emit(self) {
         warn!(
-            message = "Unknown enterprise field encountered",
+            message = "Unknown enterprise field encountered.",
             enterprise_id = self.enterprise_id,
             field_type = self.field_type,
             peer_addr = %self.peer_addr,
@@ -514,7 +514,7 @@ pub struct ProtocolVersionMismatch {
 impl InternalEvent for ProtocolVersionMismatch {
     fn emit(self) {
         warn!(
-            message = "Protocol version mismatch",
+            message = "Protocol version mismatch.",
             expected = self.expected,
             received = self.received,
             peer_addr = %self.peer_addr,
@@ -546,7 +546,7 @@ pub struct PacketTooLarge {
 impl InternalEvent for PacketTooLarge {
     fn emit(self) {
         warn!(
-            message = "Packet too large, truncating",
+            message = "Packet too large, truncating.",
             packet_size = self.packet_size,
             max_size = self.max_size,
             peer_addr = %self.peer_addr,
@@ -577,7 +577,7 @@ pub struct NetflowSourceStarted {
 impl InternalEvent for NetflowSourceStarted {
     fn emit(self) {
         info!(
-            message = "NetFlow source started",
+            message = "NetFlow source started.",
             address = %self.address,
             protocols = ?self.protocols,
             max_templates = self.max_templates,
@@ -601,7 +601,7 @@ pub struct NetflowSourceStopped {
 impl InternalEvent for NetflowSourceStopped {
     fn emit(self) {
         info!(
-            message = "NetFlow source stopped",
+            message = "NetFlow source stopped.",
             address = %self.address,
             runtime_seconds = self.runtime_seconds,
         );
@@ -622,7 +622,7 @@ pub struct ConfigValidationError {
 impl InternalEvent for ConfigValidationError {
     fn emit(self) {
         error!(
-            message = "NetFlow configuration validation failed",
+            message = "NetFlow configuration validation failed.",
             errors = ?self.errors,
             error_code = "config_validation_failed",
             error_type = error_type::CONFIGURATION_FAILED,
@@ -651,7 +651,7 @@ pub struct VariableLengthFieldParsed {
 impl InternalEvent for VariableLengthFieldParsed {
     fn emit(self) {
         debug!(
-            message = "Variable-length field parsed",
+            message = "Variable-length field parsed.",
             field_type = self.field_type,
             actual_length = self.actual_length,
             template_id = self.template_id,
@@ -678,7 +678,7 @@ pub struct FlowStatsSummary {
 impl InternalEvent for FlowStatsSummary {
     fn emit(self) {
         info!(
-            message = "Flow statistics summary",
+            message = "Flow statistics summary.",
             total_flows = self.total_flows,
             total_packets = self.total_packets,
             total_bytes = self.total_bytes,
@@ -715,7 +715,7 @@ pub struct ProtocolSpecificEvent {
 impl InternalEvent for ProtocolSpecificEvent {
     fn emit(self) {
         debug!(
-            message = "Protocol-specific event",
+            message = "Protocol-specific event.",
             protocol = self.protocol,
             event_type = self.event_type,
             details = %self.details,
@@ -742,7 +742,7 @@ pub struct MemoryUsageWarning {
 impl InternalEvent for MemoryUsageWarning {
     fn emit(self) {
         warn!(
-            message = "Memory usage warning",
+            message = "Memory usage warning.",
             component = self.component,
             current_usage = self.current_usage,
             threshold = self.threshold,

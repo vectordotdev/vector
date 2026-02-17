@@ -476,8 +476,10 @@ impl NetflowV5Parser {
         let header = NetflowV5Header::from_bytes(data)?;
         
         debug!(
-            "Parsing NetFlow v5 packet: version={}, count={}, sequence={}",
-            header.version, header.count, header.flow_sequence
+            message = "Parsing NetFlow v5 packet.",
+            version = header.version,
+            count = header.count,
+            sequence = header.flow_sequence,
         );
 
         // Create base event with header info
@@ -499,8 +501,10 @@ impl NetflowV5Parser {
             let record_end = record_offset + NETFLOW_V5_RECORD_SIZE;
             if record_end > data.len() {
                 warn!(
-                    "Insufficient data for record {}: offset={}, need={}",
-                    i, record_offset, NETFLOW_V5_RECORD_SIZE
+                    message = "Insufficient data for record.",
+                    record_index = i,
+                    offset = record_offset,
+                    need = NETFLOW_V5_RECORD_SIZE,
                 );
                 break;
             }
@@ -511,8 +515,9 @@ impl NetflowV5Parser {
                     if self.strict_validation {
                         if let Err(validation_error) = record.validate() {
                             warn!(
-                                "Invalid NetFlow v5 record {}: {}",
-                                i, validation_error
+                                message = "Invalid NetFlow v5 record.",
+                                record_index = i,
+                                error = %validation_error,
                             );
                             invalid_records += 1;
                             record_offset = record_end;
@@ -521,8 +526,9 @@ impl NetflowV5Parser {
                     } else {
                         if let Err(validation_error) = record.validate() {
                             debug!(
-                                "NetFlow v5 record {} validation warning: {}",
-                                i, validation_error
+                                message = "NetFlow v5 record validation warning.",
+                                record_index = i,
+                                error = %validation_error,
                             );
                         }
                     }
@@ -564,7 +570,11 @@ impl NetflowV5Parser {
                     });
                 }
                 Err(e) => {
-                    warn!("Failed to parse NetFlow v5 record {}: {}", i, e);
+                    warn!(
+                        message = "Failed to parse NetFlow v5 record.",
+                        record_index = i,
+                        error = %e,
+                    );
                     invalid_records += 1;
                 }
             }
@@ -604,17 +614,17 @@ pub struct NetflowV5PacketProcessed {
 impl vector_lib::internal_event::InternalEvent for NetflowV5PacketProcessed {
     fn emit(self) {
         debug!(
-            message = "NetFlow v5 packet processed",
+            message = "NetFlow v5 packet processed.",
             peer_addr = %self.peer_addr,
             total_records = self.total_records,
             valid_records = self.valid_records,
             invalid_records = self.invalid_records,
             event_count = self.event_count,
         );
-        
+
         if self.invalid_records > 0 {
             warn!(
-                message = "NetFlow v5 packet contained invalid records",
+                message = "NetFlow v5 packet contained invalid records.",
                 peer_addr = %self.peer_addr,
                 invalid_records = self.invalid_records,
                 total_records = self.total_records,
