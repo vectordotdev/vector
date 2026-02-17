@@ -357,7 +357,7 @@ flowchart LR
     I --> R
 ```
 
-### Type Conversion
+### Type conversion
 
 | Native Type | OTLP AnyValue |
 |-------------|---------------|
