@@ -92,6 +92,13 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::examples = false))]
     #[serde(default = "default_strict_validation")]
     pub strict_validation: bool,
+
+    /// Whether to include raw packet bytes (base64-encoded) in each event.
+    /// Disabled by default to keep payload size small; enable for debugging or forensics.
+    #[configurable(metadata(docs::examples = false))]
+    #[configurable(metadata(docs::examples = true))]
+    #[serde(default = "default_include_raw_data")]
+    pub include_raw_data: bool,
 }
 
 /// Supported flow protocols.
@@ -178,6 +185,10 @@ const fn default_strict_validation() -> bool {
     true
 }
 
+const fn default_include_raw_data() -> bool {
+    false
+}
+
 
 
 
@@ -197,6 +208,7 @@ impl Default for NetflowConfig {
             max_buffered_records: default_max_buffered_records(),
             options_template_mode: default_options_template_mode(),
             strict_validation: default_strict_validation(),
+            include_raw_data: default_include_raw_data(),
         }
     }
 }

@@ -46,6 +46,7 @@ impl DetectedProtocol {
 pub struct ProtocolParser {
     netflow_v5: NetflowV5Parser,
     enabled_protocols: Vec<String>,
+    include_raw_data: bool,
 }
 
 impl ProtocolParser {
@@ -55,6 +56,7 @@ impl ProtocolParser {
         Self {
             netflow_v5: NetflowV5Parser::new(field_parser.clone(), config.strict_validation),
             enabled_protocols: config.protocols.iter().map(|s| s.to_string()).collect(),
+            include_raw_data: config.include_raw_data,
         }
     }
 
@@ -91,7 +93,7 @@ impl ProtocolParser {
 
         let parse_result = match protocol {
             DetectedProtocol::NetflowV5 => {
-                self.netflow_v5.parse(data, peer_addr, true)
+                self.netflow_v5.parse(data, peer_addr, self.include_raw_data)
             }
             DetectedProtocol::Unknown(version) => {
                 Ok(vec![self.create_unknown_protocol_event(data, peer_addr, version)])
@@ -358,6 +360,7 @@ mod tests {
         let template_cache = TemplateCache::new(100);
         let config = NetflowConfig {
             protocols: vec!["netflow_v5".to_string()],
+            include_raw_data: true,
             ..Default::default()
         };
         let parser = ProtocolParser::new(&config, template_cache.clone());
@@ -368,6 +371,21 @@ mod tests {
         assert!(!events.is_empty());
         if let Event::Log(log) = &events[0] {
             assert!(log.get("raw_data").is_some());
+        }
+    }
+
+    #[test]
+    fn test_raw_data_excluded_by_default() {
+        let template_cache = TemplateCache::new(100);
+        let config = NetflowConfig::default();
+        let parser = ProtocolParser::new(&config, template_cache.clone());
+
+        let nf5_packet = create_netflow_v5_packet();
+        let events = parser.parse(&nf5_packet, test_peer_addr(), &template_cache);
+
+        assert!(!events.is_empty());
+        if let Event::Log(log) = &events[0] {
+            assert!(log.get("raw_data").is_none());
         }
     }
 
