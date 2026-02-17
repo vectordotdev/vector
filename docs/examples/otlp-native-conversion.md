@@ -4,7 +4,9 @@ This document explains the automatic native-to-OTLP conversion feature.
 
 ## Architecture overview
 
-### Previous approach (Before This PR)
+### Previous approach
+
+For Vector versions before v0.54.0, the approach is:
 
 ```mermaid
 flowchart LR
@@ -38,7 +40,9 @@ flowchart LR
     style G fill:#ffcccc
 ```
 
-### Current Approach (After This PR)
+### Current approach
+
+For Vector v0.54.0 and later, the approach is:
 
 ```mermaid
 flowchart LR
@@ -162,8 +166,10 @@ classDiagram
 
 ### Previous: Complex VRL required
 
+For Vector versions before v0.54.0, the following complex VRL transform was required:
+
 ```yaml
-# vector.yaml - OLD approach
+# vector.yaml - before v0.54.0
 sources:
   app_logs:
     type: file
@@ -239,8 +245,10 @@ sinks:
 
 ### Current: No VRL required
 
+For Vector v0.54.0 and later, no VRL is needed:
+
 ```yaml
-# vector.yaml - NEW approach
+# vector.yaml - v0.54.0+
 sources:
   app_logs:
     type: file
@@ -273,7 +281,7 @@ xychart-beta
 
 ### Benchmark results
 
-| Scenario | NEW (Auto-Convert) | OLD (VRL + Encode) | Improvement |
+| Scenario | v0.54.0+ (Auto-Convert) | Before v0.54.0 (VRL + Encode) | Improvement |
 |----------|--------------------|--------------------|-------------|
 | **Single Event** | 352 µs / 10.2 MiB/s | 378 µs / 9.5 MiB/s | **7.4% faster** |
 | **Batch 100** | 575 µs / 288 MiB/s | 2,718 µs / 61 MiB/s | **4.7x faster** |
