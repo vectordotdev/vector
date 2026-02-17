@@ -260,7 +260,7 @@ sinks:
       codec: otlp  # Auto-converts native logs!
 ```
 
-## Performance Comparison
+## Performance comparison
 
 ```mermaid
 xychart-beta
