@@ -525,6 +525,7 @@ usergroups
 userguide
 Verizon
 vhosts
+vmware
 Videocon
 Viewsonic
 WCDMA
@@ -535,6 +536,7 @@ Wiko
 winapi
 workarounds
 Woxter
+wsl
 wwang
 XCHACHA
 Xeon
