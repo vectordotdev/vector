@@ -447,4 +447,4 @@ Invalid fields are handled gracefully:
 | Negative timestamp | Use 0 |
 | Invalid UTF-8 | Lossy conversion |
 
-The pipeline never breaks due to malformed data.
+The pipeline does not break due to malformed data.
