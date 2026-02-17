@@ -335,7 +335,7 @@ mod tests {
 
         assert!(!events.is_empty());
         if let Event::Log(log) = &events[0] {
-            assert_eq!(log.get("flow_type").unwrap().as_str().unwrap(), "netflow_v5_record");
+            assert_eq!(log.get("flow_type").unwrap().as_str().unwrap(), "netflow_v5");
         }
     }
 

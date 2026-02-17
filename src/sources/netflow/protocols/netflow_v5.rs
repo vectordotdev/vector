@@ -8,6 +8,7 @@ use crate::sources::netflow::events::*;
 use crate::sources::netflow::fields::FieldParser;
 
 use std::net::SocketAddr;
+use std::time::{SystemTime, UNIX_EPOCH};
 use tracing::{debug, warn};
 use vector_lib::event::{Event, LogEvent};
 
@@ -203,77 +204,150 @@ impl NetflowV5Record {
     /// Convert record to log event
     pub fn to_log_event(&self, record_number: usize, resolve_protocols: bool) -> LogEvent {
         let mut log_event = LogEvent::default();
-        
-        // Flow identification
-        log_event.insert("flow_type", "netflow_v5_record");
+
+        log_event.insert("flow_type", "netflow_v5");
         log_event.insert("record_number", record_number);
-        
-        // Network addresses
+
         log_event.insert("src_addr", Self::ipv4_to_string(self.src_addr));
         log_event.insert("dst_addr", Self::ipv4_to_string(self.dst_addr));
         log_event.insert("next_hop", Self::ipv4_to_string(self.next_hop));
-        
-        // Interface information
+
         log_event.insert("input_interface", self.input);
         log_event.insert("output_interface", self.output);
-        
-        // Traffic counters
+
         log_event.insert("packets", self.d_pkts);
         log_event.insert("octets", self.d_octets);
-        
-        // Timing information
+
         log_event.insert("first_switched", self.first);
         log_event.insert("last_switched", self.last);
-        
-        // Port information
+
         log_event.insert("src_port", self.src_port);
         log_event.insert("dst_port", self.dst_port);
-        
-        // Protocol information
+        if resolve_protocols {
+            if let Some(name) = Self::well_known_port_name(self.src_port) {
+                log_event.insert("src_port_name", name);
+            }
+            if let Some(name) = Self::well_known_port_name(self.dst_port) {
+                log_event.insert("dst_port_name", name);
+            }
+        }
+
         log_event.insert("protocol", self.prot);
         if resolve_protocols {
             log_event.insert("protocol_name", Self::get_protocol_name(self.prot));
         }
-        
-        // TCP flags
+
         log_event.insert("tcp_flags", self.tcp_flags);
-        if self.prot == 6 { // TCP
+        if self.prot == 6 {
             log_event.insert("tcp_flags_urg", (self.tcp_flags & 0x20) != 0);
             log_event.insert("tcp_flags_ack", (self.tcp_flags & 0x10) != 0);
             log_event.insert("tcp_flags_psh", (self.tcp_flags & 0x08) != 0);
             log_event.insert("tcp_flags_rst", (self.tcp_flags & 0x04) != 0);
             log_event.insert("tcp_flags_syn", (self.tcp_flags & 0x02) != 0);
             log_event.insert("tcp_flags_fin", (self.tcp_flags & 0x01) != 0);
+            log_event.insert("tcp_flags_string", Self::tcp_flags_to_string(self.tcp_flags));
         }
-        
-        // Type of Service
+
         log_event.insert("tos", self.tos);
-        log_event.insert("dscp", (self.tos >> 2) & 0x3F); // DSCP is upper 6 bits
-        log_event.insert("ecn", self.tos & 0x03); // ECN is lower 2 bits
-        
-        // AS information
+        log_event.insert("dscp", (self.tos >> 2) & 0x3F);
+        log_event.insert("ecn", self.tos & 0x03);
+
         log_event.insert("src_as", self.src_as);
         log_event.insert("dst_as", self.dst_as);
-        
-        // Subnet mask information
+
         log_event.insert("src_mask", self.src_mask);
         log_event.insert("dst_mask", self.dst_mask);
-        
-        // Calculate flow duration if possible
-        if self.last > self.first {
-            log_event.insert("flow_duration_ms", self.last - self.first);
+        log_event.insert("src_net", Self::addr_mask_to_cidr(self.src_addr, self.src_mask));
+        log_event.insert("dst_net", Self::addr_mask_to_cidr(self.dst_addr, self.dst_mask));
+
+        log_event.insert("is_private_src", Self::is_private_ipv4_static(self.src_addr));
+        log_event.insert("is_private_dst", Self::is_private_ipv4_static(self.dst_addr));
+
+        let duration_ms = if self.last > self.first {
+            self.last - self.first
+        } else {
+            0
+        };
+        if duration_ms > 0 {
+            log_event.insert("flow_duration_ms", duration_ms);
+            let duration_secs = duration_ms as f64 / 1000.0;
+            log_event.insert("bits_per_second", (self.d_octets * 8) as f64 / duration_secs);
+            log_event.insert("packets_per_second", self.d_pkts as f64 / duration_secs);
         }
-        
-        // Calculate bytes per packet
+
         if self.d_pkts > 0 {
             log_event.insert("bytes_per_packet", self.d_octets / self.d_pkts);
         }
-        
-        // Flow direction heuristics
+
         let flow_direction = self.determine_flow_direction();
         log_event.insert("flow_direction", flow_direction);
-        
+
         log_event
+    }
+
+    fn tcp_flags_to_string(flags: u8) -> String {
+        let mut parts = Vec::with_capacity(6);
+        if (flags & 0x01) != 0 {
+            parts.push("FIN");
+        }
+        if (flags & 0x02) != 0 {
+            parts.push("SYN");
+        }
+        if (flags & 0x04) != 0 {
+            parts.push("RST");
+        }
+        if (flags & 0x08) != 0 {
+            parts.push("PSH");
+        }
+        if (flags & 0x10) != 0 {
+            parts.push("ACK");
+        }
+        if (flags & 0x20) != 0 {
+            parts.push("URG");
+        }
+        if parts.is_empty() {
+            "none".to_string()
+        } else {
+            parts.join(",")
+        }
+    }
+
+    fn well_known_port_name(port: u16) -> Option<&'static str> {
+        match port {
+            20 => Some("ftp-data"),
+            21 => Some("ftp"),
+            22 => Some("ssh"),
+            23 => Some("telnet"),
+            25 => Some("smtp"),
+            53 => Some("dns"),
+            80 => Some("http"),
+            110 => Some("pop3"),
+            143 => Some("imap"),
+            443 => Some("https"),
+            993 => Some("imaps"),
+            995 => Some("pop3s"),
+            1812 => Some("radius"),
+            3306 => Some("mysql"),
+            5432 => Some("postgresql"),
+            6379 => Some("redis"),
+            27017 => Some("mongodb"),
+            _ => None,
+        }
+    }
+
+    fn addr_mask_to_cidr(addr: u32, mask_bits: u8) -> String {
+        let mask_bits = mask_bits.min(32);
+        if mask_bits == 0 {
+            return format!("{}/0", Self::ipv4_to_string(addr));
+        }
+        let network = addr & (!0u32 << (32 - mask_bits));
+        format!("{}/{}", Self::ipv4_to_string(network), mask_bits)
+    }
+
+    fn is_private_ipv4_static(addr: u32) -> bool {
+        let a = (addr >> 24) & 0xFF;
+        let b = (addr >> 16) & 0xFF;
+        a == 10 || (a == 172 && b >= 16 && b <= 31) || (a == 192 && b == 168)
     }
 
     /// Determine flow direction based on port analysis
@@ -453,23 +527,31 @@ impl NetflowV5Parser {
                         }
                     }
 
-                    // Convert to log event
-                    let mut record_event = record.to_log_event(i as usize, true); // resolve_protocols = true
-                    
-                    // Add header context to each record
+                    let mut record_event = record.to_log_event(i as usize, true);
+
+                    record_event.insert("exporter", peer_addr.ip().to_string());
+                    record_event.insert("version", 5u16);
+                    record_event.insert("header_flow_count", header.count);
+                    record_event.insert(
+                        "time_received",
+                        SystemTime::now()
+                            .duration_since(UNIX_EPOCH)
+                            .unwrap()
+                            .as_secs(),
+                    );
+                    record_event.insert("unix_nsecs", header.unix_nsecs);
                     record_event.insert("packet_sequence", header.flow_sequence);
                     record_event.insert("engine_type", header.engine_type);
                     record_event.insert("engine_id", header.engine_id);
                     record_event.insert("sys_uptime", header.sys_uptime);
                     record_event.insert("unix_secs", header.unix_secs);
                     record_event.insert("sampling_rate", header.sampling_rate());
-                    
-                    // Add raw data if requested
+
                     if include_raw_data {
                         let encoded = base64::Engine::encode(&base64::engine::general_purpose::STANDARD, data);
                         record_event.insert("raw_data", encoded);
                     }
-                    
+
                     events.push(Event::Log(record_event));
                     valid_records += 1;
 
@@ -707,7 +789,7 @@ mod tests {
         let record = NetflowV5Record::from_bytes(&record_data).unwrap();
         let log_event = record.to_log_event(0, true);
 
-        assert_eq!(log_event.get("flow_type").unwrap().as_str().unwrap(), "netflow_v5_record");
+        assert_eq!(log_event.get("flow_type").unwrap().as_str().unwrap(), "netflow_v5");
         assert_eq!(log_event.get("src_addr").unwrap().as_str().unwrap(), "192.168.1.1");
         assert_eq!(log_event.get("dst_addr").unwrap().as_str().unwrap(), "10.0.0.1");
        assert_eq!(log_event.get("src_port").unwrap().as_integer().unwrap(), 80);
@@ -823,7 +905,7 @@ mod tests {
        
        for (i, event) in events.iter().enumerate() {
            if let Event::Log(log) = event {
-               assert_eq!(log.get("flow_type").unwrap().as_str().unwrap(), "netflow_v5_record");
+               assert_eq!(log.get("flow_type").unwrap().as_str().unwrap(), "netflow_v5");
                assert_eq!(log.get("record_number").unwrap().as_integer().unwrap(), i as i64);
                assert_eq!(log.get("src_addr").unwrap().as_str().unwrap(), "192.168.1.1");
                assert_eq!(log.get("dst_addr").unwrap().as_str().unwrap(), "10.0.0.1");
@@ -848,7 +930,7 @@ mod tests {
        for event in &events {
            if let Event::Log(log) = event {
                let flow_type = log.get("flow_type").unwrap().as_str().unwrap();
-               if flow_type == "netflow_v5_record" {
+               if flow_type == "netflow_v5" {
                    // Records should include raw data when requested
                    assert!(log.get("raw_data").is_some());
                }

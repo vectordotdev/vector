@@ -335,7 +335,7 @@ mod tests {
             // Check if flow_type exists first
             if let Some(flow_type) = log.get("flow_type") {
                 if let Some(flow_type_str) = flow_type.as_str() {
-                    assert_eq!(flow_type_str, "netflow_v5_record");
+                    assert_eq!(flow_type_str, "netflow_v5");
                 } else {
                     panic!("flow_type is not a string: {:?}", flow_type);
                 }
