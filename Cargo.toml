@@ -41,6 +41,10 @@ path = "tests/integration/lib.rs"
 name = "e2e"
 path = "tests/e2e/mod.rs"
 
+[[test]]
+name = "top"
+path = "tests/top/lib.rs"
+
 # CI-based builds use full release optimization. See scripts/environment/release-flags.sh.
 # This results in roughly a 5% reduction in performance when compiling locally vs when
 # compiled via the CI pipeline.
@@ -942,6 +946,7 @@ all-integration-tests = [
   "pulsar-integration-tests",
   "redis-integration-tests",
   "splunk-integration-tests",
+  "top-tests",
   "webhdfs-integration-tests",
 ]
 
@@ -1009,6 +1014,7 @@ pulsar-integration-tests = ["sinks-pulsar", "sources-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
+top-tests = ["top", "api", "sources-demo_logs", "sinks-blackhole"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]

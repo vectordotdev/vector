@@ -52,6 +52,15 @@ jobs:
     needs: changes
     secrets: inherit
 
+  test-top:
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-top
+      job_name: make test-top
+    needs: changes
+    secrets: inherit
+
   make-test-behavior:
     if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
     uses: ./.github/workflows/test-make-command.yml
@@ -122,6 +131,7 @@ jobs:
     needs:
       - changes
       - test-cli
+      - test-top
       - make-test-behavior
       - make-check-examples
       - make-test-docs
