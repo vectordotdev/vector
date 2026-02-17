@@ -223,6 +223,7 @@ hitag
 hitech
 HMACs
 hogwarts
+hostinfo
 htc
 htmltest
 HTTPDATE
