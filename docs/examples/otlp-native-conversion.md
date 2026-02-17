@@ -271,7 +271,7 @@ xychart-beta
     bar [9.5, 61]
 ```
 
-### Benchmark Results
+### Benchmark results
 
 | Scenario | NEW (Auto-Convert) | OLD (VRL + Encode) | Improvement |
 |----------|--------------------|--------------------|-------------|
