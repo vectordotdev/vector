@@ -21,10 +21,8 @@ use vector::test_util::{temp_dir, temp_file};
 use vector_lib::api_client::{Client, gql::ComponentsQueryExt};
 
 // Constants
-pub const STARTUP_TIME: Duration = Duration::from_secs(2);
-pub const API_READY_TIMEOUT: Duration = Duration::from_secs(10);
+pub const STARTUP_TIMEOUT: Duration = Duration::from_secs(2);
 pub const EVENT_PROCESSING_TIMEOUT: Duration = Duration::from_secs(30);
-pub const RELOAD_TIME: Duration = Duration::from_secs(3);
 
 /// Test harness for Vector instances with API enabled
 ///
@@ -35,6 +33,7 @@ pub struct TestHarness {
     client: Client,
     api_port: u16,
     config_path: PathBuf,
+    watch_mode: bool,
 }
 
 impl TestHarness {
@@ -42,13 +41,24 @@ impl TestHarness {
     ///
     /// Retries up to 3 times if port conflicts occur. Fails immediately on other errors.
     pub async fn new(pipeline_config: &str) -> Result<Self, String> {
+        Self::new_internal(pipeline_config, false).await
+    }
+
+    /// Spawns Vector with watch mode enabled (-w flag)
+    ///
+    /// Watch mode automatically reloads config when the file changes.
+    pub async fn new_with_watch_mode(pipeline_config: &str) -> Result<Self, String> {
+        Self::new_internal(pipeline_config, true).await
+    }
+
+    async fn new_internal(pipeline_config: &str, watch_mode: bool) -> Result<Self, String> {
         const MAX_RETRIES: u32 = 3;
         const RETRY_DELAY: Duration = Duration::from_millis(500);
 
         for _attempt in 1..=MAX_RETRIES {
             let api_port = find_available_port();
 
-            match Self::with_port(pipeline_config, api_port).await {
+            match Self::with_port_and_flags(pipeline_config, api_port, watch_mode).await {
                 Ok(runner) => {
                     return Ok(runner);
                 }
@@ -68,8 +78,11 @@ impl TestHarness {
         ))
     }
 
-    /// Spawns Vector with a specific API port (no retry logic)
-    pub async fn with_port(pipeline_config: &str, api_port: u16) -> Result<Self, String> {
+    async fn with_port_and_flags(
+        pipeline_config: &str,
+        api_port: u16,
+        watch_mode: bool,
+    ) -> Result<Self, String> {
         let config = formatdoc! {"
             api:
               enabled: true
@@ -84,9 +97,13 @@ impl TestHarness {
         let mut cmd =
             Command::cargo_bin("vector").map_err(|e| format!("Failed to get cargo bin: {e}"))?;
 
-        cmd.arg("-c")
-            .arg(&config_path)
-            .env("VECTOR_DATA_DIR", &data_dir);
+        cmd.arg("-c").arg(&config_path);
+
+        if watch_mode {
+            cmd.arg("-w");
+        }
+
+        cmd.env("VECTOR_DATA_DIR", &data_dir);
 
         let mut vector = cmd
             .stdin(std::process::Stdio::null())
@@ -95,33 +112,21 @@ impl TestHarness {
             .spawn()
             .map_err(|e| format!("Failed to spawn vector: {e}"))?;
 
-        sleep(STARTUP_TIME).await;
-
-        // Check if Vector exited early
-        if let Ok(Some(status)) = vector.try_wait() {
-            let output = vector
-                .wait_with_output()
-                .map_err(|e| format!("Failed to get output: {e}"))?;
-            let stderr = String::from_utf8_lossy(&output.stderr);
-            return Err(format!(
-                "Vector exited early with status {status}: {stderr}"
-            ));
-        }
-
         let client = Client::new(
             format!("http://127.0.0.1:{api_port}/graphql")
                 .parse()
                 .map_err(|e| format!("Invalid URL: {e}"))?,
         );
 
-        // Wait for API to become ready
-        wait_for_api_ready(&client, API_READY_TIMEOUT).await?;
+        // Wait for Vector startup with crash detection
+        wait_for_startup(&mut vector, &client, STARTUP_TIMEOUT).await?;
 
         Ok(Self {
             vector,
             client,
             api_port,
             config_path,
+            watch_mode,
         })
     }
 
@@ -153,7 +158,18 @@ impl TestHarness {
     }
 
     /// Reloads Vector configuration by sending SIGHUP
-    pub async fn reload_with_config(&mut self, new_pipeline_config: &str) -> Result<(), String> {
+    ///
+    /// Polls Vector to detect crashes early and succeed fast when reload completes.
+    /// Waits until the expected component IDs are present in the topology.
+    ///
+    /// # Arguments
+    /// * `new_pipeline_config` - The new pipeline configuration (without the API section)
+    /// * `expected_component_ids` - Component IDs that must be present after reload
+    pub async fn reload_with_config(
+        &mut self,
+        new_pipeline_config: &str,
+        expected_component_ids: &[&str],
+    ) -> Result<(), String> {
         let new_config = formatdoc! {"
             api:
               enabled: true
@@ -164,17 +180,19 @@ impl TestHarness {
 
         overwrite_config_file(&self.config_path, &new_config);
 
-        kill(Pid::from_raw(self.vector.id() as i32), Signal::SIGHUP)
-            .map_err(|e| format!("Failed to send SIGHUP: {e}"))?;
+        // Send SIGHUP only if not in watch mode (watch mode auto-reloads on file change)
+        if !self.watch_mode {
+            kill(Pid::from_raw(self.vector.id() as i32), Signal::SIGHUP)
+                .map_err(|e| format!("Failed to send SIGHUP: {e}"))?;
+        }
 
-        sleep(RELOAD_TIME).await;
-
-        Ok(())
-    }
-
-    /// Returns the API port
-    pub fn api_port(&self) -> u16 {
-        self.api_port
+        // Poll for reload completion with crash detection
+        wait_for_topology_match(
+            &mut self.vector,
+            &self.client,
+            expected_component_ids,
+        )
+            .await
     }
 
     /// Checks if Vector is still running
@@ -246,18 +264,89 @@ pub fn create_data_directory() -> PathBuf {
     path
 }
 
-/// Waits for the Vector API to become ready
-pub async fn wait_for_api_ready(client: &Client, timeout: Duration) -> Result<(), String> {
+/// Waits for Vector startup: polls for process health and API readiness
+///
+/// Fails fast if Vector crashes, succeeds fast if API becomes ready quickly.
+pub async fn wait_for_startup(
+    vector: &mut Child,
+    client: &Client,
+    timeout: Duration,
+) -> Result<(), String> {
     let start = Instant::now();
 
-    while start.elapsed() < timeout {
+    loop {
+        // Check if Vector crashed
+        if let Ok(Some(status)) = vector.try_wait() {
+            return if status.success() {
+                Err("Vector exited unexpectedly with success status (should stay running)".to_string())
+            } else {
+                Err(format!("Vector failed to start with status {status}"))
+            };
+        }
+
+        // Check if API is ready
         if client.healthcheck().await.is_ok() {
             return Ok(());
         }
+
+        // Check timeout
+        if start.elapsed() >= timeout {
+            return Err(format!(
+                "Vector API did not become ready within {timeout:?}"
+            ));
+        }
+
         sleep(Duration::from_millis(100)).await;
     }
+}
 
-    Err(format!("API did not become ready within {timeout:?}"))
+/// Waits for topology match while checking for process crashes
+///
+/// Combines topology polling with crash detection for reload scenarios.
+pub async fn wait_for_topology_match(
+    vector: &mut Child,
+    client: &Client,
+    expected_component_ids: &[&str],
+) -> Result<(), String> {
+    let start = Instant::now();
+
+    loop {
+        // Check if Vector crashed
+        if let Ok(Some(status)) = vector.try_wait() {
+            return Err(format!(
+                "Vector crashed during reload with status {status}"
+            ));
+        }
+
+        // Query components to see if topology matches
+        if let Ok(result) = client.components_query(100).await {
+            if let Some(data) = result.data {
+                let mut current_ids: Vec<&str> = data
+                    .components
+                    .edges
+                    .iter()
+                    .map(|e| e.node.component_id.as_str())
+                    .collect();
+                current_ids.sort_unstable();
+
+                let mut expected_sorted = expected_component_ids.to_vec();
+                expected_sorted.sort_unstable();
+
+                if current_ids == expected_sorted {
+                    return Ok(());
+                }
+            }
+        }
+
+        // Check timeout
+        if start.elapsed() >= STARTUP_TIMEOUT {
+            return Err(format!(
+                "Topology did not match expected components within {STARTUP_TIMEOUT:?}"
+            ));
+        }
+
+        sleep(Duration::from_millis(100)).await;
+    }
 }
 
 /// Waits for a component to process the expected number of events
