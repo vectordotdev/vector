@@ -331,8 +331,6 @@ majorly
 makecache
 Makefiles
 mallocs
-managedidentity
-managedidentityclientassertion
 markdownify
 marketo
 maxbin
@@ -656,7 +654,6 @@ wkkmmawf
 wmem
 woooooow
 woothee
-workloadidentity
 workstreams
 writeback
 wtcache

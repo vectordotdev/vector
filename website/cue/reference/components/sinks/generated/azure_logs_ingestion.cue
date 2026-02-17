@@ -59,10 +59,10 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 				description: "The kind of Azure credential to use."
 				required:    true
 				type: string: enum: {
-					azurecli:                       "Use Azure CLI credentials"
-					managedidentity:                "Use Managed Identity credentials"
-					managedidentityclientassertion: "Use Managed Identity with Client Assertion credentials"
-					workloadidentity:               "Use Workload Identity credentials"
+					azure_cli:                         "Use Azure CLI credentials"
+					managed_identity:                  "Use Managed Identity credentials"
+					managed_identity_client_assertion: "Use Managed Identity with Client Assertion credentials"
+					workload_identity:                 "Use Workload Identity credentials"
 				}
 			}
 			azure_tenant_id: {
@@ -79,19 +79,19 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 			}
 			client_assertion_client_id: {
 				description:   "The target Client ID to use."
-				relevant_when: "azure_credential_kind = \"managedidentityclientassertion\""
+				relevant_when: "azure_credential_kind = \"managed_identity_client_assertion\""
 				required:      true
 				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
 			}
 			client_assertion_tenant_id: {
 				description:   "The target Tenant ID to use."
-				relevant_when: "azure_credential_kind = \"managedidentityclientassertion\""
+				relevant_when: "azure_credential_kind = \"managed_identity_client_assertion\""
 				required:      true
 				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
 			}
 			user_assigned_managed_identity_id: {
 				description:   "The User Assigned Managed Identity (Client ID) to use."
-				relevant_when: "azure_credential_kind = \"managedidentity\" or azure_credential_kind = \"managedidentityclientassertion\""
+				relevant_when: "azure_credential_kind = \"managed_identity\" or azure_credential_kind = \"managed_identity_client_assertion\""
 				required:      false
 				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
 			}

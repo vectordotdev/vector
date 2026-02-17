@@ -128,7 +128,7 @@ fn basic_config_with_managed_identity() {
             stream_name = "Custom-UnitTest"
 
             [auth]
-            azure_credential_kind = "managedidentity"
+            azure_credential_kind = "managed_identity"
         "#,
     )
     .expect("Config parsing failed");

@@ -167,7 +167,7 @@ pub enum AzureAuthentication {
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(
     tag = "azure_credential_kind",
-    rename_all = "lowercase",
+    rename_all = "snake_case",
     deny_unknown_fields
 )]
 pub enum SpecificAzureCredential {
