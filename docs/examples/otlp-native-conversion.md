@@ -318,7 +318,7 @@ xychart-beta
 }
 ```
 
-## Field Mapping Reference
+## Field mapping reference
 
 ```mermaid
 flowchart LR
