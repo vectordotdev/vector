@@ -149,7 +149,7 @@ components: sources: host_metrics: {
 
 		// Host info
 		host_info: _host & {
-			description: "A Prometheus-style info metric (value is always 1.0) containing static host system information as tags. Includes OS details, CPU model, network identity (IP/MAC of default interface), virtualization info, timezone, locale, and Vector version. Useful for host fingerprinting and fleet inventory tracking."
+			description: "A Prometheus-style info metric with a constant value of 1.0 that exposes static host system information as tags. Tags include OS details, CPU model, network identity (IP and MAC address of the default interface), virtualization information, timezone, locale, and Vector version. Useful for host fingerprinting and fleet inventory tracking."
 			type:        "gauge"
 			tags: _host_metrics_tags & {
 				collector: examples: ["hostinfo"]
