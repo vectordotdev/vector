@@ -8,7 +8,6 @@ use socket2::{Domain, Protocol, Socket, Type};
 use tokio::net::UdpSocket;
 use tokio::time::Duration;
 use tracing::{debug, error, info};
-use vector_lib::internal_event::InternalEvent;
 
 use crate::config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput};
 use crate::shutdown::ShutdownSignal;
@@ -312,13 +311,6 @@ mod tests {
         assert!(!events.is_empty(), "No events received");
         
         if let Event::Log(log) = &events[0] {
-            // Debug: print all available fields
-            if let Some(map) = log.as_map() {
-                println!("Available fields: {:?}", map.keys().collect::<Vec<_>>());
-            } else {
-                println!("Log event is not a map");
-            }
-            
             // Check if flow_type exists first
             if let Some(flow_type) = log.get("flow_type") {
                 if let Some(flow_type_str) = flow_type.as_str() {

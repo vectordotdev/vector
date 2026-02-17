@@ -1,8 +1,10 @@
 //! Configuration for the NetFlow source.
 
-use serde::{Deserialize, Serialize};
 use std::net::SocketAddr;
+
+use serde::{Deserialize, Serialize};
 use vector_lib::configurable::configurable_component;
+
 use crate::serde::default_true;
 
 
@@ -63,7 +65,7 @@ pub struct NetflowConfig {
 
     /// Custom enterprise fields.
     #[serde(default)]
-    pub enterprise_fields: std::collections::HashMap<String, String>, // Simplified for now
+    pub enterprise_fields: std::collections::HashMap<String, String>,
 
     /// Whether to buffer data records while waiting for templates.
     /// When enabled, data records without templates are buffered for up to `template_timeout` seconds.

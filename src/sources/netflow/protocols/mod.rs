@@ -1,16 +1,16 @@
 //! Protocol parsing for NetFlow v5.
 //!
-//! This module provides parsing for NetFlow v5 flow records. Support for
-//! NetFlow v9, IPFIX, and sFlow will be added in follow-up PRs.
+//! This module provides parsing for NetFlow v5 flow records.
+
+use std::net::SocketAddr;
+
+use tracing::debug;
+use vector_lib::event::Event;
 
 use crate::sources::netflow::config::NetflowConfig;
 use crate::sources::netflow::events::*;
 use crate::sources::netflow::fields::FieldParser;
 use crate::sources::netflow::templates::TemplateCache;
-
-use std::net::SocketAddr;
-use tracing::debug;
-use vector_lib::event::Event;
 
 pub mod netflow_v5;
 
