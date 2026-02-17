@@ -108,7 +108,7 @@ classDiagram
     NativeLogEvent --> Scope
 ```
 
-### OTLP Output Structure
+### OTLP output structure
 
 ```mermaid
 classDiagram
