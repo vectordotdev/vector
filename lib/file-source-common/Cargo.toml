@@ -20,7 +20,7 @@ serde_json = { version = "1.0.143", default-features = false }
 bstr = { version = "1.12", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 dashmap = { version = "6.1", default-features = false }
-async-compression = { version = "0.4.27", features = ["tokio", "gzip"] }
+async-compression = { version = "0.4.33", features = ["tokio", "gzip"] }
 vector-common = { path = "../vector-common", default-features = false }
 vector-config = { path = "../vector-config", default-features = false }
 tokio = { workspace = true, features = ["full"] }
