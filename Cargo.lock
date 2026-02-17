@@ -7069,14 +7069,14 @@ dependencies = [
 
 [[package]]
 name = "nix"
-version = "0.26.4"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "598beaf3cc6fdd9a5dfb1630c2800c7acd31df7aaf0f565796fba2b53ca1af1b"
+version = "0.26.2"
+source = "git+https://github.com/vectordotdev/nix.git?branch=memfd%2Fgnu%2Fmusl#6c53a918d2d5bf4307fd60a19d9e10913ae71eeb"
 dependencies = [
  "bitflags 1.3.2",
  "cfg-if",
  "libc",
  "memoffset 0.7.1",
+ "static_assertions",
 ]
 
 [[package]]
@@ -7192,8 +7192,7 @@ checksum = "5e0826a989adedc2a244799e823aece04662b66609d96af8dff7ac6df9a8925d"
 [[package]]
 name = "ntapi"
 version = "0.3.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c28774a7fd2fbb4f0babd8237ce554b73af68021b5f695a3cebd6c59bac0980f"
+source = "git+https://github.com/MSxDOS/ntapi.git?rev=24fc1e47677fc9f6e38e5f154e6011dc9b270da6#24fc1e47677fc9f6e38e5f154e6011dc9b270da6"
 dependencies = [
  "winapi",
 ]
@@ -12576,7 +12575,7 @@ dependencies = [
  "netlink-packet-sock-diag",
  "netlink-packet-utils",
  "netlink-sys",
- "nix 0.26.4",
+ "nix 0.26.2",
  "nkeys",
  "nom 8.0.0",
  "notify",
