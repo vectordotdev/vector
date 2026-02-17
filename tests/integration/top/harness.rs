@@ -4,7 +4,7 @@
 //! and helper functions for testing.
 
 use std::fs::{OpenOptions, create_dir};
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::path::PathBuf;
 use std::process::{Child, Command};
@@ -62,7 +62,7 @@ impl TestHarness {
                 Ok(runner) => {
                     return Ok(runner);
                 }
-                Err(e) if e.contains("Address already in use") => {
+                Err(e) if is_port_conflict_error(&e) => {
                     sleep(RETRY_DELAY).await;
                     continue;
                 }
@@ -281,13 +281,16 @@ pub async fn wait_for_startup(
     loop {
         // Check if Vector crashed
         if let Ok(Some(status)) = vector.try_wait() {
+            let stderr = read_stderr(vector);
             return if status.success() {
                 Err(
                     "Vector exited unexpectedly with success status (should stay running)"
                         .to_string(),
                 )
             } else {
-                Err(format!("Vector failed to start with status {status}"))
+                Err(format!(
+                    "Vector failed to start with status {status}\nStderr: {stderr}"
+                ))
             };
         }
 
@@ -305,6 +308,31 @@ pub async fn wait_for_startup(
 
         sleep(Duration::from_millis(100)).await;
     }
+}
+
+/// Reads stderr from a child process (non-blocking)
+fn read_stderr(child: &mut Child) -> String {
+    child
+        .stderr
+        .take()
+        .map(|stderr| {
+            let reader = BufReader::new(stderr);
+            reader
+                .lines()
+                .map_while(Result::ok)
+                .collect::<Vec<_>>()
+                .join("\n")
+        })
+        .unwrap_or_default()
+}
+
+/// Checks if an error message indicates a port conflict
+///
+/// Looks for stable error indicators that don't depend on locale:
+/// - "AddrInUse" (Rust's io::ErrorKind Debug representation)
+/// - "EADDRINUSE" (Unix errno name)
+fn is_port_conflict_error(error_message: &str) -> bool {
+    error_message.contains("AddrInUse") || error_message.contains("EADDRINUSE")
 }
 
 /// Waits for topology match while checking for process crashes
