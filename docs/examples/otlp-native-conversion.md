@@ -160,7 +160,7 @@ classDiagram
 
 ## Configuration Comparison
 
-### BEFORE: Complex VRL Required
+### Previous: Complex VRL required
 
 ```yaml
 # vector.yaml - OLD approach
