@@ -4,11 +4,13 @@ use chrono::{DateTime, Utc};
 use std::{
     io::{self, SeekFrom},
     path::PathBuf,
+    pin::Pin,
+    task::{Context, Poll},
     time::Duration,
 };
 use tokio::{
     fs::File,
-    io::{AsyncBufRead, AsyncBufReadExt, AsyncSeekExt, BufReader},
+    io::{AsyncBufRead, AsyncBufReadExt, AsyncRead, AsyncSeekExt, BufReader, ReadBuf},
     time::Instant,
 };
 use tracing::debug;
@@ -21,6 +23,75 @@ use file_source_common::{
 
 #[cfg(test)]
 mod tests;
+
+/// Enum-based reader that preserves type information for metadata access.
+///
+/// We use an enum instead of `Box<dyn AsyncBufRead>` to preserve type information,
+/// allowing us to call `BufReader::get_ref()` on the `Plain` variant to access the
+/// underlying `File` for metadata (e.g., current file size via `file.metadata()`).
+///
+/// Alternative approaches considered:
+/// - `Box<dyn AsyncBufRead>`: Erases type info, can't call `get_ref()` to access File
+/// - `try_clone()` to store separate File handle: Doubles fd usage via `dup()` syscall
+/// - Raw fd with `fstat()`: Works but requires unsafe code
+///
+/// The enum approach has zero extra fd overhead - we access the same File owned by
+/// BufReader through `get_ref()`. This is critical for accurately tracking
+/// `bytes_dropped` even after file deletion (the fd remains valid).
+enum FileReader {
+    /// Plain file reader - we can access the File via get_ref() for metadata
+    Plain(BufReader<File>),
+    /// Gzipped file reader - no meaningful file position tracking
+    Gzipped(BufReader<GzipDecoder<BufReader<File>>>),
+    /// Null reader for skipped files
+    Null(io::Cursor<Vec<u8>>),
+}
+
+impl FileReader {
+    /// Get the current file size by accessing the underlying File.
+    /// Returns None for gzipped or null readers where file size isn't meaningful.
+    /// This works even after the file has been deleted (on Unix) since the fd is still open.
+    async fn file_size(&self) -> Option<u64> {
+        match self {
+            FileReader::Plain(reader) => {
+                reader.get_ref().metadata().await.ok().map(|m| m.len())
+            }
+            FileReader::Gzipped(_) | FileReader::Null(_) => None,
+        }
+    }
+}
+
+impl AsyncRead for FileReader {
+    fn poll_read(
+        self: Pin<&mut Self>,
+        cx: &mut Context<'_>,
+        buf: &mut ReadBuf<'_>,
+    ) -> Poll<io::Result<()>> {
+        match self.get_mut() {
+            FileReader::Plain(r) => Pin::new(r).poll_read(cx, buf),
+            FileReader::Gzipped(r) => Pin::new(r).poll_read(cx, buf),
+            FileReader::Null(r) => Pin::new(r).poll_read(cx, buf),
+        }
+    }
+}
+
+impl AsyncBufRead for FileReader {
+    fn poll_fill_buf(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<io::Result<&[u8]>> {
+        match self.get_mut() {
+            FileReader::Plain(r) => Pin::new(r).poll_fill_buf(cx),
+            FileReader::Gzipped(r) => Pin::new(r).poll_fill_buf(cx),
+            FileReader::Null(r) => Pin::new(r).poll_fill_buf(cx),
+        }
+    }
+
+    fn consume(self: Pin<&mut Self>, amt: usize) {
+        match self.get_mut() {
+            FileReader::Plain(r) => Pin::new(r).consume(amt),
+            FileReader::Gzipped(r) => Pin::new(r).consume(amt),
+            FileReader::Null(r) => Pin::new(r).consume(amt),
+        }
+    }
+}
 
 /// The `RawLine` struct is a thin wrapper around the bytes that have been read
 /// in order to retain the context of where in the file they have been read from.
@@ -65,7 +136,7 @@ pub struct FileUnwatchInfo {
 pub struct FileWatcher {
     pub path: PathBuf,
     findable: bool,
-    reader: Box<dyn AsyncBufRead + Send + Unpin>,
+    reader: FileReader,
     file_position: FilePosition,
     devno: u64,
     inode: u64,
@@ -77,8 +148,8 @@ pub struct FileWatcher {
     max_line_bytes: usize,
     line_delimiter: Bytes,
     buf: BytesMut,
-    /// The file size when the watcher was created. Used to calculate
-    /// bytes dropped when the file is unwatched.
+    /// The file size when the watcher was created. Used as fallback for
+    /// bytes dropped calculation when the reader doesn't support file_size().
     initial_file_size: u64,
 }
 
@@ -117,15 +188,17 @@ impl FileWatcher {
 
         let gzipped = is_gzipped(&mut reader).await?;
 
-        // Determine the actual position at which we should start reading
-        let (reader, file_position): (Box<dyn AsyncBufRead + Send + Unpin>, FilePosition) =
+        // Determine the actual position at which we should start reading.
+        // For non-gzipped files, we use FileReader::Plain which allows metadata access.
+        // For gzipped files, position tracking is not meaningful.
+        let (reader, file_position): (FileReader, FilePosition) =
             match (gzipped, too_old, read_from) {
                 (true, true, _) => {
                     debug!(
                         message = "Not reading gzipped file older than `ignore_older`.",
                         ?path,
                     );
-                    (Box::new(null_reader()), 0)
+                    (FileReader::Null(io::Cursor::new(Vec::new())), 0)
                 }
                 (true, _, ReadFrom::Checkpoint(file_position)) => {
                     debug!(
@@ -133,7 +206,7 @@ impl FileWatcher {
                         ?path,
                         %file_position
                     );
-                    (Box::new(null_reader()), file_position)
+                    (FileReader::Null(io::Cursor::new(Vec::new())), file_position)
                 }
                 // TODO: This may become the default, leading us to stop reading gzipped files that
                 // we were reading before. Should we merge this and the next branch to read
@@ -144,26 +217,26 @@ impl FileWatcher {
                         message = "Can't read from the end of already-compressed file.",
                         ?path,
                     );
-                    (Box::new(null_reader()), 0)
+                    (FileReader::Null(io::Cursor::new(Vec::new())), 0)
                 }
                 (true, false, ReadFrom::Beginning) => {
-                    (Box::new(BufReader::new(GzipDecoder::new(reader))), 0)
+                    (FileReader::Gzipped(BufReader::new(GzipDecoder::new(reader))), 0)
                 }
                 (false, true, _) => {
                     let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
-                    (Box::new(reader), pos)
+                    (FileReader::Plain(reader), pos)
                 }
                 (false, false, ReadFrom::Checkpoint(file_position)) => {
                     let pos = reader.seek(SeekFrom::Start(file_position)).await.unwrap();
-                    (Box::new(reader), pos)
+                    (FileReader::Plain(reader), pos)
                 }
                 (false, false, ReadFrom::Beginning) => {
                     let pos = reader.seek(SeekFrom::Start(0)).await.unwrap();
-                    (Box::new(reader), pos)
+                    (FileReader::Plain(reader), pos)
                 }
                 (false, false, ReadFrom::End) => {
                     let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
-                    (Box::new(reader), pos)
+                    (FileReader::Plain(reader), pos)
                 }
             };
 
@@ -201,32 +274,33 @@ impl FileWatcher {
     /// was replaced (not just renamed). In this case, returns `FileUnwatchInfo`
     /// containing metrics about the old file so the caller can emit appropriate events.
     pub async fn update_path(&mut self, path: PathBuf) -> io::Result<Option<FileUnwatchInfo>> {
-        let file_handle = File::open(&path).await?;
+        let new_file = File::open(&path).await?;
 
-        let file_info = file_handle.file_info().await?;
+        let file_info = new_file.file_info().await?;
         let unwatch_info = if (file_info.portable_dev(), file_info.portable_ino())
             != (self.devno, self.inode)
         {
             // Capture metrics from the old file before switching
-            let old_info = self.get_unwatch_info();
+            let old_info = self.get_unwatch_info().await;
 
-            let mut reader = BufReader::new(File::open(&path).await?);
+            let mut reader = BufReader::new(new_file);
             let gzipped = is_gzipped(&mut reader).await?;
-            let new_reader: Box<dyn AsyncBufRead + Send + Unpin> = if gzipped {
+            let new_reader = if gzipped {
                 if self.file_position != 0 {
-                    Box::new(null_reader())
+                    FileReader::Null(io::Cursor::new(Vec::new()))
                 } else {
-                    Box::new(BufReader::new(GzipDecoder::new(reader)))
+                    FileReader::Gzipped(BufReader::new(GzipDecoder::new(reader)))
                 }
             } else {
                 reader.seek(io::SeekFrom::Start(self.file_position)).await?;
-                Box::new(reader)
+                FileReader::Plain(reader)
             };
             self.reader = new_reader;
 
-            let file_info = file_handle.file_info().await?;
             self.devno = file_info.portable_dev();
             self.inode = file_info.portable_ino();
+            // Reset initial_file_size for the new file
+            self.initial_file_size = file_info.len();
 
             Some(old_info)
         } else {
@@ -260,20 +334,27 @@ impl FileWatcher {
         self.file_position
     }
 
-    /// Returns the number of bytes that were not read (dropped) based on the initial file size.
+    /// Returns the number of bytes that were not read (dropped).
+    /// Uses the current file size from the underlying File (works even after
+    /// file deletion since the fd remains valid), falling back to initial_file_size.
     /// When the file reaches EOF, this will be 0. When the file is unwatched before EOF,
     /// this represents the bytes that were never read.
-    /// Note: For actively written files, actual dropped bytes may be higher than this value.
-    pub fn get_bytes_dropped(&self) -> u64 {
-        self.initial_file_size.saturating_sub(self.file_position)
+    pub async fn get_bytes_dropped(&self) -> u64 {
+        let current_size = self
+            .reader
+            .file_size()
+            .await
+            .unwrap_or(self.initial_file_size);
+
+        current_size.saturating_sub(self.file_position)
     }
 
     /// Returns information about this file for metric emission when unwatching.
     /// This provides a consistent interface for all unwatch scenarios.
-    pub fn get_unwatch_info(&self) -> FileUnwatchInfo {
+    pub async fn get_unwatch_info(&self) -> FileUnwatchInfo {
         FileUnwatchInfo {
             path: self.path.clone(),
-            bytes_dropped: self.get_bytes_dropped(),
+            bytes_dropped: self.get_bytes_dropped().await,
             reached_eof: self.reached_eof,
         }
     }
@@ -386,13 +467,9 @@ impl FileWatcher {
     }
 }
 
-async fn is_gzipped(r: &mut BufReader<File>) -> io::Result<bool> {
+async fn is_gzipped<R: AsyncRead + Unpin>(r: &mut BufReader<R>) -> io::Result<bool> {
     let header_bytes = r.fill_buf().await?;
     // WARN: The paired `BufReader::consume` is not called intentionally. If we
     // do we'll chop a decent part of the potential gzip stream off.
     Ok(header_bytes.starts_with(GZIP_MAGIC))
-}
-
-fn null_reader() -> impl AsyncBufRead {
-    io::Cursor::new(Vec::new())
 }

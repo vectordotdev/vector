@@ -376,20 +376,24 @@ where
 
             // A FileWatcher is dead when the underlying file has disappeared.
             // If the FileWatcher is dead we don't retain it; it will be deallocated.
-            fp_map.retain(|file_id, watcher| {
-                if watcher.dead() {
-                    let unwatch_info = watcher.get_unwatch_info();
+            // First collect dead file IDs, then process them (get_unwatch_info is async).
+            let dead_file_ids: Vec<_> = fp_map
+                .iter()
+                .filter(|(_, watcher)| watcher.dead())
+                .map(|(file_id, _)| *file_id)
+                .collect();
+
+            for file_id in dead_file_ids {
+                if let Some(watcher) = fp_map.swap_remove(&file_id) {
+                    let unwatch_info = watcher.get_unwatch_info().await;
                     self.emitter.emit_file_unwatched(
                         &unwatch_info.path,
                         unwatch_info.reached_eof,
                         unwatch_info.bytes_dropped,
                     );
-                    checkpoints.set_dead(*file_id);
-                    false
-                } else {
-                    true
+                    checkpoints.set_dead(file_id);
                 }
-            });
+            }
             self.emitter.emit_files_open(fp_map.len());
 
             let start = time::Instant::now();
