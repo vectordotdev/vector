@@ -147,6 +147,105 @@ components: sources: host_metrics: {
 		uptime: _host & _host_metric & {description: "The number of seconds since the last boot."}
 		boot_time: _host & _host_metric & {description: "The UNIX timestamp of the last boot."}
 
+		// Host info
+		host_info: _host & {
+			description: "A Prometheus-style info metric (value is always 1.0) containing static host system information as tags. Includes OS details, CPU model, network identity (IP/MAC of default interface), virtualization info, timezone, locale, and Vector version. Useful for host fingerprinting and fleet inventory tracking."
+			type:        "gauge"
+			tags: _host_metrics_tags & {
+				collector: examples: ["hostinfo"]
+				arch: {
+					description: "The system architecture."
+					required:    false
+					examples: ["x86_64", "aarch64"]
+				}
+				boot_id: {
+					description: "The unique boot instance identifier."
+					required:    false
+					examples: ["4eb902f9-124e-482b-b933-548c016690d7"]
+				}
+				cloud_provider: {
+					description: "The cloud provider name if running in a cloud environment."
+					required:    false
+					examples: ["aws", "gcp", "azure"]
+				}
+				cpu_model: {
+					description: "The CPU model/brand string."
+					required:    false
+					examples: ["AMD Ryzen 7 7840HS w/ Radeon 780M Graphics", "Intel(R) Core(TM) i7-9750H"]
+				}
+				cpu_vendor: {
+					description: "The CPU vendor identifier."
+					required:    false
+					examples: ["AuthenticAMD", "GenuineIntel"]
+				}
+				domain: {
+					description: "The system domain name."
+					required:    false
+					examples: ["example.com"]
+				}
+				hostname: {
+					description: "The system hostname."
+					required:    false
+					examples: ["webserver-01", "localhost"]
+				}
+				ip: {
+					description: "The first IPv4 address of the default network interface."
+					required:    false
+					examples: ["192.168.1.100", "10.0.0.5"]
+				}
+				is_container: {
+					description: "Whether Vector is running inside a container."
+					required:    false
+					examples: ["true", "false"]
+				}
+				kernel_version: {
+					description: "The kernel version string."
+					required:    false
+					examples: ["5.15.153.1-microsoft-standard-WSL2", "5.4.0-42-generic"]
+				}
+				locale: {
+					description: "The system locale."
+					required:    false
+					examples: ["en_US.UTF-8", "C.UTF-8"]
+				}
+				mac_address: {
+					description: "The MAC address of the default network interface."
+					required:    false
+					examples: ["00:15:5d:c9:7b:c5", "52:54:00:12:34:56"]
+				}
+				os_name: {
+					description: "The operating system name."
+					required:    false
+					examples: ["Ubuntu", "Windows", "macOS"]
+				}
+				os_version: {
+					description: "The operating system version."
+					required:    false
+					examples: ["24.04", "11", "14.2"]
+				}
+				timezone: {
+					description: "The system timezone."
+					required:    false
+					examples: ["America/New_York", "UTC", "Europe/London"]
+				}
+				vector_version: {
+					description: "The version of Vector."
+					required:    false
+					examples: ["0.54.0"]
+				}
+				virtualization_type: {
+					description: "The virtualization type if running in a virtual environment."
+					required:    false
+					examples: ["kvm", "vmware", "wsl", "docker"]
+				}
+				vm_uuid: {
+					description: "The virtual machine UUID."
+					required:    false
+					examples: ["550e8400-e29b-41d4-a716-446655440000"]
+				}
+			}
+		}
+
 		// Host memory
 		memory_active_bytes: _host & _memory_gauge & _memory_nowin & {description: "The number of bytes of active main memory."}
 		memory_available_bytes: _host & _memory_gauge & {description: "The number of bytes of main memory available."}
