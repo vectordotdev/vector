@@ -237,7 +237,7 @@ sinks:
       codec: otlp
 ```
 
-### AFTER: Zero VRL Required
+### Current: No VRL required
 
 ```yaml
 # vector.yaml - NEW approach
