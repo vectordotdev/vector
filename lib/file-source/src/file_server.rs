@@ -232,7 +232,8 @@ where
                                         new_modified_time = ?new_modified_time,
                                         old_modified_time = ?old_modified_time,
                                     );
-                                    if let Ok(Some(unwatch_info)) = watcher.update_path(path).await {
+                                    if let Ok(Some(unwatch_info)) = watcher.update_path(path).await
+                                    {
                                         // Inode changed - emit metrics for the old file
                                         self.emitter.emit_file_unwatched(
                                             &unwatch_info.path,
