@@ -382,9 +382,9 @@ When `severity_number` is not set, it's inferred from `severity_text`:
 | ERROR | 17-20 |
 | FATAL, CRITICAL | 21-24 |
 
-## Use Case Examples
+## Use case examples
 
-### File Logs → OTLP
+### File logs → OTLP
 
 ```yaml
 sources:
