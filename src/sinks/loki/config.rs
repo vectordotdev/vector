@@ -113,6 +113,9 @@ pub struct LokiConfig {
     pub tls: Option<TlsConfig>,
 
     #[configurable(derived)]
+    pub keep_alive_requests: Option<i64>,
+
+    #[configurable(derived)]
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
