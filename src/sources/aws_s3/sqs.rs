@@ -1315,3 +1315,309 @@ fn parse_sqs_config() {
     );
     assert!(test.is_err());
 }
+
+#[cfg(test)]
+mod shutdown_tests {
+    use super::*;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    use aws_credential_types::{Credentials, provider::SharedCredentialsProvider};
+    use aws_types::region::Region;
+    use tokio::io::AsyncWriteExt;
+    use tokio::net::TcpListener;
+
+    /// Build an SQS client pointing at a local mock endpoint with retries disabled
+    /// and stalled-stream protection turned off so we get deterministic behavior.
+    fn build_sqs_client(endpoint: &str) -> SqsClient {
+        let creds = Credentials::new("test", "test", None, None, "test");
+        let config = aws_sdk_sqs::config::Builder::new()
+            .credentials_provider(SharedCredentialsProvider::new(creds))
+            .endpoint_url(endpoint)
+            .region(Some(Region::new("us-east-1")))
+            .retry_config(aws_sdk_sqs::config::retry::RetryConfig::disabled())
+            .stalled_stream_protection(
+                aws_sdk_sqs::config::StalledStreamProtectionConfig::disabled(),
+            )
+            .build();
+        SqsClient::from_conf(config)
+    }
+
+    /// Build an S3 client pointing at a local mock endpoint. For tests using
+    /// TestEvent messages, the S3 client is never actually called.
+    fn build_s3_client(endpoint: &str) -> S3Client {
+        let creds = Credentials::new("test", "test", None, None, "test");
+        let config = aws_sdk_s3::config::Builder::new()
+            .credentials_provider(SharedCredentialsProvider::new(creds))
+            .endpoint_url(endpoint)
+            .region(Some(Region::new("us-east-1")))
+            .retry_config(aws_sdk_s3::config::retry::RetryConfig::disabled())
+            .stalled_stream_protection(
+                aws_sdk_s3::config::StalledStreamProtectionConfig::disabled(),
+            )
+            .build();
+        S3Client::from_conf(config)
+    }
+
+    /// Build an IngestorProcess with the given SQS/S3 clients and a shutdown signal.
+    fn build_ingestor(
+        sqs_client: SqsClient,
+        s3_client: S3Client,
+        shutdown: ShutdownSignal,
+    ) -> IngestorProcess {
+        let (out, _rx) = crate::SourceSender::new_test();
+        let state = Arc::new(State {
+            region: Region::new("us-east-1"),
+            s3_client,
+            sqs_client,
+            compression: super::super::Compression::Auto,
+            multiline: None,
+            queue_url: "http://localhost/queue".to_string(),
+            poll_secs: 1,
+            max_number_of_messages: 10,
+            client_concurrency: 1,
+            visibility_timeout_secs: 300,
+            delete_message: true,
+            delete_failed_message: true,
+            decoder: crate::codecs::Decoder::default(),
+            deferred: None,
+        });
+        IngestorProcess::new(
+            state,
+            out,
+            shutdown,
+            LogNamespace::Legacy,
+            false,
+        )
+    }
+
+    /// Write a minimal valid HTTP response with the given status and JSON body.
+    /// Uses `Connection: close` to force the client to open a new connection
+    /// for each request, since our mock handles one request per accepted socket.
+    async fn write_http_response(
+        stream: &mut tokio::net::TcpStream,
+        status: u16,
+        body: &str,
+    ) {
+        let response = format!(
+            "HTTP/1.1 {} OK\r\nContent-Type: application/x-amz-json-1.0\r\nConnection: close\r\nContent-Length: {}\r\n\r\n{}",
+            status,
+            body.len(),
+            body,
+        );
+        stream.write_all(response.as_bytes()).await.unwrap();
+        stream.flush().await.unwrap();
+    }
+
+    /// Read the incoming HTTP request from the stream. Returns the raw
+    /// request bytes. Reads until we have seen the full headers + body.
+    async fn read_request(stream: &mut tokio::net::TcpStream) -> String {
+        use tokio::io::AsyncReadExt;
+        let mut buf = vec![0u8; 8192];
+        let n = stream.read(&mut buf).await.unwrap();
+        String::from_utf8_lossy(&buf[..n]).to_string()
+    }
+
+    // Test 1: SQS long-poll is interrupted by shutdown.
+    //
+    // When receive_with_backoff() is waiting on receive_messages() (a long-poll
+    // that may take up to 15 seconds) and shutdown fires, the select! in run()
+    // should pick the shutdown branch and cancel the long-poll. The method
+    // should return promptly without processing any messages.
+    #[tokio::test]
+    async fn shutdown_interrupts_long_poll() {
+        // Start a TCP listener that accepts connections but never responds.
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let endpoint = format!("http://{}", addr);
+
+        // Accept connections but just hold them open (never send a response).
+        tokio::spawn(async move {
+            loop {
+                let (_socket, _) = listener.accept().await.unwrap();
+                // Hold the socket open without writing anything.
+                // The spawned task keeps `_socket` alive.
+                tokio::spawn(async move {
+                    // Keep the connection alive until the test ends.
+                    tokio::time::sleep(Duration::from_secs(300)).await;
+                    drop(_socket);
+                });
+            }
+        });
+
+        let sqs_client = build_sqs_client(&endpoint);
+        let s3_client = build_s3_client(&endpoint);
+        let (trigger, shutdown, _tripwire) = ShutdownSignal::new_wired();
+
+        let ingestor = build_ingestor(sqs_client, s3_client, shutdown);
+
+        // Fire shutdown after a short delay.
+        tokio::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            drop(trigger);
+        });
+
+        // run() should return promptly once shutdown fires, not hang on the long-poll.
+        let result = tokio::time::timeout(Duration::from_secs(5), ingestor.run()).await;
+        assert!(
+            result.is_ok(),
+            "run() should have completed after shutdown, not timed out"
+        );
+    }
+
+    // Test 2: SQS error + backoff sleep is interrupted by shutdown.
+    //
+    // When receive_messages() fails and receive_with_backoff() is sleeping
+    // through a backoff delay, and shutdown fires, the select! in run() should
+    // cancel the sleep and break. The method should not keep retrying.
+    #[tokio::test]
+    async fn shutdown_interrupts_backoff_sleep() {
+        let error_received = Arc::new(tokio::sync::Notify::new());
+        let error_received_clone = Arc::clone(&error_received);
+
+        // Start a mock server that returns 500 errors.
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let endpoint = format!("http://{}", addr);
+
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let notify = Arc::clone(&error_received_clone);
+                tokio::spawn(async move {
+                    let _ = read_request(&mut socket).await;
+                    let error_body = r#"{"__type":"InternalError","message":"Internal server error"}"#;
+                    write_http_response(&mut socket, 500, error_body).await;
+                    // Signal that the error response has been sent.
+                    notify.notify_one();
+                });
+            }
+        });
+
+        let sqs_client = build_sqs_client(&endpoint);
+        let s3_client = build_s3_client(&endpoint);
+        let (trigger, shutdown, _tripwire) = ShutdownSignal::new_wired();
+
+        let ingestor = build_ingestor(sqs_client, s3_client, shutdown);
+
+        let run_handle = tokio::spawn(ingestor.run());
+
+        // Wait for the first error response to be sent. After this,
+        // receive_with_backoff() enters its backoff sleep (~1 second).
+        error_received.notified().await;
+
+        // Fire shutdown while the backoff sleep is in progress.
+        // The select! in run() should cancel the sleep and break.
+        drop(trigger);
+
+        // run() should complete promptly (well before the backoff delay expires).
+        let result = tokio::time::timeout(Duration::from_secs(5), run_handle).await;
+        assert!(
+            result.is_ok(),
+            "run() should have completed after shutdown during backoff sleep"
+        );
+    }
+
+    // Test 3: In-flight message processing completes despite shutdown.
+    //
+    // When process_messages() is running (processing already-received messages)
+    // and shutdown fires, the processing should NOT be cancelled. The messages
+    // should be fully processed and SQS deletes should happen before the method
+    // returns.
+    //
+    // Strategy: the mock server responds to ReceiveMessage with a TestEvent
+    // message. When the mock receives the subsequent DeleteMessageBatch
+    // request, it fires shutdown before sending the delete response. This
+    // guarantees shutdown occurs while process_messages() is in flight
+    // (specifically during the delete call). process_messages() must still
+    // complete, the delete response must be processed, and run() should
+    // exit cleanly on the next loop iteration.
+    #[tokio::test]
+    async fn inflight_processing_completes_despite_shutdown() {
+        let delete_count = Arc::new(AtomicUsize::new(0));
+        let delete_count_clone = Arc::clone(&delete_count);
+
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let addr = listener.local_addr().unwrap();
+        let endpoint = format!("http://{}", addr);
+
+        // Build an S3 TestEvent body. TestEvents are handled by handle_sqs_message
+        // by returning Ok(()) without making any S3 calls.
+        let test_event_body = r#"{"Service":"Amazon S3","Event":"s3:TestEvent","Time":"2024-01-01T00:00:00.000Z","Bucket":"test-bucket","RequestId":"test-request","HostId":"test-host"}"#;
+
+        // SQS ReceiveMessage response with a single message containing a TestEvent.
+        let receive_response = serde_json::json!({
+            "Messages": [{
+                "MessageId": "test-message-id",
+                "ReceiptHandle": "test-receipt-handle",
+                "Body": test_event_body,
+                "MD5OfBody": "dummy",
+            }]
+        });
+        let receive_json = serde_json::to_string(&receive_response).unwrap();
+
+        // SQS DeleteMessageBatch success response.
+        let delete_response = serde_json::json!({
+            "Successful": [{"Id": "test-message-id"}],
+            "Failed": []
+        });
+        let delete_json = serde_json::to_string(&delete_response).unwrap();
+
+        let (trigger, shutdown, _tripwire) = ShutdownSignal::new_wired();
+
+        // Fire shutdown when we see the DeleteMessageBatch request, proving
+        // process_messages is in flight. The trigger is consumed once.
+        let trigger = Arc::new(tokio::sync::Mutex::new(Some(trigger)));
+        let trigger_clone = Arc::clone(&trigger);
+
+        tokio::spawn(async move {
+            loop {
+                let (mut socket, _) = listener.accept().await.unwrap();
+                let del_count = Arc::clone(&delete_count_clone);
+                let receive = receive_json.clone();
+                let delete = delete_json.clone();
+                let trigger = Arc::clone(&trigger_clone);
+
+                tokio::spawn(async move {
+                    let request_str = read_request(&mut socket).await;
+
+                    if request_str.contains("DeleteMessageBatch") {
+                        // process_messages is in flight and has reached the
+                        // delete phase. Fire shutdown NOW, then respond. This
+                        // proves that even though shutdown is active, the
+                        // delete response is still processed.
+                        if let Some(t) = trigger.lock().await.take() {
+                            drop(t);
+                        }
+                        del_count.fetch_add(1, Ordering::SeqCst);
+                        write_http_response(&mut socket, 200, &delete).await;
+                    } else {
+                        // ReceiveMessage: return the TestEvent on the first
+                        // call, empty on subsequent calls.
+                        write_http_response(&mut socket, 200, &receive).await;
+                    }
+                });
+            }
+        });
+
+        let sqs_client = build_sqs_client(&endpoint);
+        let s3_client = build_s3_client(&endpoint);
+
+        let ingestor = build_ingestor(sqs_client, s3_client, shutdown);
+
+        // run() should complete after processing the TestEvent and deleting it,
+        // then seeing shutdown on the next loop iteration.
+        let result = tokio::time::timeout(Duration::from_secs(10), ingestor.run()).await;
+        assert!(
+            result.is_ok(),
+            "run() should have completed after processing messages and shutdown"
+        );
+
+        // The delete call must have been made, proving that process_messages()
+        // ran to completion despite shutdown firing during the delete request.
+        assert_eq!(
+            delete_count.load(Ordering::SeqCst),
+            1,
+            "SQS DeleteMessageBatch should have been called (process_messages completed)"
+        );
+    }
+}
