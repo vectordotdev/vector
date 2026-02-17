@@ -61,7 +61,7 @@ jobs:
             external
             external docs
             filtering
-            flags
+            feature flags
             healthchecks
             internal
             internal docs
