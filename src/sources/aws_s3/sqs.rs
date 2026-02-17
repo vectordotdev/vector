@@ -412,42 +412,59 @@ impl IngestorProcess {
         pin!(shutdown);
 
         loop {
-            select! {
+            // Phase 1: Wait for messages or shutdown.
+            // Safe to cancel — no messages have been processed yet.
+            let messages = select! {
+                biased;
                 _ = &mut shutdown => break,
-                result = self.run_once() => {
-                    match result {
-                        Ok(()) => {
-                            // Reset backoff on successful receive
-                            self.backoff.reset();
-                        }
-                        Err(_) => {
-                            let delay = self.backoff.next().expect("backoff never ends");
-                            trace!(
-                                delay_ms = delay.as_millis(),
-                                "`run_once` failed, will retry after delay.",
-                            );
-                            tokio::time::sleep(delay).await;
-                        }
-                    }
-                },
+                messages = self.receive_with_backoff() => messages,
+            };
+
+            // Phase 2: Process messages to completion.
+            // NOT raced against shutdown — must finish to avoid duplicate SQS delivery
+            // after visibility_timeout expires.
+            self.process_messages(messages).await;
+        }
+    }
+
+    /// Polls SQS for messages with exponential backoff on errors.
+    /// Returns only when a non-empty batch of messages is received.
+    /// On receive errors, emits error metrics and sleeps with backoff before retrying.
+    /// On empty responses (normal SQS long-poll behavior), retries immediately.
+    async fn receive_with_backoff(&mut self) -> Vec<Message> {
+        loop {
+            match self.receive_messages().await {
+                Ok(messages) if !messages.is_empty() => {
+                    emit!(SqsMessageReceiveSucceeded {
+                        count: messages.len(),
+                    });
+                    self.backoff.reset();
+                    return messages;
+                }
+                Ok(messages) => {
+                    // Empty response — normal for SQS long-polling returning nothing.
+                    emit!(SqsMessageReceiveSucceeded {
+                        count: messages.len(),
+                    });
+                    continue;
+                }
+                Err(err) => {
+                    emit!(SqsMessageReceiveError { error: &err });
+                    let delay = self.backoff.next().expect("backoff never ends");
+                    trace!(
+                        delay_ms = delay.as_millis(),
+                        "receive_messages failed, will retry after delay.",
+                    );
+                    tokio::time::sleep(delay).await;
+                }
             }
         }
     }
 
-    async fn run_once(&mut self) -> Result<(), ()> {
-        let messages = match self.receive_messages().await {
-            Ok(messages) => {
-                emit!(SqsMessageReceiveSucceeded {
-                    count: messages.len(),
-                });
-                messages
-            }
-            Err(err) => {
-                emit!(SqsMessageReceiveError { error: &err });
-                return Err(());
-            }
-        };
-
+    /// Processes a batch of SQS messages to completion: handles each message,
+    /// forwards deferred entries, and deletes successfully processed messages.
+    /// This method must not be cancelled mid-flight to avoid duplicate SQS delivery.
+    async fn process_messages(&mut self, messages: Vec<Message>) {
         let mut delete_entries = Vec::new();
         let mut deferred_entries = Vec::new();
         for message in messages {
@@ -539,7 +556,7 @@ impl IngestorProcess {
         if !deferred_entries.is_empty() {
             let Some(deferred) = &self.state.deferred else {
                 warn!("Deferred queue not configured, but received deferred entries.");
-                return Ok(());
+                return;
             };
             let cloned_entries = deferred_entries.clone();
             match self
@@ -594,7 +611,6 @@ impl IngestorProcess {
                 }
             }
         }
-        Ok(())
     }
 
     async fn handle_sqs_message(&mut self, message: Message) -> Result<(), ProcessingError> {
