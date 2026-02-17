@@ -36,7 +36,7 @@ prost-reflect.workspace = true
 rand.workspace = true
 regex.workspace = true
 serde.workspace = true
-serde_with = { version = "3.14.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
+serde_with = { version = "3.16.1", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_json.workspace = true
 serde_arrow = { version = "0.13", features = ["arrow-56"], optional = true }
 serde-aux = { version = "4.5", optional = true }
