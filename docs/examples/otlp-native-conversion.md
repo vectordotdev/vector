@@ -436,7 +436,7 @@ sinks:
       codec: otlp
 ```
 
-## Error Handling
+## Error handling
 
 Invalid fields are handled gracefully:
 
