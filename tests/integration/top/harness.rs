@@ -142,6 +142,17 @@ impl TestHarness {
             .ok_or_else(|| "No data in response".to_string())
     }
 
+    /// Queries component IDs from the GraphQL API
+    pub async fn query_component_ids(&self) -> Result<Vec<String>, String> {
+        let data = self.query_components().await?;
+        Ok(data
+            .components
+            .edges
+            .iter()
+            .map(|e| e.node.component_id.clone())
+            .collect())
+    }
+
     /// Waits for a component to process at least the expected number of events
     pub async fn wait_for_events(
         &self,

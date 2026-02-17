@@ -36,24 +36,22 @@ async fn displays_pipeline_topology_and_metrics() {
         .await
         .expect("Source never sent expected events");
 
-    // Query metrics for all components
-    let data = runner
-        .query_components()
-        .await
-        .expect("Failed to query components");
-
     // Verify all components are discovered
-    let component_ids: Vec<String> = data
-        .components
-        .edges
-        .iter()
-        .map(|e| e.node.component_id.clone())
-        .collect();
+    let component_ids = runner
+        .query_component_ids()
+        .await
+        .expect("Failed to query component IDs");
 
     assert!(component_ids.contains(&"demo".to_string()));
     assert!(component_ids.contains(&"blackhole1".to_string()));
     assert!(component_ids.contains(&"blackhole2".to_string()));
     assert_eq!(component_ids.len(), 3);
+
+    // Query full component data for types and metrics
+    let data = runner
+        .query_components()
+        .await
+        .expect("Failed to query components");
 
     // Verify component types are reported correctly
     for edge in &data.components.edges {

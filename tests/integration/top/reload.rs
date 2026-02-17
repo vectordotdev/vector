@@ -26,14 +26,10 @@ async fn config_reload_updates_components() {
     .expect("Failed to start Vector");
 
     // Verify initial components
-    let data = runner.query_components().await.expect("Failed to query");
-
-    let component_ids: Vec<String> = data
-        .components
-        .edges
-        .iter()
-        .map(|e| e.node.component_id.clone())
-        .collect();
+    let component_ids = runner
+        .query_component_ids()
+        .await
+        .expect("Failed to query");
 
     assert!(component_ids.contains(&"demo1".to_string()));
     assert!(component_ids.contains(&"blackhole1".to_string()));
@@ -71,14 +67,10 @@ async fn config_reload_updates_components() {
     // Verify additions
     assert!(runner.check_running(), "Vector should still be running");
 
-    let data = runner.query_components().await.expect("Failed to query");
-
-    let component_ids: Vec<String> = data
-        .components
-        .edges
-        .iter()
-        .map(|e| e.node.component_id.clone())
-        .collect();
+    let component_ids = runner
+        .query_component_ids()
+        .await
+        .expect("Failed to query");
 
     assert!(component_ids.contains(&"demo1".to_string()));
     assert!(component_ids.contains(&"demo2".to_string()));
@@ -113,14 +105,10 @@ async fn config_reload_updates_components() {
         .expect("Failed to reload config");
 
     // Verify old components removed and new ones added
-    let data = runner.query_components().await.expect("Failed to query");
-
-    let component_ids: Vec<String> = data
-        .components
-        .edges
-        .iter()
-        .map(|e| e.node.component_id.clone())
-        .collect();
+    let component_ids = runner
+        .query_component_ids()
+        .await
+        .expect("Failed to query");
 
     assert!(!component_ids.contains(&"demo1".to_string()));
     assert!(!component_ids.contains(&"demo2".to_string()));
