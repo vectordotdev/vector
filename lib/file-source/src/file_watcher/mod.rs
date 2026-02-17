@@ -53,9 +53,7 @@ impl FileReader {
     /// This works even after the file has been deleted (on Unix) since the fd is still open.
     async fn file_size(&self) -> Option<u64> {
         match self {
-            FileReader::Plain(reader) => {
-                reader.get_ref().metadata().await.ok().map(|m| m.len())
-            }
+            FileReader::Plain(reader) => reader.get_ref().metadata().await.ok().map(|m| m.len()),
             FileReader::Gzipped(_) | FileReader::Null(_) => None,
         }
     }
@@ -219,9 +217,10 @@ impl FileWatcher {
                     );
                     (FileReader::Null(io::Cursor::new(Vec::new())), 0)
                 }
-                (true, false, ReadFrom::Beginning) => {
-                    (FileReader::Gzipped(BufReader::new(GzipDecoder::new(reader))), 0)
-                }
+                (true, false, ReadFrom::Beginning) => (
+                    FileReader::Gzipped(BufReader::new(GzipDecoder::new(reader))),
+                    0,
+                ),
                 (false, true, _) => {
                     let pos = reader.seek(SeekFrom::End(0)).await.unwrap();
                     (FileReader::Plain(reader), pos)
@@ -277,35 +276,34 @@ impl FileWatcher {
         let new_file = File::open(&path).await?;
 
         let file_info = new_file.file_info().await?;
-        let unwatch_info = if (file_info.portable_dev(), file_info.portable_ino())
-            != (self.devno, self.inode)
-        {
-            // Capture metrics from the old file before switching
-            let old_info = self.get_unwatch_info().await;
+        let unwatch_info =
+            if (file_info.portable_dev(), file_info.portable_ino()) != (self.devno, self.inode) {
+                // Capture metrics from the old file before switching
+                let old_info = self.get_unwatch_info().await;
 
-            let mut reader = BufReader::new(new_file);
-            let gzipped = is_gzipped(&mut reader).await?;
-            let new_reader = if gzipped {
-                if self.file_position != 0 {
-                    FileReader::Null(io::Cursor::new(Vec::new()))
+                let mut reader = BufReader::new(new_file);
+                let gzipped = is_gzipped(&mut reader).await?;
+                let new_reader = if gzipped {
+                    if self.file_position != 0 {
+                        FileReader::Null(io::Cursor::new(Vec::new()))
+                    } else {
+                        FileReader::Gzipped(BufReader::new(GzipDecoder::new(reader)))
+                    }
                 } else {
-                    FileReader::Gzipped(BufReader::new(GzipDecoder::new(reader)))
-                }
+                    reader.seek(io::SeekFrom::Start(self.file_position)).await?;
+                    FileReader::Plain(reader)
+                };
+                self.reader = new_reader;
+
+                self.devno = file_info.portable_dev();
+                self.inode = file_info.portable_ino();
+                // Reset initial_file_size for the new file
+                self.initial_file_size = file_info.len();
+
+                Some(old_info)
             } else {
-                reader.seek(io::SeekFrom::Start(self.file_position)).await?;
-                FileReader::Plain(reader)
+                None
             };
-            self.reader = new_reader;
-
-            self.devno = file_info.portable_dev();
-            self.inode = file_info.portable_ino();
-            // Reset initial_file_size for the new file
-            self.initial_file_size = file_info.len();
-
-            Some(old_info)
-        } else {
-            None
-        };
 
         self.path = path;
         Ok(unwatch_info)
