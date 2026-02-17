@@ -282,7 +282,7 @@ xychart-beta
 
 ## Supported Input Formats
 
-### 1. Native OTLP Log (Flat Format)
+### 1. Native OTLP log (flat format)
 
 ```json
 {
