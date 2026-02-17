@@ -308,7 +308,7 @@ xychart-beta
 }
 ```
 
-### 2. Simple Application Log
+### 2. Simple application log
 
 ```json
 {
