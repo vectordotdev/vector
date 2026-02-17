@@ -2,7 +2,7 @@
 
 This document explains the automatic native-to-OTLP conversion feature.
 
-## Architecture Overview
+## Architecture overview
 
 ### OLD Approach (Before This PR)
 
