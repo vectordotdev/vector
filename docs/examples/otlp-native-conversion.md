@@ -369,7 +369,7 @@ flowchart LR
 | Object | `kvlistValue` |
 | Timestamp | `stringValue` (RFC3339) |
 
-### Severity Inference
+### Severity inference
 
 When `severity_number` is not set, it's inferred from `severity_text`:
 
