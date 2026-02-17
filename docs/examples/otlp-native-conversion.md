@@ -4,7 +4,7 @@ This document explains the automatic native-to-OTLP conversion feature.
 
 ## Architecture overview
 
-### OLD Approach (Before This PR)
+### Previous approach (Before This PR)
 
 ```mermaid
 flowchart LR
