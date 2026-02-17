@@ -434,19 +434,16 @@ impl IngestorProcess {
     async fn receive_with_backoff(&mut self) -> Vec<Message> {
         loop {
             match self.receive_messages().await {
-                Ok(messages) if !messages.is_empty() => {
+                Ok(messages) => {
                     emit!(SqsMessageReceiveSucceeded {
                         count: messages.len(),
                     });
+                    if messages.is_empty() {
+                        // Empty response is normal for SQS long-polling returning nothing.
+                        continue;
+                    }
                     self.backoff.reset();
                     return messages;
-                }
-                Ok(messages) => {
-                    // Empty response — normal for SQS long-polling returning nothing.
-                    emit!(SqsMessageReceiveSucceeded {
-                        count: messages.len(),
-                    });
-                    continue;
                 }
                 Err(err) => {
                     emit!(SqsMessageReceiveError { error: &err });
@@ -1326,14 +1323,19 @@ mod shutdown_tests {
     use tokio::io::AsyncWriteExt;
     use tokio::net::TcpListener;
 
+    const TEST_REGION: &str = "us-east-1";
+
+    fn test_credentials() -> SharedCredentialsProvider {
+        SharedCredentialsProvider::new(Credentials::new("test", "test", None, None, "test"))
+    }
+
     /// Build an SQS client pointing at a local mock endpoint with retries disabled
     /// and stalled-stream protection turned off so we get deterministic behavior.
     fn build_sqs_client(endpoint: &str) -> SqsClient {
-        let creds = Credentials::new("test", "test", None, None, "test");
         let config = aws_sdk_sqs::config::Builder::new()
-            .credentials_provider(SharedCredentialsProvider::new(creds))
+            .credentials_provider(test_credentials())
             .endpoint_url(endpoint)
-            .region(Some(Region::new("us-east-1")))
+            .region(Some(Region::new(TEST_REGION)))
             .retry_config(aws_sdk_sqs::config::retry::RetryConfig::disabled())
             .stalled_stream_protection(
                 aws_sdk_sqs::config::StalledStreamProtectionConfig::disabled(),
@@ -1345,11 +1347,10 @@ mod shutdown_tests {
     /// Build an S3 client pointing at a local mock endpoint. For tests using
     /// TestEvent messages, the S3 client is never actually called.
     fn build_s3_client(endpoint: &str) -> S3Client {
-        let creds = Credentials::new("test", "test", None, None, "test");
         let config = aws_sdk_s3::config::Builder::new()
-            .credentials_provider(SharedCredentialsProvider::new(creds))
+            .credentials_provider(test_credentials())
             .endpoint_url(endpoint)
-            .region(Some(Region::new("us-east-1")))
+            .region(Some(Region::new(TEST_REGION)))
             .retry_config(aws_sdk_s3::config::retry::RetryConfig::disabled())
             .stalled_stream_protection(
                 aws_sdk_s3::config::StalledStreamProtectionConfig::disabled(),
@@ -1366,7 +1367,7 @@ mod shutdown_tests {
     ) -> IngestorProcess {
         let (out, _rx) = crate::SourceSender::new_test();
         let state = Arc::new(State {
-            region: Region::new("us-east-1"),
+            region: Region::new(TEST_REGION),
             s3_client,
             sqs_client,
             compression: super::super::Compression::Auto,
@@ -1408,13 +1409,20 @@ mod shutdown_tests {
         stream.flush().await.unwrap();
     }
 
-    /// Read the incoming HTTP request from the stream. Returns the raw
-    /// request bytes. Reads until we have seen the full headers + body.
+    /// Read the incoming HTTP request from the stream and return it as a string.
     async fn read_request(stream: &mut tokio::net::TcpStream) -> String {
         use tokio::io::AsyncReadExt;
         let mut buf = vec![0u8; 8192];
         let n = stream.read(&mut buf).await.unwrap();
         String::from_utf8_lossy(&buf[..n]).to_string()
+    }
+
+    /// Bind a TCP listener on an ephemeral port and return it along with
+    /// the HTTP endpoint URL pointing at that address.
+    async fn start_listener() -> (TcpListener, String) {
+        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+        let endpoint = format!("http://{}", listener.local_addr().unwrap());
+        (listener, endpoint)
     }
 
     // Test 1: SQS long-poll is interrupted by shutdown.
@@ -1425,19 +1433,13 @@ mod shutdown_tests {
     // should return promptly without processing any messages.
     #[tokio::test]
     async fn shutdown_interrupts_long_poll() {
-        // Start a TCP listener that accepts connections but never responds.
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let endpoint = format!("http://{}", addr);
+        let (listener, endpoint) = start_listener().await;
 
-        // Accept connections but just hold them open (never send a response).
+        // Accept connections but hold them open without responding.
         tokio::spawn(async move {
             loop {
                 let (_socket, _) = listener.accept().await.unwrap();
-                // Hold the socket open without writing anything.
-                // The spawned task keeps `_socket` alive.
                 tokio::spawn(async move {
-                    // Keep the connection alive until the test ends.
                     tokio::time::sleep(Duration::from_secs(300)).await;
                     drop(_socket);
                 });
@@ -1474,10 +1476,7 @@ mod shutdown_tests {
         let error_received = Arc::new(tokio::sync::Notify::new());
         let error_received_clone = Arc::clone(&error_received);
 
-        // Start a mock server that returns 500 errors.
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let endpoint = format!("http://{}", addr);
+        let (listener, endpoint) = start_listener().await;
 
         tokio::spawn(async move {
             loop {
@@ -1536,9 +1535,7 @@ mod shutdown_tests {
         let delete_count = Arc::new(AtomicUsize::new(0));
         let delete_count_clone = Arc::clone(&delete_count);
 
-        let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let addr = listener.local_addr().unwrap();
-        let endpoint = format!("http://{}", addr);
+        let (listener, endpoint) = start_listener().await;
 
         // Build an S3 TestEvent body. TestEvents are handled by handle_sqs_message
         // by returning Ok(()) without making any S3 calls.
@@ -1582,12 +1579,10 @@ mod shutdown_tests {
 
                     if request_str.contains("DeleteMessageBatch") {
                         // process_messages is in flight and has reached the
-                        // delete phase. Fire shutdown NOW, then respond. This
-                        // proves that even though shutdown is active, the
-                        // delete response is still processed.
-                        if let Some(t) = trigger.lock().await.take() {
-                            drop(t);
-                        }
+                        // delete phase. Fire shutdown by dropping the trigger,
+                        // then respond. This proves that even though shutdown
+                        // is active, the delete response is still processed.
+                        trigger.lock().await.take();
                         del_count.fetch_add(1, Ordering::SeqCst);
                         write_http_response(&mut socket, 200, &delete).await;
                     } else {
