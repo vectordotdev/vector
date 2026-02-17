@@ -1,4 +1,5 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::LazyLock};
+use vector_vrl_category::Category;
 use vrl::prelude::expression::Expr;
 
 use vrl::prelude::*;
@@ -22,6 +23,27 @@ fn find_metrics(
     ))
 }
 
+static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(BTreeMap::new()));
+
+static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
+    vec![
+        Parameter {
+            keyword: "key",
+            kind: kind::BYTES,
+            required: true,
+            description: "The metric name to search.",
+            default: None,
+        },
+        Parameter {
+            keyword: "tags",
+            kind: kind::OBJECT,
+            required: false,
+            description: "Tags to filter the results on. Values in this object support wildcards ('*') to match on parts of the tag value.",
+            default: Some(&DEFAULT_TAGS),
+        },
+    ]
+});
+
 #[derive(Clone, Copy, Debug)]
 pub struct FindVectorMetrics;
 
@@ -37,21 +59,16 @@ impl Function for FindVectorMetrics {
         )
     }
 
+    fn category(&self) -> &'static str {
+        Category::Metrics.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::ARRAY
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "key",
-                kind: kind::BYTES,
-                required: true,
-                description: "The metric name to search.",
-            },
-            Parameter {
-                keyword: "tags",
-                kind: kind::OBJECT,
-                required: false,
-                description: "Tags to filter the results on. Values in this object support wildcards ('*') to match on parts of the tag value.",
-            },
-        ]
+        &PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {

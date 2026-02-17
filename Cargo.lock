@@ -3487,14 +3487,14 @@ dependencies = [
 
 [[package]]
 name = "dns-lookup"
-version = "2.0.4"
+version = "3.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e5766087c2235fec47fafa4cfecc81e494ee679d0fd4a59887ea0919bfb0e4fc"
+checksum = "6e39034cee21a2f5bbb66ba0e3689819c4bb5d00382a282006e802a7ffa6c41d"
 dependencies = [
  "cfg-if",
  "libc",
- "socket2 0.5.10",
- "windows-sys 0.48.0",
+ "socket2 0.6.0",
+ "windows-sys 0.60.2",
 ]
 
 [[package]]
@@ -3738,6 +3738,7 @@ dependencies = [
  "const-str",
  "dyn-clone",
  "indoc",
+ "vector-vrl-category",
  "vrl",
 ]
 
@@ -13007,12 +13008,20 @@ dependencies = [
  "indoc",
  "num-format",
  "ratatui",
+ "regex",
  "tokio",
  "tokio-stream",
  "unit-prefix",
  "url",
  "vector-api-client",
  "vector-common",
+]
+
+[[package]]
+name = "vector-vrl-category"
+version = "0.1.0"
+dependencies = [
+ "strum 0.27.2",
 ]
 
 [[package]]
@@ -13031,6 +13040,7 @@ dependencies = [
  "dnstap-parser",
  "enrichment",
  "indoc",
+ "vector-vrl-category",
  "vector-vrl-metrics",
  "vrl",
 ]
@@ -13045,6 +13055,7 @@ dependencies = [
  "tokio-stream",
  "vector-common",
  "vector-core",
+ "vector-vrl-category",
  "vrl",
 ]
 
@@ -13096,7 +13107,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.30.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#1f2c963ed13c30a8897c3555f82e85c772cd5643"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#7830c051501a08a328c53033364af55fd898aa86"
 dependencies = [
  "aes",
  "aes-siv",
@@ -13188,6 +13199,8 @@ dependencies = [
  "snafu 0.8.9",
  "snap",
  "strip-ansi-escapes",
+ "strum 0.26.3",
+ "strum_macros 0.26.4",
  "syslog_loose 0.22.0",
  "termcolor",
  "thiserror 2.0.17",
