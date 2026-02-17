@@ -187,12 +187,7 @@ impl TestHarness {
         }
 
         // Poll for reload completion with crash detection
-        wait_for_topology_match(
-            &mut self.vector,
-            &self.client,
-            expected_component_ids,
-        )
-            .await
+        wait_for_topology_match(&mut self.vector, &self.client, expected_component_ids).await
     }
 
     /// Checks if Vector is still running
@@ -278,7 +273,10 @@ pub async fn wait_for_startup(
         // Check if Vector crashed
         if let Ok(Some(status)) = vector.try_wait() {
             return if status.success() {
-                Err("Vector exited unexpectedly with success status (should stay running)".to_string())
+                Err(
+                    "Vector exited unexpectedly with success status (should stay running)"
+                        .to_string(),
+                )
             } else {
                 Err(format!("Vector failed to start with status {status}"))
             };
@@ -313,9 +311,7 @@ pub async fn wait_for_topology_match(
     loop {
         // Check if Vector crashed
         if let Ok(Some(status)) = vector.try_wait() {
-            return Err(format!(
-                "Vector crashed during reload with status {status}"
-            ));
+            return Err(format!("Vector crashed during reload with status {status}"));
         }
 
         // Query components to see if topology matches
