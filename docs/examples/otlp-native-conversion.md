@@ -38,7 +38,7 @@ flowchart LR
     style G fill:#ffcccc
 ```
 
-### NEW Approach (After This PR)
+### Current Approach (After This PR)
 
 ```mermaid
 flowchart LR
