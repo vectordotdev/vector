@@ -9,6 +9,7 @@ pub use self::source::*;
 mod sink {
     use metrics::{counter, gauge};
     use serde_json::Error;
+    use vector_lib::NamedInternalEvent;
     use vector_lib::internal_event::{
         ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     };
@@ -18,7 +19,7 @@ mod sink {
         sinks::splunk_hec::common::acknowledgements::HecAckApiError,
     };
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct SplunkEventEncodeError {
         pub error: vector_lib::Error,
     }
@@ -32,7 +33,6 @@ mod sink {
                 error_code = "serializing_json",
                 error_type = error_type::ENCODER_FAILED,
                 stage = error_stage::PROCESSING,
-                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -45,7 +45,7 @@ mod sink {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub(crate) struct SplunkInvalidMetricReceivedError<'a> {
         pub value: &'a MetricValue,
         pub kind: &'a MetricKind,
@@ -61,7 +61,6 @@ mod sink {
                 stage = error_stage::PROCESSING,
                 value = ?self.value,
                 kind = ?self.kind,
-                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -78,7 +77,7 @@ mod sink {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct SplunkResponseParseError {
         pub error: Error,
     }
@@ -91,7 +90,6 @@ mod sink {
                 error_code = "invalid_response",
                 error_type = error_type::PARSER_FAILED,
                 stage = error_stage::SENDING,
-                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -103,7 +101,7 @@ mod sink {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct SplunkIndexerAcknowledgementAPIError {
         pub message: &'static str,
         pub error: HecAckApiError,
@@ -117,7 +115,6 @@ mod sink {
                 error_code = "indexer_ack_failed",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::SENDING,
-                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -129,7 +126,7 @@ mod sink {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct SplunkIndexerAcknowledgementUnavailableError<E> {
         pub error: E,
     }
@@ -142,7 +139,6 @@ mod sink {
                 error_code = "indexer_ack_unavailable",
                 error_type = error_type::ACKNOWLEDGMENT_FAILED,
                 stage = error_stage::SENDING,
-                internal_log_rate_limit = true,
             );
             counter!(
                 "component_errors_total",
@@ -154,6 +150,7 @@ mod sink {
         }
     }
 
+    #[derive(NamedInternalEvent)]
     pub struct SplunkIndexerAcknowledgementAckAdded;
 
     impl InternalEvent for SplunkIndexerAcknowledgementAckAdded {
@@ -162,6 +159,7 @@ mod sink {
         }
     }
 
+    #[derive(NamedInternalEvent)]
     pub struct SplunkIndexerAcknowledgementAcksRemoved {
         pub count: f64,
     }
@@ -172,6 +170,7 @@ mod sink {
         }
     }
 
+    #[derive(NamedInternalEvent)]
     pub struct SplunkEventTimestampInvalidType<'a> {
         pub r#type: &'a str,
     }
@@ -181,20 +180,17 @@ mod sink {
             warn!(
                 message =
                     "Timestamp was an unexpected type. Deferring to Splunk to set the timestamp.",
-                invalid_type = self.r#type,
-                internal_log_rate_limit = true
+                invalid_type = self.r#type
             );
         }
     }
 
+    #[derive(NamedInternalEvent)]
     pub struct SplunkEventTimestampMissing;
 
     impl InternalEvent for SplunkEventTimestampMissing {
         fn emit(self) {
-            warn!(
-                message = "Timestamp was not found. Deferring to Splunk to set the timestamp.",
-                internal_log_rate_limit = true
-            );
+            warn!("Timestamp was not found. Deferring to Splunk to set the timestamp.");
         }
     }
 }
@@ -202,11 +198,12 @@ mod sink {
 #[cfg(feature = "sources-splunk_hec")]
 mod source {
     use metrics::counter;
+    use vector_lib::NamedInternalEvent;
     use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
     use crate::sources::splunk_hec::ApiError;
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct SplunkHecRequestBodyInvalidError {
         pub error: std::io::Error,
     }
@@ -218,8 +215,7 @@ mod source {
                 error = ?self.error,
                 error_code = "invalid_request_body",
                 error_type = error_type::PARSER_FAILED,
-                stage = error_stage::PROCESSING,
-                internal_log_rate_limit = true
+                stage = error_stage::PROCESSING
             );
             counter!(
                 "component_errors_total",
@@ -231,7 +227,7 @@ mod source {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, NamedInternalEvent)]
     pub struct SplunkHecRequestError {
         pub(crate) error: ApiError,
     }
@@ -242,8 +238,7 @@ mod source {
                 message = "Error processing request.",
                 error = ?self.error,
                 error_type = error_type::REQUEST_FAILED,
-                stage = error_stage::RECEIVING,
-                internal_log_rate_limit = true
+                stage = error_stage::RECEIVING
             );
             counter!(
                 "component_errors_total",

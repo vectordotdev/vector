@@ -3,6 +3,7 @@ use std::time::Duration;
 use metrics::{counter, histogram};
 use tokio::time::error::Elapsed;
 use vector_lib::{
+    NamedInternalEvent,
     internal_event::{
         ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
     },
@@ -11,7 +12,7 @@ use vector_lib::{
 
 use super::prelude::io_error_code;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ExecEventsReceived<'a> {
     pub count: usize,
     pub command: &'a str,
@@ -39,7 +40,7 @@ impl InternalEvent for ExecEventsReceived<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ExecFailedError<'a> {
     pub command: &'a str,
     pub error: std::io::Error,
@@ -54,7 +55,6 @@ impl InternalEvent for ExecFailedError<'_> {
             error_type = error_type::COMMAND_FAILED,
             error_code = %io_error_code(&self.error),
             stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -67,7 +67,7 @@ impl InternalEvent for ExecFailedError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ExecTimeoutError<'a> {
     pub command: &'a str,
     pub elapsed_seconds: u64,
@@ -83,7 +83,6 @@ impl InternalEvent for ExecTimeoutError<'_> {
             error = %self.error,
             error_type = error_type::TIMED_OUT,
             stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -95,7 +94,7 @@ impl InternalEvent for ExecTimeoutError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ExecCommandExecuted<'a> {
     pub command: &'a str,
     pub exit_status: Option<i32>,
@@ -119,7 +118,6 @@ impl InternalEvent for ExecCommandExecuted<'_> {
             command = %self.command,
             exit_status = %exit_status,
             elapsed_millis = %self.exec_duration.as_millis(),
-            internal_log_rate_limit = true,
         );
         counter!(
             "command_executed_total",
@@ -182,6 +180,7 @@ impl std::fmt::Display for ExecFailedToSignalChild {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct ExecFailedToSignalChildError<'a> {
     pub command: &'a tokio::process::Command,
     pub error: ExecFailedToSignalChild,
@@ -195,7 +194,6 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
             error_code = %self.error.to_error_code(),
             error_type = error_type::COMMAND_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -208,6 +206,7 @@ impl InternalEvent for ExecFailedToSignalChildError<'_> {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct ExecChannelClosedError;
 
 impl InternalEvent for ExecChannelClosedError {
@@ -217,7 +216,6 @@ impl InternalEvent for ExecChannelClosedError {
             message = exec_reason,
             error_type = error_type::COMMAND_FAILED,
             stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

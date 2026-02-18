@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
     ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
@@ -20,7 +21,7 @@ fn truncate_string_at(s: &str, maxlen: usize) -> Cow<'_, str> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ParserMatchError<'a> {
     pub value: &'a [u8],
 }
@@ -32,8 +33,7 @@ impl InternalEvent for ParserMatchError<'_> {
             error_code = "no_match_found",
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-            field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..],
-            internal_log_rate_limit = true
+            field = &truncate_string_at(&String::from_utf8_lossy(self.value), 60)[..]
         );
         counter!(
             "component_errors_total",
@@ -50,7 +50,7 @@ pub const DROP_EVENT: bool = true;
 #[allow(dead_code)]
 pub const RETAIN_EVENT: bool = false;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ParserMissingFieldError<'a, const DROP_EVENT: bool> {
     pub field: &'a str,
 }
@@ -63,8 +63,7 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
             field = %self.field,
             error_code = "field_not_found",
             error_type = error_type::CONDITION_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true
+            stage = error_stage::PROCESSING
         );
         counter!(
             "component_errors_total",
@@ -81,7 +80,7 @@ impl<const DROP_EVENT: bool> InternalEvent for ParserMissingFieldError<'_, DROP_
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ParserConversionError<'a> {
     pub name: &'a str,
     pub error: crate::types::Error,
@@ -95,8 +94,7 @@ impl InternalEvent for ParserConversionError<'_> {
             error = ?self.error,
             error_code = "type_conversion",
             error_type = error_type::CONVERSION_FAILED,
-            stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true
+            stage = error_stage::PROCESSING
         );
         counter!(
             "component_errors_total",

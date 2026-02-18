@@ -276,6 +276,7 @@ KDL
 keepappkey
 keephq
 kenton
+keybinds
 Kingcom
 Kolkata
 konqueror
@@ -355,6 +356,7 @@ netcat
 netdata
 Netflix
 netlify
+netlink
 Neue
 neuronull
 Nextbook
@@ -554,3 +556,4 @@ zst
 zstandard
 ZTE
 Zync
+sighup

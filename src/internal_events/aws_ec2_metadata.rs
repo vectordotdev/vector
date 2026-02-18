@@ -1,7 +1,8 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AwsEc2MetadataRefreshSuccessful;
 
 impl InternalEvent for AwsEc2MetadataRefreshSuccessful {
@@ -11,7 +12,7 @@ impl InternalEvent for AwsEc2MetadataRefreshSuccessful {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AwsEc2MetadataRefreshError {
     pub error: crate::Error,
 }
@@ -23,7 +24,6 @@ impl InternalEvent for AwsEc2MetadataRefreshError {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

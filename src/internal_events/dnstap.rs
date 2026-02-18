@@ -1,7 +1,8 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub(crate) struct DnstapParseError<E> {
     pub error: E,
 }
@@ -13,7 +14,6 @@ impl<E: std::fmt::Display> InternalEvent for DnstapParseError<E> {
             error = %self.error,
             stage = error_stage::PROCESSING,
             error_type = error_type::PARSER_FAILED,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

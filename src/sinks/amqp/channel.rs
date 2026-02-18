@@ -42,7 +42,6 @@ impl deadpool::managed::Manager for AmqpSinkChannelManager {
         info!(
             message = "Created a new channel to the AMQP broker.",
             id = channel.id(),
-            internal_log_rate_limit = true,
         );
         Ok(channel)
     }

@@ -15,7 +15,10 @@ hickory-proto.workspace = true
 prost.workspace = true
 snafu.workspace = true
 tracing.workspace = true
-vector-lib = { path = "../vector-lib" }
+vector-config.workspace = true
+vector-common = { path = "../vector-common" }
+vector-lookup = { path = "../vector-lookup", features = ["test"] }
+vector-core = { path = "../vector-core" }
 vrl.workspace = true
 paste.workspace = true
 

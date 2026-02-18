@@ -1,7 +1,8 @@
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct RedisReceiveEventError {
     error: redis::RedisError,
     error_code: String,
@@ -22,7 +23,6 @@ impl InternalEvent for RedisReceiveEventError {
             error_code = %self.error_code,
             error_type = error_type::READER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",

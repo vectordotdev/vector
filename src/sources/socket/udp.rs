@@ -230,8 +230,7 @@ pub(super) fn udp(
                                     // 10040 is the Windows error that the Udp message has exceeded max_length
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
-                                        max_length = max_length,
-                                        internal_log_rate_limit = true
+                                        max_length = max_length
                                     );
                                     continue;
                                 }
@@ -258,8 +257,7 @@ pub(super) fn udp(
                                     _ = events.pop();
                                     warn!(
                                         message = "Discarding frame larger than max_length.",
-                                        max_length = max_length,
-                                        internal_log_rate_limit = true
+                                        max_length = max_length
                                     );
                                 }
 
@@ -321,7 +319,7 @@ pub(super) fn udp(
                                 }
                             }
                             Err(error) => {
-                                // Error is logged by `crate::codecs::Decoder`, no
+                                // Error is logged by `vector_lib::codecs::Decoder`, no
                                 // further handling is needed here.
                                 if !error.can_continue() {
                                     break;

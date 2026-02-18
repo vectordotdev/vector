@@ -267,7 +267,6 @@ impl Memory {
                 error!(
                     message = "Error exporting expired items from memory enrichment table.",
                     error = %error,
-                    internal_log_rate_limit = true,
                 );
             }
         }

@@ -1,14 +1,16 @@
+use std::collections::BTreeMap;
 use std::time::Duration;
 
 use chrono::Local;
 use futures_util::future::join_all;
+use regex::Regex;
 use tokio::sync::{mpsc, oneshot};
 use vector_lib::api_client::{Client, connect_subscription_client};
 
-use super::{
+use vector_lib::top::{
     dashboard::{init_dashboard, is_tty},
     metrics,
-    state::{self, ConnectionStatus, EventType},
+    state::{self, ConnectionStatus, EventType, State},
 };
 
 /// Delay (in milliseconds) before attempting to reconnect to the Vector API
@@ -53,17 +55,28 @@ pub async fn cmd(opts: &super::Opts) -> exitcode::ExitCode {
 pub async fn top(opts: &super::Opts, client: Client, dashboard_title: &str) -> exitcode::ExitCode {
     // Channel for updating state via event messages
     let (tx, rx) = tokio::sync::mpsc::channel(20);
-    let state_rx = state::updater(rx).await;
+    let mut starting_state = State::new(BTreeMap::new());
+    starting_state.sort_state.column = opts.sort_field;
+    starting_state.sort_state.reverse = opts.sort_desc;
+    starting_state.filter_state.column = opts.filter_field;
+    starting_state.filter_state.pattern = opts
+        .filter_value
+        .as_deref()
+        .map(Regex::new)
+        .and_then(Result::ok);
+    let state_rx = state::updater(rx, starting_state).await;
     // Channel for shutdown signal
     let (shutdown_tx, shutdown_rx) = oneshot::channel::<()>();
 
-    let connection = tokio::spawn(subscription(opts.clone(), client, tx, shutdown_tx));
+    let connection = tokio::spawn(subscription(opts.clone(), client, tx.clone(), shutdown_tx));
 
     // Initialize the dashboard
     match init_dashboard(
         dashboard_title,
         opts.url().as_str(),
-        opts,
+        opts.interval,
+        opts.human_metrics,
+        tx,
         state_rx,
         shutdown_rx,
     )

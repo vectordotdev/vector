@@ -1,5 +1,6 @@
 #![allow(missing_docs)]
 use vector_lib::configurable::configurable_component;
+use vector_vrl_metrics::MetricsStorage;
 
 use crate::event::Event;
 
@@ -53,7 +54,6 @@ impl Condition {
     /// Checks if a condition is true.
     ///
     /// The event should not be modified, it is only mutable so it can be passed into VRL, but VRL type checking prevents mutation.
-    #[allow(dead_code)]
     pub fn check(&self, e: Event) -> (bool, Event) {
         match self {
             Condition::IsLog => check_is_log(e),
@@ -121,13 +121,14 @@ impl ConditionConfig {
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<Condition> {
         match self {
             ConditionConfig::IsLog => Ok(Condition::IsLog),
             ConditionConfig::IsMetric => Ok(Condition::IsMetric),
             ConditionConfig::IsTrace => Ok(Condition::IsTrace),
-            ConditionConfig::Vrl(x) => x.build(enrichment_tables),
-            ConditionConfig::DatadogSearch(x) => x.build(enrichment_tables),
+            ConditionConfig::Vrl(x) => x.build(enrichment_tables, metrics_storage),
+            ConditionConfig::DatadogSearch(x) => x.build(enrichment_tables, metrics_storage),
         }
     }
 }
@@ -156,6 +157,7 @@ pub trait ConditionalConfig: std::fmt::Debug + Send + Sync + dyn_clone::DynClone
     fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<Condition>;
 }
 
@@ -195,6 +197,7 @@ impl AnyCondition {
     pub fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<Condition> {
         match self {
             AnyCondition::String(s) => {
@@ -202,9 +205,9 @@ impl AnyCondition {
                     source: s.clone(),
                     runtime: Default::default(),
                 };
-                vrl_config.build(enrichment_tables)
+                vrl_config.build(enrichment_tables, metrics_storage)
             }
-            AnyCondition::Map(m) => m.build(enrichment_tables),
+            AnyCondition::Map(m) => m.build(enrichment_tables, metrics_storage),
         }
     }
 }

@@ -76,6 +76,8 @@ static JOURNALCTL: LazyLock<PathBuf> = LazyLock::new(|| "journalctl".into());
 enum BuildError {
     #[snafu(display("journalctl failed to execute: {}", source))]
     JournalctlSpawn { source: io::Error },
+    #[snafu(display("failed to parse output of `journalctl --version`: {:?}", output))]
+    JournalctlParseVersion { output: String },
     #[snafu(display(
         "The unit {:?} is duplicated in both include_units and exclude_units",
         unit
@@ -87,6 +89,11 @@ enum BuildError {
         value,
     ))]
     DuplicatedMatches { field: String, value: String },
+    #[snafu(display(
+        "`current_boot_only: false` not supported for systemd versions 250 through 257 (got {}).",
+        systemd_version
+    ))]
+    AllBootsNotSupported { systemd_version: u32 },
 }
 
 type Matches = HashMap<String, HashSet<String>>;
@@ -109,6 +116,10 @@ pub struct JournaldConfig {
     /// If empty or not present, all units are accepted.
     ///
     /// Unit names lacking a `.` have `.service` appended to make them a valid service unit name.
+    ///
+    /// **Note:** This option matches only the `_SYSTEMD_UNIT` field, which is narrower than `journalctl --unit`.
+    /// Messages from systemd about unit lifecycle (start/stop) have `_SYSTEMD_UNIT=init.scope` and will not match.
+    /// To capture these, explicitly include `init.scope` or use `include_matches` for finer control.
     #[serde(default)]
     #[configurable(metadata(docs::examples = "ntpd", docs::examples = "sysinit.target"))]
     pub include_units: Vec<String>,
@@ -364,8 +375,16 @@ impl SourceConfig for JournaldConfig {
             .clone()
             .unwrap_or_else(|| JOURNALCTL.clone());
 
+        let systemd_version = get_systemd_version_from_journalctl(&journalctl_path).await?;
+
+        if !self.current_boot_only && (250..=257).contains(&systemd_version) {
+            // https://github.com/vectordotdev/vector/issues/18068
+            return Err(BuildError::AllBootsNotSupported { systemd_version }.into());
+        }
+
         let starter = StartJournalctl::new(
             journalctl_path,
+            systemd_version,
             self.journal_directory.clone(),
             self.journal_namespace.clone(),
             self.current_boot_only,
@@ -463,8 +482,11 @@ impl JournaldSource {
             info!("Starting journalctl.");
             let cursor = checkpointer.lock().await.cursor.clone();
             match self.starter.start(cursor.as_deref()) {
-                Ok((stream, running)) => {
-                    if !self.run_stream(stream, &finalizer, shutdown.clone()).await {
+                Ok((stdout_stream, stderr_stream, running)) => {
+                    if !self
+                        .run_stream(stdout_stream, stderr_stream, &finalizer, shutdown.clone())
+                        .await
+                    {
                         return;
                     }
                     // Explicit drop to ensure it isn't dropped earlier.
@@ -488,25 +510,33 @@ impl JournaldSource {
     /// Return `true` if should restart `journalctl`.
     async fn run_stream<'a>(
         &'a mut self,
-        mut stream: JournalStream,
+        mut stdout_stream: JournalStream,
+        stderr_stream: JournalStream,
         finalizer: &'a Finalizer,
         mut shutdown: ShutdownSignal,
     ) -> bool {
         let bytes_received = register!(BytesReceived::from(Protocol::from("journald")));
         let events_received = register!(EventsReceived);
 
+        // Spawn stderr handler task
+        let stderr_handler = tokio::spawn(Self::handle_stderr(stderr_stream));
+
         let batch_size = self.batch_size;
-        loop {
+        let result = loop {
             let mut batch = Batch::new(self);
 
             // Start the timeout counter only once we have received a
             // valid and non-filtered event.
             while batch.events.is_empty() {
                 let item = tokio::select! {
-                    _ = &mut shutdown => return false,
-                    item = stream.next() => item,
+                    _ = &mut shutdown => {
+                        stderr_handler.abort();
+                        return false;
+                    },
+                    item = stdout_stream.next() => item,
                 };
                 if !batch.handle_next(item) {
+                    stderr_handler.abort();
                     return true;
                 }
             }
@@ -517,7 +547,7 @@ impl JournaldSource {
             for _ in 1..batch_size {
                 tokio::select! {
                     _ = &mut timeout => break,
-                    result = stream.next() => if !batch.handle_next(result) {
+                    result = stdout_stream.next() => if !batch.handle_next(result) {
                         break;
                     }
                 }
@@ -527,6 +557,28 @@ impl JournaldSource {
                 .await
             {
                 break x;
+            }
+        };
+
+        stderr_handler.abort();
+        result
+    }
+
+    /// Handle stderr stream from journalctl process
+    async fn handle_stderr(mut stderr_stream: JournalStream) {
+        while let Some(result) = stderr_stream.next().await {
+            match result {
+                Ok(line) => {
+                    let line_str = String::from_utf8_lossy(&line);
+                    let trimmed = line_str.trim();
+                    if !trimmed.is_empty() {
+                        warn!("Warning journalctl stderr: {trimmed}");
+                    }
+                }
+                Err(err) => {
+                    error!("Error reading journalctl stderr: {err}");
+                    break;
+                }
             }
         }
     }
@@ -646,6 +698,7 @@ type JournalStream = BoxStream<'static, Result<Bytes, BoxedFramingError>>;
 
 struct StartJournalctl {
     path: PathBuf,
+    systemd_version: u32,
     journal_dir: Option<PathBuf>,
     journal_namespace: Option<String>,
     current_boot_only: bool,
@@ -656,6 +709,7 @@ struct StartJournalctl {
 impl StartJournalctl {
     const fn new(
         path: PathBuf,
+        systemd_version: u32,
         journal_dir: Option<PathBuf>,
         journal_namespace: Option<String>,
         current_boot_only: bool,
@@ -664,6 +718,7 @@ impl StartJournalctl {
     ) -> Self {
         Self {
             path,
+            systemd_version,
             journal_dir,
             journal_namespace,
             current_boot_only,
@@ -675,6 +730,7 @@ impl StartJournalctl {
     fn make_command(&self, checkpoint: Option<&str>) -> Command {
         let mut command = Command::new(&self.path);
         command.stdout(Stdio::piped());
+        command.stderr(Stdio::piped());
         command.arg("--follow");
         command.arg("--all");
         command.arg("--show-cursor");
@@ -688,8 +744,16 @@ impl StartJournalctl {
             command.arg(format!("--namespace={namespace}"));
         }
 
+        // By default entries from all boots are included
+        // systemd 242 introduces support for --boot=all
+        // systemd 250 lets --follow imply --boot (with no facility to override)
+        // systemd 258 allows to override --boot as implied by --follow
         if self.current_boot_only {
-            command.arg("--boot");
+            if self.systemd_version < 250 {
+                command.arg("--boot");
+            }
+        } else if self.systemd_version >= 258 {
+            command.arg("--boot=all");
         }
 
         if let Some(cursor) = checkpoint {
@@ -711,18 +775,24 @@ impl StartJournalctl {
     fn start(
         &mut self,
         checkpoint: Option<&str>,
-    ) -> crate::Result<(JournalStream, RunningJournalctl)> {
+    ) -> crate::Result<(JournalStream, JournalStream, RunningJournalctl)> {
         let mut command = self.make_command(checkpoint);
 
         let mut child = command.spawn().context(JournalctlSpawnSnafu)?;
 
-        let stream = FramedRead::new(
+        let stdout_stream = FramedRead::new(
             child.stdout.take().unwrap(),
             CharacterDelimitedDecoder::new(b'\n'),
-        )
-        .boxed();
+        );
 
-        Ok((stream, RunningJournalctl(child)))
+        let stderr = child.stderr.take().unwrap();
+        let stderr_stream = FramedRead::new(stderr, CharacterDelimitedDecoder::new(b'\n'));
+
+        Ok((
+            stdout_stream.boxed(),
+            stderr_stream.boxed(),
+            RunningJournalctl(child),
+        ))
     }
 }
 
@@ -734,6 +804,37 @@ impl Drop for RunningJournalctl {
             _ = kill(Pid::from_raw(pid), Signal::SIGTERM);
         }
     }
+}
+
+async fn get_systemd_version_from_journalctl(journalctl_path: &PathBuf) -> crate::Result<u32> {
+    let stdout = Command::new(journalctl_path)
+        .arg("--version")
+        .output()
+        .await
+        .context(JournalctlSpawnSnafu)?
+        .stdout;
+
+    // output format: `systemd {version_number} ({full_version}){newline}{config ...}`
+    let stdout = String::from_utf8_lossy(&stdout);
+    Ok(stdout
+        .split_whitespace()
+        .nth(1)
+        .and_then(|s| s.parse::<u32>().ok())
+        .ok_or_else(|| BuildError::JournalctlParseVersion {
+            output: {
+                let cutoff = 40;
+                let length = stdout.chars().count();
+                format!(
+                    "{}{}",
+                    stdout.chars().take(cutoff).collect::<String>(),
+                    if length > cutoff {
+                        format!(" ..{} more char(s)", length - cutoff)
+                    } else {
+                        "".to_string()
+                    }
+                )
+            },
+        })?)
 }
 
 fn enrich_log_event(log: &mut LogEvent, log_namespace: LogNamespace) {
@@ -1175,7 +1276,8 @@ mod tests {
             let source = config.build(cx).await.unwrap();
             tokio::spawn(async move { source.await.unwrap() });
 
-            sleep(Duration::from_millis(100)).await;
+            // Hack: Sleep to ensure journalctl process starts and emits events before shutdown.
+            sleep(Duration::from_secs(1)).await;
             shutdown
                 .shutdown_all(Some(Instant::now() + Duration::from_secs(1)))
                 .await;
@@ -1367,7 +1469,8 @@ mod tests {
         // Make sure the checkpointer cursor is empty
         assert_eq!(checkpointer.get().await.unwrap(), None);
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        // Hack: Sleep to ensure journalctl process starts and emits events.
+        sleep(Duration::from_secs(1)).await;
 
         // Acknowledge all the received events.
         let mut count = 0;
@@ -1379,7 +1482,7 @@ mod tests {
         }
         assert_eq!(count, 8);
 
-        tokio::time::sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(100)).await;
         assert_eq!(checkpointer.get().await.unwrap().as_deref(), Some("8"));
     }
 
@@ -1475,6 +1578,7 @@ mod tests {
     fn command_options() {
         let path = PathBuf::from("journalctl");
 
+        let systemd_version = 239;
         let journal_dir = None;
         let journal_namespace = None;
         let current_boot_only = false;
@@ -1484,6 +1588,7 @@ mod tests {
 
         let command = create_command(
             &path,
+            systemd_version,
             journal_dir,
             journal_namespace,
             current_boot_only,
@@ -1494,7 +1599,7 @@ mod tests {
         let cmd_line = format!("{command:?}");
         assert!(!cmd_line.contains("--directory="));
         assert!(!cmd_line.contains("--namespace="));
-        assert!(!cmd_line.contains("--boot"));
+        assert!(!cmd_line.contains("--boot=all"));
         assert!(cmd_line.contains("--since=2000-01-01"));
 
         let journal_dir = None;
@@ -1504,6 +1609,7 @@ mod tests {
 
         let command = create_command(
             &path,
+            systemd_version,
             journal_dir,
             journal_namespace,
             current_boot_only,
@@ -1522,6 +1628,7 @@ mod tests {
 
         let command = create_command(
             &path,
+            systemd_version,
             journal_dir,
             journal_namespace,
             current_boot_only,
@@ -1535,10 +1642,31 @@ mod tests {
         assert!(cmd_line.contains("--boot"));
         assert!(cmd_line.contains("--after-cursor="));
         assert!(cmd_line.contains("--merge"));
+
+        let systemd_version = 258;
+        let journal_dir = None;
+        let journal_namespace = None;
+        let current_boot_only = false;
+        let extra_args = vec![];
+
+        let command = create_command(
+            &path,
+            systemd_version,
+            journal_dir,
+            journal_namespace,
+            current_boot_only,
+            since_now,
+            cursor,
+            extra_args,
+        );
+        let cmd_line = format!("{command:?}");
+        assert!(cmd_line.contains("--boot=all"));
     }
 
+    #[allow(clippy::too_many_arguments)]
     fn create_command(
         path: &Path,
+        systemd_version: u32,
         journal_dir: Option<PathBuf>,
         journal_namespace: Option<String>,
         current_boot_only: bool,
@@ -1548,6 +1676,7 @@ mod tests {
     ) -> Command {
         StartJournalctl::new(
             path.into(),
+            systemd_version,
             journal_dir,
             journal_namespace,
             current_boot_only,

@@ -678,10 +678,7 @@ async fn handle_tcp_frame<T>(
     } else if let Some(event) = frame_handler.handle_event(received_from, frame)
         && let Err(e) = event_sink.send_event(event).await
     {
-        error!(
-            internal_log_rate_limit = true,
-            "Error sending event: {e:?}."
-        );
+        error!("Error sending event: {e:?}.");
     }
 }
 
@@ -866,10 +863,7 @@ fn build_framestream_source<T: Send + 'static>(
 
         let handler = async move {
             if let Err(e) = event_sink.send_event_stream(&mut events).await {
-                error!(
-                    internal_log_rate_limit = true,
-                    "Error sending event: {:?}.", e
-                );
+                error!("Error sending event: {:?}.", e);
             }
 
             info!("Finished sending.");
@@ -979,7 +973,7 @@ mod test {
         event::{Event, LogEvent},
         shutdown::SourceShutdownCoordinator,
         sources::util::net::SocketListenAddr,
-        test_util::{collect_n, collect_n_stream, next_addr},
+        test_util::{addr::next_addr, collect_n, collect_n_stream},
     };
 
     #[derive(Clone)]
@@ -1481,7 +1475,7 @@ mod test {
     async fn blocked_framestream_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1505,7 +1499,7 @@ mod test {
     async fn normal_framestream_singlethreaded_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1548,7 +1542,7 @@ mod test {
     async fn normal_framestream_multithreaded_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1591,7 +1585,7 @@ mod test {
     async fn multiple_content_types_tcp() {
         let source_name = "test_source";
         let (tx, _) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,

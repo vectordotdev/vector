@@ -1,5 +1,0 @@
-version: '3'
-
-services:
-  clickhouse:
-    image: docker.io/clickhouse/clickhouse-server:${CONFIG_VERSION}

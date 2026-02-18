@@ -137,7 +137,7 @@ impl SinkConfig for PubsubConfig {
             batch_settings.timeout,
             client,
         )
-        .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error));
+        .sink_map_err(|error| error!(message = "Fatal gcp_pubsub sink error.", %error, internal_log_rate_limit = false));
 
         #[allow(deprecated)]
         Ok((VectorSink::from_event_sink(sink), healthcheck))

@@ -172,7 +172,7 @@ impl SinkConfig for MezmoConfig {
             batch_settings.timeout,
             client.clone(),
         )
-        .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error));
+        .sink_map_err(|error| error!(message = "Fatal mezmo sink error.", %error, internal_log_rate_limit = false));
 
         let healthcheck = healthcheck(self.clone(), client).boxed();
 
@@ -406,8 +406,9 @@ mod tests {
         config::SinkConfig,
         sinks::util::test::{build_test_server_status, load_sink},
         test_util::{
+            addr::next_addr,
             components::{HTTP_SINK_TAGS, assert_sink_compliance},
-            next_addr, random_lines,
+            random_lines,
         },
     };
 
@@ -479,7 +480,7 @@ mod tests {
         // Make sure we can build the config
         _ = config.build(cx.clone()).await.unwrap();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         // Swap out the host so we can force send it
         // to our local server
         let endpoint = UriSerde {

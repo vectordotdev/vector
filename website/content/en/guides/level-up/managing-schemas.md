@@ -1,8 +1,9 @@
 ---
+date: "2021-08-12"
 title: Encoding, Decoding, and Managing Schemas
 short: Schemas
 description: Learn how to manage log schemas with Vector.
-author_github: https://github.com/hoverbear
+authors: ["hoverbear"]
 domain: schemas
 weight: 1
 tags: ["schemas", "schema management", "logs", "level up", "guides", "guide"]

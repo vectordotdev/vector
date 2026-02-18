@@ -1,11 +1,13 @@
 use std::time::Duration;
 
 use metrics::{Histogram, counter, gauge, histogram};
+use vector_common::NamedInternalEvent;
 use vector_common::{
     internal_event::{InternalEvent, error_type},
     registered_event,
 };
 
+#[derive(NamedInternalEvent)]
 pub struct BufferCreated {
     pub buffer_id: String,
     pub idx: usize,
@@ -16,25 +18,41 @@ pub struct BufferCreated {
 impl InternalEvent for BufferCreated {
     #[expect(clippy::cast_precision_loss)]
     fn emit(self) {
+        let stage = self.idx.to_string();
         if self.max_size_events != 0 {
+            gauge!(
+                "buffer_max_size_events",
+                "buffer_id" => self.buffer_id.clone(),
+                "stage" => stage.clone(),
+            )
+            .set(self.max_size_events as f64);
+            // DEPRECATED: buffer-bytes-events-metrics
             gauge!(
                 "buffer_max_event_size",
                 "buffer_id" => self.buffer_id.clone(),
-                "stage" => self.idx.to_string(),
+                "stage" => stage.clone(),
             )
             .set(self.max_size_events as f64);
         }
         if self.max_size_bytes != 0 {
             gauge!(
+                "buffer_max_size_bytes",
+                "buffer_id" => self.buffer_id.clone(),
+                "stage" => stage.clone(),
+            )
+            .set(self.max_size_bytes as f64);
+            // DEPRECATED: buffer-bytes-events-metrics
+            gauge!(
                 "buffer_max_byte_size",
                 "buffer_id" => self.buffer_id,
-                "stage" => self.idx.to_string(),
+                "stage" => stage,
             )
             .set(self.max_size_bytes as f64);
         }
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct BufferEventsReceived {
     pub buffer_id: String,
     pub idx: usize,
@@ -60,12 +78,26 @@ impl InternalEvent for BufferEventsReceived {
             "stage" => self.idx.to_string()
         )
         .increment(self.byte_size);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_events",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_events",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_bytes",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_byte_size as f64);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,
@@ -75,6 +107,7 @@ impl InternalEvent for BufferEventsReceived {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct BufferEventsSent {
     pub buffer_id: String,
     pub idx: usize,
@@ -99,12 +132,26 @@ impl InternalEvent for BufferEventsSent {
             "stage" => self.idx.to_string()
         )
         .increment(self.byte_size);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_events",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_events",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_bytes",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_byte_size as f64);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,
@@ -114,6 +161,7 @@ impl InternalEvent for BufferEventsSent {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct BufferEventsDropped {
     pub buffer_id: String,
     pub idx: usize,
@@ -165,12 +213,26 @@ impl InternalEvent for BufferEventsDropped {
             "intentional" => intentional_str,
         )
         .increment(self.byte_size);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_events",
             "buffer_id" => self.buffer_id.clone(),
             "stage" => self.idx.to_string()
         )
         .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_events",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_count as f64);
+        gauge!(
+            "buffer_size_bytes",
+            "buffer_id" => self.buffer_id.clone(),
+            "stage" => self.idx.to_string()
+        )
+        .set(self.total_byte_size as f64);
+        // DEPRECATED: buffer-bytes-events-metrics
         gauge!(
             "buffer_byte_size",
             "buffer_id" => self.buffer_id,
@@ -180,6 +242,7 @@ impl InternalEvent for BufferEventsDropped {
     }
 }
 
+#[derive(NamedInternalEvent)]
 pub struct BufferReadError {
     pub error_code: &'static str,
     pub error: String,
@@ -193,7 +256,6 @@ impl InternalEvent for BufferReadError {
             error_code = self.error_code,
             error_type = error_type::READER_FAILED,
             stage = "processing",
-            internal_log_rate_limit = true,
         );
         counter!(
             "buffer_errors_total", "error_code" => self.error_code,

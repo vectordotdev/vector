@@ -3,11 +3,12 @@ use std::time::Duration;
 use http::response::Response;
 use metrics::{counter, histogram};
 use tonic::Code;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
 const GRPC_STATUS_LABEL: &str = "grpc_status";
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct GrpcServerRequestReceived;
 
 impl InternalEvent for GrpcServerRequestReceived {
@@ -16,7 +17,7 @@ impl InternalEvent for GrpcServerRequestReceived {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct GrpcServerResponseSent<'a, B> {
     pub response: &'a Response<B>,
     pub latency: Duration,
@@ -38,7 +39,7 @@ impl<B> InternalEvent for GrpcServerResponseSent<'_, B> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct GrpcInvalidCompressionSchemeError<'a> {
     pub status: &'a tonic::Status,
 }
@@ -49,8 +50,7 @@ impl InternalEvent for GrpcInvalidCompressionSchemeError<'_> {
             message = "Invalid compression scheme.",
             error = ?self.status.message(),
             error_type = error_type::REQUEST_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true
+            stage = error_stage::RECEIVING
         );
         counter!(
             "component_errors_total",
@@ -61,7 +61,7 @@ impl InternalEvent for GrpcInvalidCompressionSchemeError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct GrpcError<E> {
     pub error: E,
 }
@@ -75,8 +75,7 @@ where
             message = "Grpc error.",
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
-            stage = error_stage::RECEIVING,
-            internal_log_rate_limit = true
+            stage = error_stage::RECEIVING
         );
         counter!(
             "component_errors_total",

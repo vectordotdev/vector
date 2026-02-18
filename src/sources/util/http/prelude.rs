@@ -21,7 +21,7 @@ use warp::{
     reject::Rejection,
 };
 
-use super::encoding::decode;
+use super::encoding::decompress_body;
 use crate::{
     SourceSender,
     common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
@@ -57,7 +57,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
-        decode(encoding_header, body)
+        decompress_body(encoding_header, body)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -76,7 +76,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
-        let auth_matcher = auth.map(|a| a.build(&cx.enrichment_tables)).transpose()?;
+        let auth_matcher = auth
+            .map(|a| a.build(&cx.enrichment_tables, &cx.metrics_storage))
+            .transpose()?;
         let path = path.to_owned();
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
         let enable_source_ip = self.enable_source_ip();

@@ -18,6 +18,7 @@ use vector_lib::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
     lookup::{PathPrefix, metadata_path, path},
+    source_sender::SendError,
 };
 use vrl::compiler::SecretTarget;
 use warp::reject;
@@ -143,13 +144,16 @@ pub(super) async fn firehose(
                     }
 
                     let count = events.len();
-                    if let Err(error) = context.out.send_batch(events).await {
-                        emit!(StreamClosedError { count });
-                        let error = RequestError::ShuttingDown {
-                            request_id: request_id.clone(),
-                            source: error,
-                        };
-                        warp::reject::custom(error);
+                    match context.out.send_batch(events).await {
+                        Ok(()) => (),
+                        Err(SendError::Closed) => {
+                            emit!(StreamClosedError { count });
+                            let error = RequestError::ShuttingDown {
+                                request_id: request_id.clone(),
+                            };
+                            warp::reject::custom(error);
+                        }
+                        Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
                     }
 
                     drop(batch);
@@ -170,7 +174,7 @@ pub(super) async fn firehose(
                     }
                 }
                 Some(Err(error)) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

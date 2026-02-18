@@ -31,12 +31,14 @@ pub mod config;
 pub mod event;
 pub mod fanout;
 pub mod ipallowlist;
+pub mod latency;
 pub mod metrics;
 pub mod partition;
 pub mod schema;
 pub mod serde;
 pub mod sink;
 pub mod source;
+pub mod source_sender;
 pub mod tcp;
 #[cfg(test)]
 mod test_util;
@@ -68,19 +70,6 @@ pub(crate) fn float_eq(l_value: f64, r_value: f64) -> bool {
 }
 
 // These macros aren't actually usable in lib crates without some `vector_lib` shenanigans.
-// This test version won't be needed once all `InternalEvent`s implement `name()`.
-#[cfg(feature = "test")]
-#[macro_export]
-macro_rules! emit {
-    ($event:expr) => {
-        vector_lib::internal_event::emit(vector_lib::internal_event::DefaultName {
-            event: $event,
-            name: stringify!($event),
-        })
-    };
-}
-
-#[cfg(not(feature = "test"))]
 #[macro_export]
 macro_rules! emit {
     ($event:expr) => {
@@ -88,18 +77,6 @@ macro_rules! emit {
     };
 }
 
-#[cfg(feature = "test")]
-#[macro_export]
-macro_rules! register {
-    ($event:expr) => {
-        vector_lib::internal_event::register(vector_lib::internal_event::DefaultName {
-            event: $event,
-            name: stringify!($event),
-        })
-    };
-}
-
-#[cfg(not(feature = "test"))]
 #[macro_export]
 macro_rules! register {
     ($event:expr) => {

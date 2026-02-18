@@ -94,7 +94,7 @@ pub struct FileSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub truncate_config: FileTruncateConfig,
+    pub truncate: FileTruncateConfig,
 }
 
 /// Configuration for truncating files.
@@ -123,7 +123,7 @@ impl GenerateConfig for FileSinkConfig {
             acknowledgements: Default::default(),
             timezone: Default::default(),
             internal_metrics: Default::default(),
-            truncate_config: Default::default(),
+            truncate: Default::default(),
         })
         .unwrap()
     }
@@ -269,7 +269,7 @@ impl FileSink {
             compression: config.compression,
             events_sent: register!(EventsSent::from(Output(None))),
             include_file_metric_tag: config.internal_metrics.include_file_tag,
-            truncation_config: config.truncate_config.clone(),
+            truncation_config: config.truncate.clone(),
         })
     }
 
@@ -565,7 +565,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate_config: Default::default(),
+            truncate: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -592,7 +592,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate_config: Default::default(),
+            truncate: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -619,7 +619,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate_config: Default::default(),
+            truncate: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -651,7 +651,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate_config: Default::default(),
+            truncate: Default::default(),
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -734,7 +734,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate_config: Default::default(),
+            truncate: Default::default(),
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
@@ -791,7 +791,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate_config: Default::default(),
+            truncate: Default::default(),
         };
 
         let (input, _events) = random_metrics_with_stream(100, None, None);
@@ -823,7 +823,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate_config: Default::default(),
+            truncate: Default::default(),
         };
 
         let metric_count = 3;
@@ -875,7 +875,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
-            truncate_config: Default::default(),
+            truncate: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);

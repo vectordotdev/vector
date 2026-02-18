@@ -14,7 +14,7 @@ set -euo pipefail
 #   $OVERWRITE      overwrite Vector binary even if it already exists (default "true")
 #   $ARCHIVE_TYPE   archive type, either "tar.gz" or "zip" (default "tar.gz")
 #   $NATIVE_BUILD   whether the binary was built natively or with a --target (default "true")
-#   $TARGET         a target triple. ex: x86_64-apple-darwin (no default)
+#   $TARGET         a target triple. ex: arm64-apple-darwin (no default)
 
 #
 # Env Vars
@@ -23,7 +23,7 @@ set -euo pipefail
 OVERWRITE=${OVERWRITE:-"true"}
 ARCHIVE_TYPE="${ARCHIVE_TYPE:-"tar.gz"}"
 NATIVE_BUILD="${NATIVE_BUILD:-"true"}"
-TARGET="${TARGET:?"You must specify a target triple, ex: x86_64-apple-darwin"}"
+TARGET="${TARGET:?"You must specify a target triple, ex: arm64-apple-darwin"}"
 ARCHIVE_VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
 
 #

@@ -4,7 +4,7 @@
 
 // Imports
 import React, { useEffect, useState } from "react";
-import ReactDOM from "react-dom";
+import { createRoot } from "react-dom/client";
 import classnames from "classnames";
 import { useInterval } from "react-use";
 import { useSpring, animated } from "react-spring";
@@ -316,5 +316,8 @@ function Diagram({className, height, width}) {
 };
 
 // Place the components in the DOM
-ReactDOM.render(<RotatingGlobe size={750} />, document.getElementById("globe"));
-ReactDOM.render(<Diagram className="mx-auto" width="100%" />, document.getElementById("diagram"));
+const globeRoot = createRoot(document.getElementById("globe"));
+globeRoot.render(<RotatingGlobe size={750} />);
+
+const diagramRoot = createRoot(document.getElementById("diagram"));
+diagramRoot.render(<Diagram className="mx-auto" width="100%" />);

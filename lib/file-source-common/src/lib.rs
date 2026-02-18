@@ -1,9 +1,6 @@
 #![deny(warnings)]
 #![deny(clippy::all)]
 
-#[macro_use]
-extern crate scan_fmt;
-
 pub mod buffer;
 pub mod checkpointer;
 mod fingerprinter;

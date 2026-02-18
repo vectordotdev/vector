@@ -6,6 +6,7 @@ message Person {
   optional string name = 1;
   optional int32 id = 2;
   optional string email = 3;
+  optional string job_description = 6;  // This will have JSON name "jobDescription"
 
   enum PhoneType {
     MOBILE = 0;

@@ -8,7 +8,7 @@ use vector_common::internal_event::{InternalEventHandle, Registered, register};
 
 use super::limited_queue::LimitedSender;
 use crate::{
-    Bufferable, WhenFull,
+    BufferInstrumentation, Bufferable, WhenFull,
     buffer_usage_data::BufferUsageHandle,
     internal_events::BufferSendDuration,
     variants::disk_v2::{self, ProductionFilesystem},
@@ -134,9 +134,11 @@ pub struct BufferSender<T: Bufferable> {
     base: SenderAdapter<T>,
     overflow: Option<Box<BufferSender<T>>>,
     when_full: WhenFull,
-    instrumentation: Option<BufferUsageHandle>,
+    usage_instrumentation: Option<BufferUsageHandle>,
     #[derivative(Debug = "ignore")]
     send_duration: Option<Registered<BufferSendDuration>>,
+    #[derivative(Debug = "ignore")]
+    custom_instrumentation: Option<Arc<dyn BufferInstrumentation<T>>>,
 }
 
 impl<T: Bufferable> BufferSender<T> {
@@ -146,8 +148,9 @@ impl<T: Bufferable> BufferSender<T> {
             base,
             overflow: None,
             when_full,
-            instrumentation: None,
+            usage_instrumentation: None,
             send_duration: None,
+            custom_instrumentation: None,
         }
     }
 
@@ -157,8 +160,9 @@ impl<T: Bufferable> BufferSender<T> {
             base,
             overflow: Some(Box::new(overflow)),
             when_full: WhenFull::Overflow,
-            instrumentation: None,
+            usage_instrumentation: None,
             send_duration: None,
+            custom_instrumentation: None,
         }
     }
 
@@ -174,13 +178,18 @@ impl<T: Bufferable> BufferSender<T> {
 
     /// Configures this sender to instrument the items passing through it.
     pub fn with_usage_instrumentation(&mut self, handle: BufferUsageHandle) {
-        self.instrumentation = Some(handle);
+        self.usage_instrumentation = Some(handle);
     }
 
     /// Configures this sender to instrument the send duration.
     pub fn with_send_duration_instrumentation(&mut self, stage: usize, span: &Span) {
         let _enter = span.enter();
         self.send_duration = Some(register(BufferSendDuration { stage }));
+    }
+
+    /// Configures this sender to invoke a custom instrumentation hook.
+    pub fn with_custom_instrumentation(&mut self, instrumentation: impl BufferInstrumentation<T>) {
+        self.custom_instrumentation = Some(Arc::new(instrumentation));
     }
 }
 
@@ -196,14 +205,27 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[async_recursion]
-    pub async fn send(&mut self, item: T, send_reference: Option<Instant>) -> crate::Result<()> {
+    pub async fn send(
+        &mut self,
+        mut item: T,
+        send_reference: Option<Instant>,
+    ) -> crate::Result<()> {
+        if let Some(instrumentation) = self.custom_instrumentation.as_ref() {
+            instrumentation.on_send(&mut item);
+        }
         let item_sizing = self
-            .instrumentation
+            .usage_instrumentation
             .as_ref()
             .map(|_| (item.event_count(), item.size_of()));
 
-        let mut sent_to_base = true;
         let mut was_dropped = false;
+
+        if let Some(instrumentation) = self.usage_instrumentation.as_ref()
+            && let Some((item_count, item_size)) = item_sizing
+        {
+            instrumentation
+                .increment_received_event_count_and_byte_size(item_count as u64, item_size as u64);
+        }
         match self.when_full {
             WhenFull::Block => self.base.send(item).await?,
             WhenFull::DropNewest => {
@@ -213,7 +235,7 @@ impl<T: Bufferable> BufferSender<T> {
             }
             WhenFull::Overflow => {
                 if let Some(item) = self.base.try_send(item).await? {
-                    sent_to_base = false;
+                    was_dropped = true;
                     self.overflow
                         .as_mut()
                         .unwrap_or_else(|| unreachable!("overflow must exist"))
@@ -223,30 +245,20 @@ impl<T: Bufferable> BufferSender<T> {
             }
         }
 
-        if (sent_to_base || was_dropped)
-            && let (Some(send_duration), Some(send_reference)) =
-                (self.send_duration.as_ref(), send_reference)
+        if let Some(instrumentation) = self.usage_instrumentation.as_ref()
+            && let Some((item_count, item_size)) = item_sizing
+            && was_dropped
+        {
+            instrumentation.increment_dropped_event_count_and_byte_size(
+                item_count as u64,
+                item_size as u64,
+                true,
+            );
+        }
+        if let Some(send_duration) = self.send_duration.as_ref()
+            && let Some(send_reference) = send_reference
         {
             send_duration.emit(send_reference.elapsed());
-        }
-
-        if let Some(instrumentation) = self.instrumentation.as_ref()
-            && let Some((item_count, item_size)) = item_sizing
-        {
-            if sent_to_base {
-                instrumentation.increment_received_event_count_and_byte_size(
-                    item_count as u64,
-                    item_size as u64,
-                );
-            }
-
-            if was_dropped {
-                instrumentation.increment_dropped_event_count_and_byte_size(
-                    item_count as u64,
-                    item_size as u64,
-                    true,
-                );
-            }
         }
 
         Ok(())

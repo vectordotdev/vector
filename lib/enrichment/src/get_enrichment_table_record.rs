@@ -1,11 +1,52 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::LazyLock};
 
+use vector_vrl_category::Category;
 use vrl::prelude::*;
 
 use crate::{
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
-    vrl_util::{self, add_index, evaluate_condition, is_case_sensitive},
+    vrl_util::{self, DEFAULT_CASE_SENSITIVE, add_index, evaluate_condition, is_case_sensitive},
 };
+
+static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
+    vec![
+        Parameter {
+            keyword: "table",
+            kind: kind::BYTES,
+            required: true,
+            description: "The [enrichment table](/docs/reference/glossary/#enrichment-tables) to search.",
+            default: None,
+        },
+        Parameter {
+            keyword: "condition",
+            kind: kind::OBJECT,
+            required: true,
+            description: "The condition to search on. Since the condition is used at boot time to create indices into the data, these conditions must be statically defined.",
+            default: None,
+        },
+        Parameter {
+            keyword: "select",
+            kind: kind::ARRAY,
+            required: false,
+            description: "A subset of fields from the enrichment table to return. If not specified, all fields are returned.",
+            default: None,
+        },
+        Parameter {
+            keyword: "case_sensitive",
+            kind: kind::BOOLEAN,
+            required: false,
+            description: "Whether the text fields match the case exactly.",
+            default: Some(&DEFAULT_CASE_SENSITIVE),
+        },
+        Parameter {
+            keyword: "wildcard",
+            kind: kind::BYTES,
+            required: false,
+            description: "Value to use for wildcard matching in the search.",
+            default: None,
+        },
+    ]
+});
 
 fn get_enrichment_table_record(
     select: Option<Value>,
@@ -48,42 +89,39 @@ impl Function for GetEnrichmentTableRecord {
         "get_enrichment_table_record"
     }
 
-    fn parameters(&self) -> &'static [Parameter] {
+    fn usage(&self) -> &'static str {
+        const USAGE: &str = const_str::concat!(
+            "Searches an [enrichment table](/docs/reference/glossary/#enrichment-tables) for a row that matches the provided condition. A single row must be matched. If no rows are found or more than one row is found, an error is returned.\n\n",
+            super::ENRICHMENT_TABLE_EXPLAINER
+        );
+        USAGE
+    }
+
+    fn internal_failure_reasons(&self) -> &'static [&'static str] {
         &[
-            Parameter {
-                keyword: "table",
-                kind: kind::BYTES,
-                required: true,
-            },
-            Parameter {
-                keyword: "condition",
-                kind: kind::OBJECT,
-                required: true,
-            },
-            Parameter {
-                keyword: "select",
-                kind: kind::ARRAY,
-                required: false,
-            },
-            Parameter {
-                keyword: "case_sensitive",
-                kind: kind::BOOLEAN,
-                required: false,
-            },
-            Parameter {
-                keyword: "wildcard",
-                kind: kind::BYTES,
-                required: false,
-            },
+            "The row is not found.",
+            "Multiple rows are found that match the condition.",
         ]
     }
 
+    fn category(&self) -> &'static str {
+        Category::Enrichment.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::OBJECT
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        &PARAMETERS
+    }
+
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "find records",
             source: r#"get_enrichment_table_record!("test", {"id": 1})"#,
             result: Ok(r#"{"id": 1, "firstname": "Bob", "surname": "Smith"}"#),
-        }]
+        )]
     }
 
     fn compile(
