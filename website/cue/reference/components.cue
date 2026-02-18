@@ -469,8 +469,12 @@ components: {
 	}
 
 	#MetricOutput: [Name=string]: {
-		description:        string
-		relevant_when?:     string
+		description:    string
+		relevant_when?: string
+		deprecated:     bool | *false
+		if deprecated {
+			deprecated_message?: string
+		}
 		tags?:              #MetricTags
 		name?:              Name
 		type?:              #MetricType

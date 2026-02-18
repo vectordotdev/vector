@@ -1,3 +1,4 @@
+use vector_vrl_category::Category;
 use vrl::prelude::*;
 
 fn set_secret(
@@ -21,17 +22,33 @@ impl Function for SetSecret {
         "set_secret"
     }
 
+    fn usage(&self) -> &'static str {
+        "Sets the given secret in the event."
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Event.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {
                 keyword: "key",
                 kind: kind::BYTES,
                 required: true,
+                description: "The name of the secret.",
+                default: None,
             },
             Parameter {
                 keyword: "secret",
                 kind: kind::BYTES,
                 required: true,
+                description: "The secret value.",
+                default: None,
             },
         ]
     }

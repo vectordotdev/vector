@@ -266,7 +266,7 @@ async fn emits_buffer_utilization_histogram_on_send_and_receive() {
         .into_iter()
         .filter(|metric| metric.name().starts_with("source_buffer_"))
         .collect();
-    assert_eq!(metrics.len(), 3, "expected 3 utilization metrics");
+    assert_eq!(metrics.len(), 5, "expected 5 utilization metrics");
 
     let find_metric = |name: &str| {
         metrics
@@ -288,6 +288,12 @@ async fn emits_buffer_utilization_histogram_on_send_and_receive() {
     let metric = find_metric("source_buffer_max_event_size");
     let MetricValue::Gauge { value } = metric.value() else {
         panic!("source_buffer_max_event_size should be a gauge");
+    };
+    assert_eq!(*value, buffer_size as f64);
+
+    let metric = find_metric("source_buffer_max_size_events");
+    let MetricValue::Gauge { value } = metric.value() else {
+        panic!("source_buffer_max_size_events should be a gauge");
     };
     assert_eq!(*value, buffer_size as f64);
 }

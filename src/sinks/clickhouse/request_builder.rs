@@ -3,9 +3,9 @@
 use bytes::Bytes;
 
 use super::sink::PartitionKey;
-use crate::codecs::EncoderKind;
 use crate::sinks::prelude::*;
 use crate::sinks::util::http::HttpRequest;
+use vector_lib::codecs::EncoderKind;
 
 pub(super) struct ClickhouseRequestBuilder {
     pub(super) compression: Compression,

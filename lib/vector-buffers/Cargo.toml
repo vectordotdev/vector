@@ -20,11 +20,11 @@ crossbeam-utils.workspace = true
 derivative.workspace = true
 fslock = { version = "0.2.1", default-features = false, features = ["std"] }
 futures.workspace = true
-memmap2 = { version = "0.9.8", default-features = false }
+memmap2 = { version = "0.9.9", default-features = false }
 metrics.workspace = true
 num-traits = { version = "0.2.19", default-features = false }
 paste.workspace = true
-rkyv = { version = "0.7.45", default-features = false, features = ["size_32", "std", "strict", "validation"] }
+rkyv = { version = "0.7.46", default-features = false, features = ["size_32", "std", "strict", "validation"] }
 serde.workspace = true
 snafu.workspace = true
 tokio-util = { version = "0.7.0", default-features = false }
@@ -47,7 +47,7 @@ quickcheck = "1.0"
 rand.workspace = true
 serde_yaml.workspace = true
 temp-dir = "0.1.16"
-tokio-test = "0.4.4"
+tokio-test.workspace = true
 tracing-fluent-assertions = { version = "0.3" }
 tracing-subscriber = { workspace = true, features = ["env-filter", "fmt", "registry", "std", "ansi"] }
 

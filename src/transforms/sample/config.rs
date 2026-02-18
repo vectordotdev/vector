@@ -1,6 +1,6 @@
 use snafu::Snafu;
 use vector_lib::{
-    config::{LegacyKey, LogNamespace},
+    config::LegacyKey,
     configurable::configurable_component,
     lookup::{lookup_v2::OptionalValuePath, owned_value_path},
 };
@@ -141,7 +141,9 @@ impl TransformConfig for SampleConfig {
             self.group_by.clone(),
             self.exclude
                 .as_ref()
-                .map(|condition| condition.build(&context.enrichment_tables))
+                .map(|condition| {
+                    condition.build(&context.enrichment_tables, &context.metrics_storage)
+                })
                 .transpose()?,
             self.sample_rate_key.clone(),
         )))
@@ -159,9 +161,8 @@ impl TransformConfig for SampleConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::Log | DataType::Trace,
