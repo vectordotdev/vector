@@ -80,6 +80,17 @@ pub struct ClickhouseConfig {
     #[serde(default)]
     pub format: Format,
 
+    /// Validate that events contain all non-nullable fields before encoding.
+    ///
+    /// When enabled (default), each batch is checked for missing non-nullable fields before
+    /// encoding. Batches with missing fields are rejected early with a clear error.
+    ///
+    /// Disable this to skip the per-batch validation for better throughput when you are
+    /// confident that events always contain all required fields. Has no effect when
+    /// `allow_nullable_fields` is true, or when `format` is not `arrow_stream`.
+    #[serde(default = "default_true")]
+    pub validate_schema: bool,
+
     /// Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema.
     ///
     /// If left unspecified, use the default provided by the `ClickHouse` server.
@@ -187,6 +198,10 @@ pub struct AsyncInsertSettingsConfig {
     /// If left unspecified, use the default provided by the `ClickHouse` server.
     #[serde(default)]
     pub max_query_number: Option<u64>,
+}
+
+const fn default_true() -> bool {
+    true
 }
 
 impl_generate_config_from_default!(ClickhouseConfig);
@@ -307,7 +322,7 @@ impl ClickhouseConfig {
             .await?;
 
             let required_fields =
-                if arrow_config.allow_nullable_fields || !arrow_config.validate_schema {
+                if arrow_config.allow_nullable_fields || !self.validate_schema {
                     None
                 } else {
                     arrow_config

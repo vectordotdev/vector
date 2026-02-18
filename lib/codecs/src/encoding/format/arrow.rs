@@ -50,17 +50,6 @@ pub struct ArrowStreamSerializerConfig {
     #[configurable(derived)]
     pub allow_nullable_fields: bool,
 
-    /// Validate that events contain all non-nullable fields before encoding.
-    ///
-    /// When enabled (default), each batch is checked for missing non-nullable fields before
-    /// encoding. Batches with missing fields are rejected early with a clear error.
-    ///
-    /// Disable this to skip the per-batch validation for better throughput when you are
-    /// confident that events always contain all required fields. Has no effect when
-    /// `allow_nullable_fields` is true.
-    #[serde(default = "default_true")]
-    #[configurable(derived)]
-    pub validate_schema: bool,
 }
 
 impl Default for ArrowStreamSerializerConfig {
@@ -68,13 +57,8 @@ impl Default for ArrowStreamSerializerConfig {
         Self {
             schema: None,
             allow_nullable_fields: false,
-            validate_schema: true,
         }
     }
-}
-
-const fn default_true() -> bool {
-    true
 }
 
 impl std::fmt::Debug for ArrowStreamSerializerConfig {
@@ -88,7 +72,6 @@ impl std::fmt::Debug for ArrowStreamSerializerConfig {
                     .map(|s| format!("{} fields", s.fields().len())),
             )
             .field("allow_nullable_fields", &self.allow_nullable_fields)
-            .field("validate_schema", &self.validate_schema)
             .finish()
     }
 }
@@ -99,7 +82,6 @@ impl ArrowStreamSerializerConfig {
         Self {
             schema: Some(schema),
             allow_nullable_fields: false,
-            validate_schema: true,
         }
     }
 
