@@ -288,7 +288,7 @@ xychart-beta
 | Passthrough only | 374 µs / 9.6 MiB/s | - | Baseline |
 | Large (70 attrs) | 360 µs / 17.9 MiB/s | - | - |
 
-## Supported Input Formats
+## Supported input formats
 
 ### 1. Native OTLP log (flat format)
 
