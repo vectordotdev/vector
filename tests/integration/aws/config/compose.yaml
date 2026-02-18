@@ -7,11 +7,6 @@ services:
     image: docker.io/localstack/localstack:stable
     environment:
     - SERVICES=kinesis,s3,cloudwatch,es,firehose,kms,sqs,sns,logs
-  mock-ecs:
-    image: docker.io/amazon/amazon-ecs-local-container-endpoints:latest
-    volumes:
-    - $DOCKER_SOCKET:/var/run/docker.sock
-    - $HOME/.aws/:/home/.aws/
 
 networks:
   default:
