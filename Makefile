@@ -412,7 +412,7 @@ test-top: ## Runs top tests
 
 .PHONY: test-component-validation
 test-component-validation: ## Runs component validation tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 components::validation::tests
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features component-validation-tests --status-level pass --test-threads 4 --lib components::validation::tests
 
 ##@ Benching (Supports `ENVIRONMENT=true`)
 

@@ -44,6 +44,7 @@ path = "tests/e2e/mod.rs"
 [[test]]
 name = "top"
 path = "tests/top/lib.rs"
+required-features = ["top-tests"]
 
 # CI-based builds use full release optimization. See scripts/environment/release-flags.sh.
 # This results in roughly a 5% reduction in performance when compiling locally vs when
