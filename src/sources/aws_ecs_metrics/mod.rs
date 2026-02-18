@@ -616,20 +616,65 @@ mod test {
 #[cfg(feature = "aws-ecs-metrics-integration-tests")]
 #[cfg(test)]
 mod integration_tests {
+    use std::net::SocketAddr;
+
     use tokio::time::Duration;
+    use warp::Filter;
 
     use super::*;
-    use crate::test_util::components::{SOURCE_TAGS, run_and_assert_source_compliance};
+    use crate::test_util::{
+        addr::{PortGuard, next_addr},
+        components::{SOURCE_TAGS, run_and_assert_source_compliance},
+        wait_for_tcp,
+    };
 
-    fn ecs_address() -> String {
-        env::var("ECS_ADDRESS").unwrap_or_else(|_| "http://localhost:9088".into())
+    // Minimal ECS task stats response. The parser only needs a non-empty map with at
+    // least one container entry to emit metrics.
+    const ECS_STATS_JSON: &str = r#"{
+        "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352": {
+            "read": "2018-11-14T08:09:10.000000011Z",
+            "name": "vector2",
+            "id": "0cf54b87-f0f0-4044-b9d6-20dc54d5c414-4057181352",
+            "networks": {
+                "eth1": {
+                    "rx_bytes": 329932716,
+                    "rx_packets": 224158,
+                    "rx_errors": 0,
+                    "rx_dropped": 0,
+                    "tx_bytes": 2001229,
+                    "tx_packets": 29201,
+                    "tx_errors": 0,
+                    "tx_dropped": 0
+                }
+            }
+        }
+    }"#;
+
+    async fn start_mock_ecs_server() -> (PortGuard, SocketAddr) {
+        let (guard, addr) = next_addr();
+
+        let v2_stats = warp::get()
+            .and(warp::path!("v2" / "stats"))
+            .map(|| warp::reply::with_header(ECS_STATS_JSON, "content-type", "application/json"));
+
+        let v3_task_stats = warp::get()
+            .and(warp::path!("v3" / "task" / "stats"))
+            .map(|| warp::reply::with_header(ECS_STATS_JSON, "content-type", "application/json"));
+
+        tokio::spawn(warp::serve(v2_stats.or(v3_task_stats)).run(addr));
+        wait_for_tcp(addr).await;
+
+        (guard, addr)
     }
 
-    fn ecs_url(version: &str) -> String {
-        format!("{}/{}", ecs_address(), version)
-    }
+    async fn scrape_metrics(version: Version) {
+        let (_guard, addr) = start_mock_ecs_server().await;
 
-    async fn scrape_metrics(endpoint: String, version: Version) {
+        let endpoint = match version {
+            Version::V2 => format!("http://{addr}/v2"),
+            Version::V3 | Version::V4 => format!("http://{addr}/v3"),
+        };
+
         let config = AwsEcsMetricsSourceConfig {
             endpoint,
             version,
@@ -644,18 +689,16 @@ mod integration_tests {
 
     #[tokio::test]
     async fn scrapes_metrics_v2() {
-        scrape_metrics(ecs_url("v2"), Version::V2).await;
+        scrape_metrics(Version::V2).await;
     }
 
     #[tokio::test]
     async fn scrapes_metrics_v3() {
-        scrape_metrics(ecs_url("v3"), Version::V3).await;
+        scrape_metrics(Version::V3).await;
     }
 
     #[tokio::test]
     async fn scrapes_metrics_v4() {
-        // mock uses same endpoint for v4 as v3
-        // https://github.com/awslabs/amazon-ecs-local-container-endpoints/blob/mainline/docs/features.md#task-metadata-v4
-        scrape_metrics(ecs_url("v3"), Version::V4).await;
+        scrape_metrics(Version::V4).await;
     }
 }
