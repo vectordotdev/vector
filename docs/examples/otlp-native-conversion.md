@@ -162,7 +162,7 @@ classDiagram
     LogRecord --> KeyValue
 ```
 
-## Configuration Comparison
+## Configuration comparison
 
 ### Previous: Complex VRL required
 
