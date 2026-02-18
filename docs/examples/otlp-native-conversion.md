@@ -245,7 +245,7 @@ sinks:
 
 ### Current: No VRL required
 
-For Vector v0.54.0 and later, no VRL is needed:
+For Vector version 0.54.0 and later, VRL is not required:
 
 ```yaml
 # vector.yaml - v0.54.0+
