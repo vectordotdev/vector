@@ -166,7 +166,7 @@ classDiagram
 
 ### Previous: Complex VRL required
 
-For Vector versions before v0.54.0, the following complex VRL transform was required:
+For Vector version 0.54.0 and older, the following complex VRL transform is required:
 
 ```yaml
 # vector.yaml - before v0.54.0
