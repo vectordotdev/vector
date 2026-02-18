@@ -12,4 +12,3 @@ const-str.workspace = true
 dyn-clone = { version = "1.0.20", default-features = false }
 indoc.workspace = true
 vrl.workspace = true
-vector-vrl-category.workspace = true

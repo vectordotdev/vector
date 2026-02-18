@@ -1,6 +1,5 @@
 use std::{collections::BTreeMap, sync::LazyLock};
 
-use vector_vrl_category::Category;
 use vrl::prelude::*;
 
 use crate::{
@@ -102,10 +101,6 @@ impl Function for GetEnrichmentTableRecord {
             "The row is not found.",
             "Multiple rows are found that match the condition.",
         ]
-    }
-
-    fn category(&self) -> &'static str {
-        Category::Enrichment.as_ref()
     }
 
     fn return_kind(&self) -> u16 {
