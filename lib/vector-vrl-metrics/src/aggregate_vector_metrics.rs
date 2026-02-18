@@ -2,6 +2,7 @@ use std::collections::BTreeMap;
 use std::sync::LazyLock;
 use vector_vrl_category::Category;
 use vrl::prelude::expression::Expr;
+use vrl::prelude::function::EnumVariant;
 use vrl::value;
 
 use vrl::prelude::*;
