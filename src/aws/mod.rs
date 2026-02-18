@@ -112,10 +112,10 @@ fn connector(
     let tls_settings = MaybeTlsSettings::tls_client(tls_options)?;
 
     if proxy.enabled {
-        let proxy = build_proxy_connector(tls_settings, proxy)?;
+        let proxy = build_proxy_connector(tls_settings, proxy, false)?;
         Ok(HyperClientBuilder::new().build(proxy))
     } else {
-        let tls_connector = build_tls_connector(tls_settings)?;
+        let tls_connector = build_tls_connector(tls_settings, false)?;
         Ok(HyperClientBuilder::new().build(tls_connector))
     }
 }
