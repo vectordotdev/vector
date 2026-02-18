@@ -139,7 +139,7 @@ checksum = "265dca43d9dbb3d5bbb0b3ef1b0cd9044ce3aa5d697d5b66cde974d1f6063f09"
 dependencies = [
  "amq-protocol-uri",
  "tcp-stream",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -771,7 +771,7 @@ dependencies = [
  "polling 3.7.4",
  "rustix 0.38.40",
  "slab",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "windows-sys 0.59.0",
 ]
 
@@ -826,7 +826,7 @@ dependencies = [
  "tokio-rustls 0.26.2",
  "tokio-util",
  "tokio-websockets",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "tryhard",
  "url",
 ]
@@ -985,7 +985,7 @@ dependencies = [
  "ring",
  "time",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "url",
  "zeroize",
 ]
@@ -1023,7 +1023,7 @@ dependencies = [
  "http-body 0.4.6",
  "percent-encoding",
  "pin-project-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "uuid",
 ]
 
@@ -1051,7 +1051,7 @@ dependencies = [
  "http-body 0.4.6",
  "once_cell",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1075,7 +1075,7 @@ dependencies = [
  "http 0.2.9",
  "once_cell",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1098,7 +1098,7 @@ dependencies = [
  "http 0.2.9",
  "once_cell",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1121,7 +1121,7 @@ dependencies = [
  "http 0.2.9",
  "once_cell",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1145,7 +1145,7 @@ dependencies = [
  "http 0.2.9",
  "once_cell",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1167,7 +1167,7 @@ dependencies = [
  "fastrand 2.3.0",
  "http 0.2.9",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1201,7 +1201,7 @@ dependencies = [
  "percent-encoding",
  "regex-lite",
  "sha2",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "url",
 ]
 
@@ -1224,7 +1224,7 @@ dependencies = [
  "fastrand 2.3.0",
  "http 0.2.9",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1247,7 +1247,7 @@ dependencies = [
  "fastrand 2.3.0",
  "http 0.2.9",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1270,7 +1270,7 @@ dependencies = [
  "http 0.2.9",
  "once_cell",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1293,7 +1293,7 @@ dependencies = [
  "http 0.2.9",
  "once_cell",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1316,7 +1316,7 @@ dependencies = [
  "http 0.2.9",
  "once_cell",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1339,7 +1339,7 @@ dependencies = [
  "fastrand 2.3.0",
  "http 0.2.9",
  "regex-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1362,7 +1362,7 @@ dependencies = [
  "percent-encoding",
  "sha2",
  "time",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1395,7 +1395,7 @@ dependencies = [
  "pin-project-lite",
  "sha1",
  "sha2",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1412,7 +1412,7 @@ dependencies = [
  "http 0.2.9",
  "http-body 0.4.6",
  "pin-project-lite",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1445,7 +1445,7 @@ dependencies = [
  "percent-encoding",
  "pin-project-lite",
  "pin-utils",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1467,7 +1467,7 @@ dependencies = [
  "rustls 0.21.12",
  "rustls-native-certs 0.8.1",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1519,7 +1519,7 @@ dependencies = [
  "pin-project-lite",
  "pin-utils",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1535,7 +1535,7 @@ dependencies = [
  "http 1.3.1",
  "pin-project-lite",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "zeroize",
 ]
 
@@ -1585,7 +1585,7 @@ dependencies = [
  "aws-smithy-runtime-api",
  "aws-smithy-types",
  "rustc_version",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1697,7 +1697,7 @@ dependencies = [
  "rustc_version",
  "serde",
  "serde_json",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "typespec",
  "typespec_client_core",
 ]
@@ -1711,7 +1711,7 @@ dependencies = [
  "proc-macro2 1.0.106",
  "quote 1.0.44",
  "syn 2.0.115",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -1921,7 +1921,7 @@ dependencies = [
  "futures-io",
  "futures-lite 1.13.0",
  "piper",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -2527,7 +2527,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "toml 0.9.8",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "tracing-test",
  "uuid",
  "vector-common",
@@ -2685,7 +2685,7 @@ dependencies = [
  "prost 0.13.5",
  "prost-types 0.13.5",
  "tonic 0.12.3",
- "tracing-core 0.1.33",
+ "tracing-core 0.1.36",
 ]
 
 [[package]]
@@ -2709,8 +2709,8 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tonic 0.12.3",
- "tracing 0.1.41",
- "tracing-core 0.1.33",
+ "tracing 0.1.44",
+ "tracing-core 0.1.36",
  "tracing-subscriber",
 ]
 
@@ -3517,7 +3517,7 @@ dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",
  "snafu 0.8.9",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "vector-common",
  "vector-config",
  "vector-core",
@@ -3539,7 +3539,7 @@ dependencies = [
  "serde",
  "serde_json",
  "snafu 0.8.9",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "vector-config",
  "vector-config-common",
 ]
@@ -3572,7 +3572,7 @@ dependencies = [
  "smallvec",
  "time",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -4031,7 +4031,7 @@ dependencies = [
  "quickcheck",
  "tempfile",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "vector-common",
  "winapi",
 ]
@@ -4054,7 +4054,7 @@ dependencies = [
  "similar-asserts",
  "tempfile",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "vector-common",
  "vector-config",
  "winapi",
@@ -4611,7 +4611,7 @@ dependencies = [
  "slab",
  "tokio",
  "tokio-util",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -4630,7 +4630,7 @@ dependencies = [
  "slab",
  "tokio",
  "tokio-util",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -4919,7 +4919,7 @@ dependencies = [
  "thiserror 1.0.68",
  "tinyvec",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "url",
 ]
 
@@ -4946,7 +4946,7 @@ dependencies = [
  "thiserror 2.0.17",
  "time",
  "tinyvec",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "url",
 ]
 
@@ -4968,7 +4968,7 @@ dependencies = [
  "smallvec",
  "thiserror 1.0.68",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -5130,7 +5130,7 @@ dependencies = [
  "socket2 0.5.10",
  "tokio",
  "tower-service",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "want",
 ]
 
@@ -5336,7 +5336,7 @@ dependencies = [
  "system-configuration 0.6.1",
  "tokio",
  "tower-service",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "windows-registry",
 ]
 
@@ -5897,7 +5897,7 @@ dependencies = [
  "reqwest 0.11.26",
  "serde_json",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -6032,7 +6032,7 @@ dependencies = [
  "tokio-util",
  "tower 0.4.13",
  "tower-http 0.5.2",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -6076,7 +6076,7 @@ dependencies = [
  "thiserror 1.0.68",
  "tokio",
  "tokio-util",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -6128,7 +6128,7 @@ dependencies = [
  "pinky-swear",
  "reactor-trait",
  "serde",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "waker-fn",
 ]
 
@@ -6680,8 +6680,8 @@ dependencies = [
  "metrics",
  "metrics-util",
  "once_cell",
- "tracing 0.1.41",
- "tracing-core 0.1.33",
+ "tracing 0.1.44",
+ "tracing-core 0.1.36",
  "tracing-subscriber",
 ]
 
@@ -7990,7 +7990,7 @@ dependencies = [
  "doc-comment",
  "flume 0.10.14",
  "parking_lot 0.12.5",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -8092,7 +8092,7 @@ dependencies = [
  "hermit-abi 0.4.0",
  "pin-project-lite",
  "rustix 0.38.40",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "windows-sys 0.59.0",
 ]
 
@@ -8731,7 +8731,7 @@ dependencies = [
  "socket2 0.5.10",
  "thiserror 2.0.17",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -8750,7 +8750,7 @@ dependencies = [
  "slab",
  "thiserror 2.0.17",
  "tinyvec",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "web-time",
 ]
 
@@ -8764,7 +8764,7 @@ dependencies = [
  "libc",
  "once_cell",
  "socket2 0.5.10",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "windows-sys 0.59.0",
 ]
 
@@ -10601,7 +10601,7 @@ dependencies = [
  "thiserror 2.0.17",
  "tokio",
  "tokio-stream",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "url",
  "webpki-roots 0.26.1",
 ]
@@ -10683,7 +10683,7 @@ dependencies = [
  "sqlx-core",
  "stringprep",
  "thiserror 2.0.17",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "whoami",
 ]
 
@@ -10721,7 +10721,7 @@ dependencies = [
  "sqlx-core",
  "stringprep",
  "thiserror 2.0.17",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "whoami",
 ]
 
@@ -10746,7 +10746,7 @@ dependencies = [
  "serde_urlencoded",
  "sqlx-core",
  "thiserror 2.0.17",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "url",
 ]
 
@@ -11320,7 +11320,7 @@ dependencies = [
  "signal-hook-registry",
  "socket2 0.6.0",
  "tokio-macros",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "windows-sys 0.61.0",
 ]
 
@@ -11648,7 +11648,7 @@ dependencies = [
  "tower 0.4.13",
  "tower-layer",
  "tower-service",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "zstd 0.12.4",
 ]
 
@@ -11679,7 +11679,7 @@ dependencies = [
  "tower 0.4.13",
  "tower-layer",
  "tower-service",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -11725,7 +11725,7 @@ dependencies = [
  "tokio-util",
  "tower-layer",
  "tower-service",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -11744,7 +11744,7 @@ dependencies = [
  "tokio-util",
  "tower-layer",
  "tower-service",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -11766,7 +11766,7 @@ dependencies = [
  "tokio-util",
  "tower-layer",
  "tower-service",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -11785,7 +11785,7 @@ dependencies = [
  "pin-project-lite",
  "tower-layer",
  "tower-service",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -11839,14 +11839,14 @@ dependencies = [
 
 [[package]]
 name = "tracing"
-version = "0.1.41"
+version = "0.1.44"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "784e0ac535deb450455cbfa28a6f0df145ea1bb7ae51b821cf5e7927fdcfbdd0"
+checksum = "63e71662fa4b2a2c3a26f570f037eb95bb1f85397f3cd8076caed2f026a6d100"
 dependencies = [
  "log",
  "pin-project-lite",
  "tracing-attributes",
- "tracing-core 0.1.33",
+ "tracing-core 0.1.36",
 ]
 
 [[package]]
@@ -11861,9 +11861,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-attributes"
-version = "0.1.28"
+version = "0.1.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "395ae124c09f9e6918a2310af6038fba074bcf474ac352496d5910dd59a2226d"
+checksum = "7490cfa5ec963746568740651ac6781f701c9c5ea257c58e057f3ba8cf69e8da"
 dependencies = [
  "proc-macro2 1.0.106",
  "quote 1.0.44",
@@ -11872,9 +11872,9 @@ dependencies = [
 
 [[package]]
 name = "tracing-core"
-version = "0.1.33"
+version = "0.1.36"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e672c95779cf947c5311f83787af4fa8fffd12fb27e4993211a84bdfd9610f9c"
+checksum = "db97caf9d906fbde555dd62fa95ddba9eecfd14cb388e4f491a66d74cd5fb79a"
 dependencies = [
  "once_cell",
  "valuable",
@@ -11894,8 +11894,8 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "12de1a8c6bcfee614305e836308b596bbac831137a04c61f7e5b0b0bf2cfeaf6"
 dependencies = [
- "tracing 0.1.41",
- "tracing-core 0.1.33",
+ "tracing 0.1.44",
+ "tracing-core 0.1.36",
  "tracing-subscriber",
 ]
 
@@ -11908,7 +11908,7 @@ dependencies = [
  "futures 0.3.31",
  "futures-task",
  "pin-project",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -11928,8 +11928,8 @@ dependencies = [
  "dashmap",
  "mock_instant",
  "serial_test",
- "tracing 0.1.41",
- "tracing-core 0.1.33",
+ "tracing 0.1.44",
+ "tracing-core 0.1.36",
  "tracing-subscriber",
 ]
 
@@ -11941,7 +11941,7 @@ checksum = "ee855f1f400bd0e5c02d150ae5de3840039a3f54b025156404e34c23c03f47c3"
 dependencies = [
  "log",
  "once_cell",
- "tracing-core 0.1.33",
+ "tracing-core 0.1.36",
 ]
 
 [[package]]
@@ -11951,14 +11951,14 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "704b1aeb7be0d0a84fc9828cae51dab5970fee5088f83d1dd7ee6f6246fc6ff1"
 dependencies = [
  "serde",
- "tracing-core 0.1.33",
+ "tracing-core 0.1.36",
 ]
 
 [[package]]
 name = "tracing-subscriber"
-version = "0.3.20"
+version = "0.3.22"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2054a14f5307d601f88daf0553e1cbf472acc4f2c51afab632431cdcd72124d5"
+checksum = "2f30143827ddab0d256fd843b7a66d164e9f271cfa0dde49142c5ca0ca291f1e"
 dependencies = [
  "matchers",
  "nu-ansi-term",
@@ -11969,28 +11969,28 @@ dependencies = [
  "sharded-slab",
  "smallvec",
  "thread_local",
- "tracing 0.1.41",
- "tracing-core 0.1.33",
+ "tracing 0.1.44",
+ "tracing-core 0.1.36",
  "tracing-log",
  "tracing-serde",
 ]
 
 [[package]]
 name = "tracing-test"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "557b891436fe0d5e0e363427fc7f217abf9ccd510d5136549847bdcbcd011d68"
+checksum = "19a4c448db514d4f24c5ddb9f73f2ee71bfb24c526cf0c570ba142d1119e0051"
 dependencies = [
- "tracing-core 0.1.33",
+ "tracing-core 0.1.36",
  "tracing-subscriber",
  "tracing-test-macro",
 ]
 
 [[package]]
 name = "tracing-test-macro"
-version = "0.2.5"
+version = "0.2.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04659ddb06c87d233c566112c1c9c5b9e98256d9af50ec3bc9c8327f873a7568"
+checksum = "ad06847b7afb65c7866a36664b75c40b895e318cea4f71299f013fb22965329d"
 dependencies = [
  "quote 1.0.44",
  "syn 2.0.115",
@@ -12152,7 +12152,7 @@ dependencies = [
  "serde_json",
  "time",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "typespec",
  "typespec_macros",
  "url",
@@ -12646,8 +12646,8 @@ dependencies = [
  "tower 0.5.2",
  "tower-http 0.4.4",
  "tower-test",
- "tracing 0.1.41",
- "tracing-core 0.1.33",
+ "tracing 0.1.44",
+ "tracing-core 0.1.36",
  "tracing-futures 0.2.5",
  "tracing-limit",
  "tracing-subscriber",
@@ -12725,7 +12725,7 @@ dependencies = [
  "tokio",
  "tokio-test",
  "tokio-util",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "tracing-fluent-assertions",
  "tracing-subscriber",
  "vector-common",
@@ -12752,7 +12752,7 @@ dependencies = [
  "smallvec",
  "stream-cancel",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "vector-common-macros",
  "vector-config",
  "vrl",
@@ -12785,7 +12785,7 @@ dependencies = [
  "serde_with",
  "snafu 0.8.9",
  "toml 0.9.8",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "url",
  "vector-config-common",
  "vector-config-macros",
@@ -12803,7 +12803,7 @@ dependencies = [
  "serde",
  "serde_json",
  "syn 2.0.115",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
@@ -12886,7 +12886,7 @@ dependencies = [
  "tokio-util",
  "toml 0.9.8",
  "tonic 0.11.0",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "tracing-subscriber",
  "url",
  "urlencoding",
@@ -12947,7 +12947,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tower 0.5.2",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "twox-hash",
  "vector-common",
  "vector-core",
@@ -12965,7 +12965,7 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tokio-tungstenite 0.20.1",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "url",
  "uuid",
  "vector-api-client",
@@ -13186,7 +13186,7 @@ dependencies = [
  "termcolor",
  "thiserror 2.0.17",
  "tokio",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "ua-parser",
  "unicode-segmentation",
  "url",
@@ -13272,7 +13272,7 @@ dependencies = [
  "tokio-tungstenite 0.21.0",
  "tokio-util",
  "tower-service",
- "tracing 0.1.41",
+ "tracing 0.1.44",
 ]
 
 [[package]]
