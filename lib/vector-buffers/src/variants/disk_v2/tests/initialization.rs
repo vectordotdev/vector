@@ -30,20 +30,20 @@ async fn reader_doesnt_block_from_partial_write_on_last_record() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            let mut buffer = create_default_buffer_v2(data_dir.clone()).await;
 
             // Write a record, and then read it and acknowledge it. This puts the buffer into a
             // state where there's data in the current data file, and the ledger has a non-zero
             // record ID for where it thinks the reader needs to be. This ensures that the reader
             // actually does at least one call to `Reader::next` during `Reader::seek_to_next_record`.
-            let first_bytes_written = writer
+            let first_bytes_written = buffer.writer()
                 .write_record(SizedRecord::new(64))
                 .await
                 .expect("should not fail to write");
-            writer.flush().await.expect("flush should not fail");
-            writer.close();
+            buffer.writer().flush().await.expect("flush should not fail");
+            buffer.writer().close();
 
-            let first_read = reader
+            let first_read = buffer.reader()
                 .next()
                 .await
                 .expect("should not fail to read record")
@@ -51,16 +51,16 @@ async fn reader_doesnt_block_from_partial_write_on_last_record() {
             assert_eq!(SizedRecord::new(64), first_read);
             acknowledge(first_read).await;
 
-            let second_read = reader.next().await.expect("should not fail to read record");
+            let second_read = buffer.reader().next().await.expect("should not fail to read record");
             assert!(second_read.is_none());
 
-            ledger.flush().expect("should not fail to flush ledger");
+            buffer.ledger().flush().expect("should not fail to flush ledger");
 
             // Grab the current writer data file path before dropping the buffer.
-            let data_file_path = ledger.get_current_writer_data_file_path();
-            drop(reader);
-            drop(writer);
-            drop(ledger);
+            let data_file_path = buffer.ledger().get_current_writer_data_file_path();
+            drop(buffer);
+            // Give the finalizer task time to process the closure and drop its Arc<Ledger>
+            tokio::task::yield_now().await;
 
             // Open the data file and drop the last eight bytes of the record, which will ensure
             // that there is less data available to read than the number of bytes indicated by the
@@ -107,7 +107,7 @@ async fn reader_doesnt_block_when_ahead_of_last_record_in_current_data_file() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            let mut buffer = create_default_buffer_v2(data_dir.clone()).await;
 
             // Write two records, and then read and acknowledge both.
             //
@@ -116,21 +116,21 @@ async fn reader_doesnt_block_when_ahead_of_last_record_in_current_data_file() {
             // ensures that the reader actually does at least two calls to `Reader::next` during
             // `Reader::seek_to_next_record`, which is necessary to ensure that the reader leaves
             // the default state of `self.last_reader_record_id == 0`.
-            let first_bytes_written = writer
+            let first_bytes_written = buffer.writer()
                 .write_record(SizedRecord::new(64))
                 .await
                 .expect("should not fail to write");
-            writer.flush().await.expect("flush should not fail");
+            buffer.writer().flush().await.expect("flush should not fail");
 
-            let second_bytes_written = writer
+            let second_bytes_written = buffer.writer()
                 .write_record(SizedRecord::new(68))
                 .await
                 .expect("should not fail to write");
-            writer.flush().await.expect("flush should not fail");
+            buffer.writer().flush().await.expect("flush should not fail");
 
-            writer.close();
+            buffer.writer().close();
 
-            let first_read = reader
+            let first_read = buffer.reader()
                 .next()
                 .await
                 .expect("should not fail to read record")
@@ -138,7 +138,7 @@ async fn reader_doesnt_block_when_ahead_of_last_record_in_current_data_file() {
             assert_eq!(SizedRecord::new(64), first_read);
             acknowledge(first_read).await;
 
-            let second_read = reader
+            let second_read = buffer.reader()
                 .next()
                 .await
                 .expect("should not fail to read record")
@@ -146,16 +146,16 @@ async fn reader_doesnt_block_when_ahead_of_last_record_in_current_data_file() {
             assert_eq!(SizedRecord::new(68), second_read);
             acknowledge(second_read).await;
 
-            let third_read = reader.next().await.expect("should not fail to read record");
+            let third_read = buffer.reader().next().await.expect("should not fail to read record");
             assert!(third_read.is_none());
 
-            ledger.flush().expect("should not fail to flush ledger");
+            buffer.ledger().flush().expect("should not fail to flush ledger");
 
             // Grab the current writer data file path before dropping the buffer.
-            let data_file_path = ledger.get_current_writer_data_file_path();
-            drop(reader);
-            drop(writer);
-            drop(ledger);
+            let data_file_path = buffer.ledger().get_current_writer_data_file_path();
+            drop(buffer);
+            // Give the finalizer task time to process the closure and drop its Arc<Ledger>
+            tokio::task::yield_now().await;
 
             // Open the data file and truncate the second record. This will ensure that the reader
             // hits EOF after the first read, which we need to do in order to exercise the logic

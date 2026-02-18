@@ -36,7 +36,7 @@ async fn writer_error_when_record_is_over_the_limit() {
 
             let max_record_size = get_corrected_max_record_size(&first_record);
             let (mut writer, _reader, ledger) =
-                create_buffer_v2_with_max_record_size(data_dir, max_record_size).await;
+                create_buffer_v2_with_max_record_size(data_dir, max_record_size).await.into_parts();
 
             assert_buffer_is_empty!(ledger);
 
@@ -87,7 +87,7 @@ async fn writer_waits_when_buffer_is_full() {
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
             let (mut writer, mut reader, ledger) =
-                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await;
+                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await.into_parts();
 
             assert_buffer_is_empty!(ledger);
 
@@ -232,7 +232,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded() {
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
             let (mut writer, mut reader, ledger) =
-                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await;
+                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await.into_parts();
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
@@ -312,7 +312,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
             let (mut writer, _, ledger) =
                 create_buffer_v2_with_max_data_file_size(data_dir.clone(), max_data_file_size)
-                    .await;
+                    .await.into_parts();
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
@@ -343,7 +343,7 @@ async fn writer_rolls_data_files_when_the_limit_is_exceeded_after_reload() {
                 create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size);
             let (mut writer, mut reader, ledger) = timeout(open_wait, second_buffer_open)
                 .await
-                .expect("failed to open buffer a second time in the expected timeframe");
+                .expect("failed to open buffer a second time in the expected timeframe").into_parts();
             assert_buffer_size!(ledger, 1, first_bytes_written);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
 
@@ -402,7 +402,7 @@ async fn writer_try_write_returns_when_buffer_is_full() {
 
             let max_data_file_size = get_minimum_data_file_size_for_record_payload(&second_record);
             let (mut writer, _, ledger) =
-                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await;
+                create_buffer_v2_with_data_file_count_limit(data_dir, max_data_file_size, 2).await.into_parts();
 
             assert_buffer_is_empty!(ledger);
 
@@ -445,7 +445,7 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
                 max_data_file_size,
                 2,
             )
-            .await;
+            .await.into_parts();
 
             assert_buffer_is_empty!(ledger);
 
@@ -475,7 +475,7 @@ async fn writer_can_validate_last_write_when_buffer_is_full() {
                 max_data_file_size,
                 2,
             )
-            .await;
+            .await.into_parts();
             assert_buffer_records!(ledger, 1);
         }
     })

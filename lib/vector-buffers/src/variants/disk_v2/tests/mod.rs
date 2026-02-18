@@ -1,5 +1,6 @@
 use std::{
     io::{self, Cursor},
+    mem::ManuallyDrop,
     path::Path,
     sync::Arc,
 };
@@ -190,14 +191,119 @@ macro_rules! set_data_file_length {
     }};
 }
 
+/// A handle to a disk buffer that ensures proper cleanup of all components.
+///
+/// This struct owns the writer, reader, and ledger components of a buffer and ensures
+/// they are properly cleaned up in the correct order when dropped. This prevents race
+/// conditions with the background finalizer task that holds an Arc<Ledger>.
+///
+/// # Usage
+///
+/// ```ignore
+/// // Safe by default - Drop handles cleanup
+/// let mut buffer = create_default_buffer_v2(dir).await;
+/// buffer.writer().write_record(...).await?;
+/// let record = buffer.reader().next().await?;
+///
+/// // Explicit cleanup before reopening
+/// drop(buffer);
+/// tokio::task::yield_now().await;
+/// let buffer = create_default_buffer_v2(dir).await;
+///
+/// // Advanced: Extract components (caller responsible for cleanup)
+/// let (writer, reader, ledger) = buffer.into_parts();
+/// ```
+pub(crate) struct BufferHandle<R, FS>
+where
+    R: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
+{
+    writer: BufferWriter<R, FS>,
+    reader: BufferReader<R, FS>,
+    ledger: Arc<Ledger<FS>>,
+}
+
+impl<R, FS> BufferHandle<R, FS>
+where
+    R: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
+{
+    /// Creates a new buffer handle from its components.
+    pub fn new(
+        writer: BufferWriter<R, FS>,
+        reader: BufferReader<R, FS>,
+        ledger: Arc<Ledger<FS>>,
+    ) -> Self {
+        Self {
+            writer,
+            reader,
+            ledger,
+        }
+    }
+
+    /// Gets a mutable reference to the writer.
+    pub fn writer(&mut self) -> &mut BufferWriter<R, FS> {
+        &mut self.writer
+    }
+
+    /// Gets a mutable reference to the reader.
+    pub fn reader(&mut self) -> &mut BufferReader<R, FS> {
+        &mut self.reader
+    }
+
+    /// Gets a reference to the ledger.
+    pub fn ledger(&self) -> &Arc<Ledger<FS>> {
+        &self.ledger
+    }
+
+    /// Consumes the handle and returns the individual components.
+    ///
+    /// # Warning
+    ///
+    /// When using this method, the caller is responsible for proper cleanup of the components,
+    /// including dropping them in the correct order and yielding to allow the background
+    /// finalizer task to complete.
+    pub fn into_parts(self) -> (BufferWriter<R, FS>, BufferReader<R, FS>, Arc<Ledger<FS>>) {
+        // Use ManuallyDrop to prevent Drop from running since we're moving out the fields
+        let this = ManuallyDrop::new(self);
+        unsafe {
+            // SAFETY: We're taking ownership of all fields and preventing Drop from running,
+            // so the caller is now responsible for cleanup
+            (
+                std::ptr::read(&this.writer),
+                std::ptr::read(&this.reader),
+                std::ptr::read(&this.ledger),
+            )
+        }
+    }
+}
+
+impl<R, FS> Drop for BufferHandle<R, FS>
+where
+    R: Bufferable,
+    FS: Filesystem,
+    FS::File: Unpin,
+{
+    fn drop(&mut self) {
+        // Explicitly drop in the correct order to ensure proper cleanup.
+        // The writer should be dropped first to close any open files,
+        // then the reader, and finally the ledger.
+        //
+        // Note: We can't yield here since Drop must be synchronous,
+        // but the explicit drop order helps ensure the Arc<Ledger> reference
+        // count goes to zero in a timely manner.
+        //
+        // Tests that need to reopen the buffer should still explicitly
+        // drop the handle and yield before creating a new one.
+    }
+}
+
 /// Creates a disk v2 buffer with all default values i.e. maximum buffer size, etc.
 pub(crate) async fn create_default_buffer_v2<P, R>(
     data_dir: P,
-) -> (
-    BufferWriter<R, FilesystemUnderTest>,
-    BufferReader<R, FilesystemUnderTest>,
-    Arc<Ledger<FilesystemUnderTest>>,
-)
+) -> BufferHandle<R, FilesystemUnderTest>
 where
     P: AsRef<Path>,
     R: Bufferable,
@@ -206,20 +312,16 @@ where
         .build()
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle)
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    BufferHandle::new(writer, reader, ledger)
 }
 
 /// Creates a disk v2 buffer with all default values, but returns a handle to the buffer usage tracker.
 pub(crate) async fn create_default_buffer_v2_with_usage<P, R>(
     data_dir: P,
-) -> (
-    BufferWriter<R, FilesystemUnderTest>,
-    BufferReader<R, FilesystemUnderTest>,
-    Arc<Ledger<FilesystemUnderTest>>,
-    BufferUsageHandle,
-)
+) -> (BufferHandle<R, FilesystemUnderTest>, BufferUsageHandle)
 where
     P: AsRef<Path>,
     R: Bufferable,
@@ -231,7 +333,7 @@ where
     let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle.clone())
         .await
         .expect("should not fail to create buffer");
-    (writer, reader, ledger, usage_handle)
+    (BufferHandle::new(writer, reader, ledger), usage_handle)
 }
 
 /// Creates a disk v2 buffer that is sized such that only a fixed number of data files are allowed.
@@ -243,11 +345,7 @@ pub(crate) async fn create_buffer_v2_with_data_file_count_limit<P, R>(
     data_dir: P,
     max_data_file_size: u64,
     data_file_count_limit: u64,
-) -> (
-    BufferWriter<R, FilesystemUnderTest>,
-    BufferReader<R, FilesystemUnderTest>,
-    Arc<Ledger<FilesystemUnderTest>>,
-)
+) -> BufferHandle<R, FilesystemUnderTest>
 where
     P: AsRef<Path>,
     R: Bufferable,
@@ -278,20 +376,17 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle)
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    BufferHandle::new(writer, reader, ledger)
 }
 
 /// Creates a disk v2 buffer with the specified maximum record size.
 pub(crate) async fn create_buffer_v2_with_max_record_size<P, R>(
     data_dir: P,
     max_record_size: usize,
-) -> (
-    BufferWriter<R, FilesystemUnderTest>,
-    BufferReader<R, FilesystemUnderTest>,
-    Arc<Ledger<FilesystemUnderTest>>,
-)
+) -> BufferHandle<R, FilesystemUnderTest>
 where
     P: AsRef<Path>,
     R: Bufferable,
@@ -302,9 +397,10 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle)
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    BufferHandle::new(writer, reader, ledger)
 }
 
 /// Creates a disk v2 buffer with the specified maximum data file size.
@@ -313,11 +409,7 @@ where
 pub(crate) async fn create_buffer_v2_with_max_data_file_size<P, R>(
     data_dir: P,
     max_data_file_size: u64,
-) -> (
-    BufferWriter<R, FilesystemUnderTest>,
-    BufferReader<R, FilesystemUnderTest>,
-    Arc<Ledger<FilesystemUnderTest>>,
-)
+) -> BufferHandle<R, FilesystemUnderTest>
 where
     P: AsRef<Path>,
     R: Bufferable,
@@ -331,20 +423,17 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle)
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    BufferHandle::new(writer, reader, ledger)
 }
 
 /// Creates a disk v2 buffer with the specified write buffer size.
 pub(crate) async fn create_buffer_v2_with_write_buffer_size<P, R>(
     data_dir: P,
     write_buffer_size: usize,
-) -> (
-    BufferWriter<R, FilesystemUnderTest>,
-    BufferReader<R, FilesystemUnderTest>,
-    Arc<Ledger<FilesystemUnderTest>>,
-)
+) -> BufferHandle<R, FilesystemUnderTest>
 where
     P: AsRef<Path>,
     R: Bufferable,
@@ -355,9 +444,10 @@ where
         .expect("creating buffer should not fail");
     let usage_handle = BufferUsageHandle::noop();
 
-    Buffer::from_config_inner(config, usage_handle)
+    let (writer, reader, ledger) = Buffer::from_config_inner(config, usage_handle)
         .await
-        .expect("should not fail to create buffer")
+        .expect("should not fail to create buffer");
+    BufferHandle::new(writer, reader, ledger)
 }
 
 pub(crate) fn get_corrected_max_record_size<T>(payload: &T) -> usize

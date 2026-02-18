@@ -20,8 +20,8 @@ async fn basic_read_write_loop() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir).await;
-            assert_buffer_is_empty!(ledger);
+            let buffer = create_default_buffer_v2(data_dir).await;
+            assert_buffer_is_empty!(buffer.ledger());
 
             let expected_items = (512..768)
                 .cycle()
@@ -29,6 +29,9 @@ async fn basic_read_write_loop() {
                 .map(SizedRecord::new)
                 .collect::<Vec<_>>();
             let input_items = expected_items.clone();
+
+            // Extract writer and reader for concurrent tasks
+            let (mut writer, mut reader, ledger) = buffer.into_parts();
 
             // Now create a reader and writer task that will take a set of input messages, buffer
             // them, read them out, and then make sure nothing was missed.
@@ -76,17 +79,20 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir).await;
-            assert_buffer_is_empty!(ledger);
+            let mut buffer = create_default_buffer_v2(data_dir).await;
+            assert_buffer_is_empty!(buffer.ledger());
 
             // Now write a single value and close the writer.
-            writer
+            buffer.writer()
                 .write_record(SizedRecord::new(32))
                 .await
                 .expect("write should not fail");
-            writer.flush().await.expect("writer flush should not fail");
-            writer.close();
-            assert_buffer_records!(ledger, 1);
+            buffer.writer().flush().await.expect("writer flush should not fail");
+            buffer.writer().close();
+            assert_buffer_records!(buffer.ledger(), 1);
+
+            // Extract reader and ledger for the rest of the test
+            let (_, mut reader, ledger) = buffer.into_parts();
 
             // And read that single value.
             let first_read = read_next_some(&mut reader).await;
@@ -156,7 +162,7 @@ async fn initial_size_correct_with_multievents() {
 
         async move {
             // Create a regular buffer, no customizations required.
-            let (mut writer, _, _) = create_default_buffer_v2(data_dir.clone()).await;
+            let (mut writer, _, _) = create_default_buffer_v2(data_dir.clone()).await.into_parts();
 
             let input_items = (512..768)
                 .cycle()
@@ -209,24 +215,26 @@ async fn initial_size_correct_with_multievents() {
             writer.flush().await.expect("writer flush should not fail");
             writer.close();
 
-            // Now drop our buffer and reopen it.
+            // Now drop our buffer and reopen it. The explicit drop and yield allow
+            // the background finalizer task to complete and release the ledger lock.
             drop(writer);
-            let (writer, mut reader, ledger, usage) =
+            tokio::task::yield_now().await;
+
+            let (mut buffer, usage) =
                 create_default_buffer_v2_with_usage::<_, MultiEventRecord>(data_dir).await;
-            drop(writer);
 
             // Make sure our usage data agrees with our expected event count and byte size:
             let snapshot = usage.snapshot();
             assert_eq!(expected_events as u64, snapshot.received_event_count);
             assert_eq!(expected_bytes as u64, snapshot.received_byte_size);
-            assert_eq!(expected_events as u64, ledger.get_total_records());
+            assert_eq!(expected_events as u64, buffer.ledger().get_total_records());
             assert_eq!(expected_bytes, total_bytes_written);
 
             // Make sure we can read all of the records we wrote, and recalculate some of these
             // values from the source:
             let mut total_records_read = 0;
             let mut total_record_events = 0;
-            while let Some(record) = read_next(&mut reader).await {
+            while let Some(record) = read_next(buffer.reader()).await {
                 total_records_read += 1;
                 let event_count = record.event_count();
                 acknowledge(record).await;

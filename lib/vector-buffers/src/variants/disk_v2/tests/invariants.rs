@@ -26,7 +26,7 @@ async fn pending_read_returns_none_when_writer_closed_with_unflushed_write() {
 
         async move {
             // Create a normal buffer.
-            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir.clone()).await.into_parts();
 
             // Attempt a read, which should block because there's no data yet.  We specifically want
             // to make sure we end up waiting for the writer to indicate that we're waiting
@@ -97,7 +97,7 @@ async fn last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stop
                 .finalize();
 
             // Create a normal buffer.
-            let (mut writer, _, ledger) = create_default_buffer_v2(data_dir.clone()).await;
+            let (mut writer, _, ledger) = create_default_buffer_v2(data_dir.clone()).await.into_parts();
             let bytes_written = writer
                 .write_record(SizedRecord::new(64))
                 .await
@@ -111,7 +111,7 @@ async fn last_record_is_valid_during_load_when_buffer_correctly_flushed_and_stop
             drop(ledger);
 
             // Make sure we can open the buffer again without any errors.
-            let (_, _, ledger) = create_default_buffer_v2::<_, SizedRecord>(data_dir).await;
+            let (_, _, ledger) = create_default_buffer_v2::<_, SizedRecord>(data_dir).await.into_parts();
             assert_eq!(ledger.get_total_records(), 1);
             writer_did_not_call_reset.assert();
         }
@@ -136,7 +136,7 @@ async fn file_id_wraps_around_when_max_file_id_hit() {
             // Create our buffer with an arbitrarily low max data file size, which will let us
             // quickly run through the file ID range.
             let (mut writer, mut reader, ledger) =
-                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await;
+                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await.into_parts();
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
@@ -214,7 +214,7 @@ async fn writer_stops_when_hitting_file_that_reader_is_still_on() {
             // Create our buffer with an arbitrarily low max data file size, which will let us
             // quickly run through the file ID range.
             let (mut writer, mut reader, ledger) =
-                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await;
+                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await.into_parts();
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
@@ -330,7 +330,7 @@ async fn reader_still_works_when_record_id_wraps_around() {
 
         async move {
             // Create a simple buffer.
-            let (_, _, ledger) = create_default_buffer_v2::<_, SizedRecord>(data_dir.clone()).await;
+            let (_, _, ledger) = create_default_buffer_v2::<_, SizedRecord>(data_dir.clone()).await.into_parts();
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
 
@@ -358,7 +358,7 @@ async fn reader_still_works_when_record_id_wraps_around() {
             // stating that we're close to having written 2^64 records already.
             drop(ledger);
 
-            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir).await;
+            let (mut writer, mut reader, ledger) = create_default_buffer_v2(data_dir).await.into_parts();
 
             // Now we do two writes: one which uses u64::MAX, and another which will get the rolled
             // over value and go back to 0.
@@ -429,7 +429,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
 
         async move {
             // Create a simple buffer.
-            let (_, _, ledger) = create_default_buffer_v2::<_, SizedRecord>(data_dir.clone()).await;
+            let (_, _, ledger) = create_default_buffer_v2::<_, SizedRecord>(data_dir.clone()).await.into_parts();
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
@@ -459,7 +459,7 @@ async fn reader_deletes_data_file_around_record_id_wraparound() {
             drop(ledger);
 
             let (mut writer, mut reader, ledger) =
-                create_buffer_v2_with_max_data_file_size(data_dir, 256).await;
+                create_buffer_v2_with_max_data_file_size(data_dir, 256).await.into_parts();
 
             let starting_writer_file_id = ledger.get_current_writer_file_id();
             let next_writer_file_id = ledger.get_next_writer_file_id();
@@ -620,7 +620,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
             // the file ID range. We craft this number to allow for two records per data file.
             let (mut writer, _, ledger) =
                 create_buffer_v2_with_max_data_file_size(data_dir.clone(), max_data_file_size)
-                    .await;
+                    .await.into_parts();
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
@@ -700,7 +700,7 @@ async fn writer_waits_for_reader_after_validate_last_write_fails_and_data_file_s
                 .finalize();
 
             let (mut writer, mut reader, ledger) =
-                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await;
+                create_buffer_v2_with_max_data_file_size(data_dir, max_data_file_size).await.into_parts();
             assert!(mark_to_skip_called.try_assert());
             assert_eq!(next_data_file_id, ledger.get_next_writer_file_id());
             assert!(!waiting_on_reader.try_assert());
@@ -769,7 +769,7 @@ async fn writer_updates_ledger_when_buffered_writer_reports_implicit_flush() {
             // that the buffered writer has to implicitly flush after we've written a certain number
             // of records, but before we've manually flushed.
             let (mut writer, _, ledger) =
-                create_buffer_v2_with_write_buffer_size(data_dir.clone(), 128).await;
+                create_buffer_v2_with_write_buffer_size(data_dir.clone(), 128).await.into_parts();
 
             assert_buffer_is_empty!(ledger);
             assert_reader_writer_v2_file_positions!(ledger, 0, 0);
@@ -842,7 +842,7 @@ async fn reader_writer_positions_aligned_through_multiple_files_and_records() {
             // we're testing the position logic with multiple writes to one data file, one write to
             // a data file, etc.
             let (mut writer, mut reader, ledger) =
-                create_buffer_v2_with_max_data_file_size(data_dir, 256).await;
+                create_buffer_v2_with_max_data_file_size(data_dir, 256).await.into_parts();
 
             // We'll write multi-event records with N events based on these sizes, and as we do so,
             // we'll assert that our writer position moves as expected after the write, and that
