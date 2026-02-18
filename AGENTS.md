@@ -55,32 +55,24 @@ If you're working on Vector's Rust codebase (sources, sinks, transforms, core fu
 
 ```bash
 make fmt
-# or
-cargo vdev fmt
 ```
 
 **Check formatting:**
 
 ```bash
 make check-fmt
-# or
-cargo vdev check fmt
 ```
 
 **Run Clippy (linter):**
 
 ```bash
 make check-clippy
-# or
-cargo vdev check rust
 ```
 
 **Auto-fix Clippy issues:**
 
 ```bash
 make clippy-fix
-# or
-cargo vdev check rust --fix
 ```
 
 **Run unit tests:**
@@ -94,8 +86,9 @@ cargo nextest run --workspace --no-default-features --features "${FEATURES}"
 **Run integration tests:**
 
 ```bash
-cargo vdev int test <integration-name>
-# Example: cargo vdev int test aws
+# See available integration tests:
+# cargo vdev int show
+./scripts/run-integration-test.sh <integration-name>
 ```
 
 See [Integration Tests](#integration-tests) section below for more details.
