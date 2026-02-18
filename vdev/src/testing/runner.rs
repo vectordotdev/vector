@@ -247,6 +247,9 @@ where
 
         command.args(["--env", "RUST_BACKTRACE=1"]);
         command.args(["--env", &format!("CARGO_BUILD_TARGET_DIR={TARGET_PATH}")]);
+        if let Ok(val) = env::var("CARGO_TERM_COLOR") {
+            command.args(["--env", &format!("CARGO_TERM_COLOR={val}")]);
+        }
         for (key, value) in outer_env {
             if let Some(value) = value {
                 command.env(key, value);
