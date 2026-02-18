@@ -274,7 +274,7 @@ impl<T> Inner<T> {
                 // Compute remaining utilization from the semaphore state. Since our permits haven't
                 // been released yet, used_capacity is stable against racing senders acquiring those
                 // permits.
-                let utilization = self.used_capacity() - permit.num_permits();
+                let utilization = self.used_capacity().saturating_sub(permit.num_permits());
                 metrics.record(utilization);
             }
             // Release permits after recording so a waiting sender cannot enqueue a new item
@@ -302,7 +302,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
             MemoryBufferSize::MaxEvents(_) => item.event_count(),
         };
         let limit = self.inner.capacity.get();
-        (value, cmp::min(limit, value) as u32) as (usize, u32)
+        (value, cmp::min(limit, value) as u32)
     }
 
     /// Gets the number of items that this channel could accept.
