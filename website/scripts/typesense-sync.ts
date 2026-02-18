@@ -16,3 +16,4 @@ typesenseSync(config)
     console.error('An error occurred', err);
     process.exit(1);
   });
+
