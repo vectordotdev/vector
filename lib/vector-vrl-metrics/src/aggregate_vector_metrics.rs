@@ -13,7 +13,25 @@ use crate::common::{Error, MetricsStorage};
 static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(BTreeMap::new()));
 static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
     vec![
-        Parameter::required("function", kind::BYTES, "The metric name to search."),
+        Parameter::required("function", kind::BYTES, "The metric name to search.")
+            .enum_variants(&[
+                EnumVariant {
+                    value: "sum",
+                    description: "Sum the values of all the matched metrics.",
+                },
+                EnumVariant {
+                    value: "avg",
+                    description: "Find the average of the values of all the matched metrics.",
+                },
+                EnumVariant {
+                    value: "max",
+                    description: "Find the highest metric value of all the matched metrics.",
+                },
+                EnumVariant {
+                    value: "min",
+                    description: "Find the lowest metric value of all the matched metrics.",
+                },
+            ]),
         Parameter::required("key", kind::BYTES, "The metric name to aggregate."),
         Parameter::optional(
             "tags",
