@@ -243,7 +243,7 @@ sinks:
       codec: otlp
 ```
 
-### Current: No VRL required
+### Current: VRL is not required
 
 For Vector version 0.54.0 and later, VRL is not required:
 
