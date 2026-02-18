@@ -6,7 +6,7 @@ This document explains the automatic native-to-OTLP conversion feature.
 
 ### Previous approach
 
-For Vector versions before v0.54.0, the approach is:
+For Vector version 0.54.0 and older, the approach is:
 
 ```mermaid
 flowchart LR
