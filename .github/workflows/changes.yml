@@ -262,9 +262,6 @@ jobs:
           integration-yml:
             - ".github/workflows/integration.yml"
             - ".github/workflows/changes.yml"
-          cli-yml:
-            - ".github/workflows/cli.yml"
-            - ".github/workflows/changes.yml"
           test-make-command-yml:
             - ".github/workflows/test-make-command.yml"
             - ".github/workflows/changes.yml"
