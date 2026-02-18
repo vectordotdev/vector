@@ -91,7 +91,6 @@ jobs:
       ref: ${{ github.event.review.commit_id }}
       command: test-cli
       job_name: CLI tests
-      upload_test_results: true
     secrets: inherit
 
   make-test-behavior:
