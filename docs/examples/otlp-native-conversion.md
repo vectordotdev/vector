@@ -281,7 +281,7 @@ xychart-beta
 
 ### Benchmark results
 
-| Scenario | v0.54.0+ (Auto-Convert) | Before v0.54.0 (VRL + Encode) | Improvement |
+| Scenario | v0.54.0 and later (Auto-Convert) | v0.54.0 and older (VRL + Encode) | Improvement |
 |----------|--------------------|--------------------|-------------|
 | **Single Event** | 352 µs / 10.2 MiB/s | 378 µs / 9.5 MiB/s | **7.4% faster** |
 | **Batch 100** | 575 µs / 288 MiB/s | 2,718 µs / 61 MiB/s | **4.7x faster** |
