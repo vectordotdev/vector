@@ -434,7 +434,13 @@ impl ClickhouseClient {
     }
 
     async fn create_table_with_sql(&self, sql: &str) {
-        let response = self.client.post(&self.host).body(sql.to_owned()).send().await.unwrap();
+        let response = self
+            .client
+            .post(&self.host)
+            .body(sql.to_owned())
+            .send()
+            .await
+            .unwrap();
 
         if !response.status().is_success() {
             panic!("create table failed: {}", response.text().await.unwrap())
@@ -1243,12 +1249,17 @@ async fn arrow_schema_excludes_non_insertable_columns() {
     // MATERIALIZED/ALIAS/EPHEMERAL columns in the table definition.
     let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
 
-    // Create events with only the insertable columns (no MATERIALIZED/ALIAS/EPHEMERAL).
-    // Also omit timestamp_date (DEFAULT) to verify it gets filled by the server.
+    // Create events:
+    // - Event 0: omit timestamp_date → server fills via DEFAULT expression
+    // - Event 1: explicitly provide timestamp_date → server uses provided value
     let mut events: Vec<Event> = Vec::new();
     for i in 0..2 {
         let mut event = LogEvent::from(format!("log message {i}"));
         event.insert("host", format!("host-{i}.example.com"));
+
+        if i == 1 {
+            event.insert("timestamp_date", "2025-06-15 12:00:00");
+        }
 
         let mut attrs = vector_lib::event::ObjectMap::new();
         attrs.insert(
@@ -1283,10 +1294,17 @@ async fn arrow_schema_excludes_non_insertable_columns() {
             "message should match"
         );
 
-        // Verify DEFAULT column was filled by the server
+        // Verify DEFAULT column behavior
         assert!(
             row.get("timestamp_date").is_some(),
-            "DEFAULT column timestamp_date should be populated by server"
+            "DEFAULT column timestamp_date should always be present"
         );
+        if i == 1 {
+            assert_eq!(
+                row.get("timestamp_date").and_then(|v| v.as_str()),
+                Some("2025-06-15 12:00:00"),
+                "User-provided DEFAULT column value should be preserved"
+            );
+        }
     }
 }

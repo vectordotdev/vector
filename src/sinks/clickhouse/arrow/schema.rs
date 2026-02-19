@@ -68,29 +68,27 @@ pub async fn fetch_table_schema(
 
     let response = client.send(request).await?;
 
-    match response.status() {
-        StatusCode::OK => {
-            let body_bytes = http_body::Body::collect(response.into_body())
-                .await?
-                .to_bytes();
-            let body_str = String::from_utf8(body_bytes.into())
-                .map_err(|e| format!("Failed to parse response as UTF-8: {e}"))?;
-
-            parse_schema_from_response(&body_str)
-        }
-        status => Err(format!("Failed to fetch schema from ClickHouse: HTTP {status}").into()),
+    if response.status() != StatusCode::OK {
+        return Err(format!("Failed to fetch schema from ClickHouse: HTTP {}", response.status()).into());
     }
+
+    let body_bytes = http_body::Body::collect(response.into_body())
+        .await?
+        .to_bytes();
+
+    // Pass bytes directly instead of converting to a UTF-8 String first
+    parse_schema_from_response(&body_bytes)
 }
 
 /// Parses the JSONEachRow response from ClickHouse and builds an Arrow schema.
-fn parse_schema_from_response(response: &str) -> crate::Result<Schema> {
-    let fields = serde_json::Deserializer::from_str(response)
+fn parse_schema_from_response(response: &[u8]) -> crate::Result<Schema> {
+    let fields = serde_json::Deserializer::from_slice(response)
         .into_iter::<ColumnInfo>()
         .map(|res| -> crate::Result<Field> { res?.try_into() })
         .collect::<crate::Result<Vec<Field>>>()?;
 
     if fields.is_empty() {
-     return Err("Table does not exist or has no columns".into());
+        return Err("Table does not exist or has no columns".into());
     }
 
     Ok(Schema::new(fields))
@@ -154,7 +152,7 @@ mod tests {
 {"name":"timestamp","type":"DateTime","default_kind":""}
 "#;
 
-        let schema = parse_schema_from_response(response).unwrap();
+        let schema = parse_schema_from_response(response.as_bytes()).unwrap();
         assert_eq!(schema.fields().len(), 3);
         assert_eq!(schema.field(0).name(), "id");
         assert_eq!(schema.field(0).data_type(), &DataType::Int64);
@@ -174,7 +172,7 @@ mod tests {
 {"name":"duration_ms","type":"Decimal32(4)","default_kind":""}
 "#;
 
-        let schema = parse_schema_from_response(response).unwrap();
+        let schema = parse_schema_from_response(response.as_bytes()).unwrap();
         assert_eq!(schema.fields().len(), 3);
 
         assert_eq!(schema.field(0).name(), "bytes_sent");
@@ -201,7 +199,7 @@ mod tests {
 {"name":"name","type":"String","default_kind":""}
 "#;
 
-        let schema = parse_schema_from_response(response).unwrap();
+        let schema = parse_schema_from_response(response.as_bytes()).unwrap();
         assert_eq!(schema.fields().len(), 7);
 
         assert_eq!(schema.field(0).name(), "timestamp");
@@ -233,7 +231,7 @@ mod tests {
 {"name":"message","type":"String","default_kind":""}
 "#;
 
-        let schema = parse_schema_from_response(response).unwrap();
+        let schema = parse_schema_from_response(response.as_bytes()).unwrap();
         assert_eq!(schema.fields().len(), 3);
 
         // Regular column: non-nullable
@@ -254,7 +252,7 @@ mod tests {
 {"name":"message","type":"Nullable(String)","default_kind":""}
 "#;
 
-        let schema = parse_schema_from_response(response).unwrap();
+        let schema = parse_schema_from_response(response.as_bytes()).unwrap();
         assert_eq!(schema.fields().len(), 3);
 
         assert_eq!(schema.field(0).name(), "id");
