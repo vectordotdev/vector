@@ -82,20 +82,18 @@ pub async fn fetch_table_schema(
     }
 }
 
-/// Parses the JSON response from ClickHouse and builds an Arrow schema.
+/// Parses the JSONEachRow response from ClickHouse and builds an Arrow schema.
 fn parse_schema_from_response(response: &str) -> crate::Result<Schema> {
-    let mut lines = response.lines().filter(|line| !line.is_empty()).peekable();
+    let fields = serde_json::Deserializer::from_str(response)
+        .into_iter::<ColumnInfo>()
+        .map(|res| -> crate::Result<Field> { res?.try_into() })
+        .collect::<crate::Result<Vec<Field>>>()?;
 
-    if lines.peek().is_none() {
-        return Err("Table does not exist or has no columns".into());
+    if fields.is_empty() {
+     return Err("Table does not exist or has no columns".into());
     }
 
-    lines
-        .map(|line| -> crate::Result<Field> {
-            serde_json::from_str::<ColumnInfo>(line)?.try_into()
-        })
-        .try_collect::<_, Vec<Field>, _>()
-        .map(Schema::new)
+    Ok(Schema::new(fields))
 }
 
 /// Schema provider implementation for ClickHouse tables.
