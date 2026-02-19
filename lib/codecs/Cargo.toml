@@ -62,7 +62,7 @@ tokio = { workspace = true, features = ["test-util"] }
 similar-asserts = "1.7.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 rstest = "0.26.1"
-tracing-test = "0.2.5"
+tracing-test = "0.2.6"
 uuid.workspace = true
 vrl.workspace = true
 
