@@ -10,6 +10,7 @@ services:
   mock-ecs:
     image: docker.io/amazon/amazon-ecs-local-container-endpoints:latest
     environment:
+    # https://github.com/vectordotdev/vector/issues/24687
     - DOCKER_API_VERSION=1.44
     volumes:
     - $DOCKER_SOCKET:/var/run/docker.sock
