@@ -161,11 +161,7 @@ impl DatadogLogsConfig {
             protocol,
             conforms_as_agent,
         )
-        .compression(
-            self.compression
-                .unwrap_or_else(default_compression)
-                .unwrap(),
-        )
+        .compression(self.compression.or_else(default_compression).unwrap())
         .build();
 
         Ok(VectorSink::from_event_streamsink(sink))
@@ -234,6 +230,39 @@ mod test {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogLogsConfig>();
+    }
+
+    #[test]
+    fn default_compression_is_zstd() {
+        // Verify the default compression function returns zstd
+        assert_eq!(default_compression(), Some(Compression::zstd_default()));
+
+        // Test 1: Config deserialized without compression field has None
+        // (which will default to zstd when used in build_processor)
+        let config_yaml = indoc! {r#"
+            default_api_key: "test_key"
+        "#};
+
+        let config: DatadogLogsConfig = serde_yaml::from_str(config_yaml).unwrap();
+        assert_eq!(config.compression, None);  // Field is None when not specified
+
+        // Test 2: When explicitly set to "none", it should be Some(Compression::None)
+        let config_yaml_with_none = indoc! {r#"
+            default_api_key: "test_key"
+            compression: "none"
+        "#};
+
+        let config_no_compression: DatadogLogsConfig = serde_yaml::from_str(config_yaml_with_none).unwrap();
+        assert_eq!(config_no_compression.compression, Some(Compression::None));
+
+        // Test 3: When explicitly set to "zstd", it should be Some(Compression::Zstd)
+        let config_yaml_with_zstd = indoc! {r#"
+            default_api_key: "test_key"
+            compression: "zstd"
+        "#};
+
+        let config_zstd: DatadogLogsConfig = serde_yaml::from_str(config_yaml_with_zstd).unwrap();
+        assert!(matches!(config_zstd.compression, Some(Compression::Zstd(_))));
     }
 
     impl ValidatableComponent for DatadogLogsConfig {
