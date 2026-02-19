@@ -126,7 +126,7 @@ if [[ -z "${SKIP_CONTAINER_IMAGE_PUBLISHING:-}" ]]; then
     # from the image API, breaking minikube image load with "unable to calculate manifest".
     # Even minikube v1.34.0 doesn't fix Docker 29 compatibility.
     # Workaround: Use Docker API v1.43 which still has VirtualSize.
-    # See: https://github.com/moby/moby/issues/47207
+    # See: https://github.com/kubernetes/minikube/issues/18021
     echo "Loading image into minikube: $CONTAINER_IMAGE"
     DOCKER_API_VERSION=1.43 minikube image load "$CONTAINER_IMAGE"
     trap 'minikube image rm "$CONTAINER_IMAGE"' EXIT
