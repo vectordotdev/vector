@@ -161,7 +161,11 @@ impl DatadogLogsConfig {
             protocol,
             conforms_as_agent,
         )
-        .compression(self.compression.unwrap_or_else(default_compression).unwrap())
+        .compression(
+            self.compression
+                .unwrap_or_else(default_compression)
+                .unwrap(),
+        )
         .build();
 
         Ok(VectorSink::from_event_streamsink(sink))
