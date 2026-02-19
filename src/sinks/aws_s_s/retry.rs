@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 
-use super::service::SendMessageResponse;
+use super::{request_builder::SendMessageEntry, service::SendMessageResponse};
 use crate::{aws::is_retriable_error, sinks::util::retries::RetryLogic};
 
 #[derive(Debug)]
@@ -26,6 +26,7 @@ where
     E: std::fmt::Debug + std::fmt::Display + std::error::Error + Sync + Send + 'static,
 {
     type Error = SdkError<E, HttpResponse>;
+    type Request = SendMessageEntry;
     type Response = SendMessageResponse;
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {

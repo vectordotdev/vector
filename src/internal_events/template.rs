@@ -1,7 +1,10 @@
 use metrics::counter;
-use vector_lib::internal_event::{error_stage, error_type};
-use vector_lib::internal_event::{ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
+use vector_lib::NamedInternalEvent;
+use vector_lib::internal_event::{
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+};
 
+#[derive(NamedInternalEvent)]
 pub struct TemplateRenderingError<'a> {
     pub field: Option<&'a str>,
     pub drop_event: bool,
@@ -13,7 +16,7 @@ impl InternalEvent for TemplateRenderingError<'_> {
         let mut msg = "Failed to render template".to_owned();
         if let Some(field) = self.field {
             use std::fmt::Write;
-            _ = write!(msg, " for \"{}\"", field);
+            _ = write!(msg, " for \"{field}\"");
         }
         msg.push('.');
 
@@ -23,7 +26,6 @@ impl InternalEvent for TemplateRenderingError<'_> {
                 error = %self.error,
                 error_type = error_type::TEMPLATE_FAILED,
                 stage = error_stage::PROCESSING,
-
             );
 
             counter!(
@@ -43,7 +45,6 @@ impl InternalEvent for TemplateRenderingError<'_> {
                 error = %self.error,
                 error_type = error_type::TEMPLATE_FAILED,
                 stage = error_stage::PROCESSING,
-
             );
         }
     }

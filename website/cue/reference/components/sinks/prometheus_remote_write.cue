@@ -15,7 +15,10 @@ components: sinks: prometheus_remote_write: {
 	features: {
 		auto_generated:   true
 		acknowledgements: true
-		healthcheck: enabled: true
+		healthcheck: {
+			enabled:  true
+			uses_uri: true
+		}
 		send: {
 			batch: {
 				enabled:      true
@@ -76,7 +79,7 @@ components: sinks: prometheus_remote_write: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.prometheus_remote_write.configuration
+	configuration: generated.components.sinks.prometheus_remote_write.configuration
 
 	input: {
 		logs: false

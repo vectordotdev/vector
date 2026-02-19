@@ -4,29 +4,26 @@ use bytes::{BufMut, Bytes, BytesMut};
 use chrono::Utc;
 use http::StatusCode;
 use tokio_util::codec::Decoder;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_lib::json_size::JsonSize;
-use vector_lib::lookup::path;
-use vector_lib::{config::LegacyKey, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::StreamDecodingError,
+    config::LegacyKey,
+    internal_event::{CountByteSize, InternalEventHandle as _},
+    json_size::JsonSize,
+    lookup::path,
+};
 use vrl::core::Value;
-use warp::{filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response, Filter};
+use warp::{Filter, filters::BoxedFilter, path as warp_path, path::FullPath, reply::Response};
 
-use crate::common::datadog::DDTAGS;
-use crate::common::http::ErrorMessage;
+use super::{ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg, RequestHandler};
 use crate::{
+    common::{datadog::DDTAGS, http::ErrorMessage},
     event::Event,
     internal_events::DatadogAgentJsonParseError,
-    sources::datadog_agent::{
-        handle_request, ApiKeyQueryParams, DatadogAgentConfig, DatadogAgentSource, LogMsg,
-    },
-    SourceSender,
 };
 
-pub(crate) fn build_warp_filter(
-    acknowledgements: bool,
-    multiple_outputs: bool,
-    out: SourceSender,
+pub(super) fn build_warp_filter(
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
@@ -56,9 +53,7 @@ pub(crate) fn build_warp_filter(
                             &source,
                         )
                     });
-
-                let output = multiple_outputs.then_some(super::LOGS);
-                handle_request(events, acknowledgements, out.clone(), output)
+                handler.clone().handle_request(events, super::LOGS)
             },
         )
         .boxed()
@@ -72,10 +67,7 @@ pub(crate) fn decode_log_body(
     if body.is_empty() || body.as_ref() == b"{}" {
         // The datadog agent may send an empty payload as a keep alive
         // https://github.com/DataDog/datadog-agent/blob/5a6c5dd75a2233fbf954e38ddcc1484df4c21a35/pkg/logs/client/http/destination.go#L52
-        debug!(
-            message = "Empty payload ignored.",
-            internal_log_rate_limit = true
-        );
+        debug!(message = "Empty payload ignored.");
         return Ok(Vec::new());
     }
 
@@ -84,7 +76,7 @@ pub(crate) fn decode_log_body(
 
         ErrorMessage::new(
             StatusCode::BAD_REQUEST,
-            format!("Error parsing JSON: {:?}", error),
+            format!("Error parsing JSON: {error:?}"),
         )
     })?;
 
@@ -191,7 +183,7 @@ pub(crate) fn decode_log_body(
                 }
                 Ok(None) => break,
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;
@@ -229,7 +221,9 @@ fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
         .collect();
 
     if ddtags.is_empty() && !ddtags_str.is_empty() {
-        warn!(message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed.")
+        warn!(
+            message = "`parse_ddtags` set to true and Agent log contains non-empty ddtags string, but no tag-value pairs were parsed."
+        )
     }
 
     ddtags.into()
@@ -237,9 +231,10 @@ fn parse_ddtags(ddtags_raw: &Bytes) -> Value {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use similar_asserts::assert_eq;
     use vrl::value;
+
+    use super::*;
 
     #[test]
     fn ddtags_parse_empty() {

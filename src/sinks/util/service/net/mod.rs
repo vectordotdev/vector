@@ -7,35 +7,10 @@ mod unix;
 use std::{
     io,
     net::SocketAddr,
-    task::{ready, Context, Poll},
-    time::Duration,
+    task::{Context, Poll, ready},
 };
 
-#[cfg(unix)]
-use {crate::sinks::util::unix::UnixEither, std::path::PathBuf};
-
-use crate::{
-    internal_events::{
-        SocketOutgoingConnectionError, TcpSocketConnectionEstablished, UdpSendIncompleteError,
-    },
-    sinks::{util::retries::ExponentialBackoff, Healthcheck},
-};
-
-#[cfg(unix)]
-use crate::internal_events::{UnixSendIncompleteError, UnixSocketConnectionEstablished};
-
-pub use self::tcp::TcpConnectorConfig;
-pub use self::udp::UdpConnectorConfig;
-
-#[cfg(unix)]
-pub use self::unix::{UnixConnectorConfig, UnixMode};
-
-use self::tcp::TcpConnector;
-use self::udp::UdpConnector;
-#[cfg(unix)]
-use self::unix::UnixConnector;
-
-use futures_util::{future::BoxFuture, FutureExt};
+use futures_util::{FutureExt, future::BoxFuture};
 use snafu::{ResultExt, Snafu};
 use tokio::{
     io::AsyncWriteExt,
@@ -44,8 +19,28 @@ use tokio::{
     time::sleep,
 };
 use tower::Service;
-use vector_lib::configurable::configurable_component;
-use vector_lib::tls::{MaybeTlsStream, TlsError};
+use vector_lib::{
+    configurable::configurable_component,
+    tls::{MaybeTlsStream, TlsError},
+};
+#[cfg(unix)]
+use {crate::sinks::util::unix::UnixEither, std::path::PathBuf};
+
+#[cfg(unix)]
+use self::unix::UnixConnector;
+#[cfg(unix)]
+pub use self::unix::{UnixConnectorConfig, UnixMode};
+use self::{tcp::TcpConnector, udp::UdpConnector};
+pub use self::{tcp::TcpConnectorConfig, udp::UdpConnectorConfig};
+#[cfg(unix)]
+use crate::internal_events::{UnixSendIncompleteError, UnixSocketConnectionEstablished};
+use crate::{
+    common::backoff::ExponentialBackoff,
+    internal_events::{
+        SocketOutgoingConnectionError, TcpSocketConnectionEstablished, UdpSendIncompleteError,
+    },
+    sinks::Healthcheck,
+};
 
 /// Hostname and port tuple.
 ///
@@ -246,9 +241,7 @@ impl NetworkConnector {
 
     async fn connect_backoff(&self) -> NetworkConnection {
         // TODO: Make this configurable.
-        let mut backoff = ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60));
+        let mut backoff = ExponentialBackoff::default();
 
         loop {
             match self.connect().await {

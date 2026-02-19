@@ -31,7 +31,6 @@ components: sources: journald: {
 
 	support: {
 		targets: {
-			"x86_64-apple-darwin":   false
 			"x86_64-pc-windows-msv": false
 		}
 
@@ -49,7 +48,7 @@ components: sources: journald: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.journald.configuration
+	configuration: generated.components.sources.journald.configuration
 
 	output: logs: {
 		event: {

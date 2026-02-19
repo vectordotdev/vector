@@ -31,6 +31,6 @@ pub async fn healthcheck(config: LokiConfig, client: HttpClient) -> crate::Resul
 
     match status {
         http::StatusCode::OK => Ok(()),
-        _ => Err(format!("A non-successful status returned: {}", status).into()),
+        _ => Err(format!("A non-successful status returned: {status}").into()),
     }
 }

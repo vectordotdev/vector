@@ -99,5 +99,5 @@ calculation. It has been replaced by
 [`rtt_deviation_scale`][rtt_deviation_scale] which can be used to adjust
 the scale factor applied to this value.
 
-[arc]: /docs/about/under-the-hood/networking/arc/
+[arc]: /docs/architecture/arc/
 [rtt_deviation_scale]: /docs/reference/configuration/sinks/http/#request.adaptive_concurrency.rtt_deviation_scale

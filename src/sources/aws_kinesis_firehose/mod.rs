@@ -1,27 +1,27 @@
-use std::time::Duration;
-use std::{convert::Infallible, fmt, net::SocketAddr};
+use std::{convert::Infallible, fmt, net::SocketAddr, time::Duration};
 
 use futures::FutureExt;
-use hyper::{service::make_service_fn, Server};
+use hyper::{Server, service::make_service_fn};
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::owned_value_path;
-use vector_lib::sensitive_string::SensitiveString;
-use vector_lib::tls::MaybeTlsIncomingStream;
+use vector_lib::{
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::owned_value_path,
+    sensitive_string::SensitiveString,
+    tls::MaybeTlsIncomingStream,
+};
 use vrl::value::Kind;
 
-use crate::http::{KeepaliveConfig, MaxConnectionAgeLayer};
 use crate::{
     codecs::DecodingConfig,
     config::{
         GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig, SourceContext,
         SourceOutput,
     },
-    http::build_http_trace_layer,
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     serde::{bool_or_struct, default_decoding, default_framing_message_based},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -275,27 +275,27 @@ mod tests {
         net::SocketAddr,
     };
 
-    use base64::prelude::{Engine as _, BASE64_STANDARD};
+    use base64::prelude::{BASE64_STANDARD, Engine as _};
     use bytes::Bytes;
     use chrono::{DateTime, SubsecRound, Utc};
     use flate2::read::GzEncoder;
     use futures::Stream;
     use similar_asserts::assert_eq;
-    use tokio::time::{sleep, Duration};
-    use vector_lib::assert_event_data_eq;
-    use vector_lib::lookup::path;
+    use tokio::time::{Duration, sleep};
+    use vector_lib::{assert_event_data_eq, lookup::path};
     use vrl::value;
 
     use super::*;
     use crate::{
+        SourceSender,
         event::{Event, EventStatus},
         log_event,
         test_util::{
+            addr::{PortGuard, next_addr},
             collect_ready,
-            components::{assert_source_compliance, SOURCE_TAGS},
-            next_addr, wait_for_tcp,
+            components::{SOURCE_TAGS, assert_source_compliance},
+            wait_for_tcp,
         },
-        SourceSender,
     };
 
     const SOURCE_ARN: &str = "arn:aws:firehose:us-east-1:111111111111:deliverystream/test";
@@ -335,11 +335,11 @@ mod tests {
         record_compression: Compression,
         delivered: bool,
         log_namespace: bool,
-    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
         use EventStatus::*;
         let status = if delivered { Delivered } else { Rejected };
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
@@ -361,8 +361,9 @@ mod tests {
             .await
             .unwrap()
         });
+        // Wait for the component to bind to the port
         wait_for_tcp(address).await;
-        (recv, address)
+        (recv, address, _guard)
     }
 
     /// Sends the body to the address with the appropriate Firehose headers
@@ -389,7 +390,7 @@ mod tests {
         };
 
         let mut builder = reqwest::Client::new()
-            .post(format!("http://{}", address))
+            .post(format!("http://{address}"))
             .header("host", address.to_string())
             .header(
                 "x-amzn-trace-id",
@@ -431,7 +432,7 @@ mod tests {
         let handle = tokio::spawn(async move {
             send(address, timestamp, records, key, gzip, record_compression).await
         });
-        sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(500)).await;
         handle
     }
 
@@ -514,7 +515,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) =
+            let (rx, addr, _guard) =
                 source(None, None, false, source_record_compression, true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
@@ -615,7 +616,8 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, None, false, source_record_compression, true, true).await;
+            let (rx, addr, _guard) =
+                source(None, None, false, source_record_compression, true, true).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -647,11 +649,12 @@ mod tests {
                         meta.value().get(path!("vector", "source_type")).unwrap(),
                         &value!("aws_kinesis_firehose")
                     );
-                    assert!(meta
-                        .value()
-                        .get(path!("vector", "ingest_timestamp"))
-                        .unwrap()
-                        .is_timestamp());
+                    assert!(
+                        meta.value()
+                            .get(path!("vector", "ingest_timestamp"))
+                            .unwrap()
+                            .is_timestamp()
+                    );
 
                     // source metadata
                     assert_eq!(
@@ -686,7 +689,8 @@ mod tests {
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr) = source(None, None, false, Default::default(), true, false).await;
+            let (rx, addr, _guard) =
+                source(None, None, false, Default::default(), true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -723,7 +727,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
-        let (_rx, addr) = source(
+        let (_rx, addr, _guard) = source(
             Some("an access key".to_string().into()),
             Some(vec!["an access key in list".to_string().into()]),
             Default::default(),
@@ -751,7 +755,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key_from_list() {
-        let (_rx, addr) = source(
+        let (_rx, addr, _guard) = source(
             None,
             Some(vec!["an access key in list".to_string().into()]),
             Default::default(),
@@ -781,7 +785,7 @@ mod tests {
     async fn aws_kinesis_firehose_accepts_merged_access_keys() {
         let valid_access_key = SensitiveString::from(String::from("an access key in list"));
 
-        let (_rx, addr) = source(
+        let (_rx, addr, _guard) = source(
             Some(valid_access_key.clone()),
             Some(vec!["valid access key 2".to_string().into()]),
             Default::default(),
@@ -812,7 +816,7 @@ mod tests {
     async fn aws_kinesis_firehose_accepts_access_keys_from_list() {
         let valid_access_key = "an access key in list".to_string();
 
-        let (_rx, addr) = source(
+        let (_rx, addr, _guard) = source(
             None,
             Some(vec![
                 valid_access_key.clone().into(),
@@ -846,7 +850,7 @@ mod tests {
     async fn handles_acknowledgement_failure() {
         let expected = RECORD.as_bytes().to_owned();
 
-        let (rx, addr) = source(None, None, false, Compression::None, false, false).await;
+        let (rx, addr, _guard) = source(None, None, false, Compression::None, false, false).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 
@@ -882,7 +886,7 @@ mod tests {
 
     #[tokio::test]
     async fn event_access_key_passthrough_enabled() {
-        let (rx, address) = source(
+        let (rx, address, _guard) = source(
             None,
             Some(vec!["an access key".to_string().into()]),
             true,
@@ -915,7 +919,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_authorization_access_key_passthrough_enabled() {
-        let (rx, address) = source(None, None, true, Default::default(), true, true).await;
+        let (rx, address, _guard) = source(None, None, true, Default::default(), true, true).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 
@@ -931,10 +935,12 @@ mod tests {
 
         let events = collect_ready(rx).await;
 
-        assert!(events[0]
-            .metadata()
-            .secrets()
-            .get("aws_kinesis_firehose_access_key")
-            .is_none());
+        assert!(
+            events[0]
+                .metadata()
+                .secrets()
+                .get("aws_kinesis_firehose_access_key")
+                .is_none()
+        );
     }
 }

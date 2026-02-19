@@ -45,7 +45,7 @@ components: sources: aws_s3: components._aws & {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.aws_s3.configuration & {
+	configuration: generated.components.sources.aws_s3.configuration & {
 		_aws_include: false
 	}
 
@@ -94,10 +94,10 @@ components: sources: aws_s3: components._aws & {
 			}
 		}
 		metrics: "": {
-			description: "The input `metric` event."
+			description: "Metric events that may be emitted by this source."
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 

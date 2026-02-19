@@ -1,7 +1,7 @@
 use std::{any::TypeId, marker::PhantomData, ptr::addr_of};
 
 use tracing::{Dispatch, Id, Subscriber};
-use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
+use tracing_subscriber::{Layer, layer::Context, registry::LookupSpan};
 
 use super::AllocationGroupToken;
 
@@ -54,18 +54,18 @@ where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
     fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
-        if let Some(span_ref) = ctx.span(id) {
-            if let Some(token) = span_ref.extensions().get::<AllocationGroupToken>() {
-                token.enter();
-            }
+        if let Some(span_ref) = ctx.span(id)
+            && let Some(token) = span_ref.extensions().get::<AllocationGroupToken>()
+        {
+            token.enter();
         }
     }
 
     fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
-        if let Some(span_ref) = ctx.span(id) {
-            if let Some(token) = span_ref.extensions().get::<AllocationGroupToken>() {
-                token.exit();
-            }
+        if let Some(span_ref) = ctx.span(id)
+            && let Some(token) = span_ref.extensions().get::<AllocationGroupToken>()
+        {
+            token.exit();
         }
     }
 

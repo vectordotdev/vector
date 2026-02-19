@@ -2,7 +2,7 @@ use std::cmp;
 
 use async_graphql::{Enum, InputObject, Object};
 
-use super::{source, state, transform, Component};
+use super::{Component, source, state, transform};
 use crate::{
     api::schema::{
         filter,
@@ -28,7 +28,7 @@ impl Sink {
         &self.0.component_key
     }
 
-    pub fn get_component_type(&self) -> &str {
+    pub const fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
     }
 }

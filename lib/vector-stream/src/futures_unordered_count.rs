@@ -5,7 +5,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures_util::{stream::FuturesUnordered, Stream};
+use futures_util::{Stream, stream::FuturesUnordered};
 use pin_project::pin_project;
 
 /// A set of futures which may complete in any order, and results are returned as a count of ready
@@ -76,7 +76,7 @@ impl<F: Future> Stream for FuturesUnorderedCount<F> {
                         Poll::Pending
                     } else {
                         Poll::Ready(Some(mem::take(this.items)))
-                    }
+                    };
                 }
 
                 // We got a future result, so bump the counter.

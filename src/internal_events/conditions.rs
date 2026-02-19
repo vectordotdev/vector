@@ -1,8 +1,8 @@
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::NamedInternalEvent;
+use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Copy, Clone, NamedInternalEvent)]
 pub struct VrlConditionExecutionError<'a> {
     pub error: &'a str,
 }

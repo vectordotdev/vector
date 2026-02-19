@@ -1,23 +1,25 @@
-use std::{convert::TryInto, io::ErrorKind};
+use std::convert::TryInto;
 
 use async_compression::tokio::bufread;
 use aws_smithy_types::byte_stream::ByteStream;
-use futures::{stream, stream::StreamExt, TryStreamExt};
+use futures::{TryStreamExt, stream, stream::StreamExt};
 use snafu::Snafu;
 use tokio_util::io::StreamReader;
-use vector_lib::codecs::decoding::{
-    DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions,
+use vector_lib::{
+    codecs::{
+        NewlineDelimitedDecoderConfig,
+        decoding::{DeserializerConfig, FramingConfig, NewlineDelimitedDecoderOptions},
+    },
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::owned_value_path,
 };
-use vector_lib::codecs::NewlineDelimitedDecoderConfig;
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::owned_value_path;
-use vrl::value::{kind::Collection, Kind};
+use vrl::value::{Kind, kind::Collection};
 
 use super::util::MultilineConfig;
-use crate::codecs::DecodingConfig;
 use crate::{
-    aws::{auth::AwsAuthentication, create_client, create_client_and_region, RegionOrEndpoint},
+    aws::{RegionOrEndpoint, auth::AwsAuthentication, create_client, create_client_and_region},
+    codecs::DecodingConfig,
     common::{s3::S3ClientBuilder, sqs::SqsClientBuilder},
     config::{
         ProxyConfig, SourceAcknowledgementsConfig, SourceConfig, SourceContext, SourceOutput,
@@ -304,10 +306,11 @@ async fn s3_object_decoder(
     content_type: Option<&str>,
     mut body: ByteStream,
 ) -> Box<dyn tokio::io::AsyncRead + Send + Unpin> {
-    let first = if let Some(first) = body.next().await {
-        first
-    } else {
-        return Box::new(tokio::io::empty());
+    let first = match body.next().await {
+        Some(first) => first,
+        _ => {
+            return Box::new(tokio::io::empty());
+        }
     };
 
     let r = tokio::io::BufReader::new(StreamReader::new(
@@ -317,7 +320,7 @@ async fn s3_object_decoder(
                     yield next;
                 }
             }))
-            .map_err(|e| std::io::Error::new(ErrorKind::Other, e)),
+            .map_err(std::io::Error::other),
     ));
 
     let compression = match compression {
@@ -414,10 +417,7 @@ mod test {
             assert_eq!(
                 super::determine_compression(content_encoding, content_type, key),
                 expected,
-                "key={:?} content_encoding={:?} content_type={:?}",
-                key,
-                content_encoding,
-                content_type,
+                "key={key:?} content_encoding={content_encoding:?} content_type={content_type:?}",
             );
         }
     }
@@ -456,29 +456,31 @@ mod integration_tests {
     };
 
     use aws_sdk_s3::Client as S3Client;
-    use aws_sdk_sqs::{types::QueueAttributeName, Client as SqsClient};
+    use aws_sdk_sqs::{Client as SqsClient, types::QueueAttributeName};
     use similar_asserts::assert_eq;
-    use vector_lib::codecs::{decoding::DeserializerConfig, JsonDeserializerConfig};
-    use vector_lib::lookup::path;
+    use vector_lib::{
+        codecs::{JsonDeserializerConfig, decoding::DeserializerConfig},
+        lookup::path,
+    };
     use vrl::value::Value;
 
     use super::*;
     use crate::{
-        aws::{create_client, AwsAuthentication, RegionOrEndpoint},
+        SourceSender,
+        aws::{AwsAuthentication, RegionOrEndpoint, create_client},
         common::sqs::SqsClientBuilder,
         config::{ProxyConfig, SourceConfig, SourceContext},
         event::EventStatus::{self, *},
         line_agg,
         sources::{
-            aws_s3::{sqs::S3Event, S3ClientBuilder},
+            aws_s3::{S3ClientBuilder, sqs::S3Event},
             util::MultilineConfig,
         },
         test_util::{
             collect_n,
-            components::{assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, assert_source_compliance},
             lines_from_gzip_file, random_lines, trace_init,
         },
-        SourceSender,
     };
 
     fn lines_from_plaintext<P: AsRef<Path>>(path: P) -> Vec<String> {
@@ -517,7 +519,7 @@ mod integration_tests {
             .iter()
             .map(|msg| {
                 // convert to JSON object
-                format!(r#"{{"message": "{}"}}"#, msg)
+                format!(r#"{{"message": "{msg}"}}"#)
             })
             .collect();
 

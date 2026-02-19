@@ -1,4 +1,4 @@
-use metrics::{counter, Counter};
+use metrics::{Counter, counter};
 
 use super::{ByteSize, Protocol, SharedString};
 

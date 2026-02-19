@@ -6,15 +6,17 @@ use std::{
 use futures::stream;
 use opendal::Entry;
 use similar_asserts::assert_eq;
-use vector_lib::codecs::{encoding::FramingConfig, TextSerializerConfig};
-use vector_lib::event::{Event, LogEvent};
+use vector_lib::{
+    codecs::{TextSerializerConfig, encoding::FramingConfig},
+    event::{Event, LogEvent},
+};
 
 use super::WebHdfsConfig;
 use crate::{
     config::{SinkConfig, SinkContext},
     sinks::util::{BatchConfig, Compression},
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,
     },
 };

@@ -1,11 +1,12 @@
-use std::cell::RefCell;
-use std::collections::HashMap;
+use std::{cell::RefCell, collections::HashMap, time::Duration};
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use vector_config::{Configurable, GenerateError, Metadata, NamedComponent};
-use vector_config_common::attributes::CustomAttribute;
-use vector_config_common::schema::{SchemaGenerator, SchemaObject};
+use vector_config_common::{
+    attributes::CustomAttribute,
+    schema::{SchemaGenerator, SchemaObject},
+};
 use vector_config_macros::configurable_component;
 use vector_lib::{
     config::{
@@ -14,9 +15,10 @@ use vector_lib::{
     },
     source::Source,
 };
+use vector_vrl_metrics::MetricsStorage;
 
-use super::{dot_graph::GraphConfig, schema, ComponentKey, ProxyConfig, Resource};
-use crate::{extra_context::ExtraContext, shutdown::ShutdownSignal, SourceSender};
+use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
+use crate::{SourceSender, extra_context::ExtraContext, shutdown::ShutdownSignal};
 
 pub type BoxedSource = Box<dyn SourceConfig>;
 
@@ -33,8 +35,10 @@ impl Configurable for BoxedSource {
         metadata
     }
 
-    fn generate_schema(gen: &RefCell<SchemaGenerator>) -> Result<SchemaObject, GenerateError> {
-        vector_lib::configurable::component::SourceDescription::generate_schemas(gen)
+    fn generate_schema(
+        generator: &RefCell<SchemaGenerator>,
+    ) -> Result<SchemaObject, GenerateError> {
+        vector_lib::configurable::component::SourceDescription::generate_schemas(generator)
     }
 }
 
@@ -117,6 +121,12 @@ pub trait SourceConfig: DynClone + NamedComponent + core::fmt::Debug + Send + Sy
     /// well as emit contextual warnings when end-to-end acknowledgements are enabled, but the
     /// topology as configured does not actually support the use of end-to-end acknowledgements.
     fn can_acknowledge(&self) -> bool;
+
+    /// If this source supports timeout returns from the `SourceSender` and the configuration
+    /// provides a timeout value, return it here and the `out` channel will be configured with it.
+    fn send_timeout(&self) -> Option<Duration> {
+        None
+    }
 }
 
 dyn_clone::clone_trait_object!(SourceConfig);
@@ -125,6 +135,7 @@ pub struct SourceContext {
     pub key: ComponentKey,
     pub globals: GlobalOptions,
     pub enrichment_tables: vector_lib::enrichment::TableRegistry,
+    pub metrics_storage: MetricsStorage,
     pub shutdown: ShutdownSignal,
     pub out: SourceSender,
     pub proxy: ProxyConfig,
@@ -155,6 +166,7 @@ impl SourceContext {
                 key: key.clone(),
                 globals: GlobalOptions::default(),
                 enrichment_tables: Default::default(),
+                metrics_storage: Default::default(),
                 shutdown: shutdown_signal,
                 out,
                 proxy: Default::default(),
@@ -176,6 +188,7 @@ impl SourceContext {
             key: ComponentKey::from("default"),
             globals: GlobalOptions::default(),
             enrichment_tables: Default::default(),
+            metrics_storage: Default::default(),
             shutdown: ShutdownSignal::noop(),
             out,
             proxy: Default::default(),

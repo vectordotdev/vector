@@ -2,6 +2,7 @@
 title: Install Vector
 description: Get up and running with Vector on your preferred platform
 short: Installation
+weight: 2
 ---
 
 Vector compiles to a single static binary, which makes it easy to install.

@@ -1,9 +1,9 @@
 use metrics::counter;
-use vector_lib::internal_event::{error_stage, error_type, InternalEvent};
-use vrl::path::PathParseError;
-use vrl::value::KeyString;
+use vector_lib::NamedInternalEvent;
+use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
+use vrl::{path::PathParseError, value::KeyString};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ReduceStaleEventFlushed;
 
 impl InternalEvent for ReduceStaleEventFlushed {
@@ -12,7 +12,7 @@ impl InternalEvent for ReduceStaleEventFlushed {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct ReduceAddEventError {
     pub error: PathParseError,
     pub path: KeyString,
@@ -26,7 +26,6 @@ impl InternalEvent for ReduceAddEventError {
             error = ?self.error,
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
-
         );
         counter!(
             "component_errors_total",

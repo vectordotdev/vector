@@ -58,7 +58,7 @@ components: sinks: prometheus_exporter: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.prometheus_exporter.configuration
+	configuration: generated.components.sinks.prometheus_exporter.configuration
 
 	input: {
 		logs: false

@@ -55,7 +55,7 @@ components: sinks: mezmo: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.mezmo.configuration
+	configuration: generated.components.sinks.mezmo.configuration
 
 	input: {
 		logs:    true

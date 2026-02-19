@@ -70,7 +70,7 @@ components: sinks: axiom: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.axiom.configuration
+	configuration: generated.components.sinks.axiom.configuration
 
 	input: {
 		logs: true

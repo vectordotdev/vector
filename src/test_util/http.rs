@@ -1,12 +1,12 @@
 use std::{convert::Infallible, future::Future};
 
-use http::{uri::Scheme, Request, Response, Uri};
+use http::{Request, Response, Uri, uri::Scheme};
 use hyper::{
-    service::{make_service_fn, service_fn},
     Body, Server,
+    service::{make_service_fn, service_fn},
 };
 
-use super::{next_addr, wait_for_tcp};
+use super::{addr::next_addr, wait_for_tcp};
 
 /// Spawns an HTTP server that uses the given `handler` to respond to requests.
 ///
@@ -17,7 +17,7 @@ where
     H: Fn(Request<Body>) -> F + Clone + Send + 'static,
     F: Future<Output = std::result::Result<Response<Body>, Infallible>> + Send + 'static,
 {
-    let address = next_addr();
+    let (_guard, address) = next_addr();
 
     let uri = Uri::builder()
         .scheme(Scheme::HTTP)

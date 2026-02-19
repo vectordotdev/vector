@@ -9,8 +9,7 @@ release: "0.12.0"
 hide_on_release_notes: false
 badges:
   type: "new feature"
-  domains: ["cli"]
-  domains: ["observability"]
+  domains: ["cli", "observability"]
 ---
 
 [`vector top`][top] is a command for the Vector [CLI] that displays both metrics emitted by your Vector instance as well
@@ -36,5 +35,5 @@ a primary consumer. The dashboard UI was created using the excellent [tui-rs] li
 [cli]: /docs/reference/cli
 [htop]: https://htop.dev
 [top]: /docs/reference/cli/#top
-[topology]: /docs/about/concepts/#topology
+[topology]: /docs/introduction/concepts/#topology
 [tui]: https://docs.rs/tui

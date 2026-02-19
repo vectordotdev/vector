@@ -2,10 +2,10 @@ use std::convert::TryFrom;
 
 use futures::{future::ready, stream};
 use serde_json::Value as JsonValue;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
 use vector_lib::{
-    config::{init_telemetry, Tags, Telemetry},
+    config::{Tags, Telemetry, init_telemetry},
     event::{BatchNotifier, BatchStatus, Event, MetricValue},
+    lookup::lookup_v2::OptionalValuePath,
     metric_tags,
 };
 
@@ -21,8 +21,8 @@ use crate::{
     },
     template::Template,
     test_util::components::{
-        run_and_assert_data_volume_sink_compliance, run_and_assert_sink_compliance,
-        DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS,
+        DATA_VOLUME_SINK_TAGS, HTTP_SINK_TAGS, run_and_assert_data_volume_sink_compliance,
+        run_and_assert_sink_compliance,
     },
 };
 

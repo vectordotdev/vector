@@ -2,9 +2,8 @@ use std::fmt;
 
 use bytecheck::CheckBytes;
 use rkyv::{
-    check_archived_root,
-    validation::{validators::DefaultValidator, CheckArchiveError},
-    Archive,
+    Archive, check_archived_root,
+    validation::{CheckArchiveError, validators::DefaultValidator},
 };
 
 /// Error that occurred during serialization.

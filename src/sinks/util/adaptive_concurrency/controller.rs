@@ -7,8 +7,9 @@ use std::{
 use tokio::sync::OwnedSemaphorePermit;
 use tower::timeout::error::Elapsed;
 use vector_lib::internal_event::{InternalEventHandle as _, Registered};
+use vector_lib::stats::{EwmaVar, Mean, MeanVariance};
 
-use super::{instant_now, semaphore::ShrinkableSemaphore, AdaptiveConcurrencySettings};
+use super::{AdaptiveConcurrencySettings, instant_now, semaphore::ShrinkableSemaphore};
 #[cfg(test)]
 use crate::test_util::stats::{TimeHistogram, TimeWeightedSum};
 use crate::{
@@ -18,7 +19,6 @@ use crate::{
         AdaptiveConcurrencyLimitData, AdaptiveConcurrencyObservedRtt,
     },
     sinks::util::retries::{RetryAction, RetryLogic},
-    stats::{EwmaVar, Mean, MeanVariance},
 };
 
 /// Shared class for `tokio::sync::Semaphore` that manages adjusting the
@@ -105,7 +105,9 @@ impl<L> Controller<L> {
         }
     }
 
-    pub(super) fn acquire(&self) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static {
+    pub(super) fn acquire(
+        &self,
+    ) -> impl Future<Output = OwnedSemaphorePermit> + Send + 'static + use<L> {
         Arc::clone(&self.semaphore).acquire()
     }
 
@@ -290,7 +292,7 @@ where
                 } else {
                     warn!(
                         message = "Unhandled error response.",
-                        %error,
+                        %error
                     );
                     false
                 }

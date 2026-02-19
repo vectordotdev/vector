@@ -2,9 +2,9 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use futures::{
+    StreamExt,
     channel::mpsc::{Receiver, TryRecvError},
     stream::Stream,
-    StreamExt,
 };
 use hyper::StatusCode;
 use indoc::indoc;
@@ -17,8 +17,9 @@ use crate::{
     event::EventArray,
     sinks::util::test::{build_test_server_status, load_sink},
     test_util::{
+        addr::next_addr,
         components::{self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
-        next_addr, random_lines_with_stream,
+        random_lines_with_stream,
     },
 };
 
@@ -49,10 +50,10 @@ async fn start_test(
         "#};
     let (mut config, cx) = load_sink::<DatadogEventsConfig>(config).unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -114,10 +115,10 @@ async fn api_key_in_metadata() {
         "#})
     .unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();

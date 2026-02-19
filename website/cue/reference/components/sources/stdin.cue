@@ -40,7 +40,7 @@ components: sources: stdin: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.stdin.configuration
+	configuration: generated.components.sources.stdin.configuration
 
 	output: {
 		logs: line: {
@@ -59,10 +59,10 @@ components: sources: stdin: {
 			}
 		}
 		metrics: "": {
-			description: "The input `metric` event."
+			description: "Metric events that may be emitted by this source."
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 

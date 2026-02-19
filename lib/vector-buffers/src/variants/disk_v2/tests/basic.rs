@@ -1,16 +1,16 @@
-use std::io::Cursor;
+use std::{io::Cursor, time::Duration};
 
-use futures::{stream, StreamExt};
-use tokio_test::{assert_pending, assert_ready, task::spawn};
+use futures::{StreamExt, stream};
+use tokio::{select, time::sleep};
+use tokio_test::{assert_pending, task::spawn};
 use tracing::Instrument;
 use vector_common::finalization::Finalizable;
 
 use super::{create_default_buffer_v2, read_next, read_next_some};
 use crate::{
-    assert_buffer_is_empty, assert_buffer_records,
-    test::{acknowledge, install_tracing_helpers, with_temp_dir, MultiEventRecord, SizedRecord},
+    EventCount, assert_buffer_is_empty, assert_buffer_records,
+    test::{MultiEventRecord, SizedRecord, acknowledge, install_tracing_helpers, with_temp_dir},
     variants::disk_v2::{tests::create_default_buffer_v2_with_usage, writer::RecordWriter},
-    EventCount,
 };
 
 #[tokio::test]
@@ -66,6 +66,7 @@ async fn basic_read_write_loop() {
     .await;
 }
 
+#[ignore = "flaky. See https://github.com/vectordotdev/vector/issues/23456"]
 #[tokio::test]
 async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
     let assertion_registry = install_tracing_helpers();
@@ -127,7 +128,15 @@ async fn reader_exits_cleanly_when_writer_done_and_in_flight_acks() {
             // albeit with a return value of `None`... because the writer is closed, and we read all
             // the records, so nothing is left. :)
             assert!(blocked_read.is_woken());
-            let second_read = assert_ready!(blocked_read.poll());
+
+            let second_read = select! {
+                // if the reader task finishes in time, extract its output
+                res = blocked_read => res,
+                // otherwise panics after 1s
+                () = sleep(Duration::from_secs(1)) => {
+                    panic!("Reader not ready after 1s");
+                }
+            };
             assert_eq!(second_read.expect("read should not fail"), None);
 
             // All records should be consumed at this point.

@@ -1,13 +1,14 @@
-use std::marker::PhantomData;
-use std::task::{Context, Poll};
+use std::{
+    marker::PhantomData,
+    task::{Context, Poll},
+};
 
-use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
-use aws_smithy_runtime_api::client::result::SdkError;
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use futures::future::BoxFuture;
 use tower::Service;
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::stream::DriverResponse;
-use vector_lib::{event::EventStatus, ByteSizeOf};
+use vector_lib::{
+    ByteSizeOf, event::EventStatus, request_metadata::GroupedCountByteSize, stream::DriverResponse,
+};
 
 use super::{client::Client, request_builder::SendMessageEntry};
 

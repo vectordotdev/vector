@@ -66,7 +66,7 @@ components: sinks: aws_sqs: components._aws & {
 		notices: []
 	}
 
-	configuration: base.components.sinks.aws_sqs.configuration & {
+	configuration: generated.components.sinks.aws_sqs.configuration & {
 		_aws_include: false
 	}
 

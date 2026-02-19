@@ -6,7 +6,7 @@ use vector_common::finalization::{BatchNotifier, EventFinalizer, EventStatus};
 use crate::{
     buffer_usage_data::BufferUsageHandle,
     test::with_temp_dir,
-    variants::disk_v2::{ledger::Ledger, DiskBufferConfigBuilder},
+    variants::disk_v2::{DiskBufferConfigBuilder, ledger::Ledger},
 };
 
 pub(crate) async fn acknowledge(batch: BatchNotifier) {

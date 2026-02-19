@@ -10,7 +10,7 @@ use crate::{
         aws_kinesis::firehose::config::{
             KinesisFirehoseDefaultBatchSettings, MAX_PAYLOAD_EVENTS, MAX_PAYLOAD_SIZE,
         },
-        util::{batch::BatchError, BatchConfig, Compression},
+        util::{BatchConfig, Compression, batch::BatchError},
     },
 };
 

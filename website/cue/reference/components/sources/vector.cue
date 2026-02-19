@@ -53,7 +53,7 @@ components: sources: vector: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.vector.configuration
+	configuration: generated.components.sources.vector.configuration
 
 	output: {
 		logs: event: {
@@ -98,7 +98,7 @@ components: sources: vector: {
 			}
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events received from an upstream Vector instance."
 		}
 	}
 

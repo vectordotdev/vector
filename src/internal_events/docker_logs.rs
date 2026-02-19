@@ -1,13 +1,13 @@
 use bollard::errors::Error;
 use chrono::ParseError;
 use metrics::counter;
-use vector_lib::internal_event::InternalEvent;
 use vector_lib::{
-    internal_event::{error_stage, error_type},
+    NamedInternalEvent,
+    internal_event::{InternalEvent, error_stage, error_type},
     json_size::JsonSize,
 };
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DockerLogsEventsReceived<'a> {
     pub byte_size: JsonSize,
     pub container_id: &'a str,
@@ -32,7 +32,7 @@ impl InternalEvent for DockerLogsEventsReceived<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DockerLogsContainerEventReceived<'a> {
     pub container_id: &'a str,
     pub action: &'a str,
@@ -49,7 +49,7 @@ impl InternalEvent for DockerLogsContainerEventReceived<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DockerLogsContainerWatch<'a> {
     pub container_id: &'a str,
 }
@@ -64,7 +64,7 @@ impl InternalEvent for DockerLogsContainerWatch<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DockerLogsContainerUnwatch<'a> {
     pub container_id: &'a str,
 }
@@ -79,7 +79,7 @@ impl InternalEvent for DockerLogsContainerUnwatch<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DockerLogsCommunicationError<'a> {
     pub error: Error,
     pub container_id: Option<&'a str>,
@@ -92,8 +92,7 @@ impl InternalEvent for DockerLogsCommunicationError<'_> {
             error = ?self.error,
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
-            container_id = ?self.container_id,
-            internal_log_rate_limit = true
+            container_id = ?self.container_id
         );
         counter!(
             "component_errors_total",
@@ -104,7 +103,7 @@ impl InternalEvent for DockerLogsCommunicationError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DockerLogsContainerMetadataFetchError<'a> {
     pub error: Error,
     pub container_id: &'a str,
@@ -117,8 +116,7 @@ impl InternalEvent for DockerLogsContainerMetadataFetchError<'_> {
             error = ?self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
-            container_id = ?self.container_id,
-            internal_log_rate_limit = true
+            container_id = ?self.container_id
         );
         counter!(
             "component_errors_total",
@@ -130,7 +128,7 @@ impl InternalEvent for DockerLogsContainerMetadataFetchError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DockerLogsTimestampParseError<'a> {
     pub error: ParseError,
     pub container_id: &'a str,
@@ -143,8 +141,7 @@ impl InternalEvent for DockerLogsTimestampParseError<'_> {
             error = ?self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-            container_id = ?self.container_id,
-            internal_log_rate_limit = true
+            container_id = ?self.container_id
         );
         counter!(
             "component_errors_total",
@@ -156,7 +153,7 @@ impl InternalEvent for DockerLogsTimestampParseError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct DockerLogsLoggingDriverUnsupportedError<'a> {
     pub container_id: &'a str,
     pub error: Error,
@@ -170,7 +167,6 @@ impl InternalEvent for DockerLogsLoggingDriverUnsupportedError<'_> {
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::RECEIVING,
             container_id = ?self.container_id,
-
         );
         counter!(
             "component_errors_total",

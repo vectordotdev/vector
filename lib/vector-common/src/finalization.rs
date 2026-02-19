@@ -280,21 +280,17 @@ impl Drop for OwnedBatchNotifier {
 /// The status of an individual batch.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum BatchStatus {
     /// All events in the batch were accepted.
     ///
     /// This is the default.
+    #[default]
     Delivered,
     /// At least one event in the batch had a transient error in delivery.
     Errored,
     /// At least one event in the batch had a permanent failure or rejection.
     Rejected,
-}
-
-impl Default for BatchStatus {
-    fn default() -> Self {
-        Self::Delivered
-    }
 }
 
 impl BatchStatus {
@@ -320,10 +316,12 @@ impl BatchStatus {
 /// The status of an individual event.
 #[derive(Copy, Clone, Debug, Eq, PartialEq)]
 #[repr(u8)]
+#[derive(Default)]
 pub enum EventStatus {
     /// All copies of this event were dropped without being finalized.
     ///
     /// This is the default.
+    #[default]
     Dropped,
     /// All copies of this event were delivered successfully.
     Delivered,
@@ -333,12 +331,6 @@ pub enum EventStatus {
     Rejected,
     /// This status has been recorded and should not be updated.
     Recorded,
-}
-
-impl Default for EventStatus {
-    fn default() -> Self {
-        Self::Dropped
-    }
 }
 
 impl EventStatus {
@@ -462,7 +454,7 @@ mod tests {
         assert_eq!(receiver2.try_recv(), Ok(BatchStatus::Delivered));
     }
 
-    #[ignore] // The current implementation does not deduplicate finalizers
+    #[ignore = "The current implementation does not deduplicate finalizers"]
     #[test]
     fn clone_and_merge_events() {
         let (mut fin1, mut receiver) = make_finalizer();

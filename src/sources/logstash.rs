@@ -1,32 +1,31 @@
-use std::net::SocketAddr;
-use std::time::Duration;
 use std::{
     collections::{BTreeMap, VecDeque},
     convert::TryFrom,
     io::{self, Read},
+    net::SocketAddr,
+    time::Duration,
 };
-use vector_lib::ipallowlist::IpAllowlistConfig;
 
 use bytes::{Buf, Bytes, BytesMut};
 use flate2::read::ZlibDecoder;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Decoder;
-use vector_lib::codecs::{BytesDeserializerConfig, StreamDecodingError};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::{event_path, metadata_path, owned_value_path, path, OwnedValuePath};
 use vector_lib::{
+    codecs::{BytesDeserializerConfig, StreamDecodingError},
     config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    ipallowlist::IpAllowlistConfig,
+    lookup::{OwnedValuePath, event_path, metadata_path, owned_value_path, path},
     schema::Definition,
 };
-use vrl::value::kind::Collection;
-use vrl::value::{KeyString, Kind};
+use vrl::value::{KeyString, Kind, kind::Collection};
 
 use super::util::net::{SocketListenAddr, TcpSource, TcpSourceAck, TcpSourceAcker};
 use crate::{
     config::{
-        log_schema, DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
-        SourceContext, SourceOutput,
+        DataType, GenerateConfig, Resource, SourceAcknowledgementsConfig, SourceConfig,
+        SourceContext, SourceOutput, log_schema,
     },
     event::{Event, LogEvent, Value},
     serde::bool_or_struct,
@@ -712,19 +711,20 @@ impl From<LogstashEventFrame> for SmallVec<[Event; 1]> {
 mod test {
     use bytes::BufMut;
     use futures::Stream;
-    use rand::{rng, Rng};
+    use rand::{Rng, rng};
     use tokio::io::{AsyncReadExt, AsyncWriteExt};
     use vector_lib::lookup::OwnedTargetPath;
     use vrl::value::kind::Collection;
 
     use super::*;
     use crate::{
+        SourceSender,
         event::EventStatus,
         test_util::{
-            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
-            next_addr, spawn_collect_n, wait_for_tcp,
+            addr::next_addr,
+            components::{SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance},
+            spawn_collect_n, wait_for_tcp,
         },
-        SourceSender,
     };
 
     #[test]
@@ -746,7 +746,7 @@ mod test {
         status: EventStatus,
     ) -> (SocketAddr, impl Stream<Item = Event> + Unpin) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let source = LogstashConfig {
             address: address.into(),
             tls: None,
@@ -915,15 +915,15 @@ mod integration_tests {
 
     use super::*;
     use crate::{
+        SourceSender,
         config::SourceContext,
         event::EventStatus,
         test_util::{
             collect_n,
-            components::{assert_source_compliance, SOCKET_PUSH_SOURCE_TAGS},
+            components::{SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance},
             wait_for_tcp,
         },
         tls::{TlsConfig, TlsEnableableConfig},
-        SourceSender,
     };
 
     fn heartbeat_address() -> String {
@@ -967,8 +967,12 @@ mod integration_tests {
                 Some(TlsEnableableConfig {
                     enabled: Some(true),
                     options: TlsConfig {
-                        crt_file: Some("tests/data/host.docker.internal.crt".into()),
-                        key_file: Some("tests/data/host.docker.internal.key".into()),
+                        crt_file: Some(
+                            "tests/integration/shared/data/host.docker.internal.crt".into(),
+                        ),
+                        key_file: Some(
+                            "tests/integration/shared/data/host.docker.internal.key".into(),
+                        ),
                         ..Default::default()
                     },
                 }),
@@ -984,11 +988,12 @@ mod integration_tests {
         assert!(!events.is_empty());
 
         let log = events[0].as_log();
-        assert!(log
-            .get("line")
-            .unwrap()
-            .to_string_lossy()
-            .contains("Hello World"));
+        assert!(
+            log.get("line")
+                .unwrap()
+                .to_string_lossy()
+                .contains("Hello World")
+        );
         assert!(log.get("host").is_some());
     }
 

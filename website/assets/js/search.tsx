@@ -1,7 +1,7 @@
 import { autocomplete } from '@algolia/autocomplete-js'
 import Typesense from 'typesense'
 import React, { createElement, Fragment, useEffect, useRef } from 'react'
-import ReactDOM, { render } from 'react-dom'
+import { createRoot } from 'react-dom/client'
 
 // // Algolia search
 // const appId = process.env.ALGOLIA_APP_ID
@@ -12,10 +12,25 @@ const host = process.env.TYPESENSE_HOST
 
 let searchClient = new Typesense.Client({
   apiKey: apiKey,
+  nearestNode: {
+    host: `${host}.a1.typesense.net`,
+    port: 443,
+    protocol: 'https',
+  },
   nodes: [
     {
-      host: `${host}.a1.typesense.net`,
-      port: '443',
+      host: `${host}-1.a1.typesense.net`,
+      port: 443,
+      protocol: 'https',
+    },
+    {
+      host: `${host}-2.a1.typesense.net`,
+      port: 443,
+      protocol: 'https',
+    },
+    {
+      host: `${host}-3.a1.typesense.net`,
+      port: 443,
       protocol: 'https',
     },
   ],
@@ -99,6 +114,7 @@ const Result = ({ hit, components, category }) => {
 
 const Autocomplete = (props) => {
   const containerRef = useRef(null)
+  const panelRootRef = useRef({})
 
   useEffect(() => {
     if (!containerRef.current) {
@@ -110,7 +126,10 @@ const Autocomplete = (props) => {
       renderer: { createElement, Fragment },
       render({ children, state, components }, root) {
         const { preview } = state.context as any
-        render(
+        if (!panelRootRef.current[root]) {
+          panelRootRef.current[root] = createRoot(root)
+        }
+        panelRootRef.current[root].render(
           <Fragment>
             <div className="aa-Grid">
               <div className="aa-Results aa-Column">{children}</div>
@@ -148,8 +167,7 @@ const Autocomplete = (props) => {
                 </ul>
               </div>
             </div>
-          </Fragment>,
-          root,
+          </Fragment>
         )
       },
       ...props,
@@ -231,4 +249,5 @@ const Search = () => {
 }
 
 
-ReactDOM.render(<Search />, document.getElementById('site-search'))
+const searchRoot = createRoot(document.getElementById('site-search'))
+searchRoot.render(<Search />)

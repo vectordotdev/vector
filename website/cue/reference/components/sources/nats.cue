@@ -39,7 +39,7 @@ components: sources: nats: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.nats.configuration
+	configuration: generated.components.sources.nats.configuration
 
 	output: {
 		logs: record: {
@@ -69,10 +69,10 @@ components: sources: nats: {
 			}
 		}
 		metrics: "": {
-			description: "The input `metric` event."
+			description: "Metric events that may be emitted by this source."
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 

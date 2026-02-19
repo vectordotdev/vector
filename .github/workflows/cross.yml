@@ -2,9 +2,14 @@ name: Cross
 
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
 
 permissions:
-  statuses: write
+  contents: read
 
 jobs:
   cross-linux:
@@ -25,26 +30,12 @@ jobs:
           - arm-unknown-linux-gnueabi
           - arm-unknown-linux-musleabi
     steps:
-      - name: (PR review) Set latest commit status as pending
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: myrotvorets/set-commit-status-action@v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: Cross
-          status: pending
-
-      - name: (PR review) Checkout PR branch
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.review.commit_id }}
-
       - name: Checkout branch
-        if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@v4
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
 
-      - uses: actions/cache@v4
+      - uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
         name: Cache Cargo registry + index
         with:
           path: |
@@ -64,31 +55,7 @@ jobs:
       # aarch64 and musl in particular are notoriously hard to link.
       # While it may be tempting to slot a `check` in here for quickness, please don't.
       - run: make cross-build-${{ matrix.target }}
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
         with:
           name: "vector-debug-${{ matrix.target }}"
           path: "./target/${{ matrix.target }}/debug/vector"
-
-      - name: (PR review) Set latest commit status as failed
-        uses: myrotvorets/set-commit-status-action@v2.0.1
-        if: failure() && github.event_name == 'pull_request_review'
-        with:
-          sha: ${{ steps.comment-branch.outputs.head_sha }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: Cross
-          status: 'failure'
-
-  update-pr-status:
-    name: (PR review) Signal result to PR
-    runs-on: ubuntu-24.04
-    timeout-minutes: 5
-    needs: cross-linux
-    if: needs.cross-linux.result == 'success' && github.event_name == 'pull_request_review'
-    steps:
-      - name: (PR review) Submit PR result as success
-        uses: myrotvorets/set-commit-status-action@v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: Cross
-          status: 'success'

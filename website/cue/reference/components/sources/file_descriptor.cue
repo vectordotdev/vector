@@ -40,7 +40,7 @@ components: sources: file_descriptor: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.file_descriptor.configuration
+	configuration: generated.components.sources.file_descriptor.configuration
 
 	output: {
 		logs: line: {
@@ -52,10 +52,10 @@ components: sources: file_descriptor: {
 			}
 		}
 		metrics: "": {
-			description: "The input `metric` event."
+			description: "Metric events that may be emitted by this source."
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 

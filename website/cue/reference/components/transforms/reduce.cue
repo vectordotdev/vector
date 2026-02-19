@@ -25,7 +25,7 @@ components: transforms: reduce: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.reduce.configuration
+	configuration: generated.components.transforms.reduce.configuration
 
 	input: {
 		logs:    true

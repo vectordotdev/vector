@@ -1,8 +1,10 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion, SamplingMode, Throughput};
+use criterion::{BatchSize, Criterion, SamplingMode, Throughput, criterion_group, criterion_main};
 use indoc::indoc;
 use vector::{
     config,
-    test_util::{next_addr, runtime, send_lines, start_topology, wait_for_tcp, CountReceiver},
+    test_util::{
+        CountReceiver, addr::next_addr, runtime, send_lines, start_topology, wait_for_tcp,
+    },
 };
 
 criterion_group!(
@@ -253,14 +255,12 @@ fn benchmark_configs(
     let _ = output;
 
     let num_lines = 10_000;
-    let in_addr = next_addr();
-    let out_addr = next_addr();
+    let (_guard_0, in_addr) = next_addr();
+    let (_guard_1, out_addr) = next_addr();
 
-    let lines: Vec<_> = ::std::iter::repeat(input.to_string())
-        .take(num_lines)
-        .collect();
+    let lines: Vec<_> = std::iter::repeat_n(input.to_string(), num_lines).collect();
 
-    let mut group = criterion.benchmark_group(format!("languages/{}", benchmark_name));
+    let mut group = criterion.benchmark_group(format!("languages/{benchmark_name}"));
     group.sampling_mode(SamplingMode::Flat);
 
     let source_config = format!(
@@ -286,15 +286,15 @@ fn benchmark_configs(
 
     for (name, transform_config) in configs.into_iter() {
         group.throughput(Throughput::Elements(num_lines as u64));
-        group.bench_function(name.clone(), |b| {
+        group.bench_function(name, |b| {
             b.iter_batched(
                 || {
                     let mut config = source_config.clone();
-                    config.push_str(&transform_config);
+                    config.push_str(transform_config);
                     config.push_str(&sink_config);
 
                     let config = config::load_from_str(&config, config::Format::Toml)
-                        .expect(&format!("invalid TOML configuration: {}", &config));
+                        .unwrap_or_else(|_| panic!("invalid TOML configuration: {}", &config));
                     let rt = runtime();
                     let (output_lines, topology) = rt.block_on(async move {
                         let output_lines = CountReceiver::receive_lines(out_addr);
@@ -322,7 +322,7 @@ fn benchmark_configs(
                                 // avoids asserting the actual == expected as the socket transform
                                 // adds dynamic keys like timestamp
                                 for (key, value) in output.iter() {
-                                    assert_eq!(Some(value), actual.get(key), "for key {}", key,);
+                                    assert_eq!(Some(value), actual.get(key), "for key {key}",);
                                 }
                             }
                         }

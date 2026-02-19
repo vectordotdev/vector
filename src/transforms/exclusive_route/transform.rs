@@ -1,9 +1,14 @@
 use vector_lib::transform::SyncTransform;
 
-use crate::conditions::Condition;
-use crate::transforms::exclusive_route::config::{ExclusiveRouteConfig, UNMATCHED_ROUTE};
-use crate::transforms::TransformOutputsBuf;
-use crate::{config::TransformContext, event::Event};
+use crate::{
+    conditions::Condition,
+    config::TransformContext,
+    event::Event,
+    transforms::{
+        TransformOutputsBuf,
+        exclusive_route::config::{ExclusiveRouteConfig, UNMATCHED_ROUTE},
+    },
+};
 
 #[derive(Clone)]
 pub struct ResolvedRoute {
@@ -22,7 +27,9 @@ impl ExclusiveRoute {
             .routes
             .iter()
             .map(|route| {
-                let condition = route.condition.build(&context.enrichment_tables)?;
+                let condition = route
+                    .condition
+                    .build(&context.enrichment_tables, &context.metrics_storage)?;
                 Ok(ResolvedRoute {
                     name: route.name.clone(),
                     condition,

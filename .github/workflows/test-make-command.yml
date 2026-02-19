@@ -1,0 +1,40 @@
+name: Test Make Command - Linux
+
+on:
+  workflow_call:
+    inputs:
+      command:
+        description: 'Make command to run (e.g., test-behavior, check-examples, test-docs)'
+        required: true
+        type: string
+      job_name:
+        description: 'Display name for the job/status check'
+        required: true
+        type: string
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
+
+
+permissions:
+  contents: read
+
+jobs:
+  run-make-command:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          libsasl2: true
+      - run: make ${{ inputs.command }}

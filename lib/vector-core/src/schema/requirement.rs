@@ -3,9 +3,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use lookup::OwnedTargetPath;
 use vrl::value::Kind;
 
-use crate::config::LogNamespace;
-
 use super::Definition;
+use crate::config::LogNamespace;
 
 /// The input schema for a given component.
 ///
@@ -243,9 +242,9 @@ impl std::error::Error for ValidationError {}
 
 #[cfg(test)]
 mod tests {
-    use lookup::lookup_v2::parse_target_path;
-    use lookup::owned_value_path;
     use std::collections::HashMap;
+
+    use lookup::{lookup_v2::parse_target_path, owned_value_path};
 
     use super::*;
 

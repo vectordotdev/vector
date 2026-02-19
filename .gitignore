@@ -59,7 +59,7 @@ volumes/
 *.volume/
 
 # Environment variable files (can contain secrets)
-.env
+*.env
 .env.*
 
 # LLM tools

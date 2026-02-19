@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
+    BatchSize, BenchmarkGroup, Criterion, SamplingMode, criterion_group, measurement::WallTime,
 };
 use lookup::event_path;
 use vector_core::event::LogEvent;

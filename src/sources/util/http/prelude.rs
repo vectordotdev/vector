@@ -1,39 +1,38 @@
-use crate::common::http::{server_auth::HttpServerAuthConfig, ErrorMessage};
 use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
 use futures::{FutureExt, TryFutureExt};
-use hyper::{service::make_service_fn, Server};
+use hyper::{Server, service::make_service_fn};
 use tokio::net::TcpStream;
 use tower::ServiceBuilder;
 use tracing::Span;
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
     config::SourceAcknowledgementsConfig,
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver, Event},
-    EstimatedJsonEncodedSizeOf,
 };
 use warp::{
+    Filter,
     filters::{
-        path::{FullPath, Tail},
         BoxedFilter,
+        path::{FullPath, Tail},
     },
     http::{HeaderMap, StatusCode},
     reject::Rejection,
-    Filter,
 };
 
+use super::encoding::decompress_body;
 use crate::{
+    SourceSender,
+    common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::SourceContext,
-    http::{build_http_trace_layer, KeepaliveConfig, MaxConnectionAgeLayer},
+    http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{
         HttpBadRequest, HttpBytesReceived, HttpEventsReceived, HttpInternalError, StreamClosedError,
     },
     sources::util::http::HttpMethod,
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
-    SourceSender,
 };
-
-use super::encoding::decode;
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
     // This function can be defined to enrich events with additional HTTP
@@ -58,7 +57,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
-        decode(encoding_header, body)
+        decompress_body(encoding_header, body)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -77,7 +76,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
-        let auth_matcher = auth.map(|a| a.build(&cx.enrichment_tables)).transpose()?;
+        let auth_matcher = auth
+            .map(|a| a.build(&cx.enrichment_tables, &cx.metrics_storage))
+            .transpose()?;
         let path = path.to_owned();
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
         let enable_source_ip = self.enable_source_ip();
@@ -129,7 +130,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           addr: Option<PeerAddr>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
-
                         let events = auth_matcher
                             .as_ref()
                             .map_or(Ok(()), |a| {
@@ -181,7 +181,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                 } else {
                     //other internal error - will return 500 internal server error
                     emit!(HttpInternalError {
-                        message: &format!("Internal error: {:?}", r)
+                        message: &format!("Internal error: {r:?}")
                     });
                     Err(r)
                 }

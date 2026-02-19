@@ -17,8 +17,8 @@ pub(crate) fn check_is_trace_with_context(e: Event) -> (Result<(), String>, Even
 mod test {
     use super::check_is_trace;
     use crate::event::{
-        metric::{Metric, MetricKind, MetricValue},
         Event, LogEvent, TraceEvent,
+        metric::{Metric, MetricKind, MetricValue},
     };
 
     #[test]

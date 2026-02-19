@@ -9,10 +9,10 @@
 //!
 //! This sink only supports logs for now but could support metrics and traces as well in the future.
 
-mod config;
+mod arrow;
+pub mod config;
 #[cfg(all(test, feature = "clickhouse-integration-tests"))]
 mod integration_tests;
 mod request_builder;
 mod service;
 mod sink;
-pub use self::config::ClickhouseConfig;

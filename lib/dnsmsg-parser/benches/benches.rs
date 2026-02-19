@@ -1,18 +1,24 @@
-use criterion::{criterion_group, criterion_main, BatchSize, Criterion, Throughput};
+use criterion::{BatchSize, Criterion, Throughput, criterion_group, criterion_main};
 use data_encoding::BASE64;
 use dnsmsg_parser::dns_message_parser::DnsMessageParser;
 use hickory_proto::rr::rdata::NULL;
 
 fn benchmark_parse_as_query_message(c: &mut Criterion) {
     let raw_dns_message = "szgAAAABAAAAAAAAAmg1B2V4YW1wbGUDY29tAAAGAAE=";
-    let raw_query_message = BASE64.decode(raw_dns_message.as_bytes()).unwrap();
+    let raw_query_message = BASE64
+        .decode(raw_dns_message.as_bytes())
+        .expect("invalid base64");
 
     let mut group = c.benchmark_group("dnstap");
     group.throughput(Throughput::Bytes(raw_query_message.len() as u64));
     group.bench_function("parse_as_query_message", |b| {
         b.iter_batched(
             || DnsMessageParser::new(raw_query_message.clone()),
-            |mut parser| parser.parse_as_query_message().unwrap(),
+            |mut parser| {
+                parser
+                    .parse_as_query_message()
+                    .expect("failed to parse as query")
+            },
             BatchSize::SmallInput,
         )
     });
@@ -22,14 +28,20 @@ fn benchmark_parse_as_query_message(c: &mut Criterion) {
 
 fn benchmark_parse_as_update_message(c: &mut Criterion) {
     let raw_dns_message = "xjUoAAABAAAAAQAAB2V4YW1wbGUDY29tAAAGAAECaDXADAD/AP8AAAAAAAA=";
-    let raw_update_message = BASE64.decode(raw_dns_message.as_bytes()).unwrap();
+    let raw_update_message = BASE64
+        .decode(raw_dns_message.as_bytes())
+        .expect("invalid base64");
 
     let mut group = c.benchmark_group("dnstap");
     group.throughput(Throughput::Bytes(raw_update_message.len() as u64));
     group.bench_function("parse_as_update_message", |b| {
         b.iter_batched(
             || DnsMessageParser::new(raw_update_message.clone()),
-            |mut parser| parser.parse_as_update_message().unwrap(),
+            |mut parser| {
+                parser
+                    .parse_as_update_message()
+                    .expect("failed to parse as update")
+            },
             BatchSize::SmallInput,
         )
     });
@@ -59,7 +71,7 @@ fn benchmark_parse_apl_rdata(c: &mut Criterion) {
 }
 
 fn benchmark_parse_rdata(c: &mut Criterion, data: &str, code: u16, id: &str) {
-    let raw_rdata = BASE64.decode(data.as_bytes()).unwrap();
+    let raw_rdata = BASE64.decode(data.as_bytes()).expect("invalid base64");
 
     let record_rdata = NULL::with(raw_rdata.clone());
 
@@ -73,7 +85,11 @@ fn benchmark_parse_rdata(c: &mut Criterion, data: &str, code: u16, id: &str) {
                     DnsMessageParser::new(Vec::<u8>::new()),
                 )
             },
-            |(record_rdata, mut parser)| parser.format_unknown_rdata(code, &record_rdata).unwrap(),
+            |(record_rdata, mut parser)| {
+                parser
+                    .format_unknown_rdata(code, &record_rdata)
+                    .expect("failed to parse rdata")
+            },
             BatchSize::SmallInput,
         )
     });

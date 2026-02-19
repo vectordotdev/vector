@@ -5,7 +5,7 @@ use tokio::net::TcpStream;
 use tokio_openssl::SslStream;
 
 use super::{
-    tls_connector, ConnectSnafu, HandshakeSnafu, MaybeTlsSettings, MaybeTlsStream, SslBuildSnafu,
+    ConnectSnafu, HandshakeSnafu, MaybeTlsSettings, MaybeTlsStream, SslBuildSnafu, tls_connector,
 };
 
 impl MaybeTlsSettings {

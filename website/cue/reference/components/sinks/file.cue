@@ -43,7 +43,7 @@ components: sinks: file: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.file.configuration
+	configuration: generated.components.sinks.file.configuration
 
 	input: {
 		logs: true

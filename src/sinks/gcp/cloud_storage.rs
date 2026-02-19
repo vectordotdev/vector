@@ -2,42 +2,45 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http::header::{HeaderName, HeaderValue};
-use http::Uri;
+use http::{
+    Uri,
+    header::{HeaderName, HeaderValue},
+};
 use indoc::indoc;
-use snafu::ResultExt;
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::{EventFinalizers, Finalizable};
-use vector_lib::{request_metadata::RequestMetadata, TimeZone};
+use vector_lib::{
+    TimeZone,
+    codecs::encoding::Framer,
+    configurable::configurable_component,
+    event::{EventFinalizers, Finalizable},
+    request_metadata::RequestMetadata,
+};
 
-use crate::sinks::util::metadata::RequestMetadataBuilder;
-use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
     event::Event,
     gcp::{GcpAuthConfig, GcpAuthenticator, Scope},
-    http::{get_http_scheme_from_uri, HttpClient},
+    http::{HttpClient, get_http_scheme_from_uri},
     serde::json::to_string,
     sinks::{
+        Healthcheck, VectorSink,
         gcs_common::{
             config::{
-                build_healthcheck, default_endpoint, GcsPredefinedAcl, GcsRetryLogic,
-                GcsStorageClass,
+                GcsPredefinedAcl, GcsRetryLogic, GcsStorageClass, build_healthcheck,
+                default_endpoint,
             },
             service::{GcsRequest, GcsRequestSettings, GcsService},
             sink::GcsSink,
         },
         util::{
-            batch::BatchConfig, partitioner::KeyPartitioner, request_builder::EncodeResult,
-            timezone_to_offset, BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder,
-            ServiceBuilderExt, TowerRequestConfig,
+            BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
+            TowerRequestConfig, batch::BatchConfig, metadata::RequestMetadataBuilder,
+            partitioner::KeyPartitioner, request_builder::EncodeResult,
+            service::TowerRequestConfigDefaults, timezone_to_offset,
         },
-        Healthcheck, VectorSink,
     },
     template::{Template, TemplateParseError},
     tls::{TlsConfig, TlsSettings},
@@ -158,6 +161,17 @@ pub struct GcsSinkConfig {
     #[serde(default)]
     compression: Compression,
 
+    /// Overrides the MIME type of the created objects.
+    ///
+    /// Directly comparable to the `Content-Type` HTTP header.
+    ///
+    /// If not specified, defaults to the encoder's content type.
+    #[configurable(metadata(
+        docs::examples = "text/plain; charset=utf-8",
+        docs::examples = "application/gzip"
+    ))]
+    content_type: Option<String>,
+
     #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
@@ -206,6 +220,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         filename_time_format: default_time_format(),
         filename_append_uuid: true,
         filename_extension: Default::default(),
+        content_type: Default::default(),
         encoding,
         compression: Compression::gzip_default(),
         batch: Default::default(),
@@ -276,7 +291,7 @@ impl GcsSinkConfig {
         let protocol = get_http_scheme_from_uri(&base_url.parse::<Uri>().unwrap());
 
         let svc = ServiceBuilder::new()
-            .settings(request, GcsRetryLogic)
+            .settings(request, GcsRetryLogic::default())
             .service(GcsService::new(client, base_url, auth));
 
         let request_settings = RequestSettings::new(self, cx)?;
@@ -391,7 +406,11 @@ impl RequestSettings {
         let acl = config
             .acl
             .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
-        let content_type = HeaderValue::from_str(encoder.content_type()).unwrap();
+        let content_type_str = config
+            .content_type
+            .as_deref()
+            .unwrap_or_else(|| encoder.content_type());
+        let content_type = HeaderValue::from_str(content_type_str)?;
         let content_encoding = config
             .compression
             .content_encoding()
@@ -446,21 +465,24 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 #[cfg(test)]
 mod tests {
     use futures_util::{future::ready, stream};
-    use vector_lib::codecs::encoding::FramingConfig;
-    use vector_lib::codecs::{
-        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-    };
-    use vector_lib::partition::Partitioner;
-    use vector_lib::request_metadata::GroupedCountByteSize;
-    use vector_lib::EstimatedJsonEncodedSizeOf;
-
-    use crate::event::LogEvent;
-    use crate::test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
-        http::{always_200_response, spawn_blackhole_http_server},
+    use vector_lib::{
+        EstimatedJsonEncodedSizeOf,
+        codecs::{
+            JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+            encoding::FramingConfig,
+        },
+        partition::Partitioner,
+        request_metadata::GroupedCountByteSize,
     };
 
     use super::*;
+    use crate::{
+        event::LogEvent,
+        test_util::{
+            components::{SINK_TAGS, run_and_assert_sink_compliance},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
 
     #[test]
     fn generate_config() {
@@ -565,5 +587,51 @@ mod tests {
 
         let req = build_request(None, true, Compression::gzip_default());
         assert_ne!(req.key, "key/date.log.gz".to_string());
+    }
+
+    #[test]
+    fn gcs_content_type_default() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            content_type: None,
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let request_settings = request_settings(&sink_config, context);
+        // Should default to encoder's content type which is "text/plain" for text codec
+        assert_eq!(
+            request_settings.content_type.to_str().unwrap(),
+            "text/plain"
+        );
+    }
+
+    #[test]
+    fn gcs_content_type_custom() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            content_type: Some("text/plain; charset=utf-8".to_string()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let request_settings = request_settings(&sink_config, context);
+        // Should use custom content type
+        assert_eq!(
+            request_settings.content_type.to_str().unwrap(),
+            "text/plain; charset=utf-8"
+        );
+    }
+
+    #[test]
+    fn gcs_content_type_invalid() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            // Invalid header value with newline character
+            content_type: Some("text/plain\nInvalid".to_string()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let result = RequestSettings::new(&sink_config, context);
+        // Should return an error, not panic
+        assert!(result.is_err());
     }
 }

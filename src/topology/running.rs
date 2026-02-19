@@ -1,18 +1,32 @@
 use std::{
     collections::{HashMap, HashSet},
     sync::{
-        atomic::{AtomicBool, Ordering},
         Arc, Mutex,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
+use futures::{Future, FutureExt, future};
+use snafu::Snafu;
+use stream_cancel::Trigger;
+use tokio::{
+    sync::{mpsc, watch},
+    time::{Duration, Instant, interval, sleep_until},
+};
+use tracing::Instrument;
+use vector_lib::{
+    buffers::topology::channel::BufferSender,
+    shutdown::ShutdownSignal,
+    tap::topology::{TapOutput, TapResource, WatchRx, WatchTx},
+    trigger::DisabledTrigger,
+};
+
 use super::{
-    builder,
-    builder::TopologyPieces,
+    BuiltBuffer, TaskHandle,
+    builder::{self, TopologyPieces, TopologyPiecesBuilder, reload_enrichment_tables},
     fanout::{ControlChannel, ControlMessage},
     handle_errors, retain, take_healthchecks,
-    task::TaskOutput,
-    BuiltBuffer, TaskHandle,
+    task::{Task, TaskOutput},
 };
 use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
@@ -21,18 +35,22 @@ use crate::{
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
+    utilization::UtilizationRegistry,
 };
-use futures::{future, Future, FutureExt};
-use tokio::{
-    sync::{mpsc, watch},
-    time::{interval, sleep_until, Duration, Instant},
-};
-use tracing::Instrument;
-use vector_lib::buffers::topology::channel::BufferSender;
-use vector_lib::tap::topology::{TapOutput, TapResource, WatchRx, WatchTx};
-use vector_lib::trigger::DisabledTrigger;
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
+
+#[derive(Debug, Snafu)]
+pub enum ReloadError {
+    #[snafu(display("global options changed: {}", changed_fields.join(", ")))]
+    GlobalOptionsChanged { changed_fields: Vec<String> },
+    #[snafu(display("failed to compute global diff: {}", source))]
+    GlobalDiffFailed { source: serde_json::Error },
+    #[snafu(display("topology build failed"))]
+    TopologyBuildFailed,
+    #[snafu(display("failed to restore previous config"))]
+    FailedToRestore,
+}
 
 #[allow(dead_code)]
 pub struct RunningTopology {
@@ -49,6 +67,11 @@ pub struct RunningTopology {
     watch: (WatchTx, WatchRx),
     pub(crate) running: Arc<AtomicBool>,
     graceful_shutdown_duration: Option<Duration>,
+    utilization_registry: Option<UtilizationRegistry>,
+    utilization_task: Option<TaskHandle>,
+    utilization_task_shutdown_trigger: Option<Trigger>,
+    metrics_task: Option<TaskHandle>,
+    metrics_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
 }
 
@@ -68,6 +91,11 @@ impl RunningTopology {
             running: Arc::new(AtomicBool::new(true)),
             graceful_shutdown_duration: config.graceful_shutdown_duration,
             config,
+            utilization_registry: None,
+            utilization_task: None,
+            utilization_task_shutdown_trigger: None,
+            metrics_task: None,
+            metrics_task_shutdown_trigger: None,
             pending_reload: None,
         }
     }
@@ -127,13 +155,23 @@ impl RunningTopology {
         // pump in self.tasks, and the other for source in self.source_tasks.
         let mut check_handles = HashMap::<ComponentKey, Vec<_>>::new();
 
+        let map_closure = |_result| ();
+
         // We need to give some time to the sources to gracefully shutdown, so
         // we will merge them with other tasks.
         for (key, task) in self.tasks.into_iter().chain(self.source_tasks.into_iter()) {
-            let task = task.map(|_result| ()).shared();
+            let task = task.map(map_closure).shared();
 
             wait_handles.push(task.clone());
             check_handles.entry(key).or_default().push(task);
+        }
+
+        if let Some(utilization_task) = self.utilization_task {
+            wait_handles.push(utilization_task.map(map_closure).shared());
+        }
+
+        if let Some(metrics_task) = self.metrics_task {
+            wait_handles.push(metrics_task.map(map_closure).shared());
         }
 
         // If we reach this, we will forcefully shutdown the sources. If None, we will never force shutdown.
@@ -161,7 +199,8 @@ impl RunningTopology {
 
                 error!(
                     components = ?remaining_components,
-                    "Failed to gracefully shut down in time. Killing components."
+                    message = "Failed to gracefully shut down in time. Killing components.",
+                    internal_log_rate_limit = false
                 );
             }) as future::BoxFuture<'static, ()>
         } else {
@@ -185,18 +224,29 @@ impl RunningTopology {
                     .collect::<Vec<_>>()
                     .join(", ");
 
-                let time_remaining = deadline
-                    .map(|d| match d.checked_duration_since(Instant::now()) {
-                        Some(remaining) => format!("{} seconds left", remaining.as_secs()),
-                        None => "overdue".to_string(),
-                    })
-                    .unwrap_or("no time limit".to_string());
+                let (deadline_passed, time_remaining) = match deadline {
+                    Some(d) => match d.checked_duration_since(Instant::now()) {
+                        Some(remaining) => (false, format!("{} seconds left", remaining.as_secs())),
+                        None => (true, "overdue".to_string()),
+                    },
+                    None => (false, "no time limit".to_string()),
+                };
 
                 info!(
                     remaining_components = ?remaining_components,
                     time_remaining = ?time_remaining,
                     "Shutting down... Waiting on running components."
                 );
+
+                let all_done = check_handles.is_empty();
+
+                if all_done {
+                    info!("Shutdown reporter exiting: all components shut down.");
+                    break;
+                } else if deadline_passed {
+                    error!(remaining_components = ?remaining_components, "Shutdown reporter: deadline exceeded.");
+                    break;
+                }
             }
         };
 
@@ -212,6 +262,12 @@ impl RunningTopology {
 
         // Now kick off the shutdown process by shutting down the sources.
         let source_shutdown_complete = self.shutdown_coordinator.shutdown_all(deadline);
+        if let Some(trigger) = self.utilization_task_shutdown_trigger {
+            trigger.cancel();
+        }
+        if let Some(trigger) = self.metrics_task_shutdown_trigger {
+            trigger.cancel();
+        }
 
         futures::future::join(source_shutdown_complete, shutdown_complete_future).map(|_| ())
     }
@@ -219,31 +275,26 @@ impl RunningTopology {
     /// Attempts to load a new configuration and update this running topology.
     ///
     /// If the new configuration was valid, and all changes were able to be made -- removing of
-    /// old components, changing of existing components, adding of new components -- then `Ok(true)`
-    /// is returned.
+    /// old components, changing of existing components, adding of new components -- then
+    /// `Ok(())` is returned.
     ///
     /// If the new configuration is not valid, or not all of the changes in the new configuration
     /// were able to be made, then this method will attempt to undo the changes made and bring the
-    /// topology back to its previous state.  If either of these scenarios occur, then `Ok(false)`
-    /// is returned.
+    /// topology back to its previous state, returning the appropriate error.
     ///
-    /// # Errors
-    ///
-    /// If all changes from the new configuration cannot be made, and the current configuration
-    /// cannot be fully restored, then `Err(())` is returned.
+    /// If the restore also fails, `ReloadError::FailedToRestore` is returned.
     pub async fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
         extra_context: ExtraContext,
-    ) -> Result<bool, ()> {
+    ) -> Result<(), ReloadError> {
         info!("Reloading running topology with new configuration.");
 
         if self.config.global != new_config.global {
-            error!(
-                message =
-                "Global options can't be changed while reloading config file; reload aborted. Please restart Vector to reload the configuration file."
-            );
-            return Ok(false);
+            return match self.config.global.diff(&new_config.global) {
+                Ok(changed_fields) => Err(ReloadError::GlobalOptionsChanged { changed_fields }),
+                Err(source) => Err(ReloadError::GlobalDiffFailed { source }),
+            };
         }
 
         // Calculate the change between the current configuration and the new configuration, and
@@ -269,13 +320,12 @@ impl RunningTopology {
         // Try to build all of the new components coming from the new configuration.  If we can
         // successfully build them, we'll attempt to connect them up to the topology and spawn their
         // respective component tasks.
-        if let Some(mut new_pieces) = TopologyPieces::build_or_log_errors(
-            &new_config,
-            &diff,
-            buffers.clone(),
-            extra_context.clone(),
-        )
-        .await
+        if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&new_config, &diff)
+            .with_buffers(buffers.clone())
+            .with_extra_context(extra_context.clone())
+            .with_utilization_registry(self.utilization_registry.clone())
+            .build_or_log_errors()
+            .await
         {
             // If healthchecks are configured for any of the changing/new components, try running
             // them before moving forward with connecting and spawning.  In some cases, healthchecks
@@ -290,7 +340,7 @@ impl RunningTopology {
 
                 info!("New configuration loaded successfully.");
 
-                return Ok(true);
+                return Ok(());
             }
         }
 
@@ -300,26 +350,35 @@ impl RunningTopology {
         warn!("Failed to completely load new configuration. Restoring old configuration.");
 
         let diff = diff.flip();
-        if let Some(mut new_pieces) =
-            TopologyPieces::build_or_log_errors(&self.config, &diff, buffers, extra_context.clone())
-                .await
-        {
-            if self
+        if let Some(mut new_pieces) = TopologyPiecesBuilder::new(&self.config, &diff)
+            .with_buffers(buffers)
+            .with_extra_context(extra_context.clone())
+            .with_utilization_registry(self.utilization_registry.clone())
+            .build_or_log_errors()
+            .await
+            && self
                 .run_healthchecks(&diff, &mut new_pieces, self.config.healthchecks)
                 .await
-            {
-                self.connect_diff(&diff, &mut new_pieces).await;
-                self.spawn_diff(&diff, new_pieces);
+        {
+            self.connect_diff(&diff, &mut new_pieces).await;
+            self.spawn_diff(&diff, new_pieces);
 
-                info!("Old configuration restored successfully.");
+            info!("Old configuration restored successfully.");
 
-                return Ok(false);
-            }
+            return Err(ReloadError::TopologyBuildFailed);
         }
 
-        error!("Failed to restore old configuration.");
+        error!(
+            message = "Failed to restore old configuration.",
+            internal_log_rate_limit = false
+        );
 
-        Err(())
+        Err(ReloadError::FailedToRestore)
+    }
+
+    /// Attempts to reload enrichment tables.
+    pub(crate) async fn reload_enrichment_tables(&self) {
+        reload_enrichment_tables(&self.config).await;
     }
 
     pub(crate) async fn run_healthchecks(
@@ -342,7 +401,10 @@ impl RunningTopology {
                     info!("All healthchecks passed.");
                     true
                 } else {
-                    error!("Sinks unhealthy.");
+                    error!(
+                        message = "Sinks unhealthy.",
+                        internal_log_rate_limit = false
+                    );
                     false
                 }
             } else {
@@ -370,7 +432,7 @@ impl RunningTopology {
 
             let deadline = Instant::now() + timeout;
             for key in &diff.sources.to_remove {
-                debug!(component = %key, "Removing source.");
+                debug!(component_id = %key, "Removing source.");
 
                 let previous = self.tasks.remove(key).unwrap();
                 drop(previous); // detach and forget
@@ -381,7 +443,7 @@ impl RunningTopology {
             }
 
             for key in &diff.sources.to_change {
-                debug!(component = %key, "Changing source.");
+                debug!(component_id = %key, "Changing source.");
 
                 self.remove_outputs(key);
                 source_shutdown_handles
@@ -410,17 +472,21 @@ impl RunningTopology {
         // depend on, and thus the closing of their buffer, will naturally cause them to shutdown,
         // which is why we don't do any manual triggering of shutdown here.
         for key in &diff.transforms.to_remove {
-            debug!(component = %key, "Removing transform.");
+            debug!(component_id = %key, "Removing transform.");
 
             let previous = self.tasks.remove(key).unwrap();
             drop(previous); // detach and forget
 
             self.remove_inputs(key, diff, new_config).await;
             self.remove_outputs(key);
+
+            if let Some(registry) = self.utilization_registry.as_ref() {
+                registry.remove_component(key);
+            }
         }
 
         for key in &diff.transforms.to_change {
-            debug!(component = %key, "Changing transform.");
+            debug!(component_id = %key, "Changing transform.");
 
             self.remove_inputs(key, diff, new_config).await;
             self.remove_outputs(key);
@@ -541,8 +607,12 @@ impl RunningTopology {
             }))
             .collect::<Vec<_>>();
         for key in &removed_sinks {
-            debug!(component = %key, "Removing sink.");
+            debug!(component_id = %key, "Removing sink.");
             self.remove_inputs(key, diff, new_config).await;
+
+            if let Some(registry) = self.utilization_registry.as_ref() {
+                registry.remove_component(key);
+            }
         }
 
         // After that, for any changed sinks, we temporarily detach their inputs (not remove) so
@@ -562,7 +632,7 @@ impl RunningTopology {
             .collect::<Vec<_>>();
 
         for key in &sinks_to_change {
-            debug!(component = %key, "Changing sink.");
+            debug!(component_id = %key, "Changing sink.");
             if reuse_buffers.contains(key) {
                 self.detach_triggers
                     .remove(key)
@@ -594,7 +664,7 @@ impl RunningTopology {
         for key in &removed_sinks {
             let previous = self.tasks.remove(key).unwrap();
             if wait_for_sinks.contains(key) {
-                debug!(message = "Waiting for sink to shutdown.", %key);
+                debug!(message = "Waiting for sink to shutdown.", component_id = %key);
                 previous.await.unwrap().unwrap();
             } else {
                 drop(previous); // detach and forget
@@ -605,7 +675,7 @@ impl RunningTopology {
         for key in &sinks_to_change {
             if wait_for_sinks.contains(key) {
                 let previous = self.tasks.remove(key).unwrap();
-                debug!(message = "Waiting for sink to shutdown.", %key);
+                debug!(message = "Waiting for sink to shutdown.", component_id = %key);
                 let buffer = previous.await.unwrap().unwrap();
 
                 if reuse_buffers.contains(key) {
@@ -667,8 +737,33 @@ impl RunningTopology {
                 self.inputs_tap_metadata.remove(key);
             }
 
+            let removed_sources = diff.enrichment_tables.to_remove.iter().filter_map(|key| {
+                self.config
+                    .enrichment_table(key)
+                    .and_then(|t| t.as_source(key).map(|(key, _)| key))
+            });
+            for key in removed_sources {
+                // Sources only have outputs
+                self.outputs_tap_metadata.remove(&key);
+            }
+
             for key in diff.sources.changed_and_added() {
                 if let Some(task) = new_pieces.tasks.get(key) {
+                    self.outputs_tap_metadata
+                        .insert(key.clone(), ("source", task.typetag().to_string()));
+                }
+            }
+
+            for key in diff
+                .enrichment_tables
+                .changed_and_added()
+                .filter_map(|key| {
+                    self.config
+                        .enrichment_table(key)
+                        .and_then(|t| t.as_source(key).map(|(key, _)| key))
+                })
+            {
+                if let Some(task) = new_pieces.tasks.get(&key) {
                     self.outputs_tap_metadata
                         .insert(key.clone(), ("source", task.typetag().to_string()));
                 }
@@ -690,7 +785,7 @@ impl RunningTopology {
         // We configure the outputs of any changed/added sources first, so they're available to any
         // transforms and sinks that come afterwards.
         for key in diff.sources.changed_and_added() {
-            debug!(component = %key, "Configuring outputs for source.");
+            debug!(component_id = %key, "Configuring outputs for source.");
             self.setup_outputs(key, new_pieces).await;
         }
 
@@ -699,28 +794,28 @@ impl RunningTopology {
             .changed_and_added()
             .filter(|k| new_pieces.source_tasks.contains_key(k))
             .collect();
-        for key in added_changed_table_sources {
-            debug!(component = %key, "Connecting outputs for enrichment table source.");
+        for key in added_changed_table_sources.iter() {
+            debug!(component_id = %key, "Connecting outputs for enrichment table source.");
             self.setup_outputs(key, new_pieces).await;
         }
 
         // We configure the outputs of any changed/added transforms next, for the same reason: we
         // need them to be available to any transforms and sinks that come afterwards.
         for key in diff.transforms.changed_and_added() {
-            debug!(component = %key, "Configuring outputs for transform.");
+            debug!(component_id = %key, "Configuring outputs for transform.");
             self.setup_outputs(key, new_pieces).await;
         }
 
         // Now that all possible outputs are configured, we can start wiring up inputs, starting
         // with transforms.
         for key in diff.transforms.changed_and_added() {
-            debug!(component = %key, "Connecting inputs for transform.");
+            debug!(component_id = %key, "Connecting inputs for transform.");
             self.setup_inputs(key, diff, new_pieces).await;
         }
 
         // Now that all sources and transforms are fully configured, we can wire up sinks.
         for key in diff.sinks.changed_and_added() {
-            debug!(component = %key, "Connecting inputs for sink.");
+            debug!(component_id = %key, "Connecting inputs for sink.");
             self.setup_inputs(key, diff, new_pieces).await;
         }
         let added_changed_tables: Vec<&ComponentKey> = diff
@@ -728,8 +823,8 @@ impl RunningTopology {
             .changed_and_added()
             .filter(|k| new_pieces.inputs.contains_key(k))
             .collect();
-        for key in added_changed_tables {
-            debug!(component = %key, "Connecting inputs for enrichment table sink.");
+        for key in added_changed_tables.iter() {
+            debug!(component_id = %key, "Connecting inputs for enrichment table sink.");
             self.setup_inputs(key, diff, new_pieces).await;
         }
 
@@ -778,11 +873,17 @@ impl RunningTopology {
                         .sources
                         .changed_and_added()
                         .map(|key| key.to_string())
+                        .chain(
+                            added_changed_table_sources
+                                .iter()
+                                .map(|key| key.to_string()),
+                        )
                         .collect(),
                     sink_keys: diff
                         .sinks
                         .changed_and_added()
                         .map(|key| key.to_string())
+                        .chain(added_changed_tables.iter().map(|key| key.to_string()))
                         .collect(),
                     // Note, only sources and transforms are relevant. Sinks do
                     // not have outputs to tap.
@@ -799,7 +900,7 @@ impl RunningTopology {
     ) {
         let outputs = new_pieces.outputs.remove(key).unwrap();
         for (port, output) in outputs {
-            debug!(component = %key, output_id = ?port, "Configuring output for component.");
+            debug!(component_id = %key, output_id = ?port, "Configuring output for component.");
 
             let id = OutputId {
                 component: key.clone(),
@@ -836,7 +937,7 @@ impl RunningTopology {
                 // If the input we're connecting to is changing, that means its outputs will have been
                 // recreated, so instead of replacing a paused sink, we have to add it to this new
                 // output for the first time, since there's nothing to actually replace at this point.
-                debug!(component = %key, fanout_id = %input, "Adding component input to fanout.");
+                debug!(component_id = %key, fanout_id = %input, "Adding component input to fanout.");
 
                 _ = output.send(ControlMessage::Add(key.clone(), tx.clone()));
             } else {
@@ -844,7 +945,7 @@ impl RunningTopology {
                 // components were changed, then the output must still exist, which means we paused
                 // this component's connection to its output, so we have to replace that connection
                 // now:
-                debug!(component = %key, fanout_id = %input, "Replacing component input in fanout.");
+                debug!(component_id = %key, fanout_id = %input, "Replacing component input in fanout.");
 
                 _ = output.send(ControlMessage::Replace(key.clone(), tx.clone()));
             }
@@ -888,14 +989,14 @@ impl RunningTopology {
                     // because it isn't coming back.
                     //
                     // Case 3: This component is no longer connected to the input from new config.
-                    debug!(component = %key, fanout_id = %input, "Removing component input from fanout.");
+                    debug!(component_id = %key, fanout_id = %input, "Removing component input from fanout.");
 
                     _ = output.send(ControlMessage::Remove(key.clone()));
                 } else {
                     // We know that if this component is connected to a given input, and it isn't being
                     // changed, then it will exist when we reconnect inputs, so we should pause it
                     // now to pause further sends through that component until we reconnect:
-                    debug!(component = %key, fanout_id = %input, "Pausing component input in fanout.");
+                    debug!(component_id = %key, fanout_id = %input, "Pausing component input in fanout.");
 
                     _ = output.send(ControlMessage::Pause(key.clone()));
                 }
@@ -911,7 +1012,7 @@ impl RunningTopology {
         for (transform_key, transform) in unchanged_transforms {
             let changed_outputs = get_changed_outputs(diff, transform.inputs.clone());
             for output_id in changed_outputs {
-                debug!(component = %transform_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
+                debug!(component_id = %transform_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
                 let input = self.inputs.get(transform_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
@@ -926,7 +1027,7 @@ impl RunningTopology {
         for (sink_key, sink) in unchanged_sinks {
             let changed_outputs = get_changed_outputs(diff, sink.inputs.clone());
             for output_id in changed_outputs {
-                debug!(component = %sink_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
+                debug!(component_id = %sink_key, fanout_id = %output_id.component, "Reattaching component input to fanout.");
 
                 let input = self.inputs.get(sink_key).cloned().unwrap();
                 let output = self.outputs.get_mut(&output_id).unwrap();
@@ -938,12 +1039,12 @@ impl RunningTopology {
     /// Starts any new or changed components in the given configuration diff.
     pub(crate) fn spawn_diff(&mut self, diff: &ConfigDiff, mut new_pieces: TopologyPieces) {
         for key in &diff.sources.to_change {
-            debug!(message = "Spawning changed source.", key = %key);
+            debug!(message = "Spawning changed source.", component_id = %key);
             self.spawn_source(key, &mut new_pieces);
         }
 
         for key in &diff.sources.to_add {
-            debug!(message = "Spawning new source.", key = %key);
+            debug!(message = "Spawning new source.", component_id = %key);
             self.spawn_source(key, &mut new_pieces);
         }
 
@@ -962,32 +1063,32 @@ impl RunningTopology {
             .collect();
 
         for key in changed_table_sources {
-            debug!(message = "Spawning changed enrichment table source.", key = %key);
+            debug!(message = "Spawning changed enrichment table source.", component_id = %key);
             self.spawn_source(key, &mut new_pieces);
         }
 
         for key in added_table_sources {
-            debug!(message = "Spawning new enrichment table source.", key = %key);
+            debug!(message = "Spawning new enrichment table source.", component_id = %key);
             self.spawn_source(key, &mut new_pieces);
         }
 
         for key in &diff.transforms.to_change {
-            debug!(message = "Spawning changed transform.", key = %key);
+            debug!(message = "Spawning changed transform.", component_id = %key);
             self.spawn_transform(key, &mut new_pieces);
         }
 
         for key in &diff.transforms.to_add {
-            debug!(message = "Spawning new transform.", key = %key);
+            debug!(message = "Spawning new transform.", component_id = %key);
             self.spawn_transform(key, &mut new_pieces);
         }
 
         for key in &diff.sinks.to_change {
-            debug!(message = "Spawning changed sink.", key = %key);
+            debug!(message = "Spawning changed sink.", component_id = %key);
             self.spawn_sink(key, &mut new_pieces);
         }
 
         for key in &diff.sinks.to_add {
-            trace!(message = "Spawning new sink.", key = %key);
+            trace!(message = "Spawning new sink.", component_id = %key);
             self.spawn_sink(key, &mut new_pieces);
         }
 
@@ -1010,12 +1111,12 @@ impl RunningTopology {
             .collect();
 
         for key in changed_tables {
-            debug!(message = "Spawning changed enrichment table sink.", key = %key);
+            debug!(message = "Spawning changed enrichment table sink.", component_id = %key);
             self.spawn_sink(key, &mut new_pieces);
         }
 
         for key in added_tables {
-            debug!(message = "Spawning enrichment table new sink.", key = %key);
+            debug!(message = "Spawning enrichment table new sink.", component_id = %key);
             self.spawn_sink(key, &mut new_pieces);
         }
     }
@@ -1164,9 +1265,10 @@ impl RunningTopology {
         extra_context: ExtraContext,
     ) -> Option<(Self, ShutdownErrorReceiver)> {
         let diff = ConfigDiff::initial(&config);
-        let pieces =
-            TopologyPieces::build_or_log_errors(&config, &diff, HashMap::new(), extra_context)
-                .await?;
+        let pieces = TopologyPiecesBuilder::new(&config, &diff)
+            .with_extra_context(extra_context)
+            .build_or_log_errors()
+            .await?;
         Self::start_validated(config, diff, pieces).await
     }
 
@@ -1183,8 +1285,8 @@ impl RunningTopology {
         ) {
             (Some(e), None) => {
                 warn!(
-                "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
-            );
+                    "DEPRECATED: `expire_metrics` setting is deprecated and will be removed in a future version. Use `expire_metrics_secs` instead."
+                );
                 if e < Duration::from_secs(0) {
                     None
                 } else {
@@ -1192,7 +1294,10 @@ impl RunningTopology {
                 }
             }
             (Some(_), Some(_)) => {
-                error!("Cannot set both `expire_metrics` and `expire_metrics_secs`.");
+                error!(
+                    message = "Cannot set both `expire_metrics` and `expire_metrics_secs`.",
+                    internal_log_rate_limit = false
+                );
                 return None;
             }
             (None, Some(e)) => {
@@ -1216,10 +1321,19 @@ impl RunningTopology {
                     .unwrap_or_default(),
             )
         {
-            error!(message = "Invalid metrics expiry.", %error);
+            error!(message = "Invalid metrics expiry.", %error, internal_log_rate_limit = false);
             return None;
         }
 
+        let (utilization_emitter, utilization_registry) = pieces
+            .utilization
+            .take()
+            .expect("Topology is missing the utilization metric emitter!");
+        let metrics_storage = pieces.metrics_storage.clone();
+        let metrics_refresh_period = config
+            .global
+            .metrics_storage_refresh_period
+            .map(Duration::from_secs_f64);
         let mut running_topology = Self::new(config, abort_tx);
 
         if !running_topology
@@ -1230,6 +1344,37 @@ impl RunningTopology {
         }
         running_topology.connect_diff(&diff, &mut pieces).await;
         running_topology.spawn_diff(&diff, pieces);
+
+        let (utilization_task_shutdown_trigger, utilization_shutdown_signal, _) =
+            ShutdownSignal::new_wired();
+        running_topology.utilization_registry = Some(utilization_registry.clone());
+        running_topology.utilization_task_shutdown_trigger =
+            Some(utilization_task_shutdown_trigger);
+        running_topology.utilization_task = Some(tokio::spawn(Task::new(
+            "utilization_heartbeat".into(),
+            "",
+            async move {
+                utilization_emitter
+                    .run_utilization(utilization_shutdown_signal)
+                    .await;
+                Ok(TaskOutput::Healthcheck)
+            },
+        )));
+        if let Some(metrics_refresh_period) = metrics_refresh_period {
+            let (metrics_task_shutdown_trigger, metrics_shutdown_signal, _) =
+                ShutdownSignal::new_wired();
+            running_topology.metrics_task_shutdown_trigger = Some(metrics_task_shutdown_trigger);
+            running_topology.metrics_task = Some(tokio::spawn(Task::new(
+                "metrics_heartbeat".into(),
+                "",
+                async move {
+                    metrics_storage
+                        .run_periodic_refresh(metrics_refresh_period, metrics_shutdown_signal)
+                        .await;
+                    Ok(TaskOutput::Healthcheck)
+                },
+            )));
+        }
 
         Some((running_topology, abort_rx))
     }

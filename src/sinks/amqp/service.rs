@@ -1,13 +1,14 @@
 //! The main tower service that takes the request created by the request builder
 //! and sends it to `AMQP`.
-use crate::sinks::prelude::*;
-use bytes::Bytes;
-use futures::future::BoxFuture;
-use lapin::{options::BasicPublishOptions, BasicProperties};
-use snafu::Snafu;
 use std::task::{Context, Poll};
 
+use bytes::Bytes;
+use futures::future::BoxFuture;
+use lapin::{BasicProperties, options::BasicPublishOptions};
+use snafu::Snafu;
+
 use super::channel::AmqpSinkChannels;
+use crate::sinks::prelude::*;
 
 /// The request contains the data to send to `AMQP` together
 /// with the information need to route the message.

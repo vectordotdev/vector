@@ -71,7 +71,7 @@ pub fn default_address() -> Option<SocketAddr> {
 /// Default GraphQL API address
 pub fn default_graphql_url() -> Url {
     let addr = default_address().unwrap();
-    Url::parse(&format!("http://{}/graphql", addr))
+    Url::parse(&format!("http://{addr}/graphql"))
         .expect("Couldn't parse default API URL. Please report this.")
 }
 
@@ -95,9 +95,7 @@ impl Options {
             // Prefer non default address
             (Some(a), Some(b)) => {
                 match (Some(a) == default_address(), Some(b) == default_address()) {
-                    (false, false) => {
-                        return Err(format!("Conflicting `api` address: {}, {} .", a, b))
-                    }
+                    (false, false) => return Err(format!("Conflicting `api` address: {a}, {b} .")),
                     (false, true) => Some(a),
                     (true, _) => Some(b),
                 }

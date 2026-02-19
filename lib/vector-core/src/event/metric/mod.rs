@@ -1,9 +1,5 @@
 #[cfg(feature = "vrl")]
 use std::convert::TryFrom;
-
-#[cfg(feature = "vrl")]
-use vrl::compiler::value::VrlValueConvert;
-
 use std::{
     convert::AsRef,
     fmt::{self, Display, Formatter},
@@ -12,17 +8,19 @@ use std::{
 
 use chrono::{DateTime, Utc};
 use vector_common::{
+    EventDataEq,
     byte_size_of::ByteSizeOf,
     internal_event::{OptionalTag, TaggedEventsSent},
     json_size::JsonSize,
     request_metadata::GetEventCountTags,
-    EventDataEq,
 };
 use vector_config::configurable_component;
+#[cfg(feature = "vrl")]
+use vrl::compiler::value::VrlValueConvert;
 
 use super::{
-    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf, BatchNotifier, EventFinalizer,
-    EventFinalizers, EventMetadata, Finalizable,
+    BatchNotifier, EventFinalizer, EventFinalizers, EventMetadata, Finalizable,
+    estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf,
 };
 use crate::config::telemetry;
 
@@ -667,7 +665,7 @@ pub fn samples_to_buckets(samples: &[Sample], buckets: &[f64]) -> (Vec<Bucket>, 
 mod test {
     use std::collections::BTreeSet;
 
-    use chrono::{offset::TimeZone, DateTime, Timelike, Utc};
+    use chrono::{DateTime, Timelike, Utc, offset::TimeZone};
     use similar_asserts::assert_eq;
 
     use super::*;
@@ -896,6 +894,33 @@ mod test {
         );
 
         assert!(!new_reset_histogram.subtract(&old_histogram));
+    }
+
+    #[test]
+    fn subtract_aggregated_histograms_bucket_redistribution() {
+        // Test for issue #24415: when total count is higher but individual bucket counts is sometimes lower
+        let old_histogram = Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 15,
+                sum: 15.0,
+                buckets: buckets!(1.0 => 10, 2.0 => 5),
+            },
+        );
+
+        let mut new_histogram_with_redistribution = Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 20,
+                sum: 20.0,
+                // Total count is higher (20 > 15), but bucket1 count is lower (8 < 10)
+                buckets: buckets!(1.0 => 8, 2.0 => 12),
+            },
+        );
+
+        assert!(!new_histogram_with_redistribution.subtract(&old_histogram));
     }
 
     #[test]

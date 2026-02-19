@@ -1,16 +1,18 @@
+use futures_util::StreamExt;
+use tokio::time::{Duration, sleep};
+use tokio_stream::wrappers::UnboundedReceiverStream;
+
 use crate::{
     config::Config,
     sinks::socket::SocketSinkConfig,
     sources::socket::SocketConfig,
     test_util::{
-        mock::{error_sink, error_source, panic_sink, panic_source},
-        next_addr, random_lines, send_lines, start_topology, trace_init, wait_for_tcp,
         CountReceiver,
+        addr::next_addr,
+        mock::{error_sink, error_source, panic_sink, panic_source},
+        random_lines, send_lines, start_topology, trace_init, wait_for_tcp,
     },
 };
-use futures_util::StreamExt;
-use tokio::time::{sleep, Duration};
-use tokio_stream::wrappers::UnboundedReceiverStream;
 
 /// Ensures that an unrelated source completing immediately with an error does not prematurely terminate the topology.
 #[tokio::test]
@@ -19,8 +21,8 @@ async fn test_source_error() {
 
     let num_lines: usize = 10;
 
-    let in_addr = next_addr();
-    let out_addr = next_addr();
+    let (_guard_0, in_addr) = next_addr();
+    let (_guard_1, out_addr) = next_addr();
 
     let mut config = Config::builder();
     config.add_source("in", SocketConfig::make_basic_tcp_config(in_addr));
@@ -63,8 +65,8 @@ async fn test_source_panic() {
 
     let num_lines: usize = 10;
 
-    let in_addr = next_addr();
-    let out_addr = next_addr();
+    let (_guard_0, in_addr) = next_addr();
+    let (_guard_1, out_addr) = next_addr();
 
     let mut config = Config::builder();
     config.add_source("in", SocketConfig::make_basic_tcp_config(in_addr));
@@ -109,9 +111,9 @@ async fn test_sink_error() {
 
     let num_lines: usize = 10;
 
-    let in1_addr = next_addr();
-    let in2_addr = next_addr();
-    let out_addr = next_addr();
+    let (_guard_in1, in1_addr) = next_addr();
+    let (_guard_in2, in2_addr) = next_addr();
+    let (_guard_out, out_addr) = next_addr();
 
     let mut config = Config::builder();
     config.add_source("in1", SocketConfig::make_basic_tcp_config(in1_addr));
@@ -157,9 +159,9 @@ async fn test_sink_panic() {
 
     let num_lines: usize = 10;
 
-    let in1_addr = next_addr();
-    let in2_addr = next_addr();
-    let out_addr = next_addr();
+    let (_guard_in1, in1_addr) = next_addr();
+    let (_guard_in2, in2_addr) = next_addr();
+    let (_guard_out, out_addr) = next_addr();
 
     let mut config = Config::builder();
     config.add_source("in1", SocketConfig::make_basic_tcp_config(in1_addr));

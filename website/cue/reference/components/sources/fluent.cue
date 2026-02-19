@@ -51,7 +51,7 @@ components: sources: fluent: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.fluent.configuration
+	configuration: generated.components.sources.fluent.configuration
 
 	output: logs: line: {
 		description: "A Fluent message"

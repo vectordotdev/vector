@@ -1,16 +1,19 @@
 use std::{convert::TryFrom, iter::zip};
 
+use vector_common::sensitive_string::SensitiveString;
 use vector_lib::lookup::PathPrefix;
 
 use crate::{
     codecs::Transformer,
+    config::ProxyConfig,
     event::{LogEvent, Metric, MetricKind, MetricValue, ObjectMap, Value},
     sinks::{
         elasticsearch::{
-            sink::process_log, BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
-            ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode, VersionType,
+            BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
+            ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
+            VersionType, sink::process_log,
         },
-        util::encoding::Encoder,
+        util::{auth::Auth, encoding::Encoder},
     },
     template::Template,
 };
@@ -87,8 +90,9 @@ async fn encoding_with_external_versioning_without_version_set_does_not_include_
 
 #[tokio::test]
 async fn encoding_with_external_versioning_with_version_set_includes_version() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
+
+    use crate::config::log_schema;
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
@@ -136,8 +140,9 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
 
 #[tokio::test]
 async fn encoding_with_external_gte_versioning_with_version_set_includes_version() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
+
+    use crate::config::log_schema;
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
@@ -363,10 +368,12 @@ async fn handle_metrics() {
         encoded_lines.first().unwrap(),
         r#"{"create":{"_type":"_doc","_index":"vector"}}"#
     );
-    assert!(encoded_lines
-        .get(1)
-        .unwrap()
-        .starts_with(r#"{"gauge":{"value":42.0},"kind":"absolute","name":"cpu","timestamp""#));
+    assert!(
+        encoded_lines
+            .get(1)
+            .unwrap()
+            .starts_with(r#"{"gauge":{"value":42.0},"kind":"absolute","name":"cpu","timestamp""#)
+    );
 }
 
 #[tokio::test]
@@ -666,4 +673,106 @@ async fn datastream_index_name() {
         let processed_event = process_log(log, &es.mode, None, &config.encoding).unwrap();
         assert_eq!(processed_event.index, test_case.want, "{test_case:?}");
     }
+}
+
+#[tokio::test]
+async fn test_parse_config_with_uri_auth() {
+    let config = ElasticsearchConfig {
+        endpoints: vec!["http://user:pass@localhost:9200".to_string()],
+        ..Default::default()
+    };
+    let proxy = ProxyConfig::default();
+    let mut version = None;
+
+    let result = ElasticsearchCommon::parse_config(
+        &config,
+        "http://user:pass@localhost:9200",
+        &proxy,
+        &mut version,
+    )
+    .await;
+    assert!(result.is_ok());
+    let common = result.unwrap();
+
+    assert!(
+        common.auth.is_some(),
+        "Expected auth to be the one provided in the uri, got None"
+    );
+
+    let expected_auth = crate::http::Auth::Basic {
+        user: "user".to_string(),
+        password: SensitiveString::from("pass".to_string()),
+    };
+
+    let got_auth_inner = match common.auth.as_ref().unwrap() {
+        Auth::Basic(auth) => auth,
+        #[cfg(feature = "aws-core")]
+        Auth::Aws { .. } => panic!("Expected auth to be Basic"),
+    };
+
+    assert_eq!(
+        *got_auth_inner, expected_auth,
+        "Expected auth to be Basic with user 'user' and password 'pass'"
+    );
+}
+
+#[tokio::test]
+async fn test_parse_config_with_config_auth() {
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuthConfig::Basic {
+            user: "config_user".to_string(),
+            password: SensitiveString::from("config_pass".to_string()),
+        }),
+        endpoints: vec!["http://localhost:9200".to_string()],
+        ..Default::default()
+    };
+    let proxy = ProxyConfig::default();
+    let mut version = None;
+
+    let result =
+        ElasticsearchCommon::parse_config(&config, "http://localhost:9200", &proxy, &mut version)
+            .await;
+    assert!(result.is_ok());
+    let common = result.unwrap();
+
+    let expected_auth = crate::http::Auth::Basic {
+        user: "config_user".to_string(),
+        password: SensitiveString::from("config_pass".to_string()),
+    };
+
+    let got_auth_inner = match common.auth.as_ref().unwrap() {
+        Auth::Basic(auth) => auth,
+        #[cfg(feature = "aws-core")]
+        Auth::Aws { .. } => panic!("Expected auth to be Basic"),
+    };
+
+    assert_eq!(
+        *got_auth_inner, expected_auth,
+        "Expected auth to be Basic with user 'user' and password 'pass'"
+    );
+}
+
+#[tokio::test]
+async fn test_parse_config_with_conflicting_auth() {
+    let config = ElasticsearchConfig {
+        auth: Some(ElasticsearchAuthConfig::Basic {
+            user: "config_user".to_string(),
+            password: SensitiveString::from("config_pass".to_string()),
+        }),
+        endpoints: vec!["http://uri_user:uri_pass@localhost:9200".to_string()],
+        ..Default::default()
+    };
+    let proxy = ProxyConfig::default();
+    let mut version = None;
+
+    let result = ElasticsearchCommon::parse_config(
+        &config,
+        "http://uri_user:uri_pass@localhost:9200",
+        &proxy,
+        &mut version,
+    )
+    .await;
+
+    // Should fail due to auth being specified in both places
+    assert!(result.is_err());
 }

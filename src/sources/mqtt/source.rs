@@ -1,21 +1,21 @@
 use itertools::Itertools;
-use vector_lib::config::LogNamespace;
-use vector_lib::internal_event::EventsReceived;
+use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
+use vector_lib::{
+    codecs::Decoder,
+    config::{LegacyKey, LogNamespace},
+    internal_event::EventsReceived,
+    lookup::path,
+};
 
 use crate::{
-    codecs::Decoder,
-    common::mqtt::MqttConnector,
-    event::BatchNotifier,
-    event::Event,
-    internal_events::{EndpointBytesReceived, StreamClosedError},
-    shutdown::ShutdownSignal,
-    sources::mqtt::MqttSourceConfig,
-    sources::util,
     SourceSender,
+    common::mqtt::MqttConnector,
+    event::{BatchNotifier, Event},
+    internal_events::{EndpointBytesReceived, StreamClosedError},
+    serde::OneOrMany,
+    shutdown::ShutdownSignal,
+    sources::{mqtt::MqttSourceConfig, util},
 };
-use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS};
-use vector_lib::config::LegacyKey;
-use vector_lib::lookup::path;
 
 pub struct MqttSource {
     connector: MqttConnector,
@@ -42,10 +42,25 @@ impl MqttSource {
     pub async fn run(self, mut out: SourceSender, shutdown: ShutdownSignal) -> Result<(), ()> {
         let (client, mut connection) = self.connector.connect();
 
-        client
-            .subscribe(&self.config.topic, QoS::AtLeastOnce)
-            .await
-            .map_err(|_| ())?;
+        match &self.config.topic {
+            OneOrMany::One(topic) => {
+                client
+                    .subscribe(topic, QoS::AtLeastOnce)
+                    .await
+                    .map_err(|_| ())?;
+            }
+            OneOrMany::Many(topics) => {
+                client
+                    .subscribe_many(
+                        topics
+                            .iter()
+                            .cloned()
+                            .map(|topic| SubscribeFilter::new(topic, QoS::AtLeastOnce)),
+                    )
+                    .await
+                    .map_err(|_| ())?;
+            }
+        }
 
         loop {
             tokio::select! {
@@ -81,7 +96,7 @@ impl MqttSource {
         let events_received = register!(EventsReceived);
 
         let (batch, _batch_receiver) = BatchNotifier::maybe_new_with_receiver(false);
-        // Error is logged by `crate::codecs::Decoder`, no further handling
+        // Error is logged by `vector_lib::codecs::Decoder`, no further handling
         // is needed here.
         let decoded = util::decode_message(
             self.decoder.clone(),
@@ -107,7 +122,7 @@ impl MqttSource {
     }
 
     fn apply_metadata(&self, publish: &Publish, event: &mut Event) {
-        if let Event::Log(ref mut log) = event {
+        if let Event::Log(log) = event {
             self.log_namespace.insert_source_metadata(
                 MqttSourceConfig::NAME,
                 log,

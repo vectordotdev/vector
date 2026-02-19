@@ -1,15 +1,15 @@
 use std::time::Duration;
 
 use http::{
-    header::{self, HeaderMap, HeaderValue},
     Request, Response,
+    header::{self, HeaderMap, HeaderValue},
 };
-use hyper::{body::HttpBody, Error};
+use hyper::{Error, body::HttpBody};
 use metrics::{counter, histogram};
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type};
+use vector_lib::NamedInternalEvent;
+use vector_lib::internal_event::{InternalEvent, error_stage, error_type};
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct AboutToSendHttpRequest<'a, T> {
     pub request: &'a Request<T>,
 }
@@ -44,7 +44,7 @@ impl<T: HttpBody> InternalEvent for AboutToSendHttpRequest<'_, T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct GotHttpResponse<'a, T> {
     pub response: &'a Response<T>,
     pub roundtrip: Duration,
@@ -73,7 +73,7 @@ impl<T: HttpBody> InternalEvent for GotHttpResponse<'_, T> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct GotHttpWarning<'a> {
     pub error: &'a Error,
     pub roundtrip: Duration,
@@ -86,7 +86,6 @@ impl InternalEvent for GotHttpWarning<'_> {
             error = %self.error,
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::PROCESSING,
-
         );
         counter!("http_client_errors_total", "error_kind" => self.error.to_string()).increment(1);
         histogram!("http_client_rtt_seconds").record(self.roundtrip);
@@ -103,13 +102,13 @@ impl<B: HttpBody> std::fmt::Display for FormatBody<'_, B> {
         let size = self.0.size_hint();
         match (size.lower(), size.upper()) {
             (0, None) => write!(fmt, "[unknown]"),
-            (lower, None) => write!(fmt, "[>={} bytes]", lower),
+            (lower, None) => write!(fmt, "[>={lower} bytes]"),
 
             (0, Some(0)) => write!(fmt, "[empty]"),
-            (0, Some(upper)) => write!(fmt, "[<={} bytes]", upper),
+            (0, Some(upper)) => write!(fmt, "[<={upper} bytes]"),
 
-            (lower, Some(upper)) if lower == upper => write!(fmt, "[{} bytes]", lower),
-            (lower, Some(upper)) => write!(fmt, "[{}..={} bytes]", lower, upper),
+            (lower, Some(upper)) if lower == upper => write!(fmt, "[{lower} bytes]"),
+            (lower, Some(upper)) => write!(fmt, "[{lower}..={upper} bytes]"),
         }
     }
 }

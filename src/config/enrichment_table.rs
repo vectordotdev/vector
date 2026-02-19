@@ -1,13 +1,13 @@
 use enum_dispatch::enum_dispatch;
 use serde::Serialize;
-use vector_lib::config::GlobalOptions;
-use vector_lib::configurable::{configurable_component, Configurable, NamedComponent, ToValue};
-use vector_lib::id::{ComponentKey, Inputs};
+use vector_lib::{
+    config::GlobalOptions,
+    configurable::{Configurable, NamedComponent, ToValue, configurable_component},
+    id::{ComponentKey, Inputs},
+};
 
+use super::{SinkConfig, SinkOuter, SourceConfig, SourceOuter, dot_graph::GraphConfig};
 use crate::enrichment_tables::EnrichmentTables;
-
-use super::dot_graph::GraphConfig;
-use super::{SinkConfig, SinkOuter, SourceConfig, SourceOuter};
 
 /// Fully resolved enrichment table component.
 #[configurable_component]

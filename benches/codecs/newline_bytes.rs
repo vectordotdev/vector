@@ -2,12 +2,13 @@ use std::{fmt, time::Duration};
 
 use bytes::BytesMut;
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, BenchmarkId, Criterion,
-    SamplingMode, Throughput,
+    BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
+    measurement::WallTime,
 };
 use tokio_util::codec::Decoder;
 use vector_lib::codecs::{
-    decoding::Deserializer, decoding::Framer, BytesDeserializer, NewlineDelimitedDecoder,
+    BytesDeserializer, NewlineDelimitedDecoder,
+    decoding::{Deserializer, Framer},
 };
 
 #[derive(Debug)]
@@ -50,8 +51,8 @@ fn decoding(c: &mut Criterion) {
                         let framer = Framer::NewlineDelimited(
                             param
                                 .max_length
-                                .map(|ml| NewlineDelimitedDecoder::new_with_max_length(ml))
-                                .unwrap_or(NewlineDelimitedDecoder::new()),
+                                .map(NewlineDelimitedDecoder::new_with_max_length)
+                                .unwrap_or_default(),
                         );
                         let deserializer = Deserializer::Bytes(BytesDeserializer);
                         let decoder = vector::codecs::Decoder::new(framer, deserializer);

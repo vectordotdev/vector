@@ -6,21 +6,20 @@ use vector_lib::{
     sensitive_string::SensitiveString,
 };
 
+use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 use crate::{
     http::HttpClient,
     sinks::{
         prelude::*,
         splunk_hec::common::{
+            EndpointTarget, SplunkHecDefaultBatchSettings,
             acknowledgements::HecClientAcknowledgementsConfig,
             build_healthcheck, build_http_batch_service, create_client,
             service::{HecService, HttpRequestBuilder},
-            EndpointTarget, SplunkHecDefaultBatchSettings,
         },
         util::http::HttpRetryLogic,
     },
 };
-
-use super::{encoder::HecLogsEncoder, request_builder::HecLogsRequestBuilder, sink::HecLogsSink};
 
 /// Configuration for the `splunk_hec_logs` sink.
 #[configurable_component(sink(
@@ -241,7 +240,7 @@ impl HecLogsSinkConfig {
             self.compression,
         ));
         let http_service = ServiceBuilder::new()
-            .settings(request_settings, HttpRetryLogic)
+            .settings(request_settings, HttpRetryLogic::default())
             .service(build_http_batch_service(
                 client,
                 Arc::clone(&http_request_builder),
@@ -283,12 +282,13 @@ impl HecLogsSinkConfig {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use crate::components::validation::prelude::*;
     use vector_lib::{
-        codecs::{encoding::format::JsonSerializerOptions, JsonSerializerConfig, MetricTagValues},
+        codecs::{JsonSerializerConfig, MetricTagValues, encoding::format::JsonSerializerOptions},
         config::LogNamespace,
     };
+
+    use super::*;
+    use crate::components::validation::prelude::*;
 
     #[test]
     fn generate_config() {

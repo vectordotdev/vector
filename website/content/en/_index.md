@@ -16,7 +16,7 @@ why:
   description: "Vector strives to be the only tool you need to get observability data from A to B, [deploying](/docs/setup/deployment) as a [daemon](/docs/setup/deployment/roles/#daemon), [sidecar](/docs/setup/deployment/roles/#sidecar), or [aggregator](/docs/setup/deployment/roles/#aggregator)."
   icon: "chart.svg"
 -  title: "Unified"
-   description: "Vector supports [logs](/docs/about/under-the-hood/architecture/data-model/log) and [metrics](/docs/about/under-the-hood/architecture/data-model/metric), making it easy to collect and process all your observability data."
+   description: "Vector supports [logs](/docs/architecture/data-model/log) and [metrics](/docs/architecture/data-model/metric), making it easy to collect and process all your observability data."
    icon: "hex.svg"
 - title: "Vendor neutral"
   description: "Vector doesn't favor any specific vendor platforms and fosters a fair, open ecosystem with your best interests in mind. Lock-in free and future proof."
@@ -25,7 +25,7 @@ why:
   description: "Vector's highly configurable [transforms](/docs/reference/configuration/transforms) give you the full power of programmable runtimes. Handle complex use cases without limitation."
   icon: "code.svg"
 - title: "Clear guarantees"
-  description: "Guarantees matter, and Vector is clear on [which guarantees](/docs/about/under-the-hood/guarantees) it provides, helping you make the appropriate trade-offs for your use case."
+  description: "Guarantees matter, and Vector is clear on [which guarantees](/docs/architecture/guarantees) it provides, helping you make the appropriate trade-offs for your use case."
   icon: "laptop.svg"
 
 # Platform section

@@ -56,7 +56,7 @@ components: sources: socket: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.socket.configuration
+	configuration: generated.components.sources.socket.configuration
 
 	output: {
 		logs: line: {
@@ -92,10 +92,10 @@ components: sources: socket: {
 			}
 		}
 		metrics: "": {
-			description: "The input `metric` event."
+			description: "Metric events that may be emitted by this source."
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 

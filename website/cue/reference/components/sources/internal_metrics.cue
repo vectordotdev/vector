@@ -36,7 +36,7 @@ components: sources: internal_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.internal_metrics.configuration
+	configuration: generated.components.sources.internal_metrics.configuration
 
 	output: metrics: {
 		// Default internal metrics tags
@@ -83,6 +83,18 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags
+		}
+		component_timed_out_events_total: {
+			description:       "The total number of events for which this source responded with a timeout error."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		component_timed_out_requests_total: {
+			description:       "The total number of requests for which this source responded with a timeout error."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
 		}
 		connection_established_total: {
 			description:       "The total number of times a connection has been established."
@@ -223,6 +235,24 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		doris_bytes_loaded_total: {
+			description:       "The total number of bytes loaded into Doris."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		doris_rows_filtered_total: {
+			description:       "The total number of rows filtered by Doris during stream load."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
+		doris_rows_loaded_total: {
+			description:       "The total number of rows successfully loaded into Doris."
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _component_tags
+		}
 		k8s_format_picker_edge_cases_total: {
 			description:       "The total number of edge cases encountered while picking format of the Kubernetes log message."
 			type:              "counter"
@@ -243,13 +273,51 @@ components: sources: internal_metrics: {
 				reason: _reason
 			}
 		}
+		component_latency_seconds: {
+			description: """
+				The elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
+				"""
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		component_latency_mean_seconds: {
+			description: """
+				The mean elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
+
+				This value is smoothed over time using an exponentially weighted moving average (EWMA).
+				"""
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		buffer_byte_size: {
-			description:       "The number of bytes current in the buffer."
+			description:        "The number of bytes currently in the buffer."
+			type:               "gauge"
+			default_namespace:  "vector"
+			tags:               _component_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_bytes`](#buffer_size_bytes)."
+		}
+		buffer_events: {
+			description:        "The number of events currently in the buffer."
+			type:               "gauge"
+			default_namespace:  "vector"
+			tags:               _component_tags
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`buffer_size_events`](#buffer_size_events)."
+		}
+		buffer_size_bytes: {
+			description:       "The number of bytes currently in the buffer."
 			type:              "gauge"
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
-		buffer_events: {
+		buffer_size_events: {
 			description:       "The number of events currently in the buffer."
 			type:              "gauge"
 			default_namespace: "vector"
@@ -706,6 +774,66 @@ components: sources: internal_metrics: {
 			default_namespace: "vector"
 			tags:              _component_tags
 		}
+		source_buffer_max_byte_size: {
+			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_bytes`](#source_buffer_max_size_bytes)."
+		}
+		source_buffer_max_event_size: {
+			description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`source_buffer_max_size_events`](#source_buffer_max_size_events)."
+		}
+		source_buffer_max_size_bytes: {
+			description:       "The maximum number of bytes the source buffer can hold. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		source_buffer_max_size_events: {
+			description:       "The maximum number of events the source buffer can hold. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		source_buffer_utilization: {
+			description:       "The utilization level of the source buffer. The outputs of the source send data to this buffer."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		source_buffer_utilization_level: {
+			description:       "The current utilization level of the source buffer. The outputs of the source send data to this buffer."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		source_buffer_utilization_mean: {
+			description:       "The mean utilization level of the source buffer. The outputs of the source send data to this buffer. The mean utilization is smoothed over time using an exponentially weighted moving average (EWMA)."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
 		splunk_pending_acks: {
 			description:       "The number of outstanding Splunk HEC indexer acknowledgement acks."
 			type:              "gauge"
@@ -717,6 +845,28 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
+		}
+		s3_object_processing_failed_duration_seconds: {
+			description:       "The time taken to process an S3 object that failed, in seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				bucket: {
+					description: "The name of the S3 bucket."
+					required:    true
+				}
+			}
+		}
+		s3_object_processing_succeeded_duration_seconds: {
+			description:       "The time taken to process an S3 object that succeeded, in seconds."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				bucket: {
+					description: "The name of the S3 bucket."
+					required:    true
+				}
+			}
 		}
 		sqs_message_delete_succeeded_total: {
 			description:       "The total number of successful deletions of SQS messages."
@@ -783,6 +933,66 @@ components: sources: internal_metrics: {
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _component_tags
+		}
+		transform_buffer_max_byte_size: {
+			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_bytes`](#transform_buffer_max_size_bytes)."
+		}
+		transform_buffer_max_event_size: {
+			description:       "The maximum number of events the buffer that feeds into a transform can hold."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+			deprecated:         true
+			deprecated_message: "This metric has been deprecated in favor of [`transform_buffer_max_size_events`](#transform_buffer_max_size_events)."
+		}
+		transform_buffer_max_size_bytes: {
+			description:       "The maximum number of bytes the buffer that feeds into a transform can hold."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		transform_buffer_max_size_events: {
+			description:       "The maximum number of events the buffer that feeds into a transform can hold."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		transform_buffer_utilization: {
+			description:       "The utilization level of the buffer that feeds into a transform."
+			type:              "histogram"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		transform_buffer_utilization_level: {
+			description:       "The current utilization level of the buffer that feeds into a transform."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
+		}
+		transform_buffer_utilization_mean: {
+			description:       "The mean utilization level of the buffer that feeds into a transform. This value is smoothed over time using an exponentially weighted moving average (EWMA)."
+			type:              "gauge"
+			default_namespace: "vector"
+			tags: _component_tags & {
+				output: _output
+			}
 		}
 		uptime_seconds: {
 			description:       "The total number of seconds the Vector instance has been up."
@@ -884,6 +1094,22 @@ components: sources: internal_metrics: {
 			description: """
 				The total number of times the Windows service has been uninstalled.
 				"""
+			type:              "counter"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+
+		// config metrics
+		config_reload_rejected: {
+			description:       "Number of configuration reload attempts that were rejected."
+			type:              "counter"
+			default_namespace: "vector"
+			tags: _internal_metrics_tags & {
+				reason: _reason
+			}
+		}
+		config_reloaded: {
+			description:       "Number of times a new configuration was loaded successfully."
 			type:              "counter"
 			default_namespace: "vector"
 			tags:              _internal_metrics_tags

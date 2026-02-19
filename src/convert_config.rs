@@ -1,9 +1,13 @@
-use crate::config::{format, ConfigBuilder, Format};
+use std::{
+    fs,
+    path::{Path, PathBuf},
+    str::FromStr,
+};
+
 use clap::Parser;
 use colored::*;
-use std::fs;
-use std::path::{Path, PathBuf};
-use std::str::FromStr;
+
+use crate::config::{ConfigBuilder, Format, format};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -58,12 +62,12 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     }
 
     if opts.input_path.is_file() && opts.output_path.extension().is_some() {
-        if let Some(base_dir) = opts.output_path.parent() {
-            if !base_dir.exists() {
-                fs::create_dir_all(base_dir).unwrap_or_else(|_| {
-                    panic!("Failed to create output dir(s): {:?}", &opts.output_path)
-                });
-            }
+        if let Some(base_dir) = opts.output_path.parent()
+            && !base_dir.exists()
+        {
+            fs::create_dir_all(base_dir).unwrap_or_else(|_| {
+                panic!("Failed to create output dir(s): {:?}", &opts.output_path)
+            });
         }
 
         match convert_config(&opts.input_path, &opts.output_path, opts.output_format) {
@@ -207,12 +211,18 @@ fn walk_dir_and_convert(
     feature = "sinks-console"
 ))]
 mod tests {
-    use crate::config::{format, ConfigBuilder, Format};
-    use crate::convert_config::{check_paths, walk_dir_and_convert, Opts};
-    use std::path::{Path, PathBuf};
-    use std::str::FromStr;
-    use std::{env, fs};
+    use std::{
+        env, fs,
+        path::{Path, PathBuf},
+        str::FromStr,
+    };
+
     use tempfile::tempdir;
+
+    use crate::{
+        config::{ConfigBuilder, Format, format},
+        convert_config::{Opts, check_paths, walk_dir_and_convert},
+    };
 
     fn test_data_dir() -> PathBuf {
         PathBuf::from(env::var_os("CARGO_MANIFEST_DIR").unwrap()).join("tests/data/cmd/config")

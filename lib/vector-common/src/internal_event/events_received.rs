@@ -1,4 +1,4 @@
-use metrics::{counter, histogram, Counter, Histogram};
+use metrics::{Counter, Histogram, counter, histogram};
 use tracing::trace;
 
 use super::CountByteSize;

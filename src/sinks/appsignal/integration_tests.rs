@@ -1,5 +1,5 @@
 use bytes::Bytes;
-use futures::{channel::mpsc::Receiver, stream, StreamExt};
+use futures::{StreamExt, channel::mpsc::Receiver, stream};
 use http::header::AUTHORIZATION;
 use hyper::StatusCode;
 use indoc::indoc;
@@ -9,14 +9,17 @@ use vector_lib::event::{
 
 use crate::{
     config::SinkConfig,
-    sinks::appsignal::config::AppsignalConfig,
-    sinks::util::test::{build_test_server_status, load_sink},
+    sinks::{
+        appsignal::config::AppsignalConfig,
+        util::test::{build_test_server_status, load_sink},
+    },
     test_util::{
+        addr::next_addr,
         components::{
-            assert_sink_compliance, assert_sink_error, run_and_assert_sink_compliance,
-            COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS,
+            COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, assert_sink_compliance, assert_sink_error,
+            run_and_assert_sink_compliance,
         },
-        generate_lines_with_stream, map_event_batch_stream, next_addr,
+        generate_lines_with_stream, map_event_batch_stream,
     },
 };
 
@@ -27,9 +30,9 @@ async fn start_test(events: Vec<Event>) -> (Vec<Event>, Receiver<(http::request:
     "#};
     let config = config.replace("${TEST_APPSIGNAL_PUSH_API_KEY}", &push_api_key());
     let (mut config, cx) = load_sink::<AppsignalConfig>(config.as_str()).unwrap();
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Set the endpoint to a local server so we can fetch the sent events later
-    config.endpoint = format!("http://{}", addr);
+    config.endpoint = format!("http://{addr}");
 
     let (sink, _) = config.build(cx).await.unwrap();
 
@@ -57,7 +60,7 @@ async fn logs_real_endpoint() {
 
     let (sink, _) = config.build(cx).await.unwrap();
     let (batch, receiver) = BatchNotifier::new_with_receiver();
-    let generator = |index| format!("this is a log with index {}", index);
+    let generator = |index| format!("this is a log with index {index}");
     let (_, events) = generate_lines_with_stream(generator, 10, Some(batch));
 
     run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
@@ -101,14 +104,14 @@ async fn metrics_shape() {
         .flat_map(|index| {
             vec![
                 Event::Metric(Metric::new(
-                    format!("counter_{}", index),
+                    format!("counter_{index}"),
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: index as f64,
                     },
                 )),
                 Event::Metric(Metric::new(
-                    format!("counter_{}", index),
+                    format!("counter_{index}"),
                     MetricKind::Absolute,
                     MetricValue::Counter {
                         value: (index + index) as f64,

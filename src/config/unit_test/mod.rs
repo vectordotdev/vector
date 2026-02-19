@@ -16,15 +16,15 @@ use std::{
     sync::Arc,
 };
 
-use futures_util::{stream::FuturesUnordered, StreamExt};
+use futures_util::{StreamExt, stream::FuturesUnordered};
 use indexmap::IndexMap;
 use tokio::sync::{
-    oneshot::{self, Receiver},
     Mutex,
+    oneshot::{self, Receiver},
 };
 use uuid::Uuid;
 use vrl::{
-    compiler::{state::RuntimeState, Context, TargetValue, TimeZone},
+    compiler::{Context, TargetValue, TimeZone, state::RuntimeState},
     diagnostic::Formatter,
     value,
 };
@@ -33,16 +33,19 @@ pub use self::unit_test_components::{
     UnitTestSinkCheck, UnitTestSinkConfig, UnitTestSinkResult, UnitTestSourceConfig,
     UnitTestStreamSinkConfig, UnitTestStreamSourceConfig,
 };
-use super::{compiler::expand_globs, graph::Graph, transform::get_transform_output_ids, OutputId};
+use super::{OutputId, compiler::expand_globs, graph::Graph, transform::get_transform_output_ids};
 use crate::{
     conditions::Condition,
     config::{
-        self, loading, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
-        TestDefinition, TestInput, TestOutput,
+        self, ComponentKey, Config, ConfigBuilder, ConfigPath, SinkOuter, SourceOuter,
+        TestDefinition, TestInput, TestOutput, loading, loading::ConfigBuilderLoader,
     },
     event::{Event, EventMetadata, LogEvent},
     signal,
-    topology::{builder::TopologyPieces, RunningTopology},
+    topology::{
+        RunningTopology,
+        builder::{TopologyPieces, TopologyPiecesBuilder},
+    },
 };
 
 pub struct UnitTest {
@@ -90,7 +93,9 @@ fn init_log_schema_from_paths(
     config_paths: &[ConfigPath],
     deny_if_set: bool,
 ) -> Result<(), Vec<String>> {
-    let builder = config::loading::load_builder_from_paths(config_paths)?;
+    let builder = ConfigBuilderLoader::default()
+        .interpolate_env(true)
+        .load_from_paths(config_paths)?;
     vector_lib::config::init_log_schema(builder.global.log_schema, deny_if_set);
     Ok(())
 }
@@ -100,16 +105,19 @@ pub async fn build_unit_tests_main(
     signal_handler: &mut signal::SignalHandler,
 ) -> Result<Vec<UnitTest>, Vec<String>> {
     init_log_schema_from_paths(paths, false)?;
-    let mut secrets_backends_loader = loading::load_secret_backends_from_paths(paths)?;
-    let config_builder = if secrets_backends_loader.has_secrets_to_retrieve() {
-        let resolved_secrets = secrets_backends_loader
-            .retrieve(&mut signal_handler.subscribe())
-            .await
-            .map_err(|e| vec![e])?;
-        loading::load_builder_from_paths_with_secrets(paths, resolved_secrets)?
-    } else {
-        loading::load_builder_from_paths(paths)?
-    };
+    let secrets_backends_loader = loading::loader_from_paths(
+        loading::SecretBackendLoader::default().interpolate_env(true),
+        paths,
+    )?;
+    let secrets = secrets_backends_loader
+        .retrieve_secrets(signal_handler)
+        .await
+        .map_err(|e| vec![e])?;
+
+    let config_builder = ConfigBuilderLoader::default()
+        .interpolate_env(true)
+        .secrets(secrets)
+        .load_from_paths(paths)?;
 
     build_unit_tests(config_builder).await
 }
@@ -139,7 +147,7 @@ pub async fn build_unit_tests(
                 let mut test_error = errors.join("\n");
                 // Indent all line breaks
                 test_error = test_error.replace('\n', "\n  ");
-                test_error.insert_str(0, &format!("Failed to build test '{}':\n  ", test_name));
+                test_error.insert_str(0, &format!("Failed to build test '{test_name}':\n  "));
                 build_errors.push(test_error);
             }
         }
@@ -424,6 +432,15 @@ async fn build_unit_test(
         .collect::<Vec<_>>();
     valid_components.extend(unexpanded_transforms);
 
+    // Enrichment tables consume inputs but are referenced dynamically in VRL transforms
+    // (via get_enrichment_table_record). Since we can't statically analyze VRL usage,
+    // we conservatively include all enrichment table inputs as valid components.
+    config_builder
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, c)| c.as_sink(key).map(|(_, sink)| sink.inputs))
+        .for_each(|i| valid_components.extend(i.into_iter()));
+
     // Remove all transforms that are not relevant to the current test
     config_builder.transforms = config_builder
         .transforms
@@ -455,7 +472,7 @@ async fn build_unit_test(
     }
     let config = config_builder.build()?;
     let diff = config::ConfigDiff::initial(&config);
-    let pieces = TopologyPieces::build(&config, &diff, HashMap::new(), Default::default()).await?;
+    let pieces = TopologyPiecesBuilder::new(&config, &diff).build().await?;
 
     Ok(UnitTest {
         name: test.name,
@@ -565,11 +582,10 @@ fn build_outputs(
             .iter()
             .enumerate()
         {
-            match condition.build(&Default::default()) {
+            match condition.build(&Default::default(), &Default::default()) {
                 Ok(condition) => conditions.push(condition),
                 Err(error) => errors.push(format!(
-                    "failed to create test condition '{}': {}",
-                    index, error
+                    "failed to create test condition '{index}': {error}"
                 )),
             }
         }
@@ -595,8 +611,7 @@ fn build_input_event(input: &TestInput) -> Result<Event, String> {
         },
         "vrl" => {
             if let Some(source) = &input.source {
-                let fns = vrl::stdlib::all();
-                let result = vrl::compiler::compile(source, &fns)
+                let result = vrl::compiler::compile(source, &vector_vrl_functions::all())
                     .map_err(|e| Formatter::new(source, e.clone()).to_string())?;
 
                 let mut target = TargetValue {

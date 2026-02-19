@@ -3,11 +3,16 @@ use std::io;
 use bytes::BytesMut;
 use itertools::{Itertools, Position};
 use tokio_util::codec::Encoder as _;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::{config::telemetry, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::{Transformer, encoding::Framer, internal_events::EncoderWriteError},
+    config::telemetry,
+    request_metadata::GroupedCountByteSize,
+};
 
-use crate::{codecs::Transformer, event::Event, internal_events::EncoderWriteError};
+use crate::event::Event;
+#[cfg(feature = "codecs-arrow")]
+use vector_lib::codecs::internal_events::EncoderNullConstraintError;
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
@@ -22,7 +27,7 @@ pub trait Encoder<T> {
     ) -> io::Result<(usize, GroupedCountByteSize)>;
 }
 
-impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
+impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::Encoder<Framer>) {
     fn encode_input(
         &self,
         events: Vec<Event>,
@@ -31,6 +36,7 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
         let mut encoder = self.1.clone();
         let mut bytes_written = 0;
         let mut n_events_pending = events.len();
+        let is_empty = events.is_empty();
         let batch_prefix = encoder.batch_prefix();
         write_all(writer, n_events_pending, batch_prefix)?;
         bytes_written += batch_prefix.len();
@@ -65,7 +71,7 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
             n_events_pending -= 1;
         }
 
-        let batch_suffix = encoder.batch_suffix();
+        let batch_suffix = encoder.batch_suffix(is_empty);
         assert!(n_events_pending == 0);
         write_all(writer, 0, batch_suffix)?;
         bytes_written += batch_suffix.len();
@@ -74,7 +80,7 @@ impl Encoder<Vec<Event>> for (Transformer, crate::codecs::Encoder<Framer>) {
     }
 }
 
-impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
+impl Encoder<Event> for (Transformer, vector_lib::codecs::Encoder<()>) {
     fn encode_input(
         &self,
         mut event: Event,
@@ -92,6 +98,66 @@ impl Encoder<Event> for (Transformer, crate::codecs::Encoder<()>) {
             .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
         write_all(writer, 1, &bytes)?;
         Ok((bytes.len(), byte_size))
+    }
+}
+
+#[cfg(feature = "codecs-arrow")]
+impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
+    fn encode_input(
+        &self,
+        events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        use tokio_util::codec::Encoder as _;
+
+        let mut encoder = self.1.clone();
+        let mut byte_size = telemetry().create_request_count_byte_size();
+        let n_events = events.len();
+        let mut transformed_events = Vec::with_capacity(n_events);
+
+        for mut event in events {
+            self.0.transform(&mut event);
+            byte_size.add_event(&event, event.estimated_json_encoded_size_of());
+            transformed_events.push(event);
+        }
+
+        let mut bytes = BytesMut::new();
+        encoder
+            .encode(transformed_events, &mut bytes)
+            .map_err(|error| {
+                #[cfg(feature = "codecs-arrow")]
+                if let vector_lib::codecs::encoding::Error::SchemaConstraintViolation(
+                    ref constraint_error,
+                ) = error
+                {
+                    emit!(EncoderNullConstraintError {
+                        error: constraint_error
+                    });
+                }
+                io::Error::new(io::ErrorKind::InvalidData, error)
+            })?;
+
+        write_all(writer, n_events, &bytes)?;
+        Ok((bytes.len(), byte_size))
+    }
+}
+
+impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::EncoderKind) {
+    fn encode_input(
+        &self,
+        events: Vec<Event>,
+        writer: &mut dyn io::Write,
+    ) -> io::Result<(usize, GroupedCountByteSize)> {
+        // Delegate to the specific encoder implementation
+        match &self.1 {
+            vector_lib::codecs::EncoderKind::Framed(encoder) => {
+                (self.0.clone(), *encoder.clone()).encode_input(events, writer)
+            }
+            #[cfg(feature = "codecs-arrow")]
+            vector_lib::codecs::EncoderKind::Batch(encoder) => {
+                (self.0.clone(), encoder.clone()).encode_input(events, writer)
+            }
+        }
     }
 }
 
@@ -146,18 +212,19 @@ where
 
 #[cfg(test)]
 mod tests {
-    use std::collections::BTreeMap;
-    use std::env;
-    use std::path::PathBuf;
+    use std::{collections::BTreeMap, env, path::PathBuf};
 
     use bytes::{BufMut, Bytes};
-    use vector_lib::codecs::encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions};
-    use vector_lib::codecs::{
-        CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
-        NewlineDelimitedEncoder, TextSerializerConfig,
+    use vector_lib::{
+        codecs::{
+            CharacterDelimitedEncoder, JsonSerializerConfig, LengthDelimitedEncoder,
+            NewlineDelimitedEncoder, TextSerializerConfig,
+            encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions},
+        },
+        event::LogEvent,
+        internal_event::CountByteSize,
+        json_size::JsonSize,
     };
-    use vector_lib::event::LogEvent;
-    use vector_lib::{internal_event::CountByteSize, json_size::JsonSize};
     use vrl::value::{KeyString, Value};
 
     use super::*;
@@ -166,7 +233,7 @@ mod tests {
     fn test_encode_batch_json_empty() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<Framer>::new(
+            vector_lib::codecs::Encoder::<Framer>::new(
                 CharacterDelimitedEncoder::new(b',').into(),
                 JsonSerializerConfig::default().build().into(),
             ),
@@ -187,7 +254,7 @@ mod tests {
     fn test_encode_batch_json_single() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<Framer>::new(
+            vector_lib::codecs::Encoder::<Framer>::new(
                 CharacterDelimitedEncoder::new(b',').into(),
                 JsonSerializerConfig::default().build().into(),
             ),
@@ -215,7 +282,7 @@ mod tests {
     fn test_encode_batch_json_multiple() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<Framer>::new(
+            vector_lib::codecs::Encoder::<Framer>::new(
                 CharacterDelimitedEncoder::new(b',').into(),
                 JsonSerializerConfig::default().build().into(),
             ),
@@ -257,7 +324,7 @@ mod tests {
     fn test_encode_batch_ndjson_empty() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<Framer>::new(
+            vector_lib::codecs::Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 JsonSerializerConfig::default().build().into(),
             ),
@@ -278,7 +345,7 @@ mod tests {
     fn test_encode_batch_ndjson_single() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<Framer>::new(
+            vector_lib::codecs::Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 JsonSerializerConfig::default().build().into(),
             ),
@@ -295,9 +362,9 @@ mod tests {
             .sum::<JsonSize>();
 
         let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
-        assert_eq!(written, 15);
+        assert_eq!(written, 16);
 
-        assert_eq!(String::from_utf8(writer).unwrap(), r#"{"key":"value"}"#);
+        assert_eq!(String::from_utf8(writer).unwrap(), "{\"key\":\"value\"}\n");
         assert_eq!(CountByteSize(1, input_json_size), json_size.size().unwrap());
     }
 
@@ -305,7 +372,7 @@ mod tests {
     fn test_encode_batch_ndjson_multiple() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<Framer>::new(
+            vector_lib::codecs::Encoder::<Framer>::new(
                 NewlineDelimitedEncoder::default().into(),
                 JsonSerializerConfig::default().build().into(),
             ),
@@ -332,11 +399,11 @@ mod tests {
             .sum::<JsonSize>();
 
         let (written, json_size) = encoding.encode_input(input, &mut writer).unwrap();
-        assert_eq!(written, 50);
+        assert_eq!(written, 51);
 
         assert_eq!(
             String::from_utf8(writer).unwrap(),
-            "{\"key\":\"value1\"}\n{\"key\":\"value2\"}\n{\"key\":\"value3\"}"
+            "{\"key\":\"value1\"}\n{\"key\":\"value2\"}\n{\"key\":\"value3\"}\n"
         );
         assert_eq!(CountByteSize(3, input_json_size), json_size.size().unwrap());
     }
@@ -345,7 +412,7 @@ mod tests {
     fn test_encode_event_json() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
+            vector_lib::codecs::Encoder::<()>::new(JsonSerializerConfig::default().build().into()),
         );
 
         let mut writer = Vec::new();
@@ -366,7 +433,7 @@ mod tests {
     fn test_encode_event_text() {
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<()>::new(TextSerializerConfig::default().build().into()),
+            vector_lib::codecs::Encoder::<()>::new(TextSerializerConfig::default().build().into()),
         );
 
         let mut writer = Vec::new();
@@ -403,12 +470,13 @@ mod tests {
             protobuf: ProtobufSerializerOptions {
                 desc_file: test_data_dir().join("test_proto.desc"),
                 message_type: "test_proto.User".to_string(),
+                use_json_names: false,
             },
         };
 
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<Framer>::new(
+            vector_lib::codecs::Encoder::<Framer>::new(
                 LengthDelimitedEncoder::default().into(),
                 config.build().unwrap().into(),
             ),
@@ -457,12 +525,13 @@ mod tests {
             protobuf: ProtobufSerializerOptions {
                 desc_file: test_data_dir().join("test_proto.desc"),
                 message_type: "test_proto.User".to_string(),
+                use_json_names: false,
             },
         };
 
         let encoding = (
             Transformer::default(),
-            crate::codecs::Encoder::<Framer>::new(
+            vector_lib::codecs::Encoder::<Framer>::new(
                 LengthDelimitedEncoder::default().into(),
                 config.build().unwrap().into(),
             ),

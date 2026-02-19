@@ -1,12 +1,12 @@
 #![deny(missing_docs)]
 
-use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc};
+use std::{borrow::Cow, collections::BTreeMap, fmt, sync::Arc, time::Instant};
 
 use derivative::Derivative;
 use lookup::OwnedTargetPath;
 use serde::{Deserialize, Serialize};
 use uuid::Uuid;
-use vector_common::{byte_size_of::ByteSizeOf, config::ComponentKey, EventDataEq};
+use vector_common::{EventDataEq, byte_size_of::ByteSizeOf, config::ComponentKey};
 use vrl::{
     compiler::SecretTarget,
     value::{KeyString, Kind, Value},
@@ -23,8 +23,17 @@ const SPLUNK_HEC_TOKEN: &str = "splunk_hec_token";
 
 /// The event metadata structure is a `Arc` wrapper around the actual metadata to avoid cloning the
 /// underlying data until it becomes necessary to provide a `mut` copy.
-#[derive(Clone, Debug, Deserialize, PartialEq, Serialize)]
-pub struct EventMetadata(pub(super) Arc<Inner>);
+#[derive(Clone, Debug, Derivative, Deserialize, Serialize)]
+#[derivative(PartialEq)]
+pub struct EventMetadata {
+    #[serde(flatten)]
+    pub(super) inner: Arc<Inner>,
+
+    /// The timestamp when the event last entered a transform buffer.
+    #[derivative(PartialEq = "ignore")]
+    #[serde(default, skip)]
+    pub(crate) last_transform_timestamp: Option<Instant>,
+}
 
 /// The actual metadata structure contained by both `struct Metric`
 /// and `struct LogEvent` types.
@@ -40,7 +49,7 @@ pub(super) struct Inner {
     pub(crate) secrets: Secrets,
 
     #[serde(default, skip)]
-    finalizers: EventFinalizers,
+    pub(crate) finalizers: EventFinalizers,
 
     /// The id of the source
     pub(crate) source_id: Option<Arc<ComponentKey>>,
@@ -60,7 +69,7 @@ pub(super) struct Inner {
     ///
     /// TODO(Jean): must not skip serialization to track schemas across restarts.
     #[serde(default = "default_schema_definition", skip)]
-    schema_definition: Arc<schema::Definition>,
+    pub(crate) schema_definition: Arc<schema::Definition>,
 
     /// A store of values that may be dropped during the encoding process but may be needed
     /// later on. The map is indexed by meaning.
@@ -68,7 +77,7 @@ pub(super) struct Inner {
     /// we need to ensure it is still available later on for emitting metrics tagged by the service.
     /// This field could almost be keyed by `&'static str`, but because it needs to be deserializable
     /// we have to use `String`.
-    dropped_fields: ObjectMap,
+    pub(crate) dropped_fields: ObjectMap,
 
     /// Metadata to track the origin of metrics. This is always `None` for log and trace events.
     /// Only a small set of Vector sources and transforms explicitly set this field.
@@ -84,11 +93,11 @@ pub(super) struct Inner {
 #[derive(Clone, Default, Debug, Deserialize, PartialEq, Serialize)]
 pub struct DatadogMetricOriginMetadata {
     /// `OriginProduct`
-    origin_product: Option<u32>,
+    product: Option<u32>,
     /// `OriginCategory`
-    origin_category: Option<u32>,
+    category: Option<u32>,
     /// `OriginService`
-    origin_service: Option<u32>,
+    service: Option<u32>,
 }
 
 impl DatadogMetricOriginMetadata {
@@ -100,25 +109,25 @@ impl DatadogMetricOriginMetadata {
     #[must_use]
     pub fn new(product: Option<u32>, category: Option<u32>, service: Option<u32>) -> Self {
         Self {
-            origin_product: product,
-            origin_category: category,
-            origin_service: service,
+            product,
+            category,
+            service,
         }
     }
 
     /// Returns a reference to the `OriginProduct`.
     pub fn product(&self) -> Option<u32> {
-        self.origin_product
+        self.product
     }
 
     /// Returns a reference to the `OriginCategory`.
     pub fn category(&self) -> Option<u32> {
-        self.origin_category
+        self.category
     }
 
     /// Returns a reference to the `OriginService`.
     pub fn service(&self) -> Option<u32> {
-        self.origin_service
+        self.service
     }
 }
 
@@ -129,23 +138,26 @@ fn default_metadata_value() -> Value {
 impl EventMetadata {
     /// Creates `EventMetadata` with the given `Value`, and the rest of the fields with default values
     pub fn default_with_value(value: Value) -> Self {
-        Self(Arc::new(Inner {
-            value,
-            ..Default::default()
-        }))
+        Self {
+            inner: Arc::new(Inner {
+                value,
+                ..Default::default()
+            }),
+            last_transform_timestamp: None,
+        }
     }
 
     fn get_mut(&mut self) -> &mut Inner {
-        Arc::make_mut(&mut self.0)
+        Arc::make_mut(&mut self.inner)
     }
 
     pub(super) fn into_owned(self) -> Inner {
-        Arc::unwrap_or_clone(self.0)
+        Arc::unwrap_or_clone(self.inner)
     }
 
     /// Returns a reference to the metadata value
     pub fn value(&self) -> &Value {
-        &self.0.value
+        &self.inner.value
     }
 
     /// Returns a mutable reference to the metadata value
@@ -155,7 +167,7 @@ impl EventMetadata {
 
     /// Returns a reference to the secrets
     pub fn secrets(&self) -> &Secrets {
-        &self.0.secrets
+        &self.inner.secrets
     }
 
     /// Returns a mutable reference to the secrets
@@ -166,20 +178,20 @@ impl EventMetadata {
     /// Returns a reference to the metadata source id.
     #[must_use]
     pub fn source_id(&self) -> Option<&Arc<ComponentKey>> {
-        self.0.source_id.as_ref()
+        self.inner.source_id.as_ref()
     }
 
     /// Returns a reference to the metadata source type.
     #[must_use]
     pub fn source_type(&self) -> Option<&str> {
-        self.0.source_type.as_deref()
+        self.inner.source_type.as_deref()
     }
 
     /// Returns a reference to the metadata parent id. This is the `OutputId`
     /// of the previous component the event was sent through (if any).
     #[must_use]
     pub fn upstream_id(&self) -> Option<&OutputId> {
-        self.0.upstream_id.as_deref()
+        self.inner.upstream_id.as_deref()
     }
 
     /// Sets the `source_id` in the metadata to the provided value.
@@ -199,7 +211,7 @@ impl EventMetadata {
 
     /// Return the datadog API key, if it exists
     pub fn datadog_api_key(&self) -> Option<Arc<str>> {
-        self.0.secrets.get(DATADOG_API_KEY).cloned()
+        self.inner.secrets.get(DATADOG_API_KEY).cloned()
     }
 
     /// Set the datadog API key to passed value
@@ -209,7 +221,7 @@ impl EventMetadata {
 
     /// Return the splunk hec token, if it exists
     pub fn splunk_hec_token(&self) -> Option<Arc<str>> {
-        self.0.secrets.get(SPLUNK_HEC_TOKEN).cloned()
+        self.inner.secrets.get(SPLUNK_HEC_TOKEN).cloned()
     }
 
     /// Set the splunk hec token to passed value
@@ -227,17 +239,28 @@ impl EventMetadata {
 
     /// Fetches the dropped field by meaning.
     pub fn dropped_field(&self, meaning: impl AsRef<str>) -> Option<&Value> {
-        self.0.dropped_fields.get(meaning.as_ref())
+        self.inner.dropped_fields.get(meaning.as_ref())
     }
 
     /// Returns a reference to the `DatadogMetricOriginMetadata`.
     pub fn datadog_origin_metadata(&self) -> Option<&DatadogMetricOriginMetadata> {
-        self.0.datadog_origin_metadata.as_ref()
+        self.inner.datadog_origin_metadata.as_ref()
     }
 
     /// Returns a reference to the event id.
     pub fn source_event_id(&self) -> Option<Uuid> {
-        self.0.source_event_id
+        self.inner.source_event_id
+    }
+
+    /// Returns the timestamp of the last transform buffer enqueue operation, if it exists.
+    #[must_use]
+    pub fn last_transform_timestamp(&self) -> Option<Instant> {
+        self.last_transform_timestamp
+    }
+
+    /// Sets the transform enqueue timestamp to the provided value.
+    pub fn set_last_transform_timestamp(&mut self, timestamp: Instant) {
+        self.last_transform_timestamp = Some(timestamp);
     }
 }
 
@@ -253,18 +276,21 @@ impl Default for Inner {
             upstream_id: None,
             dropped_fields: ObjectMap::new(),
             datadog_origin_metadata: None,
-            source_event_id: Some(Uuid::now_v7()),
+            source_event_id: Some(Uuid::new_v4()),
         }
     }
 }
 
 impl Default for EventMetadata {
     fn default() -> Self {
-        Self(Arc::new(Inner::default()))
+        Self {
+            inner: Arc::new(Inner::default()),
+            last_transform_timestamp: None,
+        }
     }
 }
 
-fn default_schema_definition() -> Arc<schema::Definition> {
+pub(super) fn default_schema_definition() -> Arc<schema::Definition> {
     Arc::new(schema::Definition::new_with_default_metadata(
         Kind::any(),
         [LogNamespace::Legacy, LogNamespace::Vector],
@@ -276,7 +302,7 @@ impl ByteSizeOf for EventMetadata {
         // NOTE we don't count the `str` here because it's allocated somewhere
         // else. We're just moving around the pointer, which is already captured
         // by `ByteSizeOf::size_of`.
-        self.0.finalizers.allocated_bytes()
+        self.inner.finalizers.allocated_bytes()
     }
 }
 
@@ -342,26 +368,34 @@ impl EventMetadata {
     /// If a Datadog API key is not set in `self`, the one from `other` will be used.
     /// If a Splunk HEC token is not set in `self`, the one from `other` will be used.
     pub fn merge(&mut self, other: Self) {
+        let other_timestamp = other.last_transform_timestamp;
         let inner = self.get_mut();
         let other = other.into_owned();
         inner.finalizers.merge(other.finalizers);
         inner.secrets.merge(other.secrets);
 
         // Update `source_event_id` if necessary.
-        match (inner.source_event_id, other.source_event_id) {
-            (None, Some(id)) => {
-                inner.source_event_id = Some(id);
+        if inner.source_event_id.is_none() {
+            inner.source_event_id = other.source_event_id;
+        }
+
+        // Keep the earliest `last_transform_timestamp` for accurate latency measurement.
+        match (self.last_transform_timestamp, other_timestamp) {
+            (Some(self_ts), Some(other_ts)) => {
+                if other_ts < self_ts {
+                    self.last_transform_timestamp = Some(other_ts);
+                }
             }
-            (Some(uuid1), Some(uuid2)) if uuid2 < uuid1 => {
-                inner.source_event_id = Some(uuid2);
+            (None, Some(other_ts)) => {
+                self.last_transform_timestamp = Some(other_ts);
             }
-            _ => {} // Keep the existing value.
+            _ => {}
         }
     }
 
     /// Update the finalizer(s) status.
     pub fn update_status(&self, status: EventStatus) {
-        self.0.finalizers.update_status(status);
+        self.inner.finalizers.update_status(status);
     }
 
     /// Update the finalizers' sources.
@@ -371,7 +405,7 @@ impl EventMetadata {
 
     /// Gets a reference to the event finalizers.
     pub fn finalizers(&self) -> &EventFinalizers {
-        &self.0.finalizers
+        &self.inner.finalizers
     }
 
     /// Add a new event finalizer to the existing list of event finalizers.
@@ -391,7 +425,7 @@ impl EventMetadata {
 
     /// Get the schema definition.
     pub fn schema_definition(&self) -> &Arc<schema::Definition> {
-        &self.0.schema_definition
+        &self.inner.schema_definition
     }
 
     /// Set the schema definition.
@@ -561,6 +595,7 @@ mod test {
         let m1 = EventMetadata::default();
         let m2 = EventMetadata::default();
 
+        // Always maintain the original source event id when merging, similar to how we handle other metadata.
         {
             let mut merged = m1.clone();
             merged.merge(m2.clone());
@@ -570,7 +605,7 @@ mod test {
         {
             let mut merged = m2.clone();
             merged.merge(m1.clone());
-            assert_eq!(merged.source_event_id(), m1.source_event_id());
+            assert_eq!(merged.source_event_id(), m2.source_event_id());
         }
     }
 }

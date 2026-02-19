@@ -1,9 +1,9 @@
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc, Mutex,
+    atomic::{AtomicUsize, Ordering},
 };
 
-use tokio::sync::{oneshot, Notify};
+use tokio::sync::{Notify, oneshot};
 
 struct WaitGroupState {
     registered: AtomicUsize,

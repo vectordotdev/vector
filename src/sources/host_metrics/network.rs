@@ -4,12 +4,10 @@ use heim::net::os::linux::IoCountersExt;
 #[cfg(windows)]
 use heim::net::os::windows::IoCountersExt;
 use heim::units::information::byte;
-use vector_lib::configurable::configurable_component;
-use vector_lib::metric_tags;
+use vector_lib::{configurable::configurable_component, metric_tags};
 
+use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
 use crate::internal_events::HostMetricsScrapeDetailError;
-
-use super::{default_all_devices, example_devices, filter_result, FilterList, HostMetrics};
 
 /// Options for the network metrics collector.
 #[configurable_component]
@@ -102,8 +100,8 @@ impl HostMetrics {
 mod tests {
     use super::{
         super::{
-            tests::{all_counters, assert_filtered_metrics, count_tag},
             HostMetrics, HostMetricsConfig, MetricsBuffer,
+            tests::{all_counters, assert_filtered_metrics, count_tag},
         },
         NetworkConfig,
     };
@@ -119,9 +117,11 @@ mod tests {
         assert!(all_counters(&metrics));
 
         // All metrics are named network_*
-        assert!(!metrics
-            .iter()
-            .any(|metric| !metric.name().starts_with("network_")));
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| !metric.name().starts_with("network_"))
+        );
 
         // They should all have a "device" tag
         assert_eq!(count_tag(&metrics, "device"), metrics.len());

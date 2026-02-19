@@ -4,7 +4,7 @@ use std::{
     task::{Context, Poll},
 };
 
-use futures::{future::BoxFuture, FutureExt};
+use futures::{FutureExt, future::BoxFuture};
 use hyper::client::connect::dns::Name;
 use snafu::ResultExt;
 use tokio::task::spawn_blocking;

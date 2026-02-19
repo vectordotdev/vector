@@ -183,7 +183,7 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
 
     Test {
         name: title,
-        category: format!("docs/{}/{}", category, name),
+        category: format!("docs/{category}/{name}"),
         error: None,
         source,
         object,
@@ -192,5 +192,7 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
         skip,
         read_only_paths: vec![],
         check_diagnostics: false,
+        source_file: format!("website/cue/reference/remap/functions/{name}.cue"),
+        source_line: 1,
     }
 }

@@ -1,10 +1,8 @@
-use std::cmp::Ordering;
-
 use vector_lib::event::metric::{Metric, MetricValue, Sample};
 
 use crate::sinks::util::{
-    batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
     Merged, SinkBatchSettings,
+    batch::{Batch, BatchConfig, BatchError, BatchSize, PushResult},
 };
 
 mod normalize;
@@ -57,7 +55,12 @@ impl Batch for MetricsBuffer {
         } else {
             let max_events = self.max_events;
             self.metrics
-                .get_or_insert_with(|| MetricSet::with_capacity(max_events))
+                .get_or_insert_with(|| {
+                    MetricSet::new(MetricSetSettings {
+                        max_events: Some(max_events),
+                        ..Default::default()
+                    })
+                })
                 .insert_update(item);
             PushResult::Ok(self.num_items() >= self.max_events)
         }
@@ -101,7 +104,7 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
         return Vec::new();
     }
 
-    samples.sort_by(|a, b| a.value.partial_cmp(&b.value).unwrap_or(Ordering::Equal));
+    samples.sort_by(|a, b| a.value.total_cmp(&b.value));
 
     let mut acc = Sample {
         value: samples[0].value,
@@ -124,9 +127,12 @@ pub fn compress_distribution(samples: &mut Vec<Sample>) -> Vec<Sample> {
 
 #[cfg(test)]
 mod tests {
+    use itertools::Itertools;
     use similar_asserts::assert_eq;
-    use vector_lib::event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind};
-    use vector_lib::metric_tags;
+    use vector_lib::{
+        event::metric::{MetricKind, MetricKind::*, MetricValue, StatisticKind},
+        metric_tags,
+    };
 
     use super::*;
     use crate::{
@@ -138,7 +144,7 @@ mod tests {
 
     pub fn sample_counter(num: usize, tagstr: &str, kind: MetricKind, value: f64) -> Metric {
         Metric::new(
-            format!("counter-{}", num),
+            format!("counter-{num}"),
             kind,
             MetricValue::Counter { value },
         )
@@ -146,12 +152,12 @@ mod tests {
     }
 
     pub fn sample_gauge(num: usize, kind: MetricKind, value: f64) -> Metric {
-        Metric::new(format!("gauge-{}", num), kind, MetricValue::Gauge { value })
+        Metric::new(format!("gauge-{num}"), kind, MetricValue::Gauge { value })
     }
 
     pub fn sample_set<T: ToString>(num: usize, kind: MetricKind, values: &[T]) -> Metric {
         Metric::new(
-            format!("set-{}", num),
+            format!("set-{num}"),
             kind,
             MetricValue::Set {
                 values: values.iter().map(|s| s.to_string()).collect(),
@@ -161,7 +167,7 @@ mod tests {
 
     pub fn sample_distribution_histogram(num: u32, kind: MetricKind, rate: u32) -> Metric {
         Metric::new(
-            format!("dist-{}", num),
+            format!("dist-{num}"),
             kind,
             MetricValue::Distribution {
                 samples: vector_lib::samples![num as f64 => rate],
@@ -178,7 +184,7 @@ mod tests {
         sum: f64,
     ) -> Metric {
         Metric::new(
-            format!("buckets-{}", num),
+            format!("buckets-{num}"),
             kind,
             MetricValue::AggregatedHistogram {
                 buckets: vector_lib::buckets![
@@ -194,7 +200,7 @@ mod tests {
 
     pub fn sample_aggregated_summary(num: u32, kind: MetricKind, factor: f64) -> Metric {
         Metric::new(
-            format!("quantiles-{}", num),
+            format!("quantiles-{num}"),
             kind,
             MetricValue::AggregatedSummary {
                 quantiles: vector_lib::quantiles![
@@ -239,7 +245,7 @@ mod tests {
         result
             .into_iter()
             .map(|mut batch| {
-                batch.sort_by_key(|k| format!("{:?}", k));
+                batch.sort_by_key(|k| format!("{k:?}"));
                 batch
             })
             .collect()
@@ -578,6 +584,28 @@ mod tests {
         assert_eq!(
             compress_distribution(&mut samples),
             vector_lib::samples![1.0 => 11, 2.0 => 48, 3.0 => 26]
+        );
+    }
+
+    #[test]
+    fn compress_distributions_doesnt_panic() {
+        let to_float = |v: i32| -> f64 { v as f64 };
+
+        let mut samples = (0..=15)
+            .map(to_float)
+            .chain(std::iter::once(f64::NAN))
+            .chain((16..=20).map(to_float))
+            .rev()
+            .map(|value| Sample { value, rate: 1 })
+            .collect_vec();
+
+        assert_eq!(
+            compress_distribution(&mut samples),
+            (0..=20)
+                .map(to_float)
+                .chain(std::iter::once(f64::NAN))
+                .map(|value| Sample { value, rate: 1 })
+                .collect_vec()
         );
     }
 

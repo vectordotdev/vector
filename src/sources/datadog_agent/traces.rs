@@ -6,37 +6,31 @@ use futures::future;
 use http::StatusCode;
 use ordered_float::NotNan;
 use prost::Message;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    internal_event::{CountByteSize, InternalEventHandle as _},
+};
 use vrl::event_path;
-use warp::{filters::BoxedFilter, path, path::FullPath, reply::Response, Filter, Rejection, Reply};
+use warp::{Filter, Rejection, Reply, filters::BoxedFilter, path, path::FullPath, reply::Response};
 
-use vector_lib::internal_event::{CountByteSize, InternalEventHandle as _};
-use vector_lib::EstimatedJsonEncodedSizeOf;
-
-use crate::common::http::ErrorMessage;
+use super::{ApiKeyQueryParams, DatadogAgentSource, RequestHandler, ddtrace_proto};
 use crate::{
+    common::http::ErrorMessage,
     event::{Event, ObjectMap, TraceEvent, Value},
-    sources::datadog_agent::{
-        ddtrace_proto, handle_request, ApiKeyQueryParams, DatadogAgentSource,
-    },
-    SourceSender,
 };
 
-pub(crate) fn build_warp_filter(
-    acknowledgements: bool,
-    multiple_outputs: bool,
-    out: SourceSender,
+pub(super) fn build_warp_filter(
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
-    build_trace_filter(acknowledgements, multiple_outputs, out, source)
+    build_trace_filter(handler, source)
         .or(build_stats_filter())
         .unify()
         .boxed()
 }
 
 fn build_trace_filter(
-    acknowledgements: bool,
-    multiple_outputs: bool,
-    out: SourceSender,
+    handler: RequestHandler,
     source: DatadogAgentSource,
 ) -> BoxedFilter<(Response,)> {
     warp::post()
@@ -49,7 +43,7 @@ fn build_trace_filter(
         ))
         .and(warp::query::<ApiKeyQueryParams>())
         .and(warp::body::bytes())
-        .and_then(
+        .and_then({
             move |path: FullPath,
                   encoding_header: Option<String>,
                   api_token: Option<String>,
@@ -72,14 +66,13 @@ fn build_trace_filter(
                         .map_err(|error| {
                             ErrorMessage::new(
                                 StatusCode::UNPROCESSABLE_ENTITY,
-                                format!("Error decoding Datadog traces: {:?}", error),
+                                format!("Error decoding Datadog traces: {error:?}"),
                             )
                         })
                     });
-                let output = multiple_outputs.then_some(super::TRACES);
-                handle_request(events, acknowledgements, out.clone(), output)
-            },
-        )
+                handler.clone().handle_request(events, super::TRACES)
+            }
+        })
         .boxed()
 }
 

@@ -1,7 +1,9 @@
 use bytes::Bytes;
-use vector_lib::codecs::{encoding::Framer, JsonSerializerConfig, NewlineDelimitedEncoderConfig};
-use vector_lib::partition::Partitioner;
-use vector_lib::request_metadata::GroupedCountByteSize;
+use vector_lib::{
+    codecs::{JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer},
+    partition::Partitioner,
+    request_metadata::GroupedCountByteSize,
+};
 
 use super::config::WebHdfsConfig;
 use crate::{
@@ -10,8 +12,8 @@ use crate::{
     sinks::{
         opendal_common::{OpenDalRequest, OpenDalRequestBuilder},
         util::{
-            request_builder::{EncodeResult, RequestBuilder},
             Compression,
+            request_builder::{EncodeResult, RequestBuilder},
         },
     },
 };

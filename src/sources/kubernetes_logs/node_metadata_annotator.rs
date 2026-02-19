@@ -2,15 +2,20 @@
 
 #![deny(missing_docs)]
 
-use crate::event::{Event, LogEvent};
 use k8s_openapi::{api::core::v1::Node, apimachinery::pkg::apis::meta::v1::ObjectMeta};
-use kube::runtime::reflector::{store::Store, ObjectRef};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::OptionalTargetPath;
-use vector_lib::lookup::{lookup_v2::ValuePath, owned_value_path, path, OwnedTargetPath};
+use kube::runtime::reflector::{ObjectRef, store::Store};
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::{
+        OwnedTargetPath,
+        lookup_v2::{OptionalTargetPath, ValuePath},
+        owned_value_path, path,
+    },
+};
 
 use super::Config;
+use crate::event::{Event, LogEvent};
 
 /// Configuration for how the events are enriched with Node metadata.
 #[configurable_component]
@@ -76,19 +81,19 @@ fn annotate_from_metadata(
     metadata: &ObjectMeta,
     log_namespace: LogNamespace,
 ) {
-    if let Some(labels) = &metadata.labels {
-        if let Some(prefix_path) = &fields_spec.node_labels.path {
-            for (key, value) in labels.iter() {
-                let key_path = path!(key);
+    if let Some(labels) = &metadata.labels
+        && let Some(prefix_path) = &fields_spec.node_labels.path
+    {
+        for (key, value) in labels.iter() {
+            let key_path = path!(key);
 
-                log_namespace.insert_source_metadata(
-                    Config::NAME,
-                    log,
-                    Some(LegacyKey::Overwrite((&prefix_path.path).concat(key_path))),
-                    path!("node_labels", key),
-                    value.to_owned(),
-                )
-            }
+            log_namespace.insert_source_metadata(
+                Config::NAME,
+                log,
+                Some(LegacyKey::Overwrite((&prefix_path.path).concat(key_path))),
+                path!("node_labels", key),
+                value.to_owned(),
+            )
         }
     }
 }

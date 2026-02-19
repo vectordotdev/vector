@@ -1,8 +1,11 @@
 use std::{fmt, iter::IntoIterator, pin::Pin};
 
-use futures::{stream, task::Context, task::Poll, Sink, SinkExt, Stream, StreamExt};
+use futures::{
+    Sink, SinkExt, Stream, StreamExt, stream,
+    task::{Context, Poll},
+};
 
-use crate::event::{into_event_stream, Event, EventArray, EventContainer};
+use crate::event::{Event, EventArray, EventContainer, into_event_stream};
 
 pub enum VectorSink {
     Sink(Box<dyn Sink<EventArray, Error = ()> + Send + Unpin>),

@@ -52,7 +52,6 @@ components: sinks: mqtt: {
 			"aarch64-unknown-linux-musl":     true
 			"armv7-unknown-linux-gnueabihf":  true
 			"armv7-unknown-linux-musleabihf": true
-			"x86_64-apple-darwin":            true
 			"x86_64-pc-windows-msv":          true
 			"x86_64-unknown-linux-gnu":       true
 			"x86_64-unknown-linux-musl":      true
@@ -62,7 +61,7 @@ components: sinks: mqtt: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.mqtt.configuration
+	configuration: generated.components.sinks.mqtt.configuration
 
 	input: {
 		logs:    true

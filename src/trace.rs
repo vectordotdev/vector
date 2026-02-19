@@ -4,12 +4,12 @@ use std::{
     marker::PhantomData,
     str::FromStr,
     sync::{
-        atomic::{AtomicBool, Ordering},
         Mutex, MutexGuard, OnceLock,
+        atomic::{AtomicBool, Ordering},
     },
 };
 
-use futures_util::{future::ready, Stream, StreamExt};
+use futures_util::{Stream, StreamExt, future::ready};
 use metrics_tracing_context::MetricsLayer;
 use tokio::sync::{
     broadcast::{self, Receiver, Sender},
@@ -19,11 +19,11 @@ use tokio_stream::wrappers::BroadcastStream;
 use tracing::{Event, Subscriber};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::{
+    Layer,
     filter::LevelFilter,
     layer::{Context, SubscriberExt},
     registry::LookupSpan,
     util::SubscriberInitExt,
-    Layer,
 };
 pub use tracing_tower::{InstrumentableService, InstrumentedService};
 use vector_lib::lookup::event_path;
@@ -64,9 +64,10 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
     let metrics_layer =
         metrics_layer_enabled().then(|| MetricsLayer::new().with_filter(LevelFilter::INFO));
 
-    let broadcast_layer = RateLimitedLayer::new(BroadcastLayer::new())
-        .with_default_limit(internal_log_rate_limit)
-        .with_filter(fmt_filter.clone());
+    // BroadcastLayer should NOT be rate limited because it feeds the internal_logs source,
+    // which users rely on to capture ALL internal Vector logs for debugging/monitoring.
+    // Console output (stdout/stderr) has its own separate rate limiting below.
+    let broadcast_layer = BroadcastLayer::new().with_filter(fmt_filter.clone());
 
     let subscriber = tracing_subscriber::registry()
         .with(metrics_layer)
@@ -138,11 +139,11 @@ fn should_process_tracing_event() -> bool {
 
 /// Attempts to buffer an event into the early buffer.
 fn try_buffer_event(log: &LogEvent) -> bool {
-    if SHOULD_BUFFER.load(Ordering::Acquire) {
-        if let Some(buffer) = get_early_buffer().as_mut() {
-            buffer.push(log.clone());
-            return true;
-        }
+    if SHOULD_BUFFER.load(Ordering::Acquire)
+        && let Some(buffer) = get_early_buffer().as_mut()
+    {
+        buffer.push(log.clone());
+        return true;
     }
 
     false
@@ -371,6 +372,6 @@ impl tracing::field::Visit for SpanFields {
     }
 
     fn record_debug(&mut self, field: &tracing_core::Field, value: &dyn std::fmt::Debug) {
-        self.record(field, format!("{:?}", value));
+        self.record(field, format!("{value:?}"));
     }
 }

@@ -1,5 +1,6 @@
 use std::{
     cmp,
+    future::Future,
     io::Write,
     mem,
     pin::Pin,
@@ -11,12 +12,11 @@ use flate2::write::GzDecoder;
 use futures_util::FutureExt;
 use http::{Request, Response};
 use hyper::{
-    body::{HttpBody, Sender},
     Body,
+    body::{HttpBody, Sender},
 };
-use std::future::Future;
 use tokio::{pin, select};
-use tonic::{body::BoxBody, metadata::AsciiMetadataValue, Status};
+use tonic::{Status, body::BoxBody, metadata::AsciiMetadataValue};
 use tower::{Layer, Service};
 use vector_lib::internal_event::{
     ByteSize, BytesReceived, InternalEventHandle as _, Protocol, Registered,
@@ -42,8 +42,7 @@ impl CompressionScheme {
             .map(|s| {
                 s.to_str().map(|s| s.to_string()).map_err(|_| {
                     Status::unimplemented(format!(
-                        "`{}` contains non-visible characters and is not a valid encoding",
-                        GRPC_ENCODING_HEADER
+                        "`{GRPC_ENCODING_HEADER}` contains non-visible characters and is not a valid encoding"
                     ))
                 })
             })
@@ -53,8 +52,7 @@ impl CompressionScheme {
                 Some(scheme) => match scheme.as_str() {
                     "gzip" => Ok(Some(CompressionScheme::Gzip)),
                     other => Err(Status::unimplemented(format!(
-                        "compression scheme `{}` is not supported",
-                        other
+                        "compression scheme `{other}` is not supported"
                     ))),
                 },
             })
@@ -68,16 +66,16 @@ impl CompressionScheme {
     }
 }
 
+#[derive(Default)]
 enum State {
+    #[default]
     WaitingForHeader,
-    Forward { overall_len: usize },
-    Decompress { remaining: usize },
-}
-
-impl Default for State {
-    fn default() -> Self {
-        Self::WaitingForHeader
-    }
+    Forward {
+        overall_len: usize,
+    },
+    Decompress {
+        remaining: usize,
+    },
 }
 
 fn new_decompressor() -> GzDecoder<Vec<u8>> {
@@ -231,10 +229,10 @@ async fn drive_body_decompression(
     let result = source.trailers().await;
     let maybe_trailers =
         result.map_err(|_| Status::internal("error reading trailers from underlying body"))?;
-    if let Some(trailers) = maybe_trailers {
-        if destination.send_trailers(trailers).await.is_err() {
-            return Err(Status::internal("destination body abnormally closed"));
-        }
+    if let Some(trailers) = maybe_trailers
+        && destination.send_trailers(trailers).await.is_err()
+    {
+        return Err(Status::internal("destination body abnormally closed"));
     }
 
     Ok(bytes_received)

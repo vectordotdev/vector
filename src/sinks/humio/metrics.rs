@@ -2,16 +2,18 @@ use async_trait::async_trait;
 use futures::StreamExt;
 use futures_util::stream::BoxStream;
 use indoc::indoc;
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup;
-use vector_lib::lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath, OptionalValuePath};
-use vector_lib::sensitive_string::SensitiveString;
-use vector_lib::sink::StreamSink;
+use vector_lib::{
+    codecs::JsonSerializerConfig,
+    configurable::configurable_component,
+    lookup,
+    lookup::lookup_v2::{ConfigValuePath, OptionalTargetPath, OptionalValuePath},
+    sensitive_string::SensitiveString,
+    sink::StreamSink,
+};
 
 use super::{
     config_host_key,
-    logs::{HumioLogsConfig, HOST},
+    logs::{HOST, HumioLogsConfig},
 };
 use crate::{
     config::{
@@ -19,15 +21,15 @@ use crate::{
     },
     event::{Event, EventArray, EventContainer},
     sinks::{
+        Healthcheck, VectorSink,
         splunk_hec::common::SplunkHecDefaultBatchSettings,
         util::{BatchConfig, Compression, TowerRequestConfig},
-        Healthcheck, VectorSink,
     },
     template::Template,
     tls::TlsConfig,
     transforms::{
-        metric_to_log::{MetricToLog, MetricToLogConfig},
         FunctionTransform, OutputBuffer,
+        metric_to_log::{MetricToLog, MetricToLogConfig},
     },
 };
 
@@ -229,7 +231,7 @@ impl StreamSink<EventArray> for HumioMetricsSink {
 
 #[cfg(test)]
 mod tests {
-    use chrono::{offset::TimeZone, Utc};
+    use chrono::{Utc, offset::TimeZone};
     use futures::stream;
     use indoc::indoc;
     use similar_asserts::assert_eq;
@@ -238,13 +240,13 @@ mod tests {
     use super::*;
     use crate::{
         event::{
-            metric::{MetricKind, MetricValue, StatisticKind},
             Event, Metric,
+            metric::{MetricKind, MetricValue, StatisticKind},
         },
         sinks::util::test::{build_test_server, load_sink},
         test_util::{
             self,
-            components::{run_and_assert_sink_compliance, HTTP_SINK_TAGS},
+            components::{HTTP_SINK_TAGS, run_and_assert_sink_compliance},
         },
     };
 
@@ -281,10 +283,10 @@ mod tests {
         "#})
         .unwrap();
 
-        let addr = test_util::next_addr();
+        let (_guard, addr) = test_util::addr::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
-        config.endpoint = format!("http://{}", addr);
+        config.endpoint = format!("http://{addr}");
 
         let (sink, _) = config.build(cx).await.unwrap();
 
@@ -347,10 +349,10 @@ mod tests {
         "#})
         .unwrap();
 
-        let addr = test_util::next_addr();
+        let (_guard, addr) = test_util::addr::next_addr();
         // Swap out the endpoint so we can force send it
         // to our local server
-        config.endpoint = format!("http://{}", addr);
+        config.endpoint = format!("http://{addr}");
 
         let (sink, _) = config.build(cx).await.unwrap();
 

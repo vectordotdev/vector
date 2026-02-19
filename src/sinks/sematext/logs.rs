@@ -1,8 +1,7 @@
 use async_trait::async_trait;
 use futures::stream::{BoxStream, StreamExt};
 use indoc::indoc;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::event_path;
 
 use super::Region;
@@ -11,12 +10,12 @@ use crate::{
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::EventArray,
     sinks::{
+        Healthcheck, VectorSink,
         elasticsearch::{BulkConfig, ElasticsearchApiVersion, ElasticsearchConfig},
         util::{
-            http::RequestConfig, BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings,
-            StreamSink, TowerRequestConfig,
+            BatchConfig, Compression, RealtimeSizeBasedDefaultBatchSettings, StreamSink,
+            TowerRequestConfig, http::RequestConfig,
         },
-        Healthcheck, VectorSink,
     },
     template::Template,
 };
@@ -166,8 +165,9 @@ mod tests {
         config::SinkConfig,
         sinks::util::test::{build_test_server, load_sink},
         test_util::{
+            addr::next_addr,
             components::{self, HTTP_SINK_TAGS},
-            next_addr, random_lines_with_stream,
+            random_lines_with_stream,
         },
     };
 
@@ -186,10 +186,10 @@ mod tests {
         // Make sure we can build the config
         _ = config.build(cx.clone()).await.unwrap();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         // Swap out the host so we can force send it
         // to our local server
-        config.endpoint = Some(format!("http://{}", addr));
+        config.endpoint = Some(format!("http://{addr}"));
 
         let (sink, _) = config.build(cx).await.unwrap();
 

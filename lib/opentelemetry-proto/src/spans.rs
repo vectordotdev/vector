@@ -1,17 +1,21 @@
-use super::common::{kv_list_into_value, to_hex};
-use super::proto::{
-    resource::v1::Resource,
-    trace::v1::{
-        span::{Event as SpanEvent, Link},
-        ResourceSpans, Span, Status as SpanStatus,
-    },
-};
-use chrono::{DateTime, TimeZone, Utc};
 use std::collections::BTreeMap;
+
+use chrono::{DateTime, TimeZone, Utc};
 use vector_core::event::{Event, TraceEvent};
 use vrl::{
     event_path,
     value::{KeyString, Value},
+};
+
+use super::{
+    common::{kv_list_into_value, to_hex},
+    proto::{
+        resource::v1::Resource,
+        trace::v1::{
+            ResourceSpans, Span, Status as SpanStatus,
+            span::{Event as SpanEvent, Link},
+        },
+    },
 };
 
 pub const TRACE_ID_KEY: &str = "trace_id";
@@ -100,13 +104,13 @@ impl ResourceSpan {
             Value::from(span.dropped_links_count),
         );
         trace.insert(event_path!("status"), Value::from(span.status));
-        if let Some(resource) = self.resource {
-            if !resource.attributes.is_empty() {
-                trace.insert(
-                    event_path!(RESOURCE_KEY),
-                    kv_list_into_value(resource.attributes),
-                );
-            }
+        if let Some(resource) = self.resource
+            && !resource.attributes.is_empty()
+        {
+            trace.insert(
+                event_path!(RESOURCE_KEY),
+                kv_list_into_value(resource.attributes),
+            );
         }
         trace.insert(event_path!("ingest_timestamp"), Value::from(now));
         trace.into()

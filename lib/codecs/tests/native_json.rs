@@ -1,11 +1,15 @@
+#![allow(clippy::unwrap_used)]
+
 use bytes::BytesMut;
-use codecs::decoding::format::Deserializer;
-use codecs::encoding::format::Serializer;
-use codecs::{NativeJsonDeserializerConfig, NativeJsonSerializerConfig};
-use vector_core::buckets;
-use vector_core::config::LogNamespace;
-use vector_core::event::{Event, Metric};
-use vector_core::event::{MetricKind, MetricValue};
+use codecs::{
+    NativeJsonDeserializerConfig, NativeJsonSerializerConfig, decoding::format::Deserializer,
+    encoding::format::Serializer,
+};
+use vector_core::{
+    buckets,
+    config::LogNamespace,
+    event::{Event, Metric, MetricKind, MetricValue},
+};
 
 fn assert_roundtrip(
     input_event: Event,

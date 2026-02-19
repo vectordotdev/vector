@@ -1,18 +1,15 @@
 use std::sync::{
-    atomic::{AtomicUsize, Ordering},
     Arc,
+    atomic::{AtomicUsize, Ordering},
 };
 
 use async_trait::async_trait;
 use futures_util::FutureExt;
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
-    config::LogNamespace,
+    config::{DataType, LogNamespace, SourceOutput},
+    configurable::configurable_component,
     event::{Event, LogEvent},
     schema::Definition,
-};
-use vector_lib::{
-    config::{DataType, SourceOutput},
     source::Source,
 };
 
@@ -45,7 +42,7 @@ impl SourceConfig for BackpressureSourceConfig {
             for i in 0.. {
                 let _result = cx
                     .out
-                    .send_event(Event::Log(LogEvent::from(format!("event-{}", i))))
+                    .send_event(Event::Log(LogEvent::from(format!("event-{i}"))))
                     .await;
                 counter.fetch_add(1, Ordering::AcqRel);
 

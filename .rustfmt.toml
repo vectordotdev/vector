@@ -1,9 +1,16 @@
-edition = "2021"
+edition = "2024"
+max_width = 100
 newline_style = "unix"
 reorder_imports = true
 
 # Nightly only features
 # unstable_features = true
+
+# See https://github.com/rust-lang/rustfmt/issues/4991
 # imports_granularity = "Crate"
+
+# See https://github.com/rust-lang/rustfmt/issues/5083
 # group_imports = "StdExternalCrate"
+
+# See https://github.com/rust-lang/rustfmt/issues/3346
 # indent_style = "Block"

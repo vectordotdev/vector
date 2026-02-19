@@ -2,67 +2,40 @@ name: Unit - Mac
 
 on:
   workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
+
 
 permissions:
-  statuses: write
+  contents: read
 
 jobs:
   unit-mac:
-    runs-on: macos-13
+    runs-on: macos-14-xlarge
     timeout-minutes: 90
     env:
       CARGO_INCREMENTAL: 0
     steps:
-      - name: (PR review) Set latest commit status as pending
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: myrotvorets/set-commit-status-action@v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: Unit - Mac
-          status: pending
-
-      - name: (PR review) Checkout PR branch
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@v4
-        with:
-          ref: ${{ github.event.review.commit_id }}
-
       - name: Checkout branch
-        if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@v4
-
-      - uses: actions/cache@v4
-        name: Cache Cargo registry + index
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          ref: ${{ inputs.ref }}
 
-      - run: bash scripts/environment/bootstrap-macos.sh
-      - run: bash scripts/environment/prepare.sh
-      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cargo-nextest: true
+          protoc: true
 
       # Some tests e.g. `reader_exits_cleanly_when_writer_done_and_in_flight_acks` are flaky.
       - name: Run tests
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 45
           max_attempts: 3
           command: make test
 
       - run: make test-behavior
-
-      - name: (PR review) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@v2.0.1
-        if: always() && github.event_name == 'pull_request_review'
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: Unit - Mac
-          status: ${{ job.status }}

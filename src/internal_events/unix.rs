@@ -1,13 +1,16 @@
+#![allow(dead_code)] // TODO requires optional feature compilation
+
 use std::{io::Error, path::Path};
 
 use metrics::counter;
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::{
-    error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL,
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
 };
 
 use crate::internal_events::SocketOutgoingConnectionError;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct UnixSocketConnectionEstablished<'a> {
     pub path: &'a std::path::Path,
 }
@@ -19,7 +22,7 @@ impl InternalEvent for UnixSocketConnectionEstablished<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct UnixSocketOutgoingConnectionError<E> {
     pub error: E,
 }
@@ -36,7 +39,7 @@ impl<E: std::error::Error> InternalEvent for UnixSocketOutgoingConnectionError<E
     unix,
     any(feature = "sources-utils-net-unix", feature = "sources-dnstap")
 ))]
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct UnixSocketError<'a, E> {
     pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
@@ -54,7 +57,6 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
             path = ?self.path,
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::PROCESSING,
-
         );
         counter!(
             "component_errors_total",
@@ -65,7 +67,7 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketError<'_, E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct UnixSocketSendError<'a, E> {
     pub(crate) error: &'a E,
     pub path: &'a std::path::Path,
@@ -80,7 +82,6 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
             path = ?self.path,
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-
         );
         counter!(
             "component_errors_total",
@@ -93,7 +94,7 @@ impl<E: std::fmt::Display> InternalEvent for UnixSocketSendError<'_, E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct UnixSendIncompleteError {
     pub data_size: usize,
     pub sent: usize,
@@ -121,7 +122,7 @@ impl InternalEvent for UnixSendIncompleteError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct UnixSocketFileDeleteError<'a> {
     pub path: &'a Path,
     pub error: Error,
@@ -136,7 +137,6 @@ impl InternalEvent for UnixSocketFileDeleteError<'_> {
             error_code = "delete_socket_file",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::PROCESSING,
-
         );
         counter!(
             "component_errors_total",

@@ -4,8 +4,8 @@ use serde_json::Value;
 use vrl::{compiler::VrlRuntime, datadog_search_syntax::QueryNode, value::Value as VrlValue};
 
 use crate::{
-    schema::{generate_string_schema, SchemaGenerator, SchemaObject},
     Configurable, GenerateError, Metadata, ToValue,
+    schema::{SchemaGenerator, SchemaObject, generate_string_schema},
 };
 
 impl Configurable for VrlRuntime {

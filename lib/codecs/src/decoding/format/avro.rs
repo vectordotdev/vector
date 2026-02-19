@@ -1,18 +1,18 @@
-use super::Deserializer;
-use crate::encoding::AvroSerializerOptions;
-use bytes::Buf;
-use bytes::Bytes;
+use bytes::{Buf, Bytes};
 use chrono::Utc;
 use lookup::event_path;
 use serde::{Deserialize, Serialize};
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config::configurable_component;
 use vector_core::{
-    config::{log_schema, DataType, LogNamespace},
+    config::{DataType, LogNamespace, log_schema},
     event::{Event, LogEvent},
     schema,
 };
 use vrl::value::KeyString;
+
+use super::Deserializer;
+use crate::encoding::AvroSerializerOptions;
 
 type VrlValue = vrl::value::Value;
 type AvroValue = apache_avro::types::Value;
@@ -39,14 +39,14 @@ impl AvroDeserializerConfig {
     }
 
     /// Build the `AvroDeserializer` from this configuration.
-    pub fn build(&self) -> AvroDeserializer {
+    pub fn build(&self) -> vector_common::Result<AvroDeserializer> {
         let schema = apache_avro::Schema::parse_str(&self.avro_options.schema)
-            .map_err(|error| format!("Failed building Avro serializer: {}", error))
-            .unwrap();
-        AvroDeserializer {
+            .map_err(|error| format!("Failed building Avro serializer: {error}"))?;
+
+        Ok(AvroDeserializer {
             schema,
             strip_schema_id_prefix: self.avro_options.strip_schema_id_prefix,
-        }
+        })
     }
 
     /// The data type of events that are accepted by `AvroDeserializer`.
@@ -90,7 +90,7 @@ impl From<&AvroDeserializerOptions> for AvroSerializerOptions {
 #[derive(Clone, Debug)]
 pub struct AvroDeserializerOptions {
     /// The Avro schema definition.
-    /// Please note that the following [`apache_avro::types::Value`] variants are currently *not* supported:
+    /// **Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
     /// * `Date`
     /// * `Decimal`
     /// * `Duration`
@@ -103,7 +103,7 @@ pub struct AvroDeserializerOptions {
     ))]
     pub schema: String,
 
-    /// For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to true to strip the schema ID prefix.
+    /// For Avro datum encoded in Kafka messages, the bytes are prefixed with the schema ID.  Set this to `true` to strip the schema ID prefix.
     /// According to [Confluent Kafka's document](https://docs.confluent.io/platform/current/schema-registry/fundamentals/serdes-develop/index.html#wire-format).
     pub strip_schema_id_prefix: bool,
 }
@@ -230,6 +230,15 @@ pub fn try_from(value: AvroValue) -> vector_common::Result<VrlValue> {
         AvroValue::Uuid(uuid) => Ok(VrlValue::from(uuid.as_hyphenated().to_string())),
         AvroValue::LocalTimestampMillis(ts_millis) => Ok(VrlValue::from(ts_millis)),
         AvroValue::LocalTimestampMicros(ts_micros) => Ok(VrlValue::from(ts_micros)),
+        AvroValue::BigDecimal(_) => Err(vector_common::Error::from(
+            "AvroValue::BigDecimal is not supported",
+        )),
+        AvroValue::TimestampNanos(_) => Err(vector_common::Error::from(
+            "AvroValue::TimestampNanos is not supported",
+        )),
+        AvroValue::LocalTimestampNanos(_) => Err(vector_common::Error::from(
+            "AvroValue::LocalTimestampNanos is not supported",
+        )),
     }
 }
 

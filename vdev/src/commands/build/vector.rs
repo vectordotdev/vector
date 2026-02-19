@@ -3,7 +3,7 @@ use std::process::Command;
 use anyhow::Result;
 use clap::Args;
 
-use crate::{app::CommandExt as _, platform};
+use crate::{app::CommandExt as _, utils::platform};
 
 /// Build the `vector` executable.
 #[derive(Args, Debug)]

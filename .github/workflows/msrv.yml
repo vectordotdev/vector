@@ -13,21 +13,22 @@ env:
   RUST_BACKTRACE: full
   CI: true
   PROFILE: debug
-  # observing issues fetching boringssl via HTTPS in the OSX build, seeing if this helps
-  # can be removed when we switch back to the upstream openssl-sys crate
-  CARGO_NET_GIT_FETCH_WITH_CLI: true
+
+permissions:
+  contents: read
 
 jobs:
   check-msrv:
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.checkout_ref }}
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: |
-          # We usually run `scripts/environment/prepare.sh` but in this case we only need the toolchain.
-          rustup show active-toolchain || rustup toolchain install
-      - run: cargo install cargo-msrv --version 0.15.1
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          libsasl2: true
+          cargo-msrv: true
       - run: cargo msrv verify

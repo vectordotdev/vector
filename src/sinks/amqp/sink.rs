@@ -1,17 +1,17 @@
 //! The sink for the `AMQP` sink that wires together the main stream that takes the
 //! event and sends it to `AMQP`.
-use crate::sinks::prelude::*;
 use lapin::BasicProperties;
 use serde::Serialize;
 
-use super::channel::AmqpSinkChannels;
 use super::{
+    BuildError,
+    channel::AmqpSinkChannels,
     config::{AmqpPropertiesConfig, AmqpSinkConfig},
     encoder::AmqpEncoder,
     request_builder::AmqpRequestBuilder,
     service::AmqpService,
-    BuildError,
 };
+use crate::sinks::prelude::*;
 
 /// Stores the event together with the rendered exchange and routing_key values.
 /// This is passed into the `RequestBuilder` which then splits it out into the event
@@ -32,7 +32,7 @@ pub(super) struct AmqpSink {
     routing_key: Option<Template>,
     properties: Option<AmqpPropertiesConfig>,
     transformer: Transformer,
-    encoder: crate::codecs::Encoder<()>,
+    encoder: vector_lib::codecs::Encoder<()>,
 }
 
 impl AmqpSink {
@@ -42,7 +42,7 @@ impl AmqpSink {
 
         let transformer = config.encoding.transformer();
         let serializer = config.encoding.build()?;
-        let encoder = crate::codecs::Encoder::<()>::new(serializer);
+        let encoder = vector_lib::codecs::Encoder::<()>::new(serializer);
 
         Ok(AmqpSink {
             channels,

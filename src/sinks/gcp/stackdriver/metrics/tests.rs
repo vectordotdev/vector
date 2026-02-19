@@ -9,9 +9,9 @@ use crate::{
     gcp::GcpAuthConfig,
     sinks::{prelude::*, util::test::build_test_server},
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        addr::next_addr,
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         http::{always_200_response, spawn_blackhole_http_server},
-        next_addr,
     },
 };
 
@@ -25,8 +25,10 @@ async fn component_spec_compliance() {
     let mock_endpoint = spawn_blackhole_http_server(always_200_response).await;
 
     let config = StackdriverConfig::generate_config().to_string();
-    let mut config = StackdriverConfig::deserialize(toml::de::ValueDeserializer::new(&config))
-        .expect("config should be valid");
+    let mut config = StackdriverConfig::deserialize(
+        toml::de::ValueDeserializer::parse(&config).expect("toml should deserialize"),
+    )
+    .expect("config should be valid");
 
     // If we don't override the credentials path/API key, it tries to directly call out to the Google Instance
     // Metadata API, which we clearly don't have in unit tests. :)
@@ -47,7 +49,7 @@ async fn component_spec_compliance() {
 
 #[tokio::test]
 async fn sends_metric() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
     let config = StackdriverConfig {
         endpoint: format!("http://{in_addr}"),
         auth: GcpAuthConfig {
@@ -104,7 +106,7 @@ async fn sends_metric() {
 
 #[tokio::test]
 async fn sends_multiple_metrics() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
     let mut batch = BatchConfig::default();
     batch.max_events = Some(5);
 
@@ -191,7 +193,7 @@ async fn sends_multiple_metrics() {
 
 #[tokio::test]
 async fn does_not_aggregate_metrics() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
     let mut batch = BatchConfig::default();
     batch.max_events = Some(5);
 

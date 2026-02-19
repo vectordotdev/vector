@@ -76,7 +76,7 @@ components: sinks: vector: {
 		traces: true
 	}
 
-	configuration: base.components.sinks.vector.configuration
+	configuration: generated.components.sinks.vector.configuration
 
 	how_it_works: components.sinks.vector.how_it_works
 

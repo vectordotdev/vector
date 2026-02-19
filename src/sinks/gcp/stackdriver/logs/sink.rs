@@ -1,11 +1,10 @@
 //! Implementation of the `gcp_stackdriver_logs` sink.
 
+use super::request_builder::StackdriverLogsRequestBuilder;
 use crate::sinks::{
     prelude::*,
     util::http::{HttpJsonBatchSizer, HttpRequest},
 };
-
-use super::request_builder::StackdriverLogsRequestBuilder;
 
 pub(super) struct StackdriverLogsSink<S> {
     service: S,

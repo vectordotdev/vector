@@ -1,5 +1,5 @@
 ---
-title: Websocket Server
+title: WebSocket Server
 description: Deliver observability event data to websocket clients
 component_kind: sink
 layout: component

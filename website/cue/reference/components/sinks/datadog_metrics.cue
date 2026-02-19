@@ -57,7 +57,7 @@ components: sinks: datadog_metrics: {
 
 	support: sinks._datadog.support
 
-	configuration: base.components.sinks.datadog_metrics.configuration
+	configuration: generated.components.sinks.datadog_metrics.configuration
 
 	input: {
 		logs: false

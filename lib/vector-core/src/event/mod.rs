@@ -1,6 +1,6 @@
 use std::{convert::TryInto, fmt::Debug, sync::Arc};
 
-pub use array::{into_event_stream, EventArray, EventContainer, LogArray, MetricArray, TraceArray};
+pub use array::{EventArray, EventContainer, LogArray, MetricArray, TraceArray, into_event_stream};
 pub use estimated_json_encoded_size_of::EstimatedJsonEncodedSizeOf;
 pub use finalization::{
     BatchNotifier, BatchStatus, BatchStatusReceiver, EventFinalizer, EventFinalizers, EventStatus,
@@ -14,15 +14,14 @@ use serde::{Deserialize, Serialize};
 pub use trace::TraceEvent;
 use vector_buffers::EventCount;
 use vector_common::{
-    byte_size_of::ByteSizeOf, config::ComponentKey, finalization, internal_event::TaggedEventsSent,
-    json_size::JsonSize, request_metadata::GetEventCountTags, EventDataEq,
+    EventDataEq, byte_size_of::ByteSizeOf, config::ComponentKey, finalization,
+    internal_event::TaggedEventsSent, json_size::JsonSize, request_metadata::GetEventCountTags,
 };
 pub use vrl::value::{KeyString, ObjectMap, Value};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
 
-use crate::config::LogNamespace;
-use crate::config::OutputId;
+use crate::config::{LogNamespace, OutputId};
 
 pub mod array;
 pub mod discriminant;

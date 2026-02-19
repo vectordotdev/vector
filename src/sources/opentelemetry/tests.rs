@@ -1,49 +1,104 @@
-use crate::config::OutputId;
-use crate::event::metric::{Bucket, Quantile};
-use crate::event::{MetricKind, MetricTags, MetricValue};
-use crate::{
-    config::{SourceConfig, SourceContext},
-    event::{
-        into_event_stream, Event, EventStatus, LogEvent, Metric as MetricEvent, ObjectMap, Value,
-    },
-    sources::opentelemetry::{GrpcConfig, HttpConfig, OpentelemetryConfig, LOGS, METRICS},
-    test_util::{
-        self,
-        components::{assert_source_compliance, SOURCE_TAGS},
-        next_addr,
-    },
-    SourceSender,
+use std::{
+    net,
+    sync::Arc,
+    time::{SystemTime, UNIX_EPOCH},
 };
+
 use chrono::{DateTime, TimeZone, Utc};
 use futures::Stream;
 use futures_util::StreamExt;
 use prost::Message;
 use similar_asserts::assert_eq;
-use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 use tonic::Request;
-use vector_lib::config::LogNamespace;
-use vector_lib::lookup::path;
-use vector_lib::opentelemetry::proto::collector::metrics::v1::metrics_service_client::MetricsServiceClient;
-use vector_lib::opentelemetry::proto::collector::metrics::v1::ExportMetricsServiceRequest;
-use vector_lib::opentelemetry::proto::common::v1::any_value::Value::StringValue;
-use vector_lib::opentelemetry::proto::metrics::v1::exponential_histogram_data_point::Buckets;
-use vector_lib::opentelemetry::proto::metrics::v1::metric::Data;
-use vector_lib::opentelemetry::proto::metrics::v1::summary_data_point::ValueAtQuantile;
-use vector_lib::opentelemetry::proto::metrics::v1::{
-    AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge, Histogram,
-    HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics, Sum, Summary,
-    SummaryDataPoint,
-};
-use vector_lib::opentelemetry::proto::resource::v1::Resource;
-use vector_lib::opentelemetry::proto::{
-    collector::logs::v1::{logs_service_client::LogsServiceClient, ExportLogsServiceRequest},
-    common::v1::{any_value, AnyValue, InstrumentationScope, KeyValue},
-    logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
-    resource::v1::Resource as OtelResource,
+use vector_lib::{
+    config::LogNamespace,
+    lookup::path,
+    opentelemetry::proto::{
+        collector::{
+            logs::v1::{ExportLogsServiceRequest, logs_service_client::LogsServiceClient},
+            metrics::v1::{
+                ExportMetricsServiceRequest, metrics_service_client::MetricsServiceClient,
+            },
+        },
+        common::v1::{AnyValue, InstrumentationScope, KeyValue, any_value::Value::StringValue},
+        logs::v1::{LogRecord, ResourceLogs, ScopeLogs},
+        metrics::v1::{
+            AggregationTemporality, ExponentialHistogram, ExponentialHistogramDataPoint, Gauge,
+            Histogram, HistogramDataPoint, Metric, NumberDataPoint, ResourceMetrics, ScopeMetrics,
+            Sum, Summary, SummaryDataPoint, exponential_histogram_data_point::Buckets,
+            metric::Data, summary_data_point::ValueAtQuantile,
+        },
+        resource::v1::{Resource, Resource as OtelResource},
+    },
 };
 use vrl::value;
-use warp::http::HeaderMap;
+
+use crate::{
+    SourceSender,
+    config::{OutputId, SourceConfig, SourceContext},
+    event::{
+        Event, EventStatus, LogEvent, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
+        ObjectMap, Value, into_event_stream,
+        metric::{Bucket, Quantile},
+    },
+    sources::opentelemetry::config::{GrpcConfig, HttpConfig, LOGS, METRICS, OpentelemetryConfig},
+    test_util::{
+        self,
+        addr::next_addr,
+        components::{SOURCE_TAGS, assert_source_compliance},
+    },
+};
+
+fn create_test_logs_request() -> Request<ExportLogsServiceRequest> {
+    Request::new(ExportLogsServiceRequest {
+        resource_logs: vec![ResourceLogs {
+            resource: Some(OtelResource {
+                attributes: vec![KeyValue {
+                    key: "res_key".into(),
+                    value: Some(AnyValue {
+                        value: Some(StringValue("res_val".into())),
+                    }),
+                }],
+                dropped_attributes_count: 0,
+            }),
+            scope_logs: vec![ScopeLogs {
+                scope: Some(InstrumentationScope {
+                    name: "some.scope.name".into(),
+                    version: "1.2.3".into(),
+                    attributes: vec![KeyValue {
+                        key: "scope_attr".into(),
+                        value: Some(AnyValue {
+                            value: Some(StringValue("scope_val".into())),
+                        }),
+                    }],
+                    dropped_attributes_count: 7,
+                }),
+                log_records: vec![LogRecord {
+                    time_unix_nano: 1,
+                    observed_time_unix_nano: 2,
+                    severity_number: 9,
+                    severity_text: "info".into(),
+                    body: Some(AnyValue {
+                        value: Some(StringValue("log body".into())),
+                    }),
+                    attributes: vec![KeyValue {
+                        key: "attr_key".into(),
+                        value: Some(AnyValue {
+                            value: Some(StringValue("attr_val".into())),
+                        }),
+                    }],
+                    dropped_attributes_count: 3,
+                    flags: 4,
+                    // opentelemetry sdk will hex::decode the given trace_id and span_id
+                    trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
+                    span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
+                }],
+                schema_url: "v1".into(),
+            }],
+            schema_url: "v1".into(),
+        }],
+    })
+}
 
 #[test]
 fn generate_config() {
@@ -64,54 +119,7 @@ async fn receive_grpc_logs_vector_namespace() {
         let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
-        let req = Request::new(ExportLogsServiceRequest {
-            resource_logs: vec![ResourceLogs {
-                resource: Some(OtelResource {
-                    attributes: vec![KeyValue {
-                        key: "res_key".into(),
-                        value: Some(AnyValue {
-                            value: Some(StringValue("res_val".into())),
-                        }),
-                    }],
-                    dropped_attributes_count: 0,
-                }),
-                scope_logs: vec![ScopeLogs {
-                    scope: Some(InstrumentationScope {
-                        name: "some.scope.name".into(),
-                        version: "1.2.3".into(),
-                        attributes: vec![KeyValue {
-                            key: "scope_attr".into(),
-                            value: Some(AnyValue {
-                                value: Some(StringValue("scope_val".into())),
-                            }),
-                        }],
-                        dropped_attributes_count: 7,
-                    }),
-                    log_records: vec![LogRecord {
-                        time_unix_nano: 1,
-                        observed_time_unix_nano: 2,
-                        severity_number: 9,
-                        severity_text: "info".into(),
-                        body: Some(AnyValue {
-                            value: Some(StringValue("log body".into())),
-                        }),
-                        attributes: vec![KeyValue {
-                            key: "attr_key".into(),
-                            value: Some(AnyValue {
-                                value: Some(StringValue("attr_val".into())),
-                            }),
-                        }],
-                        dropped_attributes_count: 3,
-                        flags: 4,
-                        // opentelemetry sdk will hex::decode the given trace_id and span_id
-                        trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
-                        span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
-                    }],
-                    schema_url: "v1".into(),
-                }],
-                schema_url: "v1".into(),
-            }],
-        });
+        let req = create_test_logs_request();
         _ = client.export(req).await;
         let mut output = test_util::collect_ready(env.output).await;
         // we just send one, so only one output
@@ -126,10 +134,11 @@ async fn receive_grpc_logs_vector_namespace() {
             meta.get(path!("vector", "source_type")).unwrap(),
             &value!(OpentelemetryConfig::NAME)
         );
-        assert!(meta
-            .get(path!("vector", "ingest_timestamp"))
-            .unwrap()
-            .is_timestamp());
+        assert!(
+            meta.get(path!("vector", "ingest_timestamp"))
+                .unwrap()
+                .is_timestamp()
+        );
         assert_eq!(
             meta.get(path!("opentelemetry", "resources")).unwrap(),
             &value!({res_key: "res_val"})
@@ -203,68 +212,20 @@ async fn receive_grpc_logs_legacy_namespace() {
             .config
             .outputs(LogNamespace::Legacy)
             .remove(0)
-            .schema_definition(true);
+            .schema_definition(true)
+            .unwrap();
 
         // send request via grpc client
         let mut client = LogsServiceClient::connect(format!("http://{}", env.grpc_addr))
             .await
             .unwrap();
-        let req = Request::new(ExportLogsServiceRequest {
-            resource_logs: vec![ResourceLogs {
-                resource: Some(OtelResource {
-                    attributes: vec![KeyValue {
-                        key: "res_key".into(),
-                        value: Some(AnyValue {
-                            value: Some(StringValue("res_val".into())),
-                        }),
-                    }],
-                    dropped_attributes_count: 0,
-                }),
-                scope_logs: vec![ScopeLogs {
-                    scope: Some(InstrumentationScope {
-                        name: "some.scope.name".into(),
-                        version: "1.2.3".into(),
-                        attributes: vec![KeyValue {
-                            key: "scope_attr".into(),
-                            value: Some(AnyValue {
-                                value: Some(StringValue("scope_val".into())),
-                            }),
-                        }],
-                        dropped_attributes_count: 7,
-                    }),
-                    log_records: vec![LogRecord {
-                        time_unix_nano: 1,
-                        observed_time_unix_nano: 2,
-                        severity_number: 9,
-                        severity_text: "info".into(),
-                        body: Some(AnyValue {
-                            value: Some(StringValue("log body".into())),
-                        }),
-                        attributes: vec![KeyValue {
-                            key: "attr_key".into(),
-                            value: Some(AnyValue {
-                                value: Some(StringValue("attr_val".into())),
-                            }),
-                        }],
-                        dropped_attributes_count: 3,
-                        flags: 4,
-                        // opentelemetry sdk will hex::decode the given trace_id and span_id
-                        trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
-                        span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
-                    }],
-                    schema_url: "v1".into(),
-                }],
-                schema_url: "v1".into(),
-            }],
-        });
+        let req = create_test_logs_request();
         _ = client.export(req).await;
         let mut output = test_util::collect_ready(env.output).await;
         // we just send one, so only one output
         assert_eq!(output.len(), 1);
         let actual_event = output.pop().unwrap();
-        schema_definitions
-            .unwrap()
-            .assert_valid_for_event(&actual_event);
+        schema_definitions.assert_valid_for_event(&actual_event);
         let expect_vec = vec_into_btmap(vec![
             (
                 "attributes",
@@ -1104,35 +1065,39 @@ async fn receive_summary_metric() {
     .await;
 }
 
+fn get_source_config_with_headers(
+    grpc_addr: net::SocketAddr,
+    http_addr: net::SocketAddr,
+    use_otlp_decoding: bool,
+) -> OpentelemetryConfig {
+    OpentelemetryConfig {
+        grpc: GrpcConfig {
+            address: grpc_addr,
+            tls: Default::default(),
+        },
+        http: HttpConfig {
+            address: http_addr,
+            tls: Default::default(),
+            keepalive: Default::default(),
+            headers: vec![
+                "User-Agent".to_string(),
+                "X-*".to_string(),
+                "AbsentHeader".to_string(),
+            ],
+        },
+        acknowledgements: Default::default(),
+        log_namespace: Default::default(),
+        use_otlp_decoding,
+    }
+}
+
 #[tokio::test]
-async fn http_headers() {
+async fn http_headers_logs_use_otlp_decoding_false() {
     assert_source_compliance(&SOURCE_TAGS, async {
-        let grpc_addr = next_addr();
-        let http_addr = next_addr();
+        let (_guard_0, grpc_addr) = next_addr();
+        let (_guard_1, http_addr) = next_addr();
 
-        let mut headers = HeaderMap::new();
-        headers.insert("User-Agent", "test_client".parse().unwrap());
-        headers.insert("Upgrade-Insecure-Requests", "false".parse().unwrap());
-        headers.insert("X-Test-Header", "true".parse().unwrap());
-
-        let source = OpentelemetryConfig {
-            grpc: GrpcConfig {
-                address: grpc_addr,
-                tls: Default::default(),
-            },
-            http: HttpConfig {
-                address: http_addr,
-                tls: Default::default(),
-                keepalive: Default::default(),
-                headers: vec![
-                    "User-Agent".to_string(),
-                    "X-*".to_string(),
-                    "AbsentHeader".to_string(),
-                ],
-            },
-            acknowledgements: Default::default(),
-            log_namespace: Default::default(),
-        };
+        let source = get_source_config_with_headers(grpc_addr, http_addr, false);
         let schema_definitions = source
             .outputs(LogNamespace::Legacy)
             .remove(0)
@@ -1158,7 +1123,7 @@ async fn http_headers() {
                         severity_number: 9,
                         severity_text: "info".into(),
                         body: Some(AnyValue {
-                            value: Some(any_value::Value::StringValue("log body".into())),
+                            value: Some(StringValue("log body".into())),
                         }),
                         attributes: vec![],
                         dropped_attributes_count: 0,
@@ -1173,7 +1138,7 @@ async fn http_headers() {
             }],
         };
         let _res = client
-            .post(format!("http://{}/v1/logs", http_addr))
+            .post(format!("http://{http_addr}/v1/logs"))
             .header("Content-Type", "application/x-protobuf")
             .header("User-Agent", "Test")
             .body(req.encode_to_vec())
@@ -1211,6 +1176,67 @@ async fn http_headers() {
     .await;
 }
 
+#[tokio::test]
+async fn http_headers_logs_use_otlp_decoding_true() {
+    assert_source_compliance(&SOURCE_TAGS, async {
+        let (_guard_0, grpc_addr) = next_addr();
+        let (_guard_1, http_addr) = next_addr();
+
+        let source = get_source_config_with_headers(grpc_addr, http_addr, true);
+
+        let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
+        let server = source
+            .build(SourceContext::new_test(sender, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(http_addr).await;
+
+        let client = reqwest::Client::new();
+        let req = ExportLogsServiceRequest {
+            resource_logs: vec![ResourceLogs {
+                resource: None,
+                scope_logs: vec![ScopeLogs {
+                    scope: None,
+                    log_records: vec![LogRecord {
+                        time_unix_nano: 1,
+                        observed_time_unix_nano: 2,
+                        severity_number: 9,
+                        severity_text: "info".into(),
+                        body: Some(AnyValue {
+                            value: Some(StringValue("log body".into())),
+                        }),
+                        attributes: vec![],
+                        dropped_attributes_count: 0,
+                        flags: 4,
+                        // opentelemetry sdk will hex::decode the given trace_id and span_id
+                        trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
+                        span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
+                    }],
+                    schema_url: "v1".into(),
+                }],
+                schema_url: "v1".into(),
+            }],
+        };
+        let _res = client
+            .post(format!("http://{http_addr}/v1/logs"))
+            .header("Content-Type", "application/x-protobuf")
+            .header("User-Agent", "Test")
+            .body(req.encode_to_vec())
+            .send()
+            .await
+            .expect("Failed to send log to Opentelemetry Collector.");
+
+        let mut output = test_util::collect_ready(logs_output).await;
+        assert_eq!(output.len(), 1);
+        let actual_event = output.pop().unwrap();
+        let log = actual_event.as_log();
+        assert_eq!(log["AbsentHeader"], Value::Null);
+        assert_eq!(log["User-Agent"], "Test".into());
+    })
+    .await;
+}
+
 pub struct OTelTestEnv {
     pub grpc_addr: String,
     pub config: OpentelemetryConfig,
@@ -1221,8 +1247,8 @@ pub async fn build_otlp_test_env(
     event_name: &'static str,
     log_namespace: Option<bool>,
 ) -> OTelTestEnv {
-    let grpc_addr = next_addr();
-    let http_addr = next_addr();
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
 
     let config = OpentelemetryConfig {
         grpc: GrpcConfig {
@@ -1237,6 +1263,7 @@ pub async fn build_otlp_test_env(
         },
         acknowledgements: Default::default(),
         log_namespace,
+        use_otlp_decoding: false,
     };
 
     let (sender, output, _) = new_source(EventStatus::Delivered, event_name.to_string());
@@ -1291,4 +1318,94 @@ fn current_time_and_nanos() -> (SystemTime, u64) {
         .map(|d| d.as_secs() * 1_000_000_000 + u64::from(d.subsec_nanos()))
         .unwrap();
     (time, nanos)
+}
+
+#[tokio::test]
+async fn http_logs_use_otlp_decoding_emits_metric() {
+    use crate::metrics::Controller;
+
+    test_util::trace_init();
+
+    let (_guard_0, grpc_addr) = next_addr();
+    let (_guard_1, http_addr) = next_addr();
+
+    let source = OpentelemetryConfig {
+        grpc: GrpcConfig {
+            address: grpc_addr,
+            tls: Default::default(),
+        },
+        http: HttpConfig {
+            address: http_addr,
+            tls: Default::default(),
+            keepalive: Default::default(),
+            headers: Default::default(),
+        },
+        acknowledgements: Default::default(),
+        log_namespace: None,
+        use_otlp_decoding: true,
+    };
+
+    let (sender, logs_output, _) = new_source(EventStatus::Delivered, LOGS.to_string());
+    let server = source
+        .build(SourceContext::new_test(sender, None))
+        .await
+        .unwrap();
+    tokio::spawn(server);
+    test_util::wait_for_tcp(http_addr).await;
+
+    let client = reqwest::Client::new();
+    let req = ExportLogsServiceRequest {
+        resource_logs: vec![ResourceLogs {
+            resource: None,
+            scope_logs: vec![ScopeLogs {
+                scope: None,
+                log_records: vec![LogRecord {
+                    time_unix_nano: 1,
+                    observed_time_unix_nano: 2,
+                    severity_number: 9,
+                    severity_text: "info".into(),
+                    body: Some(AnyValue {
+                        value: Some(StringValue("log body".into())),
+                    }),
+                    attributes: vec![],
+                    dropped_attributes_count: 0,
+                    flags: 4,
+                    trace_id: str_into_hex_bytes("4ac52aadf321c2e531db005df08792f5"),
+                    span_id: str_into_hex_bytes("0b9e4bda2a55530d"),
+                }],
+                schema_url: "v1".into(),
+            }],
+            schema_url: "v1".into(),
+        }],
+    };
+    let _res = client
+        .post(format!("http://{http_addr}/v1/logs"))
+        .header("Content-Type", "application/x-protobuf")
+        .body(req.encode_to_vec())
+        .send()
+        .await
+        .expect("Failed to send log to Opentelemetry Collector.");
+
+    let mut output = test_util::collect_ready(logs_output).await;
+    assert_eq!(output.len(), 1);
+    output.pop().unwrap();
+
+    // Check that the metric was emitted
+    let metrics = Controller::get().unwrap().capture_metrics();
+    let received_events_metric = metrics
+        .iter()
+        .find(|m| m.name() == "component_received_events_total")
+        .expect("component_received_events_total metric should be present");
+
+    // Verify it has a non-zero count
+    match received_events_metric.value() {
+        MetricValue::Counter { value } => {
+            assert!(
+                *value > 0.0,
+                "component_received_events_total should be > 0, got {}",
+                value
+            );
+        }
+        _ => panic!("component_received_events_total should be a counter"),
+    }
 }

@@ -4,10 +4,9 @@ use std::pin::Pin;
 
 use bytecheck::CheckBytes;
 use rkyv::{
-    archived_root, check_archived_root,
-    ser::{serializers::AllocSerializer, Serializer},
+    Archive, Serialize, archived_root, check_archived_root,
+    ser::{Serializer, serializers::AllocSerializer},
     validation::validators::DefaultValidator,
-    Archive, Serialize,
 };
 
 use super::ser::{DeserializeError, SerializeError};

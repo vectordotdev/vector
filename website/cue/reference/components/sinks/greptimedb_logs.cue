@@ -63,7 +63,7 @@ components: sinks: greptimedb_logs: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.greptimedb_logs.configuration
+	configuration: generated.components.sinks.greptimedb_logs.configuration
 
 	input: {
 		logs: true

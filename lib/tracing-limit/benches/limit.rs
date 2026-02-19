@@ -1,16 +1,16 @@
 #[macro_use]
-extern crate tracing;
-
-#[macro_use]
 extern crate criterion;
+#[macro_use]
+extern crate tracing;
 
 use std::{
     fmt,
+    hint::black_box,
     sync::{Mutex, MutexGuard},
 };
 
-use criterion::{black_box, BenchmarkId, Criterion};
-use tracing::{field, span, subscriber::Interest, Event, Metadata, Subscriber};
+use criterion::{BenchmarkId, Criterion};
+use tracing::{Event, Metadata, Subscriber, field, span, subscriber::Interest};
 use tracing_limit::RateLimitedLayer;
 use tracing_subscriber::layer::{Context, Layer, SubscriberExt};
 
@@ -58,7 +58,7 @@ fn bench(c: &mut Criterion) {
                             foo = "foo",
                             bar = "bar",
                             baz = 3,
-                            quuux = ?0.99,
+                            quuux = ?0.99
                         )
                     }
                 })
@@ -96,7 +96,7 @@ struct Visitor<'a>(MutexGuard<'a, String>);
 impl field::Visit for Visitor<'_> {
     fn record_debug(&mut self, _field: &field::Field, value: &dyn fmt::Debug) {
         use std::fmt::Write;
-        _ = write!(&mut *self.0, "{:?}", value);
+        _ = write!(&mut *self.0, "{value:?}");
     }
 }
 
@@ -114,17 +114,17 @@ where
     }
 
     fn on_new_span(&self, span: &span::Attributes<'_>, _id: &span::Id, _ctx: Context<'_, S>) {
-        let mut visitor = Visitor(self.mutex.lock().unwrap());
+        let mut visitor = Visitor(self.mutex.lock().expect("mutex should not be poisoned"));
         span.record(&mut visitor);
     }
 
     fn on_record(&self, _id: &span::Id, values: &span::Record<'_>, _ctx: Context<'_, S>) {
-        let mut visitor = Visitor(self.mutex.lock().unwrap());
+        let mut visitor = Visitor(self.mutex.lock().expect("mutex should not be poisoned"));
         values.record(&mut visitor);
     }
 
     fn on_event(&self, event: &Event<'_>, _ctx: Context<'_, S>) {
-        let mut visitor = Visitor(self.mutex.lock().unwrap());
+        let mut visitor = Visitor(self.mutex.lock().expect("mutex should not be poisoned"));
         event.record(&mut visitor);
     }
 

@@ -4,10 +4,10 @@ use snafu::{ResultExt, Snafu};
 use vector_common::TimeZone;
 use vector_config::{configurable_component, impl_generate_config_from_default};
 
-use super::super::default_data_dir;
-use super::metrics_expiration::PerMetricSetExpiration;
-use super::Telemetry;
-use super::{proxy::ProxyConfig, AcknowledgementsConfig, LogSchema};
+use super::{
+    super::default_data_dir, AcknowledgementsConfig, LogSchema, Telemetry,
+    metrics_expiration::PerMetricSetExpiration, proxy::ProxyConfig,
+};
 use crate::serde::bool_or_struct;
 
 #[derive(Debug, Snafu)]
@@ -107,7 +107,7 @@ pub struct GlobalOptions {
     /// See [End-to-end Acknowledgements][e2e_acks] for more information on how Vector handles event
     /// acknowledgement.
     ///
-    /// [e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+    /// [e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
     #[serde(
         default,
         deserialize_with = "bool_or_struct",
@@ -119,7 +119,7 @@ pub struct GlobalOptions {
     /// The amount of time, in seconds, that internal metrics will persist after having not been
     /// updated before they expire and are removed.
     ///
-    /// Deprecated: use expire_metrics_secs instead
+    /// Deprecated: use `expire_metrics_secs` instead
     #[configurable(deprecated)]
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::hidden))]
@@ -139,6 +139,40 @@ pub struct GlobalOptions {
     /// the global default value, defined using `expire_metrics_secs`.
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     pub expire_metrics_per_metric_set: Option<Vec<PerMetricSetExpiration>>,
+
+    /// The alpha value for the exponential weighted moving average (EWMA) of source and transform
+    /// buffer utilization metrics.
+    ///
+    /// This controls how quickly the `*_buffer_utilization_mean` gauges respond to new
+    /// observations. Values closer to 1.0 retain more of the previous value, leading to slower
+    /// adjustments. The default value of 0.9 is equivalent to a "half life" of 6-7 measurements.
+    ///
+    /// Must be between 0 and 1 exclusively (0 < alpha < 1).
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(validation(range(min = 0.0, max = 1.0)))]
+    #[configurable(metadata(docs::advanced))]
+    pub buffer_utilization_ewma_alpha: Option<f64>,
+
+    /// The alpha value for the exponential weighted moving average (EWMA) of transform latency
+    /// metrics.
+    ///
+    /// This controls how quickly the `component_latency_mean_seconds` gauge responds to new
+    /// observations. Values closer to 1.0 retain more of the previous value, leading to slower
+    /// adjustments. The default value of 0.9 is equivalent to a "half life" of 6-7 measurements.
+    ///
+    /// Must be between 0 and 1 exclusively (0 < alpha < 1).
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(validation(range(min = 0.0, max = 1.0)))]
+    #[configurable(metadata(docs::advanced))]
+    pub latency_ewma_alpha: Option<f64>,
+
+    /// The interval, in seconds, at which the internal metrics cache for VRL is refreshed.
+    /// This must be set to be able to access metrics in VRL functions.
+    ///
+    /// Higher values lead to stale metric values from `get_vector_metric`,
+    /// `find_vector_metrics`, and `aggregate_vector_metrics` functions.
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    pub metrics_storage_refresh_period: Option<f64>,
 }
 
 impl_generate_config_from_default!(GlobalOptions);
@@ -287,6 +321,13 @@ impl GlobalOptions {
                 expire_metrics: self.expire_metrics.or(with.expire_metrics),
                 expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
                 expire_metrics_per_metric_set: merged_expire_metrics_per_metric_set,
+                buffer_utilization_ewma_alpha: self
+                    .buffer_utilization_ewma_alpha
+                    .or(with.buffer_utilization_ewma_alpha),
+                latency_ewma_alpha: self.latency_ewma_alpha.or(with.latency_ewma_alpha),
+                metrics_storage_refresh_period: self
+                    .metrics_storage_refresh_period
+                    .or(with.metrics_storage_refresh_period),
             })
         } else {
             Err(errors)
@@ -296,6 +337,39 @@ impl GlobalOptions {
     /// Get the configured time zone, using "local" time if none is set.
     pub fn timezone(&self) -> TimeZone {
         self.timezone.unwrap_or(TimeZone::Local)
+    }
+
+    /// Returns a list of top-level field names that differ between two [`GlobalOptions`] values.
+    ///
+    /// This function performs a shallow comparison by serializing both configs to JSON
+    /// and comparing their top-level keys.
+    ///
+    /// Useful for logging which global fields changed during config reload attempts.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`serde_json::Error`] if either of the [`GlobalOptions`] values
+    /// cannot be serialized into a JSON object. This is unlikely under normal usage,
+    /// but may occur if serialization fails due to unexpected data structures or changes
+    /// in the type definition.
+    pub fn diff(&self, other: &Self) -> Result<Vec<String>, serde_json::Error> {
+        let old_value = serde_json::to_value(self)?;
+        let new_value = serde_json::to_value(other)?;
+
+        let serde_json::Value::Object(old_map) = old_value else {
+            return Ok(vec![]);
+        };
+        let serde_json::Value::Object(new_map) = new_value else {
+            return Ok(vec![]);
+        };
+
+        Ok(old_map
+            .iter()
+            .filter_map(|(k, v_old)| match new_map.get(k) {
+                Some(v_new) if v_new != v_old => Some(k.clone()),
+                _ => None,
+            })
+            .collect())
     }
 }
 
@@ -412,6 +486,22 @@ mod tests {
             Err(vec![
                 "conflicting values for 'expire_metrics_secs' found".into()
             ])
+        );
+    }
+
+    #[test]
+    fn diff_detects_changed_keys() {
+        let old = GlobalOptions {
+            data_dir: Some(std::path::PathBuf::from("/path1")),
+            ..Default::default()
+        };
+        let new = GlobalOptions {
+            data_dir: Some(std::path::PathBuf::from("/path2")),
+            ..Default::default()
+        };
+        assert_eq!(
+            old.diff(&new).expect("diff failed"),
+            vec!["data_dir".to_string()]
         );
     }
 

@@ -1,16 +1,20 @@
-use crate::decoding::format::Deserializer;
-use crate::BytesDeserializerConfig;
 use bytes::Bytes;
 use derivative::Derivative;
-use smallvec::{smallvec, SmallVec};
+use smallvec::{SmallVec, smallvec};
 use vector_config_macros::configurable_component;
-use vector_core::config::{DataType, LogNamespace};
-use vector_core::event::{Event, TargetEvents, VrlTarget};
-use vector_core::{compile_vrl, schema};
-use vrl::compiler::state::ExternalEnv;
-use vrl::compiler::{runtime::Runtime, CompileConfig, Program, TimeZone, TypeState};
-use vrl::diagnostic::Formatter;
-use vrl::value::Kind;
+use vector_core::{
+    compile_vrl,
+    config::{DataType, LogNamespace},
+    event::{Event, TargetEvents, VrlTarget},
+    schema,
+};
+use vrl::{
+    compiler::{CompileConfig, Program, TimeZone, TypeState, runtime::Runtime, state::ExternalEnv},
+    diagnostic::Formatter,
+    value::Kind,
+};
+
+use crate::{BytesDeserializerConfig, decoding::format::Deserializer};
 
 /// Config used to build a `VrlDeserializer`.
 #[configurable_component]
@@ -37,7 +41,7 @@ pub struct VrlDeserializerOptions {
     /// time zone. The time zone name may be any name in the [TZ database][tz_database], or `local`
     /// to indicate system local time.
     ///
-    /// If not set, `local` will be used.
+    /// If not set, `local` is used.
     ///
     /// [tz_database]: https://en.wikipedia.org/wiki/List_of_tz_database_time_zones
     #[serde(default)]
@@ -55,7 +59,7 @@ impl VrlDeserializerConfig {
 
         match compile_vrl(
             &self.vrl.source,
-            &vrl::stdlib::all(),
+            &vector_vrl_functions::all(),
             &state,
             CompileConfig::default(),
         ) {
@@ -135,12 +139,11 @@ impl VrlDeserializer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use chrono::{DateTime, Utc};
     use indoc::indoc;
-    use vrl::btreemap;
-    use vrl::path::OwnedTargetPath;
-    use vrl::value::Value;
+    use vrl::{btreemap, path::OwnedTargetPath, value::Value};
+
+    use super::*;
 
     fn make_decoder(source: &str) -> VrlDeserializer {
         VrlDeserializerConfig {
@@ -257,7 +260,9 @@ mod tests {
         );
 
         // CEF input
-        let cef_bytes = Bytes::from("CEF:0|Security|Threat Manager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232");
+        let cef_bytes = Bytes::from(
+            "CEF:0|Security|Threat Manager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232",
+        );
         let result = decoder.parse(cef_bytes, LogNamespace::Vector).unwrap();
         assert_eq!(result.len(), 1);
         let cef_event = result.first().unwrap();

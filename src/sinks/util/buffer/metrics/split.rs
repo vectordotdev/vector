@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use vector_lib::event::{metric::MetricData, Metric, MetricValue};
+use vector_lib::event::{Metric, MetricValue, metric::MetricData};
 
 #[allow(clippy::large_enum_variant)]
 enum SplitState {
@@ -190,8 +190,8 @@ mod tests {
     use std::collections::BTreeSet;
 
     use vector_lib::event::{
-        metric::{Bucket, MetricTags, Quantile, Sample},
         Metric, MetricKind, MetricValue, StatisticKind,
+        metric::{Bucket, MetricTags, Quantile, Sample},
     };
 
     use super::{AggregatedSummarySplitter, MetricSplitter};

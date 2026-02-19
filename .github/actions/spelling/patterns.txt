@@ -234,5 +234,19 @@ uuid_from_friendly_id!\(".*"\)
 # Ignore punycode
 \bxn--[-0-9a-z]+
 
+# GitHub username regex derived from https://github.com/shinnn/github-username-regex
+# [a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}
+
+# authors array in .md files
+(?i)^authors: \["[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}"(?:, "[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}")*\]$
+
 # changelog.d fragment authors line
-^authors: .*$
+(?i)^authors:(?: [a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38})+$
+
+# VRL release authors (embedded in releases/*.cue files)
+(?i)^\s*authors:(?: [a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38})+ \(https://github\.com/vectordotdev/vrl/pull/\d+\)$
+
+# Release authors (embedded in releases/*.cue files)
+# Allow "contributors:" lines with one or more GitHub usernames in a JSON-style array
+(?i)^\s*contributors: \["[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}"(?:, "[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}")*\]$
+

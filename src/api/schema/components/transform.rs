@@ -2,11 +2,11 @@ use std::cmp;
 
 use async_graphql::{Enum, InputObject, Object};
 
-use super::{sink, source, state, Component};
+use super::{Component, sink, source, state};
 use crate::{
     api::schema::{
         filter,
-        metrics::{self, outputs_by_component_key, IntoTransformMetrics, Output},
+        metrics::{self, IntoTransformMetrics, Output, outputs_by_component_key},
         sort,
     },
     config::{ComponentKey, Inputs, OutputId},
@@ -28,7 +28,7 @@ impl Transform {
     pub const fn get_component_key(&self) -> &ComponentKey {
         &self.0.component_key
     }
-    pub fn get_component_type(&self) -> &str {
+    pub const fn get_component_type(&self) -> &str {
         self.0.component_type.as_str()
     }
     pub fn get_outputs(&self) -> &[String] {

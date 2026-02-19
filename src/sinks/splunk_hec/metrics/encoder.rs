@@ -1,8 +1,9 @@
 use std::{collections::BTreeMap, iter};
 
 use serde::Serialize;
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::{config::telemetry, EstimatedJsonEncodedSizeOf};
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf, config::telemetry, request_metadata::GroupedCountByteSize,
+};
 
 use super::sink::HecProcessedEvent;
 use crate::{internal_events::SplunkEventEncodeError, sinks::util::encoding::Encoder};

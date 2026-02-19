@@ -1,9 +1,11 @@
-use super::{default_all_processes, example_processes, FilterList, HostMetrics};
 use std::ffi::OsStr;
+
 use sysinfo::{ProcessRefreshKind, ProcessesToUpdate, UpdateKind};
 use vector_lib::configurable::configurable_component;
 #[cfg(target_os = "linux")]
 use vector_lib::metric_tags;
+
+use super::{FilterList, HostMetrics, default_all_processes, example_processes};
 
 /// Options for the process metrics collector.
 #[configurable_component]
@@ -58,9 +60,8 @@ impl HostMetrics {
 
 #[cfg(test)]
 mod tests {
-    use crate::sources::host_metrics::tests::count_tag;
-
     use super::super::{HostMetrics, HostMetricsConfig, MetricsBuffer};
+    use crate::sources::host_metrics::tests::count_tag;
 
     #[tokio::test]
     async fn generates_process_metrics() {
@@ -72,9 +73,11 @@ mod tests {
         assert!(!metrics.is_empty());
 
         // All metrics are named process_*
-        assert!(!metrics
-            .iter()
-            .any(|metric| !metric.name().starts_with("process_")));
+        assert!(
+            !metrics
+                .iter()
+                .any(|metric| !metric.name().starts_with("process_"))
+        );
 
         // They should all have the required tag
         assert_eq!(count_tag(&metrics, "pid"), metrics.len());

@@ -10,16 +10,25 @@ components: transforms: [Name=string]: {
 
 	kind: "transform"
 
-	configuration: base.components.transforms.configuration
+	configuration: generated.components.transforms.configuration
 
 	telemetry: metrics: {
 		component_discarded_events_total:     components.sources.internal_metrics.output.metrics.component_discarded_events_total
 		component_errors_total:               components.sources.internal_metrics.output.metrics.component_errors_total
+		component_latency_mean_seconds:       components.sources.internal_metrics.output.metrics.component_latency_mean_seconds
+		component_latency_seconds:            components.sources.internal_metrics.output.metrics.component_latency_seconds
+		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
 		component_received_events_count:      components.sources.internal_metrics.output.metrics.component_received_events_count
 		component_received_events_total:      components.sources.internal_metrics.output.metrics.component_received_events_total
-		component_received_event_bytes_total: components.sources.internal_metrics.output.metrics.component_received_event_bytes_total
-		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
 		component_sent_event_bytes_total:     components.sources.internal_metrics.output.metrics.component_sent_event_bytes_total
+		component_sent_events_total:          components.sources.internal_metrics.output.metrics.component_sent_events_total
+		transform_buffer_max_byte_size:       components.sources.internal_metrics.output.metrics.transform_buffer_max_byte_size
+		transform_buffer_max_event_size:      components.sources.internal_metrics.output.metrics.transform_buffer_max_event_size
+		transform_buffer_max_size_bytes:      components.sources.internal_metrics.output.metrics.transform_buffer_max_size_bytes
+		transform_buffer_max_size_events:     components.sources.internal_metrics.output.metrics.transform_buffer_max_size_events
+		transform_buffer_utilization:         components.sources.internal_metrics.output.metrics.transform_buffer_utilization
+		transform_buffer_utilization_level:   components.sources.internal_metrics.output.metrics.transform_buffer_utilization_level
+		transform_buffer_utilization_mean:    components.sources.internal_metrics.output.metrics.transform_buffer_utilization_mean
 		utilization:                          components.sources.internal_metrics.output.metrics.utilization
 	}
 }

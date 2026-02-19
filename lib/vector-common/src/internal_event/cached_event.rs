@@ -91,7 +91,7 @@ where
 #[cfg(test)]
 mod tests {
     #![allow(unreachable_pub)]
-    use metrics::{counter, Counter};
+    use metrics::{Counter, counter};
 
     use super::*;
 

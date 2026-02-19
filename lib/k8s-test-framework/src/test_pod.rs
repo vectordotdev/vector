@@ -4,7 +4,7 @@ use std::process::{Command, Stdio};
 
 use k8s_openapi::api::core::v1::Pod;
 
-use super::{resource_file::ResourceFile, Result};
+use super::{Result, resource_file::ResourceFile};
 use crate::up_down;
 
 /// A config that holds a test `Pod` resource file.

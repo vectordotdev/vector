@@ -4,14 +4,12 @@ use vector_lib::event::{Event, LogEvent};
 
 use crate::{
     config::{SinkConfig, SinkContext},
-    sinks::util::test::load_sink,
+    sinks::{greptimedb::logs::config::GreptimeDBLogsConfig, util::test::load_sink},
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
         trace_init,
     },
 };
-
-use crate::sinks::greptimedb::logs::config::GreptimeDBLogsConfig;
 
 #[tokio::test]
 async fn test_greptimedb_logs_sink() {
@@ -139,7 +137,7 @@ impl GreptimeClient {
 
 fn create_event(i: i32, base_time: DateTime<Utc>) -> Event {
     let mut event = LogEvent::default();
-    event.insert("message", format!("test message {}", i));
+    event.insert("message", format!("test message {i}"));
     event.insert("timestamp", base_time);
     event.insert("name", "test");
     event.insert("namespace", "default");

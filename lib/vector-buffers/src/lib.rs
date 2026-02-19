@@ -17,11 +17,10 @@ extern crate tracing;
 mod buffer_usage_data;
 
 pub mod config;
-pub use config::{BufferConfig, BufferType};
+pub use config::{BufferConfig, BufferType, MemoryBufferSize};
 use encoding::Encodable;
-use vector_config::configurable_component;
-
 pub(crate) use vector_common::Result;
+use vector_config::configurable_component;
 
 pub mod encoding;
 
@@ -108,6 +107,13 @@ pub trait Bufferable: InMemoryBufferable + Encodable {}
 
 // Blanket implementation for anything that is already bufferable.
 impl<T> Bufferable for T where T: InMemoryBufferable + Encodable {}
+
+/// Hook for observing items as they are sent into a `BufferSender`.
+pub trait BufferInstrumentation<T: Bufferable>: Send + Sync + 'static {
+    /// Called immediately before the item is emitted to the underlying buffer.
+    /// The underlying type is stored in an `Arc`, so we cannot have `&mut self`.
+    fn on_send(&self, item: &mut T);
+}
 
 pub trait EventCount {
     fn event_count(&self) -> usize;

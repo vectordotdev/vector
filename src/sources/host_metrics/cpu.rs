@@ -1,11 +1,11 @@
-use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeError};
 use futures::StreamExt;
 #[cfg(target_os = "linux")]
 use heim::cpu::os::linux::CpuTimeExt;
 use heim::units::time::second;
 use vector_lib::{event::MetricTags, metric_tags};
 
-use super::{filter_result, HostMetrics};
+use super::{HostMetrics, filter_result};
+use crate::internal_events::{HostMetricsScrapeDetailError, HostMetricsScrapeError};
 
 const MODE: &str = "mode";
 const CPU_SECS_TOTAL: &str = "cpu_seconds_total";
@@ -78,8 +78,10 @@ impl HostMetrics {
 
 #[cfg(test)]
 mod tests {
-    use super::super::{HostMetrics, HostMetricsConfig, MetricsBuffer};
-    use super::{CPU_SECS_TOTAL, LOGICAL_CPUS, MODE, PHYSICAL_CPUS};
+    use super::{
+        super::{HostMetrics, HostMetricsConfig, MetricsBuffer},
+        CPU_SECS_TOTAL, LOGICAL_CPUS, MODE, PHYSICAL_CPUS,
+    };
 
     #[tokio::test]
     async fn generates_cpu_metrics() {

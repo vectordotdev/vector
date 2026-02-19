@@ -1,6 +1,6 @@
 use std::io::Read;
 
-use base64::prelude::{Engine as _, BASE64_STANDARD};
+use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
 use chrono::Utc;
 use flate2::read::MultiGzDecoder;
@@ -8,28 +8,28 @@ use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::FramedRead;
 use vector_common::constants::GZIP_MAGIC;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::lookup::{metadata_path, path, PathPrefix};
 use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::StreamDecodingError,
     config::{LegacyKey, LogNamespace},
     event::BatchNotifier,
-    EstimatedJsonEncodedSizeOf,
-};
-use vector_lib::{
     finalization::AddBatchNotifier,
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Registered,
     },
+    lookup::{PathPrefix, metadata_path, path},
+    source_sender::SendError,
 };
 use vrl::compiler::SecretTarget;
 use warp::reject;
 
 use super::{
+    Compression,
     errors::{ParseRecordsSnafu, RequestError},
     models::{EncodedFirehoseRecord, FirehoseRequest, FirehoseResponse},
-    Compression,
 };
 use crate::{
+    SourceSender,
     codecs::Decoder,
     config::log_schema,
     event::{BatchStatus, Event},
@@ -37,7 +37,6 @@ use crate::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, EventsReceived, StreamClosedError,
     },
     sources::aws_kinesis_firehose::AwsKinesisFirehoseConfig,
-    SourceSender,
 };
 
 #[derive(Clone)]
@@ -92,7 +91,7 @@ pub(super) async fn firehose(
                         if let Some(batch) = &batch {
                             event.add_batch_notifier(batch.clone());
                         }
-                        if let Event::Log(ref mut log) = event {
+                        if let Event::Log(log) = event {
                             log_namespace.insert_vector_metadata(
                                 log,
                                 log_schema().source_type_key(),
@@ -134,25 +133,27 @@ pub(super) async fn firehose(
                                 source_arn.to_owned(),
                             );
 
-                            if context.store_access_key {
-                                if let Some(access_key) = &request.access_key {
-                                    log.metadata_mut().secrets_mut().insert_secret(
-                                        "aws_kinesis_firehose_access_key",
-                                        access_key,
-                                    );
-                                }
+                            if context.store_access_key
+                                && let Some(access_key) = &request.access_key
+                            {
+                                log.metadata_mut()
+                                    .secrets_mut()
+                                    .insert_secret("aws_kinesis_firehose_access_key", access_key);
                             }
                         }
                     }
 
                     let count = events.len();
-                    if let Err(error) = context.out.send_batch(events).await {
-                        emit!(StreamClosedError { count });
-                        let error = RequestError::ShuttingDown {
-                            request_id: request_id.clone(),
-                            source: error,
-                        };
-                        warp::reject::custom(error);
+                    match context.out.send_batch(events).await {
+                        Ok(()) => (),
+                        Err(SendError::Closed) => {
+                            emit!(StreamClosedError { count });
+                            let error = RequestError::ShuttingDown {
+                                request_id: request_id.clone(),
+                            };
+                            warp::reject::custom(error);
+                        }
+                        Err(SendError::Timeout) => unreachable!("No timeout is configured here"),
                     }
 
                     drop(batch);
@@ -173,7 +174,7 @@ pub(super) async fn firehose(
                     }
                 }
                 Some(Err(error)) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;
@@ -258,8 +259,9 @@ fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
 
 #[cfg(test)]
 mod tests {
-    use flate2::{write::GzEncoder, Compression};
     use std::io::Write as _;
+
+    use flate2::{Compression, write::GzEncoder};
 
     use super::*;
 

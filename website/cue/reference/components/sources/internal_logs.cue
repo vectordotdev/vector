@@ -37,7 +37,7 @@ components: sources: internal_logs: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.internal_logs.configuration
+	configuration: generated.components.sources.internal_logs.configuration
 
 	output: logs: line: {
 		description: "An individual log or trace message."

@@ -45,7 +45,7 @@ components: sinks: datadog_events: {
 
 	support: sinks._datadog.support
 
-	configuration: base.components.sinks.datadog_events.configuration
+	configuration: generated.components.sinks.datadog_events.configuration
 
 	input: {
 		logs:    true

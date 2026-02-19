@@ -3,8 +3,8 @@ mod vec_stream;
 use std::{future::ready, pin::Pin, time::Duration};
 
 use futures::{
-    stream::{self, BoxStream},
     FutureExt, Stream, StreamExt,
+    stream::{self, BoxStream},
 };
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
@@ -82,9 +82,9 @@ where
     {
         let timers = self.timers();
         let mut is_shutdown: bool = false; // TODO: consider using an enum describing the state instead of a
-                                           // a single boolean variable.
-                                           // It is used to prevent timers to emit messages after the source
-                                           // stream stopped.
+        // a single boolean variable.
+        // It is used to prevent timers to emit messages after the source
+        // stream stopped.
 
         Box::pin(
             input_rx

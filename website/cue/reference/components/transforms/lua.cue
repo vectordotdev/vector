@@ -38,7 +38,7 @@ components: transforms: lua: {
 		notices: []
 	}
 
-	configuration: base.components.transforms.lua.configuration
+	configuration: generated.components.transforms.lua.configuration
 
 	input: {
 		logs: true

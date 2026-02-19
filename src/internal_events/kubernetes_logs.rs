@@ -1,14 +1,16 @@
 use metrics::counter;
-use vector_lib::internal_event::{InternalEvent, INTENTIONAL};
 use vector_lib::{
-    internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL},
+    NamedInternalEvent,
+    internal_event::{
+        ComponentEventsDropped, INTENTIONAL, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+    },
     json_size::JsonSize,
 };
 use vrl::core::Value;
 
 use crate::event::Event;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct KubernetesLogsEventsReceived<'a> {
     pub file: &'a str,
     pub byte_size: JsonSize,
@@ -58,7 +60,7 @@ impl InternalEvent for KubernetesLogsEventsReceived<'_> {
 
 const ANNOTATION_FAILED: &str = "annotation_failed";
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct KubernetesLogsEventAnnotationError<'a> {
     pub event: &'a Event,
 }
@@ -71,7 +73,6 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-
         );
         counter!(
             "component_errors_total",
@@ -83,7 +84,7 @@ impl InternalEvent for KubernetesLogsEventAnnotationError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub(crate) struct KubernetesLogsEventNamespaceAnnotationError<'a> {
     pub event: &'a Event,
 }
@@ -96,7 +97,6 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-
         );
         counter!(
             "component_errors_total",
@@ -109,7 +109,7 @@ impl InternalEvent for KubernetesLogsEventNamespaceAnnotationError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub(crate) struct KubernetesLogsEventNodeAnnotationError<'a> {
     pub event: &'a Event,
 }
@@ -122,7 +122,6 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
             error_code = ANNOTATION_FAILED,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-
         );
         counter!(
             "component_errors_total",
@@ -135,7 +134,7 @@ impl InternalEvent for KubernetesLogsEventNodeAnnotationError<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct KubernetesLogsFormatPickerEdgeCase {
     pub what: &'static str,
 }
@@ -150,7 +149,7 @@ impl InternalEvent for KubernetesLogsFormatPickerEdgeCase {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct KubernetesLogsDockerFormatParseError<'a> {
     pub error: &'a dyn std::error::Error,
 }
@@ -162,7 +161,6 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
             error = %self.error,
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
-
         );
         counter!(
             "component_errors_total",
@@ -176,7 +174,7 @@ impl InternalEvent for KubernetesLogsDockerFormatParseError<'_> {
 
 const KUBERNETES_LIFECYCLE: &str = "kubernetes_lifecycle";
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct KubernetesLifecycleError<E> {
     pub message: &'static str,
     pub error: E,
@@ -191,7 +189,6 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
             error_code = KUBERNETES_LIFECYCLE,
             error_type = error_type::READER_FAILED,
             stage = error_stage::PROCESSING,
-
         );
         counter!(
             "component_errors_total",
@@ -207,7 +204,7 @@ impl<E: std::fmt::Display> InternalEvent for KubernetesLifecycleError<E> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct KubernetesMergedLineTooBigError<'a> {
     pub event: &'a Value,
     pub configured_limit: usize,
@@ -221,7 +218,6 @@ impl InternalEvent for KubernetesMergedLineTooBigError<'_> {
             event = ?self.event,
             configured_limit = self.configured_limit,
             encountered_size_so_far = self.encountered_size_so_far,
-            internal_log_rate_limit = true,
             error_type = error_type::CONDITION_FAILED,
             stage = error_stage::RECEIVING,
         );

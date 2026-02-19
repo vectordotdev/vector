@@ -1,26 +1,22 @@
-use std::collections::HashMap;
-use std::convert::TryFrom;
+use std::{collections::HashMap, convert::TryFrom};
 
 use aws_config::Region;
 use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
 use aws_sdk_kms::Client as KMSClient;
 use chrono::Duration;
-use futures::{stream, StreamExt};
+use futures::{StreamExt, stream};
 use similar_asserts::assert_eq;
-use vector_lib::codecs::TextSerializerConfig;
-use vector_lib::lookup;
+use vector_lib::{codecs::TextSerializerConfig, lookup};
 
 use super::*;
-use crate::aws::{create_client, ClientBuilder};
-use crate::aws::{AwsAuthentication, RegionOrEndpoint};
-use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder;
 use crate::{
-    config::{log_schema, ProxyConfig, SinkConfig, SinkContext},
+    aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
+    config::{ProxyConfig, SinkConfig, SinkContext, log_schema},
     event::{Event, LogEvent, Value},
-    sinks::util::BatchConfig,
+    sinks::{aws_cloudwatch_logs::config::CloudwatchLogsClientBuilder, util::BatchConfig},
     template::Template,
     test_util::{
-        components::{run_and_assert_sink_compliance, AWS_SINK_TAGS},
+        components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_lines, random_lines_with_stream, random_string, trace_init,
     },
 };
@@ -459,7 +455,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
     let stream_name = gen_name();
     let config = CloudwatchLogsSinkConfig {
         group_name: Template::try_from(GROUP_NAME).unwrap(),
-        stream_name: Template::try_from(format!("{}-{{{{key}}}}", stream_name)).unwrap(),
+        stream_name: Template::try_from(format!("{stream_name}-{{{{key}}}}")).unwrap(),
         region: RegionOrEndpoint::with_both("us-east-1", cloudwatch_address().as_str()),
         encoding: TextSerializerConfig::default().into(),
         create_missing_group: true,
@@ -498,7 +494,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
     let response = create_client_test()
         .await
         .get_log_events()
-        .log_stream_name(format!("{}-0", stream_name))
+        .log_stream_name(format!("{stream_name}-0"))
         .log_group_name(GROUP_NAME)
         .start_time(timestamp.timestamp_millis())
         .send()
@@ -522,7 +518,7 @@ async fn cloudwatch_insert_log_event_partitioned() {
     let response = create_client_test()
         .await
         .get_log_events()
-        .log_stream_name(format!("{}-1", stream_name))
+        .log_stream_name(format!("{stream_name}-1"))
         .log_group_name(GROUP_NAME)
         .start_time(timestamp.timestamp_millis())
         .send()

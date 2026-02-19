@@ -1,14 +1,16 @@
 //! Encoding for the `AMQP` sink.
-use crate::sinks::prelude::*;
-use bytes::BytesMut;
 use std::io;
+
+use bytes::BytesMut;
 use tokio_util::codec::Encoder as _;
 use vector_lib::config::telemetry;
 
+use crate::sinks::prelude::*;
+
 #[derive(Clone, Debug)]
 pub(super) struct AmqpEncoder {
-    pub(super) encoder: crate::codecs::Encoder<()>,
-    pub(super) transformer: crate::codecs::Transformer,
+    pub(super) encoder: vector_lib::codecs::Encoder<()>,
+    pub(super) transformer: vector_lib::codecs::Transformer,
 }
 
 impl encoding::Encoder<Event> for AmqpEncoder {
@@ -26,7 +28,7 @@ impl encoding::Encoder<Event> for AmqpEncoder {
         let mut encoder = self.encoder.clone();
         encoder
             .encode(input, &mut body)
-            .map_err(|_| io::Error::new(io::ErrorKind::Other, "unable to encode"))?;
+            .map_err(|_| io::Error::other("unable to encode"))?;
 
         let body = body.freeze();
         write_all(writer, 1, body.as_ref())?;

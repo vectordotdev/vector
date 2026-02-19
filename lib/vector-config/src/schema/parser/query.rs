@@ -224,7 +224,7 @@ pub enum SchemaType<'a> {
 }
 
 pub trait QueryableSchema {
-    fn schema_type(&self) -> SchemaType;
+    fn schema_type(&self) -> SchemaType<'_>;
     fn description(&self) -> Option<&str>;
     fn title(&self) -> Option<&str>;
     fn get_attributes(&self, key: &str) -> Option<OneOrMany<CustomAttribute>>;
@@ -236,7 +236,7 @@ impl<T> QueryableSchema for &T
 where
     T: QueryableSchema,
 {
-    fn schema_type(&self) -> SchemaType {
+    fn schema_type(&self) -> SchemaType<'_> {
         (*self).schema_type()
     }
 
@@ -262,7 +262,7 @@ where
 }
 
 impl QueryableSchema for &SchemaObject {
-    fn schema_type(&self) -> SchemaType {
+    fn schema_type(&self) -> SchemaType<'_> {
         // TODO: Technically speaking, it is allowed to use the "X of" schema types in conjunction
         // with other schema types i.e. `allOf` in conjunction with specifying a `type`.
         //
@@ -282,7 +282,9 @@ impl QueryableSchema for &SchemaObject {
             } else if let Some(any_of) = subschemas.any_of.as_ref() {
                 return SchemaType::AnyOf(any_of.iter().map(schema_to_simple_schema).collect());
             } else {
-                panic!("Encountered schema with subschema validation that wasn't one of the supported types: allOf, oneOf, anyOf.");
+                panic!(
+                    "Encountered schema with subschema validation that wasn't one of the supported types: allOf, oneOf, anyOf."
+                );
             }
         }
 
@@ -384,7 +386,7 @@ impl<'a> From<&'a SchemaObject> for SimpleSchema<'a> {
 }
 
 impl QueryableSchema for SimpleSchema<'_> {
-    fn schema_type(&self) -> SchemaType {
+    fn schema_type(&self) -> SchemaType<'_> {
         self.schema.schema_type()
     }
 

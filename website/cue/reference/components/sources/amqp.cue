@@ -42,7 +42,7 @@ components: sources: amqp: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.amqp.configuration
+	configuration: generated.components.sources.amqp.configuration
 
 	output: {
 		logs: record: {
@@ -78,10 +78,10 @@ components: sources: amqp: {
 			}
 		}
 		metrics: "": {
-			description: "The input `metric` event."
+			description: "Metric events that may be emitted by this source."
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 

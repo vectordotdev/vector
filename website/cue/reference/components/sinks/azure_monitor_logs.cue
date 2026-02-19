@@ -61,7 +61,7 @@ components: sinks: azure_monitor_logs: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.azure_monitor_logs.configuration
+	configuration: generated.components.sinks.azure_monitor_logs.configuration
 
 	input: {
 		logs:    true

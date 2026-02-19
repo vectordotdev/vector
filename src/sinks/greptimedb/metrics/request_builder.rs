@@ -1,13 +1,14 @@
-use crate::sinks::util::statistic::DistributionStatistic;
 use chrono::Utc;
 use greptimedb_ingester::{api::v1::*, helpers::values::*};
 use vector_lib::{
     event::{
-        metric::{Bucket, MetricSketch, Quantile, Sample},
         Metric, MetricValue,
+        metric::{Bucket, MetricSketch, Quantile, Sample},
     },
     metrics::AgentDDSketch,
 };
+
+use crate::sinks::util::statistic::DistributionStatistic;
 
 pub(super) struct RequestBuilderOptions {
     pub(super) use_new_naming: bool,

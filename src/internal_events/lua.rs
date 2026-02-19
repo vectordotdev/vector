@@ -1,10 +1,12 @@
 use metrics::{counter, gauge};
-use vector_lib::internal_event::InternalEvent;
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, UNINTENTIONAL};
+use vector_lib::NamedInternalEvent;
+use vector_lib::internal_event::{
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+};
 
 use crate::transforms::lua::v2::BuildError;
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct LuaGcTriggered {
     pub used_memory: usize,
 }
@@ -15,7 +17,7 @@ impl InternalEvent for LuaGcTriggered {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct LuaScriptError {
     pub error: mlua::Error,
 }
@@ -43,7 +45,7 @@ impl InternalEvent for LuaScriptError {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct LuaBuildError {
     pub error: BuildError,
 }
@@ -57,7 +59,7 @@ impl InternalEvent for LuaBuildError {
             error_type = error_type::SCRIPT_FAILED,
             error_code = lua_build_error_code(&self.error),
             stage = error_stage::PROCESSING,
-
+            internal_log_rate_limit = false,
         );
         counter!(
             "component_errors_total",

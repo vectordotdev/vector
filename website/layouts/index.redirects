@@ -17,7 +17,7 @@
 {{- end -}}
 
 {{/* Other redirects (301 because permanent) */}}
-/docs/about/data-model/*   /docs/about/under-the-hood/architecture/data-model/:splat  301
+/docs/architecture/data-model/*   /docs/architecture/data-model/:splat  301
 /docs/components/*   /docs/reference/:splat  301
 /docs/reference/sinks/*   /docs/reference/configuration/sinks/:splat  301
 /docs/reference/sources/*   /docs/reference/configuration/sources/:splat  301

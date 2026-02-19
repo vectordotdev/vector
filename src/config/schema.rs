@@ -1,5 +1,4 @@
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
+use vector_lib::{config::LogNamespace, configurable::configurable_component};
 
 pub(crate) use crate::schema::Definition;
 
@@ -147,13 +146,12 @@ mod test {
             let mut errors = vec![];
             a.append(b, &mut errors);
             if errors.is_empty() {
-                assert_eq!(Some(a), expected, "result mismatch: {}", test);
+                assert_eq!(Some(a), expected, "result mismatch: {test}");
             } else {
                 assert_eq!(
                     errors.is_empty(),
                     expected.is_some(),
-                    "error mismatch: {}",
-                    test
+                    "error mismatch: {test}"
                 );
             }
         }

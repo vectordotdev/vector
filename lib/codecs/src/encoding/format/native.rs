@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use tokio_util::codec::Encoder;
 use vector_core::{
     config::DataType,
-    event::{proto, Event, EventArray},
+    event::{Event, EventArray, proto},
     schema,
 };
 

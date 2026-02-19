@@ -58,7 +58,7 @@ components: sources: aws_kinesis_firehose: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.aws_kinesis_firehose.configuration
+	configuration: generated.components.sources.aws_kinesis_firehose.configuration
 
 	output: {
 		logs: {
@@ -98,10 +98,10 @@ components: sources: aws_kinesis_firehose: {
 			}
 		}
 		metrics: "": {
-			description: "The input `metric` event."
+			description: "Metric events that may be emitted by this source."
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 

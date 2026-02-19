@@ -1,6 +1,7 @@
-use aws_sdk_cloudwatchlogs::error::SdkError;
-use aws_sdk_cloudwatchlogs::operation::describe_log_groups::DescribeLogGroupsError;
-use aws_sdk_cloudwatchlogs::Client as CloudwatchLogsClient;
+use aws_sdk_cloudwatchlogs::{
+    Client as CloudwatchLogsClient, error::SdkError,
+    operation::describe_log_groups::DescribeLogGroupsError,
+};
 use snafu::Snafu;
 
 use crate::sinks::aws_cloudwatch_logs::config::CloudwatchLogsSinkConfig;
@@ -58,7 +59,9 @@ pub async fn healthcheck(
                     info!("Skipping healthcheck log group check: `group_name` is dynamic.");
                     Ok(())
                 } else if config.create_missing_group {
-                    info!("Skipping healthcheck log group check: `group_name` will be created if missing.");
+                    info!(
+                        "Skipping healthcheck log group check: `group_name` will be created if missing."
+                    );
                     Ok(())
                 } else {
                     Err(HealthcheckError::NoLogGroup.into())

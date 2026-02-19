@@ -1,6 +1,6 @@
 use hickory_proto::{
-    serialize::binary::{BinDecodable, BinDecoder, BinEncodable, BinEncoder},
     ProtoError,
+    serialize::binary::{BinDecodable, BinDecoder, BinEncodable, BinEncoder},
 };
 
 pub const EDE_OPTION_CODE: u16 = 15u16;

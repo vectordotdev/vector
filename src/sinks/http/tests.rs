@@ -1,23 +1,33 @@
 //! Unit tests for the `http` sink.
 
-use std::sync::{atomic, Arc};
+use std::{
+    future::ready,
+    sync::{Arc, atomic},
+};
 
 use bytes::{Buf, Bytes};
-use flate2::{read::MultiGzDecoder, read::ZlibDecoder};
+use flate2::read::{MultiGzDecoder, ZlibDecoder};
 use futures::stream;
 use headers::{Authorization, HeaderMapExt};
 use hyper::{Body, Method, Response, StatusCode};
-use serde::{de, Deserialize};
-use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig},
-    JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+use serde::{Deserialize, de};
+use vector_lib::{
+    codecs::{
+        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+        encoding::{Framer, FramingConfig},
+    },
+    event::{BatchNotifier, BatchStatus, Event, LogEvent},
+    finalization::AddBatchNotifier,
 };
 
-use vector_lib::event::{BatchNotifier, BatchStatus, Event, LogEvent};
-
+use super::{
+    config::{HttpSinkConfig, validate_headers, validate_payload_wrapper},
+    encoder::HttpEncoder,
+};
 use crate::{
     assert_downcast_matches,
     codecs::{EncodingConfigWithFraming, SinkType},
+    log_event,
     sinks::{
         prelude::*,
         util::{
@@ -30,15 +40,13 @@ use crate::{
         },
     },
     test_util::{
-        components::{self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS},
-        next_addr, random_lines_with_stream,
+        addr::next_addr,
+        components::{
+            self, COMPONENT_ERROR_TAGS, HTTP_SINK_TAGS, init_test, run_and_assert_sink_compliance,
+            run_and_assert_sink_error_with_events,
+        },
+        create_events_batch_with_fn, random_lines_with_stream,
     },
-};
-
-use super::{
-    config::HttpSinkConfig,
-    config::{validate_headers, validate_payload_wrapper},
-    encoder::HttpEncoder,
 };
 
 #[test]
@@ -265,6 +273,96 @@ async fn http_passes_custom_headers() {
 }
 
 #[tokio::test]
+async fn http_passes_template_headers() {
+    run_sink_with_events(
+        r#"
+        [request.headers]
+        Static-Header = "static-value"
+        Accept = "application/vnd.api+json"
+        X-Event-Level = "{{level}}"
+        X-Event-Message = "{{message}}"
+        X-Static-Template = "constant-value"
+    "#,
+        || {
+            let mut event = Event::Log(LogEvent::from("test message"));
+            event.as_mut_log().insert("level", "info");
+            event.as_mut_log().insert("message", "templated message");
+            event
+        },
+        10,
+        |parts| {
+            assert_eq!(
+                Some("static-value"),
+                parts
+                    .headers
+                    .get("Static-Header")
+                    .map(|v| v.to_str().unwrap())
+            );
+
+            assert_eq!(
+                Some("application/vnd.api+json"),
+                parts.headers.get("Accept").map(|v| v.to_str().unwrap())
+            );
+
+            assert_eq!(
+                Some("constant-value"),
+                parts
+                    .headers
+                    .get("X-Static-Template")
+                    .map(|v| v.to_str().unwrap())
+            );
+
+            assert_eq!(
+                Some("info"),
+                parts
+                    .headers
+                    .get("X-Event-Level")
+                    .map(|v| v.to_str().unwrap())
+            );
+            assert_eq!(
+                Some("templated message"),
+                parts
+                    .headers
+                    .get("X-Event-Message")
+                    .map(|v| v.to_str().unwrap())
+            );
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn http_template_headers_missing_fields() {
+    run_sink_with_events(
+        r#"
+        [request.headers]
+        X-Required-Field = "{{required_field}}"
+        X-Static = "static-value"
+    "#,
+        || {
+            let mut event = Event::Log(LogEvent::from("good event"));
+            event.as_mut_log().insert("required_field", "present");
+            event
+        },
+        10,
+        |parts| {
+            assert_eq!(
+                Some("present"),
+                parts
+                    .headers
+                    .get("X-Required-Field")
+                    .map(|v| v.to_str().unwrap())
+            );
+            assert_eq!(
+                Some("static-value"),
+                parts.headers.get("X-Static").map(|v| v.to_str().unwrap())
+            );
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
 async fn retries_on_no_connection() {
     components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
         let num_lines = 10;
@@ -409,7 +507,7 @@ async fn json_compression(compression: &str) {
     components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
         let num_lines = 1000;
 
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let config = r#"
         uri = "http://$IN_ADDR/frames"
@@ -468,7 +566,7 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
     components::assert_sink_compliance(&HTTP_SINK_TAGS, async {
         let num_lines = 1000;
 
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let config = r#"
         uri = "http://$IN_ADDR/frames"
@@ -528,6 +626,241 @@ async fn json_compression_with_payload_wrapper(compression: &str) {
     .await;
 }
 
+#[tokio::test]
+async fn templateable_uri_path() {
+    init_test();
+    fn create_event_with_id(id: i64) -> Event {
+        log_event!["id" => id]
+    }
+
+    let num_events_per_id = 100;
+    let an_id = 1;
+    let another_id = 2;
+    let (_guard, in_addr) = next_addr();
+
+    let config = format!(
+        r#"
+        uri = "http://{in_addr}/id/{{{{id}}}}"
+        encoding.codec = "json"
+        "#
+    );
+
+    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+    let cx = SinkContext::default();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (rx, trigger, server) = build_test_server(in_addr);
+
+    let (some_events_with_an_id, mut a_receiver) =
+        create_events_batch_with_fn(|| create_event_with_id(an_id), num_events_per_id);
+    let (some_events_with_another_id, mut another_receiver) =
+        create_events_batch_with_fn(|| create_event_with_id(another_id), num_events_per_id);
+    let all_events = some_events_with_an_id
+        .into_iter()
+        .chain(some_events_with_another_id);
+    let event_stream = stream::iter(all_events);
+
+    tokio::spawn(server);
+
+    run_and_assert_sink_compliance(sink, event_stream, &HTTP_SINK_TAGS).await;
+
+    drop(trigger);
+
+    assert_eq!(a_receiver.try_recv(), Ok(BatchStatus::Delivered));
+    assert_eq!(another_receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let request_batches = rx
+        .inspect(|(parts, body)| {
+            let events: Vec<serde_json::Value> = serde_json::from_slice(body).unwrap();
+
+            // Assert that all the events are received
+            assert_eq!(events.len(), num_events_per_id);
+
+            // Assert that all events have the same id
+            let expected_event_id = events[0]["id"].as_i64().unwrap();
+
+            for event in events {
+                let event_id = event["id"].as_i64().unwrap();
+                assert_eq!(event_id, expected_event_id)
+            }
+
+            // Assert that the uri path is the expected one for the given id
+            let expected_uri_path = format!("/id/{expected_event_id}");
+            assert_eq!(parts.uri.path(), expected_uri_path);
+        })
+        .collect::<Vec<_>>()
+        .await;
+    assert_eq!(request_batches.len(), 2)
+}
+
+#[tokio::test]
+async fn templateable_uri_auth() {
+    init_test();
+
+    fn create_event_with_user_and_pass(user: &str, pass: &str) -> Event {
+        log_event!["user" => user, "pass" => pass]
+    }
+
+    let num_events_per_auth = 100;
+    let an_user = "an_user";
+    let a_pass = "a_pass";
+    let another_user = "another_user";
+    let another_pass = "another_pass";
+    let (_guard, in_addr) = next_addr();
+    let config = format!(
+        r#"
+        uri = "http://{{{{user}}}}:{{{{pass}}}}@{in_addr}/"
+        encoding.codec = "json"
+        "#
+    );
+
+    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+    let cx = SinkContext::default();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (rx, trigger, server) = build_test_server(in_addr);
+
+    let (some_events_with_an_auth, mut a_receiver) = create_events_batch_with_fn(
+        || create_event_with_user_and_pass(an_user, a_pass),
+        num_events_per_auth,
+    );
+    let (some_events_with_another_auth, mut another_receiver) = create_events_batch_with_fn(
+        || create_event_with_user_and_pass(another_user, another_pass),
+        num_events_per_auth,
+    );
+    let all_events = some_events_with_an_auth
+        .into_iter()
+        .chain(some_events_with_another_auth);
+    let event_stream = stream::iter(all_events);
+
+    tokio::spawn(server);
+
+    run_and_assert_sink_compliance(sink, event_stream, &HTTP_SINK_TAGS).await;
+
+    drop(trigger);
+
+    assert_eq!(a_receiver.try_recv(), Ok(BatchStatus::Delivered));
+    assert_eq!(another_receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    let request_batches = rx
+        .inspect(|(parts, body)| {
+            let events: Vec<serde_json::Value> = serde_json::from_slice(body).unwrap();
+
+            // Assert that all the events are received
+            assert_eq!(events.len(), num_events_per_auth);
+
+            // Assert that all events have the same user & pass
+            let expected_user = events[0]["user"].as_str().unwrap().to_string();
+            let expected_pass = events[0]["pass"].as_str().unwrap().to_string();
+
+            for event in events {
+                let event_user = event["user"].as_str().unwrap();
+                let event_pass = event["pass"].as_str().unwrap();
+                assert_eq!(event_user, expected_user);
+                assert_eq!(event_pass, expected_pass);
+            }
+
+            // Assert that the auth is the expected one for the given user & pass
+            let expected_auth = Authorization::basic(&expected_user, &expected_pass);
+            assert_eq!(parts.headers.typed_get(), Some(expected_auth));
+        })
+        .collect::<Vec<_>>()
+        .await;
+    assert_eq!(request_batches.len(), 2);
+}
+
+#[tokio::test]
+async fn missing_field_in_uri_template() {
+    init_test();
+
+    let (_guard, in_addr) = next_addr();
+    let config = format!(
+        r#"
+        uri = "http://{in_addr}/{{{{missing_field}}}}"
+        encoding.codec = "json"
+        "#
+    );
+    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+    let cx = SinkContext::default();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (rx, trigger, server) = build_test_server(in_addr);
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let mut event = Event::Log(LogEvent::default());
+    event.add_batch_notifier(batch);
+
+    tokio::spawn(server);
+    let expected_emitted_error_events = ["TemplateRenderingError"];
+    run_and_assert_sink_error_with_events(
+        sink,
+        stream::once(ready(event)),
+        &expected_emitted_error_events,
+        &COMPONENT_ERROR_TAGS,
+    )
+    .await;
+
+    drop(trigger);
+
+    // TODO(https://github.com/vectordotdev/vector/issues/23366): Currently, When the KeyPartitioner fails to build the batch key from
+    // an event, the finalizer is not notified with
+    // EventStatus::Rejected. The error is silently ignored.
+    // See src/sinks/http/sink.rs:47
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+
+    // No requests should have been made to the server
+    let requests = rx.collect::<Vec<_>>().await;
+    assert!(requests.is_empty());
+}
+
+#[tokio::test]
+async fn http_uri_auth_conflict() {
+    init_test();
+
+    let (_guard, in_addr) = next_addr();
+    let config = format!(
+        r#"
+        uri = "http://user:pass@{in_addr}/"
+        encoding.codec = "json"
+        auth.strategy = "basic"
+        auth.user = "user"
+        auth.password = "pass"
+        "#
+    );
+    let config: HttpSinkConfig = toml::from_str(&config).unwrap();
+
+    let cx = SinkContext::default();
+
+    let (sink, _) = config.build(cx).await.unwrap();
+    let (rx, trigger, server) = build_test_server(in_addr);
+
+    let (batch, mut receiver) = BatchNotifier::new_with_receiver();
+    let mut event = Event::Log(LogEvent::default());
+    event.add_batch_notifier(batch);
+
+    tokio::spawn(server);
+
+    let expected_emitted_error_events = ["CallError", "SinkRequestBuildError"];
+    run_and_assert_sink_error_with_events(
+        sink,
+        stream::once(ready(event)),
+        &expected_emitted_error_events,
+        &COMPONENT_ERROR_TAGS,
+    )
+    .await;
+
+    drop(trigger);
+
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+
+    // No requests should have been made to the server
+    let requests = rx.collect::<Vec<_>>().await;
+    assert!(requests.is_empty());
+}
+
 fn parse_compressed_json<T>(compression: &str, buf: Bytes) -> T
 where
     T: de::DeserializeOwned,
@@ -536,7 +869,7 @@ where
         "gzip" => serde_json::from_reader(MultiGzDecoder::new(buf.reader())).unwrap(),
         "zstd" => serde_json::from_reader(zstd::Decoder::new(buf.reader()).unwrap()).unwrap(),
         "zlib" => serde_json::from_reader(ZlibDecoder::new(buf.reader())).unwrap(),
-        _ => panic!("undefined compression: {}", compression),
+        _ => panic!("undefined compression: {compression}"),
     }
 }
 
@@ -561,19 +894,37 @@ async fn run_sink(extra_config: &str, assert_parts: impl Fn(http::request::Parts
     assert_eq!(input_lines, output_lines);
 }
 
+async fn run_sink_with_events(
+    extra_config: &str,
+    event_generator: impl Fn() -> Event + Clone,
+    num_events: usize,
+    assert_parts: impl Fn(http::request::Parts),
+) {
+    let (in_addr, sink) = build_sink(extra_config).await;
+    let (rx, trigger, server) = build_test_server(in_addr);
+    tokio::spawn(server);
+
+    let (events, mut receiver) = create_events_batch_with_fn(event_generator, num_events);
+    let events = stream::iter(events);
+
+    components::run_and_assert_sink_compliance(sink, events, &HTTP_SINK_TAGS).await;
+    drop(trigger);
+
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    let _output_lines = get_received_gzip(rx, assert_parts).await;
+}
+
 async fn build_sink(extra_config: &str) -> (std::net::SocketAddr, crate::sinks::VectorSink) {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     let config = format!(
         r#"
-                uri = "http://{addr}/frames"
+                uri = "http://{in_addr}/frames"
                 compression = "gzip"
                 framing.method = "newline_delimited"
                 encoding.codec = "json"
-                {extras}
+                {extra_config}
             "#,
-        addr = in_addr,
-        extras = extra_config,
     );
     let config: HttpSinkConfig = toml::from_str(&config).unwrap();
 

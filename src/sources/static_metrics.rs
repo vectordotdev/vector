@@ -1,27 +1,26 @@
-use std::collections::BTreeMap;
-use std::num::NonZeroU32;
-use std::time::Duration;
+use std::{collections::BTreeMap, num::NonZeroU32, time::Duration};
 
 use chrono::Utc;
 use futures::StreamExt;
 use serde_with::serde_as;
 use tokio::time;
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    config::LogNamespace,
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
 };
-use vector_lib::{config::LogNamespace, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
 use crate::{
+    SourceSender,
     config::{SourceConfig, SourceContext, SourceOutput},
     event::{
-        metric::{MetricData, MetricName, MetricSeries, MetricTime, MetricValue},
         EventMetadata, Metric, MetricKind,
+        metric::{MetricData, MetricName, MetricSeries, MetricTime, MetricValue},
     },
     internal_events::{EventsReceived, StreamClosedError},
     shutdown::ShutdownSignal,
-    SourceSender,
 };
 
 /// Configuration for the `static_metrics` source.
@@ -203,7 +202,7 @@ mod tests {
         event::Event,
         test_util::{
             self,
-            components::{run_and_assert_source_compliance, SOURCE_TAGS},
+            components::{SOURCE_TAGS, run_and_assert_source_compliance},
         },
     };
 

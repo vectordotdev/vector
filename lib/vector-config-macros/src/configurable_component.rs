@@ -1,10 +1,10 @@
-use darling::{ast::NestedMeta, Error, FromMeta};
+use darling::{Error, FromMeta, ast::NestedMeta};
 use proc_macro::TokenStream;
 use proc_macro2::{Ident, Span};
 use quote::{quote, quote_spanned};
 use syn::{
-    parse_macro_input, parse_quote, parse_quote_spanned, punctuated::Punctuated, spanned::Spanned,
-    token::Comma, DeriveInput, Lit, LitStr, Meta, MetaList, Path,
+    DeriveInput, Lit, LitStr, Meta, MetaList, Path, parse_macro_input, parse_quote,
+    parse_quote_spanned, punctuated::Punctuated, spanned::Spanned, token::Comma,
 };
 use vector_config_common::{
     constants::ComponentType, human_friendly::generate_human_friendly_string,

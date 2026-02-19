@@ -1,7 +1,7 @@
 use std::{
     sync::{
-        atomic::{AtomicUsize, Ordering},
         Arc,
+        atomic::{AtomicUsize, Ordering},
     },
     task::{Context, Poll},
     time::Duration,
@@ -196,7 +196,7 @@ impl Service<KafkaRequest> for KafkaService {
                             event_byte_size: config::telemetry().create_request_count_byte_size(),
                             raw_byte_size: 0,
                             event_status: EventStatus::Errored,
-                        })
+                        });
                     }
                 };
             }

@@ -7,7 +7,7 @@ use std::{
     mem::{drop, replace},
     pin::Pin,
     sync::{Arc, Mutex},
-    task::{ready, Context, Poll},
+    task::{Context, Poll, ready},
 };
 
 use futures::future::{BoxFuture, FutureExt};

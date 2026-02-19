@@ -1,12 +1,19 @@
 use std::{borrow::Cow, str::FromStr};
-use vrl::path::PathParseError;
 
 use bytes::Bytes;
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::{Event, LogEvent, Value};
-use vrl::datadog_filter::regex::{wildcard_regex, word_regex};
-use vrl::datadog_filter::{build_matcher, Filter, Matcher, Resolver, Run};
-use vrl::datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode};
+use vector_lib::{
+    configurable::configurable_component,
+    event::{Event, EventRef, LogEvent, Value},
+};
+use vector_vrl_metrics::MetricsStorage;
+use vrl::{
+    datadog_filter::{
+        Filter, Matcher, Resolver, Run, build_matcher,
+        regex::{wildcard_regex, word_regex},
+    },
+    datadog_search_syntax::{Comparison, ComparisonValue, Field, QueryNode},
+    path::PathParseError,
+};
 
 use super::{Condition, Conditional, ConditionalConfig};
 
@@ -23,6 +30,12 @@ impl Default for DatadogSearchConfig {
         Self {
             source: QueryNode::MatchAllDocs,
         }
+    }
+}
+
+impl DatadogSearchConfig {
+    pub fn build_matcher(&self) -> crate::Result<Box<dyn Matcher<LogEvent>>> {
+        Ok(build_matcher(&self.source, &EventFilter)?)
     }
 }
 
@@ -45,13 +58,28 @@ impl_generate_config_from_default!(DatadogSearchConfig);
 /// a [Datadog Search Syntax query](https://docs.datadoghq.com/logs/explorer/search_syntax/).
 #[derive(Debug, Clone)]
 pub struct DatadogSearchRunner {
-    matcher: Box<dyn Matcher<Event>>,
+    matcher: Box<dyn Matcher<LogEvent>>,
+}
+
+impl TryFrom<&DatadogSearchConfig> for DatadogSearchRunner {
+    type Error = crate::Error;
+    fn try_from(config: &DatadogSearchConfig) -> Result<Self, Self::Error> {
+        config.build_matcher().map(|matcher| Self { matcher })
+    }
+}
+
+impl DatadogSearchRunner {
+    pub fn matches<'a>(&self, event: impl Into<EventRef<'a>>) -> bool {
+        match event.into() {
+            EventRef::Log(log) => self.matcher.run(log),
+            _ => false,
+        }
+    }
 }
 
 impl Conditional for DatadogSearchRunner {
-    fn check(&self, e: Event) -> (bool, Event) {
-        let result = self.matcher.run(&e);
-        (result, e)
+    fn check(&self, event: Event) -> (bool, Event) {
+        (self.matches(&event), event)
     }
 }
 
@@ -59,19 +87,10 @@ impl ConditionalConfig for DatadogSearchConfig {
     fn build(
         &self,
         _enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        _: &MetricsStorage,
     ) -> crate::Result<Condition> {
-        let matcher = as_log(build_matcher(&self.source, &EventFilter).map_err(|e| e.to_string())?);
-
-        Ok(Condition::DatadogSearch(DatadogSearchRunner { matcher }))
+        Ok(Condition::DatadogSearch(self.try_into()?))
     }
-}
-
-/// Run the provided `Matcher` when we're dealing with `LogEvent`s. Otherwise, return false.
-fn as_log(matcher: Box<dyn Matcher<LogEvent>>) -> Box<dyn Matcher<Event>> {
-    Run::boxed(move |ev| match ev {
-        Event::Log(log) => matcher.run(log),
-        _ => false,
-    })
 }
 
 #[derive(Default, Clone)]
@@ -84,7 +103,7 @@ impl Filter<LogEvent> for EventFilter {
     fn exists(&self, field: Field) -> Result<Box<dyn Matcher<LogEvent>>, PathParseError> {
         Ok(match field {
             Field::Tag(tag) => {
-                let starts_with = format!("{}:", tag);
+                let starts_with = format!("{tag}:");
 
                 any_string_match_multiple(vec!["ddtags", "tags"], move |value| {
                     value == tag || value.starts_with(&starts_with)
@@ -125,7 +144,7 @@ impl Filter<LogEvent> for EventFilter {
             }
             // Individual tags are compared by element key:value.
             Field::Tag(tag) => {
-                let value_bytes = Value::Bytes(format!("{}:{}", tag, to_match).into());
+                let value_bytes = Value::Bytes(format!("{tag}:{to_match}").into());
 
                 array_match_multiple(vec!["ddtags", "tags"], move |values| {
                     values.contains(&value_bytes)
@@ -160,13 +179,13 @@ impl Filter<LogEvent> for EventFilter {
         Ok(match field {
             // Default fields are matched by word boundary.
             Field::Default(field) => {
-                let re = word_regex(&format!("{}*", prefix));
+                let re = word_regex(&format!("{prefix}*"));
 
                 string_match(field, move |value| re.is_match(&value))
             }
             // Tags are recursed until a match is found.
             Field::Tag(tag) => {
-                let starts_with = format!("{}:{}", tag, prefix);
+                let starts_with = format!("{tag}:{prefix}");
 
                 any_string_match_multiple(vec!["ddtags", "tags"], move |value| {
                     value.starts_with(&starts_with)
@@ -202,7 +221,7 @@ impl Filter<LogEvent> for EventFilter {
                 string_match(field, move |value| re.is_match(&value))
             }
             Field::Tag(tag) => {
-                let re = wildcard_regex(&format!("{}:{}", tag, wildcard));
+                let re = wildcard_regex(&format!("{tag}:{wildcard}"));
 
                 any_string_match_multiple(vec!["ddtags", "tags"], move |value| re.is_match(&value))
             }
@@ -814,6 +833,18 @@ mod test {
             ),
             // Float attribute match (negate w/-).
             ("-@a:0.75", log_event!["a" => 0.74], log_event!["a" => 0.75]),
+            // Attribute match with dot in name
+            (
+                "@a.b:x",
+                log_event!["a" => serde_json::json!({"b": "x"})],
+                Event::Log(LogEvent::from(Value::from(serde_json::json!({"a.b": "x"})))),
+            ),
+            // Attribute with dot in name (flattened key) - requires escaped quotes.
+            (
+                r#"@\"a.b\":x"#,
+                Event::Log(LogEvent::from(Value::from(serde_json::json!({"a.b": "x"})))),
+                log_event!["a" => serde_json::json!({"b": "x"})],
+            ),
             // Wildcard prefix.
             (
                 "*bla",
@@ -1239,9 +1270,9 @@ mod test {
             ),
             // negate OR of two values
             (
-                "-@field:value1 OR -@field:value2",
-                log_event!["field" => "value"],
-                log_event!["field" => "value2"],
+                "-@field1:value1 OR -@field2:value2",
+                log_event!["field1" => "value1"],
+                log_event!["field1" => "value1", "field2" => "value2"],
             ),
             // default AND of two values
             (
@@ -1610,8 +1641,8 @@ mod test {
 
             // Every query should build successfully.
             let cond = config
-                .build(&Default::default())
-                .unwrap_or_else(|_| panic!("build failed: {}", source));
+                .build(&Default::default(), &Default::default())
+                .unwrap_or_else(|_| panic!("build failed: {source}"));
 
             assert!(
                 cond.check_with_context(pass.clone()).0.is_ok(),

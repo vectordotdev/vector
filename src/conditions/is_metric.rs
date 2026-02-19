@@ -17,8 +17,8 @@ pub(crate) fn check_is_metric_with_context(e: Event) -> (Result<(), String>, Eve
 mod test {
     use super::check_is_metric;
     use crate::event::{
-        metric::{Metric, MetricKind, MetricValue},
         Event, LogEvent,
+        metric::{Metric, MetricKind, MetricValue},
     };
 
     #[test]

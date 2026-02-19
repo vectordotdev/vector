@@ -3,39 +3,43 @@ mod integration_tests;
 #[cfg(test)]
 mod tests;
 
-use aws_config::Region;
-use aws_sdk_cloudwatch::error::SdkError;
-use aws_sdk_cloudwatch::operation::put_metric_data::PutMetricDataError;
-use aws_sdk_cloudwatch::types::{Dimension, MetricDatum};
-use aws_sdk_cloudwatch::Client as CloudwatchClient;
-use aws_smithy_types::DateTime as AwsDateTime;
-use futures::{stream, FutureExt, SinkExt};
-use futures_util::{future, future::BoxFuture};
 use std::task::{Context, Poll};
-use tower::Service;
-use vector_lib::configurable::configurable_component;
-use vector_lib::{sink::VectorSink, ByteSizeOf, EstimatedJsonEncodedSizeOf};
 
-use crate::{
-    aws::{
-        auth::AwsAuthentication, create_client, is_retriable_error, ClientBuilder, RegionOrEndpoint,
-    },
-    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
-    event::{
-        metric::{Metric, MetricTags, MetricValue},
-        Event,
-    },
-    sinks::util::{
-        batch::BatchConfig,
-        buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
-        retries::RetryLogic,
-        Compression, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
-        TowerRequestConfig,
-    },
-    tls::TlsConfig,
+use aws_config::Region;
+use aws_sdk_cloudwatch::{
+    Client as CloudwatchClient,
+    error::SdkError,
+    operation::put_metric_data::PutMetricDataError,
+    types::{Dimension, MetricDatum},
+};
+use aws_smithy_types::DateTime as AwsDateTime;
+use futures::{FutureExt, SinkExt, stream};
+use futures_util::{future, future::BoxFuture};
+use indexmap::IndexMap;
+use tower::Service;
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf, configurable::configurable_component, sink::VectorSink,
 };
 
 use super::util::service::TowerRequestConfigDefaults;
+use crate::{
+    aws::{
+        ClientBuilder, RegionOrEndpoint, auth::AwsAuthentication, create_client, is_retriable_error,
+    },
+    config::{AcknowledgementsConfig, Input, ProxyConfig, SinkConfig, SinkContext},
+    event::{
+        Event,
+        metric::{Metric, MetricTags, MetricValue},
+    },
+    sinks::util::{
+        Compression, EncodedEvent, PartitionBuffer, PartitionInnerBuffer, SinkBatchSettings,
+        TowerRequestConfig,
+        batch::BatchConfig,
+        buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
+        retries::RetryLogic,
+    },
+    tls::TlsConfig,
+};
 
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CloudWatchMetricsDefaultBatchSettings;
@@ -110,6 +114,15 @@ pub struct CloudWatchMetricsSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
+
+    /// A map from metric name to AWS storage resolution.
+    /// Valid values are 1 (high resolution) and 60 (standard resolution).
+    /// If unset, the AWS SDK default of 60 (standard resolution) is used.
+    /// See [AWS Metrics Resolution](https://docs.aws.amazon.com/AmazonCloudWatch/latest/monitoring/cloudwatch_concepts.html#Resolution_definition)
+    /// See [MetricDatum::storage_resolution](https://docs.rs/aws-sdk-cloudwatch/1.91.0/aws_sdk_cloudwatch/types/struct.MetricDatum.html#structfield.storage_resolution)
+    #[configurable(metadata(docs::additional_props_description = "An AWS storage resolution."))]
+    #[serde(default)]
+    pub storage_resolution: IndexMap<String, i32>,
 }
 
 impl_generate_config_from_default!(CloudWatchMetricsSinkConfig);
@@ -201,6 +214,7 @@ struct CloudWatchMetricsRetryLogic;
 
 impl RetryLogic for CloudWatchMetricsRetryLogic {
     type Error = SdkError<PutMetricDataError>;
+    type Request = PartitionInnerBuffer<Vec<Metric>, String>;
     type Response = ();
 
     fn is_retriable_error(&self, error: &Self::Error) -> bool {
@@ -219,6 +233,7 @@ fn tags_to_dimensions(tags: &MetricTags) -> Vec<Dimension> {
 #[derive(Clone)]
 pub struct CloudWatchMetricsSvc {
     client: CloudwatchClient,
+    storage_resolution: IndexMap<String, i32>,
 }
 
 impl CloudWatchMetricsSvc {
@@ -230,13 +245,16 @@ impl CloudWatchMetricsSvc {
         let batch = config.batch.into_batch_settings()?;
         let request_settings = config.request.into_settings();
 
-        let service = CloudWatchMetricsSvc { client };
+        let service = CloudWatchMetricsSvc {
+            client,
+            storage_resolution: validate_storage_resolutions(config.storage_resolution)?,
+        };
         let buffer = PartitionBuffer::new(MetricsBuffer::new(batch.size));
         let mut normalizer = MetricNormalizer::<AwsCloudwatchMetricNormalize>::default();
 
         let sink = request_settings
             .partition_sink(CloudWatchMetricsRetryLogic, service, buffer, batch.timeout)
-            .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error))
+            .sink_map_err(|error| error!(message = "Fatal CloudwatchMetrics sink error.", %error, internal_log_rate_limit = false))
             .with_flat_map(move |event: Event| {
                 stream::iter({
                     let byte_size = event.allocated_bytes();
@@ -259,6 +277,7 @@ impl CloudWatchMetricsSvc {
     }
 
     fn encode_events(&mut self, events: Vec<Metric>) -> Vec<MetricDatum> {
+        let resolutions = &self.storage_resolution;
         events
             .into_iter()
             .filter_map(|event| {
@@ -267,6 +286,7 @@ impl CloudWatchMetricsSvc {
                     .timestamp()
                     .map(|x| AwsDateTime::from_millis(x.timestamp_millis()));
                 let dimensions = event.tags().map(tags_to_dimensions);
+                let resolution = resolutions.get(&metric_name).copied();
                 // AwsCloudwatchMetricNormalize converts these to the right MetricKind
                 match event.value() {
                     MetricValue::Counter { value } => Some(
@@ -275,6 +295,7 @@ impl CloudWatchMetricsSvc {
                             .value(*value)
                             .set_timestamp(timestamp)
                             .set_dimensions(dimensions)
+                            .set_storage_resolution(resolution)
                             .build(),
                     ),
                     MetricValue::Distribution {
@@ -287,6 +308,7 @@ impl CloudWatchMetricsSvc {
                             .set_counts(Some(samples.iter().map(|s| s.rate as f64).collect()))
                             .set_timestamp(timestamp)
                             .set_dimensions(dimensions)
+                            .set_storage_resolution(resolution)
                             .build(),
                     ),
                     MetricValue::Set { values } => Some(
@@ -295,6 +317,7 @@ impl CloudWatchMetricsSvc {
                             .value(values.len() as f64)
                             .set_timestamp(timestamp)
                             .set_dimensions(dimensions)
+                            .set_storage_resolution(resolution)
                             .build(),
                     ),
                     MetricValue::Gauge { value } => Some(
@@ -303,6 +326,7 @@ impl CloudWatchMetricsSvc {
                             .value(*value)
                             .set_timestamp(timestamp)
                             .set_dimensions(dimensions)
+                            .set_storage_resolution(resolution)
                             .build(),
                     ),
                     _ => None,
@@ -342,4 +366,17 @@ impl Service<PartitionInnerBuffer<Vec<Metric>, String>> for CloudWatchMetricsSvc
             Ok(())
         })
     }
+}
+
+fn validate_storage_resolutions(
+    storage_resolutions: IndexMap<String, i32>,
+) -> crate::Result<IndexMap<String, i32>> {
+    for (metric_name, storage_resolution) in storage_resolutions.iter() {
+        if !matches!(storage_resolution, 1 | 60) {
+            return Err(
+                format!("Storage resolution for {metric_name} should be '1' or '60'").into(),
+            );
+        }
+    }
+    Ok(storage_resolutions)
 }

@@ -1,9 +1,9 @@
-use crate::components::validation::{
-    component_names::*, ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent,
-};
 use vector_lib::event::{Event, Metric, MetricKind};
 
 use super::{ComponentMetricType, Validator};
+use crate::components::validation::{
+    ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent, component_names::*,
+};
 
 /// Validates that the component meets the requirements of the [Component Specification][component_spec].
 ///
@@ -129,11 +129,7 @@ fn validate_telemetry(
         }
     });
 
-    if errs.is_empty() {
-        Ok(out)
-    } else {
-        Err(errs)
-    }
+    if errs.is_empty() { Ok(out) } else { Err(errs) }
 }
 
 fn validate_metric(
@@ -224,10 +220,10 @@ fn filter_events_by_metric_and_component<'a>(
         .filter(|&m| {
             if m.name() == metric.to_string() {
                 debug!("{}", m);
-                if let Some(tags) = m.tags() {
-                    if tags.get("component_id").unwrap_or("") == component_id {
-                        return true;
-                    }
+                if let Some(tags) = m.tags()
+                    && tags.get("component_id").unwrap_or("") == component_id
+                {
+                    return true;
                 }
             }
 
@@ -256,7 +252,7 @@ fn sum_counters(
                     sum += *value;
                 }
             }
-            _ => errs.push(format!("{}: metric value is not a counter", metric_name,)),
+            _ => errs.push(format!("{metric_name}: metric value is not a counter",)),
         }
     }
 

@@ -50,7 +50,7 @@ components: sources: apache_metrics: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.apache_metrics.configuration
+	configuration: generated.components.sources.apache_metrics.configuration
 
 	output: metrics: {
 		// Default Apache metrics tags

@@ -1,0 +1,25 @@
+version: '3'
+
+services:
+  postgres:
+    image: docker.io/postgres:${CONFIG_VERSION}
+    command: /postgres-init.sh
+    environment:
+    - POSTGRES_USER=vector
+    - POSTGRES_PASSWORD=vector
+    volumes:
+    - socket:/var/run/postgresql
+    - ../data/postgres-init.sh:/postgres-init.sh:ro
+    - ../../../data/ca:/certs:ro
+
+volumes:
+  # Use external volume 'postgres_socket' that's shared with the test runner
+  # The runner creates this volume and mounts it at /pg_socket
+  socket:
+    name: postgres_socket
+    external: true
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

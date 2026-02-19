@@ -86,30 +86,30 @@ fn get_timestamp_millis(event: &Event) -> Option<i64> {
 
 fn get_headers(event: &Event, headers_key: Option<&OwnedTargetPath>) -> Option<OwnedHeaders> {
     headers_key.and_then(|headers_key| {
-        if let Event::Log(log) = event {
-            if let Some(headers) = log.get(headers_key) {
-                match headers {
-                    Value::Object(headers_map) => {
-                        let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
-                        for (key, value) in headers_map {
-                            if let Value::Bytes(value_bytes) = value {
-                                owned_headers = owned_headers.insert(Header {
-                                    key,
-                                    value: Some(value_bytes.as_ref()),
-                                });
-                            } else {
-                                emit!(KafkaHeaderExtractionError {
-                                    header_field: headers_key
-                                });
-                            }
+        if let Event::Log(log) = event
+            && let Some(headers) = log.get(headers_key)
+        {
+            match headers {
+                Value::Object(headers_map) => {
+                    let mut owned_headers = OwnedHeaders::new_with_capacity(headers_map.len());
+                    for (key, value) in headers_map {
+                        if let Value::Bytes(value_bytes) = value {
+                            owned_headers = owned_headers.insert(Header {
+                                key,
+                                value: Some(value_bytes.as_ref()),
+                            });
+                        } else {
+                            emit!(KafkaHeaderExtractionError {
+                                header_field: headers_key
+                            });
                         }
-                        return Some(owned_headers);
                     }
-                    _ => {
-                        emit!(KafkaHeaderExtractionError {
-                            header_field: headers_key
-                        });
-                    }
+                    return Some(owned_headers);
+                }
+                _ => {
+                    emit!(KafkaHeaderExtractionError {
+                        header_field: headers_key
+                    });
                 }
             }
         }

@@ -2,19 +2,21 @@ use futures::StreamExt;
 use indoc::indoc;
 use vector_lib::finalization::{BatchNotifier, BatchStatus};
 
-use crate::sinks::datadog::test_utils::{test_server, ApiStatus};
+use super::config::DatadogMetricsConfig;
 use crate::{
     common::datadog,
     config::{SinkConfig, SinkContext},
     extra_context::ExtraContext,
-    sinks::util::test::load_sink_with_context,
+    sinks::{
+        datadog::test_utils::{ApiStatus, test_server},
+        util::test::load_sink_with_context,
+    },
     test_util::{
-        components::{run_and_assert_sink_compliance, SINK_TAGS},
-        next_addr, random_metrics_with_stream,
+        addr::next_addr,
+        components::{SINK_TAGS, run_and_assert_sink_compliance},
+        random_metrics_with_stream,
     },
 };
-
-use super::config::DatadogMetricsConfig;
 
 #[tokio::test]
 async fn global_options() {
@@ -28,10 +30,10 @@ async fn global_options() {
     };
     let (mut config, cx) = load_sink_with_context::<DatadogMetricsConfig>(config, cx).unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -52,9 +54,10 @@ async fn global_options() {
         .collect::<Vec<_>>()
         .await;
 
-    assert!(keys
-        .iter()
-        .all(|value| value.to_str().unwrap() == "global-key"));
+    assert!(
+        keys.iter()
+            .all(|value| value.to_str().unwrap() == "global-key")
+    );
 }
 
 #[tokio::test]
@@ -73,10 +76,10 @@ async fn override_global_options() {
     };
     let (mut config, cx) = load_sink_with_context::<DatadogMetricsConfig>(config, cx).unwrap();
 
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     // Swap out the endpoint so we can force send it
     // to our local server
-    let endpoint = format!("http://{}", addr);
+    let endpoint = format!("http://{addr}");
     config.local_dd_common.endpoint = Some(endpoint.clone());
 
     let (sink, _) = config.build(cx).await.unwrap();
@@ -97,7 +100,8 @@ async fn override_global_options() {
         .collect::<Vec<_>>()
         .await;
 
-    assert!(keys
-        .iter()
-        .all(|value| value.to_str().unwrap() == "local-key"));
+    assert!(
+        keys.iter()
+            .all(|value| value.to_str().unwrap() == "local-key")
+    );
 }

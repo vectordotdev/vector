@@ -1,23 +1,30 @@
-use std::collections::hash_map::Entry;
-use std::collections::HashMap;
-use std::pin::Pin;
-use std::time::{Duration, Instant};
+use std::{
+    collections::{HashMap, hash_map::Entry},
+    pin::Pin,
+    time::{Duration, Instant},
+};
 
-use crate::internal_events::ReduceAddEventError;
-use crate::transforms::reduce::merge_strategy::{
-    get_value_merger, MergeStrategy, ReduceValueMerger,
-};
-use crate::{
-    conditions::Condition,
-    event::{discriminant::Discriminant, Event, EventMetadata, LogEvent},
-    internal_events::ReduceStaleEventFlushed,
-    transforms::{reduce::config::ReduceConfig, TaskTransform},
-};
 use futures::Stream;
 use indexmap::IndexMap;
-use vector_lib::stream::expiration_map::{map_with_expiration, Emitter};
-use vrl::path::{parse_target_path, OwnedTargetPath};
-use vrl::prelude::KeyString;
+use vector_lib::stream::expiration_map::{Emitter, map_with_expiration};
+use vector_vrl_metrics::MetricsStorage;
+use vrl::{
+    path::{OwnedTargetPath, parse_target_path},
+    prelude::KeyString,
+};
+
+use crate::{
+    conditions::Condition,
+    event::{Event, EventMetadata, LogEvent, discriminant::Discriminant},
+    internal_events::{ReduceAddEventError, ReduceStaleEventFlushed},
+    transforms::{
+        TaskTransform,
+        reduce::{
+            config::ReduceConfig,
+            merge_strategy::{MergeStrategy, ReduceValueMerger, get_value_merger},
+        },
+    },
+};
 
 #[derive(Clone, Debug)]
 struct ReduceState {
@@ -168,6 +175,7 @@ impl Reduce {
     pub fn new(
         config: &ReduceConfig,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<Self> {
         if config.ends_when.is_some() && config.starts_when.is_some() {
             return Err("only one of `ends_when` and `starts_when` can be provided".into());
@@ -176,12 +184,12 @@ impl Reduce {
         let ends_when = config
             .ends_when
             .as_ref()
-            .map(|c| c.build(enrichment_tables))
+            .map(|c| c.build(enrichment_tables, metrics_storage))
             .transpose()?;
         let starts_when = config
             .starts_when
             .as_ref()
-            .map(|c| c.build(enrichment_tables))
+            .map(|c| c.build(enrichment_tables, metrics_storage))
             .transpose()?;
         let group_by = config.group_by.clone().into_iter().collect();
         let max_events = config.max_events.map(|max| max.into());
@@ -218,10 +226,10 @@ impl Reduce {
         let mut flush_discriminants = Vec::new();
         let now = Instant::now();
         for (k, t) in &self.reduce_merge_states {
-            if let Some(period) = self.end_every_period {
-                if (now - t.creation) >= period {
-                    flush_discriminants.push(k.clone());
-                }
+            if let Some(period) = self.end_every_period
+                && (now - t.creation) >= period
+            {
+                flush_discriminants.push(k.clone());
             }
 
             if (now - t.stale_since) >= self.expire_after {
@@ -347,23 +355,22 @@ where
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
     use indoc::indoc;
     use serde_json::json;
-    use std::sync::Arc;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
+    use vector_lib::{enrichment::TableRegistry, lookup::owned_value_path};
     use vrl::value::Kind;
 
-    use vector_lib::enrichment::TableRegistry;
-    use vector_lib::lookup::owned_value_path;
-
-    use crate::config::schema::Definition;
-    use crate::config::{schema, LogNamespace, OutputId, TransformConfig};
-    use crate::event::{LogEvent, Value};
-    use crate::test_util::components::assert_transform_compliance;
-    use crate::transforms::test::create_topology;
-
     use super::*;
+    use crate::{
+        config::{OutputId, TransformConfig, schema, schema::Definition},
+        event::{LogEvent, Value},
+        test_util::components::assert_transform_compliance,
+        transforms::test::create_topology,
+    };
 
     #[tokio::test]
     async fn reduce_from_condition() {
@@ -393,20 +400,15 @@ group_by = [ "request_id" ]
                     None,
                 );
             let schema_definitions = reduce_config
-                .outputs(
-                    vector_lib::enrichment::TableRegistry::default(),
-                    &[("test".into(), input_definition)],
-                    LogNamespace::Legacy,
-                )
+                .outputs(&Default::default(), &[("test".into(), input_definition)])
                 .first()
                 .unwrap()
                 .schema_definitions(true)
                 .clone();
 
             let new_schema_definition = reduce_config.outputs(
-                TableRegistry::default(),
+                &Default::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
-                LogNamespace::Legacy,
             )[0]
             .clone()
             .log_schema_definitions
@@ -446,7 +448,7 @@ group_by = [ "request_id" ]
             e_5.insert("extra_field", "value1");
             e_5.insert("test_end", "yep");
 
-            for event in vec![e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into()] {
+            for event in [e_1.into(), e_2.into(), e_3.into(), e_4.into(), e_5.into()] {
                 tx.send(event).await.unwrap();
             }
 
@@ -495,9 +497,8 @@ merge_strategies.baz = "max"
             let (tx, rx) = mpsc::channel(1);
 
             let new_schema_definition = reduce_config.outputs(
-                TableRegistry::default(),
+                &Default::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
-                LogNamespace::Legacy,
             )[0]
             .clone()
             .log_schema_definitions
@@ -565,9 +566,8 @@ group_by = [ "request_id" ]
         assert_transform_compliance(async move {
             let (tx, rx) = mpsc::channel(1);
             let new_schema_definition = reduce_config.outputs(
-                TableRegistry::default(),
+                &Default::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
-                LogNamespace::Legacy,
             )[0]
             .clone()
             .log_schema_definitions
@@ -640,9 +640,10 @@ max_events = 0
 
         match reduce_config {
             Ok(_conf) => unreachable!("max_events=0 should be rejected."),
-            Err(err) => assert!(err
-                .to_string()
-                .contains("invalid value: integer `0`, expected a nonzero usize")),
+            Err(err) => assert!(
+                err.to_string()
+                    .contains("invalid value: integer `0`, expected a nonzero usize")
+            ),
         }
     }
 
@@ -670,7 +671,7 @@ max_events = 1
             let mut e_3 = LogEvent::from("test 3");
             e_3.insert("id", "1");
 
-            for event in vec![e_1.into(), e_2.into(), e_3.into()] {
+            for event in [e_1.into(), e_2.into(), e_3.into()] {
                 tx.send(event).await.unwrap();
             }
 
@@ -723,7 +724,7 @@ max_events = 3
             let mut e_6 = LogEvent::from("test 6");
             e_6.insert("id", "1");
 
-            for event in vec![
+            for event in [
                 e_1.into(),
                 e_2.into(),
                 e_3.into(),
@@ -773,9 +774,8 @@ merge_strategies.bar = "concat"
             let (tx, rx) = mpsc::channel(1);
 
             let new_schema_definition = reduce_config.outputs(
-                TableRegistry::default(),
+                &Default::default(),
                 &[(OutputId::from("in"), Definition::default_legacy_namespace())],
-                LogNamespace::Legacy,
             )[0]
             .clone()
             .log_schema_definitions
@@ -936,7 +936,12 @@ merge_strategies.bar = "concat"
             "#,
         ))
         .unwrap();
-        let error = Reduce::new(&config, &TableRegistry::default()).unwrap_err();
+        let error = Reduce::new(
+            &config,
+            &TableRegistry::default(),
+            &MetricsStorage::default(),
+        )
+        .unwrap_err();
         assert_eq!(
             error.to_string(),
             "Merge strategies with indexes are currently not supported. Path: `nested.msg[0]`"

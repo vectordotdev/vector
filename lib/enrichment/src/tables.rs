@@ -35,7 +35,7 @@ use std::{
 };
 
 use arc_swap::ArcSwap;
-use vrl::value::ObjectMap;
+use vrl::value::{ObjectMap, Value};
 
 use super::{Condition, IndexHandle, Table};
 use crate::Case;
@@ -134,7 +134,7 @@ impl TableRegistry {
     pub fn table_ids(&self) -> Vec<String> {
         let locked = self.loading.lock().unwrap();
         match *locked {
-            Some(ref tables) => tables.iter().map(|(key, _)| key.clone()).collect(),
+            Some(ref tables) => tables.keys().cloned().collect(),
             None => Vec::new(),
         }
     }
@@ -157,7 +157,7 @@ impl TableRegistry {
         match *locked {
             None => Err("finish_load has been called".to_string()),
             Some(ref mut tables) => match tables.get_mut(table) {
-                None => Err(format!("table '{}' not loaded", table)),
+                None => Err(format!("table '{table}' not loaded")),
                 Some(table) => table.add_index(case, fields),
             },
         }
@@ -216,13 +216,14 @@ impl TableSearch {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<ObjectMap, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
-                None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_row(case, condition, select, index),
+                None => Err(format!("table {table} not loaded")),
+                Some(table) => table.find_table_row(case, condition, select, wildcard, index),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -238,13 +239,14 @@ impl TableSearch {
         case: Case,
         condition: &'a [Condition<'a>],
         select: Option<&[String]>,
+        wildcard: Option<&Value>,
         index: Option<IndexHandle>,
     ) -> Result<Vec<ObjectMap>, String> {
         let tables = self.0.load();
         if let Some(ref tables) = **tables {
             match tables.get(table) {
-                None => Err(format!("table {} not loaded", table)),
-                Some(table) => table.find_table_rows(case, condition, select, index),
+                None => Err(format!("table {table} not loaded")),
+                Some(table) => table.find_table_rows(case, condition, select, wildcard, index),
             }
         } else {
             Err("finish_load not called".to_string())
@@ -276,17 +278,18 @@ fn fmt_enrichment_table(
             tables.truncate(std::cmp::max(tables.len(), 0));
             tables.push(')');
 
-            write!(f, "{} {}", name, tables)
+            write!(f, "{name} {tables}")
         }
-        None => write!(f, "{} loading", name),
+        None => write!(f, "{name} loading"),
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use vrl::value::Value;
+
     use super::*;
     use crate::test_util::DummyEnrichmentTable;
-    use vrl::value::Value;
 
     #[test]
     fn tables_loaded() {
@@ -337,6 +340,7 @@ mod tests {
                     value: Value::from("thang"),
                 }],
                 None,
+                None,
                 None
             )
         );
@@ -377,6 +381,7 @@ mod tests {
                     field: "thing",
                     value: Value::from("thang"),
                 }],
+                None,
                 None,
                 None
             )
@@ -442,7 +447,7 @@ mod tests {
             tables
                 .get("dummy1")
                 .unwrap()
-                .find_table_row(Case::Sensitive, &Vec::new(), None, None)
+                .find_table_row(Case::Sensitive, &Vec::new(), None, None, None)
                 .unwrap()
                 .get("field")
                 .cloned()
@@ -455,7 +460,7 @@ mod tests {
             tables
                 .get("dummy2")
                 .unwrap()
-                .find_table_row(Case::Sensitive, &Vec::new(), None, None)
+                .find_table_row(Case::Sensitive, &Vec::new(), None, None, None)
                 .unwrap()
                 .get("thing")
                 .cloned()

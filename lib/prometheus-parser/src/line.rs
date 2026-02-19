@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use nom::{
+    Parser,
     branch::alt,
     bytes::complete::{is_not, tag, take_while, take_while1},
     character::complete::{char, digit1},
@@ -10,7 +11,7 @@ use nom::{
     error::ParseError,
     multi::fold_many0,
     number::complete::double,
-    sequence::{delimited, pair, preceded, tuple},
+    sequence::{delimited, pair, preceded},
 };
 
 /// We try to catch all nom's `ErrorKind` with our own `ErrorKind`,
@@ -112,7 +113,7 @@ impl Metric {
     /// ```
     ///
     /// We don't parse timestamp.
-    fn parse(input: &str) -> IResult<Self> {
+    fn parse(input: &str) -> IResult<'_, Self> {
         let input = trim_space(input);
         let (input, name) = parse_name(input)?;
         let (input, labels) = Self::parse_labels(input)?;
@@ -130,7 +131,7 @@ impl Metric {
     }
 
     /// Float value, and +Inf, -Int, Nan.
-    pub(crate) fn parse_value(input: &str) -> IResult<f64> {
+    pub(crate) fn parse_value(input: &str) -> IResult<'_, f64> {
         let input = trim_space(input);
         alt((
             value(f64::INFINITY, tag("+Inf")),
@@ -140,7 +141,8 @@ impl Metric {
             // This shouldn't be necessary if that issue is remedied.
             value(f64::NAN, tag("NaN")),
             double,
-        ))(input)
+        ))
+        .parse(input)
         .map_err(|_: NomError| {
             ErrorKind::ParseFloatError {
                 input: input.to_owned(),
@@ -149,12 +151,13 @@ impl Metric {
         })
     }
 
-    fn parse_timestamp(input: &str) -> IResult<Option<i64>> {
+    fn parse_timestamp(input: &str) -> IResult<'_, Option<i64>> {
         let input = trim_space(input);
         opt(map_res(
             recognize(pair(opt(char('-')), digit1)),
             |s: &str| s.parse(),
-        ))(input)
+        ))
+        .parse(input)
         .map_err(|_: NomError| {
             ErrorKind::ParseTimestampError {
                 input: input.to_owned(),
@@ -163,18 +166,19 @@ impl Metric {
         })
     }
 
-    fn parse_name_value(input: &str) -> IResult<(String, String)> {
+    fn parse_name_value(input: &str) -> IResult<'_, (String, String)> {
         map(
-            tuple((parse_name, match_char('='), Self::parse_escaped_string)),
+            (parse_name, match_char('='), Self::parse_escaped_string),
             |(name, _, value)| (name, value),
-        )(input)
+        )
+        .parse(input)
     }
 
     // Return:
     // - Some((name, value)) => success
     // - None => list is properly ended with "}"
     // - Error => errors of parse_name_value
-    fn element_parser(input: &str) -> IResult<Option<(String, String)>> {
+    fn element_parser(input: &str) -> IResult<'_, Option<(String, String)>> {
         match Self::parse_name_value(input) {
             Ok((input, result)) => Ok((input, Some(result))),
             Err(nom::Err::Error(parse_name_value_error)) => match match_char('}')(input) {
@@ -186,7 +190,7 @@ impl Metric {
         }
     }
 
-    fn parse_labels_inner(mut input: &str) -> IResult<BTreeMap<String, String>> {
+    fn parse_labels_inner(mut input: &str) -> IResult<'_, BTreeMap<String, String>> {
         let sep = match_char(',');
 
         let mut result = BTreeMap::new();
@@ -221,10 +225,10 @@ impl Metric {
     }
 
     /// Parse `{label_name="value",...}`
-    fn parse_labels(input: &str) -> IResult<BTreeMap<String, String>> {
+    fn parse_labels(input: &str) -> IResult<'_, BTreeMap<String, String>> {
         let input = trim_space(input);
 
-        match opt(char('{'))(input) {
+        match opt(char('{')).parse(input) {
             Ok((input, None)) => Ok((input, BTreeMap::new())),
             Ok((input, Some(_))) => Self::parse_labels_inner(input),
             Err(failure) => Err(failure),
@@ -234,7 +238,7 @@ impl Metric {
     /// Parse `'"' string_content '"'`. `string_content` can contain any unicode characters,
     /// backslash (`\`), double-quote (`"`), and line feed (`\n`) characters have to be
     /// escaped as `\\`, `\"`, and `\n`, respectively.
-    fn parse_escaped_string(input: &str) -> IResult<String> {
+    fn parse_escaped_string(input: &str) -> IResult<'_, String> {
         #[derive(Debug)]
         enum StringFragment<'a> {
             Literal(&'a str),
@@ -270,7 +274,7 @@ impl Metric {
             },
         );
 
-        fn match_quote(input: &str) -> IResult<char> {
+        fn match_quote(input: &str) -> IResult<'_, char> {
             char('"')(input).map_err(|_: NomError| {
                 ErrorKind::ExpectedChar {
                     expected: '"',
@@ -280,12 +284,12 @@ impl Metric {
             })
         }
 
-        delimited(match_quote, build_string, match_quote)(input)
+        delimited(match_quote, build_string, match_quote).parse(input)
     }
 }
 
 impl Header {
-    fn space1(input: &str) -> IResult<()> {
+    fn space1(input: &str) -> IResult<'_, ()> {
         take_while1(|c| c == ' ' || c == '\t')(input)
             .map_err(|_: NomError| {
                 ErrorKind::ExpectedSpace {
@@ -297,7 +301,7 @@ impl Header {
     }
 
     /// `# TYPE <metric_name> <metric_type>`
-    fn parse(input: &str) -> IResult<Self> {
+    fn parse(input: &str) -> IResult<'_, Self> {
         let input = trim_space(input);
         let (input, _) = char('#')(input).map_err(|_: NomError| ErrorKind::ExpectedChar {
             expected: '#',
@@ -317,7 +321,8 @@ impl Header {
             value(MetricKind::Summary, tag("summary")),
             value(MetricKind::Histogram, tag("histogram")),
             value(MetricKind::Untyped, tag("untyped")),
-        ))(input)
+        ))
+        .parse(input)
         .map_err(|_: NomError| ErrorKind::InvalidMetricKind {
             input: input.to_owned(),
         })?;
@@ -356,7 +361,7 @@ impl Line {
         };
 
         if let Ok((input, _)) = char::<_, NomErrorType>('#')(input) {
-            if tuple::<_, _, NomErrorType, _>((sp, tag("TYPE")))(input).is_ok() {
+            if (sp, tag::<_, _, NomErrorType>("TYPE")).parse(input).is_ok() {
                 return Err(header_error);
             }
             Ok(None)
@@ -367,12 +372,13 @@ impl Line {
 }
 
 /// Name matches the regex `[a-zA-Z_][a-zA-Z0-9_]*`.
-fn parse_name(input: &str) -> IResult<String> {
+fn parse_name(input: &str) -> IResult<'_, String> {
     let input = trim_space(input);
     let (input, (a, b)) = pair(
         take_while1(|c: char| c.is_alphabetic() || c == '_'),
         take_while(|c: char| c.is_alphanumeric() || c == '_' || c == ':'),
-    )(input)
+    )
+    .parse(input)
     .map_err(|_: NomError| ErrorKind::ParseNameError {
         input: input.to_owned(),
     })?;
@@ -389,7 +395,7 @@ fn sp<'a, E: ParseError<&'a str>>(i: &'a str) -> nom::IResult<&'a str, &'a str, 
 
 fn match_char(c: char) -> impl Fn(&str) -> IResult<char> {
     move |input| {
-        preceded(sp, char(c))(input).map_err(|_: NomError| {
+        preceded(sp, char(c)).parse(input).map_err(|_: NomError| {
             ErrorKind::ExpectedChar {
                 expected: c,
                 input: input.to_owned(),
@@ -408,7 +414,7 @@ mod test {
     #[test]
     fn test_parse_escaped_string() {
         fn wrap(s: &str) -> String {
-            format!("  \t \"{}\"  .", s)
+            format!("  \t \"{s}\"  .")
         }
 
         // parser should not consume more that it needed
@@ -448,7 +454,7 @@ mod test {
     #[test]
     fn test_parse_name() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 
@@ -474,7 +480,7 @@ mod test {
     #[test]
     fn test_parse_header() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 
@@ -548,7 +554,7 @@ mod test {
     #[test]
     fn test_parse_value() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 
@@ -616,7 +622,7 @@ mod test {
     #[test]
     fn test_parse_labels() {
         fn wrap(s: &str) -> String {
-            format!("  \t {}  .", s)
+            format!("  \t {s}  .")
         }
         let tail = "  .";
 

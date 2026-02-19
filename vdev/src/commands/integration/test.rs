@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::Args;
 
-use crate::testing::integration::IntegrationTest;
+use crate::testing::integration::ComposeTestLocalConfig;
 
 /// Execute integration tests
 ///
@@ -20,10 +20,6 @@ pub struct Cli {
     /// The desired environment (optional)
     environment: Option<String>,
 
-    /// Whether to compile the test runner with all integration test features
-    #[arg(short = 'a', long)]
-    build_all: bool,
-
     /// Number of retries to allow on each integration test case.
     #[arg(short = 'r', long)]
     retries: Option<u8>,
@@ -34,10 +30,10 @@ pub struct Cli {
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        crate::commands::compose_tests::test::exec::<IntegrationTest>(
+        crate::commands::compose_tests::test::exec(
+            ComposeTestLocalConfig::integration(),
             &self.integration,
             self.environment.as_ref(),
-            self.build_all,
             self.retries.unwrap_or_default(),
             &self.args,
         )

@@ -1,6 +1,7 @@
 use bytes::Bytes;
 use goauth::scopes::Scope;
-use http::{header::CONTENT_TYPE, Request, Uri};
+use http::{Request, Uri, header::CONTENT_TYPE};
+use snafu::ResultExt;
 
 use super::{
     request_builder::{StackdriverMetricsEncoder, StackdriverMetricsRequestBuilder},
@@ -10,18 +11,16 @@ use crate::{
     gcp::{GcpAuthConfig, GcpAuthenticator},
     http::HttpClient,
     sinks::{
-        gcp,
+        HTTPRequestBuilderSnafu, gcp,
         prelude::*,
         util::{
             http::{
-                http_response_retry_logic, HttpRequest, HttpService, HttpServiceRequestBuilder,
+                HttpRequest, HttpService, HttpServiceRequestBuilder, http_response_retry_logic,
             },
             service::TowerRequestConfigDefaults,
         },
-        HTTPRequestBuilderSnafu,
     },
 };
-use snafu::ResultExt;
 
 #[derive(Clone, Copy, Debug)]
 pub struct StackdriverMetricsTowerRequestConfigDefaults;

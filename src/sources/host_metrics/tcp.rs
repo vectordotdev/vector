@@ -1,22 +1,22 @@
-use crate::sources::host_metrics::HostMetricsScrapeDetailError;
-use byteorder::{ByteOrder, NativeEndian};
 use std::{collections::HashMap, io, path::Path};
-use vector_lib::event::MetricTags;
 
+use byteorder::{ByteOrder, NativeEndian};
 use netlink_packet_core::{
-    NetlinkHeader, NetlinkMessage, NetlinkPayload, NLM_F_ACK, NLM_F_DUMP, NLM_F_REQUEST,
+    NLM_F_ACK, NLM_F_DUMP, NLM_F_REQUEST, NetlinkHeader, NetlinkMessage, NetlinkPayload,
 };
 use netlink_packet_sock_diag::{
+    SockDiagMessage,
     constants::*,
     inet::{ExtensionFlags, InetRequest, InetResponseHeader, SocketId, StateFlags},
-    SockDiagMessage,
 };
 use netlink_sys::{
-    protocols::NETLINK_SOCK_DIAG, AsyncSocket, AsyncSocketExt, SocketAddr, TokioSocket,
+    AsyncSocket, AsyncSocketExt, SocketAddr, TokioSocket, protocols::NETLINK_SOCK_DIAG,
 };
 use snafu::{ResultExt, Snafu};
+use vector_lib::event::MetricTags;
 
 use super::HostMetrics;
+use crate::sources::host_metrics::HostMetricsScrapeDetailError;
 
 const PROC_IPV6_FILE: &str = "/proc/net/if_inet6";
 const TCP_CONNS_TOTAL: &str = "tcp_connections_total";
@@ -241,10 +241,12 @@ async fn fetch_netlink_inet_headers(addr_family: u8) -> Result<Vec<InetResponseH
         .await
         .context(NetlinkSendSnafu)?;
 
-    let mut receive_buffer = vec![0; 4096];
     let mut inet_resp_hdrs = Vec::with_capacity(32); // Pre-allocate with an estimate
 
-    while let Ok(()) = socket.recv(&mut &mut receive_buffer[..]).await {
+    while let Ok((receive_buffer, _addr)) = socket.recv_from_full().await {
+        if receive_buffer.is_empty() {
+            break;
+        }
         let done = parse_netlink_messages(&receive_buffer, &mut inet_resp_hdrs)?;
         if done {
             break;
@@ -288,19 +290,20 @@ fn is_ipv6_enabled() -> bool {
 
 #[cfg(test)]
 mod tests {
+    use netlink_packet_sock_diag::{
+        AF_INET,
+        inet::{InetResponseHeader, SocketId},
+    };
     use tokio::net::{TcpListener, TcpStream};
 
-    use netlink_packet_sock_diag::{
-        inet::{InetResponseHeader, SocketId},
-        AF_INET,
-    };
-
     use super::{
-        fetch_netlink_inet_headers, parse_nl_inet_hdrs, TcpStats, STATE, TCP_CONNS_TOTAL,
-        TCP_RX_QUEUED_BYTES_TOTAL, TCP_TX_QUEUED_BYTES_TOTAL,
+        STATE, TCP_CONNS_TOTAL, TCP_RX_QUEUED_BYTES_TOTAL, TCP_TX_QUEUED_BYTES_TOTAL, TcpStats,
+        fetch_netlink_inet_headers, parse_nl_inet_hdrs,
     };
-    use crate::sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer};
-    use crate::test_util::next_addr;
+    use crate::{
+        sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer},
+        test_util::addr::next_addr,
+    };
 
     #[test]
     fn parses_nl_inet_hdrs() {
@@ -343,7 +346,7 @@ mod tests {
 
     async fn fetches_nl_net_hdrs() {
         // start a TCP server
-        let next_addr = next_addr();
+        let (_guard, next_addr) = next_addr();
         let listener = TcpListener::bind(next_addr).await.unwrap();
         let addr = listener.local_addr().unwrap();
         tokio::spawn(async move {
@@ -374,7 +377,7 @@ mod tests {
     }
 
     async fn generates_tcp_metrics() {
-        let next_addr = next_addr();
+        let (_guard, next_addr) = next_addr();
         let _listener = TcpListener::bind(next_addr).await.unwrap();
 
         let mut buffer = MetricsBuffer::new(None);

@@ -3,8 +3,8 @@ use std::cell::RefCell;
 use serde_json::Value;
 
 use crate::{
-    schema::{SchemaGenerator, SchemaObject},
     Configurable, GenerateError, ToValue,
+    schema::{SchemaGenerator, SchemaObject},
 };
 
 impl Configurable for toml::Value {

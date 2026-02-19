@@ -460,49 +460,51 @@ impl Sender {
 
 #[cfg(test)]
 mod tests {
-    use std::mem;
-    use std::num::NonZeroUsize;
+    use std::{mem, num::NonZeroUsize};
 
     use futures::poll;
     use tokio::sync::mpsc::UnboundedSender;
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use tracing::Span;
     use vector_buffers::{
+        WhenFull,
         topology::{
             builder::TopologyBuilder,
             channel::{BufferReceiver, BufferSender},
         },
-        WhenFull,
     };
     use vrl::value::Value;
 
     use super::{ControlMessage, Fanout};
-    use crate::event::{Event, EventArray, LogEvent};
-    use crate::test_util::{collect_ready, collect_ready_events};
-    use crate::{config::ComponentKey, event::EventContainer};
+    use crate::{
+        config::ComponentKey,
+        event::{Event, EventArray, EventContainer, LogEvent},
+        test_util::{collect_ready, collect_ready_events},
+    };
 
-    async fn build_sender_pair(
+    fn build_sender_pair(
         capacity: usize,
     ) -> (BufferSender<EventArray>, BufferReceiver<EventArray>) {
         TopologyBuilder::standalone_memory(
             NonZeroUsize::new(capacity).expect("capacity must be nonzero"),
             WhenFull::Block,
             &Span::current(),
+            None,
+            None,
         )
-        .await
     }
 
-    async fn build_sender_pairs(
+    fn build_sender_pairs(
         capacities: &[usize],
     ) -> Vec<(BufferSender<EventArray>, BufferReceiver<EventArray>)> {
         let mut pairs = Vec::new();
         for capacity in capacities {
-            pairs.push(build_sender_pair(*capacity).await);
+            pairs.push(build_sender_pair(*capacity));
         }
         pairs
     }
 
-    async fn fanout_from_senders(
+    fn fanout_from_senders(
         capacities: &[usize],
     ) -> (
         Fanout,
@@ -510,7 +512,7 @@ mod tests {
         Vec<BufferReceiver<EventArray>>,
     ) {
         let (mut fanout, control) = Fanout::new();
-        let pairs = build_sender_pairs(capacities).await;
+        let pairs = build_sender_pairs(capacities);
 
         let mut receivers = Vec::new();
         for (i, (sender, receiver)) in pairs.into_iter().enumerate() {
@@ -521,13 +523,13 @@ mod tests {
         (fanout, control, receivers)
     }
 
-    async fn add_sender_to_fanout(
+    fn add_sender_to_fanout(
         fanout: &mut Fanout,
         receivers: &mut Vec<BufferReceiver<EventArray>>,
         sender_id: usize,
         capacity: usize,
     ) {
-        let (sender, receiver) = build_sender_pair(capacity).await;
+        let (sender, receiver) = build_sender_pair(capacity);
         receivers.push(receiver);
 
         fanout.add(ComponentKey::from(sender_id.to_string()), sender);
@@ -541,13 +543,13 @@ mod tests {
             .expect("sending control message should not fail");
     }
 
-    async fn replace_sender_in_fanout(
+    fn replace_sender_in_fanout(
         control: &UnboundedSender<ControlMessage>,
         receivers: &mut [BufferReceiver<EventArray>],
         sender_id: usize,
         capacity: usize,
     ) -> BufferReceiver<EventArray> {
-        let (sender, receiver) = build_sender_pair(capacity).await;
+        let (sender, receiver) = build_sender_pair(capacity);
         let old_receiver = mem::replace(&mut receivers[sender_id], receiver);
 
         control
@@ -566,13 +568,13 @@ mod tests {
         old_receiver
     }
 
-    async fn start_sender_replace(
+    fn start_sender_replace(
         control: &UnboundedSender<ControlMessage>,
         receivers: &mut [BufferReceiver<EventArray>],
         sender_id: usize,
         capacity: usize,
     ) -> (BufferReceiver<EventArray>, BufferSender<EventArray>) {
-        let (sender, receiver) = build_sender_pair(capacity).await;
+        let (sender, receiver) = build_sender_pair(capacity);
         let old_receiver = mem::replace(&mut receivers[sender_id], receiver);
 
         control
@@ -615,20 +617,23 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_writes_to_all() {
-        let (mut fanout, _, receivers) = fanout_from_senders(&[2, 2]).await;
+        let (mut fanout, _, receivers) = fanout_from_senders(&[2, 2]);
         let events = make_event_array(2);
 
         let clones = events.clone();
         fanout.send(clones, None).await.expect("should not fail");
 
         for receiver in receivers {
-            assert_eq!(collect_ready(receiver.into_stream()), &[events.clone()]);
+            assert_eq!(
+                collect_ready(receiver.into_stream()),
+                std::slice::from_ref(&events)
+            );
         }
     }
 
     #[tokio::test]
     async fn fanout_notready() {
-        let (mut fanout, _, mut receivers) = fanout_from_senders(&[2, 1, 2]).await;
+        let (mut fanout, _, mut receivers) = fanout_from_senders(&[2, 1, 2]);
         let events = make_events(2);
 
         // First send should immediately complete because all senders have capacity:
@@ -657,7 +662,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_grow() {
-        let (mut fanout, _, mut receivers) = fanout_from_senders(&[4, 4]).await;
+        let (mut fanout, _, mut receivers) = fanout_from_senders(&[4, 4]);
         let events = make_events(3);
 
         // Send in the first two events to our initial two senders:
@@ -671,7 +676,7 @@ mod tests {
             .expect("should not fail");
 
         // Now add a third sender:
-        add_sender_to_fanout(&mut fanout, &mut receivers, 2, 4).await;
+        add_sender_to_fanout(&mut fanout, &mut receivers, 2, 4);
 
         // Send in the last event which all three senders will now get:
         fanout
@@ -692,7 +697,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_shrink() {
-        let (mut fanout, control, receivers) = fanout_from_senders(&[4, 4]).await;
+        let (mut fanout, control, receivers) = fanout_from_senders(&[4, 4]);
         let events = make_events(3);
 
         // Send in the first two events to our initial two senders:
@@ -768,7 +773,7 @@ mod tests {
         ];
 
         for (sender_id, should_complete, expected_last_seen) in cases {
-            let (mut fanout, control, mut receivers) = fanout_from_senders(&[2, 1, 2]).await;
+            let (mut fanout, control, mut receivers) = fanout_from_senders(&[2, 1, 2]);
 
             // First send should immediately complete because all senders have capacity:
             let mut first_send = spawn(fanout.send(events[0].clone().into(), None));
@@ -823,7 +828,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_replace() {
-        let (mut fanout, control, mut receivers) = fanout_from_senders(&[4, 4, 4]).await;
+        let (mut fanout, control, mut receivers) = fanout_from_senders(&[4, 4, 4]);
         let events = make_events(3);
 
         // First two sends should immediately complete because all senders have capacity:
@@ -837,7 +842,7 @@ mod tests {
             .expect("should not fail");
 
         // Replace the first sender with a brand new one before polling again:
-        let old_first_receiver = replace_sender_in_fanout(&control, &mut receivers, 0, 4).await;
+        let old_first_receiver = replace_sender_in_fanout(&control, &mut receivers, 0, 4);
 
         // And do the third send which should also complete since all senders still have capacity:
         fanout
@@ -864,7 +869,7 @@ mod tests {
 
     #[tokio::test]
     async fn fanout_wait() {
-        let (mut fanout, control, mut receivers) = fanout_from_senders(&[4, 4]).await;
+        let (mut fanout, control, mut receivers) = fanout_from_senders(&[4, 4]);
         let events = make_events(3);
 
         // First two sends should immediately complete because all senders have capacity:
@@ -877,7 +882,7 @@ mod tests {
         // doesn't let any writes through until we replace it properly.  We get back the receiver
         // we've replaced, but also the sender that we want to eventually install:
         let (old_first_receiver, new_first_sender) =
-            start_sender_replace(&control, &mut receivers, 0, 4).await;
+            start_sender_replace(&control, &mut receivers, 0, 4);
 
         // Third send should return pending because now we have an in-flight replacement:
         let mut third_send = spawn(fanout.send(events[2].clone().into(), None));

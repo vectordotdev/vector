@@ -1,0 +1,33 @@
+title: "Q&A"
+labels: [ q-a ]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Please fill out the following fields to help us assist you effectively.
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What are you trying to do? What issue are you encountering?
+
+  - type: textarea
+    id: config
+    attributes:
+      label: Vector Config
+      description: Your Vector configuration (please redact sensitive data)
+      placeholder: |
+        ```yaml
+        # your config
+        ```
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Vector Logs
+      description: Paste any relevant Vector logs or error messages.
+      placeholder: |
+        ```sh
+        Jul 10 14:32:02 vector[1234]: ERROR ...
+        ```

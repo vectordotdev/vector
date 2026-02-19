@@ -89,12 +89,12 @@ Download and unpack the archive:
 ```shell
 # Latest (version {{< version >}})
 mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/{{< version >}}/vector-{{< version >}}-x86_64-apple-darwin.tar.gz  | \
+  curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/{{< version >}}/vector-{{< version >}}-arm64-apple-darwin.tar.gz  | \
   tar xzf - -C vector --strip-components=2
 
 # Nightly
 mkdir -p vector && \
-  curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-nightly-x86_64-apple-darwin.tar.gz  | \
+  curl -sSfL --proto '=https' --tlsv1.2 https://packages.timber.io/vector/nightly/latest/vector-nightly-arm64-apple-darwin.tar.gz  | \
   tar xzf - -C vector --strip-components=2
 ```
 

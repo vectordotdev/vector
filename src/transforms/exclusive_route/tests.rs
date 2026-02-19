@@ -1,16 +1,19 @@
-use crate::config::{DataType, TransformOutput};
-use crate::event::{Event, LogEvent};
 use std::collections::HashMap;
 
 use indoc::indoc;
 use vector_lib::transform::TransformOutputsBuf;
 
-use crate::transforms::exclusive_route::config::{ExclusiveRouteConfig, UNMATCHED_ROUTE};
-use crate::transforms::exclusive_route::transform::ExclusiveRoute;
-use crate::transforms::SyncTransform;
 use crate::{
-    config::{build_unit_tests, ConfigBuilder},
-    test_util::components::{init_test, COMPONENT_MULTIPLE_OUTPUTS_TESTS},
+    config::{ConfigBuilder, DataType, TransformOutput, build_unit_tests},
+    event::{Event, LogEvent},
+    test_util::components::{COMPONENT_MULTIPLE_OUTPUTS_TESTS, init_test},
+    transforms::{
+        SyncTransform,
+        exclusive_route::{
+            config::{ExclusiveRouteConfig, UNMATCHED_ROUTE},
+            transform::ExclusiveRoute,
+        },
+    },
 };
 
 fn get_outputs_buf() -> (Vec<&'static str>, TransformOutputsBuf) {

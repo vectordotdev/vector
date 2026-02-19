@@ -53,7 +53,7 @@ components: sources: prometheus_scrape: {
 		platform_name: null
 	}
 
-	configuration: base.components.sources.prometheus_scrape.configuration & {
+	configuration: generated.components.sources.prometheus_scrape.configuration & {
 		endpoints: warnings: ["You must explicitly add the path to your endpoints. Vector will _not_ automatically add `/metrics`."]
 	}
 

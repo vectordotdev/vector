@@ -67,7 +67,7 @@ components: sinks: keep: {
 		notices: []
 	}
 
-	configuration: base.components.sinks.keep.configuration
+	configuration: generated.components.sinks.keep.configuration
 
 	input: {
 		logs:    true

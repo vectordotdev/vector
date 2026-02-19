@@ -64,6 +64,8 @@ pub mod mqtt;
 pub mod nats;
 #[cfg(feature = "sources-nginx_metrics")]
 pub mod nginx_metrics;
+#[cfg(feature = "sources-okta")]
+pub mod okta;
 #[cfg(feature = "sources-opentelemetry")]
 pub mod opentelemetry;
 #[cfg(feature = "sources-postgresql_metrics")]
@@ -90,6 +92,8 @@ pub mod statsd;
 pub mod syslog;
 #[cfg(feature = "sources-vector")]
 pub mod vector;
+#[cfg(feature = "sources-websocket")]
+pub mod websocket;
 
 pub mod util;
 
@@ -98,7 +102,9 @@ pub use vector_lib::source::Source;
 #[allow(dead_code)] // Easier than listing out all the features that use this
 /// Common build errors
 #[derive(Debug, Snafu)]
-enum BuildError {
+pub enum BuildError {
     #[snafu(display("URI parse error: {}", source))]
     UriParseError { source: ::http::uri::InvalidUri },
+    #[snafu(display("VRL compilation error: {}", message))]
+    VrlCompilationError { message: String },
 }

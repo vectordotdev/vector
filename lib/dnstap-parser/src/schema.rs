@@ -1,10 +1,12 @@
 use std::{collections::BTreeMap, sync::LazyLock};
 
-use vector_lib::lookup::{owned_value_path, OwnedValuePath};
-use vrl::btreemap;
-use vrl::value::{
-    kind::{Collection, Field},
-    Kind,
+use vector_lookup::{OwnedValuePath, owned_value_path};
+use vrl::{
+    btreemap,
+    value::{
+        Kind,
+        kind::{Collection, Field},
+    },
 };
 
 #[derive(Debug, Default, Clone)]
@@ -133,8 +135,8 @@ impl DnstapEventSchema {
     /// Schema definition for fields stored in the root.
     fn root_schema_definition(
         &self,
-        schema: vector_lib::schema::Definition,
-    ) -> vector_lib::schema::Definition {
+        schema: vector_core::schema::Definition,
+    ) -> vector_core::schema::Definition {
         schema
             .optional_field(&DNSTAP_VALUE_PATHS.server_identity, Kind::bytes(), None)
             .optional_field(&DNSTAP_VALUE_PATHS.server_version, Kind::bytes(), None)
@@ -150,8 +152,8 @@ impl DnstapEventSchema {
     /// Schema definition from the message.
     pub fn message_schema_definition(
         &self,
-        schema: vector_lib::schema::Definition,
-    ) -> vector_lib::schema::Definition {
+        schema: vector_core::schema::Definition,
+    ) -> vector_core::schema::Definition {
         schema
             .optional_field(&DNSTAP_VALUE_PATHS.socket_family, Kind::bytes(), None)
             .optional_field(&DNSTAP_VALUE_PATHS.socket_protocol, Kind::bytes(), None)
@@ -177,8 +179,8 @@ impl DnstapEventSchema {
     /// The schema definition for a dns tap message.
     pub fn schema_definition(
         &self,
-        schema: vector_lib::schema::Definition,
-    ) -> vector_lib::schema::Definition {
+        schema: vector_core::schema::Definition,
+    ) -> vector_core::schema::Definition {
         self.root_schema_definition(self.message_schema_definition(schema))
     }
 }

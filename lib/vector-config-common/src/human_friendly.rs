@@ -1,5 +1,7 @@
-use std::collections::{HashMap, HashSet};
-use std::sync::LazyLock;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::LazyLock,
+};
 
 use convert_case::{Boundary, Case, Converter};
 

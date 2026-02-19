@@ -1,28 +1,30 @@
-use std::convert::TryFrom;
-use std::time::{Duration, Instant};
+use std::{
+    convert::TryFrom,
+    num::NonZeroU64,
+    time::{Duration, Instant},
+};
 
 use async_compression::tokio::write::{GzipEncoder, ZstdEncoder};
 use async_trait::async_trait;
 use bytes::{Bytes, BytesMut};
 use futures::{
-    future,
+    FutureExt, future,
     stream::{BoxStream, StreamExt},
-    FutureExt,
 };
 use serde_with::serde_as;
 use tokio::{
     fs::{self, File},
     io::AsyncWriteExt,
 };
-use tokio_util::codec::Encoder as _;
-use vector_lib::codecs::{
-    encoding::{Framer, FramingConfig},
-    TextSerializerConfig,
-};
-use vector_lib::configurable::configurable_component;
+use tokio_util::{codec::Encoder as _, time::delay_queue::Expired};
 use vector_lib::{
-    internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
     EstimatedJsonEncodedSizeOf, TimeZone,
+    codecs::{
+        TextSerializerConfig,
+        encoding::{Framer, FramingConfig},
+    },
+    configurable::configurable_component,
+    internal_event::{CountByteSize, EventsSent, InternalEventHandle as _, Output, Registered},
 };
 
 use crate::{
@@ -33,7 +35,7 @@ use crate::{
     internal_events::{
         FileBytesSent, FileInternalMetricsConfig, FileIoError, FileOpen, TemplateRenderingError,
     },
-    sinks::util::{timezone_to_offset, StreamSink},
+    sinks::util::{StreamSink, timezone_to_offset},
     template::Template,
 };
 
@@ -89,6 +91,26 @@ pub struct FileSinkConfig {
     #[configurable(derived)]
     #[serde(default)]
     pub internal_metrics: FileInternalMetricsConfig,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub truncate: FileTruncateConfig,
+}
+
+/// Configuration for truncating files.
+#[configurable_component]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct FileTruncateConfig {
+    /// If this is set, files will be truncated after being closed for a set amount of seconds.
+    #[serde(default)]
+    pub after_close_time_secs: Option<NonZeroU64>,
+    /// If this is set, files will be truncated after set amount of seconds of no modifications.
+    #[serde(default)]
+    pub after_modified_time_secs: Option<NonZeroU64>,
+    /// If this is set, files will be truncated after set amount of seconds regardless of the state.
+    #[serde(default)]
+    pub after_secs: Option<NonZeroU64>,
 }
 
 impl GenerateConfig for FileSinkConfig {
@@ -101,6 +123,7 @@ impl GenerateConfig for FileSinkConfig {
             acknowledgements: Default::default(),
             timezone: Default::default(),
             internal_metrics: Default::default(),
+            truncate: Default::default(),
         })
         .unwrap()
     }
@@ -132,7 +155,12 @@ pub enum Compression {
     None,
 }
 
-enum OutFile {
+struct OutFile {
+    created_at: Instant,
+    inner: OutFileInner,
+}
+
+enum OutFileInner {
     Regular(File),
     Gzip(GzipEncoder<File>),
     Zstd(ZstdEncoder<File>),
@@ -140,35 +168,42 @@ enum OutFile {
 
 impl OutFile {
     fn new(file: File, compression: Compression) -> Self {
-        match compression {
-            Compression::None => OutFile::Regular(file),
-            Compression::Gzip => OutFile::Gzip(GzipEncoder::new(file)),
-            Compression::Zstd => OutFile::Zstd(ZstdEncoder::new(file)),
+        Self {
+            created_at: Instant::now(),
+            inner: match compression {
+                Compression::None => OutFileInner::Regular(file),
+                Compression::Gzip => OutFileInner::Gzip(GzipEncoder::new(file)),
+                Compression::Zstd => OutFileInner::Zstd(ZstdEncoder::new(file)),
+            },
         }
     }
 
     async fn sync_all(&mut self) -> Result<(), std::io::Error> {
-        match self {
-            OutFile::Regular(file) => file.sync_all().await,
-            OutFile::Gzip(gzip) => gzip.get_mut().sync_all().await,
-            OutFile::Zstd(zstd) => zstd.get_mut().sync_all().await,
+        match &mut self.inner {
+            OutFileInner::Regular(file) => file.sync_all().await,
+            OutFileInner::Gzip(gzip) => gzip.get_mut().sync_all().await,
+            OutFileInner::Zstd(zstd) => zstd.get_mut().sync_all().await,
         }
     }
 
     async fn shutdown(&mut self) -> Result<(), std::io::Error> {
-        match self {
-            OutFile::Regular(file) => file.shutdown().await,
-            OutFile::Gzip(gzip) => gzip.shutdown().await,
-            OutFile::Zstd(zstd) => zstd.shutdown().await,
+        match &mut self.inner {
+            OutFileInner::Regular(file) => file.shutdown().await,
+            OutFileInner::Gzip(gzip) => gzip.shutdown().await,
+            OutFileInner::Zstd(zstd) => zstd.shutdown().await,
         }
     }
 
     async fn write_all(&mut self, src: &[u8]) -> Result<(), std::io::Error> {
-        match self {
-            OutFile::Regular(file) => file.write_all(src).await,
-            OutFile::Gzip(gzip) => gzip.write_all(src).await,
-            OutFile::Zstd(zstd) => zstd.write_all(src).await,
+        match &mut self.inner {
+            OutFileInner::Regular(file) => file.write_all(src).await,
+            OutFileInner::Gzip(gzip) => gzip.write_all(src).await,
+            OutFileInner::Zstd(zstd) => zstd.write_all(src).await,
         }
+    }
+
+    const fn created_at(&self) -> Instant {
+        self.created_at
     }
 
     /// Shutdowns by flushing data, writing headers, and syncing all of that
@@ -211,6 +246,7 @@ pub struct FileSink {
     compression: Compression,
     events_sent: Registered<EventsSent>,
     include_file_metric_tag: bool,
+    truncation_config: FileTruncateConfig,
 }
 
 impl FileSink {
@@ -233,6 +269,7 @@ impl FileSink {
             compression: config.compression,
             events_sent: register!(EventsSent::from(Output(None))),
             include_file_metric_tag: config.internal_metrics.include_file_tag,
+            truncation_config: config.truncate.clone(),
         })
     }
 
@@ -299,22 +336,10 @@ impl FileSink {
                         // We do not poll map when it's empty, so we should
                         // never reach this branch.
                         None => unreachable!(),
-                        Some((mut expired_file, path)) => {
+                        Some((expired_file, path)) => {
                             // We got an expired file. All we really want is to
                             // flush and close it.
-                            if let Err(error) = expired_file.close().await {
-                                emit!(FileIoError {
-                                    error,
-                                    code: "failed_closing_file",
-                                    message: "Failed to close file.",
-                                    path: &path,
-                                    dropped_events: 0,
-                                });
-                            }
-                            drop(expired_file); // ignore close error
-                            emit!(FileOpen {
-                                count: self.files.len()
-                            });
+                            self.close_file(expired_file, path).await;
                         }
                     }
                 }
@@ -340,12 +365,14 @@ impl FileSink {
         let next_deadline = self.deadline_at();
         trace!(message = "Computed next deadline.", next_deadline = ?next_deadline, path = ?path);
 
-        let file = if let Some(file) = self.files.reset_at(&path, next_deadline) {
+        let bytes_path = BytesPath::new(path.clone());
+        let truncate = self.should_truncate(&bytes_path, &path).await;
+        let file = if !truncate && let Some(file) = self.files.reset_at(&path, next_deadline) {
             trace!(message = "Working with an already opened file.", path = ?path);
             file
         } else {
             trace!(message = "Opening new file.", ?path);
-            let file = match open_file(BytesPath::new(path.clone())).await {
+            let file = match open_file(bytes_path, truncate).await {
                 Ok(file) => file,
                 Err(error) => {
                     // We couldn't open the file for this event.
@@ -397,9 +424,64 @@ impl FileSink {
             }
         }
     }
+
+    async fn should_truncate(&mut self, bytes_path: &BytesPath, path: &bytes::Bytes) -> bool {
+        let mut truncate = false;
+
+        if let Some(after_close_time_secs) = self.truncation_config.after_close_time_secs
+            && self.files.get(path).is_none()
+            && let Ok(metadata) = fs::metadata(bytes_path).await
+            && let Ok(time) = metadata
+                .modified()
+                .map_err(|_| ())
+                .and_then(|t| t.elapsed().map_err(|_| ()))
+            && time.as_secs() > after_close_time_secs.into()
+        {
+            truncate = true;
+        }
+
+        if let Some(after_secs) = self.truncation_config.after_secs
+            && let Some(file) = self.files.get(path)
+            && (file.created_at().elapsed().as_secs() > after_secs.into())
+        {
+            truncate = true;
+        }
+
+        if let Some(after_modified_time_secs) = self.truncation_config.after_modified_time_secs
+            && let Some(previous_modification) = self
+                .files
+                .get_with_deadline(path)
+                .and_then(|(_, deadline)| deadline.checked_sub(self.idle_timeout))
+            && previous_modification.elapsed().as_secs() > after_modified_time_secs.into()
+        {
+            truncate = true;
+        }
+
+        if truncate && let Some((file, path)) = self.files.remove(path) {
+            self.close_file(file, path).await;
+        }
+
+        truncate
+    }
+
+    async fn close_file(&self, mut file: OutFile, path: Expired<Bytes>) {
+        if let Err(error) = file.close().await {
+            emit!(FileIoError {
+                error,
+                code: "failed_closing_file",
+                message: "Failed to close file.",
+                path: &path,
+                dropped_events: 0,
+            });
+        }
+        drop(file); // ignore close error
+        emit!(FileOpen {
+            count: self.files.len()
+        });
+    }
 }
 
-async fn open_file(path: impl AsRef<std::path::Path>) -> std::io::Result<File> {
+async fn open_file(path: impl AsRef<std::path::Path>, truncate: bool) -> std::io::Result<File> {
     let parent = path.as_ref().parent();
 
     if let Some(parent) = parent {
@@ -410,7 +492,8 @@ async fn open_file(path: impl AsRef<std::path::Path>) -> std::io::Result<File> {
         .read(false)
         .write(true)
         .create(true)
-        .append(true)
+        .append(!truncate)
+        .truncate(truncate)
         .open(path)
         .await
 }
@@ -444,7 +527,7 @@ mod tests {
     use std::convert::TryInto;
 
     use chrono::{SubsecRound, Utc};
-    use futures::{stream, SinkExt};
+    use futures::{SinkExt, stream};
     use similar_asserts::assert_eq;
     use vector_lib::{
         codecs::JsonSerializerConfig,
@@ -456,7 +539,7 @@ mod tests {
     use crate::{
         config::log_schema,
         test_util::{
-            components::{assert_sink_compliance, FILE_SINK_TAGS},
+            components::{FILE_SINK_TAGS, assert_sink_compliance},
             lines_from_file, lines_from_gzip_file, lines_from_zstd_file, random_events_with_stream,
             random_lines_with_stream, random_metrics_with_stream,
             random_metrics_with_stream_timestamp, temp_dir, temp_file, trace_init,
@@ -482,6 +565,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
+            truncate: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);
@@ -508,6 +592,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
+            truncate: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -534,6 +619,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
+            truncate: Default::default(),
         };
 
         let (input, _) = random_lines_with_stream(100, 64, None);
@@ -565,6 +651,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
+            truncate: Default::default(),
         };
 
         let (mut input, _events) = random_events_with_stream(32, 8, None);
@@ -647,6 +734,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
+            truncate: Default::default(),
         };
 
         let (mut input, _events) = random_lines_with_stream(10, 64, None);
@@ -703,6 +791,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
+            truncate: Default::default(),
         };
 
         let (input, _events) = random_metrics_with_stream(100, None, None);
@@ -722,7 +811,7 @@ mod tests {
 
         let format = "%Y-%m-%d-%H-%M-%S";
         let mut template = directory.to_string_lossy().to_string();
-        template.push_str(&format!("/{}.log", format));
+        template.push_str(&format!("/{format}.log"));
 
         let config = FileSinkConfig {
             path: template.try_into().unwrap(),
@@ -734,6 +823,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
+            truncate: Default::default(),
         };
 
         let metric_count = 3;
@@ -785,6 +875,7 @@ mod tests {
             internal_metrics: FileInternalMetricsConfig {
                 include_file_tag: true,
             },
+            truncate: Default::default(),
         };
 
         let (input, _events) = random_lines_with_stream(100, 64, None);

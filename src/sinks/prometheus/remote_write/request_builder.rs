@@ -4,12 +4,11 @@ use bytes::{Bytes, BytesMut};
 use prost::Message;
 use vector_lib::{config::telemetry, event::Metric};
 
+use super::{PartitionKey, sink::EventCollection};
 use crate::sinks::{
     prelude::*,
     prometheus::{collector, collector::MetricCollector as _},
 };
-
-use super::{sink::EventCollection, PartitionKey};
 
 pub(crate) struct RemoteWriteEncoder {
     pub(super) default_namespace: Option<String>,

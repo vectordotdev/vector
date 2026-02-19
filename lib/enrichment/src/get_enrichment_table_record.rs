@@ -1,17 +1,59 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::LazyLock};
+
+use vector_vrl_category::Category;
 use vrl::prelude::*;
 
-use crate::vrl_util::is_case_sensitive;
 use crate::{
-    vrl_util::{self, add_index, evaluate_condition},
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
+    vrl_util::{self, DEFAULT_CASE_SENSITIVE, add_index, evaluate_condition, is_case_sensitive},
 };
+
+static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
+    vec![
+        Parameter {
+            keyword: "table",
+            kind: kind::BYTES,
+            required: true,
+            description: "The [enrichment table](/docs/reference/glossary/#enrichment-tables) to search.",
+            default: None,
+        },
+        Parameter {
+            keyword: "condition",
+            kind: kind::OBJECT,
+            required: true,
+            description: "The condition to search on. Since the condition is used at boot time to create indices into the data, these conditions must be statically defined.",
+            default: None,
+        },
+        Parameter {
+            keyword: "select",
+            kind: kind::ARRAY,
+            required: false,
+            description: "A subset of fields from the enrichment table to return. If not specified, all fields are returned.",
+            default: None,
+        },
+        Parameter {
+            keyword: "case_sensitive",
+            kind: kind::BOOLEAN,
+            required: false,
+            description: "Whether the text fields match the case exactly.",
+            default: Some(&DEFAULT_CASE_SENSITIVE),
+        },
+        Parameter {
+            keyword: "wildcard",
+            kind: kind::BYTES,
+            required: false,
+            description: "Value to use for wildcard matching in the search.",
+            default: None,
+        },
+    ]
+});
 
 fn get_enrichment_table_record(
     select: Option<Value>,
     enrichment_tables: &TableSearch,
     table: &str,
     case_sensitive: Case,
+    wildcard: Option<Value>,
     condition: &[Condition],
     index: Option<IndexHandle>,
 ) -> Resolved {
@@ -27,11 +69,13 @@ fn get_enrichment_table_record(
             }),
         })
         .transpose()?;
+
     let data = enrichment_tables.find_table_row(
         table,
         case_sensitive,
         condition,
         select.as_ref().map(|select| select.as_ref()),
+        wildcard.as_ref(),
         index,
     )?;
 
@@ -45,37 +89,39 @@ impl Function for GetEnrichmentTableRecord {
         "get_enrichment_table_record"
     }
 
-    fn parameters(&self) -> &'static [Parameter] {
+    fn usage(&self) -> &'static str {
+        const USAGE: &str = const_str::concat!(
+            "Searches an [enrichment table](/docs/reference/glossary/#enrichment-tables) for a row that matches the provided condition. A single row must be matched. If no rows are found or more than one row is found, an error is returned.\n\n",
+            super::ENRICHMENT_TABLE_EXPLAINER
+        );
+        USAGE
+    }
+
+    fn internal_failure_reasons(&self) -> &'static [&'static str] {
         &[
-            Parameter {
-                keyword: "table",
-                kind: kind::BYTES,
-                required: true,
-            },
-            Parameter {
-                keyword: "condition",
-                kind: kind::OBJECT,
-                required: true,
-            },
-            Parameter {
-                keyword: "select",
-                kind: kind::ARRAY,
-                required: false,
-            },
-            Parameter {
-                keyword: "case_sensitive",
-                kind: kind::BOOLEAN,
-                required: false,
-            },
+            "The row is not found.",
+            "Multiple rows are found that match the condition.",
         ]
     }
 
+    fn category(&self) -> &'static str {
+        Category::Enrichment.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::OBJECT
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        &PARAMETERS
+    }
+
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "find records",
             source: r#"get_enrichment_table_record!("test", {"id": 1})"#,
             result: Ok(r#"{"id": 1, "firstname": "Bob", "surname": "Smith"}"#),
-        }]
+        )]
     }
 
     fn compile(
@@ -104,6 +150,7 @@ impl Function for GetEnrichmentTableRecord {
         let select = arguments.optional("select");
 
         let case_sensitive = is_case_sensitive(&arguments, state)?;
+        let wildcard = arguments.optional("wildcard");
         let index = Some(
             add_index(registry, &table, case_sensitive, &condition)
                 .map_err(|err| Box::new(err) as Box<_>)?,
@@ -115,6 +162,7 @@ impl Function for GetEnrichmentTableRecord {
             index,
             select,
             case_sensitive,
+            wildcard,
             enrichment_tables: registry.as_readonly(),
         }
         .as_expr())
@@ -127,6 +175,7 @@ pub struct GetEnrichmentTableRecordFn {
     condition: BTreeMap<KeyString, expression::Expr>,
     index: Option<IndexHandle>,
     select: Option<Box<dyn Expression>>,
+    wildcard: Option<Box<dyn Expression>>,
     case_sensitive: Case,
     enrichment_tables: TableSearch,
 }
@@ -150,6 +199,11 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
 
         let table = &self.table;
         let case_sensitive = self.case_sensitive;
+        let wildcard = self
+            .wildcard
+            .as_ref()
+            .map(|array| array.resolve(ctx))
+            .transpose()?;
         let index = self.index;
         let enrichment_tables = &self.enrichment_tables;
 
@@ -158,6 +212,7 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
             enrichment_tables,
             table,
             case_sensitive,
+            wildcard,
             &condition,
             index,
         )
@@ -170,11 +225,11 @@ impl FunctionExpression for GetEnrichmentTableRecordFn {
 
 #[cfg(test)]
 mod tests {
-    use vrl::compiler::prelude::TimeZone;
-    use vrl::compiler::state::RuntimeState;
-    use vrl::compiler::TargetValue;
-    use vrl::value;
-    use vrl::value::Secrets;
+    use vrl::{
+        compiler::{TargetValue, prelude::TimeZone, state::RuntimeState},
+        value,
+        value::Secrets,
+    };
 
     use super::*;
     use crate::test_util::get_table_registry;
@@ -191,6 +246,7 @@ mod tests {
             index: Some(IndexHandle(999)),
             select: None,
             case_sensitive: Case::Sensitive,
+            wildcard: None,
             enrichment_tables: registry.as_readonly(),
         };
 

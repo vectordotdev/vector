@@ -2,7 +2,7 @@ use std::env;
 
 use anyhow::Result;
 
-use crate::{app, util::CargoToml};
+use crate::{app, utils::cargo::CargoToml};
 
 const CARGO: &str = "cargo";
 const BASE_ARGS: [&str; 5] = [
@@ -50,7 +50,9 @@ impl Cli {
         )?;
 
         // The feature builds already run in parallel below, so don't overload the parallelism
-        env::set_var("CARGO_BUILD_JOBS", "1");
+        unsafe {
+            env::set_var("CARGO_BUILD_JOBS", "1");
+        }
 
         app::exec(
             "parallel",

@@ -208,7 +208,6 @@ where
     ///
     /// Defaults to `usize::MAX`, or effectively no limit.  Due to the internal design of the
     /// buffer, the effective maximum limit is around `max_data_file_size` * 2^16.
-    #[allow(dead_code)]
     pub fn max_buffer_size(mut self, amount: u64) -> Self {
         self.max_buffer_size = Some(amount);
         self
@@ -421,11 +420,10 @@ where
 mod tests {
     use proptest::{prop_assert, proptest, test_runner::Config};
 
-    use crate::variants::disk_v2::common::MAX_ALIGNABLE_AMOUNT;
-
     use super::{
-        align16, BuildError, DiskBufferConfigBuilder, MINIMUM_MAX_RECORD_SIZE, SERIALIZER_ALIGNMENT,
+        BuildError, DiskBufferConfigBuilder, MINIMUM_MAX_RECORD_SIZE, SERIALIZER_ALIGNMENT, align16,
     };
+    use crate::variants::disk_v2::common::MAX_ALIGNABLE_AMOUNT;
 
     #[test]
     #[should_panic(expected = "`amount` must be less than `MAX_ALIGNABLE_AMOUNT`")]
@@ -448,7 +446,7 @@ mod tests {
 
             // Make sure we're actually aligned.
             let aligned = align16(input);
-            prop_assert!(aligned % SERIALIZER_ALIGNMENT == 0);
+            prop_assert!(aligned.is_multiple_of(SERIALIZER_ALIGNMENT));
 
             // Make sure we're not overaligned, too.
             let delta = if aligned >= input {

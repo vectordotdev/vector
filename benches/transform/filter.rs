@@ -1,12 +1,12 @@
 use std::time::Duration;
 
 use criterion::{
-    criterion_group, measurement::WallTime, BatchSize, BenchmarkGroup, Criterion, SamplingMode,
-    Throughput,
+    BatchSize, BenchmarkGroup, Criterion, SamplingMode, Throughput, criterion_group,
+    measurement::WallTime,
 };
 use vector::{
     conditions::Condition,
-    transforms::{filter::Filter, FunctionTransform, OutputBuffer},
+    transforms::{FunctionTransform, OutputBuffer, filter::Filter},
 };
 use vector_lib::event::{Event, LogEvent};
 

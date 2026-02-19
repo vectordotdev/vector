@@ -8,12 +8,14 @@ use std::{
 use bytes::Bytes;
 use prost::Message;
 use snafu::Snafu;
-use vector_lib::event::{EventFinalizers, Finalizable};
-use vector_lib::request_metadata::RequestMetadata;
+use vector_lib::{
+    event::{EventFinalizers, Finalizable},
+    request_metadata::RequestMetadata,
+};
 use vrl::event_path;
 
 use super::{
-    apm_stats::{compute_apm_stats, Aggregator},
+    apm_stats::{Aggregator, compute_apm_stats},
     config::{DatadogTracesEndpoint, DatadogTracesEndpointConfiguration},
     dd_proto,
     service::TraceApiRequest,
@@ -22,7 +24,7 @@ use super::{
 use crate::{
     event::{Event, ObjectMap, TraceEvent, Value},
     sinks::util::{
-        metadata::RequestMetadataBuilder, Compression, Compressor, IncrementalRequestBuilder,
+        Compression, Compressor, IncrementalRequestBuilder, metadata::RequestMetadataBuilder,
     },
 };
 
@@ -437,7 +439,7 @@ mod test {
     use proptest::prelude::*;
     use vrl::event_path;
 
-    use super::{encode_traces, PartitionKey};
+    use super::{PartitionKey, encode_traces};
     use crate::event::{LogEvent, TraceEvent};
 
     proptest! {

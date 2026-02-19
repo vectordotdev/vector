@@ -30,14 +30,13 @@ name: CI Integration Review Trigger
 
 on:
   pull_request_review:
-    types: [submitted]
+    types: [ submitted ]
 
 permissions:
   statuses: write
+  packages: write
 
 env:
-  AWS_ACCESS_KEY_ID: "dummy"
-  AWS_SECRET_ACCESS_KEY: "dummy"
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
   TEST_APPSIGNAL_PUSH_API_KEY: ${{ secrets.TEST_APPSIGNAL_PUSH_API_KEY }}
   TEST_DATADOG_API_KEY: ${{ secrets.CI_TEST_DATADOG_API_KEY }}
@@ -45,7 +44,7 @@ env:
   DD_ENV: "ci"
   DD_API_KEY: ${{ secrets.DD_API_KEY }}
   RUST_BACKTRACE: full
-  TEST_LOG: vector=debug
+  VECTOR_LOG: vector=debug
   VERBOSE: true
   CI: true
   PROFILE: debug
@@ -65,7 +64,7 @@ jobs:
           private_key: ${{ secrets.GH_APP_DATADOG_VECTOR_CI_APP_PRIVATE_KEY }}
       - name: Get PR review author
         id: comment
-        uses: tspascoal/get-user-teams-membership@v3
+        uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
         with:
           username: ${{ github.actor }}
           team: 'Vector'
@@ -76,17 +75,27 @@ jobs:
         run: exit 1
 
       - name: (PR review) Set latest commit status as pending
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: pending
 
-  integration-tests:
+  build-test-runner:
     needs: prep-pr
+    uses: ./.github/workflows/build-test-runner.yml
+    with:
+      commit_sha: ${{ github.event.review.commit_id }}
+      checkout_ref: ${{ github.event.review.commit_id }}
+
+  integration-tests:
+    needs:
+      - prep-pr
+      - build-test-runner
     runs-on: ubuntu-24.04
     timeout-minutes: 90
     strategy:
+      fail-fast: false
       matrix:
         service: [
           "amqp", "appsignal", "aws", "axiom", "azure", "clickhouse", "databend", "datadog-agent",
@@ -96,57 +105,65 @@ jobs:
           "redis", "splunk", "webhdfs"
         ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
-      - run: sudo npm -g install @datadog/datadog-ci
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.event.review.commit_id }}
 
-      - run: docker image prune -af ; docker container prune -f
+      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
 
       - name: Integration Tests - ${{ matrix.service }}
         if: ${{ startsWith(github.event.review.body, '/ci-run-integration-all')
           || startsWith(github.event.review.body, '/ci-run-all')
           || startsWith(github.event.review.body, format('/ci-run-integration-{0}', matrix.service)) }}
-        uses: nick-fields/retry@v3
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 30
           max_attempts: 3
-          command: bash scripts/int-e2e-test.sh int ${{ matrix.service }}
+          command: bash scripts/run-integration-test.sh int ${{ matrix.service }}
 
   e2e-tests:
-    needs: prep-pr
+    needs:
+      - prep-pr
+      - build-test-runner
     runs-on: ubuntu-24.04-8core
     timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [
+          "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics"
+        ]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: "recursive"
           ref: ${{ github.event.review.commit_id }}
 
-      - run: sudo npm -g install @datadog/datadog-ci
+      - name: Pull test runner image
+        uses: ./.github/actions/pull-test-runner
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          commit_sha: ${{ github.event.review.commit_id }}
 
-      - run: docker image prune -af ; docker container prune -f
-      - name: e2e-datadog-logs
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-logs')
-          || startsWith(github.event.review.body, '/ci-run-integration-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
+      - run: bash scripts/environment/prepare.sh --modules=datadog-ci
+
+      - name: E2E Tests - ${{ matrix.service }}
+        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-all')
+          || startsWith(github.event.review.body, '/ci-run-all')
+          || startsWith(github.event.review.body, format('/ci-run-e2e-{0}', matrix.service)) }}
+        uses: nick-fields/retry@ce71cc2ab81d554ebbe88c79ab5975992d79ba08 # v3.0.2
         with:
           timeout_minutes: 35
           max_attempts: 3
-          command: bash scripts/int-e2e-test.sh e2e datadog-logs
+          command: bash scripts/run-integration-test.sh e2e ${{ matrix.service }}
 
-      - name: datadog-e2e-metrics
-        if: ${{ startsWith(github.event.review.body, '/ci-run-e2e-datadog-metrics')
-          || startsWith(github.event.review.body, '/ci-run-e2e-all')
-          || startsWith(github.event.review.body, '/ci-run-all') }}
-        uses: nick-fields/retry@v3
-        with:
-          timeout_minutes: 35
-          max_attempts: 3
-          command: bash scripts/int-e2e-test.sh e2e datadog-metrics
 
   update-pr-status:
     name: Signal result to PR
@@ -155,9 +172,9 @@ jobs:
     needs:
       - integration-tests
       - e2e-tests
-    if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all'))
+    if: always() && (startsWith(github.event.review.body, '/ci-run-integration') || contains(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-e2e'))
     env:
-      FAILED: ${{ contains(needs.*.result, 'failure') }}
+      FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:
       - name: Generate authentication token
         id: generate_token
@@ -168,7 +185,7 @@ jobs:
 
       - name: Validate issue comment
         if: github.event_name == 'pull_request_review'
-        uses: tspascoal/get-user-teams-membership@v3
+        uses: tspascoal/get-user-teams-membership@57e9f42acd78f4d0f496b3be4368fc5f62696662 # v3.0.0
         with:
           username: ${{ github.actor }}
           team: 'Vector'
@@ -176,16 +193,17 @@ jobs:
 
       - name: (PR review) Submit PR result as success
         if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
-        uses: myrotvorets/set-commit-status-action@v2.0.1
+        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
         with:
           sha: ${{ github.event.review.commit_id }}
           token: ${{ secrets.GITHUB_TOKEN }}
           status: 'success'
 
-      - run: |
-          echo "failed=${{ env.FAILED }}"
-          if [[ "$FAILED" == "true" ]] ; then
+      - name: Check all jobs status
+        run: |
+          if [[ "${{ env.FAILED }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           else
-            exit 0
+            echo "All jobs completed successfully"
           fi

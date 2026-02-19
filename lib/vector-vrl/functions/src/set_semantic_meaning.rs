@@ -1,8 +1,16 @@
-use std::collections::BTreeMap;
-use std::ops::{Deref, DerefMut};
-use vrl::diagnostic::Label;
-use vrl::path::{OwnedTargetPath, PathPrefix};
-use vrl::prelude::*;
+use std::{
+    collections::BTreeMap,
+    ops::{Deref, DerefMut},
+};
+
+use vector_vrl_category::Category;
+use vrl::{
+    diagnostic::Label,
+    path::{OwnedTargetPath, PathPrefix},
+    prelude::*,
+};
+
+use indoc::indoc;
 
 #[derive(Debug, Default, Clone)]
 pub struct MeaningList(pub BTreeMap<String, OwnedTargetPath>);
@@ -29,27 +37,49 @@ impl Function for SetSemanticMeaning {
         "set_semantic_meaning"
     }
 
+    fn usage(&self) -> &'static str {
+        indoc! {"
+            Sets a semantic meaning for an event. **Note**: This function assigns
+            meaning at startup, and has _no_ runtime behavior. It is suggested
+            to put all calls to this function at the beginning of a VRL function. The function
+            cannot be conditionally called. For example, using an if statement cannot stop the meaning
+            from being assigned.
+        "}
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Event.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
         &[
             Parameter {
                 keyword: "target",
                 kind: kind::ANY,
                 required: true,
+                description: "The path of the value that is assigned a meaning.",
+                default: None,
             },
             Parameter {
                 keyword: "meaning",
                 kind: kind::BYTES,
                 required: true,
+                description: "The name of the meaning to assign.",
+                default: None,
             },
         ]
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "Sets custom field semantic meaning",
             source: r#"set_semantic_meaning(.foo, "bar")"#,
             result: Ok("null"),
-        }]
+        )]
     }
 
     fn compile(

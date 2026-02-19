@@ -39,12 +39,11 @@ impl MetricNormalize for DatadogMetricsNormalizer {
 #[cfg(test)]
 mod tests {
     use vector_lib::{
-        event::{metric::MetricSketch, Metric, MetricKind, MetricValue},
+        event::{Metric, MetricKind, MetricValue, metric::MetricSketch},
         metrics::AgentDDSketch,
     };
 
     use super::DatadogMetricsNormalizer;
-
     use crate::test_util::metrics::{
         assert_normalize, generate_f64s, get_aggregated_histogram, get_distribution, tests,
     };

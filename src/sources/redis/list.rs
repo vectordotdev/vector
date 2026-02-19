@@ -1,6 +1,7 @@
-use redis::{aio::ConnectionManager, AsyncCommands, ErrorKind, RedisError, RedisResult};
-use snafu::{ResultExt, Snafu};
 use std::time::Duration;
+
+use redis::{AsyncCommands, ErrorKind, RedisError, RedisResult, aio::ConnectionManager};
+use snafu::{ResultExt, Snafu};
 
 use super::{InputHandler, Method};
 use crate::{internal_events::RedisReceiveEventError, sources::Source};
