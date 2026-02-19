@@ -1,10 +1,11 @@
 use anyhow::Result;
 use serde::Serialize;
-use std::fs;
-use std::path::PathBuf;
+use std::{collections::HashMap, fs, path::PathBuf};
 use vrl::compiler::Function;
 use vrl::compiler::value::kind;
 use vrl::core::Value;
+use vrl::prelude::Parameter;
+use vrl::prelude::function::EnumVariant;
 
 /// Generate VRL function documentation as JSON files.
 ///
@@ -52,6 +53,8 @@ struct ArgumentDoc {
     description: String,
     required: bool,
     r#type: Vec<String>,
+    #[serde(skip_serializing_if = "HashMap::is_empty")]
+    r#enum: HashMap<String, String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     default: Option<String>,
 }
@@ -111,12 +114,36 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
     let arguments: Vec<ArgumentDoc> = func
         .parameters()
         .iter()
-        .map(|param| ArgumentDoc {
-            name: param.keyword.trim().to_string(),
-            description: param.description.trim().to_string(),
-            required: param.required,
-            r#type: kind_to_types(param.kind),
-            default: param.default.map(pretty_value),
+        .map(|param| {
+            let Parameter {
+                keyword,
+                kind,
+                required,
+                description,
+                default,
+                enum_variants,
+            } = param;
+
+            let name = keyword.trim().to_string();
+            let description = description.trim().to_string();
+            let default = default.map(pretty_value);
+            let r#type = kind_to_types(*kind);
+            let r#enum = enum_variants
+                .unwrap_or_default()
+                .iter()
+                .map(|EnumVariant { value, description }| {
+                    (value.to_string(), description.to_string())
+                })
+                .collect();
+
+            ArgumentDoc {
+                name,
+                description,
+                required: *required,
+                r#type,
+                default,
+                r#enum,
+            }
         })
         .collect();
 
