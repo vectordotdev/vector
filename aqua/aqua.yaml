@@ -9,7 +9,7 @@ packages:
   - name: crates.io/cargo-deb@2.9.3 # Create Debian packages
   - name: cross-rs/cross@v0.2.5 # Cross-compile Rust projects
   - name: nextest-rs/nextest/cargo-nextest@cargo-nextest-0.9.47 # Rust test runner
-  - name: EmbarkStudios/cargo-deny@0.16.2 # Lint dependencies for security and licenses
+  - name: EmbarkStudios/cargo-deny@0.19.0 # Lint dependencies for security and licenses
   - name: foresterre/cargo-msrv@v0.15.1 # Find minimum supported Rust version
   - name: crates.io/dd-rust-license-tool@1.0.4 # Generate license information
   - name: bufbuild/buf@v1.50.0 # Protobuf linting and breaking change detection
