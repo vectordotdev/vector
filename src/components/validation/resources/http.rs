@@ -7,9 +7,9 @@ use std::{
 };
 
 use axum::{
+    Router,
     response::IntoResponse,
     routing::{MethodFilter, MethodRouter},
-    Router,
 };
 use bytes::{BufMut as _, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
@@ -499,12 +499,12 @@ where
                 }
             });
 
-        let router = Router::new()
-            .route(&request_path, method_router)
-            .fallback(|req: Request<Body>| async move {
+        let router = Router::new().route(&request_path, method_router).fallback(
+            |req: Request<Body>| async move {
                 error!(?req, "Component sent request the server could not route.");
                 StatusCode::NOT_FOUND
-            });
+            },
+        );
 
         // Now actually run/drive the HTTP server and process requests until we're told to shutdown.
         http_server_started.mark_as_done();
