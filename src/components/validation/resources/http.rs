@@ -7,10 +7,9 @@ use std::{
 };
 
 use axum::{
-    error_handling::HandleErrorLayer,
     response::IntoResponse,
     routing::{MethodFilter, MethodRouter},
-    BoxError, Router,
+    Router,
 };
 use bytes::{BufMut as _, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
@@ -21,8 +20,6 @@ use tokio::{
     sync::{Mutex, Notify, mpsc, oneshot},
 };
 use tokio_util::codec::Decoder;
-use tower::ServiceBuilder;
-use tower_http::decompression::RequestDecompressionLayer;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
@@ -503,16 +500,6 @@ where
             });
 
         let router = Router::new()
-            .layer(
-                ServiceBuilder::new()
-                    .layer(HandleErrorLayer::new(|error: BoxError| async move {
-                        (
-                            StatusCode::INTERNAL_SERVER_ERROR,
-                            format!("Unhandled server error: {}", error),
-                        )
-                    }))
-                    .layer(RequestDecompressionLayer::new()),
-            )
             .route(&request_path, method_router)
             .fallback(|req: Request<Body>| async move {
                 error!(?req, "Component sent request the server could not route.");
