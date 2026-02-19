@@ -101,8 +101,7 @@ impl SqsSinkConfig {
     }
 
     /// Determines if batching is enabled by checking if any batch settings are configured.
-    #[allow(dead_code)] // Used in build() for routing
-    fn batching_enabled(&self) -> bool {
+    const fn batching_enabled(&self) -> bool {
         self.batch.max_events.is_some() || self.batch.timeout_secs.is_some()
     }
 }
