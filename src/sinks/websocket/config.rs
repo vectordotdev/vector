@@ -70,7 +70,12 @@ impl WebSocketSinkConfig {
     fn build_connector(&self) -> Result<WebSocketConnector, WebSocketError> {
         let tls =
             MaybeTlsSettings::from_config(self.common.tls.as_ref(), false).context(ConnectSnafu)?;
-        WebSocketConnector::new(self.common.uri.clone(), tls, self.common.auth.clone())
+        WebSocketConnector::new(
+            self.common.uri.clone(),
+            tls,
+            self.common.auth.clone(),
+            self.common.compression.clone(),
+        )
     }
 }
 

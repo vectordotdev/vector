@@ -87,6 +87,9 @@ components: sources: websocket: {
 				tls: {
 					enabled: true
 				}
+				compression: {
+					level: 6
+				}
 				ping_interval: 30
 				ping_timeout:  10
 				ping_message:  "PING"

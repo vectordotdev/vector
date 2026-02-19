@@ -23,19 +23,16 @@ use crate::{
     },
 };
 use async_trait::async_trait;
-use bytes::BytesMut;
+use bytes::{Bytes, BytesMut};
 use futures::{
-    StreamExt, TryStreamExt,
+    StreamExt,
     channel::mpsc::{UnboundedSender, unbounded},
     future, pin_mut,
     stream::BoxStream,
 };
-use http::StatusCode;
+use http_body_util::Empty;
+use hyper1::body::Incoming;
 use tokio::net::TcpStream;
-use tokio_tungstenite::tungstenite::{
-    Message,
-    handshake::server::{ErrorResponse, Request, Response},
-};
 use tokio_util::codec::Encoder as _;
 use tracing::Instrument;
 use url::Url;
@@ -50,6 +47,7 @@ use vector_lib::{
     sink::StreamSink,
     tls::{MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
+use yawc::{Frame, WebSocket as YawcWebSocket};
 
 pub struct WebSocketListenerSink {
     tls: MaybeTlsSettings,
@@ -88,7 +86,7 @@ impl WebSocketListenerSink {
     fn extract_extra_tags(
         extra_tags_config: &HashMap<String, ExtraMetricTagsConfig>,
         base_url: Option<&Url>,
-        req: &Request,
+        req: &hyper1::Request<Incoming>,
     ) -> Vec<(String, String)> {
         extra_tags_config
             .iter()
@@ -120,10 +118,10 @@ impl WebSocketListenerSink {
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
         subprotocol: SubProtocolConfig,
-        peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
+        peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Frame>>>>,
         extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
         client_checkpoints: Arc<Mutex<HashMap<String, Uuid>>>,
-        buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
+        buffer: Arc<Mutex<VecDeque<(Uuid, Frame)>>>,
         mut listener: MaybeTlsListener,
     ) {
         let open_gauge = OpenGauge::new();
@@ -151,9 +149,9 @@ impl WebSocketListenerSink {
         auth: Option<HttpServerAuthMatcher>,
         message_buffering: Option<MessageBufferingConfig>,
         subprotocol: SubProtocolConfig,
-        peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Message>>>>,
+        peers: Arc<Mutex<HashMap<SocketAddr, UnboundedSender<Frame>>>>,
         client_checkpoints: Arc<Mutex<HashMap<String, Uuid>>>,
-        buffer: Arc<Mutex<VecDeque<(Uuid, Message)>>>,
+        buffer: Arc<Mutex<VecDeque<(Uuid, Frame)>>>,
         stream: MaybeTlsIncomingStream<TcpStream>,
         extra_tags_config: HashMap<String, ExtraMetricTagsConfig>,
         open_gauge: OpenGauge,
@@ -178,86 +176,162 @@ impl WebSocketListenerSink {
                 _ => None,
             })
             .collect();
-        let mut buffer_replay = BufferReplayRequest::NO_REPLAY;
-        let mut client_checkpoint_key = None;
 
-        let header_callback = |req: &Request, mut response: Response| {
-            client_checkpoint_key = message_buffering.client_key(req, &addr);
-            buffer_replay = message_buffering.extract_message_replay_request(
-                req,
-                client_checkpoint_key.clone().and_then(|key| {
-                    client_checkpoints
-                        .lock()
-                        .expect("mutex poisoned")
-                        .get(&key)
-                        .cloned()
-                }),
-            );
-            let Some(auth) = auth else {
-                extra_tags.append(&mut Self::extract_extra_tags(
-                    &extra_tags_config,
-                    base_url.as_ref(),
-                    req,
-                ));
-                return Ok(response);
-            };
-            match auth.handle_auth(Some(&addr), req.headers(), req.uri().path()) {
-                Ok(_) => {
-                    extra_tags.append(&mut Self::extract_extra_tags(
-                        &extra_tags_config,
-                        base_url.as_ref(),
-                        req,
-                    ));
-                    match subprotocol {
-                        SubProtocolConfig::Any => {
-                            if let Some(websocket_protocol) =
-                                req.headers().get("Sec-WebSocket-Protocol")
-                            {
-                                response
-                                    .headers_mut()
-                                    .insert("Sec-WebSocket-Protocol", websocket_protocol.clone());
-                            }
+        // Channel to communicate upgrade context from the HTTP service to the outer scope
+        let (ctx_tx, ctx_rx) = tokio::sync::oneshot::channel::<(
+            yawc::UpgradeFut,
+            Vec<(String, String)>, // extra_tags from request
+            Option<String>,        // client_checkpoint_key
+            BufferReplayRequest,   // buffer_replay
+        )>();
+        let ctx_tx = std::sync::Mutex::new(Some(ctx_tx));
+
+        let io = hyper_util::rt::TokioIo::new(stream);
+
+        let message_buffering_for_handler = message_buffering.clone();
+        let client_checkpoints_for_handler = Arc::clone(&client_checkpoints);
+        let service = hyper1::service::service_fn(move |mut req: hyper1::Request<Incoming>| {
+            let auth = auth.clone();
+            let message_buffering = message_buffering.clone();
+            let subprotocol = subprotocol.clone();
+            let extra_tags_config = extra_tags_config.clone();
+            let client_checkpoints = Arc::clone(&client_checkpoints);
+            let base_url = base_url.clone();
+            let ctx_tx = ctx_tx.lock().unwrap().take();
+
+            async move {
+                let client_checkpoint_key = message_buffering.client_key(&req, &addr);
+                let buffer_replay = message_buffering.extract_message_replay_request(
+                    &req,
+                    client_checkpoint_key.clone().and_then(|key| {
+                        client_checkpoints
+                            .lock()
+                            .expect("mutex poisoned")
+                            .get(&key)
+                            .cloned()
+                    }),
+                );
+
+                // Validate auth
+                let mut req_extra_tags = Vec::new();
+                if let Some(ref auth) = auth {
+                    match auth.handle_auth(
+                        Some(&addr),
+                        &convert_headers(req.headers()),
+                        req.uri().path(),
+                    ) {
+                        Ok(_) => {
+                            req_extra_tags.append(&mut Self::extract_extra_tags(
+                                &extra_tags_config,
+                                base_url.as_ref(),
+                                &req,
+                            ));
+
+                            // Handle subprotocol negotiation (will be added to upgrade response below)
                         }
-                        SubProtocolConfig::Specific {
-                            supported_subprotocols,
-                        } => {
-                            let requested_protocols =
-                                req.headers().get_all("Sec-WebSocket-Protocol");
-                            if let Some(matched_protocol) =
-                                requested_protocols.iter().find(|requested_protocol| {
-                                    supported_subprotocols.iter().any(|supported_protocol| {
-                                        requested_protocol.as_bytes()
-                                            == supported_protocol.as_bytes()
-                                    })
-                                })
-                            {
-                                response
-                                    .headers_mut()
-                                    .insert("Sec-WebSocket-Protocol", matched_protocol.clone());
-                            }
+                        Err(message) => {
+                            debug!("Websocket handshake auth validation failed: {}", message);
+                            return Ok::<_, hyper1::Error>(
+                                hyper1::Response::builder()
+                                    .status(hyper1::StatusCode::UNAUTHORIZED)
+                                    .body(Empty::<Bytes>::new())
+                                    .unwrap(),
+                            );
                         }
                     }
-                    Ok(response)
+                } else {
+                    req_extra_tags.append(&mut Self::extract_extra_tags(
+                        &extra_tags_config,
+                        base_url.as_ref(),
+                        &req,
+                    ));
                 }
-                Err(message) => {
-                    let mut response = ErrorResponse::default();
-                    *response.status_mut() = StatusCode::UNAUTHORIZED;
-                    *response.body_mut() = Some(message.message().to_string());
-                    debug!("Websocket handshake auth validation failed: {}", message);
-                    Err(response)
-                }
-            }
-        };
 
-        let ws_stream = tokio_tungstenite::accept_hdr_async(stream, header_callback)
-            .await
-            .map_err(|err| {
-                debug!("Error during websocket handshake: {}", err);
+                // Perform WebSocket upgrade
+                let (mut response, upgrade_fut) = match YawcWebSocket::upgrade(&mut req) {
+                    Ok(result) => result,
+                    Err(err) => {
+                        debug!("WebSocket upgrade failed: {}", err);
+                        return Ok(hyper1::Response::builder()
+                            .status(hyper1::StatusCode::BAD_REQUEST)
+                            .body(Empty::<Bytes>::new())
+                            .unwrap());
+                    }
+                };
+
+                // Handle subprotocol negotiation on the response
+                match subprotocol {
+                    SubProtocolConfig::Any => {
+                        if let Some(websocket_protocol) =
+                            req.headers().get("Sec-WebSocket-Protocol")
+                        {
+                            response
+                                .headers_mut()
+                                .insert("Sec-WebSocket-Protocol", websocket_protocol.clone());
+                        }
+                    }
+                    SubProtocolConfig::Specific {
+                        supported_subprotocols,
+                    } => {
+                        let requested_protocols = req.headers().get_all("Sec-WebSocket-Protocol");
+                        if let Some(matched_protocol) =
+                            requested_protocols.iter().find(|requested_protocol| {
+                                supported_subprotocols.iter().any(|supported_protocol| {
+                                    requested_protocol.as_bytes() == supported_protocol.as_bytes()
+                                })
+                            })
+                        {
+                            response
+                                .headers_mut()
+                                .insert("Sec-WebSocket-Protocol", matched_protocol.clone());
+                        }
+                    }
+                }
+
+                // Send upgrade context
+                if let Some(tx) = ctx_tx {
+                    let _ = tx.send((
+                        upgrade_fut,
+                        req_extra_tags,
+                        client_checkpoint_key,
+                        buffer_replay,
+                    ));
+                }
+
+                Ok(response)
+            }
+        });
+
+        // Spawn the HTTP1 connection handler
+        tokio::spawn(async move {
+            let _ = hyper1::server::conn::http1::Builder::new()
+                .serve_connection(io, service)
+                .with_upgrades()
+                .await;
+        });
+
+        // Wait for the upgrade context from the HTTP handler
+        let (upgrade_fut, req_extra_tags, client_checkpoint_key, buffer_replay) =
+            ctx_rx.await.map_err(|_| {
+                debug!("HTTP handler did not send upgrade context (auth failure or bad request)");
                 emit!(WebSocketListenerConnectionFailedError {
-                    error: Box::new(err),
+                    error: Box::<dyn std::error::Error + Send + Sync>::from(
+                        "WebSocket upgrade failed"
+                    ),
                     extra_tags: extra_tags.clone()
                 })
             })?;
+
+        extra_tags.extend(req_extra_tags);
+
+        // Wait for the WebSocket upgrade to complete
+        let ws = upgrade_fut.await.map_err(|err| {
+            debug!("WebSocket upgrade error: {}", err);
+            emit!(WebSocketListenerConnectionFailedError {
+                error: Box::new(err),
+                extra_tags: extra_tags.clone()
+            })
+        })?;
 
         let _open_token = open_gauge.open(|count| emit!(ConnectionOpen { count }));
 
@@ -266,16 +340,13 @@ impl WebSocketListenerSink {
 
         {
             let mut peers = peers.lock().expect("mutex poisoned");
-            buffer_replay.replay_messages(
-                &buffer.lock().expect("mutex poisoned"),
-                |(_, message)| {
-                    if let Err(error) = tx.unbounded_send(message.clone()) {
-                        emit!(WebSocketListenerSendError {
-                            error: Box::new(error)
-                        });
-                    }
-                },
-            );
+            buffer_replay.replay_messages(&buffer.lock().expect("mutex poisoned"), |(_, frame)| {
+                if let Err(error) = tx.unbounded_send(frame.clone()) {
+                    emit!(WebSocketListenerSendError {
+                        error: Box::new(error)
+                    });
+                }
+            });
 
             debug!("WebSocket connection established: {}", addr);
 
@@ -286,46 +357,43 @@ impl WebSocketListenerSink {
             });
         }
 
-        let (outgoing, incoming) = ws_stream.split();
+        let (outgoing, incoming) = ws.split();
 
-        let incoming_data_handler = incoming.try_for_each(|msg| {
+        let incoming_data_handler = incoming.for_each(|frame| {
             let ip = addr.ip();
-            debug!(
-                "Received a message from {ip}: {}",
-                msg.to_text().unwrap_or(&format!("Couldn't convert: {msg}"))
-            );
+            let text = std::str::from_utf8(frame.payload()).unwrap_or("<non-utf8>");
+            debug!("Received a message from {ip}: {text}",);
             if let (Some(client_key), Some(checkpoint)) = (
                 &client_checkpoint_key,
-                message_buffering.handle_ack_request(msg),
+                message_buffering_for_handler.handle_ack_request(frame),
             ) {
                 debug!("Inserting checkpoint for {client_key}({ip}): {checkpoint}");
-                client_checkpoints
+                client_checkpoints_for_handler
                     .lock()
                     .expect("mutex poisoned")
                     .insert(client_key.clone(), checkpoint);
             }
 
-            future::ok(())
+            future::ready(())
         });
         let forward_data_to_client = rx
-            .map(|message| {
+            .map(|frame| {
                 emit!(WebSocketListenerMessageSent {
-                    message_size: message.len(),
+                    message_size: frame.payload().len(),
                     extra_tags: extra_tags.clone()
                 });
-                Ok(message)
+                Ok(frame)
             })
             .forward(outgoing);
 
         pin_mut!(forward_data_to_client, incoming_data_handler);
-        if let Err(error) = future::select(forward_data_to_client, incoming_data_handler)
-            .await
-            .factor_first()
-            .0
-        {
-            emit!(WebSocketListenerSendError {
-                error: Box::new(error)
-            })
+        match future::select(forward_data_to_client, incoming_data_handler).await {
+            future::Either::Left((Err(error), _)) => {
+                emit!(WebSocketListenerSendError {
+                    error: Box::new(error)
+                })
+            }
+            _ => {}
         }
 
         {
@@ -340,6 +408,20 @@ impl WebSocketListenerSink {
 
         Ok(())
     }
+}
+
+/// Convert http 1.x HeaderMap to http 0.2 HeaderMap for compatibility with auth handler.
+fn convert_headers(headers: &hyper1::HeaderMap) -> http::header::HeaderMap {
+    let mut map = http::header::HeaderMap::new();
+    for (name, value) in headers.iter() {
+        if let (Ok(name), Ok(value)) = (
+            http::header::HeaderName::from_bytes(name.as_str().as_bytes()),
+            http::header::HeaderValue::from_bytes(value.as_bytes()),
+        ) {
+            map.insert(name, value);
+        }
+    }
+    map
 }
 
 #[async_trait]
@@ -391,31 +473,31 @@ impl StreamSink<Event> for WebSocketListenerSink {
                 Ok(()) => {
                     finalizers.update_status(EventStatus::Delivered);
 
-                    let message = if encode_as_binary {
-                        Message::binary(bytes)
+                    let frame = if encode_as_binary {
+                        Frame::binary(bytes.freeze())
                     } else {
-                        Message::text(String::from_utf8_lossy(&bytes))
+                        Frame::text(String::from_utf8_lossy(&bytes).into_owned())
                     };
-                    let message_len = message.len();
+                    let frame_len = frame.payload().len();
 
                     if self.message_buffering.should_buffer() {
                         let mut buffer = message_buffer.lock().expect("mutex poisoned");
                         if buffer.len() + 1 >= buffer.capacity() {
                             buffer.pop_front();
                         }
-                        buffer.push_back((message_id, message.clone()));
+                        buffer.push_back((message_id, frame.clone()));
                     }
 
                     let peers = peers.lock().expect("mutex poisoned");
                     let broadcast_recipients = peers.values();
                     for recp in broadcast_recipients {
-                        if let Err(error) = recp.unbounded_send(message.clone()) {
+                        if let Err(error) = recp.unbounded_send(frame.clone()) {
                             emit!(WebSocketListenerSendError {
                                 error: Box::new(error)
                             });
                         } else {
                             events_sent.emit(CountByteSize(1, event_byte_size));
-                            bytes_sent.emit(ByteSize(message_len));
+                            bytes_sent.emit(ByteSize(frame_len));
                         }
                     }
                 }
@@ -437,7 +519,6 @@ mod tests {
     use futures::{SinkExt, Stream, StreamExt, channel::mpsc::UnboundedReceiver};
     use futures_util::stream;
     use tokio::{task::JoinHandle, time};
-    use tokio_tungstenite::tungstenite::client::IntoClientRequest;
     use vector_lib::{
         codecs::{
             JsonDeserializerConfig,
@@ -447,6 +528,7 @@ mod tests {
         metrics::Controller,
         sink::VectorSink,
     };
+    use yawc::{Frame, WebSocket as YawcWebSocket};
 
     use super::*;
     use crate::{
@@ -859,29 +941,27 @@ mod tests {
         attach_websocket_client(localhost_with_port(port), expected_events, true).await
     }
 
-    async fn attach_websocket_client<R: IntoClientRequest + Unpin>(
-        client_request: R,
+    async fn attach_websocket_client(
+        url: String,
         expected_events: Vec<Event>,
         ack: bool,
     ) -> JoinHandle<()> {
-        let (ws_stream, _) = tokio_tungstenite::connect_async(client_request)
+        let ws = YawcWebSocket::connect(Url::parse(&url).expect("Invalid URL"))
             .await
             .expect("Client failed to connect.");
-        let (mut tx, rx) = ws_stream.split();
+        let (mut tx, rx) = ws.split();
         tokio::spawn(async move {
             let events = expected_events.clone();
 
-            let pairs: Vec<(Result<Message, _>, Event)> = rx
+            let pairs: Vec<(Frame, Event)> = rx
                 .take(events.len())
                 .zip(stream::iter(events))
                 .collect()
                 .await;
 
-            pairs.iter().for_each(|(msg, expected)| {
-                let mut base_msg = serde_json::from_str::<Value>(
-                    &msg.as_ref().unwrap().clone().into_text().unwrap(),
-                )
-                .unwrap();
+            pairs.iter().for_each(|(frame, expected)| {
+                let text = std::str::from_utf8(frame.payload()).unwrap();
+                let mut base_msg = serde_json::from_str::<Value>(text).unwrap();
                 // Removing message_id from message, since it is not part of the event
                 base_msg.remove("message_id", true);
                 let msg_text = serde_json::to_string(&base_msg).unwrap();
@@ -890,8 +970,8 @@ mod tests {
             });
 
             if ack {
-                for (msg, _) in pairs {
-                    tx.send(msg.unwrap()).await.unwrap();
+                for (frame, _) in pairs {
+                    tx.send(frame).await.unwrap();
                 }
             }
 
