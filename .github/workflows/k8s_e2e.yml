@@ -126,11 +126,11 @@ jobs:
             // https://cloud.google.com/kubernetes-engine/docs/release-notes
             // https://docs.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli#aks-kubernetes-release-calendar
             const kubernetes_version = [
-              { version: "v1.35.0",  is_essential: true  }, // Latest stable
-              { version: "v1.34.0",  is_essential: true  }, // Current GA across providers
+              { version: "v1.35.1",  is_essential: true  }, // Latest stable (Feb 10, 2026)
+              { version: "v1.34.4",  is_essential: true  }, // Current patch (Feb 10, 2026)
               { version: "v1.33.0",  is_essential: false }, // Widely supported
-              { version: "v1.32.0",  is_essential: false }, // Minimum for AKS
-              { version: "v1.31.0",  is_essential: false }, // Extended support on EKS/GKE
+              { version: "v1.32.0",  is_essential: false }, // EOL Feb 28 2026
+              { version: "v1.31.0",  is_essential: false }, // Extended support on cloud providers
             ]
             const container_runtime = [
               "docker",
