@@ -240,20 +240,13 @@ pub struct SqsMessageReceiveError<'a, E> {
 
 impl<E: std::fmt::Display> InternalEvent for SqsMessageReceiveError<'_, E> {
     fn emit(self) {
-        error!(
+        warn!(
             message = "Failed to fetch SQS events.",
             error = %self.error,
             error_code = "failed_fetching_sqs_events",
             error_type = error_type::REQUEST_FAILED,
             stage = error_stage::RECEIVING,
         );
-        counter!(
-            "component_errors_total",
-            "error_code" => "failed_fetching_sqs_events",
-            "error_type" => error_type::REQUEST_FAILED,
-            "stage" => error_stage::RECEIVING,
-        )
-        .increment(1);
     }
 }
 
