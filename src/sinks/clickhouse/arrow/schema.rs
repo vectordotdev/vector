@@ -6,7 +6,6 @@ use arrow::datatypes::{Field, Schema};
 use async_trait::async_trait;
 use http::{Request, StatusCode};
 use hyper::Body;
-use itertools::Itertools;
 use serde::Deserialize;
 use url::form_urlencoded;
 use vector_lib::codecs::encoding::format::{ArrowEncodingError, SchemaProvider};
@@ -20,6 +19,7 @@ struct ColumnInfo {
     name: String,
     #[serde(rename = "type")]
     column_type: String,
+    default_kind: String,
 }
 
 impl TryFrom<ColumnInfo> for Field {
@@ -30,6 +30,8 @@ impl TryFrom<ColumnInfo> for Field {
         let (dt, nullable) = (&ch_type)
             .try_into()
             .map_err(|e| format!("Failed to convert column '{}': {e}", column.name))?;
+        // DEFAULT columns have server-side defaults, so users don't need to provide them.
+        let nullable = nullable || column.default_kind == "DEFAULT";
         Ok(Field::new(column.name, dt, nullable))
     }
 }
@@ -42,9 +44,10 @@ pub async fn fetch_table_schema(
     table: &str,
     auth: Option<&Auth>,
 ) -> crate::Result<Schema> {
-    let query = "SELECT name, type \
+    let query = "SELECT name, type, default_kind \
                  FROM system.columns \
                  WHERE database = {db:String} AND table = {tbl:String} \
+                 AND default_kind IN ('', 'DEFAULT') \
                  ORDER BY position \
                  FORMAT JSONEachRow";
 
@@ -148,9 +151,9 @@ mod tests {
 
     #[test]
     fn test_parse_schema() {
-        let response = r#"{"name":"id","type":"Int64"}
-{"name":"message","type":"String"}
-{"name":"timestamp","type":"DateTime"}
+        let response = r#"{"name":"id","type":"Int64","default_kind":""}
+{"name":"message","type":"String","default_kind":""}
+{"name":"timestamp","type":"DateTime","default_kind":""}
 "#;
 
         let schema = parse_schema_from_response(response).unwrap();
@@ -168,40 +171,36 @@ mod tests {
 
     #[test]
     fn test_parse_schema_with_type_parameters() {
-        // Test that type string parsing works for types with parameters
-        let response = r#"{"name":"bytes_sent","type":"Decimal(18, 2)"}
-{"name":"timestamp","type":"DateTime64(6)"}
-{"name":"duration_ms","type":"Decimal32(4)"}
+        let response = r#"{"name":"bytes_sent","type":"Decimal(18, 2)","default_kind":""}
+{"name":"timestamp","type":"DateTime64(6)","default_kind":""}
+{"name":"duration_ms","type":"Decimal32(4)","default_kind":""}
 "#;
 
         let schema = parse_schema_from_response(response).unwrap();
         assert_eq!(schema.fields().len(), 3);
 
-        // Check Decimal parsed from type string
         assert_eq!(schema.field(0).name(), "bytes_sent");
         assert_eq!(schema.field(0).data_type(), &DataType::Decimal128(18, 2));
 
-        // Check DateTime64 parsed from type string
         assert_eq!(schema.field(1).name(), "timestamp");
         assert_eq!(
             schema.field(1).data_type(),
             &DataType::Timestamp(TimeUnit::Microsecond, None)
         );
 
-        // Check Decimal32 parsed from type string
         assert_eq!(schema.field(2).name(), "duration_ms");
         assert_eq!(schema.field(2).data_type(), &DataType::Decimal128(9, 4));
     }
 
     #[test]
     fn test_schema_field_ordering() {
-        let response = r#"{"name":"timestamp","type":"DateTime64(3)"}
-{"name":"host","type":"String"}
-{"name":"message","type":"String"}
-{"name":"id","type":"Int64"}
-{"name":"score","type":"Float64"}
-{"name":"active","type":"Bool"}
-{"name":"name","type":"String"}
+        let response = r#"{"name":"timestamp","type":"DateTime64(3)","default_kind":""}
+{"name":"host","type":"String","default_kind":""}
+{"name":"message","type":"String","default_kind":""}
+{"name":"id","type":"Int64","default_kind":""}
+{"name":"score","type":"Float64","default_kind":""}
+{"name":"active","type":"Bool","default_kind":""}
+{"name":"name","type":"String","default_kind":""}
 "#;
 
         let schema = parse_schema_from_response(response).unwrap();
@@ -223,5 +222,50 @@ mod tests {
         assert_eq!(schema.field(3).data_type(), &DataType::Int64);
         assert_eq!(schema.field(4).data_type(), &DataType::Float64);
         assert_eq!(schema.field(5).data_type(), &DataType::Boolean);
+    }
+
+    /// Tests that DEFAULT columns are marked nullable in the parsed schema,
+    /// since ClickHouse fills them with server-side defaults when omitted.
+    #[test]
+    fn test_default_columns_marked_nullable() {
+        // The SQL query filters out MATERIALIZED/ALIAS/EPHEMERAL, so
+        // parse_schema_from_response only sees regular and DEFAULT columns.
+        let response = r#"{"name":"id","type":"Int64","default_kind":""}
+{"name":"status","type":"String","default_kind":"DEFAULT"}
+{"name":"message","type":"String","default_kind":""}
+"#;
+
+        let schema = parse_schema_from_response(response).unwrap();
+        assert_eq!(schema.fields().len(), 3);
+
+        // Regular column: non-nullable
+        assert!(!schema.field(0).is_nullable());
+        // DEFAULT column: forced nullable even though type is non-nullable
+        assert_eq!(schema.field(1).name(), "status");
+        assert!(schema.field(1).is_nullable());
+        // Regular column: non-nullable
+        assert!(!schema.field(2).is_nullable());
+    }
+
+    /// Simulates the response after the SQL query has filtered out
+    /// MATERIALIZED/ALIAS/EPHEMERAL columns, leaving only regular and DEFAULT.
+    #[test]
+    fn test_post_filter_schema_with_default() {
+        let response = r#"{"name":"id","type":"Int64","default_kind":""}
+{"name":"created_at","type":"DateTime64(3)","default_kind":"DEFAULT"}
+{"name":"message","type":"Nullable(String)","default_kind":""}
+"#;
+
+        let schema = parse_schema_from_response(response).unwrap();
+        assert_eq!(schema.fields().len(), 3);
+
+        assert_eq!(schema.field(0).name(), "id");
+        assert!(!schema.field(0).is_nullable());
+
+        assert_eq!(schema.field(1).name(), "created_at");
+        assert!(schema.field(1).is_nullable()); // DEFAULT → nullable
+
+        assert_eq!(schema.field(2).name(), "message");
+        assert!(schema.field(2).is_nullable()); // Nullable(String) → nullable
     }
 }
