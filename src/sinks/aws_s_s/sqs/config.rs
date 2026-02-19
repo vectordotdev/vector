@@ -51,6 +51,20 @@ pub(super) struct SqsSinkConfig {
     /// When configured, multiple events will be sent in a single request using the
     /// `send_message_batch` API, reducing the number of API calls by up to 10x.
     ///
+    /// ## Retry Behavior
+    ///
+    /// Uses **all-or-nothing** semantics: if any message in a batch fails to send, the **entire batch is retried**
+    /// by Vector's retry framework. This approach simplifies error handling and leverages Vector's built-in
+    /// deduplication and acknowledgements to prevent message loss.
+    ///
+    /// Per-message retry is not used because:
+    /// - SQS batch limit is only 10 messages—low cost to retry all
+    /// - Simpler than maintaining per-message state
+    /// - Aligns with Vector's request-level deduplication semantics
+    ///
+    /// SQS limits batches to a maximum of 10 messages or 256KB (standard queues), upgradable to 1MB.
+    /// The default batch size is set to 256KB to ensure compatibility with standard queues, but can be increased for extended queues.
+    ///
     /// Note: Batching introduces latency based on the `timeout_secs` setting.
     /// If omitted, messages are sent individually (legacy behavior).
     #[configurable(derived)]
@@ -87,6 +101,7 @@ impl SqsSinkConfig {
     }
 
     /// Determines if batching is enabled by checking if any batch settings are configured.
+    #[allow(dead_code)] // Used in build() for routing
     fn batching_enabled(&self) -> bool {
         self.batch.max_events.is_some() || self.batch.timeout_secs.is_some()
     }
