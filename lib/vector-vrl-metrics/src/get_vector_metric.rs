@@ -24,20 +24,13 @@ static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(BTreeMap::
 
 static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
     vec![
-        Parameter {
-            keyword: "key",
-            kind: kind::BYTES,
-            required: true,
-            description: "The metric name to search.",
-            default: None,
-        },
-        Parameter {
-            keyword: "tags",
-            kind: kind::OBJECT,
-            required: false,
-            description: "Tags to filter the results on. Values in this object support wildcards ('*') to match on parts of the tag value.",
-            default: Some(&DEFAULT_TAGS),
-        },
+        Parameter::required("key", kind::BYTES, "The metric name to search."),
+        Parameter::optional(
+            "tags",
+            kind::OBJECT,
+            "Tags to filter the results on. Values in this object support wildcards ('*') to match on parts of the tag value.",
+        )
+        .default(&DEFAULT_TAGS),
     ]
 });
 
