@@ -35,22 +35,11 @@ impl Function for SetSecret {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "key",
-                kind: kind::BYTES,
-                required: true,
-                description: "The name of the secret.",
-                default: None,
-            },
-            Parameter {
-                keyword: "secret",
-                kind: kind::BYTES,
-                required: true,
-                description: "The secret value.",
-                default: None,
-            },
-        ]
+        const PARAMETERS: &[Parameter] = &[
+            Parameter::required("key", kind::BYTES, "The name of the secret."),
+            Parameter::required("secret", kind::BYTES, "The secret value."),
+        ];
+        PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {
