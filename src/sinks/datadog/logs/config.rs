@@ -233,18 +233,19 @@ mod test {
     }
 
     #[test]
-    fn default_compression_is_zstd() {
+    fn compression_config_field() {
         // Verify the default compression function returns zstd
         assert_eq!(default_compression(), Some(Compression::zstd_default()));
 
-        // Test 1: Config deserialized without compression field has None
-        // (which will default to zstd when used in build_processor)
+        // Test 1: Config deserialized without compression field gets zstd default
+        // (due to #[serde(default = "default_compression")])
         let config_yaml = indoc! {r#"
             default_api_key: "test_key"
         "#};
 
         let config: DatadogLogsConfig = serde_yaml::from_str(config_yaml).unwrap();
-        assert_eq!(config.compression, None);  // Field is None when not specified
+        // The serde default applies immediately during deserialization
+        assert!(matches!(config.compression, Some(Compression::Zstd(_))));
 
         // Test 2: When explicitly set to "none", it should be Some(Compression::None)
         let config_yaml_with_none = indoc! {r#"
@@ -252,7 +253,8 @@ mod test {
             compression: "none"
         "#};
 
-        let config_no_compression: DatadogLogsConfig = serde_yaml::from_str(config_yaml_with_none).unwrap();
+        let config_no_compression: DatadogLogsConfig =
+            serde_yaml::from_str(config_yaml_with_none).unwrap();
         assert_eq!(config_no_compression.compression, Some(Compression::None));
 
         // Test 3: When explicitly set to "zstd", it should be Some(Compression::Zstd)
@@ -262,7 +264,22 @@ mod test {
         "#};
 
         let config_zstd: DatadogLogsConfig = serde_yaml::from_str(config_yaml_with_zstd).unwrap();
-        assert!(matches!(config_zstd.compression, Some(Compression::Zstd(_))));
+        assert!(matches!(
+            config_zstd.compression,
+            Some(Compression::Zstd(_))
+        ));
+
+        // Test 4: When explicitly set to "gzip", it should be Some(Compression::Gzip)
+        let config_yaml_with_gzip = indoc! {r#"
+            default_api_key: "test_key"
+            compression: "gzip"
+        "#};
+
+        let config_gzip: DatadogLogsConfig = serde_yaml::from_str(config_yaml_with_gzip).unwrap();
+        assert!(matches!(
+            config_gzip.compression,
+            Some(Compression::Gzip(_))
+        ));
     }
 
     impl ValidatableComponent for DatadogLogsConfig {
