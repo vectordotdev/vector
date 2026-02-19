@@ -132,17 +132,15 @@ impl SqsBatchMessagePublisher {
                 let failed = response.failed();
                 if !failed.is_empty() {
                     warn!(
-                        message = "Batch message send failed: some messages will be retried",
+                        message = "Batch message send failed; retrying entire batch",
                         failed_count = failed.len(),
                         total_count = request.entries.len()
                     );
                     for failure in failed {
-                        error!(
-                            message = "Message failed in batch (batch will retry)",
+                        debug!(
+                            message = "Failed message in batch",
                             id = ?failure.id,
                             code = ?failure.code,
-                            message = ?failure.message,
-                            sender_fault = failure.sender_fault
                         );
                     }
 

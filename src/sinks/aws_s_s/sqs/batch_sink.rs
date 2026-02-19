@@ -26,7 +26,7 @@ use crate::sinks::prelude::*;
 /// ## Example
 ///
 /// If a batch of 10 messages has 1 failure:
-/// 1. Publisher logs the failure: `error!("Message failed in batch (batch will retry)")`
+/// 1. Publisher logs the failure: `debug!("Failed message in batch")`
 /// 2. Publisher returns `Err(SdkError::service_error(...))`
 /// 3. Vector's retry framework catches the error
 /// 4. Entire batch of 10 messages is re-queued and retried
