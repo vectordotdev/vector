@@ -14,12 +14,12 @@ path = "tests/bin/generate-avro-fixtures.rs"
 
 [dependencies]
 apache-avro = { version = "0.20.0", default-features = false }
-arrow = { version = "56.2.0", default-features = false, features = ["ipc"] }
+arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
 async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 rust_decimal.workspace = true
-csv-core = { version = "0.1.12", default-features = false }
+csv-core = { version = "0.1.13", default-features = false }
 derivative.workspace = true
 derive_more = { version = "2.0.1", optional = true, features = ["from", "display"] }
 dyn-clone = { version = "1", default-features = false }
@@ -38,6 +38,7 @@ regex.workspace = true
 serde.workspace = true
 serde_with = { version = "3.14.0", default-features = false, features = ["std", "macros", "chrono_0_4"] }
 serde_json.workspace = true
+serde_arrow = { version = "0.13", features = ["arrow-56"], optional = true }
 serde-aux = { version = "4.5", optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu.workspace = true
@@ -62,12 +63,12 @@ tokio = { workspace = true, features = ["test-util"] }
 similar-asserts = "1.7.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 rstest = "0.26.1"
-tracing-test = "0.2.5"
+tracing-test = "0.2.6"
 uuid.workspace = true
 vrl.workspace = true
 
 [features]
-arrow = []
+arrow = ["dep:arrow", "dep:serde_arrow"]
 opentelemetry = ["dep:opentelemetry-proto"]
 syslog = ["dep:syslog_loose", "dep:strum", "dep:derive_more", "dep:serde-aux", "dep:toml"]
 test = []
