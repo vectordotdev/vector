@@ -19,7 +19,7 @@ async-trait.workspace = true
 bytes.workspace = true
 chrono.workspace = true
 rust_decimal.workspace = true
-csv-core = { version = "0.1.12", default-features = false }
+csv-core = { version = "0.1.13", default-features = false }
 derivative.workspace = true
 derive_more = { version = "2.0.1", optional = true, features = ["from", "display"] }
 dyn-clone = { version = "1", default-features = false }
