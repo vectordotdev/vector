@@ -118,7 +118,7 @@ jobs:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.33.1",
+              "v1.38.1",  // Latest stable version - Feb 19, 2026
             ]
 
             // Aim to test against oldest supported k8s cloud-provider versions
@@ -126,11 +126,11 @@ jobs:
             // https://cloud.google.com/kubernetes-engine/docs/release-notes
             // https://docs.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli#aks-kubernetes-release-calendar
             const kubernetes_version = [
-              { version: "v1.23.3",  is_essential: true  },
-              { version: "v1.22.5",  is_essential: false },
-              { version: "v1.21.8",  is_essential: false },
-              { version: "v1.20.14", is_essential: false },
-              { version: "v1.19.8",  is_essential: false },
+              { version: "v1.35.0",  is_essential: true  }, // Latest stable
+              { version: "v1.34.0",  is_essential: true  }, // Current GA across providers
+              { version: "v1.33.0",  is_essential: false }, // Widely supported
+              { version: "v1.32.0",  is_essential: false }, // Minimum for AKS
+              { version: "v1.31.0",  is_essential: false }, // Extended support on EKS/GKE
             ]
             const container_runtime = [
               "docker",
