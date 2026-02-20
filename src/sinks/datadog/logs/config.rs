@@ -291,8 +291,8 @@ mod test {
                     default_api_key: Some("unused".to_string().into()),
                     ..Default::default()
                 },
-                // Disable compression for validation tests
-                compression: None,
+                // Disable compression for validation tests to ensure byte counting is accurate
+                compression: Some(Compression::None),
                 ..Default::default()
             };
 
