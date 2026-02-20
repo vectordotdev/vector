@@ -12,7 +12,7 @@ use super::{
     encoder::{CreateError, DatadogMetricsEncoder, EncoderError, FinishError},
     service::DatadogMetricsRequest,
 };
-use crate::sinks::util::{IncrementalRequestBuilder, metadata::RequestMetadataBuilder};
+use crate::sinks::util::{Compression, IncrementalRequestBuilder, metadata::RequestMetadataBuilder};
 
 #[derive(Debug, Snafu)]
 pub enum RequestBuilderError {
@@ -72,6 +72,7 @@ pub struct DDMetricsMetadata {
 /// Incremental request builder specific to Datadog metrics.
 pub struct DatadogMetricsRequestBuilder {
     endpoint_configuration: DatadogMetricsEndpointConfiguration,
+    compression: Compression,
     series_encoder: DatadogMetricsEncoder,
     sketches_encoder: DatadogMetricsEncoder,
 }
@@ -80,16 +81,20 @@ impl DatadogMetricsRequestBuilder {
     pub fn new(
         endpoint_configuration: DatadogMetricsEndpointConfiguration,
         default_namespace: Option<String>,
+        compression: Compression,
     ) -> Result<Self, RequestBuilderError> {
         Ok(Self {
             endpoint_configuration,
+            compression,
             series_encoder: DatadogMetricsEncoder::new(
                 DatadogMetricsEndpoint::series(),
                 default_namespace.clone(),
+                compression,
             )?,
             sketches_encoder: DatadogMetricsEncoder::new(
                 DatadogMetricsEndpoint::Sketches,
                 default_namespace,
+                compression,
             )?,
         })
     }
@@ -243,6 +248,7 @@ impl IncrementalRequestBuilder<((Option<Arc<str>>, DatadogMetricsEndpoint), Vec<
 
         DatadogMetricsRequest {
             api_key: ddmetrics_metadata.api_key,
+            compression: self.compression,
             payload,
             uri,
             content_type: ddmetrics_metadata.endpoint.content_type(),

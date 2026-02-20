@@ -17,7 +17,7 @@ use crate::{
     sinks::{
         Healthcheck, UriParseSnafu, VectorSink,
         datadog::{DatadogCommonConfig, LocalDatadogCommonConfig},
-        util::{ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig, batch::BatchConfig},
+        util::{Compression, ServiceBuilderExt, SinkBatchSettings, TowerRequestConfig, batch::BatchConfig},
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
@@ -162,6 +162,17 @@ pub struct DatadogMetricsConfig {
     #[serde(default)]
     pub default_namespace: Option<String>,
 
+    /// Compression configuration for the sink.
+    ///
+    /// Datadog supports `none`, `gzip`, `deflate` (zlib), and `zstd` compression methods.
+    /// The default is `deflate` (zlib) for backward compatibility, though Datadog
+    /// Agent 7.62+ uses `zstd` by default for better compression ratios (~38% better).
+    ///
+    /// Note: Snappy compression is not supported by the Datadog metrics API.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub compression: Option<Compression>,
+
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
@@ -177,6 +188,19 @@ impl_generate_config_from_default!(DatadogMetricsConfig);
 #[typetag::serde(name = "datadog_metrics")]
 impl SinkConfig for DatadogMetricsConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        // Validate compression configuration
+        if let Some(compression) = self.compression {
+            match compression {
+                Compression::None | Compression::Gzip(_) | Compression::Zlib(_) | Compression::Zstd(_) => {
+                    // These are supported by Datadog metrics API
+                }
+                Compression::Snappy => {
+                    return Err("Snappy compression is not supported by the Datadog metrics API. \
+                              Please use 'none', 'gzip', 'deflate' (zlib), or 'zstd' compression instead.".into());
+                }
+            }
+        }
+
         let client = self.build_client(&cx.proxy)?;
         let global = cx.extra_context.get_or_default::<datadog::Options>();
         let dd_common = self.local_dd_common.with_globals(global)?;
@@ -269,6 +293,7 @@ impl DatadogMetricsConfig {
         let request_builder = DatadogMetricsRequestBuilder::new(
             endpoint_configuration,
             self.default_namespace.clone(),
+            self.compression.unwrap_or_default(),
         )?;
 
         let protocol = self.get_protocol(dd_common);
@@ -302,4 +327,5 @@ mod tests {
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogMetricsConfig>();
     }
+
 }

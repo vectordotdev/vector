@@ -20,7 +20,7 @@ use vector_lib::{
 
 use crate::{
     http::{BuildRequestSnafu, HttpClient},
-    sinks::{datadog::DatadogApiError, util::retries::RetryLogic},
+    sinks::{datadog::DatadogApiError, util::{Compression, retries::RetryLogic}},
 };
 
 /// Retry logic specific to the Datadog metrics endpoints.
@@ -41,6 +41,7 @@ impl RetryLogic for DatadogMetricsRetryLogic {
 #[derive(Debug, Clone)]
 pub struct DatadogMetricsRequest {
     pub api_key: Option<Arc<str>>,
+    pub compression: Compression,
     pub payload: Bytes,
     pub uri: Uri,
     pub content_type: &'static str,
@@ -63,12 +64,9 @@ impl DatadogMetricsRequest {
                 HeaderValue::from_str(&key).expect("API key should be only valid ASCII characters")
             },
         );
-        // Requests to the metrics endpoints can be compressed, and there's almost no reason to
-        // _not_ compress them given tha t metric data, when encoded, is very repetitive.  Thus,
-        // here and through the sink code, we always compress requests.  Datadog also only supports
-        // zlib (DEFLATE) compression, which is why it's hard-coded here vs being set via the common
-        // `Compression` value that most sinks utilize.
-        let request = Request::post(self.uri)
+        // Requests to the metrics endpoints can be compressed. We support multiple compression
+        // methods including zlib (deflate), gzip, zstd, and none.
+        let mut request = Request::post(self.uri)
             .header("DD-API-KEY", api_key)
             // TODO: The Datadog Agent sends this header to indicate the version of the Go library
             // it uses which contains the Protocol Buffers definitions used for the Sketches API.
@@ -81,8 +79,14 @@ impl DatadogMetricsRequest {
             // able to programmatically set the version of the repo so we don't need to hardcode
             // this header.
             .header("DD-Agent-Payload", "4.87.0")
-            .header(CONTENT_TYPE, self.content_type)
-            .header(CONTENT_ENCODING, "deflate");
+            .header(CONTENT_TYPE, self.content_type);
+
+        // Add Content-Encoding header only if compression is enabled
+        if let Some(encoding) = self.compression.content_encoding() {
+            request = request.header(CONTENT_ENCODING, encoding);
+        }
+
+        let request = request;
 
         request.body(Body::from(self.payload))
     }

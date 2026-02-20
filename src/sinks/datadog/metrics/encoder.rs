@@ -138,10 +138,10 @@ struct EncoderState {
     byte_size: GroupedCountByteSize,
 }
 
-impl Default for EncoderState {
-    fn default() -> Self {
+impl EncoderState {
+    fn new(compression: Compression) -> Self {
         Self {
-            writer: get_compressor(),
+            writer: Compressor::from(compression),
             written: 0,
             buf: Vec::with_capacity(1024),
             processed: Vec::new(),
@@ -150,9 +150,16 @@ impl Default for EncoderState {
     }
 }
 
+impl Default for EncoderState {
+    fn default() -> Self {
+        Self::new(Compression::zlib_default())
+    }
+}
+
 pub struct DatadogMetricsEncoder {
     endpoint: DatadogMetricsEndpoint,
     default_namespace: Option<Arc<str>>,
+    compression: Compression,
     uncompressed_limit: usize,
     compressed_limit: usize,
 
@@ -167,11 +174,13 @@ impl DatadogMetricsEncoder {
     pub fn new(
         endpoint: DatadogMetricsEndpoint,
         default_namespace: Option<String>,
+        compression: Compression,
     ) -> Result<Self, CreateError> {
         let payload_limits = endpoint.payload_limits();
         Self::with_payload_limits(
             endpoint,
             default_namespace,
+            compression,
             payload_limits.uncompressed,
             payload_limits.compressed,
         )
@@ -181,6 +190,7 @@ impl DatadogMetricsEncoder {
     pub fn with_payload_limits(
         endpoint: DatadogMetricsEndpoint,
         default_namespace: Option<String>,
+        compression: Compression,
         uncompressed_limit: usize,
         compressed_limit: usize,
     ) -> Result<Self, CreateError> {
@@ -191,9 +201,10 @@ impl DatadogMetricsEncoder {
         Ok(Self {
             endpoint,
             default_namespace: default_namespace.map(Arc::from),
+            compression,
             uncompressed_limit,
             compressed_limit,
-            state: EncoderState::default(),
+            state: EncoderState::new(compression),
             log_schema: log_schema(),
             origin_product_value: *ORIGIN_PRODUCT_VALUE,
         })
@@ -202,7 +213,7 @@ impl DatadogMetricsEncoder {
 
 impl DatadogMetricsEncoder {
     fn reset_state(&mut self) -> EncoderState {
-        mem::take(&mut self.state)
+        mem::replace(&mut self.state, EncoderState::new(self.compression))
     }
 
     fn encode_single_metric(&mut self, metric: Metric) -> Result<Option<Metric>, EncoderError> {
@@ -874,12 +885,6 @@ fn generate_series_metrics(
     }])
 }
 
-fn get_compressor() -> Compressor {
-    // We use the "zlib default" compressor because it's all Datadog supports, and adding it
-    // generically to `Compression` would make things a little weird because of the conversion trait
-    // implementations that are also only none vs gzip.
-    Compression::zlib_default().into()
-}
 
 const fn max_uncompressed_header_len() -> usize {
     SERIES_PAYLOAD_HEADER.len() + SERIES_PAYLOAD_FOOTER.len()
@@ -1010,7 +1015,7 @@ mod tests {
 
     use super::{
         DatadogMetricsEncoder, EncoderError, ddmetric_proto, encode_proto_key_and_message,
-        encode_tags, encode_timestamp, generate_series_metrics, get_compressor,
+        encode_tags, encode_timestamp, generate_series_metrics,
         get_sketch_payload_sketches_field_number, max_compression_overhead_len,
         max_uncompressed_header_len, series_to_proto_message, sketch_to_proto_message,
         validate_payload_size_limits, write_payload_footer, write_payload_header,
@@ -1049,7 +1054,7 @@ mod tests {
     }
 
     fn get_compressed_empty_series_payload() -> Bytes {
-        let mut compressor = get_compressor();
+        let mut compressor = Compressor::from(Compression::zlib_default());
 
         _ = write_payload_header(
             DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
@@ -1066,7 +1071,7 @@ mod tests {
     }
 
     fn get_compressed_empty_sketches_payload() -> Bytes {
-        get_compressor().finish().expect("should not fail").freeze()
+        Compressor::from(Compression::zlib_default()).finish().expect("should not fail").freeze()
     }
 
     fn decompress_payload(payload: Bytes) -> io::Result<Bytes> {
@@ -1149,7 +1154,7 @@ mod tests {
     #[test]
     fn incorrect_metric_for_endpoint_causes_error() {
         // Series metrics can't go to the sketches endpoint.
-        let mut sketch_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
+        let mut sketch_encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None, Compression::zlib_default())
             .expect("default payload size limits should be valid");
         let series_result = sketch_encoder.try_encode(get_simple_counter());
         assert!(matches!(
@@ -1159,7 +1164,7 @@ mod tests {
 
         // And sketches can't go to the series endpoint.
         let mut series_v1_encoder =
-            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None)
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None, Compression::zlib_default())
                 .expect("default payload size limits should be valid");
         let sketch_result = series_v1_encoder.try_encode(get_simple_sketch());
         assert!(matches!(
@@ -1168,7 +1173,7 @@ mod tests {
         ));
 
         let mut series_v2_encoder =
-            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None)
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None, Compression::zlib_default())
                 .expect("default payload size limits should be valid");
         let sketch_result = series_v2_encoder.try_encode(get_simple_sketch());
         assert!(matches!(
@@ -1380,7 +1385,7 @@ mod tests {
         // This is a simple test where we ensure that a single metric, with the default limits, can
         // be encoded without hitting any errors.
         let mut encoder =
-            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None)
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V1), None, Compression::zlib_default())
                 .expect("default payload size limits should be valid");
         let counter = get_simple_counter();
         let expected = counter.clone();
@@ -1404,7 +1409,7 @@ mod tests {
         // This is a simple test where we ensure that a single metric, with the default limits, can
         // be encoded without hitting any errors.
         let mut encoder =
-            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None)
+            DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Series(SeriesApiVersion::V2), None, Compression::zlib_default())
                 .expect("default payload size limits should be valid");
         let counter = get_simple_counter();
         let expected = counter.clone();
@@ -1427,7 +1432,7 @@ mod tests {
     fn encode_single_sketch_metric_with_default_limits() {
         // This is a simple test where we ensure that a single metric, with the default limits, can
         // be encoded without hitting any errors.
-        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
+        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None, Compression::zlib_default())
             .expect("default payload size limits should be valid");
         let sketch = get_simple_sketch();
         let expected = sketch.clone();
@@ -1450,7 +1455,7 @@ mod tests {
     fn encode_empty_sketch() {
         // This is a simple test where we ensure that a single metric, with the default limits, can
         // be encoded without hitting any errors.
-        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None)
+        let mut encoder = DatadogMetricsEncoder::new(DatadogMetricsEndpoint::Sketches, None, Compression::zlib_default())
             .expect("default payload size limits should be valid");
         let sketch = Metric::new(
             "empty",
@@ -1591,6 +1596,7 @@ mod tests {
         let mut encoder = DatadogMetricsEncoder::with_payload_limits(
             DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
             None,
+            Compression::zlib_default(),
             header_len + 1,
             usize::MAX,
         )
@@ -1630,6 +1636,7 @@ mod tests {
         let mut encoder = DatadogMetricsEncoder::with_payload_limits(
             DatadogMetricsEndpoint::Sketches,
             None,
+            Compression::zlib_default(),
             1,
             usize::MAX,
         )
@@ -1667,6 +1674,7 @@ mod tests {
         let mut encoder = DatadogMetricsEncoder::with_payload_limits(
             DatadogMetricsEndpoint::Series(SeriesApiVersion::V1),
             None,
+            Compression::zlib_default(),
             uncompressed_limit,
             compressed_limit,
         )
@@ -1708,6 +1716,7 @@ mod tests {
         let mut encoder = DatadogMetricsEncoder::with_payload_limits(
             DatadogMetricsEndpoint::Sketches,
             None,
+            Compression::zlib_default(),
             uncompressed_limit,
             compressed_limit,
         )
@@ -1770,6 +1779,7 @@ mod tests {
             let result = DatadogMetricsEncoder::with_payload_limits(
                 DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
                 None,
+                Compression::zlib_default(),
                 uncompressed_limit,
                 compressed_limit,
             );
