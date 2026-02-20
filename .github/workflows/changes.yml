@@ -247,6 +247,9 @@ jobs:
             - "src/sources/kubernetes_logs/**"
             - "lib/k8s-e2e-tests/**"
             - "lib/k8s-test-framework/**"
+            - "scripts/test-e2e-kubernetes.sh"
+            - "scripts/build-docker.sh"
+            - "scripts/deploy-chart-test.sh"
             - ".github/workflows/k8s_e2e.yml"
             - ".github/workflows/changes.yml"
           website:
