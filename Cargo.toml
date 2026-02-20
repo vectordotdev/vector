@@ -298,6 +298,7 @@ aws-smithy-types = { version = "1.2.11", default-features = false, features = ["
 
 # Azure
 azure_core = { version = "0.30", features = ["reqwest", "hmac_openssl"], optional = true }
+azure_identity = { version = "0.30", optional = true }
 
 # Azure Storage
 azure_storage_blob = { version = "0.7", optional = true }
@@ -783,6 +784,7 @@ sinks-logs = [
   "sinks-aws_sqs",
   "sinks-axiom",
   "sinks-azure_blob",
+  "sinks-azure_logs_ingestion",
   "sinks-azure_monitor_logs",
   "sinks-blackhole",
   "sinks-chronicle",
@@ -850,6 +852,7 @@ sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-http"]
 sinks-azure_blob = ["dep:azure_core", "dep:azure_storage_blob"]
+sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
