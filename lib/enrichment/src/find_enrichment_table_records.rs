@@ -1,5 +1,6 @@
 use std::{collections::BTreeMap, sync::LazyLock};
 
+use vector_vrl_category::Category;
 use vrl::prelude::*;
 
 use crate::{
@@ -96,6 +97,10 @@ impl Function for FindEnrichmentTableRecords {
             "Searches an [enrichment table](/docs/reference/glossary/#enrichment-tables) for rows that match the provided condition.\n\n",
             super::ENRICHMENT_TABLE_EXPLAINER
         )
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Enrichment.as_ref()
     }
 
     fn return_kind(&self) -> u16 {
