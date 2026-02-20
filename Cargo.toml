@@ -1016,12 +1016,14 @@ webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
+throttle-integration-tests = ["sources-stdin", "sinks-console", "sinks-blackhole", "transforms-throttle", "transforms-remap"]
 test-utils = ["vector-lib/test"]
 
 # End-to-End testing-related features
 all-e2e-tests = [
   "e2e-tests-datadog",
-  "e2e-tests-opentelemetry"
+  "e2e-tests-opentelemetry",
+  "e2e-tests-throttle"
 ]
 
 e2e-tests-datadog = [
@@ -1040,6 +1042,14 @@ e2e-tests-opentelemetry = [
   "sinks-file",
   "codecs-opentelemetry",
   "dep:prost-reflect"
+]
+
+e2e-tests-throttle = [
+  "sources-http_server",
+  "transforms-throttle",
+  "transforms-remap",
+  "sinks-file",
+  "sinks-console"
 ]
 
 vector-api-tests = [
@@ -1088,7 +1098,7 @@ language-benches = ["sinks-socket", "sources-socket", "transforms-lua", "transfo
 # Separate benching process for metrics due to the nature of the bootstrap procedures.
 statistic-benches = []
 remap-benches = ["transforms-remap"]
-transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route"]
+transform-benches = ["transforms-filter", "transforms-dedupe", "transforms-reduce", "transforms-route", "transforms-throttle"]
 codecs-benches = []
 loki-benches = ["sinks-loki"]
 enrichment-tables-benches = ["enrichment-tables-geoip", "enrichment-tables-mmdb", "enrichment-tables-memory"]

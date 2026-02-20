@@ -1,0 +1,28 @@
+# Perf: events-only, 100 keys, legacy + detailed metrics ON
+sources:
+  in:
+    type: demo_logs
+    format: json
+    count: 100000
+    interval: 0
+
+transforms:
+  add_key:
+    type: remap
+    inputs: ["in"]
+    source: '.service = "svc-" + to_string(to_int(now()) % 100)'
+
+  throttle:
+    type: throttle
+    inputs: ["add_key"]
+    window_secs: 60
+    key_field: "{{ service }}"
+    threshold: 10000
+    internal_metrics:
+      emit_events_discarded_per_key: true
+      emit_detailed_metrics: true
+
+sinks:
+  out:
+    type: blackhole
+    inputs: ["throttle"]

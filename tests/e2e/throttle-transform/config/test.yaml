@@ -1,0 +1,21 @@
+features:
+  - e2e-tests-throttle
+
+test: "e2e"
+
+test_filter: "throttle_transform::"
+
+runner:
+  env:
+    VECTOR_HTTP_PORT: '9090'
+
+matrix:
+  vector_config:
+    - 'vector_events.yaml'
+    - 'vector_bytes.yaml'
+    - 'vector_multi.yaml'
+
+paths:
+  - "src/transforms/throttle/**"
+  - "src/internal_events/throttle*"
+  - "tests/e2e/throttle-transform/**"
