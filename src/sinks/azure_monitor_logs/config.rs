@@ -30,7 +30,7 @@ pub(super) fn default_host() -> String {
 /// Configuration for the `azure_monitor_logs` sink.
 #[configurable_component(sink(
     "azure_monitor_logs",
-    "Publish log events to the Azure Monitor Logs service."
+    "Publish log events to the Azure Monitor Data Collector API."
 ))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
