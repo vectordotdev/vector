@@ -155,7 +155,14 @@ pub struct GlobalOptions {
     ///
     /// This controls how quickly the `*_buffer_utilization_mean` gauges respond to new
     /// observations. Longer half-lives retain more of the previous value, leading to slower
-    /// adjustments. The default is 5 seconds.
+    /// adjustments.
+    ///
+    /// - Lower values (< 1): Metrics update quickly but may be volatile
+    /// - Default (5): Balanced between responsiveness and stability
+    /// - Higher values (> 5): Smooth, stable metrics that update slowly
+    ///
+    /// Adjust based on whether you need fast detection of buffer issues (lower)
+    /// or want to see sustained trends without noise (higher).
     ///
     /// Must be greater than 0.
     #[serde(skip_serializing_if = "is_default_buffer_utilization_ewma_half_life_seconds")]
