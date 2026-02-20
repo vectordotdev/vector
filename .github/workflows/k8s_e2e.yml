@@ -15,11 +15,21 @@
 name: K8S E2E Suite
 
 permissions:
-  statuses: write
+  contents: read
 
 on:
   workflow_dispatch:
+    inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
   workflow_call:
+    inputs:
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
   pull_request:
   merge_group:
     types: [checks_requested]
@@ -43,7 +53,6 @@ env:
   RUST_BACKTRACE: full
   VECTOR_LOG: vector=debug
   VERBOSE: true
-  DISABLE_MOLD: true
   CI: true
   PROFILE: debug
 
@@ -66,41 +75,19 @@ jobs:
       CARGO_PROFILE_RELEASE_OPT_LEVEL: 0
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
       CARGO_INCREMENTAL: 0
+      DISABLE_MOLD: true
     steps:
-      - name: (PR review) Set latest commit status as pending
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: pending
-
-      - name: (PR review) Checkout PR branch
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          ref: ${{ github.event.review.commit_id }}
-
       - name: Checkout branch
-        if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          path: |
-            ~/.cargo/registry
-            ~/.cargo/git
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
+          ref: ${{ inputs.ref }}
       - run: sudo -E bash scripts/ci-free-disk-space.sh
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh --modules=rustup,cross
-      - run: rustup target add x86_64-unknown-linux-gnu
-      - run: echo "::add-matcher::.github/matchers/rust.json"
 
-      # TODO: Use the setup action in this workflow.
-      - name: Install vdev
-        uses: ./.github/actions/install-vdev
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          cross: true
+          mold: false
 
       - run: VECTOR_VERSION="$(vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
@@ -108,14 +95,6 @@ jobs:
         with:
           name: e2e-test-deb-package
           path: target/artifacts/*
-
-      - name: (PR review) Set latest commit status as 'failure'
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        if: failure() && github.event_name == 'pull_request_review'
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: 'failure'
 
   # GitHub Actions don't support `matrix` at the job-level `if:` condition.
   # We apply this workaround - compute `matrix` in a preceding job, and assign
@@ -139,7 +118,7 @@ jobs:
           script: |
             // Parameters.
             const minikube_version = [
-              "v1.33.1",
+              "v1.38.1",  // Latest stable version - Feb 19, 2026
             ]
 
             // Aim to test against oldest supported k8s cloud-provider versions
@@ -147,11 +126,11 @@ jobs:
             // https://cloud.google.com/kubernetes-engine/docs/release-notes
             // https://docs.microsoft.com/en-us/azure/aks/supported-kubernetes-versions?tabs=azure-cli#aks-kubernetes-release-calendar
             const kubernetes_version = [
-              { version: "v1.23.3",  is_essential: true  },
-              { version: "v1.22.5",  is_essential: false },
-              { version: "v1.21.8",  is_essential: false },
-              { version: "v1.20.14", is_essential: false },
-              { version: "v1.19.8",  is_essential: false },
+              { version: "v1.35.1",  is_essential: true  }, // Latest stable (Feb 10, 2026)
+              { version: "v1.34.4",  is_essential: true  }, // Current patch (Feb 10, 2026)
+              { version: "v1.33.0",  is_essential: false }, // Widely supported
+              { version: "v1.32.0",  is_essential: false }, // EOL Feb 28 2026
+              { version: "v1.31.0",  is_essential: false }, // Extended support on cloud providers
             ]
             const container_runtime = [
               "docker",
@@ -191,20 +170,10 @@ jobs:
       matrix: ${{ fromJson(needs.compute-k8s-test-plan.outputs.matrix) }}
       fail-fast: false
     steps:
-      - name: (PR review) Get PR branch
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3.0.0
-        id: comment-branch
-
-      - name: (PR review) Checkout PR branch
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          ref: ${{ steps.comment-branch.outputs.head_ref }}
-
       - name: Checkout branch
-        if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
 
       - uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
         with:
@@ -230,14 +199,6 @@ jobs:
           max_attempts: 3
           command: make test-e2e-kubernetes
 
-      - name: (PR review) Set latest commit status as failure
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        if: failure() && github.event_name == 'pull_request_review'
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: 'failure'
-
   final-result:
     name: K8s E2E Suite
     runs-on: ubuntu-24.04
@@ -251,19 +212,6 @@ jobs:
     env:
       FAILED: ${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}
     steps:
-      - name: (PR review) Get PR branch
-        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
-        uses: xt0rted/pull-request-comment-branch@e8b8daa837e8ea7331c0003c9c316a64c6d8b0b1 # v3.0.0
-        id: comment-branch
-
-      - name: (PR review) Submit PR result as success
-        if: github.event_name == 'pull_request_review' && env.FAILED != 'true'
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          status: 'success'
-
       - name: Check all jobs status
         run: |
           if [[ "${{ env.FAILED }}" == "true" ]]; then

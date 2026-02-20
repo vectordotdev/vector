@@ -32,6 +32,8 @@ extern crate tracing;
 extern crate vector_lib;
 
 pub use indoc::indoc;
+// re-export codecs for convenience
+pub use vector_lib::codecs;
 
 #[cfg(all(feature = "tikv-jemallocator", not(feature = "allocation-tracing")))]
 #[global_allocator]
@@ -72,8 +74,6 @@ pub mod app;
 pub mod async_read;
 #[cfg(feature = "aws-config")]
 pub mod aws;
-#[allow(unreachable_pub)]
-pub mod codecs;
 pub mod common;
 pub mod completion;
 mod convert_config;

@@ -222,7 +222,7 @@ impl ComposeTestConfig {
             .collect();
 
         if !test_dir.is_dir() {
-            bail!("unknown integration: {}", integration);
+            bail!("unknown integration: {integration}");
         }
 
         let config_dir = if use_config_subdir {

@@ -240,11 +240,11 @@ fn assert_counter_metric(metrics: &[Metric], name: &str, expected: f64) {
 }
 
 #[tokio::test]
-#[expect(clippy::cast_precision_loss)]
 async fn emits_buffer_utilization_histogram_on_send_and_receive() {
+    const BUFFER_SIZE: usize = 2;
+
     metrics::init_test();
-    let buffer_size = 2;
-    let (mut sender, mut recv) = SourceSender::new_test_sender_with_options(buffer_size, None);
+    let (mut sender, mut recv) = SourceSender::new_test_sender_with_options(BUFFER_SIZE, None);
 
     let event = Event::Log(LogEvent::from("test event"));
     sender
@@ -256,17 +256,24 @@ async fn emits_buffer_utilization_histogram_on_send_and_receive() {
         .await
         .expect("second send succeeds");
 
+    assert_buffer_metrics(BUFFER_SIZE, 2);
+
     // Drain the channel so both the send and receive paths are exercised.
     assert!(recv.next().await.is_some());
     assert!(recv.next().await.is_some());
 
+    assert_buffer_metrics(BUFFER_SIZE, 0);
+}
+
+#[expect(clippy::cast_precision_loss)]
+fn assert_buffer_metrics(buffer_size: usize, level: usize) {
     let metrics: Vec<_> = Controller::get()
         .expect("metrics controller available")
         .capture_metrics()
         .into_iter()
         .filter(|metric| metric.name().starts_with("source_buffer_"))
         .collect();
-    assert_eq!(metrics.len(), 4, "expected 4 utilization metrics");
+    assert_eq!(metrics.len(), 5, "expected 5 utilization metrics");
 
     let find_metric = |name: &str| {
         metrics
@@ -283,11 +290,17 @@ async fn emits_buffer_utilization_histogram_on_send_and_receive() {
     let MetricValue::Gauge { value } = metric.value() else {
         panic!("source_buffer_utilization_level should be a gauge");
     };
-    assert_eq!(*value, 2.0);
+    assert_eq!(*value, level as f64);
 
     let metric = find_metric("source_buffer_max_event_size");
     let MetricValue::Gauge { value } = metric.value() else {
         panic!("source_buffer_max_event_size should be a gauge");
+    };
+    assert_eq!(*value, buffer_size as f64);
+
+    let metric = find_metric("source_buffer_max_size_events");
+    let MetricValue::Gauge { value } = metric.value() else {
+        panic!("source_buffer_max_size_events should be a gauge");
     };
     assert_eq!(*value, buffer_size as f64);
 }

@@ -136,6 +136,38 @@ async fn sends_templated_x_scope_orgid_header() {
 }
 
 #[tokio::test]
+async fn sends_custom_headers() {
+    let outputs = send_request(
+        indoc! {r#"
+                [request.headers]
+                X-Custom-Header = "custom-value"
+                X-Another-Header = "another-value"
+            "#},
+        vec![create_event("gauge-4".into(), 42.0)],
+    )
+    .await;
+
+    assert_eq!(outputs.len(), 1);
+    let (headers, req) = &outputs[0];
+
+    // Verify custom headers are present
+    assert_eq!(headers["x-custom-header"], "custom-value");
+    assert_eq!(headers["x-another-header"], "another-value");
+
+    // Verify standard headers are still present
+    assert_eq!(headers["x-prometheus-remote-write-version"], "0.1.0");
+    assert_eq!(headers["content-type"], "application/x-protobuf");
+
+    // Verify the metric data is correct
+    assert_eq!(req.timeseries.len(), 1);
+    assert_eq!(
+        req.timeseries[0].labels,
+        labels!("__name__" => "gauge-4", "production" => "true", "region" => "us-west-1")
+    );
+    assert_eq!(req.timeseries[0].samples[0].value, 42.0);
+}
+
+#[tokio::test]
 async fn retains_state_between_requests() {
     // This sink converts all incremental events to absolute, and
     // should accumulate their totals between batches.
@@ -286,4 +318,32 @@ fn create_inc_event(name: String, value: f64) -> Event {
     )
     .with_timestamp(Some(chrono::Utc::now()))
     .into()
+}
+
+#[tokio::test]
+async fn conflicting_auth_headers_rejected() {
+    let config = indoc! {r#"
+        endpoint = "http://localhost:9090/api/v1/write"
+        [request.headers]
+        Authorization = "Bearer my-token"
+        [auth]
+        strategy = "bearer"
+        token = "another-token"
+    "#};
+
+    let config: RemoteWriteConfig = toml::from_str(config).unwrap();
+    let cx = SinkContext::default();
+
+    let result = config.build(cx).await;
+    match result {
+        Err(error) => {
+            let error_msg = error.to_string();
+            assert!(
+                error_msg
+                    .contains("Authorization header can not be used with defined auth options"),
+                "Expected auth conflict error, got: {error_msg}"
+            );
+        }
+        Ok(_) => panic!("Expected an error for conflicting auth settings, but build succeeded"),
+    }
 }

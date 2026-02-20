@@ -88,7 +88,7 @@ pub async fn process_message(
             }
             Err(error) => {
                 success = false;
-                // Error is logged by `crate::codecs::Decoder`, no further
+                // Error is logged by `vector_lib::codecs::Decoder`, no further
                 // handling is needed here.
                 if !error.can_continue() {
                     break;

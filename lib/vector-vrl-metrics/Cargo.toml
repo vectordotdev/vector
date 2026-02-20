@@ -8,8 +8,10 @@ license = "MPL-2.0"
 
 [dependencies]
 arc-swap.workspace = true
+const-str.workspace = true
 vrl.workspace = true
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl"] }
 vector-common = { path = "../vector-common", default-features = false }
-tokio = { version = "1.45.1", default-features = false }
-tokio-stream = { version = "0.1.17", default-features = false }
+tokio.workspace = true
+tokio-stream.workspace = true
+vector-vrl-category.workspace = true

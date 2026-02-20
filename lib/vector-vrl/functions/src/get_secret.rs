@@ -1,3 +1,4 @@
+use vector_vrl_category::Category;
 use vrl::prelude::*;
 
 fn get_secret(ctx: &mut Context, key: Value) -> std::result::Result<Value, ExpressionError> {
@@ -17,12 +18,25 @@ impl Function for GetSecret {
         "get_secret"
     }
 
+    fn usage(&self) -> &'static str {
+        "Returns the value of the given secret from an event."
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Event.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::BYTES | kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "key",
-            kind: kind::BYTES,
-            required: true,
-        }]
+        const PARAMETERS: &[Parameter] = &[Parameter::required(
+            "key",
+            kind::BYTES,
+            "The name of the secret.",
+        )];
+        PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {

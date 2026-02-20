@@ -164,8 +164,10 @@ fn parse_with_deserializer(
         .map(|r| r.into_vec())
         .map_err(emit_decode_error)?;
 
+    // Count individual items within OTLP batches for consistency with other sources
+    let count = super::count_otlp_items(&events);
     events_received.emit(CountByteSize(
-        events.len(),
+        count,
         events.estimated_json_encoded_size_of(),
     ));
 
