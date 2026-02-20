@@ -342,14 +342,14 @@ impl HttpResourceOutputContext<'_> {
                             let byte_size = body.len();
 
                             // Validation tests should not use compression - error if we receive compressed data
-                            if let Some(encoding) = &content_encoding {
-                                if encoding != "identity" {
-                                    error!(
-                                        "Received compressed data (Content-Encoding: {encoding}). \
+                            if let Some(encoding) = &content_encoding
+                                && encoding != "identity"
+                            {
+                                error!(
+                                    "Received compressed data (Content-Encoding: {encoding}). \
                                         Validation tests assert on bytes sizes and compressed size might not be deterministic."
-                                    );
-                                    return StatusCode::BAD_REQUEST.into_response();
-                                }
+                                );
+                                return StatusCode::BAD_REQUEST.into_response();
                             }
 
                             let mut body = BytesMut::from(&body[..]);
