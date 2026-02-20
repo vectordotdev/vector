@@ -412,16 +412,9 @@ impl NetflowV5Record {
             }
         }
 
-        // Check timing - relaxed validation for timing anomalies (first/last are sysUptime in milliseconds)
-        if self.last < self.first {
-            let time_diff_ms = self.first - self.last;
-            if time_diff_ms > 3_600_000 {
-                return Err(format!(
-                    "Invalid timing: last_switched ({}) < first_switched ({}) by {} ms",
-                    self.last, self.first, time_diff_ms
-                ));
-            }
-        }
+        // first_switched/last_switched are sysUptime milliseconds; when last < first it is often
+        // 32-bit wraparound on long-uptime devices, not bad data. Accept the record and emit.
+        // Skip timing rejection to avoid dropping valid flows from real exporters.
 
         Ok(())
     }
@@ -528,7 +521,7 @@ impl NetflowV5Parser {
                 Ok(record) => {
                     if self.strict_validation {
                         if let Err(validation_error) = record.validate() {
-                            warn!(
+                            debug!(
                                 message = "Invalid NetFlow v5 record.",
                                 record_index = i,
                                 error = %validation_error,
@@ -943,13 +936,13 @@ mod tests {
         let record = NetflowV5Record::from_bytes(&record_data).unwrap();
         assert!(record.validate().is_err());
 
-        // Invalid: last < first by more than 1 hour (first/last are sysUptime in ms; diff > 3_600_000 ms)
+        // first/last (sysUptime ms) are not rejected when last < first; wraparound is accepted
         record_data[16..20].copy_from_slice(&10u32.to_be_bytes()); // packets
         record_data[20..24].copy_from_slice(&1500u32.to_be_bytes()); // octets
         record_data[24..28].copy_from_slice(&3_601_000u32.to_be_bytes()); // first
-        record_data[28..32].copy_from_slice(&100u32.to_be_bytes()); // last (diff 3_600_900 ms)
+        record_data[28..32].copy_from_slice(&100u32.to_be_bytes()); // last
         let record = NetflowV5Record::from_bytes(&record_data).unwrap();
-        assert!(record.validate().is_err());
+        assert!(record.validate().is_ok());
     }
 
     #[test]

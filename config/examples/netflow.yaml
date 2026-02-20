@@ -14,14 +14,6 @@ sources:
     type: "netflow"
     address: "0.0.0.0:2055"
     protocols: ["netflow_v5"]
-    max_packet_size: 65535
-    max_templates: 1000
-    template_timeout: 1800
-    parse_enterprise_fields: true
-    parse_options_templates: true
-    parse_variable_length_fields: true
-    buffer_missing_templates: true
-    max_buffered_records: 1000
 
 # Parse and enrich the flow data
 # Docs: https://vector.dev/docs/reference/configuration/transforms/remap

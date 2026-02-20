@@ -93,7 +93,7 @@ pub struct NetflowConfig {
     pub options_template_mode: String,
 
     /// Whether to use strict validation for NetFlow v5 records.
-    /// When disabled, timing anomalies (last < first) are logged as warnings instead of errors.
+    /// When enabled, records that fail validation (e.g. zero packets with non-zero octets) are dropped and counted; per-record details are logged at debug level.
     #[configurable(metadata(docs::examples = true))]
     #[configurable(metadata(docs::examples = false))]
     #[serde(default = "default_strict_validation")]
