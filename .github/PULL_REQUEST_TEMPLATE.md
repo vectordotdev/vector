@@ -32,7 +32,7 @@ Changes to CI, website, playground and similar are generally not considered user
 - Closes: #<issue/PR number or link>
 -->
 <!--
-- Related: #<issue/PR number or link> 
+- Related: #<issue/PR number or link>
 -->
 
 ## Notes
