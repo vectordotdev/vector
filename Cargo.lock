@@ -1727,7 +1727,7 @@ dependencies = [
  "pin-project",
  "serde",
  "time",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "url",
 ]
 
