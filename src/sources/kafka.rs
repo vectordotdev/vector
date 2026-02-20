@@ -35,12 +35,11 @@ use tokio::{
     task::JoinSet,
     time::Sleep,
 };
-use tokio_util::codec::FramedRead;
 use tracing::{Instrument, Span};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        DecoderFramedRead, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace},
@@ -999,7 +998,7 @@ fn parse_stream<'a>(
 
     let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
-    let mut stream = FramedRead::with_capacity(payload, decoder, msg.payload_len());
+    let mut stream = DecoderFramedRead::with_capacity(payload, decoder, msg.payload_len());
     let (count, _) = stream.size_hint();
     let stream = stream! {
         while let Some(result) = stream.next().await {
@@ -1778,7 +1777,7 @@ mod integration_test {
         delay: Duration,
         status: EventStatus,
     ) -> (SourceSender, impl Stream<Item = EventArray> + Unpin) {
-        let (pipe, recv) = SourceSender::new_test_sender_with_buffer(100);
+        let (pipe, recv) = SourceSender::new_test_sender_with_options(100, None);
         let recv = recv.into_stream();
         let recv = recv.then(move |item| async move {
             let mut events = item.events;

@@ -2,15 +2,15 @@ use anyhow::Result;
 use std::{collections::HashSet, env, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
-use crate::testing::test_runner_dockerfile;
-use crate::utils::IS_A_TTY;
 use crate::{
     app::{self, CommandExt as _},
     testing::{
         build::prepare_build_command,
         docker::{DOCKER_SOCKET, docker_command},
+        test_runner_dockerfile,
     },
     utils::{
+        IS_A_TTY,
         command::ChainArgs as _,
         environment::{Environment, append_environment_variables},
     },
@@ -292,6 +292,11 @@ impl IntegrationTestRunner {
             network,
             volumes,
         })
+    }
+
+    /// Returns true if this runner uses the shared image (with all features)
+    pub(super) fn is_shared_runner(&self) -> bool {
+        self.integration.is_none()
     }
 
     pub(super) fn ensure_network(&self) -> Result<()> {

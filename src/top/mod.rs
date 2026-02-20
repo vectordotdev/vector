@@ -6,6 +6,7 @@ use glob::Pattern;
 
 pub use cmd::{cmd, top};
 use url::Url;
+use vector_lib::top::state::{FilterColumn, SortColumn};
 
 use crate::config::api::default_graphql_url;
 
@@ -34,6 +35,24 @@ pub struct Opts {
     /// Components IDs to observe (comma-separated; accepts glob patterns)
     #[arg(default_value = "*", value_delimiter(','), short = 'c', long)]
     components: Vec<Pattern>,
+
+    /// Field to sort values to by default (can be changed while running).
+    #[arg(short = 's', long)]
+    sort_field: Option<SortColumn>,
+
+    /// Sort descending instead of ascending.
+    #[arg(long, default_value_t = false)]
+    sort_desc: bool,
+
+    /// Field to filter values by default (can be changed while running).
+    #[arg(default_value = "id", long)]
+    filter_field: FilterColumn,
+
+    /// Filter to apply to the chosen field (ID by default).
+    ///
+    /// This accepts Regex patterns.
+    #[arg(short = 'f', long)]
+    filter_value: Option<String>,
 }
 
 impl Opts {

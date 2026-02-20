@@ -1,7 +1,6 @@
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
-    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -112,11 +111,9 @@ impl UdpConnector {
         }
     }
 
-    const fn fresh_backoff() -> ExponentialBackoff {
+    fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
-        ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60))
+        ExponentialBackoff::default()
     }
 
     async fn connect(&self) -> Result<UdpSocket, UdpError> {

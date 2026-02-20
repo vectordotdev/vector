@@ -15,7 +15,10 @@ components: sinks: prometheus_remote_write: {
 	features: {
 		auto_generated:   true
 		acknowledgements: true
-		healthcheck: enabled: true
+		healthcheck: {
+			enabled:  true
+			uses_uri: true
+		}
 		send: {
 			batch: {
 				enabled:      true
@@ -34,7 +37,7 @@ components: sinks: prometheus_remote_write: {
 				retry_initial_backoff_secs: 1
 				retry_max_duration_secs:    10
 				timeout_secs:               60
-				headers:                    false
+				headers:                    true
 			}
 			tls: {
 				enabled:                true

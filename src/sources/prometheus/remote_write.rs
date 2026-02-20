@@ -234,7 +234,7 @@ mod test {
     }
 
     async fn receives_metrics(tls: Option<TlsEnableableConfig>) {
-        let address = test_util::next_addr();
+        let (_guard, address) = test_util::addr::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let proto = MaybeTlsSettings::from_config(tls.as_ref(), true)
@@ -433,7 +433,7 @@ mod test {
     /// we accept the metric, but take the last label in the list.
     #[tokio::test]
     async fn receives_metrics_duplicate_labels() {
-        let address = test_util::next_addr();
+        let (_guard, address) = test_util::addr::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let source = PrometheusRemoteWriteConfig {
@@ -505,7 +505,7 @@ mod test {
 
     #[tokio::test]
     async fn test_skip_nan_values_enabled() {
-        let address = test_util::next_addr();
+        let (_guard, address) = test_util::addr::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let source = PrometheusRemoteWriteConfig {
@@ -576,7 +576,7 @@ mod test {
 
     #[tokio::test]
     async fn test_skip_nan_values_disabled() {
-        let address = test_util::next_addr();
+        let (_guard, address) = test_util::addr::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let source = PrometheusRemoteWriteConfig {
@@ -661,7 +661,7 @@ mod test {
 
     #[tokio::test]
     async fn receives_metrics_on_custom_path() {
-        let address = test_util::next_addr();
+        let (_guard, address) = test_util::addr::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let source = PrometheusRemoteWriteConfig {
@@ -710,7 +710,7 @@ mod test {
 
     #[tokio::test]
     async fn rejects_metrics_on_wrong_path() {
-        let address = test_util::next_addr();
+        let (_guard, address) = test_util::addr::next_addr();
         let (tx, _rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let source = PrometheusRemoteWriteConfig {
@@ -750,7 +750,7 @@ mod test {
 
     #[tokio::test]
     async fn receives_metrics_on_default_path() {
-        let address = test_util::next_addr();
+        let (_guard, address) = test_util::addr::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let source = PrometheusRemoteWriteConfig {
@@ -784,7 +784,7 @@ mod test {
 
     #[tokio::test]
     async fn rejects_metrics_on_wrong_path_with_skip_nan_enabled() {
-        let address = test_util::next_addr();
+        let (_guard, address) = test_util::addr::next_addr();
         let (tx, _rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let source = PrometheusRemoteWriteConfig {
@@ -824,7 +824,7 @@ mod test {
 
     #[tokio::test]
     async fn accepts_conflicting_metadata() {
-        let address = test_util::next_addr();
+        let (_guard, address) = test_util::addr::next_addr();
         let (tx, rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let source = PrometheusRemoteWriteConfig {
@@ -865,7 +865,7 @@ mod test {
 
     #[tokio::test]
     async fn rejects_conflicting_metadata() {
-        let address = test_util::next_addr();
+        let (_guard, address) = test_util::addr::next_addr();
         let (tx, _rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
 
         let source = PrometheusRemoteWriteConfig {

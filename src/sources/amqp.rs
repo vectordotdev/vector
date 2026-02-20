@@ -7,12 +7,14 @@ use bytes::Bytes;
 use chrono::{TimeZone, Utc};
 use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
-use lapin::{Channel, acker::Acker, message::Delivery};
+use lapin::{Channel, acker::Acker, message::Delivery, options::BasicQosOptions};
 use snafu::Snafu;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::decoding::{DeserializerConfig, FramingConfig},
+    codecs::{
+        DecoderFramedRead,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, log_schema},
     configurable::configurable_component,
     event::{Event, LogEvent},
@@ -100,6 +102,17 @@ pub struct AmqpSourceConfig {
     #[configurable(derived)]
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub(crate) acknowledgements: SourceAcknowledgementsConfig,
+
+    /// Maximum number of unacknowledged messages the broker will deliver to this consumer.
+    ///
+    /// This controls flow control via AMQP QoS prefetch. Lower values limit memory usage and
+    /// prevent overwhelming slow consumers, but may reduce throughput. Higher values increase
+    /// throughput but consume more memory.
+    ///
+    /// If not set, the broker/client default applies (often unlimited).
+    #[serde(default)]
+    #[configurable(metadata(docs::examples = 100))]
+    pub(crate) prefetch_count: Option<u16>,
 }
 
 fn default_queue() -> String {
@@ -311,7 +324,7 @@ async fn receive_event(
 ) -> Result<(), ()> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
     let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
-    let mut stream = FramedRead::new(payload, decoder);
+    let mut stream = DecoderFramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
     let timestamp = msg
@@ -421,6 +434,17 @@ async fn run_amqp_source(
 ) -> Result<(), ()> {
     let (finalizer, mut ack_stream) =
         UnorderedFinalizer::<FinalizerEntry>::maybe_new(acknowledgements, Some(shutdown.clone()));
+
+    // Apply AMQP QoS (prefetch) before starting consumption.
+    if let Some(count) = config.prefetch_count {
+        // per-consumer prefetch (global = false)
+        channel
+            .basic_qos(count, BasicQosOptions { global: false })
+            .await
+            .map_err(|error| {
+                error!(message = "Failed to apply basic_qos.", ?error);
+            })?;
+    }
 
     debug!("Starting amqp source, listening to queue {}.", config.queue);
     let mut consumer = channel

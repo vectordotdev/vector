@@ -1,5 +1,4 @@
-use crate::app::CommandExt as _;
-use crate::utils::cargo;
+use crate::{app::CommandExt as _, utils::cargo};
 use anyhow::{Ok, Result, anyhow};
 use glob::glob;
 use std::process::Command;
@@ -14,11 +13,11 @@ impl Cli {
         let artifacts = glob("target/artifacts/*")
             .expect("failed to read glob pattern")
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| anyhow!("failed to read path: {}", e))?
+            .map_err(|e| anyhow!("failed to read path: {e}"))?
             .into_iter()
             .map(|p| p.into_os_string().into_string())
             .collect::<Result<Vec<_>, _>>()
-            .map_err(|e| anyhow!("failed to turn path into string: {:?}", e))?;
+            .map_err(|e| anyhow!("failed to turn path into string: {}", e.to_string_lossy()))?;
 
         let version = cargo::get_version()?;
         let mut command = Command::new("gh");

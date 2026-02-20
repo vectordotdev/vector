@@ -7,6 +7,7 @@ use std::{
 };
 
 use futures::{Future, FutureExt, future};
+use snafu::Snafu;
 use stream_cancel::Trigger;
 use tokio::{
     sync::{mpsc, watch},
@@ -31,7 +32,6 @@ use crate::{
     config::{ComponentKey, Config, ConfigDiff, HealthcheckOptions, Inputs, OutputId, Resource},
     event::EventArray,
     extra_context::ExtraContext,
-    internal_events::config::{ConfigReloadRejected, ConfigReloaded},
     shutdown::SourceShutdownCoordinator,
     signal::ShutdownError,
     spawn_named,
@@ -39,6 +39,18 @@ use crate::{
 };
 
 pub type ShutdownErrorReceiver = mpsc::UnboundedReceiver<ShutdownError>;
+
+#[derive(Debug, Snafu)]
+pub enum ReloadError {
+    #[snafu(display("global options changed: {}", changed_fields.join(", ")))]
+    GlobalOptionsChanged { changed_fields: Vec<String> },
+    #[snafu(display("failed to compute global diff: {}", source))]
+    GlobalDiffFailed { source: serde_json::Error },
+    #[snafu(display("topology build failed"))]
+    TopologyBuildFailed,
+    #[snafu(display("failed to restore previous config"))]
+    FailedToRestore,
+}
 
 #[allow(dead_code)]
 pub struct RunningTopology {
@@ -58,6 +70,8 @@ pub struct RunningTopology {
     utilization_registry: Option<UtilizationRegistry>,
     utilization_task: Option<TaskHandle>,
     utilization_task_shutdown_trigger: Option<Trigger>,
+    metrics_task: Option<TaskHandle>,
+    metrics_task_shutdown_trigger: Option<Trigger>,
     pending_reload: Option<HashSet<ComponentKey>>,
 }
 
@@ -80,6 +94,8 @@ impl RunningTopology {
             utilization_registry: None,
             utilization_task: None,
             utilization_task_shutdown_trigger: None,
+            metrics_task: None,
+            metrics_task_shutdown_trigger: None,
             pending_reload: None,
         }
     }
@@ -152,6 +168,10 @@ impl RunningTopology {
 
         if let Some(utilization_task) = self.utilization_task {
             wait_handles.push(utilization_task.map(map_closure).shared());
+        }
+
+        if let Some(metrics_task) = self.metrics_task {
+            wait_handles.push(metrics_task.map(map_closure).shared());
         }
 
         // If we reach this, we will forcefully shutdown the sources. If None, we will never force shutdown.
@@ -245,6 +265,9 @@ impl RunningTopology {
         if let Some(trigger) = self.utilization_task_shutdown_trigger {
             trigger.cancel();
         }
+        if let Some(trigger) = self.metrics_task_shutdown_trigger {
+            trigger.cancel();
+        }
 
         futures::future::join(source_shutdown_complete, shutdown_complete_future).map(|_| ())
     }
@@ -252,35 +275,26 @@ impl RunningTopology {
     /// Attempts to load a new configuration and update this running topology.
     ///
     /// If the new configuration was valid, and all changes were able to be made -- removing of
-    /// old components, changing of existing components, adding of new components -- then `Ok(true)`
-    /// is returned.
+    /// old components, changing of existing components, adding of new components -- then
+    /// `Ok(())` is returned.
     ///
     /// If the new configuration is not valid, or not all of the changes in the new configuration
     /// were able to be made, then this method will attempt to undo the changes made and bring the
-    /// topology back to its previous state.  If either of these scenarios occur, then `Ok(false)`
-    /// is returned.
+    /// topology back to its previous state, returning the appropriate error.
     ///
-    /// # Errors
-    ///
-    /// If all changes from the new configuration cannot be made, and the current configuration
-    /// cannot be fully restored, then `Err(())` is returned.
+    /// If the restore also fails, `ReloadError::FailedToRestore` is returned.
     pub async fn reload_config_and_respawn(
         &mut self,
         new_config: Config,
         extra_context: ExtraContext,
-    ) -> Result<bool, ()> {
+    ) -> Result<(), ReloadError> {
         info!("Reloading running topology with new configuration.");
 
         if self.config.global != new_config.global {
-            match self.config.global.diff(&new_config.global) {
-                Ok(changed) => {
-                    emit!(ConfigReloadRejected::global_options_changed(changed));
-                }
-                Err(err) => {
-                    emit!(ConfigReloadRejected::failed_to_compute_global_diff(err));
-                }
-            }
-            return Ok(false);
+            return match self.config.global.diff(&new_config.global) {
+                Ok(changed_fields) => Err(ReloadError::GlobalOptionsChanged { changed_fields }),
+                Err(source) => Err(ReloadError::GlobalDiffFailed { source }),
+            };
         }
 
         // Calculate the change between the current configuration and the new configuration, and
@@ -324,9 +338,9 @@ impl RunningTopology {
                 self.spawn_diff(&diff, new_pieces);
                 self.config = new_config;
 
-                emit!(ConfigReloaded);
+                info!("New configuration loaded successfully.");
 
-                return Ok(true);
+                return Ok(());
             }
         }
 
@@ -351,7 +365,7 @@ impl RunningTopology {
 
             info!("Old configuration restored successfully.");
 
-            return Ok(false);
+            return Err(ReloadError::TopologyBuildFailed);
         }
 
         error!(
@@ -359,7 +373,7 @@ impl RunningTopology {
             internal_log_rate_limit = false
         );
 
-        Err(())
+        Err(ReloadError::FailedToRestore)
     }
 
     /// Attempts to reload enrichment tables.
@@ -1315,6 +1329,11 @@ impl RunningTopology {
             .utilization
             .take()
             .expect("Topology is missing the utilization metric emitter!");
+        let metrics_storage = pieces.metrics_storage.clone();
+        let metrics_refresh_period = config
+            .global
+            .metrics_storage_refresh_period
+            .map(Duration::from_secs_f64);
         let mut running_topology = Self::new(config, abort_tx);
 
         if !running_topology
@@ -1338,11 +1357,24 @@ impl RunningTopology {
                 utilization_emitter
                     .run_utilization(utilization_shutdown_signal)
                     .await;
-                // TODO: new task output type for this? Or handle this task in a completely
-                // different way
                 Ok(TaskOutput::Healthcheck)
             },
         )));
+        if let Some(metrics_refresh_period) = metrics_refresh_period {
+            let (metrics_task_shutdown_trigger, metrics_shutdown_signal, _) =
+                ShutdownSignal::new_wired();
+            running_topology.metrics_task_shutdown_trigger = Some(metrics_task_shutdown_trigger);
+            running_topology.metrics_task = Some(tokio::spawn(Task::new(
+                "metrics_heartbeat".into(),
+                "",
+                async move {
+                    metrics_storage
+                        .run_periodic_refresh(metrics_refresh_period, metrics_shutdown_signal)
+                        .await;
+                    Ok(TaskOutput::Healthcheck)
+                },
+            )));
+        }
 
         Some((running_topology, abort_rx))
     }

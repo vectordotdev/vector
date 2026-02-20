@@ -721,8 +721,9 @@ mod test {
         SourceSender,
         event::EventStatus,
         test_util::{
+            addr::next_addr,
             components::{SOCKET_PUSH_SOURCE_TAGS, assert_source_compliance},
-            next_addr, spawn_collect_n, wait_for_tcp,
+            spawn_collect_n, wait_for_tcp,
         },
     };
 
@@ -745,7 +746,7 @@ mod test {
         status: EventStatus,
     ) -> (SocketAddr, impl Stream<Item = Event> + Unpin) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let source = LogstashConfig {
             address: address.into(),
             tls: None,

@@ -1,11 +1,43 @@
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::LazyLock};
 
+use vector_vrl_category::Category;
 use vrl::prelude::*;
 
 use crate::{
     Case, Condition, IndexHandle, TableRegistry, TableSearch,
-    vrl_util::{self, add_index, evaluate_condition, is_case_sensitive},
+    vrl_util::{self, DEFAULT_CASE_SENSITIVE, add_index, evaluate_condition, is_case_sensitive},
 };
+
+static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
+    vec![
+        Parameter::required(
+            "table",
+            kind::BYTES,
+            "The [enrichment table](/docs/reference/glossary/#enrichment-tables) to search.",
+        ),
+        Parameter::required(
+            "condition",
+            kind::OBJECT,
+            "The condition to search on. Since the condition is used at boot time to create indices into the data, these conditions must be statically defined.",
+        ),
+        Parameter::optional(
+            "select",
+            kind::ARRAY,
+            "A subset of fields from the enrichment table to return. If not specified, all fields are returned.",
+        ),
+        Parameter::optional(
+            "case_sensitive",
+            kind::BOOLEAN,
+            "Whether text fields need to match cases exactly.",
+        )
+        .default(&DEFAULT_CASE_SENSITIVE),
+        Parameter::optional(
+            "wildcard",
+            kind::BYTES,
+            "Value to use for wildcard matching in the search.",
+        ),
+    ]
+});
 
 fn find_enrichment_table_records(
     select: Option<Value>,
@@ -51,38 +83,27 @@ impl Function for FindEnrichmentTableRecords {
         "find_enrichment_table_records"
     }
 
+    fn usage(&self) -> &'static str {
+        const_str::concat!(
+            "Searches an [enrichment table](/docs/reference/glossary/#enrichment-tables) for rows that match the provided condition.\n\n",
+            super::ENRICHMENT_TABLE_EXPLAINER
+        )
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Enrichment.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::ARRAY
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "table",
-                kind: kind::BYTES,
-                required: true,
-            },
-            Parameter {
-                keyword: "condition",
-                kind: kind::OBJECT,
-                required: true,
-            },
-            Parameter {
-                keyword: "select",
-                kind: kind::ARRAY,
-                required: false,
-            },
-            Parameter {
-                keyword: "case_sensitive",
-                kind: kind::BOOLEAN,
-                required: false,
-            },
-            Parameter {
-                keyword: "wildcard",
-                kind: kind::BYTES,
-                required: false,
-            },
-        ]
+        &PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[Example {
+        &[example!(
             title: "find records",
             source: r#"find_enrichment_table_records!("test", {"surname": "Smith"})"#,
             result: Ok(
@@ -90,7 +111,7 @@ impl Function for FindEnrichmentTableRecords {
                              {"id": 2, "firstname": "Fred", "surname": "Smith"}]"#,
                 },
             ),
-        }]
+        )]
     }
 
     fn compile(
