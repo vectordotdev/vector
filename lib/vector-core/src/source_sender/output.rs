@@ -115,11 +115,11 @@ impl Output {
         log_definition: Option<Arc<Definition>>,
         output_id: OutputId,
         timeout: Option<Duration>,
-        ewma_alpha: Option<f64>,
+        ewma_half_life_seconds: Option<f64>,
     ) -> (Self, LimitedReceiver<SourceSenderItem>) {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(n).unwrap());
         let metrics = ChannelMetricMetadata::new(UTILIZATION_METRIC_PREFIX, Some(output.clone()));
-        let (tx, rx) = channel::limited(limit, Some(metrics), ewma_alpha);
+        let (tx, rx) = channel::limited(limit, Some(metrics), ewma_half_life_seconds);
         (
             Self {
                 sender: tx,
