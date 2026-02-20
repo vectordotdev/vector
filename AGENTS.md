@@ -197,7 +197,6 @@ Prefer inline variable syntax in format strings (Rust 1.58+).
 ```rust
 format!("Error: {err}");
 println!("Processing {count} items");
-error!("Failed to connect: {error}");
 ```
 
 **Incorrect:**
@@ -205,7 +204,6 @@ error!("Failed to connect: {error}");
 ```rust
 format!("Error: {}", err);      // Unnecessary positional argument
 println!("Processing {} items", count);
-error!("Failed to connect: {}", error);
 ```
 
 **Why:** Inline syntax is more readable and reduces mistakes with argument ordering.
