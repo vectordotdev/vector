@@ -293,8 +293,6 @@ fn populate_log_event(
     // This handles the transition from the original timestamp logic. Originally the
     // `timestamp_key` was populated by the `properties.timestamp()` time on the message, falling
     // back to calling `now()`.
-    let now = Utc::now();
-    log.metadata_mut().set_ingest_timestamp(now);
     match log_namespace {
         LogNamespace::Vector => {
             if let Some(timestamp) = timestamp {
@@ -304,11 +302,11 @@ fn populate_log_event(
                 );
             };
 
-            log.insert(metadata_path!("vector", "ingest_timestamp"), now);
+            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
         LogNamespace::Legacy => {
             if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
-                log.try_insert(timestamp_key, timestamp.unwrap_or(now));
+                log.try_insert(timestamp_key, timestamp.unwrap_or_else(Utc::now));
             }
         }
     };

@@ -153,10 +153,10 @@ pub struct GlobalOptions {
     #[configurable(metadata(docs::advanced))]
     pub buffer_utilization_ewma_alpha: Option<f64>,
 
-    /// The alpha value for the exponential weighted moving average (EWMA) of transform processing
-    /// time metrics.
+    /// The alpha value for the exponential weighted moving average (EWMA) of transform latency
+    /// metrics.
     ///
-    /// This controls how quickly the `event_processing_time_mean_seconds` gauge responds to new
+    /// This controls how quickly the `component_latency_mean_seconds` gauge responds to new
     /// observations. Values closer to 1.0 retain more of the previous value, leading to slower
     /// adjustments. The default value of 0.9 is equivalent to a "half life" of 6-7 measurements.
     ///
@@ -164,7 +164,7 @@ pub struct GlobalOptions {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(validation(range(min = 0.0, max = 1.0)))]
     #[configurable(metadata(docs::advanced))]
-    pub processing_time_ewma_alpha: Option<f64>,
+    pub latency_ewma_alpha: Option<f64>,
 
     /// The interval, in seconds, at which the internal metrics cache for VRL is refreshed.
     /// This must be set to be able to access metrics in VRL functions.
@@ -324,9 +324,7 @@ impl GlobalOptions {
                 buffer_utilization_ewma_alpha: self
                     .buffer_utilization_ewma_alpha
                     .or(with.buffer_utilization_ewma_alpha),
-                processing_time_ewma_alpha: self
-                    .processing_time_ewma_alpha
-                    .or(with.processing_time_ewma_alpha),
+                latency_ewma_alpha: self.latency_ewma_alpha.or(with.latency_ewma_alpha),
                 metrics_storage_refresh_period: self
                     .metrics_storage_refresh_period
                     .or(with.metrics_storage_refresh_period),

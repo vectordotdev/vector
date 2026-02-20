@@ -152,7 +152,7 @@ async fn process_stream(
                                 log_namespace.insert_standard_vector_source_metadata(
                                     log,
                                     source_type,
-                                    now,
+                                    now
                                 );
 
                                 if let Some(hostname) = &hostname {

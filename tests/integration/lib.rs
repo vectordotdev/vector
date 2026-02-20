@@ -12,6 +12,10 @@ mod cli;
 #[cfg(feature = "shutdown-tests")]
 mod shutdown;
 
+// Top tests use Unix signals (SIGTERM, SIGHUP) via the nix crate
+#[cfg(all(feature = "top", target_family = "unix"))]
+mod top;
+
 /// Creates a file with given content
 pub fn create_file(config: &str) -> PathBuf {
     let path = temp_file();
@@ -29,7 +33,6 @@ pub fn overwrite_file(path: PathBuf, config: &str) {
         .unwrap();
 
     file.write_all(config.as_bytes()).unwrap();
-    file.flush().unwrap();
     file.sync_all().unwrap();
 }
 

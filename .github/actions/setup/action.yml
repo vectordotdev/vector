@@ -83,7 +83,7 @@ runs:
     - name: Check vdev cache status
       id: check-vdev-cache
       if: ${{ inputs.vdev == 'true' }}
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: ~/.cargo/bin/vdev
         key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'Cargo.toml', 'Cargo.lock') }}
@@ -148,7 +148,7 @@ runs:
 
     - name: Cache Cargo registry, index, and git DB
       if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: |
           ~/.cargo/registry/index/
@@ -159,7 +159,7 @@ runs:
           ${{ runner.os }}-cargo-
 
     - name: Install mold
-      if: ${{ runner.os == 'Linux' && (inputs.mold == 'true' || env.VDEV_NEEDS_COMPILE == 'true') }}
+      if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && (inputs.mold == 'true' || env.VDEV_NEEDS_COMPILE == 'true') }}
       shell: bash
       run: |
         echo "Installing mold"
@@ -244,7 +244,7 @@ runs:
 
     - name: Cache prepare.sh binaries
       id: cache-prepare-binaries
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: |
           ~/.cargo/bin/cargo-deb

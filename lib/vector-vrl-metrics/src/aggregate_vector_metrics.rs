@@ -1,5 +1,8 @@
 use std::collections::BTreeMap;
+use std::sync::LazyLock;
+use vector_vrl_category::Category;
 use vrl::prelude::expression::Expr;
+use vrl::prelude::function::EnumVariant;
 use vrl::value;
 
 use vrl::prelude::*;
@@ -7,6 +10,38 @@ use vrl::prelude::*;
 use crate::common::resolve_tags;
 use crate::common::validate_tags;
 use crate::common::{Error, MetricsStorage};
+
+static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(BTreeMap::new()));
+static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
+    vec![
+        Parameter::required("function", kind::BYTES, "The metric name to search.")
+            .enum_variants(&[
+                EnumVariant {
+                    value: "sum",
+                    description: "Sum the values of all the matched metrics.",
+                },
+                EnumVariant {
+                    value: "avg",
+                    description: "Find the average of the values of all the matched metrics.",
+                },
+                EnumVariant {
+                    value: "max",
+                    description: "Find the highest metric value of all the matched metrics.",
+                },
+                EnumVariant {
+                    value: "min",
+                    description: "Find the lowest metric value of all the matched metrics.",
+                },
+            ]),
+        Parameter::required("key", kind::BYTES, "The metric name to aggregate."),
+        Parameter::optional(
+            "tags",
+            kind::OBJECT,
+            "Tags to filter the results on. Values in this object support wildcards ('*') to match on parts of the tag value.",
+        )
+        .default(&DEFAULT_TAGS),
+    ]
+});
 
 fn aggregate_metrics(
     metrics_storage: &MetricsStorage,
@@ -54,24 +89,16 @@ impl Function for AggregateVectorMetrics {
         )
     }
 
+    fn category(&self) -> &'static str {
+        Category::Metrics.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::FLOAT | kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "function",
-                kind: kind::BYTES,
-                required: true,
-            },
-            Parameter {
-                keyword: "key",
-                kind: kind::BYTES,
-                required: true,
-            },
-            Parameter {
-                keyword: "tags",
-                kind: kind::OBJECT,
-                required: false,
-            },
-        ]
+        &PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {
