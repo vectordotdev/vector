@@ -1,6 +1,6 @@
 package metadata
 
-generated: components: sinks: datadog_logs: configuration: {
+generated: components: sinks: azure_logs_ingestion: configuration: {
 	acknowledgements: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
@@ -27,6 +27,76 @@ generated: components: sinks: datadog_logs: configuration: {
 			type: bool: {}
 		}
 	}
+	auth: {
+		description: "Configuration of the authentication strategy for interacting with Azure services."
+		required:    false
+		type: object: options: {
+			azure_client_id: {
+				description: """
+					The [Azure Client ID][azure_client_id].
+
+					[azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				required: false
+				type: string: {
+					default: ""
+					examples: ["00000000-0000-0000-0000-000000000000"]
+				}
+			}
+			azure_client_secret: {
+				description: """
+					The [Azure Client Secret][azure_client_secret].
+
+					[azure_client_secret]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				required: false
+				type: string: {
+					default: ""
+					examples: ["00-00~000000-0000000~0000000000000000000"]
+				}
+			}
+			azure_credential_kind: {
+				description: "The kind of Azure credential to use."
+				required:    true
+				type: string: enum: {
+					azure_cli:                         "Use Azure CLI credentials"
+					managed_identity:                  "Use Managed Identity credentials"
+					managed_identity_client_assertion: "Use Managed Identity with Client Assertion credentials"
+					workload_identity:                 "Use Workload Identity credentials"
+				}
+			}
+			azure_tenant_id: {
+				description: """
+					The [Azure Tenant ID][azure_tenant_id].
+
+					[azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				required: false
+				type: string: {
+					default: ""
+					examples: ["00000000-0000-0000-0000-000000000000"]
+				}
+			}
+			client_assertion_client_id: {
+				description:   "The target Client ID to use."
+				relevant_when: "azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      true
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+			client_assertion_tenant_id: {
+				description:   "The target Tenant ID to use."
+				relevant_when: "azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      true
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+			user_assigned_managed_identity_id: {
+				description:   "The User Assigned Managed Identity (Client ID) to use."
+				relevant_when: "azure_credential_kind = \"managed_identity\" or azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+		}
+	}
 	batch: {
 		description: "Event batching behavior."
 		required:    false
@@ -40,87 +110,33 @@ generated: components: sinks: datadog_logs: configuration: {
 					"""
 				required: false
 				type: uint: {
-					default: 4250000
+					default: 10000000
 					unit:    "bytes"
 				}
 			}
 			max_events: {
 				description: "The maximum size of a batch before it is flushed."
 				required:    false
-				type: uint: {
-					default: 1000
-					unit:    "events"
-				}
+				type: uint: unit: "events"
 			}
 			timeout_secs: {
 				description: "The maximum age of a batch before it is flushed."
 				required:    false
 				type: float: {
-					default: 5.0
+					default: 1.0
 					unit:    "seconds"
 				}
 			}
 		}
 	}
-	compression: {
+	dcr_immutable_id: {
 		description: """
-			Compression configuration.
+			The [Data collection rule immutable ID][dcr_immutable_id] for the Data collection endpoint.
 
-			All compression algorithms use the default compression level unless otherwise specified.
+			[dcr_immutable_id]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
 			"""
-		required: false
-		type: string: {
-			default: "zstd"
-			enum: {
-				gzip: """
-					[Gzip][gzip] compression.
-
-					[gzip]: https://www.gzip.org/
-					"""
-				none: "No compression."
-				snappy: """
-					[Snappy][snappy] compression.
-
-					[snappy]: https://github.com/google/snappy/blob/main/docs/README.md
-					"""
-				zlib: """
-					[Zlib][zlib] compression.
-
-					[zlib]: https://zlib.net/
-					"""
-				zstd: """
-					[Zstandard][zstd] compression.
-
-					[zstd]: https://facebook.github.io/zstd/
-					"""
-			}
-		}
-	}
-	conforms_as_agent: {
-		description: """
-			When enabled this sink will normalize events to conform to the Datadog Agent standard. This
-			also sends requests to the logs backend with the `DD-PROTOCOL: agent-json` header. This bool
-			will be overidden as `true` if this header has already been set in the request.headers
-			configuration setting.
-			"""
-		required: false
-		type: bool: default: false
-	}
-	default_api_key: {
-		description: """
-			The default Datadog [API key][api_key] to use in authentication of HTTP requests.
-
-			If an event has a Datadog [API key][api_key] set explicitly in its metadata, it takes
-			precedence over this setting.
-
-			This value can also be set by specifying the `DD_API_KEY` environment variable.
-			The value specified here takes precedence over the environment variable.
-
-			[api_key]: https://docs.datadoghq.com/api/?lang=bash#authentication
-			[global_options]: /docs/reference/configuration/global-options/#datadog
-			"""
-		required: false
-		type: string: examples: ["${DATADOG_API_KEY_ENV_VAR}", "ef8d5de700e7989468166c40fc8a0ccd"]
+		required: true
+		type: string: examples: ["dcr-000a00a000a00000a000000aa000a0aa"]
 	}
 	encoding: {
 		description: "Transformations to prepare an event for serialization."
@@ -152,20 +168,22 @@ generated: components: sinks: datadog_logs: configuration: {
 	}
 	endpoint: {
 		description: """
-			The endpoint to send observability data to.
+			The [Data collection endpoint URI][endpoint] associated with the Log Analytics workspace.
 
-			The endpoint must contain an HTTP scheme, and may specify a hostname or IP
-			address and port. The API path should NOT be specified as this is handled by
-			the sink.
-
-			If set, overrides the `site` option.
+			[endpoint]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
 			"""
-		required: false
-		type: string: examples: ["http://127.0.0.1:8080", "http://example.com:12345"]
+		required: true
+		type: string: examples: ["https://my-dce-5kyl.eastus-1.ingest.monitor.azure.com"]
 	}
 	request: {
-		description: "Outbound HTTP request settings."
-		required:    false
+		description: """
+			Middleware settings for outbound requests.
+
+			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
+
+			Note that the retry backoff policy follows the Fibonacci sequence.
+			"""
+		required: false
 		type: object: options: {
 			adaptive_concurrency: {
 				description: """
@@ -264,23 +282,6 @@ generated: components: sinks: datadog_logs: configuration: {
 					uint: {}
 				}
 			}
-			headers: {
-				description: "Additional HTTP headers to add to every HTTP request."
-				required:    false
-				type: object: {
-					examples: [{
-						Accept:               "text/plain"
-						"X-Event-Level":      "{{level}}"
-						"X-Event-Timestamp":  "{{timestamp}}"
-						"X-My-Custom-Header": "A-Value"
-					}]
-					options: "*": {
-						description: "An HTTP request header and its value. Both header names and values support templating with event data."
-						required:    true
-						type: string: {}
-					}
-				}
-			}
 			rate_limit_duration_secs: {
 				description: "The time window used for the `rate_limit_num` option."
 				required:    false
@@ -360,23 +361,32 @@ generated: components: sinks: datadog_logs: configuration: {
 			}
 		}
 	}
-	site: {
+	stream_name: {
 		description: """
-			The Datadog [site][dd_site] to send observability data to.
+			The [Stream name][stream_name] for the Data collection rule.
 
-			This value can also be set by specifying the `DD_SITE` environment variable.
-			The value specified here takes precedence over the environment variable.
+			[stream_name]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
+			"""
+		required: true
+		type: string: examples: ["Custom-MyTable"]
+	}
+	timestamp_field: {
+		description: """
+			The destination field (column) for the timestamp.
 
-			If not specified by the environment variable, a default value of
-			`datadoghq.com` is taken.
+			The setting of `log_schema.timestamp_key`, usually `timestamp`, is used as the source.
+			Most schemas use `TimeGenerated`, but some use `Timestamp` (legacy) or `EventStartTime` (ASIM) [std_columns].
 
-			[dd_site]: https://docs.datadoghq.com/getting_started/site
+			[std_columns]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/log-standard-columns#timegenerated
 			"""
 		required: false
-		type: string: examples: ["us3.datadoghq.com", "datadoghq.eu"]
+		type: string: {
+			default: "TimeGenerated"
+			examples: ["EventStartTime", "Timestamp"]
+		}
 	}
 	tls: {
-		description: "Configures the TLS options for incoming/outgoing connections."
+		description: "TLS configuration."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {
@@ -409,16 +419,6 @@ generated: components: sinks: datadog_logs: configuration: {
 					"""
 				required: false
 				type: string: examples: ["/path/to/host_certificate.crt"]
-			}
-			enabled: {
-				description: """
-					Whether to require TLS for incoming or outgoing connections.
-
-					When enabled and used for incoming connections, an identity certificate is also required. See `tls.crt_file` for
-					more information.
-					"""
-				required: false
-				type: bool: {}
 			}
 			key_file: {
 				description: """
@@ -477,6 +477,18 @@ generated: components: sinks: datadog_logs: configuration: {
 				required: false
 				type: bool: {}
 			}
+		}
+	}
+	token_scope: {
+		description: """
+			[Token scope][token_scope] for dedicated Azure regions.
+
+			[token_scope]: https://learn.microsoft.com/en-us/azure/azure-monitor/logs/logs-ingestion-api-overview
+			"""
+		required: false
+		type: string: {
+			default: "https://monitor.azure.com/.default"
+			examples: ["https://monitor.azure.us/.default", "https://monitor.azure.cn/.default"]
 		}
 	}
 }

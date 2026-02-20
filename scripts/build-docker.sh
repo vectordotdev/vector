@@ -122,7 +122,13 @@ elif [[ "$CHANNEL" == "custom" ]]; then
   build distroless-static "$VERSION"
   build distroless-libc "$VERSION"
 elif [[ "$CHANNEL" == "test" ]]; then
-  build "${BASE:-"alpine"}" "${TAG:-"test"}"
-  build "${BASE:-"distroless-libc"}" "${TAG:-"test"}"
-  build "${BASE:-"distroless-static"}" "${TAG:-"test"}"
+  # If BASE is specified, build only that base
+  if [[ -n "${BASE:-}" ]]; then
+    build "$BASE" "${TAG:-"test"}"
+  else
+    # If BASE is not specified, build all three bases
+    build "alpine" "${TAG:-"test"}"
+    build "distroless-libc" "${TAG:-"test"}"
+    build "distroless-static" "${TAG:-"test"}"
+  fi
 fi

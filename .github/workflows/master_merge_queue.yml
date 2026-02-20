@@ -47,8 +47,12 @@ jobs:
     secrets: inherit
 
   test-cli:
-    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cli-yml == 'true' }}
-    uses: ./.github/workflows/cli.yml
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-cli
+      job_name: CLI tests
+      upload_test_results: true
     needs: changes
     secrets: inherit
 

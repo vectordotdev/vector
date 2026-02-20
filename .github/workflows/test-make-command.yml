@@ -15,6 +15,11 @@ on:
         description: 'Git ref to checkout'
         required: false
         type: string
+      upload_test_results:
+        description: 'Whether to upload nextest test results (for commands that use cargo nextest)'
+        required: false
+        type: boolean
+        default: false
 
 
 permissions:
@@ -38,4 +43,9 @@ jobs:
           cargo-nextest: true
           protoc: true
           libsasl2: true
+          cargo-nextest: ${{ inputs.upload_test_results }}
+          datadog-ci: ${{ inputs.upload_test_results }}
       - run: make ${{ inputs.command }}
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: ${{ always() && inputs.upload_test_results }}
