@@ -105,12 +105,12 @@ impl tokio_util::codec::Decoder for Decoder {
 mod tests {
     use bytes::Bytes;
     use futures::{StreamExt, stream};
-    use tokio_util::{codec::FramedRead, io::StreamReader};
+    use tokio_util::io::StreamReader;
     use vrl::value::Value;
 
     use super::Decoder;
     use crate::{
-        JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
+        DecoderFramedRead, JsonDeserializer, NewlineDelimitedDecoder, StreamDecodingError,
         decoding::{Deserializer, Framer},
     };
 
@@ -127,7 +127,7 @@ mod tests {
             Framer::NewlineDelimited(NewlineDelimitedDecoder::new()),
             Deserializer::Json(JsonDeserializer::default()),
         );
-        let mut stream = FramedRead::new(reader, decoder);
+        let mut stream = DecoderFramedRead::new(reader, decoder);
 
         let next = stream.next().await.unwrap();
         let event = next.unwrap().0.pop().unwrap().into_log();
