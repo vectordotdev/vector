@@ -62,6 +62,7 @@ jobs:
     with:
       command: test-top
       job_name: make test-top
+      upload_test_results: true
     needs: changes
     secrets: inherit
 
