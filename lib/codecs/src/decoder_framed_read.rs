@@ -1,5 +1,6 @@
 use bytes::BytesMut;
 use futures::Stream;
+use pin_project::pin_project;
 use std::{
     io,
     pin::Pin,
@@ -107,7 +108,9 @@ where
 ///     }
 /// }
 /// ```
+#[pin_project]
 pub struct DecoderFramedRead<T, D> {
+    #[pin]
     inner: FramedRead<T, DecoderResultWrapper<D>>,
 }
 
@@ -180,19 +183,11 @@ where
     type Item = Result<D::Item, D::Error>;
 
     fn poll_next(self: Pin<&mut Self>, cx: &mut Context<'_>) -> Poll<Option<Self::Item>> {
-        // SAFETY: This is a pin projection from `self` to the `inner` field.
-        // It's safe because:
-        // 1. `inner` is not moved after the projection (we only call methods on the pinned reference)
-        // 2. The destructor of `DecoderFramedRead` doesn't move `inner`
-        // 3. We maintain the pinning invariant - if `self` is pinned, `inner` is pinned
-        // 4. `DecoderFramedRead` is not `#[repr(packed)]`
-        //
-        // TODO: Consider using the `pin-project` crate to automate this safe pin projection
-        let inner = unsafe { self.map_unchecked_mut(|this| &mut this.inner) };
+        let this = self.project();
 
         // The DecoderResultWrapper transforms errors into Ok(Err(...)) so the stream continues.
         // We need to unwrap this double Result structure here.
-        match inner.poll_next(cx) {
+        match this.inner.poll_next(cx) {
             Poll::Ready(Some(Ok(Ok(item)))) => Poll::Ready(Some(Ok(item))),
             Poll::Ready(Some(Ok(Err(error)))) => Poll::Ready(Some(Err(error))),
             Poll::Ready(Some(Err(error))) => Poll::Ready(Some(Err(error.into()))),

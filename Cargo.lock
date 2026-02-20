@@ -2525,6 +2525,7 @@ dependencies = [
  "metrics",
  "opentelemetry-proto",
  "ordered-float 4.6.0",
+ "pin-project",
  "prost 0.12.6",
  "prost-reflect",
  "rand 0.9.2",
