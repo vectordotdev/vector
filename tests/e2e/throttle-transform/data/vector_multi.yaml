@@ -1,0 +1,34 @@
+# E2E test: multi-threshold with events + json_bytes + detailed metrics
+sources:
+  http_in:
+    type: http_server
+    address: "0.0.0.0:9090"
+    encoding: json
+
+transforms:
+  throttle:
+    type: throttle
+    inputs: ["http_in"]
+    window_secs: 60
+    key_field: "{{ service }}"
+    reroute_dropped: true
+    threshold:
+      events: 30
+      json_bytes: 10000
+    internal_metrics:
+      emit_detailed_metrics: true
+
+sinks:
+  primary:
+    type: file
+    inputs: ["throttle"]
+    path: "/output/primary.log"
+    encoding:
+      codec: json
+
+  dropped:
+    type: file
+    inputs: ["throttle.dropped"]
+    path: "/output/dropped.log"
+    encoding:
+      codec: json

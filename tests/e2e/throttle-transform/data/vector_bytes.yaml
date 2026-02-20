@@ -1,0 +1,31 @@
+# E2E test: json_bytes throttle with dropped output port
+sources:
+  http_in:
+    type: http_server
+    address: "0.0.0.0:9090"
+    encoding: json
+
+transforms:
+  throttle:
+    type: throttle
+    inputs: ["http_in"]
+    window_secs: 60
+    key_field: "{{ service }}"
+    reroute_dropped: true
+    threshold:
+      json_bytes: 5000
+
+sinks:
+  primary:
+    type: file
+    inputs: ["throttle"]
+    path: "/output/primary.log"
+    encoding:
+      codec: json
+
+  dropped:
+    type: file
+    inputs: ["throttle.dropped"]
+    path: "/output/dropped.log"
+    encoding:
+      codec: json

@@ -1,4 +1,4 @@
-use std::{hash::Hash, sync::Arc, time::Duration};
+use std::{hash::Hash, num::NonZeroU32, sync::Arc, time::Duration};
 
 use governor::{
     Quota, RateLimiter, clock, middleware::NoOpMiddleware, state::keyed::DashMapStateStore,
@@ -41,6 +41,22 @@ where
 
     pub fn check_key(&self, key: &K) -> bool {
         self.rate_limiter.check_key(key).is_ok()
+    }
+
+    /// Check whether `n` tokens can be consumed for the given key.
+    ///
+    /// Returns `true` if the tokens were consumed (within rate limit).
+    /// Returns `false` if the rate limit would be exceeded.
+    /// If `n` exceeds the bucket's total burst capacity (`InsufficientCapacity`),
+    /// returns `true` and allows the event through — permanently rejecting events
+    /// larger than the burst size would be incorrect behavior.
+    pub fn check_key_n(&self, key: &K, n: NonZeroU32) -> bool {
+        match self.rate_limiter.check_key_n(key, n) {
+            Ok(ok) => ok.is_ok(),
+            // InsufficientCapacity: n > burst size. Allow through rather than
+            // permanently blocking events that exceed the burst capacity.
+            Err(_) => true,
+        }
     }
 }
 

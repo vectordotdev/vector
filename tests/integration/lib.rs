@@ -16,6 +16,9 @@ mod shutdown;
 #[cfg(all(feature = "top", target_family = "unix"))]
 mod top;
 
+#[cfg(feature = "throttle-integration-tests")]
+mod throttle;
+
 /// Creates a file with given content
 pub fn create_file(config: &str) -> PathBuf {
     let path = temp_file();
