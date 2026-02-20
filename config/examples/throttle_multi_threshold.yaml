@@ -1,0 +1,37 @@
+# Example: Multi-threshold throttling with per-tenant visibility
+#
+# This configuration demonstrates the throttle transform's multi-dimensional
+# rate limiting. Events are throttled per-service by event count, JSON byte size,
+# and custom VRL token cost. Dropped events are routed to a dead-letter file sink.
+sources:
+  app_logs:
+    type: stdin
+
+transforms:
+  per_tenant_throttle:
+    type: throttle
+    inputs: ["app_logs"]
+    window_secs: 60
+    key_field: "{{ service }}"
+    threshold:
+      events: 1000
+      json_bytes: 500000
+      tokens: 'strlen(string!(.message))'
+    exclude: '.level == "error"'
+    reroute_dropped: true
+    internal_metrics:
+      emit_detailed_metrics: true
+
+sinks:
+  primary:
+    type: console
+    inputs: ["per_tenant_throttle"]
+    encoding:
+      codec: json
+
+  dead_letter:
+    type: file
+    inputs: ["per_tenant_throttle.dropped"]
+    path: "/var/log/vector/throttled/%Y-%m-%d.log"
+    encoding:
+      codec: json

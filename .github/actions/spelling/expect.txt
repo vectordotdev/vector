@@ -40,7 +40,6 @@ BADSIG
 BADTIME
 BADTRUNC
 barfoo
-barieom
 basearch
 baseof
 bazqux
@@ -62,7 +61,6 @@ bottlenecked
 Brandur
 breadcrumb
 bringustogether
-bruceg
 bsd
 btag
 btime
@@ -253,7 +251,6 @@ hostagent
 hostcall
 hostpath
 hoverable
-hoverbear
 httpdeliveryrequestresponse
 httpevent
 hugepages
@@ -283,7 +280,6 @@ isdst
 issie
 iut
 ixm
-jamtur
 janky
 JINSPIRED
 jmxrmi
@@ -292,7 +288,6 @@ Jolokia
 JSONAs
 jsonify
 jsonlines
-jszwedko
 kebabcase
 kernelmode
 keyclock
@@ -325,8 +320,6 @@ logseverity
 logtypes
 lpop
 lpush
-lucperkins
-lukesteensen
 lvl
 maj
 majorly
@@ -371,7 +364,6 @@ msv
 multitenant
 munging
 musleabihf
-muslueabihf
 mustprogress
 mutiple
 myannotation
@@ -552,6 +544,7 @@ statefulset
 streamsink
 strng
 subfooter
+sublinearly
 subsecond
 subtagline
 summ
@@ -593,6 +586,7 @@ tocbot
 TOCs
 TODOs
 tokio
+topk
 tonydanza
 toolbars
 toproto
@@ -678,5 +672,4 @@ zieme
 zoog
 zork
 zorp
-zsherman
 zulip
