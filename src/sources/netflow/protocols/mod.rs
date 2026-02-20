@@ -2,6 +2,7 @@
 //!
 //! This module provides parsing for NetFlow v5 flow records.
 
+use std::collections::HashSet;
 use std::net::SocketAddr;
 
 use tracing::debug;
@@ -31,37 +32,40 @@ impl DetectedProtocol {
             DetectedProtocol::Unknown(_) => "unknown",
         }
     }
-
-    /// Check if this protocol is enabled in configuration.
-    pub fn is_enabled(&self, config: &NetflowConfig) -> bool {
-        let flow_protocol = match self {
-            DetectedProtocol::NetflowV5 => "netflow_v5",
-            DetectedProtocol::Unknown(_) => return false,
-        };
-        config.is_protocol_enabled(flow_protocol)
-    }
 }
 
 /// Protocol parser for NetFlow v5.
 pub struct ProtocolParser {
     netflow_v5: NetflowV5Parser,
-    enabled_protocols: Vec<String>,
+    enabled_protocols: HashSet<String>,
     include_raw_data: bool,
 }
 
 impl ProtocolParser {
     /// Create a new protocol parser with the given configuration.
+    /// `template_cache` is used by v9/IPFIX; for v5-only it is not used but kept for API consistency.
     pub fn new(config: &NetflowConfig, _template_cache: TemplateCache) -> Self {
         let field_parser = FieldParser::new(config);
+        let enabled_protocols = config.protocols.iter().cloned().collect();
         Self {
-            netflow_v5: NetflowV5Parser::new(field_parser.clone(), config.strict_validation),
-            enabled_protocols: config.protocols.iter().map(|s| s.to_string()).collect(),
+            netflow_v5: NetflowV5Parser::new(field_parser, config.strict_validation),
+            enabled_protocols,
             include_raw_data: config.include_raw_data,
         }
     }
 
+    /// Returns true if the given protocol name is enabled in configuration.
+    fn protocol_enabled(&self, name: &str) -> bool {
+        self.enabled_protocols.contains(name)
+    }
+
     /// Parse a packet and return flow events.
-    pub fn parse(&self, data: &[u8], peer_addr: SocketAddr, _template_cache: &TemplateCache) -> Vec<Event> {
+    pub fn parse(
+        &self,
+        data: &[u8],
+        peer_addr: SocketAddr,
+        _template_cache: &TemplateCache,
+    ) -> Vec<Event> {
         let protocol = self.detect_protocol(data);
 
         debug!(
@@ -70,14 +74,9 @@ impl ProtocolParser {
             peer_addr = %peer_addr,
         );
 
-        let config_stub = NetflowConfig {
-            protocols: self.enabled_protocols.clone(),
-            ..Default::default()
-        };
-
-        if !protocol.is_enabled(&config_stub) {
+        if !self.protocol_enabled(protocol.as_str()) {
             debug!(
-                message = "Protocol disabled, ignoring packet.",
+                message = "Protocol disabled or unknown, emitting diagnostic event.",
                 protocol = protocol.as_str(),
                 peer_addr = %peer_addr,
             );
@@ -85,19 +84,22 @@ impl ProtocolParser {
                 protocol: protocol.as_str(),
                 peer_addr,
             });
-            if let DetectedProtocol::Unknown(version) = protocol {
-                return vec![self.create_unknown_protocol_event(data, peer_addr, version)];
-            }
-            return Vec::new();
+            return match protocol {
+                DetectedProtocol::Unknown(version) => {
+                    vec![self.create_unknown_protocol_event(data, peer_addr, version)]
+                }
+                _ => vec![self.create_disabled_protocol_event(data, peer_addr, protocol.as_str())],
+            };
         }
 
         let parse_result = match protocol {
             DetectedProtocol::NetflowV5 => {
-                self.netflow_v5.parse(data, peer_addr, self.include_raw_data)
+                self.netflow_v5
+                    .parse(data, peer_addr, self.include_raw_data)
             }
-            DetectedProtocol::Unknown(version) => {
-                Ok(vec![self.create_unknown_protocol_event(data, peer_addr, version)])
-            }
+            DetectedProtocol::Unknown(version) => Ok(vec![
+                self.create_unknown_protocol_event(data, peer_addr, version),
+            ]),
         };
 
         match parse_result {
@@ -128,11 +130,28 @@ impl ProtocolParser {
             return DetectedProtocol::Unknown(0);
         }
         let version = u16::from_be_bytes([data[0], data[1]]);
-        if version == 5 && NetflowV5Parser::can_parse(data) {
+        if version == 5 && NetflowV5Parser::can_parse_with_version(data, version) {
             DetectedProtocol::NetflowV5
         } else {
             DetectedProtocol::Unknown(version)
         }
+    }
+
+    fn create_disabled_protocol_event(
+        &self,
+        data: &[u8],
+        peer_addr: SocketAddr,
+        protocol: &str,
+    ) -> Event {
+        let mut log_event = vector_lib::event::LogEvent::default();
+        log_event.insert("flow_type", "disabled");
+        log_event.insert("protocol", protocol);
+        log_event.insert("peer_addr", peer_addr.to_string());
+        log_event.insert("packet_length", data.len());
+        if data.len() >= 4 {
+            log_event.insert("first_4_bytes", hex::encode(&data[..4]));
+        }
+        Event::Log(log_event)
     }
 
     fn create_unknown_protocol_event(
@@ -182,7 +201,7 @@ impl ProtocolParser {
     /// Get statistics about supported protocols.
     pub fn get_protocol_stats(&self) -> ProtocolStats {
         ProtocolStats {
-            enabled_protocols: self.enabled_protocols.clone(),
+            enabled_protocols: self.enabled_protocols.iter().cloned().collect(),
             total_enabled: self.enabled_protocols.len(),
         }
     }
@@ -197,15 +216,14 @@ pub struct ProtocolStats {
 
 /// Parse flow data using the protocol parser.
 pub fn parse_flow_data(
+    parser: &ProtocolParser,
     data: &[u8],
     peer_addr: SocketAddr,
     template_cache: &TemplateCache,
-    config: &NetflowConfig,
 ) -> Result<Vec<Event>, String> {
     if data.is_empty() {
         return Err("Empty packet received".to_string());
     }
-    let parser = ProtocolParser::new(config, template_cache.clone());
     Ok(parser.parse(data, peer_addr, template_cache))
 }
 
@@ -241,24 +259,6 @@ impl vector_lib::internal_event::InternalEvent for ProtocolParseSuccess {
             peer_addr = %self.peer_addr,
             event_count = self.event_count,
             byte_size = self.byte_size,
-        );
-    }
-}
-
-#[derive(Debug)]
-pub struct ProtocolDetectionFailed {
-    pub peer_addr: SocketAddr,
-    pub packet_length: usize,
-    pub first_bytes: String,
-}
-
-impl vector_lib::internal_event::InternalEvent for ProtocolDetectionFailed {
-    fn emit(self) {
-        tracing::warn!(
-            message = "Failed to detect protocol.",
-            peer_addr = %self.peer_addr,
-            packet_length = self.packet_length,
-            first_bytes = %self.first_bytes,
         );
     }
 }
@@ -307,8 +307,8 @@ mod tests {
             protocols: vec!["netflow_v5".to_string()],
             ..Default::default()
         };
-        assert!(DetectedProtocol::NetflowV5.is_enabled(&config));
-        assert!(!DetectedProtocol::Unknown(123).is_enabled(&config));
+        assert!(config.is_protocol_enabled("netflow_v5"));
+        assert!(!config.is_protocol_enabled("unknown"));
     }
 
     #[test]
@@ -321,7 +321,10 @@ mod tests {
         let parser = ProtocolParser::new(&config, template_cache.clone());
         let nf5_packet = create_netflow_v5_packet();
         let events = parser.parse(&nf5_packet, test_peer_addr(), &template_cache);
-        assert!(events.is_empty());
+        assert_eq!(events.len(), 1);
+        let log = events[0].as_log();
+        assert_eq!(log.get("flow_type").unwrap().as_str().unwrap(), "disabled");
+        assert_eq!(log.get("protocol").unwrap().as_str().unwrap(), "netflow_v5");
     }
 
     #[test]
@@ -335,7 +338,10 @@ mod tests {
 
         assert!(!events.is_empty());
         if let Event::Log(log) = &events[0] {
-            assert_eq!(log.get("flow_type").unwrap().as_str().unwrap(), "netflow_v5");
+            assert_eq!(
+                log.get("flow_type").unwrap().as_str().unwrap(),
+                "netflow_v5"
+            );
         }
     }
 
@@ -393,7 +399,8 @@ mod tests {
     fn test_empty_packet() {
         let template_cache = TemplateCache::new(100);
         let config = test_config();
-        let result = parse_flow_data(&[], test_peer_addr(), &template_cache, &config);
+        let parser = ProtocolParser::new(&config, template_cache.clone());
+        let result = parse_flow_data(&parser, &[], test_peer_addr(), &template_cache);
         assert!(result.is_err());
         assert_eq!(result.unwrap_err(), "Empty packet received");
     }
@@ -436,8 +443,9 @@ mod tests {
     fn test_main_parse_function() {
         let template_cache = TemplateCache::new(100);
         let config = test_config();
+        let parser = ProtocolParser::new(&config, template_cache.clone());
         let nf5_packet = create_netflow_v5_packet();
-        let result = parse_flow_data(&nf5_packet, test_peer_addr(), &template_cache, &config);
+        let result = parse_flow_data(&parser, &nf5_packet, test_peer_addr(), &template_cache);
         assert!(result.is_ok());
         let events = result.unwrap();
         assert!(!events.is_empty());

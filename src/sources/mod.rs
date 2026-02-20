@@ -62,6 +62,8 @@ pub mod mongodb_metrics;
 pub mod mqtt;
 #[cfg(feature = "sources-nats")]
 pub mod nats;
+#[cfg(feature = "sources-netflow")]
+pub mod netflow;
 #[cfg(feature = "sources-nginx_metrics")]
 pub mod nginx_metrics;
 #[cfg(feature = "sources-okta")]
@@ -82,8 +84,6 @@ pub mod pulsar;
 pub mod redis;
 #[cfg(feature = "sources-socket")]
 pub mod socket;
-#[cfg(feature = "sources-netflow")]
-pub mod netflow;
 #[cfg(feature = "sources-splunk_hec")]
 pub mod splunk_hec;
 #[cfg(feature = "sources-static_metrics")]

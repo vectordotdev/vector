@@ -45,7 +45,11 @@ impl Template {
         }
     }
 
-    pub fn new_options(template_id: u16, fields: Vec<TemplateField>, scope_field_count: u16) -> Self {
+    pub fn new_options(
+        template_id: u16,
+        fields: Vec<TemplateField>,
+        scope_field_count: u16,
+    ) -> Self {
         let now = Instant::now();
         Self {
             template_id,
@@ -89,6 +93,7 @@ impl CacheStats {
 }
 
 /// Minimal template cache for NetFlow v5. No templates are stored; the cache is a no-op.
+/// Designed to be used as `Arc<TemplateCache>`: clone the Arc to share the same cache across workers.
 pub struct TemplateCache {
     max_size: usize,
     _max_buffered_records: usize,

@@ -4,10 +4,12 @@
 //! logging, metrics, and error reporting. These events provide visibility
 //! into the source's operation and help with troubleshooting.
 
+use metrics::counter;
 use std::net::SocketAddr;
 use tracing::{debug, error, info, warn};
-use vector_lib::internal_event::{error_stage, error_type, ComponentEventsDropped, InternalEvent, UNINTENTIONAL};
-use metrics::counter;
+use vector_lib::internal_event::{
+    ComponentEventsDropped, InternalEvent, UNINTENTIONAL, error_stage, error_type,
+};
 
 /// NetFlow packet received successfully
 #[derive(Debug)]
@@ -25,16 +27,16 @@ impl InternalEvent for NetflowEventsReceived {
             byte_size = self.byte_size,
             peer_addr = %self.peer_addr,
         );
-        
+
         counter!(
             "component_received_events_total",
-            "peer_addr" => self.peer_addr.to_string(),
+            "peer_addr" => self.peer_addr.ip().to_string(),
         )
         .increment(self.count as u64);
-        
+
         counter!(
             "component_received_event_bytes_total",
-            "peer_addr" => self.peer_addr.to_string(),
+            "peer_addr" => self.peer_addr.ip().to_string(),
         )
         .increment(self.byte_size as u64);
     }
@@ -74,14 +76,14 @@ impl<'a> InternalEvent for NetflowParseError<'a> {
                 internal_log_rate_limit = true,
             );
         }
-        
+
         counter!(
             "component_errors_total",
             "error_code" => "parse_failed",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "protocol" => self.protocol.to_string(),
-            "peer_addr" => self.peer_addr.to_string(),
+            "peer_addr" => self.peer_addr.ip().to_string(),
         )
         .increment(1);
     }
@@ -107,13 +109,13 @@ impl<'a> InternalEvent for NetflowTemplateError<'a> {
             stage = error_stage::PROCESSING,
             internal_log_rate_limit = true,
         );
-        
+
         counter!(
             "component_errors_total",
             "error_code" => "template_error",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-            "peer_addr" => self.peer_addr.to_string(),
+            "peer_addr" => self.peer_addr.ip().to_string(),
         )
         .increment(1);
     }
@@ -141,14 +143,14 @@ impl<'a> InternalEvent for NetflowFieldParseError<'a> {
             stage = error_stage::PROCESSING,
             internal_log_rate_limit = true,
         );
-        
+
         counter!(
             "component_errors_total",
             "error_code" => "field_parse_error",
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
             "field_type" => self.field_type.to_string(),
-            "peer_addr" => self.peer_addr.to_string(),
+            "peer_addr" => self.peer_addr.ip().to_string(),
         )
         .increment(1);
     }
@@ -163,13 +165,17 @@ pub struct NetflowEventsDropped {
 
 impl InternalEvent for NetflowEventsDropped {
     fn emit(self) {
-        // Reduce noise for template-related drops when buffering is enabled
-        if self.reason.contains("No template") {
+        let error_code: &'static str = if self.reason.contains("No template") {
+            "template_missing"
+        } else {
+            "events_dropped"
+        };
+        if error_code == "template_missing" {
             debug!(
                 message = "NetFlow events dropped - template not available.",
                 count = self.count,
                 reason = %self.reason,
-                error_code = "template_missing",
+                error_code = error_code,
                 error_type = error_type::PARSER_FAILED,
                 stage = error_stage::PROCESSING,
                 internal_log_rate_limit = true,
@@ -179,24 +185,23 @@ impl InternalEvent for NetflowEventsDropped {
                 message = "NetFlow events dropped.",
                 count = self.count,
                 reason = %self.reason,
-                error_code = "events_dropped",
+                error_code = error_code,
                 error_type = error_type::PARSER_FAILED,
                 stage = error_stage::PROCESSING,
             );
         }
-        
+
         counter!(
             "component_errors_total",
-            "error_code" => "events_dropped",
+            "error_code" => error_code,
             "error_type" => error_type::PARSER_FAILED,
             "stage" => error_stage::PROCESSING,
-            "reason" => self.reason.to_string(),
         )
         .increment(1);
-        
+
         emit!(ComponentEventsDropped::<UNINTENTIONAL> {
             count: self.count,
-            reason: self.reason,
+            reason: error_code,
         });
     }
 }
@@ -218,13 +223,13 @@ impl InternalEvent for NetflowBindError {
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
         );
-        
+
         counter!(
             "component_errors_total",
             "error_code" => "socket_bind_failed",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::RECEIVING,
-            "address" => self.address.to_string(),
+            "address" => self.address.ip().to_string(),
         )
         .increment(1);
     }
@@ -246,7 +251,7 @@ impl InternalEvent for NetflowReceiveError {
             stage = error_stage::RECEIVING,
             internal_log_rate_limit = true,
         );
-        
+
         counter!(
             "component_errors_total",
             "error_code" => "socket_receive_failed",
@@ -276,7 +281,7 @@ impl InternalEvent for NetflowMulticastJoinError {
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::RECEIVING,
         );
-        
+
         counter!(
             "component_errors_total",
             "error_code" => "multicast_join_failed",
@@ -309,16 +314,10 @@ impl InternalEvent for TemplateCleanupCompleted {
                 timeout_seconds = self.timeout_seconds,
             );
         }
-        
-        counter!(
-            "netflow_template_cache_cleanups_total",
-        )
-        .increment(1);
-        
-        counter!(
-            "netflow_template_cache_expired_total",
-        )
-        .increment(self.removed_count as u64);
+
+        counter!("netflow_template_cache_cleanups_total",).increment(1);
+
+        counter!("netflow_template_cache_expired_total",).increment(self.removed_count as u64);
     }
 }
 
@@ -351,11 +350,11 @@ impl InternalEvent for TemplateReceived {
             observation_domain_id = self.observation_domain_id,
             protocol = self.protocol,
         );
-        
+
         counter!(
             "netflow_templates_received_total",
             "protocol" => self.protocol.to_string(),
-            "peer_addr" => self.peer_addr.to_string(),
+            "peer_addr" => self.peer_addr.ip().to_string(),
         )
         .increment(1);
     }
@@ -370,11 +369,11 @@ impl InternalEvent for BufferedRecordsProcessed {
             peer_addr = %self.peer_addr,
             observation_domain_id = self.observation_domain_id,
         );
-        
+
         counter!(
             "netflow_buffered_records_processed_total",
             "template_id" => self.template_id.to_string(),
-            "peer_addr" => self.peer_addr.to_string(),
+            "peer_addr" => self.peer_addr.ip().to_string(),
         )
         .increment(self.record_count as u64);
     }
@@ -400,16 +399,10 @@ impl InternalEvent for TemplateCacheStats {
             total_hits = self.total_hits,
             total_misses = self.total_misses,
         );
-        
-        metrics::gauge!(
-            "netflow_template_cache_size",
-        )
-        .set(self.cache_size as f64);
-        
-        metrics::gauge!(
-            "netflow_template_cache_hit_ratio",
-        )
-        .set(self.hit_ratio);
+
+        metrics::gauge!("netflow_template_cache_size",).set(self.cache_size as f64);
+
+        metrics::gauge!("netflow_template_cache_hit_ratio",).set(self.hit_ratio);
     }
 }
 
@@ -433,14 +426,14 @@ impl InternalEvent for DataRecordParsed {
             peer_addr = %self.peer_addr,
             protocol = self.protocol,
         );
-        
+
         counter!(
             "netflow_records_parsed_total",
             "protocol" => self.protocol.to_string(),
-            "peer_addr" => self.peer_addr.to_string(),
+            "peer_addr" => self.peer_addr.ip().to_string(),
         )
         .increment(1);
-        
+
         counter!(
             "netflow_fields_parsed_total",
             "protocol" => self.protocol.to_string(),
@@ -467,7 +460,7 @@ impl InternalEvent for EnterpriseFieldEncountered {
             field_name = %self.field_name,
             peer_addr = %self.peer_addr,
         );
-        
+
         counter!(
             "netflow_enterprise_fields_total",
             "enterprise_id" => self.enterprise_id.to_string(),
@@ -494,7 +487,7 @@ impl InternalEvent for UnknownEnterpriseField {
             peer_addr = %self.peer_addr,
             internal_log_rate_limit = true,
         );
-        
+
         counter!(
             "netflow_unknown_enterprise_fields_total",
             "enterprise_id" => self.enterprise_id.to_string(),
@@ -522,7 +515,7 @@ impl InternalEvent for ProtocolVersionMismatch {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
         );
-        
+
         counter!(
             "component_errors_total",
             "error_code" => "version_mismatch",
@@ -554,7 +547,7 @@ impl InternalEvent for PacketTooLarge {
             error_type = error_type::PARSER_FAILED,
             stage = error_stage::PROCESSING,
         );
-        
+
         counter!(
             "component_errors_total",
             "error_code" => "packet_too_large",
@@ -583,11 +576,8 @@ impl InternalEvent for NetflowSourceStarted {
             max_templates = self.max_templates,
             template_timeout = self.template_timeout,
         );
-        
-        counter!(
-            "netflow_source_starts_total",
-        )
-        .increment(1);
+
+        counter!("netflow_source_starts_total",).increment(1);
     }
 }
 
@@ -605,11 +595,8 @@ impl InternalEvent for NetflowSourceStopped {
             address = %self.address,
             runtime_seconds = self.runtime_seconds,
         );
-        
-        counter!(
-            "netflow_source_stops_total",
-        )
-        .increment(1);
+
+        counter!("netflow_source_stops_total",).increment(1);
     }
 }
 
@@ -628,7 +615,7 @@ impl InternalEvent for ConfigValidationError {
             error_type = error_type::CONFIGURATION_FAILED,
             stage = error_stage::RECEIVING,
         );
-        
+
         counter!(
             "component_errors_total",
             "error_code" => "config_validation_failed",
@@ -657,11 +644,8 @@ impl InternalEvent for VariableLengthFieldParsed {
             template_id = self.template_id,
             peer_addr = %self.peer_addr,
         );
-        
-        counter!(
-            "netflow_variable_length_fields_total",
-        )
-        .increment(1);
+
+        counter!("netflow_variable_length_fields_total",).increment(1);
     }
 }
 
@@ -685,21 +669,12 @@ impl InternalEvent for FlowStatsSummary {
             unique_peers = self.unique_peers,
             active_templates = self.active_templates,
         );
-        
-        metrics::gauge!(
-            "netflow_total_flows",
-        )
-        .set(self.total_flows as f64);
-        
-        metrics::gauge!(
-            "netflow_unique_peers",
-        )
-        .set(self.unique_peers as f64);
-        
-        metrics::gauge!(
-            "netflow_active_templates",
-        )
-        .set(self.active_templates as f64);
+
+        metrics::gauge!("netflow_total_flows",).set(self.total_flows as f64);
+
+        metrics::gauge!("netflow_unique_peers",).set(self.unique_peers as f64);
+
+        metrics::gauge!("netflow_active_templates",).set(self.active_templates as f64);
     }
 }
 
@@ -721,7 +696,7 @@ impl InternalEvent for ProtocolSpecificEvent {
             details = %self.details,
             peer_addr = %self.peer_addr,
         );
-        
+
         counter!(
             "netflow_protocol_events_total",
             "protocol" => self.protocol.to_string(),
@@ -747,14 +722,14 @@ impl InternalEvent for MemoryUsageWarning {
             current_usage = self.current_usage,
             threshold = self.threshold,
             error_code = "memory_usage_high",
-            error_type = error_type::CONFIGURATION_FAILED,
+            error_type = error_type::CONDITION_FAILED,
             stage = error_stage::PROCESSING,
         );
-        
+
         counter!(
             "component_errors_total",
             "error_code" => "memory_usage_high",
-            "error_type" => error_type::CONFIGURATION_FAILED,
+            "error_type" => error_type::CONDITION_FAILED,
             "stage" => error_stage::PROCESSING,
             "component" => self.component.to_string(),
         )
@@ -782,31 +757,26 @@ mod tests {
                 byte_size: 1500,
                 peer_addr,
             }) as Box<dyn std::fmt::Debug>,
-            
             Box::new(NetflowParseError {
                 error: "test error",
                 protocol: "netflow_v5",
                 peer_addr,
             }),
-            
             Box::new(NetflowTemplateError {
                 error: "template error",
                 template_id: 256,
                 peer_addr,
             }),
-            
             Box::new(NetflowFieldParseError {
                 error: "field error",
                 field_type: 1,
                 template_id: 256,
                 peer_addr,
             }),
-            
             Box::new(NetflowEventsDropped {
                 count: 5,
                 reason: "no template",
             }),
-            
             Box::new(TemplateReceived {
                 template_id: 256,
                 field_count: 10,
@@ -814,7 +784,6 @@ mod tests {
                 observation_domain_id: 1,
                 protocol: "ipfix",
             }),
-            
             Box::new(EnterpriseFieldEncountered {
                 enterprise_id: 23867,
                 field_type: 1,
@@ -837,12 +806,14 @@ mod tests {
             count: 1,
             byte_size: 100,
             peer_addr,
-        }.emit();
+        }
+        .emit();
 
         TemplateCleanupCompleted {
             removed_count: 5,
             timeout_seconds: 3600,
-        }.emit();
+        }
+        .emit();
 
         FlowStatsSummary {
             total_flows: 1000,
@@ -850,7 +821,8 @@ mod tests {
             total_bytes: 1000000,
             unique_peers: 10,
             active_templates: 50,
-        }.emit();
+        }
+        .emit();
     }
 
     #[test]
@@ -862,19 +834,22 @@ mod tests {
             error: "Invalid packet format",
             protocol: "netflow_v9",
             peer_addr,
-        }.emit();
+        }
+        .emit();
 
         NetflowTemplateError {
             error: "Template field count mismatch",
             template_id: 512,
             peer_addr,
-        }.emit();
+        }
+        .emit();
 
         ProtocolVersionMismatch {
             expected: 9,
             received: 5,
             peer_addr,
-        }.emit();
+        }
+        .emit();
     }
 
     #[test]
@@ -887,7 +862,8 @@ mod tests {
             hit_ratio: 0.95,
             total_hits: 950,
             total_misses: 50,
-        }.emit();
+        }
+        .emit();
 
         DataRecordParsed {
             template_id: 256,
@@ -895,7 +871,8 @@ mod tests {
             record_size: 60,
             peer_addr,
             protocol: "ipfix",
-        }.emit();
+        }
+        .emit();
     }
 
     #[test]
@@ -907,12 +884,14 @@ mod tests {
             protocols: vec!["netflow_v5".to_string(), "ipfix".to_string()],
             max_templates: 1000,
             template_timeout: 3600,
-        }.emit();
+        }
+        .emit();
 
         NetflowSourceStopped {
             address,
             runtime_seconds: 86400,
-        }.emit();
+        }
+        .emit();
     }
 
     #[test]
@@ -922,7 +901,8 @@ mod tests {
                 "max_packet_size must be > 0".to_string(),
                 "invalid protocol specified".to_string(),
             ],
-        }.emit();
+        }
+        .emit();
     }
 
     #[test]
@@ -934,13 +914,15 @@ mod tests {
             field_type: 1001,
             field_name: "cisco_application_id".to_string(),
             peer_addr,
-        }.emit();
+        }
+        .emit();
 
         UnknownEnterpriseField {
             enterprise_id: 99999,
             field_type: 5000,
             peer_addr,
-        }.emit();
+        }
+        .emit();
     }
 
     #[test]
@@ -952,7 +934,8 @@ mod tests {
             actual_length: 256,
             template_id: 512,
             peer_addr,
-        }.emit();
+        }
+        .emit();
     }
 
     #[test]
@@ -961,7 +944,8 @@ mod tests {
             component: "template_cache",
             current_usage: 104857600, // 100MB
             threshold: 83886080,      // 80MB
-        }.emit();
+        }
+        .emit();
     }
 
     #[test]
@@ -973,6 +957,7 @@ mod tests {
             event_type: "sample_rate_change",
             details: "Sample rate changed from 1000 to 2000".to_string(),
             peer_addr,
-        }.emit();
+        }
+        .emit();
     }
 }

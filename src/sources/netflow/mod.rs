@@ -9,11 +9,18 @@ use tokio::net::UdpSocket;
 use tokio::time::Duration;
 use tracing::{debug, error, info};
 
+use crate::SourceSender;
 use crate::config::{DataType, Resource, SourceConfig, SourceContext, SourceOutput};
 use crate::shutdown::ShutdownSignal;
-use crate::sources::netflow::events::*;
 use crate::sources::Source;
-use crate::SourceSender;
+use crate::sources::netflow::events::*;
+
+/// Ensures ProtocolParser is Send + Sync so it can be shared across worker tasks.
+#[allow(dead_code)]
+fn assert_protocol_parser_send_sync() {
+    fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<protocols::ProtocolParser>();
+}
 
 pub mod config;
 pub mod events;
@@ -23,8 +30,8 @@ pub mod templates;
 
 pub use config::NetflowConfig;
 
-/// Creates a UDP socket with SO_REUSEPORT for multi-worker support.
-async fn create_reuseport_socket(address: std::net::SocketAddr) -> Result<UdpSocket, std::io::Error> {
+/// Creates a UDP socket. On Linux, enables SO_REUSEPORT for multi-worker load balancing; on other platforms, uses a single socket.
+async fn create_bind_socket(address: std::net::SocketAddr) -> Result<UdpSocket, std::io::Error> {
     let domain = if address.is_ipv4() {
         Domain::IPV4
     } else {
@@ -32,6 +39,7 @@ async fn create_reuseport_socket(address: std::net::SocketAddr) -> Result<UdpSoc
     };
 
     let socket = Socket::new(domain, Type::DGRAM, Some(Protocol::UDP))?;
+    #[cfg(target_os = "linux")]
     socket.set_reuse_port(true)?;
     socket.set_reuse_address(true)?;
     socket.bind(&address.into())?;
@@ -47,12 +55,11 @@ async fn netflow_source(
     shutdown: ShutdownSignal,
     out: SourceSender,
 ) -> Result<(), ()> {
-    // Determine number of worker threads based on available parallelism
-    let num_workers = std::thread::available_parallelism()
-        .map(|n| n.get())
-        .unwrap_or(1)
-        .max(1);
-    
+    #[cfg(target_os = "linux")]
+    let num_workers = config.workers;
+    #[cfg(not(target_os = "linux"))]
+    let num_workers = 1;
+
     debug!(
         address = %config.address,
         num_workers = num_workers,
@@ -61,31 +68,39 @@ async fn netflow_source(
 
     // Create shared template cache and protocol parser
     let template_cache = Arc::new(templates::TemplateCache::new_with_buffering(
-        config.max_templates, 
-        config.max_buffered_records
+        config.max_templates,
+        config.max_buffered_records,
     ));
-    let protocol_parser = Arc::new(protocols::ProtocolParser::new(&config, (*template_cache).clone()));
-    
+    let protocol_parser = Arc::new(protocols::ProtocolParser::new(
+        &config,
+        (*template_cache).clone(),
+    ));
+
     // Spawn worker tasks
-    let mut worker_handles = Vec::with_capacity(num_workers);
-    
+    let mut worker_handles: Vec<tokio::task::JoinHandle<Result<(), ()>>> =
+        Vec::with_capacity(num_workers);
+
     for worker_id in 0..num_workers {
-        // Create socket with SO_REUSEPORT to allow multiple sockets on same address
-        let socket = create_reuseport_socket(config.address).await.map_err(|error| {
-            emit!(NetflowBindError {
-                address: config.address,
-                error,
-            });
-        })?;
-        
-        // Clone shared resources for this worker
+        let socket = match create_bind_socket(config.address).await {
+            Ok(s) => s,
+            Err(error) => {
+                emit!(NetflowBindError {
+                    address: config.address,
+                    error,
+                });
+                for handle in worker_handles.drain(..) {
+                    handle.abort();
+                }
+                return Err(());
+            }
+        };
+
         let template_cache = template_cache.clone();
         let protocol_parser = protocol_parser.clone();
         let config = config.clone();
         let shutdown = shutdown.clone();
         let out = out.clone();
-        
-        // Spawn worker task
+
         let handle = tokio::spawn(async move {
             netflow_worker(
                 worker_id,
@@ -95,12 +110,13 @@ async fn netflow_source(
                 protocol_parser,
                 out,
                 shutdown,
-            ).await
+            )
+            .await
         });
-        
+
         worker_handles.push(handle);
     }
-    
+
     // Wait for all workers to complete
     for (worker_id, handle) in worker_handles.into_iter().enumerate() {
         if let Err(e) = handle.await {
@@ -112,13 +128,13 @@ async fn netflow_source(
             return Err(());
         }
     }
-    
+
     info!(message = "All NetFlow workers completed.");
     Ok(())
 }
 
 /// Individual NetFlow worker task that processes packets from a single UDP socket.
-/// 
+///
 /// Each worker runs in its own task and processes packets independently,
 /// sharing the template cache and protocol parser with other workers.
 async fn netflow_worker(
@@ -135,32 +151,28 @@ async fn netflow_worker(
         address = %config.address,
         message = "NetFlow worker started.",
     );
-    
-    // Pre-allocate multiple buffers for better performance
-    let mut buffers = Vec::with_capacity(8);
-    for _ in 0..8 {
-        buffers.push(vec![0u8; config.max_packet_size]);
-    }
-    let mut buffer_index = 0;
+
+    // Buffer one byte larger than max to detect truncated UDP datagrams (OS truncates when recv buffer is full).
+    let mut buffer = vec![0u8; config.max_packet_size + 1];
     let mut last_cleanup = std::time::Instant::now();
 
     loop {
         tokio::select! {
-            recv_result = socket.recv_from(&mut buffers[buffer_index]) => {
+            recv_result = socket.recv_from(&mut buffer) => {
                 match recv_result {
                     Ok((len, peer_addr)) => {
                         if len > config.max_packet_size {
                             emit!(NetflowParseError {
-                                error: "Packet too large",
+                                error: "Packet too large (truncated)",
                                 protocol: "unknown",
                                 peer_addr,
                             });
                             continue;
                         }
 
-                        let data = &buffers[buffer_index][..len];
+                        let data = &buffer[..len];
                         let events = protocol_parser.parse(data, peer_addr, &template_cache);
-                        
+
                         if !events.is_empty() {
                             emit!(NetflowEventsReceived {
                                 count: events.len(),
@@ -177,9 +189,6 @@ async fn netflow_worker(
                                 return Err(());
                             }
                         }
-
-                        // Rotate buffer for next packet
-                        buffer_index = (buffer_index + 1) % buffers.len();
 
                         // Periodic template cleanup (only one worker should do this)
                         if worker_id == 0 && last_cleanup.elapsed() > Duration::from_secs(300) {
@@ -202,10 +211,7 @@ async fn netflow_worker(
         }
     }
 
-    debug!(
-        worker_id = worker_id,
-        message = "NetFlow worker completed.",
-    );
+    debug!(worker_id = worker_id, message = "NetFlow worker completed.",);
     Ok(())
 }
 
@@ -220,10 +226,13 @@ impl SourceConfig for NetflowConfig {
         Ok(Box::pin(netflow_source(config, shutdown, out)))
     }
 
-    fn outputs(&self, _global_log_namespace: vector_lib::config::LogNamespace) -> Vec<SourceOutput> {
+    fn outputs(
+        &self,
+        _global_log_namespace: vector_lib::config::LogNamespace,
+    ) -> Vec<SourceOutput> {
         vec![SourceOutput::new_maybe_logs(
-            DataType::Log, 
-            vector_lib::schema::Definition::any()
+            DataType::Log,
+            vector_lib::schema::Definition::any(),
         )]
     }
 
@@ -251,6 +260,7 @@ mod tests {
         let template_cache = TemplateCache::new(1000);
         let config = NetflowConfig {
             address: "127.0.0.1:2055".parse().unwrap(),
+            workers: 1,
             max_packet_size: 1500,
             max_templates: 1000,
             template_timeout: 3600,
@@ -271,111 +281,58 @@ mod tests {
 
         // Create minimal NetFlow v5 packet
         let mut packet = vec![0u8; 72]; // 24 header + 48 record
-        
+
         // NetFlow v5 header
-        packet[0..2].copy_from_slice(&5u16.to_be_bytes());     // version
-        packet[2..4].copy_from_slice(&1u16.to_be_bytes());     // count
+        packet[0..2].copy_from_slice(&5u16.to_be_bytes()); // version
+        packet[2..4].copy_from_slice(&1u16.to_be_bytes()); // count
         packet[4..8].copy_from_slice(&12345u32.to_be_bytes()); // sys_uptime
         packet[8..12].copy_from_slice(&1609459200u32.to_be_bytes()); // unix_secs
-        packet[12..16].copy_from_slice(&0u32.to_be_bytes());   // unix_nsecs
+        packet[12..16].copy_from_slice(&0u32.to_be_bytes()); // unix_nsecs
         packet[16..20].copy_from_slice(&100u32.to_be_bytes()); // flow_sequence
         packet[20] = 0; // engine_type
         packet[21] = 0; // engine_id
-        packet[22..24].copy_from_slice(&0u16.to_be_bytes());   // sampling_interval
-        
+        packet[22..24].copy_from_slice(&0u16.to_be_bytes()); // sampling_interval
+
         // Complete flow record (48 bytes)
         packet[24..28].copy_from_slice(&0xC0A80101u32.to_be_bytes()); // src_addr: 192.168.1.1
         packet[28..32].copy_from_slice(&0x0A000001u32.to_be_bytes()); // dst_addr: 10.0.0.1
-        packet[32..36].copy_from_slice(&0u32.to_be_bytes());   // next_hop
-        packet[36..38].copy_from_slice(&0u16.to_be_bytes());   // input
-        packet[38..40].copy_from_slice(&0u16.to_be_bytes());   // output
-        packet[40..44].copy_from_slice(&10u32.to_be_bytes());  // d_pkts
+        packet[32..36].copy_from_slice(&0u32.to_be_bytes()); // next_hop
+        packet[36..38].copy_from_slice(&0u16.to_be_bytes()); // input
+        packet[38..40].copy_from_slice(&0u16.to_be_bytes()); // output
+        packet[40..44].copy_from_slice(&10u32.to_be_bytes()); // d_pkts
         packet[44..48].copy_from_slice(&1500u32.to_be_bytes()); // d_octets
-        packet[48..52].copy_from_slice(&0u32.to_be_bytes());   // first
-        packet[52..56].copy_from_slice(&0u32.to_be_bytes());   // last
-        packet[56..58].copy_from_slice(&80u16.to_be_bytes());  // src_port
+        packet[48..52].copy_from_slice(&0u32.to_be_bytes()); // first
+        packet[52..56].copy_from_slice(&0u32.to_be_bytes()); // last
+        packet[56..58].copy_from_slice(&80u16.to_be_bytes()); // src_port
         packet[58..60].copy_from_slice(&443u16.to_be_bytes()); // dst_port
         packet[60] = 0; // pad1
         packet[61] = 0; // tcp_flags
         packet[62] = 6; // prot (TCP)
         packet[63] = 0; // tos
-        packet[64..66].copy_from_slice(&0u16.to_be_bytes());   // src_as
-        packet[66..68].copy_from_slice(&0u16.to_be_bytes());   // dst_as
+        packet[64..66].copy_from_slice(&0u16.to_be_bytes()); // src_as
+        packet[66..68].copy_from_slice(&0u16.to_be_bytes()); // dst_as
         packet[68] = 24; // src_mask
         packet[69] = 24; // dst_mask
-        packet[70..72].copy_from_slice(&0u16.to_be_bytes());   // pad2
+        packet[70..72].copy_from_slice(&0u16.to_be_bytes()); // pad2
 
         // Parse packet directly
         let events = parser.parse(&packet, peer_addr, &template_cache);
 
         assert!(!events.is_empty(), "No events received");
-        
-        if let Event::Log(log) = &events[0] {
-            // Check if flow_type exists first
-            if let Some(flow_type) = log.get("flow_type") {
-                if let Some(flow_type_str) = flow_type.as_str() {
-                    assert_eq!(flow_type_str, "netflow_v5");
-                } else {
-                    panic!("flow_type is not a string: {:?}", flow_type);
-                }
-            } else {
-                panic!("flow_type field not found in event");
-            }
-            
-            // Check record fields (version is not included in record events)
-            if let Some(src_addr) = log.get("src_addr") {
-                if let Some(src_addr_str) = src_addr.as_str() {
-                    assert_eq!(src_addr_str, "192.168.1.1");
-                } else {
-                    panic!("src_addr is not a string: {:?}", src_addr);
-                }
-            } else {
-                panic!("src_addr field not found in event");
-            }
-            
-            if let Some(dst_addr) = log.get("dst_addr") {
-                if let Some(dst_addr_str) = dst_addr.as_str() {
-                    assert_eq!(dst_addr_str, "10.0.0.1");
-                } else {
-                    panic!("dst_addr is not a string: {:?}", dst_addr);
-                }
-            } else {
-                panic!("dst_addr field not found in event");
-            }
-            
-            // Check other important fields
-            if let Some(protocol) = log.get("protocol") {
-                if let Some(protocol_int) = protocol.as_integer() {
-                    assert_eq!(protocol_int, 6); // TCP
-                } else {
-                    panic!("protocol is not an integer: {:?}", protocol);
-                }
-            } else {
-                panic!("protocol field not found in event");
-            }
-            
-            if let Some(src_port) = log.get("src_port") {
-                if let Some(src_port_int) = src_port.as_integer() {
-                    assert_eq!(src_port_int, 80);
-                } else {
-                    panic!("src_port is not an integer: {:?}", src_port);
-                }
-            } else {
-                panic!("src_port field not found in event");
-            }
-            
-            if let Some(dst_port) = log.get("dst_port") {
-                if let Some(dst_port_int) = dst_port.as_integer() {
-                    assert_eq!(dst_port_int, 443);
-                } else {
-                    panic!("dst_port is not an integer: {:?}", dst_port);
-                }
-            } else {
-                panic!("dst_port field not found in event");
-            }
-        } else {
-            panic!("Expected Log event, got {:?}", events[0]);
-        }
+
+        let log = events[0].as_log();
+        assert_eq!(
+            log.get("flow_type").unwrap().as_str().unwrap(),
+            "netflow_v5"
+        );
+        assert_eq!(
+            log.get("src_addr").unwrap().as_str().unwrap(),
+            "192.168.1.1"
+        );
+        assert_eq!(log.get("dst_addr").unwrap().as_str().unwrap(), "10.0.0.1");
+        assert_eq!(log.get("protocol").unwrap().as_integer().unwrap(), 6);
+        assert_eq!(log.get("src_port").unwrap().as_integer().unwrap(), 80);
+        assert_eq!(log.get("dst_port").unwrap().as_integer().unwrap(), 443);
     }
 
     #[tokio::test]
@@ -383,6 +340,7 @@ mod tests {
         let addr = next_addr();
         let config = NetflowConfig {
             address: addr,
+            workers: 1,
             max_packet_size: 1500,
             max_templates: 1000,
             template_timeout: 3600,
@@ -402,21 +360,22 @@ mod tests {
         let cx = SourceContext::new_test(tx, None);
         let source = config.build(cx).await.unwrap();
         let _source_task = tokio::spawn(source);
-        
-        tokio::time::sleep(Duration::from_millis(100)).await;
 
-        // Send invalid packet (too short)
-        let packet = vec![0u8; 5];
-        let socket = StdUdpSocket::bind("127.0.0.1:0").unwrap();
-        socket.send_to(&packet, addr).unwrap();
+        for _ in 0..20 {
+            tokio::time::sleep(Duration::from_millis(25)).await;
+            let packet = vec![0u8; 5];
+            if StdUdpSocket::bind("127.0.0.1:0")
+                .and_then(|s| s.send_to(&packet, addr))
+                .is_ok()
+            {
+                break;
+            }
+        }
 
-        // Should either get no events or an unknown protocol event
         let events = tokio::time::timeout(Duration::from_millis(500), collect_ready(rx))
             .await
             .unwrap_or_default();
 
-        // Invalid packets might create unknown protocol events or be dropped
-        // Both behaviors are acceptable
         if !events.is_empty() {
             if let Event::Log(log) = &events[0] {
                 assert_eq!(log.get("flow_type").unwrap().as_str().unwrap(), "unknown");

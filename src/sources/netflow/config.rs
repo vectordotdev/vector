@@ -7,7 +7,6 @@ use vector_lib::configurable::configurable_component;
 
 use crate::serde::default_true;
 
-
 /// Configuration for the NetFlow source.
 #[derive(Clone, Debug)]
 #[configurable_component(source("netflow"))]
@@ -17,6 +16,12 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::examples = "0.0.0.0:2055"))]
     #[configurable(metadata(docs::examples = "0.0.0.0:4739"))]
     pub address: SocketAddr,
+
+    /// Number of worker tasks to spawn. Each worker binds to the same address (SO_REUSEPORT on Unix). Defaults to 1.
+    #[configurable(metadata(docs::examples = 1))]
+    #[configurable(metadata(docs::examples = 4))]
+    #[serde(default = "default_workers")]
+    pub workers: usize,
 
     /// The maximum size of incoming NetFlow packets and field values.
     #[configurable(metadata(docs::type_unit = "bytes"))]
@@ -37,7 +42,6 @@ pub struct NetflowConfig {
     #[configurable(metadata(docs::examples = 7200))]
     #[serde(default = "default_template_timeout")]
     pub template_timeout: u64,
-
 
     /// Protocols to accept. This release supports `netflow_v5`.
     #[configurable(metadata(docs::examples = "protocols"))]
@@ -171,6 +175,10 @@ const fn default_template_timeout() -> u64 {
     1800 // 30 minutes - matches typical resend intervals
 }
 
+const fn default_workers() -> usize {
+    1
+}
+
 fn default_protocols() -> Vec<String> {
     vec!["netflow_v5".to_string()]
 }
@@ -191,13 +199,11 @@ const fn default_include_raw_data() -> bool {
     false
 }
 
-
-
-
 impl Default for NetflowConfig {
     fn default() -> Self {
         Self {
             address: "0.0.0.0:2055".parse().unwrap(),
+            workers: default_workers(),
             max_packet_size: default_max_packet_size(),
             max_templates: default_max_templates(),
             template_timeout: default_template_timeout(),
@@ -206,7 +212,7 @@ impl Default for NetflowConfig {
             parse_options_templates: default_true(),
             parse_variable_length_fields: default_true(),
             enterprise_fields: std::collections::HashMap::new(),
-            buffer_missing_templates: true,
+            buffer_missing_templates: default_true(),
             max_buffered_records: default_max_buffered_records(),
             options_template_mode: default_options_template_mode(),
             strict_validation: default_strict_validation(),
@@ -215,14 +221,15 @@ impl Default for NetflowConfig {
     }
 }
 
-
-
 impl NetflowConfig {
     /// Validate the configuration.
     pub fn validate(&self) -> Result<(), Vec<String>> {
         let mut errors = Vec::new();
 
         // Validate numeric ranges
+        if self.workers == 0 {
+            errors.push("workers must be at least 1".to_string());
+        }
         if self.max_packet_size == 0 {
             errors.push("max_packet_size must be greater than 0".to_string());
         }
@@ -252,8 +259,25 @@ impl NetflowConfig {
         if self.protocols.is_empty() {
             errors.push("at least one protocol must be enabled".to_string());
         }
+        const KNOWN_PROTOCOLS: &[&str] = &["netflow_v5"];
+        for p in &self.protocols {
+            if !KNOWN_PROTOCOLS.contains(&p.as_str()) {
+                errors.push(format!(
+                    "unknown protocol '{}'; supported: {}",
+                    p,
+                    KNOWN_PROTOCOLS.join(", ")
+                ));
+            }
+        }
 
-
+        // Validate options_template_mode
+        const VALID_OPTIONS_MODES: &[&str] = &["emit_metadata", "discard", "enrich"];
+        if !VALID_OPTIONS_MODES.contains(&self.options_template_mode.as_str()) {
+            errors.push(format!(
+                "options_template_mode must be one of: {}",
+                VALID_OPTIONS_MODES.join(", ")
+            ));
+        }
 
         // Validate enterprise field mappings
         for (key, field_name) in &self.enterprise_fields {
@@ -319,7 +343,7 @@ impl NetflowConfig {
 
     /// Check if a specific protocol is enabled.
     pub fn is_protocol_enabled(&self, protocol: &str) -> bool {
-        self.protocols.contains(&protocol.to_string())
+        self.protocols.iter().any(|p| p.as_str() == protocol)
     }
 }
 
@@ -343,9 +367,13 @@ mod tests {
     fn test_invalid_max_packet_size() {
         let mut config = NetflowConfig::default();
         config.max_packet_size = 0;
-        
+
         let errors = config.validate().unwrap_err();
-        assert!(errors.iter().any(|e| e.contains("max_packet_size must be greater than 0")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("max_packet_size must be greater than 0"))
+        );
     }
 
     #[test]
@@ -359,22 +387,24 @@ mod tests {
     #[test]
     fn test_enterprise_field_validation() {
         let mut config = NetflowConfig::default();
-        
+
         // Valid enterprise field
-        config.enterprise_fields.insert(
-            "9:1001".to_string(),
-            "cisco_app_id".to_string(),
-        );
+        config
+            .enterprise_fields
+            .insert("9:1001".to_string(), "cisco_app_id".to_string());
         assert!(config.validate().is_ok());
-        
+
         // Invalid key format
-        config.enterprise_fields.insert(
-            "invalid_key".to_string(),
-            "test".to_string(),
-        );
-        
+        config
+            .enterprise_fields
+            .insert("invalid_key".to_string(), "test".to_string());
+
         let errors = config.validate().unwrap_err();
-        assert!(errors.iter().any(|e| e.contains("must be in format 'enterprise_id:field_id'")));
+        assert!(
+            errors
+                .iter()
+                .any(|e| e.contains("must be in format 'enterprise_id:field_id'"))
+        );
     }
 
     #[test]
@@ -392,15 +422,14 @@ mod tests {
     #[test]
     fn test_enterprise_field_lookup() {
         let mut config = NetflowConfig::default();
-        config.enterprise_fields.insert(
-            "9:1001".to_string(),
-            "cisco_app_id".to_string(),
-        );
-        
+        config
+            .enterprise_fields
+            .insert("9:1001".to_string(), "cisco_app_id".to_string());
+
         let field = config.get_enterprise_field(9, 1001);
         assert!(field.is_some());
         assert_eq!(field.unwrap(), "cisco_app_id");
-        
+
         let missing = config.get_enterprise_field(9, 1002);
         assert!(missing.is_none());
     }
@@ -410,7 +439,7 @@ mod tests {
         let config = NetflowConfig::default();
         let toml_value = toml::Value::try_from(&config).unwrap();
         assert!(toml_value.is_table());
-        
+
         let serialized = toml::to_string(&config).unwrap();
         let deserialized: NetflowConfig = toml::from_str(&serialized).unwrap();
         assert_eq!(config.address, deserialized.address);
