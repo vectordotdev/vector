@@ -37,7 +37,7 @@ mod tests;
 ///
 /// The enum approach has zero extra fd overhead - we access the same File owned by
 /// BufReader through `get_ref()`. This is critical for accurately tracking
-/// `bytes_dropped` even after file deletion (the fd remains valid).
+/// `bytes_unread` even after file deletion (the fd remains valid).
 enum FileReader {
     /// Plain file reader - we can access the File via get_ref() for metadata
     Plain(BufReader<File>),
@@ -118,8 +118,8 @@ pub struct RawLineResult {
 pub struct FileUnwatchInfo {
     /// The path of the file
     pub path: PathBuf,
-    /// Number of bytes that were not read (dropped) from the file
-    pub bytes_dropped: u64,
+    /// Number of bytes that were not read from the file
+    pub bytes_unread: u64,
     /// Whether the file reached EOF before being unwatched
     pub reached_eof: bool,
 }
@@ -147,7 +147,7 @@ pub struct FileWatcher {
     line_delimiter: Bytes,
     buf: BytesMut,
     /// The file size when the watcher was created. Used as fallback for
-    /// bytes dropped calculation when the reader doesn't support file_size().
+    /// bytes unread calculation when the reader doesn't support file_size().
     initial_file_size: u64,
 }
 
@@ -332,12 +332,12 @@ impl FileWatcher {
         self.file_position
     }
 
-    /// Returns the number of bytes that were not read (dropped).
+    /// Returns the number of bytes that were not read.
     /// Uses the current file size from the underlying File (works even after
     /// file deletion since the fd remains valid), falling back to initial_file_size.
     /// When the file reaches EOF, this will be 0. When the file is unwatched before EOF,
     /// this represents the bytes that were never read.
-    pub async fn get_bytes_dropped(&self) -> u64 {
+    pub async fn get_bytes_unread(&self) -> u64 {
         let current_size = self
             .reader
             .file_size()
@@ -352,7 +352,7 @@ impl FileWatcher {
     pub async fn get_unwatch_info(&self) -> FileUnwatchInfo {
         FileUnwatchInfo {
             path: self.path.clone(),
-            bytes_dropped: self.get_bytes_dropped().await,
+            bytes_unread: self.get_bytes_unread().await,
             reached_eof: self.reached_eof,
         }
     }

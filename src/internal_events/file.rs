@@ -315,10 +315,10 @@ mod source {
         pub file: &'a Path,
         pub include_file_metric_tag: bool,
         pub reached_eof: bool,
-        /// Number of bytes that were not read (dropped) from the file.
+        /// Number of bytes that were not read from the file.
         /// When reached_eof is true, this will be 0. When false, this represents
         /// the bytes that were not read before the file was unwatched.
-        pub bytes_dropped: u64,
+        pub bytes_unread: u64,
     }
 
     impl InternalEvent for FileUnwatched<'_> {
@@ -328,7 +328,7 @@ mod source {
                 message = "Stopped watching file.",
                 file = %self.file.display(),
                 reached_eof,
-                bytes_dropped = self.bytes_dropped,
+                bytes_unread = self.bytes_unread,
             );
             if self.include_file_metric_tag {
                 let file_tag = self.file.to_string_lossy().into_owned();
@@ -339,11 +339,11 @@ mod source {
                 )
                 .increment(1);
                 counter!(
-                    "files_unwatched_bytes_dropped_total",
+                    "files_unwatched_bytes_unread_total",
                     "file" => file_tag,
                     "reached_eof" => reached_eof,
                 )
-                .increment(self.bytes_dropped);
+                .increment(self.bytes_unread);
             } else {
                 counter!(
                     "files_unwatched_total",
@@ -351,10 +351,10 @@ mod source {
                 )
                 .increment(1);
                 counter!(
-                    "files_unwatched_bytes_dropped_total",
+                    "files_unwatched_bytes_unread_total",
                     "reached_eof" => reached_eof,
                 )
-                .increment(self.bytes_dropped);
+                .increment(self.bytes_unread);
             }
         }
     }
@@ -573,12 +573,12 @@ mod source {
             });
         }
 
-        fn emit_file_unwatched(&self, file: &Path, reached_eof: bool, bytes_dropped: u64) {
+        fn emit_file_unwatched(&self, file: &Path, reached_eof: bool, bytes_unread: u64) {
             emit!(FileUnwatched {
                 file,
                 include_file_metric_tag: self.include_file_metric_tag,
                 reached_eof,
-                bytes_dropped,
+                bytes_unread,
             });
         }
 

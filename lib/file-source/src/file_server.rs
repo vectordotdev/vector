@@ -212,7 +212,7 @@ where
                                     self.emitter.emit_file_unwatched(
                                         &unwatch_info.path,
                                         unwatch_info.reached_eof,
-                                        unwatch_info.bytes_dropped,
+                                        unwatch_info.bytes_unread,
                                     );
                                 }
                             } else {
@@ -238,7 +238,7 @@ where
                                         self.emitter.emit_file_unwatched(
                                             &unwatch_info.path,
                                             unwatch_info.reached_eof,
-                                            unwatch_info.bytes_dropped,
+                                            unwatch_info.bytes_unread,
                                         );
                                     }
                                 }
@@ -390,7 +390,7 @@ where
                     self.emitter.emit_file_unwatched(
                         &unwatch_info.path,
                         unwatch_info.reached_eof,
-                        unwatch_info.bytes_dropped,
+                        unwatch_info.bytes_unread,
                     );
                     checkpoints.set_dead(file_id);
                 }
