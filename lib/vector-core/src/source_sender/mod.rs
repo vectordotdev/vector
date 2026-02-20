@@ -17,7 +17,7 @@ pub use errors::SendError;
 use output::Output;
 pub use sender::{SourceSender, SourceSenderItem};
 
-pub const CHUNK_SIZE: usize = 1000;
+pub const CHUNK_SIZE: usize = 32;
 
 #[cfg(any(test, feature = "test"))]
 const TEST_BUFFER_SIZE: usize = 100;
