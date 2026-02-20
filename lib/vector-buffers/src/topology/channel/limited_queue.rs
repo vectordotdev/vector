@@ -408,6 +408,12 @@ impl<T: Send + 'static> LimitedReceiver<T> {
             // There wasn't an item for us to pop, so see if the channel is actually closed.  If so,
             // then it's time for us to close up shop as well.
             if self.inner.limiter.is_closed() {
+                if self.available_capacity() < self.inner.capacity.get() {
+                    // We only terminate when closed and fully drained. A close can race with queue
+                    // visibility while items/in-flight permits still exist.
+                    tokio::task::yield_now().await;
+                    continue;
+                }
                 return None;
             }
 
@@ -457,10 +463,11 @@ pub fn limited<T: InMemoryBufferable + fmt::Debug>(
 mod tests {
     use std::num::NonZeroUsize;
 
+    use rand::{Rng as _, SeedableRng as _, rngs::SmallRng};
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use vector_common::byte_size_of::ByteSizeOf;
 
-    use super::{ChannelMetricMetadata, limited};
+    use super::{ChannelMetricMetadata, LimitedReceiver, LimitedSender, limited};
     use crate::{
         MemoryBufferSize,
         test::MultiEventRecord,
@@ -895,5 +902,71 @@ mod tests {
         assert_eq!(Some(msg2), assert_ready!(recv2.poll()));
 
         assert_eq!(2, tx.available_capacity());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn concurrent_send_receive_metrics_remain_valid() {
+        const ITEM_COUNT: usize = 4_000;
+
+        // Try different sizes of the buffer, from 10 to 1000 events.
+        for size in 1..=100 {
+            let limit = NonZeroUsize::new(size * 10).unwrap();
+            let (tx, rx) = limited(
+                MemoryBufferSize::MaxEvents(limit),
+                Some(ChannelMetricMetadata::new("test_channel_concurrent", None)),
+                None,
+            );
+            let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
+
+            let sender = tokio::spawn(send_samples(tx, ITEM_COUNT));
+            let receiver = tokio::spawn(receive_samples(rx, ITEM_COUNT));
+
+            sender.await.expect("sender task should not panic");
+            receiver.await.expect("receiver task should not panic");
+
+            let recorded = metrics.lock().unwrap().clone();
+            assert_eq!(
+                recorded.len(),
+                ITEM_COUNT * 2,
+                "expected one metric update per send and per receive"
+            );
+
+            // For MaxEvents with single-event messages, the occupancy counter tracks exact
+            // utilization, so values must stay within [0, limit].
+            let max_allowed = limit.get();
+            let observed_max = recorded.iter().copied().max().unwrap_or_default();
+            assert!(
+                recorded.iter().all(|value| *value <= max_allowed),
+                "observed utilization value above valid bound: max={observed_max}, allowed={max_allowed}"
+            );
+        }
+    }
+
+    async fn send_samples(mut tx: LimitedSender<Sample>, item_count: usize) {
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+
+        for i in 0..item_count {
+            tx.send(Sample::new(i as u64))
+                .await
+                .expect("send should succeed");
+            if rng.random::<u8>() % 8 == 0 {
+                tokio::task::yield_now().await;
+            }
+        }
+    }
+
+    async fn receive_samples(mut rx: LimitedReceiver<Sample>, item_count: usize) {
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+
+        for i in 0..item_count {
+            let next = rx
+                .next()
+                .await
+                .expect("receiver should yield all sent items");
+            assert_eq!(Sample::new(i as u64), next);
+            if rng.random::<u8>() % 8 == 0 {
+                tokio::task::yield_now().await;
+            }
+        }
     }
 }
