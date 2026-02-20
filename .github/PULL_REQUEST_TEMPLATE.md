@@ -29,9 +29,10 @@ Changes to CI, website, playground and similar are generally not considered user
 ## References
 
 <!--
-- Closes: #<issue number>
-- Related: #<issue number>
-- Related: #<PR number>
+- Closes: #<issue/PR number or link>
+-->
+<!--
+- Related: #<issue/PR number or link> 
 -->
 
 ## Notes
