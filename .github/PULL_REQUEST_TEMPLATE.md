@@ -11,6 +11,7 @@ This should help the reviewers give feedback faster and with higher quality. -->
 ## Change Type
 - [ ] Bug fix
 - [ ] New feature
+- [ ] Dependencies update
 - [ ] Non-functional (chore, refactoring, docs)
 - [ ] Performance
 
