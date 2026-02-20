@@ -14,6 +14,7 @@ pub struct Cli {
 }
 
 impl Cli {
+    #[allow(clippy::unnecessary_wraps)]
     pub fn exec(self) -> Result<()> {
         let mut cmd = RootCli::command();
         let bin_name = cmd.get_name().to_string();

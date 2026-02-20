@@ -1,10 +1,4 @@
 #![deny(clippy::pedantic, warnings)]
-#![allow(
-    clippy::module_name_repetitions,
-    clippy::print_stdout,
-    clippy::unused_self,
-    clippy::unnecessary_wraps
-)]
 
 #[macro_use]
 mod utils;
