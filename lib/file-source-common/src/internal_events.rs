@@ -11,7 +11,7 @@ pub trait FileSourceInternalEvents: Send + Sync + Clone + 'static {
 
     fn emit_file_watch_error(&self, path: &Path, error: Error);
 
-    fn emit_file_unwatched(&self, path: &Path, reached_eof: bool, bytes_dropped: u64);
+    fn emit_file_unwatched(&self, path: &Path, reached_eof: bool, bytes_unread: u64);
 
     fn emit_file_deleted(&self, path: &Path);
 
