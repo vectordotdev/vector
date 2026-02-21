@@ -16,6 +16,8 @@ pub use format::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
     find_null_non_nullable_fields,
 };
+#[cfg(feature = "parquet")]
+pub use format::{ParquetCompression, ParquetSerializer, ParquetSerializerConfig, SchemaMode};
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
