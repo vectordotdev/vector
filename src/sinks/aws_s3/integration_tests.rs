@@ -19,6 +19,8 @@ use flate2::read::MultiGzDecoder;
 use futures::{Stream, stream};
 use similar_asserts::assert_eq;
 use tokio_stream::StreamExt;
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::encoding::BatchSerializerConfig;
 use vector_lib::{
     codecs::{TextSerializerConfig, encoding::FramingConfig},
     config::proxy::ProxyConfig,
@@ -433,6 +435,8 @@ async fn s3_flush_on_exhaustion() {
             options: S3Options::default(),
             region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
             compression: Compression::None,
             batch,
             request: TowerRequestConfig::default(),
@@ -490,6 +494,115 @@ async fn s3_flush_on_exhaustion() {
     assert_eq!(lines, response_lines); // if all events are received, and lines.len() < batch size, then a flush was performed.
 }
 
+#[cfg(feature = "codecs-parquet")]
+#[tokio::test]
+async fn s3_parquet_insert_message() {
+    use vector_lib::codecs::encoding::format::{
+        ParquetCompression, ParquetFieldType, ParquetSchemaField, ParquetSerializerConfig,
+    };
+
+    let cx = SinkContext::default();
+    let bucket = uuid::Uuid::new_v4().to_string();
+    create_bucket(&bucket, false).await;
+
+    let parquet_config = ParquetSerializerConfig {
+        schema: vec![
+            ParquetSchemaField {
+                name: "message".to_string(),
+                data_type: ParquetFieldType::Utf8,
+            },
+            ParquetSchemaField {
+                name: "host".to_string(),
+                data_type: ParquetFieldType::Utf8,
+            },
+        ],
+        compression: ParquetCompression::Snappy,
+        ..Default::default()
+    };
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(100);
+    batch.timeout_secs = Some(5.0);
+
+    let config = S3SinkConfig {
+        bucket: bucket.to_string(),
+        key_prefix: random_string(10) + "/date=%F",
+        filename_time_format: default_filename_time_format(),
+        filename_append_uuid: true,
+        filename_extension: None,
+        options: S3Options::default(),
+        region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
+        encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+        batch_encoding: Some(BatchSerializerConfig::Parquet(parquet_config)),
+        compression: Compression::None,
+        batch,
+        request: TowerRequestConfig::default(),
+        tls: Default::default(),
+        auth: Default::default(),
+        acknowledgements: Default::default(),
+        timezone: Default::default(),
+        force_path_style: true,
+        retry_strategy: Default::default(),
+    };
+
+    let prefix = config.key_prefix.clone();
+    let service = config.create_service(&cx.globals.proxy).await.unwrap();
+    let sink = config.build_processor(service, cx).unwrap();
+
+    let (batch_notifier, receiver) = BatchNotifier::new_with_receiver();
+    let events: Vec<Event> = (0..10)
+        .map(|i| {
+            let mut log = LogEvent::from(format!("message_{}", i));
+            log.insert("host", format!("host_{}", i % 3));
+            Event::from(log).with_batch_notifier(&batch_notifier)
+        })
+        .collect();
+
+    drop(batch_notifier);
+    run_and_assert_sink_compliance(sink, stream::iter(events), &AWS_SINK_TAGS).await;
+    assert_eq!(receiver.await, BatchStatus::Delivered);
+
+    let keys = get_keys(&bucket, prefix).await;
+    assert_eq!(keys.len(), 1);
+
+    let key = keys[0].clone();
+    assert!(
+        key.ends_with(".parquet"),
+        "Expected .parquet extension, got: {}",
+        key
+    );
+
+    // Download and validate Parquet file
+    let obj = get_object(&bucket, key).await;
+    assert_eq!(obj.content_encoding, None);
+
+    let body = obj.body.collect().await.unwrap().into_bytes();
+    assert!(body.len() >= 4, "Output too short to be valid Parquet");
+    assert_eq!(&body[..4], b"PAR1", "Missing Parquet magic bytes");
+
+    // Verify we can read rows from the Parquet file
+    use bytes::Bytes;
+    use parquet::file::reader::{FileReader, SerializedFileReader};
+    use parquet::record::reader::RowIter;
+
+    let reader =
+        SerializedFileReader::new(Bytes::copy_from_slice(&body)).expect("Invalid Parquet file");
+    let row_count = RowIter::from_file_into(Box::new(reader)).count();
+    assert_eq!(row_count, 10, "Expected 10 rows in Parquet file");
+
+    // Verify schema has our columns
+    let reader =
+        SerializedFileReader::new(Bytes::copy_from_slice(&body)).expect("Invalid Parquet file");
+    let schema = reader.metadata().file_metadata().schema_descr();
+    let columns: Vec<String> = schema
+        .columns()
+        .iter()
+        .map(|c| c.name().to_string())
+        .collect();
+    assert!(columns.contains(&"message".to_string()));
+    assert!(columns.contains(&"host".to_string()));
+}
+
 async fn client() -> S3Client {
     let auth = AwsAuthentication::test_auth();
     let region = RegionOrEndpoint::with_both("us-east-1", s3_address());
@@ -526,6 +639,8 @@ fn config(bucket: &str, batch_size: usize) -> S3SinkConfig {
         options: S3Options::default(),
         region: RegionOrEndpoint::with_both("us-east-1", s3_address()),
         encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+        #[cfg(feature = "codecs-parquet")]
+        batch_encoding: None,
         compression: Compression::None,
         batch,
         request: TowerRequestConfig::default(),
