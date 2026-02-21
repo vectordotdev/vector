@@ -44,6 +44,7 @@ pub struct OctetCountingDecoderOptions {
 pub struct OctetCountingDecoder {
     other: LinesCodec,
     octet_decoding: Option<State>,
+    lossy: bool,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -59,6 +60,7 @@ impl OctetCountingDecoder {
         Self {
             other: LinesCodec::new(),
             octet_decoding: None,
+            lossy: false,
         }
     }
 
@@ -67,6 +69,22 @@ impl OctetCountingDecoder {
         Self {
             other: LinesCodec::new_with_max_length(max_length),
             octet_decoding: None,
+            lossy: false,
+        }
+    }
+
+    /// Creates a `OctetCountingDecoder` with a maximum frame length limit and lossy UTF-8 handling.
+    ///
+    /// # Arguments
+    ///
+    /// * `max_length` - Maximum allowed frame length in bytes. Frames exceeding this will error.
+    /// * `lossy` - If `true`, invalid UTF-8 sequences are replaced with U+FFFD (replacement character).
+    ///             If `false`, invalid UTF-8 causes a decoding error and the frame is dropped.
+    pub fn new_with_max_length_and_lossy(max_length: usize, lossy: bool) -> Self {
+        Self {
+            other: LinesCodec::new_with_max_length(max_length),
+            octet_decoding: None,
+            lossy,
         }
     }
 
@@ -168,19 +186,26 @@ impl OctetCountingDecoder {
 
                     Ok(None)
                 } else if let Some(msg) = src.get(from..to) {
-                    let bytes = match std::str::from_utf8(msg) {
-                        Ok(_) => Bytes::copy_from_slice(msg),
-                        Err(_) => {
-                            // The data was not valid UTF8 :-(.
-                            //
-                            // Advance the buffer past the erroneous bytes to
-                            // prevent us getting stuck in an infinite loop.
-                            src.advance(to);
-                            self.octet_decoding = None;
-                            return Err(LinesCodecError::Io(io::Error::new(
-                                io::ErrorKind::InvalidData,
-                                "Unable to decode message as UTF8",
-                            )));
+                    let bytes = if self.lossy {
+                        // In lossy mode, replace invalid UTF-8 sequences with U+FFFD (replacement character).
+                        // String::from_utf8_lossy() converts bytes to UTF-8, replacing invalid sequences.
+                        // .into_owned() converts the Cow<str> to an owned String.
+                        Bytes::from(String::from_utf8_lossy(msg).into_owned())
+                    } else {
+                        match std::str::from_utf8(msg) {
+                            Ok(_) => Bytes::copy_from_slice(msg),
+                            Err(_) => {
+                                // The data was not valid UTF8 :-(.
+                                //
+                                // Advance the buffer past the erroneous bytes to
+                                // prevent us from getting stuck in an infinite loop.
+                                src.advance(to);
+                                self.octet_decoding = None;
+                                return Err(LinesCodecError::Io(io::Error::new(
+                                    io::ErrorKind::InvalidData,
+                                    "Unable to decode message as UTF8",
+                                )));
+                            }
                         }
                     };
 

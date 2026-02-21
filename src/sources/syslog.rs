@@ -69,6 +69,46 @@ pub struct SyslogConfig {
     #[configurable(metadata(docs::hidden))]
     #[serde(default)]
     pub log_namespace: Option<bool>,
+
+    /// Controls how the syslog source handles messages containing invalid UTF-8 byte sequences.
+    ///
+    /// When syslog messages contain invalid UTF-8 characters (common with certain legacy systems,
+    /// binary data, or corrupted transmissions), this setting determines whether Vector should
+    /// drop the entire message or attempt to salvage it by replacing invalid sequences.
+    ///
+    /// ## Behavior
+    ///
+    /// - **false (default)**: Strict UTF-8 validation
+    ///   - Invalid UTF-8 sequences cause the entire message to be dropped
+    ///   - An error is logged: "Failed framing bytes. error=Unable to decode message as UTF8"
+    ///   - Use this when data integrity is critical and you need to know about encoding issues
+    ///
+    /// - **true**: Lossy UTF-8 conversion
+    ///   - Invalid UTF-8 sequences are replaced with the Unicode replacement character (U+FFFD)
+    ///   - The message is processed normally with substituted characters
+    ///   - No error is logged for UTF-8 issues
+    ///   - Use this when message delivery is more important than perfect encoding
+    ///
+    /// ## What is Affected
+    ///
+    /// - **TCP and Unix sockets**: Applies to the octet-counting framing layer
+    /// - **UDP**: Applies to the syslog message deserialization
+    /// - **All modes**: Also affects the syslog message parsing itself if the framing succeeds
+    ///
+    /// ## Example
+    ///
+    /// A syslog message containing invalid UTF-8 bytes:
+    /// - With lossy = false: Message dropped, error logged
+    /// - With lossy = true: Message delivered with replacement characters in place of invalid bytes
+    ///
+    /// ## Default
+    ///
+    /// Defaults to false to maintain strict data validation and make encoding issues visible.
+    /// Set to true if you are receiving messages from systems that may send non-UTF-8 data
+    /// and you prefer to receive partial messages rather than losing them entirely.
+    #[serde(default)]
+    #[configurable]
+    lossy: bool,
 }
 
 /// Listener mode for the `syslog` source.
@@ -141,6 +181,7 @@ impl SyslogConfig {
             host_key: None,
             max_length: crate::serde::default_max_length(),
             log_namespace: None,
+            lossy: false,
         }
     }
 }
@@ -159,6 +200,7 @@ impl Default for SyslogConfig {
             host_key: None,
             max_length: crate::serde::default_max_length(),
             log_namespace: None,
+            lossy: false,
         }
     }
 }
@@ -180,6 +222,9 @@ impl SourceConfig for SyslogConfig {
             .and_then(|k| k.path)
             .or(log_schema().host_key().cloned());
 
+        let mut deserial = SyslogDeserializerConfig::from_source(SyslogConfig::NAME);
+        deserial.syslog.lossy = self.lossy;
+
         match self.mode.clone() {
             Mode::Tcp {
                 address,
@@ -193,6 +238,7 @@ impl SourceConfig for SyslogConfig {
                     max_length: self.max_length,
                     host_key,
                     log_namespace,
+                    lossy: self.lossy,
                 };
                 let shutdown_secs = Duration::from_secs(30);
                 let tls_config = tls.as_ref().map(|tls| tls.tls_config.clone());
@@ -228,6 +274,7 @@ impl SourceConfig for SyslogConfig {
                 cx.shutdown,
                 log_namespace,
                 cx.out,
+                self.lossy,
             )),
             #[cfg(unix)]
             Mode::Unix {
@@ -235,12 +282,11 @@ impl SourceConfig for SyslogConfig {
                 socket_file_mode,
             } => {
                 let decoder = Decoder::new(
-                    Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(
+                    Framer::OctetCounting(OctetCountingDecoder::new_with_max_length_and_lossy(
                         self.max_length,
+                        self.lossy,
                     )),
-                    Deserializer::Syslog(
-                        SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
-                    ),
+                    Deserializer::Syslog(deserial.build()),
                 );
 
                 build_unix_stream_source(
@@ -286,6 +332,7 @@ struct SyslogTcpSource {
     max_length: usize,
     host_key: Option<OwnedValuePath>,
     log_namespace: LogNamespace,
+    lossy: bool,
 }
 
 impl TcpSource for SyslogTcpSource {
@@ -295,9 +342,14 @@ impl TcpSource for SyslogTcpSource {
     type Acker = TcpNullAcker;
 
     fn decoder(&self) -> Self::Decoder {
+        let mut deserial = SyslogDeserializerConfig::from_source(SyslogConfig::NAME);
+        deserial.syslog.lossy = self.lossy;
         Decoder::new(
-            Framer::OctetCounting(OctetCountingDecoder::new_with_max_length(self.max_length)),
-            Deserializer::Syslog(SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build()),
+            Framer::OctetCounting(OctetCountingDecoder::new_with_max_length_and_lossy(
+                self.max_length,
+                self.lossy,
+            )),
+            Deserializer::Syslog(deserial.build()),
         )
     }
 
@@ -323,6 +375,7 @@ pub fn udp(
     shutdown: ShutdownSignal,
     log_namespace: LogNamespace,
     mut out: SourceSender,
+    lossy: bool,
 ) -> super::Source {
     Box::pin(async move {
         let listenfd = ListenFd::from_env();
@@ -347,13 +400,13 @@ pub fn udp(
 
         let bytes_received = register!(BytesReceived::from(Protocol::UDP));
 
+        let mut deserial = SyslogDeserializerConfig::from_source(SyslogConfig::NAME);
+        deserial.syslog.lossy = lossy;
         let mut stream = UdpFramed::new(
             socket,
             Decoder::new(
                 Framer::Bytes(BytesDecoder::new()),
-                Deserializer::Syslog(
-                    SyslogDeserializerConfig::from_source(SyslogConfig::NAME).build(),
-                ),
+                Deserializer::Syslog(deserial.build()),
             ),
         )
         .take_until(shutdown)
@@ -790,7 +843,35 @@ mod test {
         assert!(matches!(config.mode, Mode::Unix { .. }));
     }
 
-    #[cfg(unix)]
+    #[test]
+    fn config_lossy() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "unix"
+            path = "127.0.0.1:1235"
+            lossy = true
+          "#,
+        )
+        .unwrap();
+        let lossy_actual = config.lossy;
+
+        assert_eq!(lossy_actual, true);
+    }
+
+    #[test]
+    fn config_lossy_default() {
+        let config: SyslogConfig = toml::from_str(
+            r#"
+            mode = "unix"
+            path = "127.0.0.1:1235"
+          "#,
+        )
+        .unwrap();
+        let lossy_actual = config.lossy;
+
+        assert_eq!(lossy_actual, false);
+    }
+
     #[test]
     fn config_unix_permissions() {
         let config: SyslogConfig = toml::from_str(
@@ -1238,6 +1319,8 @@ mod test {
             let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
             for line in input_lines {
                 socket.send_to(line.as_bytes(), in_addr).await.unwrap();
+                // Yield to allow the receiver to process packets and avoid buffer overflow
+                tokio::task::yield_now().await;
             }
 
             // Wait a short period of time to ensure the messages get sent.
@@ -1417,6 +1500,221 @@ mod test {
                 })
                 .collect();
             assert_eq!(output_messages, input_messages);
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_tcp_syslog_lossy() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (_guard, in_addr) = next_addr();
+
+            // Create and spawn the source with lossy=true
+            let mut config = SyslogConfig::from_mode(Mode::Tcp {
+                address: in_addr.into(),
+                permit_origin: None,
+                keepalive: None,
+                tls: None,
+                receive_buffer_bytes: None,
+                connection_limit: None,
+            });
+            config.lossy = true;
+
+            let key = ComponentKey::from("in");
+            let (tx, rx) = SourceSender::new_test();
+            let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+            let shutdown_complete = shutdown.shutdown_tripwire();
+
+            let source = config
+                .build(context)
+                .await
+                .expect("source should not fail to build");
+            tokio::spawn(source);
+
+            wait_for_tcp(in_addr).await;
+
+            let output_events = CountReceiver::receive_events(rx);
+
+            // Create a message with non-UTF8 characters (raw bytes)
+            // Using invalid UTF-8 sequence: 0xE4 0x80 (incomplete UTF-8) and 0xFF 0xFE
+            let syslog_prefix =
+                b"<14>1 2023-01-01T12:00:00Z host app 123 msgid - Test message with non-UTF8: ";
+            let invalid_utf8_bytes = b"\xE4\x80\xFF\xFE";
+            let mut syslog_message = Vec::from(syslog_prefix);
+            syslog_message.extend_from_slice(invalid_utf8_bytes);
+            // Format as octet counting: "{length} {message}"
+            let octet_counting_message = format!("{} ", syslog_message.len());
+            let mut input_bytes = Vec::from(octet_counting_message.as_bytes());
+            input_bytes.extend_from_slice(&syslog_message);
+            let input_bytes: Bytes = input_bytes.into();
+
+            // Send raw bytes via TCP using BytesCodec
+            let codec = BytesCodec::new();
+            send_encodable(in_addr, codec, vec![input_bytes])
+                .await
+                .unwrap();
+
+            sleep(Duration::from_secs(1)).await;
+
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
+                .await;
+            shutdown_complete.await;
+
+            let output_events = output_events.await;
+            assert_eq!(output_events.len(), 1);
+
+            // With lossy=true, the message should be processed successfully
+            let event = output_events.into_iter().next().unwrap();
+            let message = event.as_log().get("message").unwrap().to_string_lossy();
+            // The non-UTF8 characters should be replaced with U+FFFD REPLACEMENT CHARACTER
+            assert!(message.contains("Test message with non-UTF8"));
+            assert!(
+                message.contains(char::REPLACEMENT_CHARACTER),
+                "Message should contain U+FFFD replacement character, got: {:?}",
+                message
+            );
+        })
+        .await;
+    }
+
+    #[tokio::test]
+    async fn test_udp_syslog_lossy() {
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let (_guard, in_addr) = next_addr();
+
+            // Create and spawn the source with lossy=true
+            let mut config = SyslogConfig::from_mode(Mode::Udp {
+                address: in_addr.into(),
+                receive_buffer_bytes: None,
+            });
+            config.lossy = true;
+
+            let key = ComponentKey::from("in");
+            let (tx, rx) = SourceSender::new_test();
+            let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+            let shutdown_complete = shutdown.shutdown_tripwire();
+
+            let source = config
+                .build(context)
+                .await
+                .expect("source should not fail to build");
+            tokio::spawn(source);
+
+            sleep(Duration::from_millis(150)).await;
+
+            let output_events = CountReceiver::receive_events(rx);
+
+            // Create a message with non-UTF8 characters (raw bytes)
+            // Using invalid UTF-8 sequence: 0xE4 0x80 (incomplete UTF-8) and 0xFF 0xFE
+            let syslog_prefix =
+                b"<14>1 2023-01-01T12:00:00Z host app 123 msgid - UDP test with non-UTF8: ";
+            let invalid_utf8_bytes = b"\xE4\x80\xFF\xFE";
+            let mut non_utf8_bytes = Vec::from(syslog_prefix);
+            non_utf8_bytes.extend_from_slice(invalid_utf8_bytes);
+            // For UDP, we send the raw bytes directly (UDP uses BytesDecoder, not octet counting)
+
+            let socket = tokio::net::UdpSocket::bind("127.0.0.1:0").await.unwrap();
+            socket.send_to(&non_utf8_bytes, in_addr).await.unwrap();
+            tokio::task::yield_now().await;
+
+            sleep(Duration::from_secs(1)).await;
+
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
+                .await;
+            shutdown_complete.await;
+
+            let output_events = output_events.await;
+            assert_eq!(output_events.len(), 1);
+
+            // With lossy=true, the message should be processed successfully
+            let event = output_events.into_iter().next().unwrap();
+            let message = event.as_log().get("message").unwrap().to_string_lossy();
+            assert!(message.contains("UDP test with non-UTF8"));
+            // The non-UTF8 characters should be replaced with U+FFFD REPLACEMENT CHARACTER
+            assert!(
+                message.contains(char::REPLACEMENT_CHARACTER),
+                "Message should contain U+FFFD replacement character, got: {:?}",
+                message
+            );
+        })
+        .await;
+    }
+
+    #[cfg(unix)]
+    #[tokio::test]
+    async fn test_unix_stream_syslog_lossy() {
+        use tokio::{io::AsyncWriteExt, net::UnixStream};
+
+        assert_source_compliance(&SOCKET_PUSH_SOURCE_TAGS, async {
+            let in_path = tempfile::tempdir()
+                .unwrap()
+                .keep()
+                .join("stream_test_lossy");
+
+            // Create and spawn the source with lossy=true
+            let mut config = SyslogConfig::from_mode(Mode::Unix {
+                path: in_path.clone(),
+                socket_file_mode: None,
+            });
+            config.lossy = true;
+
+            let key = ComponentKey::from("in");
+            let (tx, rx) = SourceSender::new_test();
+            let (context, shutdown) = SourceContext::new_shutdown(&key, tx);
+            let shutdown_complete = shutdown.shutdown_tripwire();
+
+            let source = config
+                .build(context)
+                .await
+                .expect("source should not fail to build");
+            tokio::spawn(source);
+
+            // Wait for source to become ready to accept traffic.
+            while !in_path.exists() {
+                sleep(Duration::from_millis(50)).await;
+            }
+
+            let output_events = CountReceiver::receive_events(rx);
+
+            // Create a message with non-UTF8 characters (raw bytes)
+            // Using invalid UTF-8 sequence: 0xE4 0x80 (incomplete UTF-8) and 0xFF 0xFE
+            let syslog_prefix =
+                b"<14>1 2023-01-01T12:00:00Z host app 123 msgid - Unix test with non-UTF8: ";
+            let invalid_utf8_bytes = b"\xE4\x80\xFF\xFE";
+            let mut syslog_message = Vec::from(syslog_prefix);
+            syslog_message.extend_from_slice(invalid_utf8_bytes);
+            // Format as octet counting: "{length} {message}"
+            let octet_counting_message = format!("{} ", syslog_message.len());
+            let mut message_bytes = Vec::from(octet_counting_message.as_bytes());
+            message_bytes.extend_from_slice(&syslog_message);
+
+            // For Unix stream, we need to send the raw bytes with octet counting format
+            let mut stream = UnixStream::connect(&in_path).await.unwrap();
+            stream.write_all(&message_bytes).await.unwrap();
+            stream.shutdown().await.unwrap();
+
+            sleep(Duration::from_secs(1)).await;
+
+            shutdown
+                .shutdown_all(Some(Instant::now() + Duration::from_millis(100)))
+                .await;
+            shutdown_complete.await;
+
+            let output_events = output_events.await;
+            assert_eq!(output_events.len(), 1);
+
+            // With lossy=true, the message should be processed successfully
+            let event = output_events.into_iter().next().unwrap();
+            let message = event.as_log().get("message").unwrap().to_string_lossy();
+            assert!(message.contains("Unix test with non-UTF8"));
+            // The non-UTF8 characters should be replaced with U+FFFD REPLACEMENT CHARACTER
+            assert!(
+                message.contains(char::REPLACEMENT_CHARACTER),
+                "Message should contain U+FFFD replacement character, got: {:?}",
+                message
+            );
         })
         .await;
     }
