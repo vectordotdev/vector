@@ -141,7 +141,7 @@ echo "Running pre-push checks..."
 make check-licenses
 make check-fmt
 make check-clippy
-make check-component-docs
+make check-generated-docs
 
 # Some other checks that in our experience rarely fail on PRs.
 make check-deny
@@ -292,7 +292,7 @@ cargo vdev check events
 cargo vdev check licenses
 # Vector's documentation for each component is generated from the comments attached to the Component structs and members.
 # Running this ensures that the generated docs are up to date.
-make check-component-docs
+make check-generated-docs
 # Generate the code documentation for the Vector project.
 # Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
 cd rust-doc && make docs

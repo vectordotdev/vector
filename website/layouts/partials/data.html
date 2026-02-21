@@ -1800,6 +1800,16 @@
           </div>
         </div>
       {{ end }}
+
+      {{ if isset .ctx "raises" }}
+        <div>
+          <span class="font-light"> Raises </span>
+
+          <div class="text-sm">
+            {{ template "code" .ctx.raises }}
+          </div>
+        </div>
+      {{ end }}
     </div>
   </div>
 {{ end }}

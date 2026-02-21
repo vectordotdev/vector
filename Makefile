@@ -472,7 +472,7 @@ check: ## Run prerequisite code checks
 check-all: ## Check everything
 check-all: check-fmt check-clippy check-docs
 check-all: check-examples check-component-features
-check-all: check-scripts check-deny check-component-docs check-licenses
+check-all: check-scripts check-deny check-generated-docs check-licenses
 
 .PHONY: check-component-features
 check-component-features: ## Check that all component features are setup properly
@@ -514,9 +514,9 @@ check-deny: ## Check advisories licenses and sources for crate dependencies
 check-events: ## Check that events satisfy patterns set in https://github.com/vectordotdev/vector/blob/master/rfcs/2020-03-17-2064-event-driven-observability.md
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check events
 
-.PHONY: check-component-docs
-check-component-docs: generate-component-docs ## Checks that the machine-generated component Cue docs are up-to-date.
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check component-docs
+.PHONY: check-generated-docs
+check-generated-docs: generate-docs ## Checks that the machine-generated component Cue docs are up-to-date.
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check generated-docs
 
 ##@ Rustdoc
 build-rustdoc: ## Build Vector's Rustdocs
@@ -692,6 +692,14 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
+
+.PHONY: generate-vrl-docs
+generate-vrl-docs: ## Generate VRL function documentation from Rust source.
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build vrl-docs \
+		$(if $(findstring true,$(CI)),>/dev/null,)
+
+.PHONY: generate-docs
+generate-docs: generate-component-docs generate-vrl-docs
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation

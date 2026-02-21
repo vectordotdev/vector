@@ -12,7 +12,10 @@ impl Cli {
         let dirty_component_files: Vec<String> = files
             .into_iter()
             .filter(|file| file.starts_with("website/cue/reference"))
-            .filter(|file| file.contains("generated/"))
+            .filter(|file| {
+                file.contains("generated/")
+                    || file.starts_with("website/cue/reference/remap/functions/")
+            })
             .collect();
 
         // If it is not empty, there are out-of-sync component Cue files in the current branch.
@@ -22,7 +25,7 @@ impl Cli {
                 println!(" - {file}");
             }
             println!(
-                "Run `make generate-component-docs` locally to update your branch and commit/push the changes."
+                "Run `make generate-docs` locally to update your branch and commit/push the changes."
             );
             std::process::exit(1);
         }
