@@ -328,7 +328,7 @@ components: transforms: throttle: {
 						- `throttle_tokens_processed_total` — cumulative VRL token cost per key.
 						- `throttle_utilization_ratio` — current usage / threshold ratio gauge per key per threshold type (0.0 to 1.0+).
 
-						These metrics enable per-tenant dashboards, proactive alerting (e.g., alert when utilization exceeds 80%
+						These metrics enable per-tenant dashboards, proactive alerting (for example, alert when utilization exceeds 80%
 						before throttling starts), and cost attribution based on per-tenant byte volume.
 
 						**Cardinality warning:** Series count scales as `O(unique_keys x threshold_types)`. For 100 keys with
