@@ -6,10 +6,10 @@ use vector_core::{config::DataType, event::Event, schema};
 
 #[cfg(feature = "arrow")]
 use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
-#[cfg(feature = "parquet")]
-use super::format::{ParquetSerializer, ParquetSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "parquet")]
+use super::format::{ParquetSerializer, ParquetSerializerConfig};
 #[cfg(feature = "syslog")]
 use super::format::{SyslogSerializer, SyslogSerializerConfig};
 use super::{
@@ -189,7 +189,7 @@ impl BatchSerializerConfig {
             #[cfg(feature = "parquet")]
             BatchSerializerConfig::Parquet(parquet_config) => {
                 let serializer = ParquetSerializer::new(parquet_config.clone())?;
-                Ok(super::BatchSerializer::Parquet(serializer))
+                Ok(super::BatchSerializer::Parquet(Box::new(serializer)))
             }
         }
     }

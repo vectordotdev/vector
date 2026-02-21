@@ -5,8 +5,6 @@
 
 #[cfg(feature = "arrow")]
 mod arrow;
-#[cfg(feature = "parquet")]
-mod parquet;
 mod avro;
 mod cef;
 mod common;
@@ -18,6 +16,8 @@ mod native;
 mod native_json;
 #[cfg(feature = "opentelemetry")]
 mod otlp;
+#[cfg(feature = "parquet")]
+mod parquet;
 mod protobuf;
 mod raw_message;
 #[cfg(feature = "syslog")]
@@ -26,14 +26,14 @@ mod text;
 
 use std::fmt::Debug;
 
-#[cfg(feature = "arrow")]
-pub use arrow::{
-    ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
-};
 #[cfg(feature = "parquet")]
 pub use self::parquet::{
     ParquetCompression, ParquetFieldType, ParquetSchemaField, ParquetSerializer,
     ParquetSerializerConfig, SchemaMode,
+};
+#[cfg(feature = "arrow")]
+pub use arrow::{
+    ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
 };
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};

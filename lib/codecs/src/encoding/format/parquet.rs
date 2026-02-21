@@ -14,7 +14,7 @@ use parquet::file::properties::WriterProperties;
 use vector_config::configurable_component;
 use vector_core::event::Event;
 
-use super::arrow::{build_record_batch, ArrowEncodingError};
+use super::arrow::{ArrowEncodingError, build_record_batch};
 
 /// Parquet compression codec options.
 #[configurable_component]
@@ -125,7 +125,7 @@ pub struct ParquetSchemaField {
 
 /// Configuration for the Parquet serializer.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Default)]
 pub struct ParquetSerializerConfig {
     /// The schema definition for Parquet encoding.
     ///
@@ -144,16 +144,6 @@ pub struct ParquetSerializerConfig {
     #[serde(default)]
     #[configurable(derived)]
     pub schema_mode: SchemaMode,
-}
-
-impl Default for ParquetSerializerConfig {
-    fn default() -> Self {
-        Self {
-            schema: Vec::new(),
-            compression: ParquetCompression::default(),
-            schema_mode: SchemaMode::default(),
-        }
-    }
 }
 
 impl ParquetSerializerConfig {
@@ -238,7 +228,9 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
         if self.schema_mode == SchemaMode::Strict {
             for event in &events {
                 if let Some(log) = event.maybe_as_log() {
-                    for (key, _) in log.all_event_fields().expect("log event should have fields")
+                    for (key, _) in log
+                        .all_event_fields()
+                        .expect("log event should have fields")
                     {
                         // Strip the leading '.' that Vector adds to field paths
                         let field_name = key.strip_prefix('.').unwrap_or(&key);
@@ -261,8 +253,11 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
 
         // Write as a complete Parquet file to an in-memory buffer
         let mut buf = Vec::new();
-        let mut writer =
-            ArrowWriter::try_new(&mut buf, self.schema.clone(), Some(self.writer_props.clone()))?;
+        let mut writer = ArrowWriter::try_new(
+            &mut buf,
+            self.schema.clone(),
+            Some(self.writer_props.clone()),
+        )?;
         writer.write(&record_batch)?;
         writer.close()?;
 
@@ -487,10 +482,7 @@ mod tests {
             .encode(events, &mut buffer)
             .expect("Empty events should succeed");
 
-        assert!(
-            buffer.is_empty(),
-            "Buffer should be empty for empty events"
-        );
+        assert!(buffer.is_empty(), "Buffer should be empty for empty events");
     }
 
     #[test]
@@ -531,9 +523,6 @@ mod tests {
     fn test_parquet_empty_schema_error() {
         let config = ParquetSerializerConfig::default();
         let result = ParquetSerializer::new(config);
-        assert!(
-            result.is_err(),
-            "Should fail when schema has no fields"
-        );
+        assert!(result.is_err(), "Should fail when schema has no fields");
     }
 }

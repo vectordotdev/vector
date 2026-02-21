@@ -15,11 +15,6 @@ pub use encoder::{BatchEncoder, BatchSerializer, Encoder, EncoderKind};
 pub use format::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
 };
-#[cfg(feature = "parquet")]
-pub use format::{
-    ParquetCompression, ParquetFieldType, ParquetSchemaField, ParquetSerializer,
-    ParquetSerializerConfig, SchemaMode,
-};
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,
@@ -31,6 +26,11 @@ pub use format::{
 };
 #[cfg(feature = "opentelemetry")]
 pub use format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "parquet")]
+pub use format::{
+    ParquetCompression, ParquetFieldType, ParquetSchemaField, ParquetSerializer,
+    ParquetSerializerConfig, SchemaMode,
+};
 #[cfg(feature = "syslog")]
 pub use format::{SyslogSerializer, SyslogSerializerConfig};
 pub use framing::{
