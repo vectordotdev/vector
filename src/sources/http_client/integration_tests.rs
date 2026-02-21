@@ -59,6 +59,8 @@ async fn invalid_endpoint() {
         body: None,
         auth: None,
         tls: None,
+        follow_redirects: false,
+        max_redirects: 5,
         log_namespace: None,
     })
     .await;
@@ -79,6 +81,8 @@ async fn collected_logs_bytes() {
         body: None,
         auth: None,
         tls: None,
+        follow_redirects: false,
+        max_redirects: 5,
         log_namespace: None,
     })
     .await;
@@ -105,6 +109,8 @@ async fn collected_logs_json() {
         body: None,
         auth: None,
         tls: None,
+        follow_redirects: false,
+        max_redirects: 5,
         log_namespace: None,
     })
     .await;
@@ -131,6 +137,8 @@ async fn collected_metrics_native_json() {
         body: None,
         auth: None,
         tls: None,
+        follow_redirects: false,
+        max_redirects: 5,
         log_namespace: None,
     })
     .await;
@@ -162,6 +170,8 @@ async fn collected_trace_native_json() {
         body: None,
         auth: None,
         tls: None,
+        follow_redirects: false,
+        max_redirects: 5,
         log_namespace: None,
     })
     .await;
@@ -188,6 +198,8 @@ async fn unauthorized_no_auth() {
         body: None,
         auth: None,
         tls: None,
+        follow_redirects: false,
+        max_redirects: 5,
         log_namespace: None,
     })
     .await;
@@ -211,6 +223,8 @@ async fn unauthorized_wrong_auth() {
             user: "white_rabbit".to_string(),
             password: "morpheus".to_string().into(),
         }),
+        follow_redirects: false,
+        max_redirects: 5,
         log_namespace: None,
     })
     .await;
@@ -234,6 +248,8 @@ async fn authorized() {
             user: "user".to_string(),
             password: "pass".to_string().into(),
         }),
+        follow_redirects: false,
+        max_redirects: 5,
         log_namespace: None,
     })
     .await;
@@ -257,6 +273,8 @@ async fn tls_invalid_ca() {
             ..Default::default()
         }),
         auth: None,
+        follow_redirects: false,
+        max_redirects: 5,
         log_namespace: None,
     })
     .await;
@@ -280,6 +298,8 @@ async fn tls_valid() {
             ..Default::default()
         }),
         auth: None,
+        follow_redirects: false,
+        max_redirects: 5,
         log_namespace: None,
     })
     .await;
@@ -301,6 +321,8 @@ async fn shutdown() {
         body: None,
         tls: None,
         auth: None,
+        follow_redirects: false,
+        max_redirects: 5,
         log_namespace: None,
     };
 
