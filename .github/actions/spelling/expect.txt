@@ -601,6 +601,7 @@ transitioning
 Trauring
 Treemap
 trialled
+Trino
 Trivago
 trivy
 trl
