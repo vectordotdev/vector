@@ -37,7 +37,7 @@ pub use framing::{
     NewlineDelimitedEncoderConfig, VarintLengthDelimitedEncoder,
     VarintLengthDelimitedEncoderConfig,
 };
-#[cfg(feature = "arrow")]
+#[cfg(any(feature = "arrow", feature = "parquet"))]
 pub use serializer::BatchSerializerConfig;
 pub use serializer::{Serializer, SerializerConfig};
 pub use transformer::{TimestampFormat, Transformer};
