@@ -3,7 +3,7 @@ use std::{collections::VecDeque, fmt::Debug, io, sync::Arc};
 use itertools::Itertools;
 use snafu::Snafu;
 use vector_lib::{
-    event::{ObjectMap, Value},
+    event::{LogEvent, ObjectMap, Value},
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
 };
@@ -217,6 +217,91 @@ pub fn path_is_field(path: &OwnedTargetPath, field: &str) -> bool {
         && matches!(&path.path.segments[..], [OwnedSegment::Field(f)] if f.as_str() == field)
 }
 
+// Helper function to check if a field exists and is a string
+fn is_valid_string_field(log: &LogEvent, field_name: &str) -> bool {
+    let field_path = event_path!(field_name);
+    match log.get(field_path) {
+        Some(Value::Bytes(_)) => true,
+        _ => false,
+    }
+}
+
+// Helper function to check if a field is either undefined or a string (no other types allowed)
+fn is_string_or_undefined(log: &LogEvent, field_name: &str) -> bool {
+    let field_path = event_path!(field_name);
+    match log.get(field_path) {
+        None => true,                    // undefined is OK
+        Some(Value::Bytes(_)) => true,   // string is OK
+        _ => false,                      // any other type is not OK
+    }
+}
+
+// Helper function to check if ddtags field is valid (array of strings or undefined)
+fn is_valid_ddtags_field(log: &LogEvent) -> bool {
+    let ddtags_path = event_path!(DDTAGS);
+    match log.get(ddtags_path) {
+        None => true, // undefined is OK
+        Some(Value::Array(arr)) => {
+            // Must be array of strings
+            arr.iter().all(|item| matches!(item, Value::Bytes(_)))
+        }
+        _ => false, // any other type is not OK
+    }
+}
+
+// Check for missing/invalid reserved attributes and warn about them. This helps ensure proper processing
+// by the Datadog logs intake.
+pub fn warn_missing_reserved_attributes(event: &Event) {
+    let log = event.as_log();
+    let mut validation_errors = Vec::new();
+
+    // service - must be defined and string
+    if !is_valid_string_field(log, "service") {
+        validation_errors.push("service (must be string)".to_string());
+    }
+
+    // ddsource - must be defined and string
+    if !is_valid_string_field(log, "ddsource") {
+        validation_errors.push("ddsource (must be string)".to_string());
+    }
+
+    // host/hostname - at least one must be defined and string, none should be non-string
+    let host_valid = is_string_or_undefined(log, "host");
+    let hostname_valid = is_string_or_undefined(log, "hostname");
+    let host_exists = log.contains(event_path!("host"));
+    let hostname_exists = log.contains(event_path!("hostname"));
+
+    if !host_valid || !hostname_valid {
+        validation_errors.push("host/hostname (if present, must be string)".to_string());
+    } else if !host_exists && !hostname_exists {
+        validation_errors.push("host/hostname (at least one must be defined)".to_string());
+    }
+
+    // status/level - at least one must be defined and string, none should be non-string
+    let status_valid = is_string_or_undefined(log, "status");
+    let level_valid = is_string_or_undefined(log, "level");
+    let status_exists = log.contains(event_path!("status"));
+    let level_exists = log.contains(event_path!("level"));
+
+    if !status_valid || !level_valid {
+        validation_errors.push("status/level (if present, must be string)".to_string());
+    } else if !status_exists && !level_exists {
+        validation_errors.push("status/level (at least one must be defined)".to_string());
+    }
+
+    // ddtags - must be array of strings or undefined
+    if !is_valid_ddtags_field(log) {
+        validation_errors.push("ddtags (must be array of strings or undefined)".to_string());
+    }
+
+    if !validation_errors.is_empty() {
+        warn!(
+            message = "Invalid reserved attributes for optimal Datadog logs intake processing.",
+            validation_errors = ?validation_errors,
+        );
+    }
+}
+
 #[derive(Debug, Snafu)]
 pub enum RequestBuildError {
     #[snafu(display("Encoded payload is greater than the max limit."))]
@@ -260,6 +345,8 @@ impl LogRequestBuilder {
                 if self.conforms_as_agent {
                     normalize_as_agent_event(&mut event);
                 }
+                // Check for missing reserved attributes and warn if any are missing
+                warn_missing_reserved_attributes(&event);
                 self.transformer.transform(&mut event);
                 let estimated_json_size = event.estimated_json_encoded_size_of();
                 (event, estimated_json_size)
@@ -447,8 +534,11 @@ mod tests {
         value::{Kind, kind::Collection},
     };
 
-    use super::{normalize_as_agent_event, normalize_event};
-    use crate::common::datadog::DD_RESERVED_SEMANTIC_ATTRS;
+    use super::{
+        is_valid_ddtags_field, is_valid_string_field, is_string_or_undefined,
+        normalize_as_agent_event, normalize_event, warn_missing_reserved_attributes,
+    };
+    use crate::common::datadog::{DDTAGS, DD_RESERVED_SEMANTIC_ATTRS};
 
     fn assert_normalized_log_has_expected_attrs(log: &LogEvent) {
         assert!(
@@ -737,5 +827,128 @@ mod tests {
                 }
             }))
         );
+    }
+
+    #[test]
+    fn test_is_valid_string_field() {
+        let mut log = LogEvent::default();
+        log.insert(event_path!("string_field"), "test-value");
+        log.insert(event_path!("integer_field"), 123);
+        log.insert(event_path!("array_field"), vec!["item1", "item2"]);
+
+        assert!(is_valid_string_field(&log, "string_field"));
+        assert!(!is_valid_string_field(&log, "integer_field"));
+        assert!(!is_valid_string_field(&log, "array_field"));
+        assert!(!is_valid_string_field(&log, "missing_field"));
+    }
+
+    #[test]
+    fn test_is_string_or_undefined() {
+        let mut log = LogEvent::default();
+        log.insert(event_path!("string_field"), "test-value");
+        log.insert(event_path!("integer_field"), 123);
+
+        assert!(is_string_or_undefined(&log, "string_field"));
+        assert!(!is_string_or_undefined(&log, "integer_field"));
+        assert!(is_string_or_undefined(&log, "missing_field"));
+    }
+
+    #[test]
+    fn test_is_valid_ddtags_field() {
+        let mut log1 = LogEvent::default();
+        // undefined ddtags is valid
+        assert!(is_valid_ddtags_field(&log1));
+
+        let mut log2 = LogEvent::default();
+        log2.insert(event_path!(DDTAGS), vec!["tag1:value1", "tag2:value2"]);
+        assert!(is_valid_ddtags_field(&log2));
+
+        let mut log3 = LogEvent::default();
+        log3.insert(event_path!(DDTAGS), "invalid-string");
+        assert!(!is_valid_ddtags_field(&log3));
+
+        let mut log4 = LogEvent::default();
+        log4.insert(event_path!(DDTAGS), vec!["tag1:value1", 123]);
+        assert!(!is_valid_ddtags_field(&log4));
+    }
+
+    #[test]
+    fn warn_valid_complete_event() {
+        // Test with a complete valid event
+        let mut log = LogEvent::default();
+        log.insert(event_path!("message"), "test message");
+        log.insert(event_path!("timestamp"), 1234567890); // timestamp has no constraints
+        log.insert(event_path!("hostname"), "test-host");
+        log.insert(event_path!("service"), "test-service");
+        log.insert(event_path!("ddsource"), "test-source");
+        log.insert(event_path!(DDTAGS), vec!["env:test", "service:my-service"]);
+        log.insert(event_path!("status"), "info");
+
+        let event = Event::Log(log);
+
+        // This should not produce any warnings
+        warn_missing_reserved_attributes(&event);
+    }
+
+    #[test]
+    fn warn_valid_event_with_fallbacks() {
+        // Test with valid event using fallback fields
+        let mut log = LogEvent::default();
+        log.insert(event_path!("host"), "test-host"); // fallback for hostname
+        log.insert(event_path!("level"), "info"); // fallback for status
+        log.insert(event_path!("service"), "test-service");
+        log.insert(event_path!("ddsource"), "test-source");
+        // ddtags is undefined, which is valid
+
+        let event = Event::Log(log);
+
+        // This should not produce any warnings
+        warn_missing_reserved_attributes(&event);
+    }
+
+    #[test]
+    fn warn_invalid_types() {
+        // Test with invalid field types
+        let mut log = LogEvent::default();
+        log.insert(event_path!("hostname"), "test-host"); // valid
+        log.insert(event_path!("service"), 123); // invalid type
+        log.insert(event_path!("ddsource"), true); // invalid type
+        log.insert(event_path!("status"), "info"); // valid
+        log.insert(event_path!(DDTAGS), "invalid-string"); // should be array
+
+        let event = Event::Log(log);
+
+        // This should produce warnings for service, ddsource, and ddtags
+        warn_missing_reserved_attributes(&event);
+    }
+
+    #[test]
+    fn warn_missing_required_fields() {
+        // Test with missing required fields
+        let mut log = LogEvent::default();
+        log.insert(event_path!("timestamp"), 1234567890);
+        // Missing: service, ddsource, hostname/host, status/level
+
+        let event = Event::Log(log);
+
+        // This should produce warnings for all missing required fields
+        warn_missing_reserved_attributes(&event);
+    }
+
+    #[test]
+    fn warn_mixed_valid_invalid_fallbacks() {
+        // Test with mix of valid and invalid fallback scenarios
+        let mut log = LogEvent::default();
+        log.insert(event_path!("host"), 123); // invalid type
+        log.insert(event_path!("hostname"), "test-host"); // valid
+        log.insert(event_path!("status"), "info"); // valid
+        // missing level is OK since status is present
+        log.insert(event_path!("service"), "test-service"); // valid
+        log.insert(event_path!("ddsource"), "test-source"); // valid
+
+        let event = Event::Log(log);
+
+        // This should warn about host field having wrong type
+        warn_missing_reserved_attributes(&event);
     }
 }
