@@ -6,14 +6,14 @@ mod integration_test {
     use std::{collections::HashMap, future::ready, thread, time::Duration};
 
     use bytes::Bytes;
-    use futures::StreamExt;
+    use futures::{StreamExt, stream};
     use rdkafka::{
         Message, Offset, TopicPartitionList,
         consumer::{BaseConsumer, Consumer},
         message::Headers,
     };
     use vector_lib::{
-        codecs::TextSerializerConfig,
+        codecs::{JsonSerializerConfig, TextSerializerConfig},
         config::{Tags, Telemetry, init_telemetry},
         event::{BatchNotifier, BatchStatus},
         lookup::lookup_v2::ConfigTargetPath,
@@ -21,7 +21,7 @@ mod integration_test {
 
     use super::super::{config::KafkaSinkConfig, sink::KafkaSink, *};
     use crate::{
-        event::{ObjectMap, Value},
+        event::{ObjectMap, TraceEvent, Value},
         kafka::{KafkaAuthConfig, KafkaCompression, KafkaSaslConfig},
         sinks::prelude::*,
         test_util::{
@@ -29,7 +29,7 @@ mod integration_test {
                 DATA_VOLUME_SINK_TAGS, SINK_TAGS, assert_data_volume_sink_compliance,
                 assert_sink_compliance,
             },
-            random_lines_with_stream, random_string, wait_for,
+            map_event_batch_stream, random_lines_with_stream, random_string, wait_for,
         },
         tls::{TEST_PEM_INTERMEDIATE_CA_PATH, TlsConfig, TlsEnableableConfig},
     };
@@ -308,6 +308,125 @@ mod integration_test {
             KafkaCompression::None,
             false,
         )
+        .await;
+    }
+
+    #[tokio::test]
+    async fn kafka_happy_path_trace_events() {
+        crate::test_util::trace_init();
+
+        assert_sink_compliance(&SINK_TAGS, async move {
+            let topic_prefix = format!("test-trace-{}", random_string(10));
+            let topic = format!("{}-{}", topic_prefix, chrono::Utc::now().format("%Y%m%d"));
+            let key_field = ConfigTargetPath::try_from("trace_key".to_string()).unwrap();
+            let headers_key = ConfigTargetPath::try_from("trace_headers".to_string()).unwrap();
+            let trace_key = "trace-partition-key";
+            let header_key = "trace-header-key";
+            let header_value = "trace-header-value";
+
+            let config = KafkaSinkConfig {
+                bootstrap_servers: kafka_address(9091),
+                topic: Template::try_from(format!("{topic_prefix}-%Y%m%d")).unwrap(),
+                healthcheck_topic: None,
+                key_field: Some(key_field.clone()),
+                encoding: JsonSerializerConfig::default().into(),
+                batch: BatchConfig::default(),
+                compression: KafkaCompression::None,
+                auth: KafkaAuthConfig::default(),
+                socket_timeout_ms: Duration::from_millis(60000),
+                message_timeout_ms: Duration::from_millis(300000),
+                rate_limit_duration_secs: 1,
+                rate_limit_num: i64::MAX as u64,
+                librdkafka_options: HashMap::new(),
+                headers_key: Some(headers_key.clone()),
+                acknowledgements: Default::default(),
+            };
+
+            let num_events = 100;
+            let mut expected_messages = Vec::with_capacity(num_events);
+
+            let (batch, receiver) = BatchNotifier::new_with_receiver();
+            let mut events = Vec::with_capacity(num_events);
+            for i in 0..num_events {
+                let message = format!("trace-message-{i}");
+                expected_messages.push(message.clone());
+
+                let mut trace = TraceEvent::default();
+                trace.insert("message", message);
+                trace.insert("trace_key", trace_key);
+                trace.insert("timestamp", chrono::Utc::now());
+
+                let mut trace_headers = ObjectMap::new();
+                trace_headers.insert(header_key.into(), Value::Bytes(Bytes::from(header_value)));
+                trace.insert(&headers_key, trace_headers);
+
+                events.push(Event::Trace(trace.with_batch_notifier(&batch)));
+            }
+
+            let sink = KafkaSink::new(config).unwrap();
+            let sink = VectorSink::from_event_streamsink(sink);
+            let stream = map_event_batch_stream(stream::iter(events), Some(batch));
+            sink.run(stream).await.unwrap();
+            assert_eq!(receiver.await, BatchStatus::Delivered);
+
+            // Read back everything from the beginning.
+            let mut client_config = rdkafka::ClientConfig::new();
+            client_config.set("bootstrap.servers", kafka_address(9091).as_str());
+            client_config.set("group.id", random_string(10));
+            client_config.set("enable.partition.eof", "true");
+            let mut tpl = TopicPartitionList::new();
+            tpl.add_partition(&topic, 0)
+                .set_offset(Offset::Beginning)
+                .unwrap();
+            let consumer: BaseConsumer = client_config.create().unwrap();
+            consumer.assign(&tpl).unwrap();
+
+            wait_for(
+                || match consumer.fetch_watermarks(&topic, 0, Duration::from_secs(3)) {
+                    Ok((_low, high)) => ready(high >= num_events as i64),
+                    Err(err) => {
+                        println!("retrying due to error fetching watermarks: {err}");
+                        ready(false)
+                    }
+                },
+            )
+            .await;
+
+            let (low, high) = consumer
+                .fetch_watermarks(&topic, 0, Duration::from_secs(3))
+                .unwrap();
+            assert_eq!((0, num_events as i64), (low, high));
+
+            let mut failures = 0;
+            let mut observed_messages = Vec::new();
+            while failures < 100 {
+                match consumer.poll(Duration::from_secs(3)) {
+                    Some(Ok(msg)) => {
+                        let payload: &str = msg.payload_view().unwrap().unwrap();
+                        let payload_json: serde_json::Value = serde_json::from_str(payload).unwrap();
+                        observed_messages.push(payload_json["message"].as_str().unwrap().to_owned());
+
+                        let key = msg.key().unwrap();
+                        assert_eq!(key, trace_key.as_bytes());
+
+                        let timestamp = msg.timestamp().to_millis();
+                        assert!(timestamp.is_some());
+
+                        let header = msg.headers().unwrap().get(0);
+                        assert_eq!(header.key, header_key);
+                        assert_eq!(header.value.unwrap(), header_value.as_bytes());
+                    }
+                    None if observed_messages.len() >= num_events => break,
+                    _ => {
+                        failures += 1;
+                        thread::sleep(Duration::from_millis(50));
+                    }
+                }
+            }
+
+            assert_eq!(observed_messages.len(), num_events);
+            assert_eq!(observed_messages, expected_messages);
+        })
         .await;
     }
 
