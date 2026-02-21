@@ -182,6 +182,17 @@ pub struct CloudwatchLogsSinkConfig {
         docs::additional_props_description = "A tag represented as a key-value pair"
     ))]
     pub tags: Option<HashMap<String, String>>,
+
+    /// The [log group class][log_group_class] of the target log group.
+    ///
+    /// Defaults to `standard` when creating the group without this optional configuration.
+    ///
+    /// Allowed values are `standard` and `infrequent_access`.
+    ///
+    /// [log_group_class]: https://docs.aws.amazon.com/AmazonCloudWatch/latest/logs/CloudWatch_Logs_Log_Classes.html
+    #[configurable(derived)]
+    #[serde(default)]
+    pub log_group_class: Option<String>,
 }
 
 impl CloudwatchLogsSinkConfig {
@@ -268,6 +279,7 @@ fn default_config(encoding: EncodingConfig) -> CloudwatchLogsSinkConfig {
         acknowledgements: Default::default(),
         kms_key: Default::default(),
         tags: Default::default(),
+        log_group_class: Default::default(),
     }
 }
 
