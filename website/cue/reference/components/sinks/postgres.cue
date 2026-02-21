@@ -54,6 +54,9 @@ components: sinks: postgres: {
 			As a workaround, you can add a `NOT NULL` constraint to the column, so when inserting an event which is missing that field
 			a `NOT NULL` constraint violation would be raised, and define a [constraint trigger](\(urls.postgresql_constraint_trigger))
 			to catch the exception and set the desired default value.
+
+			Alternatively, you can use the `columns` configuration option to explicitly specify which columns to insert,
+			excluding columns like serial/auto-increment columns that should be handled by PostgreSQL.
 			""",
 		]
 		notices: []
