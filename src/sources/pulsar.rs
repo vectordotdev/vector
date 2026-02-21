@@ -12,11 +12,10 @@ use pulsar::{
     consumer::Message,
     message::proto::MessageIdData,
 };
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        Decoder, DecoderFramedRead, DecodingConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, SourceOutput},
@@ -35,7 +34,6 @@ use vrl::{owned_value_path, path, value::Kind};
 
 use crate::{
     SourceSender,
-    codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext},
     event::BatchNotifier,
     internal_events::{
@@ -390,7 +388,7 @@ async fn parse_message(
     let topic = msg.topic.clone();
     let producer_name = msg.payload.metadata.producer_name.clone();
 
-    let mut stream = FramedRead::new(msg.payload.data.as_ref(), decoder.clone());
+    let mut stream = DecoderFramedRead::new(msg.payload.data.as_ref(), decoder.clone());
     let stream = async_stream::stream! {
         while let Some(next) = stream.next().await {
             match next {
@@ -442,7 +440,7 @@ async fn parse_message(
                     }
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs`, no further
+                    // Error is logged by `vector_lib::codecs`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

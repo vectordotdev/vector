@@ -5,30 +5,38 @@
 #![deny(warnings)]
 
 mod common;
+mod decoder_framed_read;
 pub mod decoding;
 pub mod encoding;
 pub mod gelf;
+pub mod internal_events;
+mod ready_frames;
 
+pub use decoder_framed_read::DecoderFramedRead;
 pub use decoding::{
     BytesDecoder, BytesDecoderConfig, BytesDeserializer, BytesDeserializerConfig,
-    CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, GelfDeserializer,
-    GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig, LengthDelimitedDecoder,
-    LengthDelimitedDecoderConfig, NativeDeserializer, NativeDeserializerConfig,
-    NativeJsonDeserializer, NativeJsonDeserializerConfig, NewlineDelimitedDecoder,
-    NewlineDelimitedDecoderConfig, OctetCountingDecoder, OctetCountingDecoderConfig,
-    StreamDecodingError, VarintLengthDelimitedDecoder, VarintLengthDelimitedDecoderConfig,
+    CharacterDelimitedDecoder, CharacterDelimitedDecoderConfig, Decoder, DecodingConfig,
+    GelfDeserializer, GelfDeserializerConfig, JsonDeserializer, JsonDeserializerConfig,
+    LengthDelimitedDecoder, LengthDelimitedDecoderConfig, NativeDeserializer,
+    NativeDeserializerConfig, NativeJsonDeserializer, NativeJsonDeserializerConfig,
+    NewlineDelimitedDecoder, NewlineDelimitedDecoderConfig, OctetCountingDecoder,
+    OctetCountingDecoderConfig, StreamDecodingError, VarintLengthDelimitedDecoder,
+    VarintLengthDelimitedDecoderConfig,
 };
 #[cfg(feature = "syslog")]
 pub use decoding::{SyslogDeserializer, SyslogDeserializerConfig};
 pub use encoding::{
-    BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder, CharacterDelimitedEncoderConfig,
-    CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig, JsonSerializer,
-    JsonSerializerConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig, LogfmtSerializer,
-    LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig, NativeSerializer,
-    NativeSerializerConfig, NewlineDelimitedEncoder, NewlineDelimitedEncoderConfig,
-    RawMessageSerializer, RawMessageSerializerConfig, TextSerializer, TextSerializerConfig,
+    BatchEncoder, BatchSerializer, BytesEncoder, BytesEncoderConfig, CharacterDelimitedEncoder,
+    CharacterDelimitedEncoderConfig, CsvSerializer, CsvSerializerConfig, Encoder, EncoderKind,
+    EncodingConfig, EncodingConfigWithFraming, GelfSerializer, GelfSerializerConfig,
+    JsonSerializer, JsonSerializerConfig, LengthDelimitedEncoder, LengthDelimitedEncoderConfig,
+    LogfmtSerializer, LogfmtSerializerConfig, NativeJsonSerializer, NativeJsonSerializerConfig,
+    NativeSerializer, NativeSerializerConfig, NewlineDelimitedEncoder,
+    NewlineDelimitedEncoderConfig, RawMessageSerializer, RawMessageSerializerConfig, SinkType,
+    TextSerializer, TextSerializerConfig, TimestampFormat, Transformer,
 };
 pub use gelf::{VALID_FIELD_REGEX, gelf_fields};
+pub use ready_frames::ReadyFrames;
 use vector_config_macros::configurable_component;
 
 /// The user configuration to choose the metric tag strategy.

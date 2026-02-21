@@ -701,16 +701,23 @@ generated: configuration: configuration: {
 			type: bool: {}
 		}
 	}
-	buffer_utilization_ewma_alpha: {
+	buffer_utilization_ewma_half_life_seconds: {
 		description: """
-			The alpha value for the exponential weighted moving average (EWMA) of source and transform
-			buffer utilization metrics.
+			The half-life, in seconds, for the exponential weighted moving average (EWMA) of source
+			and transform buffer utilization metrics.
 
-			This value specifies how much of the existing value is retained when each update is made.
-			Values closer to 1.0 result in the value adjusting slower to changes. The default value of
-			0.9 is equivalent to a "half life" of 6-7 measurements.
+			This controls how quickly the `*_buffer_utilization_mean` gauges respond to new
+			observations. Longer half-lives retain more of the previous value, leading to slower
+			adjustments.
 
-			Must be between 0 and 1 exclusive (0 < alpha < 1).
+			- Lower values (< 1): Metrics update quickly but may be volatile
+			- Default (5): Balanced between responsiveness and stability
+			- Higher values (> 5): Smooth, stable metrics that update slowly
+
+			Adjust based on whether you need fast detection of buffer issues (lower)
+			or want to see sustained trends without noise (higher).
+
+			Must be greater than 0.
 			"""
 		required: false
 		type: float: {}
@@ -828,6 +835,20 @@ generated: configuration: configuration: {
 
 			Set this to a value larger than your `internal_metrics` scrape interval (default 5 minutes)
 			so metrics live long enough to be emitted and captured.
+			"""
+		required: false
+		type: float: {}
+	}
+	latency_ewma_alpha: {
+		description: """
+			The alpha value for the exponential weighted moving average (EWMA) of transform latency
+			metrics.
+
+			This controls how quickly the `component_latency_mean_seconds` gauge responds to new
+			observations. Values closer to 1.0 retain more of the previous value, leading to slower
+			adjustments. The default value of 0.9 is equivalent to a "half life" of 6-7 measurements.
+
+			Must be between 0 and 1 exclusively (0 < alpha < 1).
 			"""
 		required: false
 		type: float: {}
