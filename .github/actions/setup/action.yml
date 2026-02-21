@@ -54,6 +54,10 @@ inputs:
     required: false
     default: false
     description: "Install cargo-msrv for minimum supported Rust version checks."
+  cargo-hack:
+    required: false
+    default: false
+    description: "Install cargo-hack for feature compilation checks."
   dd-rust-license-tool:
     required: false
     default: false
@@ -105,6 +109,7 @@ runs:
                    "${{ inputs.cargo-nextest }}" \
                    "${{ inputs.cargo-deny }}" \
                    "${{ inputs.cargo-msrv }}" \
+                   "${{ inputs.cargo-hack }}" \
                    "${{ inputs.dd-rust-license-tool }}" \
                    "${{ inputs.wasm-pack }}"; do
           if [[ "$val" == "true" ]]; then
@@ -252,6 +257,7 @@ runs:
           ~/.cargo/bin/cargo-nextest
           ~/.cargo/bin/cargo-deny
           ~/.cargo/bin/cargo-msrv
+          ~/.cargo/bin/cargo-hack
           ~/.cargo/bin/dd-rust-license-tool
           ~/.cargo/bin/wasm-pack
           /usr/local/bin/markdownlint
@@ -270,6 +276,7 @@ runs:
         [[ "${{ inputs.cargo-nextest }}" == "true" ]] && mods+=("cargo-nextest")
         [[ "${{ inputs.cargo-deny }}" == "true" ]] && mods+=("cargo-deny")
         [[ "${{ inputs.cargo-msrv }}" == "true" ]] && mods+=("cargo-msrv")
+        [[ "${{ inputs.cargo-hack }}" == "true" ]] && mods+=("cargo-hack")
         [[ "${{ inputs.dd-rust-license-tool }}" == "true" ]] && mods+=("dd-rust-license-tool")
         [[ "${{ inputs.wasm-pack }}" == "true" ]] && mods+=("wasm-pack")
         [[ "${{ inputs.markdownlint }}" == "true" ]] && mods+=("markdownlint")
