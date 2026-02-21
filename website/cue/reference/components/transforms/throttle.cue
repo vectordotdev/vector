@@ -137,8 +137,8 @@ components: transforms: throttle: {
 				serialization — it recursively estimates the size of each field and value type. The estimated byte
 				count is consumed from a separate rate limiter bucket.
 
-				This is useful for controlling costs when downstream services charge by data volume (e.g., cloud
-				logging services) or when hitting per-stream byte rate limits (e.g., Loki's 3MB/stream limit).
+				This is useful for controlling costs when downstream services charge by data volume (for example, cloud
+				logging services) or when hitting per-stream byte rate limits (for example, Loki's 3MB/stream limit).
 				"""
 			sub_sections: [
 				{
