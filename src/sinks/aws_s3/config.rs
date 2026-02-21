@@ -1,9 +1,13 @@
 use aws_sdk_s3::Client as S3Client;
 use tower::ServiceBuilder;
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::BatchEncoder;
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::encoding::BatchSerializerConfig;
 use vector_lib::{
     TimeZone,
     codecs::{
-        TextSerializerConfig,
+        EncoderKind, TextSerializerConfig,
         encoding::{Framer, FramingConfig},
     },
     configurable::configurable_component,
@@ -105,6 +109,16 @@ pub struct S3SinkConfig {
     #[serde(flatten)]
     pub encoding: EncodingConfigWithFraming,
 
+    /// Batch encoding configuration for columnar formats.
+    ///
+    /// When set, events are encoded together as a batch in a columnar format (e.g., Parquet)
+    /// instead of the standard per-event framing-based encoding. The columnar format handles
+    /// its own internal compression, so the top-level `compression` setting is bypassed.
+    #[cfg(feature = "codecs-parquet")]
+    #[configurable(derived)]
+    #[serde(default)]
+    pub batch_encoding: Option<BatchSerializerConfig>,
+
     /// Compression configuration.
     ///
     /// All compression algorithms use the default compression level unless otherwise specified.
@@ -176,6 +190,8 @@ impl GenerateConfig for S3SinkConfig {
             options: S3Options::default(),
             region: RegionOrEndpoint::default(),
             encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            #[cfg(feature = "codecs-parquet")]
+            batch_encoding: None,
             compression: Compression::gzip_default(),
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
@@ -201,6 +217,10 @@ impl SinkConfig for S3SinkConfig {
     }
 
     fn input(&self) -> Input {
+        #[cfg(feature = "codecs-parquet")]
+        if let Some(batch_config) = &self.batch_encoding {
+            return Input::new(batch_config.input_type());
+        }
         Input::new(self.encoding.config().1.input_type())
     }
 
@@ -246,8 +266,43 @@ impl S3SinkConfig {
         let partitioner = S3KeyPartitioner::new(key_prefix, ssekms_key_id, None);
 
         let transformer = self.encoding.transformer();
+
+        // When batch_encoding is configured (e.g., Parquet), use batch mode
+        // with internal compression and appropriate file extension.
+        #[cfg(feature = "codecs-parquet")]
+        if let Some(batch_config) = &self.batch_encoding {
+            let batch_serializer = batch_config.build_batch_serializer()?;
+            let encoder = EncoderKind::Batch(Box::new(BatchEncoder::new(batch_serializer)));
+
+            // Auto-detect file extension from batch format
+            let filename_extension =
+                self.filename_extension
+                    .clone()
+                    .or_else(|| match batch_config {
+                        #[cfg(feature = "codecs-parquet")]
+                        BatchSerializerConfig::Parquet(_) => Some("parquet".to_string()),
+                        #[allow(unreachable_patterns)]
+                        _ => None,
+                    });
+
+            let request_options = S3RequestOptions {
+                bucket: self.bucket.clone(),
+                api_options: self.options.clone(),
+                filename_extension,
+                filename_time_format: self.filename_time_format.clone(),
+                filename_append_uuid: self.filename_append_uuid,
+                encoder: (transformer, encoder),
+                // Batch formats handle their own compression internally
+                compression: Compression::None,
+                filename_tz_offset: offset,
+            };
+
+            let sink = S3Sink::new(service, request_options, partitioner, batch_settings);
+            return Ok(VectorSink::from_event_streamsink(sink));
+        }
+
         let (framer, serializer) = self.encoding.build(SinkType::MessageBased)?;
-        let encoder = Encoder::<Framer>::new(framer, serializer);
+        let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(framer, serializer)));
 
         let request_options = S3RequestOptions {
             bucket: self.bucket.clone(),

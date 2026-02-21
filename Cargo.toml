@@ -356,6 +356,7 @@ async-compression = { version = "0.4.27", default-features = false, features = [
 apache-avro = { version = "0.16.0", default-features = false, optional = true }
 arrow = { version = "56.2.0", default-features = false, features = ["ipc"], optional = true }
 arrow-schema = { version = "56.2.0", default-features = false, optional = true }
+parquet = { version = "56.2.0", default-features = false, features = ["arrow", "snap", "zstd", "lz4", "flate2-rust_backened"], optional = true }
 axum = { version = "0.6.20", default-features = false }
 base64 = { workspace = true, optional = true }
 bloomy = { version = "1.2.0", default-features = false, optional = true }
@@ -592,6 +593,7 @@ enrichment-tables-memory = ["dep:evmap", "dep:evmap-derive", "dep:thread_local"]
 
 # Codecs
 codecs-arrow = ["dep:arrow", "dep:arrow-schema", "vector-lib/arrow"]
+codecs-parquet = ["dep:parquet", "codecs-arrow", "vector-lib/parquet"]
 codecs-opentelemetry = ["vector-lib/opentelemetry"]
 codecs-syslog = ["vector-lib/syslog"]
 

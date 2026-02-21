@@ -155,7 +155,7 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::EncoderKind) {
             }
             #[cfg(feature = "codecs-arrow")]
             vector_lib::codecs::EncoderKind::Batch(encoder) => {
-                (self.0.clone(), encoder.clone()).encode_input(events, writer)
+                (self.0.clone(), *encoder.clone()).encode_input(events, writer)
             }
         }
     }
