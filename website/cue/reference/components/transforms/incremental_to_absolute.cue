@@ -179,4 +179,10 @@ components: transforms: incremental_to_absolute: {
 				"""
 		}
 	}
+
+		telemetry: metrics: {
+		component_cache_bytes:            components.sources.internal_metrics.output.metrics.component_cache_bytes
+		component_cache_evictions_total: 	components.sources.internal_metrics.output.metrics.component_cache_evictions_total
+		component_cache_events:    				components.sources.internal_metrics.output.metrics.component_cache_events
+	}
 }
