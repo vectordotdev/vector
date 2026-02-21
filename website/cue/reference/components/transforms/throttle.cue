@@ -168,7 +168,7 @@ components: transforms: throttle: {
 				{
 					title: "Edge and IoT Bandwidth Throttling"
 					body: """
-						On edge devices with limited uplink bandwidth (e.g., satellite links), throttling by bytes ensures
+						On edge devices with limited uplink bandwidth (for example, satellite links), throttling by bytes ensures
 						that a 50-byte heartbeat and a 500 KB firmware diagnostic are not treated equally:
 
 						```yaml
