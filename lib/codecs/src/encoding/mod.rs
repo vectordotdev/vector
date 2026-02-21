@@ -15,6 +15,8 @@ pub use encoder::{BatchEncoder, BatchSerializer, Encoder, EncoderKind};
 pub use format::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
 };
+#[cfg(feature = "parquet")]
+pub use format::{ParquetCompression, ParquetSerializer, ParquetSerializerConfig, SchemaMode};
 pub use format::{
     AvroSerializer, AvroSerializerConfig, AvroSerializerOptions, CefSerializer,
     CefSerializerConfig, CsvSerializer, CsvSerializerConfig, GelfSerializer, GelfSerializerConfig,

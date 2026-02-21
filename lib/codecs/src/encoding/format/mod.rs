@@ -5,6 +5,8 @@
 
 #[cfg(feature = "arrow")]
 mod arrow;
+#[cfg(feature = "parquet")]
+mod parquet;
 mod avro;
 mod cef;
 mod common;
@@ -27,6 +29,10 @@ use std::fmt::Debug;
 #[cfg(feature = "arrow")]
 pub use arrow::{
     ArrowEncodingError, ArrowStreamSerializer, ArrowStreamSerializerConfig, SchemaProvider,
+};
+#[cfg(feature = "parquet")]
+pub use self::parquet::{
+    ParquetCompression, ParquetSerializer, ParquetSerializerConfig, SchemaMode,
 };
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};

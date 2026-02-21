@@ -295,7 +295,7 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
 }
 
 /// Build an Arrow RecordBatch from a slice of events using the provided schema.
-fn build_record_batch(
+pub(crate) fn build_record_batch(
     schema: SchemaRef,
     events: &[Event],
 ) -> Result<RecordBatch, ArrowEncodingError> {
