@@ -95,6 +95,8 @@ urls: {
 	azure_blob_endpoints:                       "https://docs.microsoft.com/en-us/rest/api/storageservices/blob-service-rest-api"
 	azure_monitor:                              "https://azure.microsoft.com/en-us/services/monitor/"
 	azure_monitor_logs_endpoints:               "https://docs.microsoft.com/en-us/rest/api/monitor/"
+	azure_monitor_data_collector_deprecation:   "https://learn.microsoft.com/previous-versions/azure/azure-monitor/logs/data-collector-api"
+	azure_logs_ingestion_endpoints:             "https://learn.microsoft.com/azure/azure-monitor/logs/logs-ingestion-api-overview"
 	base16:                                     "\(wikipedia)/wiki/Hexadecimal"
 	base64:                                     "\(wikipedia)/wiki/Base64"
 	base64_padding:                             "\(wikipedia)/wiki/Base64#Output_padding"

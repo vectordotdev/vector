@@ -1,11 +1,13 @@
 use std::{
-    cmp, fmt,
-    fmt::Debug,
+    cmp,
+    fmt::{self, Debug},
+    num::NonZeroUsize,
     pin::Pin,
     sync::{
         Arc,
         atomic::{AtomicUsize, Ordering},
     },
+    time::Instant,
 };
 
 #[cfg(test)]
@@ -16,9 +18,11 @@ use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
 use metrics::{Gauge, Histogram, gauge, histogram};
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
-use vector_common::stats::EwmaGauge;
+use vector_common::stats::TimeEwmaGauge;
 
 use crate::{InMemoryBufferable, config::MemoryBufferSize};
+
+pub const DEFAULT_EWMA_HALF_LIFE_SECONDS: f64 = 5.0;
 
 /// Error returned by `LimitedSender::send` when the receiver has disconnected.
 #[derive(Debug, PartialEq, Eq)]
@@ -109,7 +113,7 @@ impl ChannelMetricMetadata {
 struct Metrics {
     histogram: Histogram,
     gauge: Gauge,
-    mean_gauge: EwmaGauge,
+    mean_gauge: TimeEwmaGauge,
     // We hold a handle to the max gauge to avoid it being dropped by the metrics collector, but
     // since the value is static, we never need to update it. The compiler detects this as an unused
     // field, so we need to suppress the warning here.
@@ -126,8 +130,10 @@ impl Metrics {
     fn new(
         limit: MemoryBufferSize,
         metadata: ChannelMetricMetadata,
-        ewma_alpha: Option<f64>,
+        ewma_half_life_seconds: Option<f64>,
     ) -> Self {
+        let ewma_half_life_seconds =
+            ewma_half_life_seconds.unwrap_or(DEFAULT_EWMA_HALF_LIFE_SECONDS);
         let ChannelMetricMetadata { prefix, output } = metadata;
         let (legacy_suffix, gauge_suffix, max_value) = match limit {
             MemoryBufferSize::MaxEvents(max_events) => (
@@ -156,7 +162,7 @@ impl Metrics {
             Self {
                 histogram: histogram!(histogram_name, "output" => label_value.clone()),
                 gauge: gauge!(gauge_name, "output" => label_value.clone()),
-                mean_gauge: EwmaGauge::new(mean_gauge_handle, ewma_alpha),
+                mean_gauge: TimeEwmaGauge::new(mean_gauge_handle, ewma_half_life_seconds),
                 max_gauge,
                 legacy_max_gauge,
                 #[cfg(test)]
@@ -172,7 +178,7 @@ impl Metrics {
             Self {
                 histogram: histogram!(histogram_name),
                 gauge: gauge!(gauge_name),
-                mean_gauge: EwmaGauge::new(mean_gauge_handle, ewma_alpha),
+                mean_gauge: TimeEwmaGauge::new(mean_gauge_handle, ewma_half_life_seconds),
                 max_gauge,
                 legacy_max_gauge,
                 #[cfg(test)]
@@ -182,10 +188,10 @@ impl Metrics {
     }
 
     #[expect(clippy::cast_precision_loss)]
-    fn record(&self, value: usize) {
+    fn record(&self, value: usize, reference: Instant) {
         self.histogram.record(value as f64);
         self.gauge.set(value as f64);
-        self.mean_gauge.record(value as f64);
+        self.mean_gauge.record(value as f64, reference);
         #[cfg(test)]
         if let Ok(mut recorded) = self.recorded_values.lock() {
             recorded.push(value);
@@ -200,6 +206,7 @@ struct Inner<T> {
     limiter: Arc<Semaphore>,
     read_waker: Arc<Notify>,
     metrics: Option<Metrics>,
+    capacity: NonZeroUsize,
 }
 
 impl<T> Clone for Inner<T> {
@@ -210,18 +217,20 @@ impl<T> Clone for Inner<T> {
             limiter: self.limiter.clone(),
             read_waker: self.read_waker.clone(),
             metrics: self.metrics.clone(),
+            capacity: self.capacity,
         }
     }
 }
 
-impl<T: InMemoryBufferable> Inner<T> {
+impl<T: Send + Sync + Debug + 'static> Inner<T> {
     fn new(
         limit: MemoryBufferSize,
         metric_metadata: Option<ChannelMetricMetadata>,
-        ewma_alpha: Option<f64>,
+        ewma_half_life_seconds: Option<f64>,
     ) -> Self {
         let read_waker = Arc::new(Notify::new());
-        let metrics = metric_metadata.map(|metadata| Metrics::new(limit, metadata, ewma_alpha));
+        let metrics =
+            metric_metadata.map(|metadata| Metrics::new(limit, metadata, ewma_half_life_seconds));
         match limit {
             MemoryBufferSize::MaxEvents(max_events) => Inner {
                 data: Arc::new(ArrayQueue::new(max_events.get())),
@@ -229,6 +238,7 @@ impl<T: InMemoryBufferable> Inner<T> {
                 limiter: Arc::new(Semaphore::new(max_events.get())),
                 read_waker,
                 metrics,
+                capacity: max_events,
             },
             MemoryBufferSize::MaxSize(max_bytes) => Inner {
                 data: Arc::new(SegQueue::new()),
@@ -236,24 +246,48 @@ impl<T: InMemoryBufferable> Inner<T> {
                 limiter: Arc::new(Semaphore::new(max_bytes.get())),
                 read_waker,
                 metrics,
+                capacity: max_bytes,
             },
         }
     }
 
     /// Records a send after acquiring all required permits.
     ///
-    /// The `total` value represents the channel utilization after this send completes.  It may be
-    /// greater than the configured limit because the channel intentionally allows a single
-    /// oversized payload to flow through rather than forcing the sender to split it.
-    fn send_with_permit(&mut self, total: usize, permits: OwnedSemaphorePermit, item: T) {
+    /// The `size` value is the true utilization contribution of `item`, which may exceed the number
+    /// of permits acquired for oversized payloads.
+    fn send_with_permits(&mut self, size: usize, permits: OwnedSemaphorePermit, item: T) {
+        if let Some(metrics) = &self.metrics {
+            // For normal items, capacity - available_permits() exactly represents the total queued
+            // utilization (including this item's just-acquired permits). For oversized items that
+            // acquired fewer permits than their true size, `size` is the correct utilization since
+            // the queue must have been empty for the oversized acquire to succeed.
+            let utilization = size.max(self.used_capacity());
+            metrics.record(utilization, Instant::now());
+        }
         self.data.push((permits, item));
         self.read_waker.notify_one();
-        // Due to the race between getting the available capacity, acquiring the permits, and the
-        // above push, the total may be inaccurate. Record it anyways as the histogram totals will
-        // _eventually_ converge on a true picture of the buffer utilization.
-        if let Some(metrics) = self.metrics.as_ref() {
-            metrics.record(total);
-        }
+    }
+}
+
+impl<T> Inner<T> {
+    fn used_capacity(&self) -> usize {
+        self.capacity.get() - self.limiter.available_permits()
+    }
+
+    fn pop_and_record(&self) -> Option<T> {
+        self.data.pop().map(|(permit, item)| {
+            if let Some(metrics) = &self.metrics {
+                // Compute remaining utilization from the semaphore state. Since our permits haven't
+                // been released yet, used_capacity is stable against racing senders acquiring those
+                // permits.
+                let utilization = self.used_capacity().saturating_sub(permit.num_permits());
+                metrics.record(utilization, Instant::now());
+            }
+            // Release permits after recording so a waiting sender cannot enqueue a new item
+            // before this pop's utilization measurement is taken.
+            drop(permit);
+            item
+        })
     }
 }
 
@@ -265,16 +299,16 @@ pub struct LimitedSender<T> {
 
 impl<T: InMemoryBufferable> LimitedSender<T> {
     #[allow(clippy::cast_possible_truncation)]
-    fn calc_required_permits(&self, item: &T) -> (usize, usize, u32) {
+    fn calc_required_permits(&self, item: &T) -> (usize, u32) {
         // We have to limit the number of permits we ask for to the overall limit since we're always
         // willing to store more items than the limit if the queue is entirely empty, because
         // otherwise we might deadlock ourselves by not being able to send a single item.
-        let (limit, value) = match self.inner.limit {
-            MemoryBufferSize::MaxSize(max_size) => (max_size, item.allocated_bytes()),
-            MemoryBufferSize::MaxEvents(max_events) => (max_events, item.event_count()),
+        let value = match self.inner.limit {
+            MemoryBufferSize::MaxSize(_) => item.allocated_bytes(),
+            MemoryBufferSize::MaxEvents(_) => item.event_count(),
         };
-        let limit = limit.get();
-        (limit, value, cmp::min(limit, value) as u32)
+        let limit = self.inner.capacity.get();
+        (value, cmp::min(limit, value) as u32)
     }
 
     /// Gets the number of items that this channel could accept.
@@ -290,8 +324,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
     /// with the given `item`.
     pub async fn send(&mut self, item: T) -> Result<(), SendError<T>> {
         // Calculate how many permits we need, and wait until we can acquire all of them.
-        let (limit, count, permits_required) = self.calc_required_permits(&item);
-        let in_use = limit.saturating_sub(self.available_capacity());
+        let (size, permits_required) = self.calc_required_permits(&item);
         match self
             .inner
             .limiter
@@ -300,7 +333,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
             .await
         {
             Ok(permits) => {
-                self.inner.send_with_permit(in_use + count, permits, item);
+                self.inner.send_with_permits(size, permits, item);
                 trace!("Sent item.");
                 Ok(())
             }
@@ -322,8 +355,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
     /// Will panic if adding ack amount overflows.
     pub fn try_send(&mut self, item: T) -> Result<(), TrySendError<T>> {
         // Calculate how many permits we need, and try to acquire them all without waiting.
-        let (limit, count, permits_required) = self.calc_required_permits(&item);
-        let in_use = limit.saturating_sub(self.available_capacity());
+        let (size, permits_required) = self.calc_required_permits(&item);
         match self
             .inner
             .limiter
@@ -331,7 +363,7 @@ impl<T: InMemoryBufferable> LimitedSender<T> {
             .try_acquire_many_owned(permits_required)
         {
             Ok(permits) => {
-                self.inner.send_with_permit(in_use + count, permits, item);
+                self.inner.send_with_permits(size, permits, item);
                 trace!("Attempt to send item succeeded.");
                 Ok(())
             }
@@ -375,13 +407,19 @@ impl<T: Send + 'static> LimitedReceiver<T> {
 
     pub async fn next(&mut self) -> Option<T> {
         loop {
-            if let Some((_permit, item)) = self.inner.data.pop() {
+            if let Some(item) = self.inner.pop_and_record() {
                 return Some(item);
             }
 
             // There wasn't an item for us to pop, so see if the channel is actually closed.  If so,
             // then it's time for us to close up shop as well.
             if self.inner.limiter.is_closed() {
+                if self.available_capacity() < self.inner.capacity.get() {
+                    // We only terminate when closed and fully drained. A close can race with queue
+                    // visibility while items/in-flight permits still exist.
+                    tokio::task::yield_now().await;
+                    continue;
+                }
                 return None;
             }
 
@@ -414,9 +452,9 @@ impl<T> Drop for LimitedReceiver<T> {
 pub fn limited<T: InMemoryBufferable + fmt::Debug>(
     limit: MemoryBufferSize,
     metric_metadata: Option<ChannelMetricMetadata>,
-    ewma_alpha: Option<f64>,
+    ewma_half_life_seconds: Option<f64>,
 ) -> (LimitedSender<T>, LimitedReceiver<T>) {
-    let inner = Inner::new(limit, metric_metadata, ewma_alpha);
+    let inner = Inner::new(limit, metric_metadata, ewma_half_life_seconds);
 
     let sender = LimitedSender {
         inner: inner.clone(),
@@ -431,10 +469,11 @@ pub fn limited<T: InMemoryBufferable + fmt::Debug>(
 mod tests {
     use std::num::NonZeroUsize;
 
+    use rand::{Rng as _, SeedableRng as _, rngs::SmallRng};
     use tokio_test::{assert_pending, assert_ready, task::spawn};
     use vector_common::byte_size_of::ByteSizeOf;
 
-    use super::{ChannelMetricMetadata, limited};
+    use super::{ChannelMetricMetadata, LimitedReceiver, LimitedSender, limited};
     use crate::{
         MemoryBufferSize,
         test::MultiEventRecord,
@@ -471,7 +510,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn records_utilization_on_send() {
+    async fn records_utilization() {
         let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
         let (mut tx, mut rx) = limited(
             limit,
@@ -482,9 +521,41 @@ mod tests {
         let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
 
         tx.send(Sample::new(1)).await.expect("send should succeed");
-        assert_eq!(metrics.lock().unwrap().last().copied(), Some(1));
+        let records = metrics.lock().unwrap().clone();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records.last().copied(), Some(1));
 
-        let _ = rx.next().await;
+        assert_eq!(Sample::new(1), rx.next().await.unwrap());
+        let records = metrics.lock().unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(records.last().copied(), Some(0));
+    }
+
+    #[tokio::test]
+    async fn oversized_send_records_true_utilization_via_normal_send_path() {
+        let limit = MemoryBufferSize::MaxEvents(NonZeroUsize::new(2).unwrap());
+        let (mut tx, mut rx) = limited(
+            limit,
+            Some(ChannelMetricMetadata::new("test_channel_oversized", None)),
+            None,
+        );
+        let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
+
+        // Normal send path: permits are capped to the limit (2), but utilization should reflect
+        // the true item contribution (3).
+        let oversized = MultiEventRecord::new(3);
+        tx.send(oversized.clone())
+            .await
+            .expect("send should succeed");
+
+        let records = metrics.lock().unwrap().clone();
+        assert_eq!(records.len(), 1);
+        assert_eq!(records.last().copied(), Some(3));
+
+        assert_eq!(Some(oversized), rx.next().await);
+        let records = metrics.lock().unwrap().clone();
+        assert_eq!(records.len(), 2);
+        assert_eq!(records.last().copied(), Some(0));
     }
 
     #[test]
@@ -837,5 +908,71 @@ mod tests {
         assert_eq!(Some(msg2), assert_ready!(recv2.poll()));
 
         assert_eq!(2, tx.available_capacity());
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+    async fn concurrent_send_receive_metrics_remain_valid() {
+        const ITEM_COUNT: usize = 4_000;
+
+        // Try different sizes of the buffer, from 10 to 1000 events.
+        for size in 1..=100 {
+            let limit = NonZeroUsize::new(size * 10).unwrap();
+            let (tx, rx) = limited(
+                MemoryBufferSize::MaxEvents(limit),
+                Some(ChannelMetricMetadata::new("test_channel_concurrent", None)),
+                None,
+            );
+            let metrics = tx.inner.metrics.as_ref().unwrap().recorded_values.clone();
+
+            let sender = tokio::spawn(send_samples(tx, ITEM_COUNT));
+            let receiver = tokio::spawn(receive_samples(rx, ITEM_COUNT));
+
+            sender.await.expect("sender task should not panic");
+            receiver.await.expect("receiver task should not panic");
+
+            let recorded = metrics.lock().unwrap().clone();
+            assert_eq!(
+                recorded.len(),
+                ITEM_COUNT * 2,
+                "expected one metric update per send and per receive"
+            );
+
+            // For MaxEvents with single-event messages, the occupancy counter tracks exact
+            // utilization, so values must stay within [0, limit].
+            let max_allowed = limit.get();
+            let observed_max = recorded.iter().copied().max().unwrap_or_default();
+            assert!(
+                recorded.iter().all(|value| *value <= max_allowed),
+                "observed utilization value above valid bound: max={observed_max}, allowed={max_allowed}"
+            );
+        }
+    }
+
+    async fn send_samples(mut tx: LimitedSender<Sample>, item_count: usize) {
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+
+        for i in 0..item_count {
+            tx.send(Sample::new(i as u64))
+                .await
+                .expect("send should succeed");
+            if rng.random::<u8>() % 8 == 0 {
+                tokio::task::yield_now().await;
+            }
+        }
+    }
+
+    async fn receive_samples(mut rx: LimitedReceiver<Sample>, item_count: usize) {
+        let mut rng = SmallRng::from_rng(&mut rand::rng());
+
+        for i in 0..item_count {
+            let next = rx
+                .next()
+                .await
+                .expect("receiver should yield all sent items");
+            assert_eq!(Sample::new(i as u64), next);
+            if rng.random::<u8>() % 8 == 0 {
+                tokio::task::yield_now().await;
+            }
+        }
     }
 }

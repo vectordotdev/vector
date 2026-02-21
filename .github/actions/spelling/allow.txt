@@ -558,3 +558,4 @@ zstandard
 ZTE
 Zync
 sighup
+CLAUDE
