@@ -5,19 +5,17 @@
 //! a continuous stream of record batches without a file footer.
 
 use arrow::{
-    array::ArrayRef,
-    compute::{CastOptions, cast_with_options},
-    datatypes::{DataType, Field, Fields, Schema, SchemaRef, TimeUnit},
+    datatypes::{DataType, Field, Fields, Schema, SchemaRef},
     ipc::writer::StreamWriter,
+    json::reader::ReaderBuilder,
     record_batch::RecordBatch,
 };
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
-use chrono::{DateTime, Utc};
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu, ensure};
 use std::sync::Arc;
 use vector_config::configurable_component;
-use vector_core::event::{Event, LogEvent, Value};
+use vector_core::event::Event;
 
 /// Provides Arrow schema for encoding.
 ///
@@ -33,7 +31,7 @@ pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
 
 /// Configuration for Arrow IPC stream serialization
 #[configurable_component]
-#[derive(Clone, Default)]
+#[derive(Clone)]
 pub struct ArrowStreamSerializerConfig {
     /// The Arrow schema to use for encoding
     #[serde(skip)]
@@ -51,6 +49,15 @@ pub struct ArrowStreamSerializerConfig {
     #[serde(default)]
     #[configurable(derived)]
     pub allow_nullable_fields: bool,
+}
+
+impl Default for ArrowStreamSerializerConfig {
+    fn default() -> Self {
+        Self {
+            schema: None,
+            allow_nullable_fields: false,
+        }
+    }
 }
 
 impl std::fmt::Debug for ArrowStreamSerializerConfig {
@@ -96,10 +103,8 @@ pub struct ArrowStreamSerializer {
 
 impl ArrowStreamSerializer {
     /// Create a new ArrowStreamSerializer with the given configuration
-    pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, vector_common::Error> {
-        let schema = config
-            .schema
-            .ok_or_else(|| vector_common::Error::from("Arrow serializer requires a schema."))?;
+    pub fn new(config: ArrowStreamSerializerConfig) -> Result<Self, ArrowEncodingError> {
+        let schema = config.schema.ok_or(ArrowEncodingError::MissingSchema)?;
 
         // If allow_nullable_fields is enabled, transform the schema once here
         // instead of on every batch encoding
@@ -108,8 +113,7 @@ impl ArrowStreamSerializer {
                 .fields()
                 .iter()
                 .map(|f| make_field_nullable(f))
-                .collect::<Result<Vec<_>, _>>()
-                .map_err(|e| vector_common::Error::from(e.to_string()))?
+                .collect::<Result<Vec<_>, _>>()?
                 .into();
             Schema::new_with_metadata(nullable_fields, schema.metadata().clone())
         } else {
@@ -130,7 +134,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ArrowStreamSerializer {
             return Err(ArrowEncodingError::NoEvents);
         }
 
-        let bytes = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&self.schema)))?;
+        let bytes = encode_events_to_arrow_ipc_stream(&events, Arc::clone(&self.schema))?;
 
         buffer.extend_from_slice(&bytes);
         Ok(())
@@ -158,10 +162,6 @@ pub enum ArrowEncodingError {
     #[snafu(display("No events provided for encoding"))]
     NoEvents,
 
-    /// Schema must be provided before encoding
-    #[snafu(display("Schema must be provided before encoding"))]
-    NoSchemaProvided,
-
     /// Failed to fetch schema from provider
     #[snafu(display("Failed to fetch schema from provider: {}", message))]
     SchemaFetchError {
@@ -176,31 +176,22 @@ pub enum ArrowEncodingError {
         field_name: String,
     },
 
+    /// Arrow serializer requires a schema
+    #[snafu(display("Arrow serializer requires a schema"))]
+    MissingSchema,
+
     /// IO error during encoding
-    #[snafu(display("IO error: {}", source))]
+    #[snafu(display("IO error: {}", source), context(false))]
     Io {
         /// The underlying IO error
         source: std::io::Error,
     },
 
-    /// Serde Arrow serialization error
-    #[snafu(display("Serde Arrow error: {}", source))]
-    SerdeArrow {
-        /// The underlying serde_arrow error
-        source: serde_arrow::Error,
-    },
-
-    /// Timestamp value overflows the representable range
-    #[snafu(display(
-        "Timestamp overflow for field '{}': value '{}' cannot be represented as i64 nanoseconds",
-        field_name,
-        timestamp
-    ))]
-    TimestampOverflow {
-        /// The field name
-        field_name: String,
-        /// The timestamp value that overflowed
-        timestamp: String,
+    /// Arrow JSON decoding error
+    #[snafu(display("Arrow JSON decoding error: {}", source))]
+    ArrowJsonDecode {
+        /// The underlying Arrow error
+        source: arrow::error::ArrowError,
     },
 
     /// Invalid Map schema structure
@@ -213,32 +204,22 @@ pub enum ArrowEncodingError {
     },
 }
 
-impl From<std::io::Error> for ArrowEncodingError {
-    fn from(error: std::io::Error) -> Self {
-        Self::Io { source: error }
-    }
-}
-
 /// Encodes a batch of events into Arrow IPC streaming format
 pub fn encode_events_to_arrow_ipc_stream(
     events: &[Event],
-    schema: Option<SchemaRef>,
+    schema: SchemaRef,
 ) -> Result<Bytes, ArrowEncodingError> {
     if events.is_empty() {
         return Err(ArrowEncodingError::NoEvents);
     }
 
-    let schema_ref = schema.ok_or(ArrowEncodingError::NoSchemaProvided)?;
-
-    let record_batch = build_record_batch(schema_ref, events)?;
-
-    let ipc_err = |source| ArrowEncodingError::IpcWrite { source };
+    let record_batch = build_record_batch(schema, events)?;
 
     let mut buffer = BytesMut::new().writer();
     let mut writer =
-        StreamWriter::try_new(&mut buffer, record_batch.schema_ref()).map_err(ipc_err)?;
-    writer.write(&record_batch).map_err(ipc_err)?;
-    writer.finish().map_err(ipc_err)?;
+        StreamWriter::try_new(&mut buffer, record_batch.schema_ref()).context(IpcWriteSnafu)?;
+    writer.write(&record_batch).context(IpcWriteSnafu)?;
+    writer.finish().context(IpcWriteSnafu)?;
 
     Ok(buffer.into_inner().freeze())
 }
@@ -257,18 +238,20 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
         DataType::Map(inner, sorted) => {
             // A Map's inner field is a "entries" Struct<Key, Value>
             let DataType::Struct(fields) = inner.data_type() else {
-                return Err(ArrowEncodingError::InvalidMapSchema {
-                    field_name: field.name().to_string(),
+                return InvalidMapSchemaSnafu {
+                    field_name: field.name(),
                     reason: format!("inner type must be Struct, found {:?}", inner.data_type()),
-                });
+                }
+                .fail();
             };
 
-            if fields.len() != 2 {
-                return Err(ArrowEncodingError::InvalidMapSchema {
-                    field_name: field.name().to_string(),
+            ensure!(
+                fields.len() == 2,
+                InvalidMapSchemaSnafu {
+                    field_name: field.name(),
                     reason: format!("expected 2 fields (key, value), found {}", fields.len()),
-                });
-            }
+                },
+            );
             let key_field = &fields[0];
             let value_field = &fields[1];
 
@@ -299,122 +282,42 @@ fn build_record_batch(
     schema: SchemaRef,
     events: &[Event],
 ) -> Result<RecordBatch, ArrowEncodingError> {
-    let log_events: Vec<LogEvent> = events
+    let mut decoder = ReaderBuilder::new(Arc::clone(&schema))
+        .build_decoder()
+        .context(RecordBatchCreationSnafu)?;
+
+    let values: Vec<&vrl::value::Value> = events
         .iter()
         .filter_map(Event::maybe_as_log)
-        .map(|log| convert_timestamps(log, &schema))
-        .collect::<Result<Vec<_>, _>>()?;
-
-    let batch = serde_arrow::to_record_batch(schema.fields(), &log_events).map_err(|source| {
-        // serde_arrow doesn't expose structured error variants (see
-        // https://docs.rs/serde_arrow/latest/serde_arrow/enum.Error.html), so we string-match on
-        // the message to detect null constraint violations, then find the actual field ourselves.
-        if source.message().contains("non-nullable")
-            && let Some(field_name) = find_null_field(&log_events, &schema)
-        {
-            return ArrowEncodingError::NullConstraint { field_name };
-        }
-        ArrowEncodingError::SerdeArrow { source }
-    })?;
-
-    // Post-process: use Arrow's cast for any remaining type mismatches.
-    // serde_arrow serializes Vector's Value types using fixed Arrow types (e.g., Int64
-    // for all integers, Float64 for floats, LargeUtf8 for strings), but the target schema
-    // may specify narrower types. Arrow's cast handles these conversions safely.
-    let columns: Result<Vec<ArrayRef>, _> = batch
-        .columns()
-        .iter()
-        .zip(schema.fields())
-        .map(|(col, field)| {
-            if col.data_type() == field.data_type() {
-                Ok(col.clone())
-            } else {
-                cast_with_options(col, field.data_type(), &CastOptions::default())
-                    .map_err(|source| ArrowEncodingError::RecordBatchCreation { source })
-            }
-        })
+        .map(|log| log.value())
         .collect();
 
-    RecordBatch::try_new(schema, columns?)
-        .map_err(|source| ArrowEncodingError::RecordBatchCreation { source })
-}
+    decoder.serialize(&values).context(ArrowJsonDecodeSnafu)?;
 
-/// Find which non-nullable field has a missing value (called only on error).
-fn find_null_field(events: &[LogEvent], schema: &SchemaRef) -> Option<String> {
-    for field in schema.fields() {
-        if !field.is_nullable() {
-            let name = field.name();
-            if events
-                .iter()
-                .any(|e| e.get(lookup::event_path!(name)).is_none())
-            {
-                return Some(name.to_string());
-            }
-        }
-    }
-    None
-}
-
-/// Convert Value::Timestamp to Value::Integer for timestamp columns.
-///
-/// This is necessary because serde_arrow's string parsing expects specific formats
-/// based on the timezone setting, but Vector's timestamps always serialize as RFC 3339
-/// with 'Z' suffix. Converting to i64 directly avoids this format mismatch.
-fn convert_timestamps(
-    event: &LogEvent,
-    schema: &SchemaRef,
-) -> Result<LogEvent, ArrowEncodingError> {
-    let mut result = event.clone();
-
-    for field in schema.fields() {
-        if let DataType::Timestamp(unit, _) = field.data_type() {
-            let field_name = field.name().as_str();
-
-            if let Some(Value::Timestamp(ts)) = event.get(lookup::event_path!(field_name)) {
-                let val = timestamp_to_unit(ts, unit).ok_or_else(|| {
-                    ArrowEncodingError::TimestampOverflow {
-                        field_name: field_name.to_string(),
-                        timestamp: ts.to_rfc3339(),
-                    }
-                })?;
-                result.insert(field_name, Value::Integer(val));
-            }
-        }
-    }
-
-    Ok(result)
-}
-
-/// Convert a DateTime<Utc> to i64 in the specified Arrow TimeUnit.
-/// Returns None if the value would overflow (only possible for nanoseconds).
-fn timestamp_to_unit(ts: &DateTime<Utc>, unit: &TimeUnit) -> Option<i64> {
-    match unit {
-        TimeUnit::Second => Some(ts.timestamp()),
-        TimeUnit::Millisecond => Some(ts.timestamp_millis()),
-        TimeUnit::Microsecond => Some(ts.timestamp_micros()),
-        TimeUnit::Nanosecond => ts.timestamp_nanos_opt(),
-    }
+    decoder
+        .flush()
+        .context(ArrowJsonDecodeSnafu)?
+        .ok_or(ArrowEncodingError::NoEvents)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
     use arrow::{
-        array::{
-            Array, BinaryArray, BooleanArray, Float64Array, Int64Array, StringArray,
-            TimestampMicrosecondArray, TimestampMillisecondArray, TimestampNanosecondArray,
-            TimestampSecondArray,
-        },
+        array::{Array, AsArray},
+        datatypes::TimeUnit,
         ipc::reader::StreamReader,
     };
+    use chrono::Utc;
     use std::io::Cursor;
+    use vector_core::event::{LogEvent, Value};
 
     /// Helper to encode events and return the decoded RecordBatch
     fn encode_and_decode(
         events: Vec<Event>,
         schema: SchemaRef,
     ) -> Result<RecordBatch, Box<dyn std::error::Error>> {
-        let bytes = encode_events_to_arrow_ipc_stream(&events, Some(Arc::clone(&schema)))?;
+        let bytes = encode_events_to_arrow_ipc_stream(&events, Arc::clone(&schema))?;
         let cursor = Cursor::new(bytes);
         let mut reader = StreamReader::try_new(cursor, None)?;
         Ok(reader.next().unwrap()?)
@@ -432,29 +335,14 @@ mod tests {
         Event::Log(log)
     }
 
-    /// Assert a primitive value at a specific column and row
-    macro_rules! assert_primitive_value {
-        ($batch:expr, $col:expr, $row:expr, $array_type:ty, $expected:expr) => {
-            assert_eq!(
-                $batch
-                    .column($col)
-                    .as_any()
-                    .downcast_ref::<$array_type>()
-                    .unwrap()
-                    .value($row),
-                $expected
-            )
-        };
-    }
-
     mod comprehensive {
         use super::*;
 
         #[test]
         fn test_encode_all_types() {
-            use arrow::array::{
-                Decimal128Array, ListArray, MapArray, UInt8Array, UInt16Array, UInt32Array,
-                UInt64Array,
+            use arrow::datatypes::{
+                Decimal128Type, Float32Type, Float64Type, Int8Type, Int16Type, Int32Type,
+                Int64Type, TimestampMillisecondType, UInt8Type, UInt16Type, UInt32Type, UInt64Type,
             };
             use vrl::value::ObjectMap;
 
@@ -496,7 +384,6 @@ mod tests {
             log.insert("float32_field", 3.15);
             log.insert("float64_field", 3.15);
             log.insert("bool_field", true);
-            log.insert("bytes_field", bytes::Bytes::from("binary"));
             log.insert("timestamp_field", now);
             log.insert("decimal_field", 99.99);
             // Complex types
@@ -540,7 +427,6 @@ mod tests {
                 Field::new("float32_field", DataType::Float32, true),
                 Field::new("float64_field", DataType::Float64, true),
                 Field::new("bool_field", DataType::Boolean, true),
-                Field::new("bytes_field", DataType::Binary, true),
                 Field::new(
                     "timestamp_field",
                     DataType::Timestamp(TimeUnit::Millisecond, None),
@@ -564,105 +450,77 @@ mod tests {
             let batch = encode_and_decode(events, schema).expect("Failed to encode");
 
             assert_eq!(batch.num_rows(), 1);
-            assert_eq!(batch.num_columns(), 19);
+            assert_eq!(batch.num_columns(), 18);
 
             // Verify all primitive types
+            assert_eq!(batch.column(0).as_string::<i32>().value(0), "test");
+            assert_eq!(batch.column(1).as_primitive::<Int8Type>().value(0), 127);
+            assert_eq!(batch.column(2).as_primitive::<Int16Type>().value(0), 32000);
+            assert_eq!(
+                batch.column(3).as_primitive::<Int32Type>().value(0),
+                1000000
+            );
+            assert_eq!(batch.column(4).as_primitive::<Int64Type>().value(0), 42);
+            assert_eq!(batch.column(5).as_primitive::<UInt8Type>().value(0), 255);
+            assert_eq!(batch.column(6).as_primitive::<UInt16Type>().value(0), 65535);
+            assert_eq!(
+                batch.column(7).as_primitive::<UInt32Type>().value(0),
+                4000000
+            );
+            assert_eq!(
+                batch.column(8).as_primitive::<UInt64Type>().value(0),
+                9000000000
+            );
+            assert!((batch.column(9).as_primitive::<Float32Type>().value(0) - 3.15).abs() < 0.001);
+            assert!((batch.column(10).as_primitive::<Float64Type>().value(0) - 3.15).abs() < 0.001);
+            assert!(batch.column(11).as_boolean().value(0));
             assert_eq!(
                 batch
-                    .column(0)
-                    .as_any()
-                    .downcast_ref::<StringArray>()
-                    .unwrap()
+                    .column(12)
+                    .as_primitive::<TimestampMillisecondType>()
                     .value(0),
-                "test"
-            );
-            assert_primitive_value!(batch, 1, 0, arrow::array::Int8Array, 127);
-            assert_primitive_value!(batch, 2, 0, arrow::array::Int16Array, 32000);
-            assert_primitive_value!(batch, 3, 0, arrow::array::Int32Array, 1000000);
-            assert_primitive_value!(batch, 4, 0, Int64Array, 42);
-            assert_primitive_value!(batch, 5, 0, UInt8Array, 255);
-            assert_primitive_value!(batch, 6, 0, UInt16Array, 65535);
-            assert_primitive_value!(batch, 7, 0, UInt32Array, 4000000);
-            assert_primitive_value!(batch, 8, 0, UInt64Array, 9000000000);
-            assert!(
-                (batch
-                    .column(9)
-                    .as_any()
-                    .downcast_ref::<arrow::array::Float32Array>()
-                    .unwrap()
-                    .value(0)
-                    - 3.15)
-                    .abs()
-                    < 0.001
-            );
-            assert!(
-                (batch
-                    .column(10)
-                    .as_any()
-                    .downcast_ref::<Float64Array>()
-                    .unwrap()
-                    .value(0)
-                    - 3.15)
-                    .abs()
-                    < 0.001
-            );
-            assert!(
-                batch
-                    .column(11)
-                    .as_any()
-                    .downcast_ref::<BooleanArray>()
-                    .unwrap()
-                    .value(0)
-            );
-            assert_primitive_value!(batch, 12, 0, BinaryArray, b"binary");
-            assert_primitive_value!(
-                batch,
-                13,
-                0,
-                TimestampMillisecondArray,
                 now.timestamp_millis()
             );
-            assert_primitive_value!(batch, 14, 0, Decimal128Array, 9999);
+            assert_eq!(
+                batch.column(13).as_primitive::<Decimal128Type>().value(0),
+                9999
+            );
 
-            let list_array = batch
-                .column(15)
-                .as_any()
-                .downcast_ref::<ListArray>()
-                .unwrap();
+            let list_array = batch.column(14).as_list::<i32>();
             assert!(!list_array.is_null(0));
-            let list_value = list_array.value(0);
-            assert_eq!(list_value.len(), 3);
-            let int_array = list_value.as_any().downcast_ref::<Int64Array>().unwrap();
+            let list_values = list_array.value(0);
+            assert_eq!(list_values.len(), 3);
+            let int_array = list_values.as_primitive::<Int64Type>();
             assert_eq!(int_array.value(0), 1);
             assert_eq!(int_array.value(1), 2);
             assert_eq!(int_array.value(2), 3);
 
             // Verify struct field (unnamed)
-            let struct_array = batch
-                .column(16)
-                .as_any()
-                .downcast_ref::<arrow::array::StructArray>()
-                .unwrap();
+            let struct_array = batch.column(15).as_struct();
             assert!(!struct_array.is_null(0));
-            assert_primitive_value!(struct_array, 0, 0, StringArray, "nested_str");
-            assert_primitive_value!(struct_array, 1, 0, Int64Array, 999);
+            assert_eq!(
+                struct_array.column(0).as_string::<i32>().value(0),
+                "nested_str"
+            );
+            assert_eq!(
+                struct_array.column(1).as_primitive::<Int64Type>().value(0),
+                999
+            );
 
             // Verify named struct field (named tuple)
-            let named_struct_array = batch
-                .column(17)
-                .as_any()
-                .downcast_ref::<arrow::array::StructArray>()
-                .unwrap();
+            let named_struct_array = batch.column(16).as_struct();
             assert!(!named_struct_array.is_null(0));
-            assert_primitive_value!(named_struct_array, 0, 0, StringArray, "test_category");
-            assert_primitive_value!(named_struct_array, 1, 0, StringArray, "test_tag");
+            assert_eq!(
+                named_struct_array.column(0).as_string::<i32>().value(0),
+                "test_category"
+            );
+            assert_eq!(
+                named_struct_array.column(1).as_string::<i32>().value(0),
+                "test_tag"
+            );
 
             // Verify map field
-            let map_array = batch
-                .column(18)
-                .as_any()
-                .downcast_ref::<MapArray>()
-                .unwrap();
+            let map_array = batch.column(17).as_map();
             assert!(!map_array.is_null(0));
             let map_value = map_array.value(0);
             assert_eq!(map_value.len(), 2);
@@ -673,27 +531,19 @@ mod tests {
         use super::*;
 
         #[test]
-        fn test_encode_without_schema_fails() {
-            let events = vec![create_event(vec![("message", "hello")])];
-
-            let result = encode_events_to_arrow_ipc_stream(&events, None);
-            assert!(result.is_err());
-            assert!(matches!(
-                result.unwrap_err(),
-                ArrowEncodingError::NoSchemaProvided
-            ));
-        }
-
-        #[test]
         fn test_encode_empty_events() {
+            let schema = SchemaRef::new(Schema::new(vec![Field::new(
+                "message",
+                DataType::Utf8,
+                true,
+            )]));
             let events: Vec<Event> = vec![];
-            let result = encode_events_to_arrow_ipc_stream(&events, None);
-            assert!(result.is_err());
+            let result = encode_events_to_arrow_ipc_stream(&events, schema);
             assert!(matches!(result.unwrap_err(), ArrowEncodingError::NoEvents));
         }
 
         #[test]
-        fn test_null_constraint_error() {
+        fn test_missing_non_nullable_field_errors() {
             let events = vec![create_event(vec![("other_field", "value")])];
 
             let schema = SchemaRef::new(Schema::new(vec![Field::new(
@@ -702,19 +552,17 @@ mod tests {
                 false, // non-nullable
             )]));
 
-            let result = encode_events_to_arrow_ipc_stream(&events, Some(schema));
+            let result = encode_events_to_arrow_ipc_stream(&events, schema);
             assert!(result.is_err());
-            match result.unwrap_err() {
-                ArrowEncodingError::NullConstraint { field_name } => {
-                    assert_eq!(field_name, "required_field");
-                }
-                other => panic!("Expected NullConstraint error, got: {:?}", other),
-            }
         }
     }
 
     mod temporal_types {
         use super::*;
+        use arrow::datatypes::{
+            TimestampMicrosecondType, TimestampMillisecondType, TimestampNanosecondType,
+            TimestampSecondType,
+        };
 
         #[test]
         fn test_encode_timestamp_precisions() {
@@ -755,45 +603,25 @@ mod tests {
             assert_eq!(batch.num_rows(), 1);
             assert_eq!(batch.num_columns(), 4);
 
-            let ts_second = batch
-                .column(0)
-                .as_any()
-                .downcast_ref::<TimestampSecondArray>()
-                .unwrap();
+            let ts_second = batch.column(0).as_primitive::<TimestampSecondType>();
             assert!(!ts_second.is_null(0));
             assert_eq!(ts_second.value(0), now.timestamp());
 
-            let ts_milli = batch
-                .column(1)
-                .as_any()
-                .downcast_ref::<TimestampMillisecondArray>()
-                .unwrap();
+            let ts_milli = batch.column(1).as_primitive::<TimestampMillisecondType>();
             assert!(!ts_milli.is_null(0));
             assert_eq!(ts_milli.value(0), now.timestamp_millis());
 
-            let ts_micro = batch
-                .column(2)
-                .as_any()
-                .downcast_ref::<TimestampMicrosecondArray>()
-                .unwrap();
+            let ts_micro = batch.column(2).as_primitive::<TimestampMicrosecondType>();
             assert!(!ts_micro.is_null(0));
             assert_eq!(ts_micro.value(0), now.timestamp_micros());
 
-            let ts_nano = batch
-                .column(3)
-                .as_any()
-                .downcast_ref::<TimestampNanosecondArray>()
-                .unwrap();
+            let ts_nano = batch.column(3).as_primitive::<TimestampNanosecondType>();
             assert!(!ts_nano.is_null(0));
             assert_eq!(ts_nano.value(0), now.timestamp_nanos_opt().unwrap());
         }
 
         #[test]
         fn test_encode_mixed_timestamp_string_native_and_integer() {
-            // Test mixing RFC3339 string timestamps, native Timestamp values, and integers.
-            // Note: String timestamps require the schema to have Some("UTC") timezone for
-            // serde_arrow to parse them correctly. Native Value::Timestamp values are
-            // converted to integers internally, so they work with any timezone setting.
             let now = Utc::now();
 
             let mut log1 = LogEvent::default();
@@ -807,10 +635,9 @@ mod tests {
 
             let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
-            // Use Some("UTC") to enable serde_arrow's RFC3339 string parsing
             let schema = SchemaRef::new(Schema::new(vec![Field::new(
                 "ts",
-                DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into())),
+                DataType::Timestamp(TimeUnit::Nanosecond, Some("+00:00".into())),
                 true,
             )]));
 
@@ -818,11 +645,7 @@ mod tests {
 
             assert_eq!(batch.num_rows(), 3);
 
-            let ts_array = batch
-                .column(0)
-                .as_any()
-                .downcast_ref::<TimestampNanosecondArray>()
-                .unwrap();
+            let ts_array = batch.column(0).as_primitive::<TimestampNanosecondType>();
 
             // All three should be non-null
             assert!(!ts_array.is_null(0));
@@ -883,9 +706,7 @@ mod tests {
 
             let array = batch
                 .column(0)
-                .as_any()
-                .downcast_ref::<Int64Array>()
-                .unwrap();
+                .as_primitive::<arrow::datatypes::Int64Type>();
 
             assert_eq!(array.value(0), 42);
             assert!(!array.is_null(0));

@@ -1,7 +1,12 @@
 //! Implementation of the `clickhouse` sink.
 
-use super::{config::Format, request_builder::ClickhouseRequestBuilder};
+use std::io;
+
+use super::{RequiredFields, config::Format, request_builder::ClickhouseRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
+#[cfg(feature = "codecs-arrow")]
+use vector_lib::codecs::internal_events::EncoderNullConstraintError;
+use vector_lib::lookup;
 
 pub struct ClickhouseSink<S> {
     batch_settings: BatcherSettings,
@@ -10,6 +15,7 @@ pub struct ClickhouseSink<S> {
     table: Template,
     format: Format,
     request_builder: ClickhouseRequestBuilder,
+    required_fields: RequiredFields,
 }
 
 impl<S> ClickhouseSink<S>
@@ -26,6 +32,7 @@ where
         table: Template,
         format: Format,
         request_builder: ClickhouseRequestBuilder,
+        required_fields: RequiredFields,
     ) -> Self {
         Self {
             batch_settings,
@@ -34,11 +41,13 @@ where
             table,
             format,
             request_builder,
+            required_fields,
         }
     }
 
     async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let batch_settings = self.batch_settings;
+        let required_fields = self.required_fields;
 
         input
             .batched_partitioned(
@@ -46,6 +55,19 @@ where
                 || batch_settings.as_byte_size_config(),
             )
             .filter_map(|(key, batch)| async move { key.map(move |k| (k, batch)) })
+            .filter_map(move |(key, mut events)| {
+                let required_fields = required_fields.clone();
+                async move {
+                    if let Err(error) = validate_required_fields(&required_fields, &events) {
+                        events
+                            .take_finalizers()
+                            .update_status(EventStatus::Rejected);
+                        emit!(SinkRequestBuildError { error });
+                        return None;
+                    }
+                    Some((key, events))
+                }
+            })
             .request_builder(
                 default_request_builder_concurrency_limit(),
                 self.request_builder,
@@ -132,4 +154,30 @@ impl Partitioner for KeyPartitioner {
             format: self.format,
         })
     }
+}
+
+fn validate_required_fields(
+    required_fields: &RequiredFields,
+    events: &[Event],
+) -> Result<(), io::Error> {
+    let Some(required_fields) = required_fields else {
+        return Ok(());
+    };
+
+    for event in events.iter().filter_map(Event::maybe_as_log) {
+        for field in required_fields {
+            if event.get(lookup::event_path!(field)).is_none() {
+                let msg = format!(
+                    "Missing required field '{field}'. This field is non-nullable in the Arrow schema.",
+                );
+                let error: vector_common::Error =
+                    Box::new(io::Error::new(io::ErrorKind::InvalidData, msg.clone()));
+                #[cfg(feature = "codecs-arrow")]
+                emit!(EncoderNullConstraintError { error: &error });
+                return Err(io::Error::new(io::ErrorKind::InvalidData, msg));
+            }
+        }
+    }
+
+    Ok(())
 }

@@ -31,10 +31,11 @@ use crate::{
         util::{BatchConfig, Compression, TowerRequestConfig},
     },
     test_util::{
-        components::{SINK_TAGS, run_and_assert_sink_compliance},
+        components::{SINK_TAGS, init_test, run_and_assert_sink_compliance},
         random_table_name, trace_init,
     },
 };
+use vector_lib::metrics::Controller;
 
 fn clickhouse_address() -> String {
     std::env::var("CLICKHOUSE_ADDRESS").unwrap_or_else(|_| "http://localhost:8123".into())
@@ -1173,4 +1174,76 @@ async fn test_complex_types() {
         .and_then(|v| v.as_array())
         .unwrap();
     assert_eq!(2, nested3.len());
+}
+
+/// Tests that missing required fields emit EncoderNullConstraintError and reject the batch
+#[tokio::test]
+async fn test_missing_required_field_emits_null_constraint_error() {
+    init_test();
+
+    let table = random_table_name();
+    let host = clickhouse_address();
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(1);
+
+    let client = ClickhouseClient::new(host.clone());
+
+    // Create table with non-nullable required_field column
+    client
+        .create_table(
+            &table,
+            "host String, timestamp DateTime64(3), message String, required_field String",
+        )
+        .await;
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        table: table.clone().try_into().unwrap(),
+        compression: Compression::None,
+        format: crate::sinks::clickhouse::config::Format::ArrowStream,
+        batch_encoding: Some(BatchSerializerConfig::ArrowStream(Default::default())),
+        batch,
+        request: TowerRequestConfig {
+            retry_attempts: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    // Building the sink fetches the schema - required_field will be detected as non-nullable
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    // Create an event WITHOUT the required_field
+    let (batch_notifier, mut receiver) = BatchNotifier::new_with_receiver();
+    let mut event = LogEvent::from("test message").with_batch_notifier(&batch_notifier);
+    drop(batch_notifier);
+    event.insert("host", "example.com");
+    // Deliberately NOT inserting "required_field"
+
+    // Run the sink - should fail due to missing required field
+    timeout(Duration::from_secs(5), sink.run_events(vec![event.into()]))
+        .await
+        .unwrap()
+        .unwrap();
+
+    // The batch should be rejected
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Rejected));
+
+    // Verify the component_errors_total metric was incremented with the correct error_code
+    let metrics = Controller::get().unwrap().capture_metrics();
+    let null_constraint_errors: Vec<_> = metrics
+        .iter()
+        .filter(|m| {
+            m.name() == "component_errors_total"
+                && m.tags()
+                    .map(|t| t.get("error_code") == Some("encoding_null_constraint"))
+                    .unwrap_or(false)
+        })
+        .collect();
+
+    assert!(
+        !null_constraint_errors.is_empty(),
+        "Expected component_errors_total with error_code=encoding_null_constraint to be emitted"
+    );
 }

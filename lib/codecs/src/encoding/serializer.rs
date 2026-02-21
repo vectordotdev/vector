@@ -170,7 +170,7 @@ impl BatchSerializerConfig {
     ) -> Result<ArrowStreamSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => {
-                ArrowStreamSerializer::new(arrow_config.clone())
+                Ok(ArrowStreamSerializer::new(arrow_config.clone())?)
             }
         }
     }
