@@ -183,9 +183,7 @@ pub struct GcsSinkConfig {
     /// Sets the `Cache-Control` header for the created objects.
     ///
     /// Directly comparable to the `Cache-Control` HTTP header.
-    #[configurable(metadata(
-        docs::examples = "no-transform"
-    ))]
+    #[configurable(metadata(docs::examples = "no-transform"))]
     cache_control: Option<String>,
 
     #[configurable(derived)]
