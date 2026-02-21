@@ -1,9 +1,17 @@
-use std::{collections::HashMap, fmt::Write as _, path::PathBuf};
+use std::{
+    collections::{HashMap, HashSet},
+    fmt::Write as _,
+    path::PathBuf,
+};
 
 use clap::Parser;
 use itertools::Itertools;
+use vector_lib::{config::OutputId, id::ComponentKey};
 
-use crate::config;
+use crate::config::{
+    self,
+    dot_graph::{EdgeAttributes, GraphConfig},
+};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -94,6 +102,16 @@ fn node_attributes_to_string(attributes: &HashMap<String, String>, default_shape
     attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
 }
 
+fn edge_attributes_to_string(attributes: &EdgeAttributes, default_label: Option<&str>) -> String {
+    let mut attrs = attributes.0.clone();
+    if let Some(default_label) = default_label
+        && !attrs.contains_key("label")
+    {
+        attrs.insert("label".to_string(), default_label.to_string());
+    }
+    attrs.iter().map(|(k, v)| format!("{k}=\"{v}\"")).join(" ")
+}
+
 pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
     let paths = opts.paths_with_formats();
     let paths = match config::process_paths(&paths) {
@@ -122,6 +140,43 @@ pub(crate) fn cmd(opts: &Opts) -> exitcode::ExitCode {
 fn render_dot(config: config::Config) -> exitcode::ExitCode {
     let mut dot = String::from("digraph {\n");
 
+    let mut written_tables = HashSet::<ComponentKey>::new();
+
+    for (id, table) in config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_source(key))
+    {
+        writeln!(
+            dot,
+            "  \"{}\" [{}]",
+            id,
+            node_attributes_to_string(&table.graph.node_attributes, "cylinder")
+        )
+        .expect("write to String never fails");
+        written_tables.insert(id);
+    }
+
+    for (id, table) in config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_sink(key))
+    {
+        if !written_tables.contains(&id) {
+            writeln!(
+                dot,
+                "  \"{}\" [{}]",
+                id,
+                node_attributes_to_string(&table.graph.node_attributes, "cylinder")
+            )
+            .expect("write to String never fails");
+        }
+
+        for input in table.inputs.iter() {
+            render_dot_edge(&mut dot, &id, input, &table.graph);
+        }
+    }
+
     for (id, source) in config.sources() {
         writeln!(
             dot,
@@ -142,16 +197,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
         .expect("write to String never fails");
 
         for input in transform.inputs.iter() {
-            if let Some(port) = &input.port {
-                writeln!(
-                    dot,
-                    "  \"{}\" -> \"{}\" [label=\"{}\"]",
-                    input.component, id, port
-                )
-                .expect("write to String never fails");
-            } else {
-                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
-            }
+            render_dot_edge(&mut dot, id, input, &transform.graph);
         }
     }
 
@@ -165,16 +211,7 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
         .expect("write to String never fails");
 
         for input in &sink.inputs {
-            if let Some(port) = &input.port {
-                writeln!(
-                    dot,
-                    "  \"{}\" -> \"{}\" [label=\"{}\"]",
-                    input.component, id, port
-                )
-                .expect("write to String never fails");
-            } else {
-                writeln!(dot, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
-            }
+            render_dot_edge(&mut dot, id, input, &sink.graph);
         }
     }
 
@@ -188,8 +225,64 @@ fn render_dot(config: config::Config) -> exitcode::ExitCode {
     exitcode::OK
 }
 
+fn render_dot_edge(into: &mut String, id: &ComponentKey, input: &OutputId, graph: &GraphConfig) {
+    let edge_attributes = graph.edge_attributes.get(&input.component.to_string());
+    if let Some(port) = &input.port {
+        writeln!(
+            into,
+            "  \"{}\" -> \"{}\" [{}]",
+            input.component,
+            id,
+            edge_attributes_to_string(
+                edge_attributes.unwrap_or(&EdgeAttributes::default()),
+                Some(port)
+            )
+        )
+        .expect("write to String never fails");
+    } else if let Some(edge_attributes) = edge_attributes {
+        writeln!(
+            into,
+            "  \"{input}\" -> \"{id}\" [{}]",
+            edge_attributes_to_string(edge_attributes, None)
+        )
+        .expect("write to String never fails");
+    } else {
+        writeln!(into, "  \"{input}\" -> \"{id}\"").expect("write to String never fails");
+    }
+}
+
 fn render_mermaid(config: config::Config) -> exitcode::ExitCode {
     let mut mermaid = String::from("flowchart TD;\n");
+
+    writeln!(mermaid, "\n  %% Enrichment tables").unwrap();
+    let mut written_tables = HashSet::<ComponentKey>::new();
+
+    for (id, _) in config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_source(key))
+    {
+        writeln!(mermaid, "  {id}[({id})]").unwrap();
+        written_tables.insert(id);
+    }
+
+    for (id, table) in config
+        .enrichment_tables
+        .iter()
+        .filter_map(|(key, table)| table.as_sink(key))
+    {
+        if !written_tables.contains(&id) {
+            writeln!(mermaid, "  {id}[({id})]").unwrap();
+        }
+
+        for input in table.inputs.iter() {
+            if let Some(port) = &input.port {
+                writeln!(mermaid, "  {0} -->|{port}| {id}", input.component).unwrap();
+            } else {
+                writeln!(mermaid, "  {0} --> {id}", input.component).unwrap();
+            }
+        }
+    }
 
     writeln!(mermaid, "\n  %% Sources").unwrap();
     for (id, _) in config.sources() {
