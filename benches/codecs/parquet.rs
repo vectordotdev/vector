@@ -11,7 +11,6 @@ use tokio_util::codec::Encoder;
 use vector::event::{Event, LogEvent};
 use vector_lib::{
     btreemap,
-    byte_size_of::ByteSizeOf,
     codecs::{
         JsonSerializerConfig, NewlineDelimitedEncoder,
         encoding::{
@@ -73,7 +72,6 @@ fn parquet_encoder(c: &mut Criterion) {
 
     for batch_size in batch_sizes {
         let events = make_events(batch_size);
-        let total_bytes: u64 = events.iter().map(|e| e.size_of() as u64).sum();
 
         // Parquet Snappy (default)
         group.throughput(Throughput::Elements(batch_size as u64));
@@ -132,9 +130,9 @@ fn parquet_encoder(c: &mut Criterion) {
             )
         });
 
-        // NDJSON baseline for comparison
+        // NDJSON baseline (uncompressed)
         group.throughput(Throughput::Elements(batch_size as u64));
-        group.bench_function(format!("ndjson_baseline_{}_events", batch_size), |b| {
+        group.bench_function(format!("ndjson_raw_{}_events", batch_size), |b| {
             b.iter_batched(
                 || {
                     let encoder = vector::codecs::Encoder::<Framer>::new(
@@ -149,6 +147,31 @@ fn parquet_encoder(c: &mut Criterion) {
                         encoder.encode(event, &mut bytes).unwrap();
                     }
                     bytes
+                },
+                BatchSize::SmallInput,
+            )
+        });
+
+        // NDJSON + Snappy (encode then compress, matching S3 sink pipeline)
+        group.throughput(Throughput::Elements(batch_size as u64));
+        group.bench_function(format!("ndjson_snappy_{}_events", batch_size), |b| {
+            b.iter_batched(
+                || {
+                    let encoder = vector::codecs::Encoder::<Framer>::new(
+                        NewlineDelimitedEncoder::default().into(),
+                        JsonSerializerConfig::default().build().into(),
+                    );
+                    (encoder, events.clone())
+                },
+                |(mut encoder, events)| {
+                    let mut bytes = BytesMut::new();
+                    for event in events {
+                        encoder.encode(event, &mut bytes).unwrap();
+                    }
+                    let compressed = snap::raw::Encoder::new()
+                        .compress_vec(&bytes)
+                        .unwrap();
+                    compressed
                 },
                 BatchSize::SmallInput,
             )
