@@ -32,7 +32,8 @@ pub use arrow::{
 };
 #[cfg(feature = "parquet")]
 pub use self::parquet::{
-    ParquetCompression, ParquetSerializer, ParquetSerializerConfig, SchemaMode,
+    ParquetCompression, ParquetFieldType, ParquetSchemaField, ParquetSerializer,
+    ParquetSerializerConfig, SchemaMode,
 };
 pub use avro::{AvroSerializer, AvroSerializerConfig, AvroSerializerOptions};
 pub use cef::{CefSerializer, CefSerializerConfig};
