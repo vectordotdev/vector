@@ -448,6 +448,13 @@ async fn build_unit_test(
         .filter(|(key, _)| valid_components.contains(&key.to_string()))
         .collect();
 
+    // Remove all enrichment tables that are not relevant to the current test
+    config_builder.enrichment_tables = config_builder
+        .enrichment_tables
+        .into_iter()
+        .filter(|(key, _)| valid_components.contains(&key.to_string()))
+        .collect();
+
     // Sanitize the inputs of all relevant transforms
     let graph = Graph::new_unchecked(
         &config_builder.sources,
