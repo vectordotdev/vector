@@ -5,6 +5,7 @@ test_filter: ::azure_
 
 env:
   AZURE_ADDRESS: local-azure-blob
+  EVENTHUBS_ADDRESS: eventhubs-emulator
   HEARTBEAT_ADDRESS: 0.0.0.0:8080
   LOGSTASH_ADDRESS: 0.0.0.0:8081
 
@@ -15,5 +16,6 @@ matrix:
 # expressions are evaluated using https://github.com/micromatch/picomatch
 paths:
 - "src/sinks/azure_**"
+- "src/sources/azure_**"
 - "src/sinks/util/**"
 - "tests/integration/azure/**"

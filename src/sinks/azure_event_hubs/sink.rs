@@ -1,0 +1,346 @@
+use std::collections::HashMap;
+use std::sync::Arc;
+use std::time::Duration;
+
+use azure_messaging_eventhubs::{EventDataBatchOptions, ProducerClient};
+use bytes::Bytes;
+use futures_util::StreamExt;
+use tokio::time::sleep;
+use tower::ServiceExt as _;
+use tower::limit::RateLimit;
+use vector_lib::EstimatedJsonEncodedSizeOf;
+use vector_lib::internal_event::{
+    ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
+};
+use vector_lib::lookup::lookup_v2::OptionalTargetPath;
+
+use super::config::AzureEventHubsSinkConfig;
+use super::service::{EventHubsRequest, EventHubsRequestMetadata, EventHubsService};
+use crate::{sinks::prelude::*, sources::azure_event_hubs::build_credential};
+
+pub struct AzureEventHubsSink {
+    producer: Arc<ProducerClient>,
+    event_hub_name: String,
+    transformer: Transformer,
+    encoder: Encoder<()>,
+    partition_id_field: Option<OptionalTargetPath>,
+    batch_enabled: bool,
+    batch_max_events: usize,
+    batch_timeout: Duration,
+    service: RateLimit<EventHubsService>,
+}
+
+impl AzureEventHubsSink {
+    pub async fn new(config: &AzureEventHubsSinkConfig) -> crate::Result<Self> {
+        let (namespace, event_hub_name, credential, custom_endpoint) = build_credential(
+            config.connection_string.as_ref(),
+            config.namespace.as_deref(),
+            config.event_hub_name.as_deref(),
+        )?;
+
+        let event_hub_name_for_metrics = event_hub_name.clone();
+
+        let retry_options = azure_messaging_eventhubs::RetryOptions {
+            initial_delay: azure_core::time::Duration::milliseconds(
+                config.retry_initial_delay_ms as i64,
+            ),
+            max_delay: azure_core::time::Duration::seconds(30),
+            max_retries: config.retry_max_retries,
+            max_total_elapsed: azure_core::time::Duration::seconds(
+                config.retry_max_elapsed_secs as i64,
+            ),
+        };
+
+        let mut builder = ProducerClient::builder().with_retry_options(retry_options);
+        if let Some(endpoint) = custom_endpoint {
+            builder = builder.with_custom_endpoint(endpoint);
+        }
+        let producer = builder
+            .open(&namespace, &event_hub_name, credential)
+            .await
+            .map_err(|e| format!("Failed to create Event Hubs producer: {e}"))?;
+
+        let transformer = config.encoding.transformer();
+        let serializer = config.encoding.build()?;
+        let encoder = Encoder::<()>::new(serializer);
+
+        let producer = Arc::new(producer);
+
+        let service = ServiceBuilder::new()
+            .rate_limit(
+                config.rate_limit_num,
+                Duration::from_secs(config.rate_limit_duration_secs),
+            )
+            .service(EventHubsService::new(
+                Arc::clone(&producer),
+                event_hub_name_for_metrics.clone(),
+            ));
+
+        Ok(Self {
+            producer,
+            event_hub_name: event_hub_name_for_metrics,
+            transformer,
+            encoder,
+            partition_id_field: config.partition_id_field.clone(),
+            batch_enabled: config.batch_enabled,
+            batch_max_events: config.batch_max_events,
+            batch_timeout: Duration::from_secs(config.batch_timeout_secs),
+            service,
+        })
+    }
+
+    /// Encode an event to bytes and extract optional partition ID.
+    fn encode_event(
+        &mut self,
+        mut event: Event,
+    ) -> Option<(Option<String>, Bytes, JsonSize, EventFinalizers)> {
+        let finalizers = event.take_finalizers();
+
+        let partition_id = self.partition_id_field.as_ref().and_then(|field| {
+            field.path.as_ref().and_then(|path| {
+                if let Event::Log(ref log) = event {
+                    log.get(path).map(|v| v.to_string_lossy().into_owned())
+                } else {
+                    None
+                }
+            })
+        });
+
+        self.transformer.transform(&mut event);
+        let json_byte_size = event.estimated_json_encoded_size_of();
+
+        let mut buf = bytes::BytesMut::new();
+        if tokio_util::codec::Encoder::encode(&mut self.encoder, event, &mut buf).is_err() {
+            return None;
+        }
+
+        Some((partition_id, buf.freeze(), json_byte_size, finalizers))
+    }
+
+    /// Send a single event through the rate-limited Tower service.
+    async fn send_single_via_service(
+        &mut self,
+        partition_id: Option<String>,
+        body: Bytes,
+        json_byte_size: JsonSize,
+        finalizers: EventFinalizers,
+        events_sent: &<EventsSent as vector_lib::internal_event::RegisterInternalEvent>::Handle,
+        bytes_sent: &<BytesSent as vector_lib::internal_event::RegisterInternalEvent>::Handle,
+    ) -> Result<(), ()> {
+        let byte_size = body.len();
+        let request = EventHubsRequest {
+            body,
+            metadata: EventHubsRequestMetadata {
+                finalizers,
+                partition_id,
+                event_hub_name: self.event_hub_name.clone(),
+            },
+        };
+
+        let svc = self.service.ready().await.map_err(|_| ())?;
+        match svc.call(request).await {
+            Ok(response) => {
+                events_sent.emit(CountByteSize(1, json_byte_size));
+                bytes_sent.emit(ByteSize(byte_size));
+                if response.event_status() == EventStatus::Errored {
+                    // Telemetry already emitted in service; finalizers handled there too
+                }
+                Ok(())
+            }
+            Err(_) => Ok(()),
+        }
+    }
+
+    /// Flush buffered events as EventDataBatch per partition, rate-limited via Tower service.
+    async fn flush_batches(
+        &mut self,
+        buffer: &mut Vec<(Option<String>, Bytes, JsonSize, EventFinalizers)>,
+        events_sent: &<EventsSent as vector_lib::internal_event::RegisterInternalEvent>::Handle,
+        bytes_sent: &<BytesSent as vector_lib::internal_event::RegisterInternalEvent>::Handle,
+    ) -> Result<(), ()> {
+        if buffer.is_empty() {
+            return Ok(());
+        }
+
+        // Wait for the rate limiter to allow a request before flushing
+        self.service.ready().await.map_err(|_| ())?;
+
+        // Group by partition_id
+        let mut by_partition: HashMap<Option<String>, Vec<(Bytes, JsonSize, EventFinalizers)>> =
+            HashMap::new();
+        for (pid, body, json_size, fins) in buffer.drain(..) {
+            by_partition
+                .entry(pid)
+                .or_default()
+                .push((body, json_size, fins));
+        }
+
+        for (partition_id, events) in by_partition {
+            let batch_options = EventDataBatchOptions {
+                partition_id: partition_id.clone(),
+                ..Default::default()
+            };
+
+            let mut batch = self
+                .producer
+                .create_batch(Some(batch_options))
+                .await
+                .map_err(|e| {
+                    emit!(
+                        crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
+                            error: format!("Failed to create batch: {e}"),
+                        }
+                    );
+                })?;
+
+            let mut all_finalizers = Vec::new();
+            let mut total_bytes = 0usize;
+            let mut total_json_size = JsonSize::zero();
+
+            for (body, json_size, finalizers) in events {
+                let event_data = azure_messaging_eventhubs::models::EventData::builder()
+                    .with_body(body.to_vec())
+                    .build();
+
+                total_bytes += body.len();
+                total_json_size += json_size;
+                all_finalizers.push(finalizers);
+
+                match batch.try_add_event_data(event_data.clone(), None) {
+                    Ok(true) => {} // added successfully
+                    Ok(false) => {
+                        // Batch full — send current, create new, add this event
+                        self.send_batch_inner(batch).await?;
+
+                        let batch_options = EventDataBatchOptions {
+                            partition_id: partition_id.clone(),
+                            ..Default::default()
+                        };
+                        batch = self
+                            .producer
+                            .create_batch(Some(batch_options))
+                            .await
+                            .map_err(|e| {
+                                emit!(crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
+                                    error: format!("Failed to create batch: {e}"),
+                                });
+                            })?;
+
+                        if let Err(e) = batch.try_add_event_data(event_data, None) {
+                            emit!(crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
+                                error: format!("Event too large for batch: {e}"),
+                            });
+                        }
+                    }
+                    Err(e) => {
+                        emit!(crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
+                            error: format!("Failed to add event to batch: {e}"),
+                        });
+                    }
+                }
+            }
+
+            if !batch.is_empty() {
+                self.send_batch_inner(batch).await?;
+            }
+
+            // Mark all events in this partition as delivered
+            let event_count = all_finalizers.len();
+            for finalizers in all_finalizers {
+                finalizers.update_status(EventStatus::Delivered);
+            }
+
+            let pid_label = partition_id.as_deref().unwrap_or("");
+            crate::internal_events::azure_event_hubs::sink::emit_eventhubs_sent_metrics(
+                event_count,
+                total_bytes,
+                &self.event_hub_name,
+                pid_label,
+            );
+
+            // Standard Vector sink telemetry
+            events_sent.emit(CountByteSize(event_count, total_json_size));
+            bytes_sent.emit(ByteSize(total_bytes));
+        }
+
+        Ok(())
+    }
+
+    async fn send_batch_inner(
+        &self,
+        batch: azure_messaging_eventhubs::EventDataBatch<'_>,
+    ) -> Result<(), ()> {
+        self.producer.send_batch(batch, None).await.map_err(|e| {
+            emit!(
+                crate::internal_events::azure_event_hubs::sink::AzureEventHubsSendError {
+                    error: e.to_string(),
+                }
+            );
+        })
+    }
+
+    async fn run_inner(mut self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        let mut input = input.fuse();
+
+        let events_sent = register!(EventsSent::from(Output(None)));
+        let bytes_sent = register!(BytesSent::from(Protocol("amqp".into())));
+
+        if !self.batch_enabled {
+            // Non-batch mode: send each event through the rate-limited Tower service
+            while let Some(event) = input.next().await {
+                if let Some((partition_id, body, json_size, finalizers)) = self.encode_event(event)
+                {
+                    self.send_single_via_service(
+                        partition_id,
+                        body,
+                        json_size,
+                        finalizers,
+                        &events_sent,
+                        &bytes_sent,
+                    )
+                    .await?;
+                }
+            }
+            return Ok(());
+        }
+
+        // Batch mode: accumulate events, flush through rate-limited service
+        let mut buffer: Vec<(Option<String>, Bytes, JsonSize, EventFinalizers)> = Vec::new();
+
+        loop {
+            let timeout = sleep(self.batch_timeout);
+            tokio::pin!(timeout);
+
+            tokio::select! {
+                event = input.next() => {
+                    match event {
+                        Some(event) => {
+                            if let Some(encoded) = self.encode_event(event) {
+                                buffer.push(encoded);
+                            }
+
+                            if buffer.len() >= self.batch_max_events {
+                                self.flush_batches(&mut buffer, &events_sent, &bytes_sent).await?;
+                            }
+                        }
+                        None => {
+                            // Stream ended, flush remaining
+                            self.flush_batches(&mut buffer, &events_sent, &bytes_sent).await?;
+                            return Ok(());
+                        }
+                    }
+                }
+                _ = &mut timeout, if !buffer.is_empty() => {
+                    self.flush_batches(&mut buffer, &events_sent, &bytes_sent).await?;
+                }
+            }
+        }
+    }
+}
+
+#[async_trait]
+impl StreamSink<Event> for AzureEventHubsSink {
+    async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+        self.run_inner(input).await
+    }
+}

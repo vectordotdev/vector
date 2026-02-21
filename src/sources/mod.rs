@@ -13,6 +13,8 @@ pub mod aws_kinesis_firehose;
 pub mod aws_s3;
 #[cfg(feature = "sources-aws_sqs")]
 pub mod aws_sqs;
+#[cfg(feature = "sources-azure_event_hubs")]
+pub mod azure_event_hubs;
 #[cfg(feature = "sources-datadog_agent")]
 pub mod datadog_agent;
 #[cfg(feature = "sources-demo_logs")]
