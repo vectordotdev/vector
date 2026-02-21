@@ -4,6 +4,7 @@
 //! This reuses the Arrow record batch building logic from the Arrow IPC codec,
 //! then writes the batch as a complete Parquet file using `ArrowWriter`.
 
+use std::collections::HashSet;
 use std::sync::Arc;
 
 use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
@@ -177,8 +178,10 @@ impl ParquetSerializerConfig {
 #[derive(Clone, Debug)]
 pub struct ParquetSerializer {
     schema: SchemaRef,
-    writer_props: WriterProperties,
+    writer_props: Arc<WriterProperties>,
     schema_mode: SchemaMode,
+    /// Pre-built set of schema field names for O(1) strict-mode lookups.
+    schema_field_names: HashSet<String>,
 }
 
 impl ParquetSerializer {
@@ -186,27 +189,30 @@ impl ParquetSerializer {
     pub fn new(
         config: ParquetSerializerConfig,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync + 'static>> {
+        // to_arrow_schema() already creates fields with nullable=true
         let schema = config
             .to_arrow_schema()
             .ok_or("Parquet serializer requires a schema with at least one field")?;
 
-        // Make all fields nullable for compatibility
-        let nullable_schema = Schema::new(
-            schema
-                .fields()
-                .iter()
-                .map(|f| Arc::new(Field::new(f.name(), f.data_type().clone(), true)))
-                .collect::<Vec<_>>(),
+        let schema_ref = SchemaRef::new(schema);
+
+        let schema_field_names = schema_ref
+            .fields()
+            .iter()
+            .map(|f| f.name().clone())
+            .collect::<HashSet<_>>();
+
+        let writer_props = Arc::new(
+            WriterProperties::builder()
+                .set_compression(config.compression.to_parquet_compression())
+                .build(),
         );
 
-        let writer_props = WriterProperties::builder()
-            .set_compression(config.compression.to_parquet_compression())
-            .build();
-
         Ok(Self {
-            schema: SchemaRef::new(nullable_schema),
+            schema: schema_ref,
             writer_props,
             schema_mode: config.schema_mode,
+            schema_field_names,
         })
     }
 
@@ -224,7 +230,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             return Ok(());
         }
 
-        // In strict mode, check for extra fields not in the schema
+        // In strict mode, check for extra fields not in the schema (O(1) per field via HashSet)
         if self.schema_mode == SchemaMode::Strict {
             for event in &events {
                 if let Some(log) = event.maybe_as_log() {
@@ -232,9 +238,8 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
                         .all_event_fields()
                         .expect("log event should have fields")
                     {
-                        // Strip the leading '.' that Vector adds to field paths
                         let field_name = key.strip_prefix('.').unwrap_or(&key);
-                        if self.schema.field_with_name(field_name).is_err() {
+                        if !self.schema_field_names.contains(field_name) {
                             return Err(Box::new(ArrowEncodingError::SchemaFetchError {
                                 message: format!(
                                     "Strict schema mode: event contains field '{}' not in schema",
@@ -251,17 +256,15 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
         let record_batch = build_record_batch(Arc::clone(&self.schema), &events)
             .map_err(|e| Box::new(e) as Box<dyn std::error::Error + Send + Sync>)?;
 
-        // Write as a complete Parquet file to an in-memory buffer
-        let mut buf = Vec::new();
+        // Write Parquet directly into the output buffer (no intermediate Vec)
         let mut writer = ArrowWriter::try_new(
-            &mut buf,
-            self.schema.clone(),
-            Some(self.writer_props.clone()),
+            buffer.writer(),
+            Arc::clone(record_batch.schema_ref()),
+            Some((*self.writer_props).clone()),
         )?;
         writer.write(&record_batch)?;
         writer.close()?;
 
-        buffer.put_slice(&buf);
         Ok(())
     }
 }
@@ -524,5 +527,124 @@ mod tests {
         let config = ParquetSerializerConfig::default();
         let result = ParquetSerializer::new(config);
         assert!(result.is_err(), "Should fail when schema has no fields");
+    }
+
+    #[test]
+    fn test_parquet_schema_field_names_prebuilt() {
+        let serializer = make_serializer(vec![
+            ("message", ParquetFieldType::Utf8),
+            ("host", ParquetFieldType::Utf8),
+            ("status", ParquetFieldType::Int64),
+        ]);
+
+        // Verify the HashSet was correctly populated at construction time
+        assert_eq!(serializer.schema_field_names.len(), 3);
+        assert!(serializer.schema_field_names.contains("message"));
+        assert!(serializer.schema_field_names.contains("host"));
+        assert!(serializer.schema_field_names.contains("status"));
+        assert!(!serializer.schema_field_names.contains("nonexistent"));
+    }
+
+    #[test]
+    fn test_parquet_strict_mode_uses_hashset_lookup() {
+        // Strict mode should use the pre-built HashSet for O(1) field validation
+        let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
+            schema: schema_fields(vec![
+                ("name", ParquetFieldType::Utf8),
+                ("age", ParquetFieldType::Int64),
+            ]),
+            compression: ParquetCompression::default(),
+            schema_mode: SchemaMode::Strict,
+        })
+        .expect("Failed to create serializer");
+
+        // Valid event - all fields in schema
+        let valid_events = vec![create_event(vec![("name", "alice")])];
+        let mut buffer = BytesMut::new();
+        assert!(
+            serializer.encode(valid_events, &mut buffer).is_ok(),
+            "Strict mode should accept events with only schema fields"
+        );
+
+        // Invalid event - extra field
+        let invalid_events = vec![create_event(vec![
+            ("name", "bob"),
+            ("unknown_field", "value"),
+        ])];
+        let mut buffer = BytesMut::new();
+        let result = serializer.encode(invalid_events, &mut buffer);
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().to_string().contains("unknown_field"),
+            "Error should reference the extra field"
+        );
+    }
+
+    #[test]
+    fn test_parquet_writer_props_arc_shared() {
+        // Verify WriterProperties is wrapped in Arc (clone is cheap)
+        let serializer = make_serializer(vec![("msg", ParquetFieldType::Utf8)]);
+        let cloned = serializer.clone();
+
+        // Arc::strong_count should be 2 after clone
+        assert_eq!(
+            Arc::strong_count(&serializer.writer_props),
+            2,
+            "WriterProperties should be shared via Arc"
+        );
+        drop(cloned);
+        assert_eq!(Arc::strong_count(&serializer.writer_props), 1);
+    }
+
+    #[test]
+    fn test_parquet_direct_buffer_write() {
+        // Verify encode writes directly to buffer (not double-buffered)
+        let mut serializer = make_serializer(vec![("msg", ParquetFieldType::Utf8)]);
+
+        let events = vec![create_event(vec![("msg", "test")])];
+        let mut buffer = BytesMut::new();
+
+        serializer
+            .encode(events, &mut buffer)
+            .expect("Encoding should succeed");
+
+        // Buffer should contain valid Parquet data directly
+        assert_parquet_magic(&buffer);
+        assert_eq!(parquet_row_count(&buffer), 1);
+    }
+
+    #[test]
+    fn test_parquet_schema_already_nullable() {
+        // Verify schema fields are nullable without redundant transformation
+        let serializer = make_serializer(vec![
+            ("name", ParquetFieldType::Utf8),
+            ("count", ParquetFieldType::Int64),
+        ]);
+
+        for field in serializer.schema.fields() {
+            assert!(
+                field.is_nullable(),
+                "Field '{}' should be nullable",
+                field.name()
+            );
+        }
+    }
+
+    #[test]
+    fn test_parquet_multiple_batches_same_serializer() {
+        // Verify serializer can encode multiple batches correctly (Arc<WriterProperties> reuse)
+        let mut serializer = make_serializer(vec![("msg", ParquetFieldType::Utf8)]);
+
+        for i in 0..3 {
+            let events = vec![create_event(vec![("msg", format!("batch_{}", i))])];
+            let mut buffer = BytesMut::new();
+
+            serializer
+                .encode(events, &mut buffer)
+                .unwrap_or_else(|e| panic!("Batch {} failed: {}", i, e));
+
+            assert_parquet_magic(&buffer);
+            assert_eq!(parquet_row_count(&buffer), 1, "Batch {} wrong row count", i);
+        }
     }
 }
