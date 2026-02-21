@@ -205,7 +205,7 @@ components: transforms: throttle: {
 			body: """
 				When `reroute_dropped` is set to `true`, events that exceed any rate limit threshold are sent to
 				a named `.dropped` output port instead of being silently discarded. This port can be connected to
-				a dead-letter sink (e.g., a file or S3 bucket) for later analysis or replay.
+				a dead-letter sink (for example, a file or S3 bucket) for later analysis or replay.
 
 				To connect to the dropped output, use `<transform_name>.dropped` as the input for a downstream
 				component.
