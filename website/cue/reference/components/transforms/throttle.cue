@@ -119,7 +119,7 @@ components: transforms: throttle: {
 				{
 					title: "Multi-Threshold Behavior"
 					body: """
-						When multiple threshold types are configured (e.g., `events` and `json_bytes`), each type runs its
+						When multiple threshold types are configured (for example, `events` and `json_bytes`), each type runs its
 						own independent GCRA rate limiter. An event is dropped the moment *any* limiter is exceeded.
 
 						For example, with `threshold.events: 1000` and `threshold.json_bytes: 3000000`, a stream could be
