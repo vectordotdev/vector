@@ -168,8 +168,7 @@ fn validate_required_fields(
         for field in required_fields {
             if event.get(lookup::event_path!(field)).is_none() {
                 let msg = format!(
-                    "Missing required field '{}'. This field is non-nullable in the Arrow schema.",
-                    field
+                    "Missing required field '{field}'. This field is non-nullable in the Arrow schema.",
                 );
                 let error: vector_common::Error =
                     Box::new(io::Error::new(io::ErrorKind::InvalidData, msg.clone()));

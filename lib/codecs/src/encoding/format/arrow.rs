@@ -49,7 +49,6 @@ pub struct ArrowStreamSerializerConfig {
     #[serde(default)]
     #[configurable(derived)]
     pub allow_nullable_fields: bool,
-
 }
 
 impl Default for ArrowStreamSerializerConfig {

@@ -321,16 +321,15 @@ impl ClickhouseConfig {
             )
             .await?;
 
-            let required_fields =
-                if arrow_config.allow_nullable_fields || !self.validate_schema {
-                    None
-                } else {
-                    arrow_config
-                        .schema
-                        .as_ref()
-                        .map(extract_required_fields)
-                        .filter(|fields| !fields.is_empty())
-                };
+            let required_fields = if arrow_config.allow_nullable_fields || !self.validate_schema {
+                None
+            } else {
+                arrow_config
+                    .schema
+                    .as_ref()
+                    .map(extract_required_fields)
+                    .filter(|fields| !fields.is_empty())
+            };
 
             let resolved_batch_config = BatchSerializerConfig::ArrowStream(arrow_config);
             let arrow_serializer = resolved_batch_config.build()?;
