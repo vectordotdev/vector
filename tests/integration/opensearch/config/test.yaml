@@ -1,0 +1,20 @@
+features:
+  - es-integration-tests
+  - opensearch-integration-tests
+
+test_filter: "::elasticsearch::integration_tests::"
+
+env:
+  ELASTICSEARCH_HTTP_ADDRESS: http://opensearch:9200
+  ELASTICSEARCH_HTTPS_ADDRESS: https://opensearch-secure:9201
+  ELASTICSEARCH_USERNAME: admin
+
+matrix:
+  version: [3.5.0]
+
+# changes to these files/paths will invoke the integration test in CI
+# expressions are evaluated using https://github.com/micromatch/picomatch
+paths:
+  - "src/sinks/elasticsearch/**"
+  - "src/sinks/util/**"
+  - "tests/integration/elasticsearch/**"

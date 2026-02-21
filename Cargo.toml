@@ -992,6 +992,7 @@ datadog-traces-integration-tests = ["sources-datadog_agent", "sinks-datadog_trac
 docker-logs-integration-tests = ["sources-docker_logs", "unix"]
 doris-integration-tests = ["sinks-doris"]
 es-integration-tests = ["sinks-elasticsearch", "aws-core"]
+opensearch-integration-tests = []
 eventstoredb_metrics-integration-tests = ["sources-eventstoredb_metrics"]
 fluent-integration-tests = ["docker", "sources-fluent"]
 gcp-cloud-storage-integration-tests = ["sinks-gcp"]
