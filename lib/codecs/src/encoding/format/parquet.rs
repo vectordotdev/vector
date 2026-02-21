@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use arrow::datatypes::{Field, Schema, SchemaRef};
+use arrow::datatypes::{DataType, Field, Schema, SchemaRef, TimeUnit};
 use bytes::{BufMut, BytesMut};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression as ParquetCodecCompression;
@@ -58,14 +58,82 @@ pub enum SchemaMode {
     Strict,
 }
 
+/// Arrow data type for Parquet schema field definitions.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ParquetFieldType {
+    /// Boolean values.
+    Boolean,
+    /// 32-bit signed integer.
+    Int32,
+    /// 64-bit signed integer.
+    Int64,
+    /// 32-bit floating point.
+    Float32,
+    /// 64-bit floating point.
+    Float64,
+    /// UTF-8 string.
+    Utf8,
+    /// Binary data.
+    Binary,
+    /// Timestamp with millisecond precision (UTC).
+    TimestampMillisecond,
+    /// Timestamp with microsecond precision (UTC).
+    TimestampMicrosecond,
+    /// Timestamp with nanosecond precision (UTC).
+    TimestampNanosecond,
+    /// Date (days since epoch).
+    Date32,
+}
+
+impl ParquetFieldType {
+    fn to_arrow_data_type(&self) -> DataType {
+        match self {
+            Self::Boolean => DataType::Boolean,
+            Self::Int32 => DataType::Int32,
+            Self::Int64 => DataType::Int64,
+            Self::Float32 => DataType::Float32,
+            Self::Float64 => DataType::Float64,
+            Self::Utf8 => DataType::Utf8,
+            Self::Binary => DataType::Binary,
+            Self::TimestampMillisecond => {
+                DataType::Timestamp(TimeUnit::Millisecond, Some("UTC".into()))
+            }
+            Self::TimestampMicrosecond => {
+                DataType::Timestamp(TimeUnit::Microsecond, Some("UTC".into()))
+            }
+            Self::TimestampNanosecond => {
+                DataType::Timestamp(TimeUnit::Nanosecond, Some("UTC".into()))
+            }
+            Self::Date32 => DataType::Date32,
+        }
+    }
+}
+
+/// A field definition for the Parquet schema.
+#[configurable_component]
+#[derive(Clone, Debug)]
+pub struct ParquetSchemaField {
+    /// The name of the field.
+    pub name: String,
+
+    /// The data type of the field.
+    #[serde(rename = "type")]
+    pub data_type: ParquetFieldType,
+}
+
 /// Configuration for the Parquet serializer.
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct ParquetSerializerConfig {
-    /// The Arrow schema for Parquet encoding.
-    #[serde(skip)]
+    /// The schema definition for Parquet encoding.
+    ///
+    /// Each entry defines a column with a name and data type.
+    /// All fields are made nullable automatically.
+    #[serde(default)]
     #[configurable(derived)]
-    pub schema: Option<Schema>,
+    pub schema: Vec<ParquetSchemaField>,
 
     /// Compression codec for Parquet columns.
     #[serde(default)]
@@ -81,10 +149,25 @@ pub struct ParquetSerializerConfig {
 impl Default for ParquetSerializerConfig {
     fn default() -> Self {
         Self {
-            schema: None,
+            schema: Vec::new(),
             compression: ParquetCompression::default(),
             schema_mode: SchemaMode::default(),
         }
+    }
+}
+
+impl ParquetSerializerConfig {
+    /// Convert the user-facing schema config to an Arrow Schema.
+    fn to_arrow_schema(&self) -> Option<Schema> {
+        if self.schema.is_empty() {
+            return None;
+        }
+        let fields: Vec<Field> = self
+            .schema
+            .iter()
+            .map(|f| Field::new(&f.name, f.data_type.to_arrow_data_type(), true))
+            .collect();
+        Some(Schema::new(fields))
     }
 }
 
@@ -114,8 +197,8 @@ impl ParquetSerializer {
         config: ParquetSerializerConfig,
     ) -> Result<Self, Box<dyn std::error::Error + Send + Sync + 'static>> {
         let schema = config
-            .schema
-            .ok_or("Parquet serializer requires a schema")?;
+            .to_arrow_schema()
+            .ok_or("Parquet serializer requires a schema with at least one field")?;
 
         // Make all fields nullable for compatibility
         let nullable_schema = Schema::new(
@@ -191,7 +274,6 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use arrow::datatypes::DataType;
     use bytes::Bytes;
     use parquet::file::reader::{FileReader, SerializedFileReader};
     use parquet::record::reader::RowIter;
@@ -210,10 +292,21 @@ mod tests {
         Event::Log(log)
     }
 
-    /// Helper to build a ParquetSerializer with a given schema and defaults
-    fn make_serializer(schema: Schema) -> ParquetSerializer {
+    /// Helper to create schema fields from (name, type) pairs
+    fn schema_fields(fields: Vec<(&str, ParquetFieldType)>) -> Vec<ParquetSchemaField> {
+        fields
+            .into_iter()
+            .map(|(name, data_type)| ParquetSchemaField {
+                name: name.to_string(),
+                data_type,
+            })
+            .collect()
+    }
+
+    /// Helper to build a ParquetSerializer with given fields and defaults
+    fn make_serializer(fields: Vec<(&str, ParquetFieldType)>) -> ParquetSerializer {
         ParquetSerializer::new(ParquetSerializerConfig {
-            schema: Some(schema),
+            schema: schema_fields(fields),
             compression: ParquetCompression::default(),
             schema_mode: SchemaMode::default(),
         })
@@ -250,12 +343,10 @@ mod tests {
     fn test_parquet_encode_basic() {
         use vector_core::event::Value;
 
-        let schema = Schema::new(vec![
-            Field::new("name", DataType::Utf8, true),
-            Field::new("age", DataType::Int64, true),
+        let mut serializer = make_serializer(vec![
+            ("name", ParquetFieldType::Utf8),
+            ("age", ParquetFieldType::Int64),
         ]);
-
-        let mut serializer = make_serializer(schema);
 
         let mut log1 = LogEvent::default();
         log1.insert("name", "alice");
@@ -285,12 +376,10 @@ mod tests {
 
     #[test]
     fn test_parquet_relaxed_mode_missing_fields() {
-        let schema = Schema::new(vec![
-            Field::new("name", DataType::Utf8, true),
-            Field::new("age", DataType::Int64, true),
+        let mut serializer = make_serializer(vec![
+            ("name", ParquetFieldType::Utf8),
+            ("age", ParquetFieldType::Int64),
         ]);
-
-        let mut serializer = make_serializer(schema);
 
         // Event only has "name", missing "age"
         let events = vec![create_event(vec![("name", "alice")])];
@@ -307,9 +396,7 @@ mod tests {
 
     #[test]
     fn test_parquet_relaxed_mode_extra_fields() {
-        let schema = Schema::new(vec![Field::new("name", DataType::Utf8, true)]);
-
-        let mut serializer = make_serializer(schema);
+        let mut serializer = make_serializer(vec![("name", ParquetFieldType::Utf8)]);
 
         // Event has "name" + extra "city" field not in schema
         let events = vec![create_event(vec![("name", "alice"), ("city", "paris")])];
@@ -330,10 +417,8 @@ mod tests {
 
     #[test]
     fn test_parquet_strict_mode_extra_fields_error() {
-        let schema = Schema::new(vec![Field::new("name", DataType::Utf8, true)]);
-
         let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
-            schema: Some(schema),
+            schema: schema_fields(vec![("name", ParquetFieldType::Utf8)]),
             compression: ParquetCompression::default(),
             schema_mode: SchemaMode::Strict,
         })
@@ -356,7 +441,7 @@ mod tests {
 
     #[test]
     fn test_parquet_compression_variants() {
-        let schema = Schema::new(vec![Field::new("msg", DataType::Utf8, true)]);
+        let fields = schema_fields(vec![("msg", ParquetFieldType::Utf8)]);
         let events = vec![create_event(vec![("msg", "hello world")])];
 
         let compressions = vec![
@@ -369,7 +454,7 @@ mod tests {
 
         for compression in compressions {
             let mut serializer = ParquetSerializer::new(ParquetSerializerConfig {
-                schema: Some(schema.clone()),
+                schema: fields.clone(),
                 compression,
                 schema_mode: SchemaMode::default(),
             })
@@ -393,8 +478,7 @@ mod tests {
 
     #[test]
     fn test_parquet_empty_events() {
-        let schema = Schema::new(vec![Field::new("msg", DataType::Utf8, true)]);
-        let mut serializer = make_serializer(schema);
+        let mut serializer = make_serializer(vec![("msg", ParquetFieldType::Utf8)]);
 
         let events: Vec<Event> = vec![];
         let mut buffer = BytesMut::new();
@@ -406,6 +490,50 @@ mod tests {
         assert!(
             buffer.is_empty(),
             "Buffer should be empty for empty events"
+        );
+    }
+
+    #[test]
+    fn test_parquet_config_deserialization() {
+        let json = serde_json::json!({
+            "schema": [
+                {"name": "timestamp", "type": "timestamp_millisecond"},
+                {"name": "message", "type": "utf8"},
+                {"name": "level", "type": "utf8"},
+                {"name": "count", "type": "int64"},
+                {"name": "ratio", "type": "float64"}
+            ],
+            "compression": "zstd",
+            "schema_mode": "strict"
+        });
+
+        let config: ParquetSerializerConfig =
+            serde_json::from_value(json).expect("Config should deserialize");
+
+        assert_eq!(config.schema.len(), 5);
+        assert_eq!(config.schema[0].name, "timestamp");
+        assert_eq!(
+            config.schema[0].data_type,
+            ParquetFieldType::TimestampMillisecond
+        );
+        assert_eq!(config.compression, ParquetCompression::Zstd);
+        assert_eq!(config.schema_mode, SchemaMode::Strict);
+
+        // Verify the config can build a working serializer
+        let serializer = ParquetSerializer::new(config);
+        assert!(
+            serializer.is_ok(),
+            "Should build serializer from deserialized config"
+        );
+    }
+
+    #[test]
+    fn test_parquet_empty_schema_error() {
+        let config = ParquetSerializerConfig::default();
+        let result = ParquetSerializer::new(config);
+        assert!(
+            result.is_err(),
+            "Should fail when schema has no fields"
         );
     }
 }
