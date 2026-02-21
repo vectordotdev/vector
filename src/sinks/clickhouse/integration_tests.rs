@@ -433,6 +433,20 @@ impl ClickhouseClient {
         }
     }
 
+    async fn create_table_with_sql(&self, sql: &str) {
+        let response = self
+            .client
+            .post(&self.host)
+            .body(sql.to_owned())
+            .send()
+            .await
+            .unwrap();
+
+        if !response.status().is_success() {
+            panic!("create table failed: {}", response.text().await.unwrap())
+        }
+    }
+
     async fn select_all(&self, table: &str) -> QueryResponse {
         let response = self
             .client
@@ -1173,4 +1187,124 @@ async fn test_complex_types() {
         .and_then(|v| v.as_array())
         .unwrap();
     assert_eq!(2, nested3.len());
+}
+
+/// Tests that Arrow schema fetching correctly handles special ClickHouse column types:
+/// - MATERIALIZED and ALIAS columns are excluded from the schema (can't receive INSERT data)
+/// - DEFAULT columns are kept but marked nullable (server fills them in if omitted)
+/// - EPHEMERAL columns are excluded (not stored, only used in expressions)
+///
+/// The sink should successfully insert data without providing values for any of these
+/// special column types.
+#[tokio::test]
+async fn arrow_schema_excludes_non_insertable_columns() {
+    trace_init();
+
+    let table = random_table_name();
+    let host = clickhouse_address();
+
+    let client = ClickhouseClient::new(host.clone());
+
+    // Create a table with all special column types:
+    // - Regular columns: timestamp, host, message, resource_attributes
+    // - DEFAULT: timestamp_date (computed from timestamp if not provided)
+    // - MATERIALIZED: cluster_name (computed on INSERT, cannot receive data)
+    // - ALIAS: host_upper (virtual, computed on SELECT)
+    // - EPHEMERAL: _ttl (not stored, only usable in DEFAULT/MATERIALIZED expressions)
+    client
+        .create_table_with_sql(&format!(
+            "CREATE TABLE {table} (\
+                host String, \
+                timestamp DateTime64(3), \
+                message String, \
+                timestamp_date DateTime DEFAULT toDateTime(timestamp), \
+                resource_attributes Map(String, String), \
+                cluster_name String MATERIALIZED resource_attributes['k8s.cluster.name'], \
+                host_upper String ALIAS upper(host), \
+                _ttl UInt32 EPHEMERAL 0\
+            ) ENGINE = MergeTree ORDER BY (host, timestamp)"
+        ))
+        .await;
+
+    let mut batch = BatchConfig::default();
+    batch.max_events = Some(2);
+
+    let config = ClickhouseConfig {
+        endpoint: host.parse().unwrap(),
+        table: table.clone().try_into().unwrap(),
+        compression: Compression::None,
+        format: crate::sinks::clickhouse::config::Format::ArrowStream,
+        batch_encoding: Some(BatchSerializerConfig::ArrowStream(
+            ArrowStreamSerializerConfig::default(),
+        )),
+        batch,
+        request: TowerRequestConfig {
+            retry_attempts: 1,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    // Building the sink fetches the schema — this should succeed even with
+    // MATERIALIZED/ALIAS/EPHEMERAL columns in the table definition.
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+
+    // Create events:
+    // - Event 0: omit timestamp_date → server fills via DEFAULT expression
+    // - Event 1: explicitly provide timestamp_date → server uses provided value
+    let mut events: Vec<Event> = Vec::new();
+    for i in 0..2 {
+        let mut event = LogEvent::from(format!("log message {i}"));
+        event.insert("host", format!("host-{i}.example.com"));
+
+        if i == 1 {
+            event.insert("timestamp_date", "2025-06-15 12:00:00");
+        }
+
+        let mut attrs = vector_lib::event::ObjectMap::new();
+        attrs.insert(
+            "k8s.cluster.name".into(),
+            vector_lib::event::Value::Bytes(format!("cluster-{i}").into()),
+        );
+        event.insert(
+            "resource_attributes",
+            vector_lib::event::Value::Object(attrs),
+        );
+
+        events.push(event.into());
+    }
+
+    run_and_assert_sink_compliance(sink, stream::iter(events), &SINK_TAGS).await;
+
+    let output = client.select_all(&table).await;
+    assert_eq!(2, output.rows);
+
+    for (i, row) in output.data.iter().enumerate() {
+        // Verify regular columns were inserted
+        assert!(
+            row.get("host")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| s == format!("host-{i}.example.com")),
+            "host should match"
+        );
+        assert!(
+            row.get("message")
+                .and_then(|v| v.as_str())
+                .is_some_and(|s| s == format!("log message {i}")),
+            "message should match"
+        );
+
+        // Verify DEFAULT column behavior
+        assert!(
+            row.get("timestamp_date").is_some(),
+            "DEFAULT column timestamp_date should always be present"
+        );
+        if i == 1 {
+            assert_eq!(
+                row.get("timestamp_date").and_then(|v| v.as_str()),
+                Some("2025-06-15 12:00:00"),
+                "User-provided DEFAULT column value should be preserved"
+            );
+        }
+    }
 }
