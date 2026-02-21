@@ -304,9 +304,8 @@ impl ClickhouseConfig {
             .await?;
 
             let resolved_batch_config = BatchSerializerConfig::ArrowStream(arrow_config);
-            let arrow_serializer = resolved_batch_config.build()?;
-            let batch_serializer = BatchSerializer::Arrow(arrow_serializer);
-            let encoder = EncoderKind::Batch(BatchEncoder::new(batch_serializer));
+            let batch_serializer = resolved_batch_config.build_batch_serializer()?;
+            let encoder = EncoderKind::Batch(Box::new(BatchEncoder::new(batch_serializer)));
 
             return Ok((Format::ArrowStream, encoder));
         }

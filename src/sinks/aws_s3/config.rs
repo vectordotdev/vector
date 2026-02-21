@@ -1,5 +1,9 @@
 use aws_sdk_s3::Client as S3Client;
 use tower::ServiceBuilder;
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::BatchEncoder;
+#[cfg(feature = "codecs-parquet")]
+use vector_lib::codecs::encoding::BatchSerializerConfig;
 use vector_lib::{
     TimeZone,
     codecs::{
@@ -9,10 +13,6 @@ use vector_lib::{
     configurable::configurable_component,
     sink::VectorSink,
 };
-#[cfg(feature = "codecs-parquet")]
-use vector_lib::codecs::BatchEncoder;
-#[cfg(feature = "codecs-parquet")]
-use vector_lib::codecs::encoding::BatchSerializerConfig;
 
 use super::sink::S3RequestOptions;
 use crate::{
@@ -272,17 +272,18 @@ impl S3SinkConfig {
         #[cfg(feature = "codecs-parquet")]
         if let Some(batch_config) = &self.batch_encoding {
             let batch_serializer = batch_config.build_batch_serializer()?;
-            let encoder = EncoderKind::Batch(BatchEncoder::new(batch_serializer));
+            let encoder = EncoderKind::Batch(Box::new(BatchEncoder::new(batch_serializer)));
 
             // Auto-detect file extension from batch format
-            let filename_extension = self.filename_extension.clone().or_else(|| {
-                match batch_config {
-                    #[cfg(feature = "codecs-parquet")]
-                    BatchSerializerConfig::Parquet(_) => Some("parquet".to_string()),
-                    #[allow(unreachable_patterns)]
-                    _ => None,
-                }
-            });
+            let filename_extension =
+                self.filename_extension
+                    .clone()
+                    .or_else(|| match batch_config {
+                        #[cfg(feature = "codecs-parquet")]
+                        BatchSerializerConfig::Parquet(_) => Some("parquet".to_string()),
+                        #[allow(unreachable_patterns)]
+                        _ => None,
+                    });
 
             let request_options = S3RequestOptions {
                 bucket: self.bucket.clone(),

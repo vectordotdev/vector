@@ -16,6 +16,9 @@ pub enum BatchSerializer {
     /// Arrow IPC stream format serializer.
     #[cfg(feature = "arrow")]
     Arrow(ArrowStreamSerializer),
+    /// Parquet format serializer.
+    #[cfg(feature = "parquet")]
+    Parquet(Box<ParquetSerializer>),
 }
 
 /// An encoder that encodes batches of events.
@@ -63,6 +66,11 @@ impl tokio_util::codec::Encoder<Vec<Event>> for BatchEncoder {
                     }
                 })
             }
+            #[cfg(feature = "parquet")]
+            BatchSerializer::Parquet(serializer) => serializer
+                .encode(events, buffer)
+                .map_err(Error::SerializingError),
+            #[allow(unreachable_patterns)]
             _ => unreachable!("BatchSerializer cannot be constructed without encode()"),
         }
     }
@@ -74,8 +82,8 @@ pub enum EncoderKind {
     /// Uses framing to encode individual events
     Framed(Box<Encoder<Framer>>),
     /// Encodes events in batches without framing
-    #[cfg(feature = "arrow")]
-    Batch(BatchEncoder),
+    #[cfg(any(feature = "arrow", feature = "parquet"))]
+    Batch(Box<BatchEncoder>),
 }
 
 #[derive(Debug, Clone)]

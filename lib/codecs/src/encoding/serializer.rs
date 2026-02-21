@@ -8,6 +8,8 @@ use vector_core::{config::DataType, event::Event, schema};
 use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
+#[cfg(feature = "parquet")]
+use super::format::{ParquetSerializer, ParquetSerializerConfig};
 #[cfg(feature = "syslog")]
 use super::format::{SyslogSerializer, SyslogSerializerConfig};
 use super::{
@@ -170,7 +172,13 @@ impl BatchSerializerConfig {
     ) -> Result<ArrowStreamSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
             BatchSerializerConfig::ArrowStream(arrow_config) => {
-                Ok(ArrowStreamSerializer::new(arrow_config.clone())?)
+                let serializer = ArrowStreamSerializer::new(arrow_config.clone())?;
+                Ok(super::BatchSerializer::Arrow(serializer))
+            }
+            #[cfg(feature = "parquet")]
+            BatchSerializerConfig::Parquet(parquet_config) => {
+                let serializer = ParquetSerializer::new(parquet_config.clone())?;
+                Ok(super::BatchSerializer::Parquet(Box::new(serializer)))
             }
         }
     }
