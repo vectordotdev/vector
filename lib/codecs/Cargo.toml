@@ -31,6 +31,7 @@ memchr = { version = "2", default-features = false }
 metrics.workspace = true
 opentelemetry-proto = { path = "../opentelemetry-proto", optional = true }
 ordered-float.workspace = true
+pin-project.workspace = true
 prost.workspace = true
 prost-reflect.workspace = true
 rand.workspace = true

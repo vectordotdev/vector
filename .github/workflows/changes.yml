@@ -52,8 +52,6 @@ on:
         value: ${{ jobs.source.outputs.test-yml }}
       integration-yml:
         value: ${{ jobs.source.outputs.integration-yml }}
-      cli-yml:
-        value: ${{ jobs.source.outputs.cli-yml }}
       test-make-command-yml:
         value: ${{ jobs.source.outputs.test-make-command-yml }}
       msrv-yml:
@@ -175,7 +173,6 @@ jobs:
       website_only: ${{ steps.filter.outputs.website == 'true' && steps.filter.outputs.not_website == 'false' }}
       test-yml: ${{ steps.filter.outputs.test-yml }}
       integration-yml: ${{ steps.filter.outputs.integration-yml }}
-      cli-yml: ${{ steps.filter.outputs.cli-yml }}
       test-make-command-yml: ${{ steps.filter.outputs.test-make-command-yml }}
       msrv-yml: ${{ steps.filter.outputs.msrv-yml }}
       cross-yml: ${{ steps.filter.outputs.cross-yml }}
@@ -264,9 +261,6 @@ jobs:
             - ".github/workflows/changes.yml"
           integration-yml:
             - ".github/workflows/integration.yml"
-            - ".github/workflows/changes.yml"
-          cli-yml:
-            - ".github/workflows/cli.yml"
             - ".github/workflows/changes.yml"
           test-make-command-yml:
             - ".github/workflows/test-make-command.yml"

@@ -10,6 +10,16 @@ use super::{
 };
 use crate::serde::bool_or_struct;
 
+#[expect(
+    clippy::ref_option,
+    reason = "we have to follow the serde calling convention"
+)]
+fn is_default_buffer_utilization_ewma_half_life_seconds(value: &Option<f64>) -> bool {
+    value.is_none_or(|seconds| {
+        seconds == vector_buffers::topology::channel::DEFAULT_EWMA_HALF_LIFE_SECONDS
+    })
+}
+
 #[derive(Debug, Snafu)]
 pub(crate) enum DataDirError {
     #[snafu(display("data_dir option required, but not given here or globally"))]
@@ -140,18 +150,25 @@ pub struct GlobalOptions {
     #[serde(skip_serializing_if = "crate::serde::is_default")]
     pub expire_metrics_per_metric_set: Option<Vec<PerMetricSetExpiration>>,
 
-    /// The alpha value for the exponential weighted moving average (EWMA) of source and transform
-    /// buffer utilization metrics.
+    /// The half-life, in seconds, for the exponential weighted moving average (EWMA) of source
+    /// and transform buffer utilization metrics.
     ///
     /// This controls how quickly the `*_buffer_utilization_mean` gauges respond to new
-    /// observations. Values closer to 1.0 retain more of the previous value, leading to slower
-    /// adjustments. The default value of 0.9 is equivalent to a "half life" of 6-7 measurements.
+    /// observations. Longer half-lives retain more of the previous value, leading to slower
+    /// adjustments.
     ///
-    /// Must be between 0 and 1 exclusively (0 < alpha < 1).
-    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
-    #[configurable(validation(range(min = 0.0, max = 1.0)))]
+    /// - Lower values (< 1): Metrics update quickly but may be volatile
+    /// - Default (5): Balanced between responsiveness and stability
+    /// - Higher values (> 5): Smooth, stable metrics that update slowly
+    ///
+    /// Adjust based on whether you need fast detection of buffer issues (lower)
+    /// or want to see sustained trends without noise (higher).
+    ///
+    /// Must be greater than 0.
+    #[serde(skip_serializing_if = "is_default_buffer_utilization_ewma_half_life_seconds")]
+    #[configurable(validation(range(min = 0.0)))]
     #[configurable(metadata(docs::advanced))]
-    pub buffer_utilization_ewma_alpha: Option<f64>,
+    pub buffer_utilization_ewma_half_life_seconds: Option<f64>,
 
     /// The alpha value for the exponential weighted moving average (EWMA) of transform latency
     /// metrics.
@@ -321,9 +338,9 @@ impl GlobalOptions {
                 expire_metrics: self.expire_metrics.or(with.expire_metrics),
                 expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
                 expire_metrics_per_metric_set: merged_expire_metrics_per_metric_set,
-                buffer_utilization_ewma_alpha: self
-                    .buffer_utilization_ewma_alpha
-                    .or(with.buffer_utilization_ewma_alpha),
+                buffer_utilization_ewma_half_life_seconds: self
+                    .buffer_utilization_ewma_half_life_seconds
+                    .or(with.buffer_utilization_ewma_half_life_seconds),
                 latency_ewma_alpha: self.latency_ewma_alpha.or(with.latency_ewma_alpha),
                 metrics_storage_refresh_period: self
                     .metrics_storage_refresh_period
