@@ -11,6 +11,7 @@
 #
 # /ci-run-all                 : runs all of the below
 # /ci-run-cli                 : runs CLI - Linux
+# /ci-run-test-top            : runs make test-top
 # /ci-run-test-behavior       : runs make test-behavior
 # /ci-run-check-examples      : runs make check-examples
 # /ci-run-test-docs           : runs make test-docs
@@ -55,6 +56,7 @@ jobs:
     if: |
         startsWith(github.event.review.body, '/ci-run-all')
         || startsWith(github.event.review.body, '/ci-run-cli')
+        || startsWith(github.event.review.body, '/ci-run-test-top')
         || startsWith(github.event.review.body, '/ci-run-test-behavior')
         || startsWith(github.event.review.body, '/ci-run-check-examples')
         || startsWith(github.event.review.body, '/ci-run-test-docs')
@@ -91,6 +93,16 @@ jobs:
       ref: ${{ github.event.review.commit_id }}
       command: test-cli
       job_name: CLI tests
+    secrets: inherit
+
+  make-test-top:
+    needs: validate
+    if: startsWith(github.event.review.body, '/ci-run-all') || contains(github.event.review.body, '/ci-run-test-top')
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      ref: ${{ github.event.review.commit_id }}
+      command: test-top
+      job_name: make test-top
     secrets: inherit
 
   make-test-behavior:
