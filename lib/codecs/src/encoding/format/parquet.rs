@@ -116,32 +116,44 @@ impl ParquetFieldType {
 #[configurable_component]
 #[derive(Clone, Debug)]
 pub struct ParquetSchemaField {
-    /// The name of the field.
+    /// The name of the field in the Parquet file.
+    #[configurable(metadata(docs::examples = "message", docs::examples = "timestamp"))]
     pub name: String,
 
-    /// The data type of the field.
+    /// The Arrow data type of the field.
     #[serde(rename = "type")]
+    #[configurable(metadata(docs::examples = "utf8", docs::examples = "int64"))]
     pub data_type: ParquetFieldType,
 }
 
 /// Configuration for the Parquet serializer.
+///
+/// Encodes events as Apache Parquet columnar files, optimized for analytical queries
+/// via Athena, Trino, Spark, and other columnar query engines. Requires a user-defined
+/// schema mapping event fields to Parquet column types.
 #[configurable_component]
 #[derive(Clone, Debug, Default)]
 pub struct ParquetSerializerConfig {
     /// The schema definition for Parquet encoding.
     ///
-    /// Each entry defines a column with a name and data type.
-    /// All fields are made nullable automatically.
+    /// Each entry defines a column name and its Arrow data type. Events are projected
+    /// onto this schema: missing fields become null, and all fields are nullable.
     #[serde(default)]
     #[configurable(derived)]
     pub schema: Vec<ParquetSchemaField>,
 
-    /// Compression codec for Parquet columns.
+    /// Compression codec applied per column page inside the Parquet file.
+    ///
+    /// Parquet handles compression internally, so the sink-level `compression` must be
+    /// set to `"none"` when using Parquet encoding.
     #[serde(default)]
     #[configurable(derived)]
     pub compression: ParquetCompression,
 
-    /// Schema handling mode.
+    /// Controls how events with fields not present in the schema are handled.
+    ///
+    /// In `relaxed` mode (default), extra fields are silently dropped. In `strict` mode,
+    /// extra fields cause an encoding error.
     #[serde(default)]
     #[configurable(derived)]
     pub schema_mode: SchemaMode,

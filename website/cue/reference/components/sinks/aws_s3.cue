@@ -214,6 +214,72 @@ components: sinks: aws_s3: components._aws & {
 				`storage_class` option.
 				"""
 		}
+
+		parquet_encoding: {
+			title: "Parquet Batch Encoding"
+			body:  """
+				The S3 sink supports Apache Parquet batch encoding via the `batch_encoding`
+				option. When configured, events are encoded together as Parquet columnar files
+				instead of the default per-event JSON or text encoding. Parquet files are
+				optimized for analytical queries via Athena, Trino, Spark, and other columnar
+				query engines.
+
+				Parquet handles compression internally at the column page level, so the
+				top-level `compression` setting must be set to `"none"`.
+
+				Output files automatically use the `.parquet` extension.
+
+				This feature requires the `codecs-parquet` feature flag at compile time.
+
+				#### TOML Example
+
+				```toml
+				[sinks.s3_parquet]
+				type = "aws_s3"
+				bucket = "my-analytics-bucket"
+				key_prefix = "logs/date=%F"
+				compression = "none"
+
+				[sinks.s3_parquet.batch_encoding]
+				parquet.compression = "snappy"
+				parquet.schema_mode = "relaxed"
+
+				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
+				name = "message"
+				data_type = "utf8"
+
+				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
+				name = "timestamp"
+				data_type = "timestamp_millis"
+
+				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
+				name = "host"
+				data_type = "utf8"
+				```
+
+				#### YAML Example
+
+				```yaml
+				sinks:
+				  s3_parquet:
+				    type: aws_s3
+				    bucket: my-analytics-bucket
+				    key_prefix: "logs/date=%F"
+				    compression: none
+				    batch_encoding:
+				      parquet:
+				        compression: snappy
+				        schema_mode: relaxed
+				        schema:
+				          - name: message
+				            type: utf8
+				          - name: timestamp
+				            type: timestamp_millis
+				          - name: host
+				            type: utf8
+				```
+				"""
+		}
 	}
 
 	permissions: iam: [
