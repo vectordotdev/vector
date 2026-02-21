@@ -40,7 +40,6 @@ jobs:
       - uses: ./.github/actions/setup
         with:
           rust: true
-          cargo-nextest: true
           protoc: true
           libsasl2: true
           cargo-nextest: ${{ inputs.upload_test_results }}
