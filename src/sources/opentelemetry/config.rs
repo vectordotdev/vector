@@ -257,7 +257,10 @@ impl SourceConfig for OpentelemetryConfig {
             filters,
             cx.shutdown,
             self.http.keepalive.clone(),
-        );
+        )
+        .map_err(|error| {
+            error!(message = "Source future failed.", %error);
+        });
 
         Ok(join(grpc_source, http_source).map(|_| Ok(())).boxed())
     }
