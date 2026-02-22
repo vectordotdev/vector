@@ -16,16 +16,13 @@ use crate::{
 #[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[serde(deny_unknown_fields)]
 pub struct TagCardinalityLimitInternalMetricsConfig {
-    /// Whether to include extended labels (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+    /// Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
     ///
-    /// This can be useful for debugging, but should be used with caution as it can significantly
-    /// increase metric cardinality if metric names or tag keys are high cardinality.
-    ///
-    /// Note that this defaults to false because the extended tags have potentially unbounded cardinality.
-    /// Only set this to true if you know that the number of unique metric names and tag keys is bounded.
-    #[serde(default = "default_include_key_in_limit_metric")]
-    #[configurable(metadata(docs::human_name = "Include Key in Limit Metric"))]
-    pub include_key_in_limit_metric: bool,
+    /// This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
+    /// increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
+    #[serde(default = "default_include_extended_tags")]
+    #[configurable(metadata(docs::human_name = "Include Extended Tags"))]
+    pub include_extended_tags: bool,
 }
 
 /// Configuration for the `tag_cardinality_limit` transform.
@@ -136,7 +133,7 @@ const fn default_value_limit() -> usize {
     500
 }
 
-const fn default_include_key_in_limit_metric() -> bool {
+const fn default_include_extended_tags() -> bool {
     false
 }
 

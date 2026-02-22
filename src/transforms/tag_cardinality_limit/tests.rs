@@ -88,9 +88,7 @@ const fn make_transform_hashset_with_per_metric_limits(
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
-            internal_metrics: TagCardinalityLimitInternalMetricsConfig {
-                include_key_in_limit_metric: false,
-            },
+            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
         },
         per_metric_limits,
     }
@@ -108,9 +106,7 @@ const fn make_transform_bloom_with_per_metric_limits(
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
-            internal_metrics: TagCardinalityLimitInternalMetricsConfig {
-                include_key_in_limit_metric: false,
-            },
+            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
         },
         per_metric_limits,
     }

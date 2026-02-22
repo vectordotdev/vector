@@ -156,9 +156,9 @@ impl TagCardinalityLimit {
                                 metric_name: &metric_name,
                                 tag_key: key,
                                 tag_value: &value.to_string(),
-                                include_extended_tags_in_limit_metric: config
+                                include_extended_tags: config
                                     .internal_metrics
-                                    .include_key_in_limit_metric,
+                                    .include_extended_tags,
                             });
                             return None;
                         }
@@ -169,7 +169,7 @@ impl TagCardinalityLimit {
                 }
                 LimitExceededAction::DropTag => {
                     let config = self.get_config_for_metric(metric_key.as_ref());
-                    let include_extended_tags = config.internal_metrics.include_key_in_limit_metric;
+                    let include_extended_tags = config.internal_metrics.include_extended_tags;
                     tags_map.retain(|key, value| {
                         if self.try_accept_tag(metric_key.as_ref(), key, value) {
                             true
@@ -178,7 +178,7 @@ impl TagCardinalityLimit {
                                 metric_name: &metric_name,
                                 tag_key: key,
                                 tag_value: &value.to_string(),
-                                include_extended_tags_in_limit_metric: include_extended_tags,
+                                include_extended_tags,
                             });
                             false
                         }

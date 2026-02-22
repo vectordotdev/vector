@@ -15,15 +15,12 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 	internal_metrics: {
 		description: "Configuration of internal metrics for the TagCardinalityLimit transform."
 		required:    false
-		type: object: options: include_key_in_limit_metric: {
+		type: object: options: include_extended_tags: {
 			description: """
-				Whether to include extended labels (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+				Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
 
-				This can be useful for debugging, but should be used with caution as it can significantly
-				increase metric cardinality if metric names or tag keys are high cardinality.
-
-				Note that this defaults to false because the extended tags have potentially unbounded cardinality.
-				Only set this to true if you know that the number of unique metric names and tag keys is bounded.
+				This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
+				increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
 				"""
 			required: false
 			type: bool: default: false
@@ -84,16 +81,13 @@ generated: components: transforms: tag_cardinality_limit: configuration: {
 				internal_metrics: {
 					description: "Configuration of internal metrics for the TagCardinalityLimit transform."
 					required:    false
-					type: object: options: include_key_in_limit_metric: {
+					type: object: options: include_extended_tags: {
 						description: """
-																				Whether to include extended labels (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+							Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
 
-																				This can be useful for debugging, but should be used with caution as it can significantly
-																				increase metric cardinality if metric names or tag keys are high cardinality.
-
-																				Note that this defaults to false because the extended tags have potentially unbounded cardinality.
-																				Only set this to true if you know that the number of unique metric names and tag keys is bounded.
-																				"""
+							This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
+							increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
+							"""
 						required: false
 						type: bool: default: false
 					}
