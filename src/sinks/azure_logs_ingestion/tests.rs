@@ -8,6 +8,8 @@ use vector_lib::config::log_schema;
 use azure_core::credentials::{AccessToken, TokenCredential};
 use azure_core::time::OffsetDateTime;
 
+use crate::sinks::azure_common::config::{AzureAuthentication, SpecificAzureCredential};
+
 use super::config::AzureLogsIngestionConfig;
 
 use crate::{
@@ -48,7 +50,7 @@ async fn basic_config_error_with_no_auth() {
     assert_eq!(config.timestamp_field, "TimeGenerated");
 
     match &config.auth {
-        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::ClientSecretCredential {
+        crate::sinks::azure_common::config::AzureAuthentication::ClientSecretCredential {
             azure_tenant_id,
             azure_client_id,
             azure_client_secret,
@@ -105,7 +107,7 @@ fn basic_config_with_client_credentials() {
     assert_eq!(config.timestamp_field, "TimeGenerated");
 
     match &config.auth {
-        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::ClientSecretCredential {
+        AzureAuthentication::ClientSecretCredential {
             azure_tenant_id,
             azure_client_id,
             azure_client_secret,
@@ -146,11 +148,7 @@ fn basic_config_with_managed_identity() {
     assert_eq!(config.timestamp_field, "TimeGenerated");
 
     match &config.auth {
-        crate::sinks::azure_logs_ingestion::config::AzureAuthentication::Specific(
-            crate::sinks::azure_logs_ingestion::config::SpecificAzureCredential::ManagedIdentity {
-                ..
-            },
-        ) => {
+        AzureAuthentication::Specific(SpecificAzureCredential::ManagedIdentity { .. }) => {
             // Expected variant
         }
         _ => panic!("Expected Specific(ManagedIdentity) variant"),

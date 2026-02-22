@@ -1,20 +1,14 @@
 use std::sync::Arc;
 
-use azure_core::credentials::{TokenCredential, TokenRequestOptions};
-use azure_core::http::ClientMethodOptions;
-use azure_core::{Error, error::ErrorKind};
+use azure_core::credentials::TokenCredential;
 
-use azure_identity::{
-    AzureCliCredential, ClientAssertion, ClientAssertionCredential, ClientSecretCredential,
-    ManagedIdentityCredential, ManagedIdentityCredentialOptions, UserAssignedId,
-    WorkloadIdentityCredential,
-};
-use vector_lib::{configurable::configurable_component, schema, sensitive_string::SensitiveString};
+use vector_lib::{configurable::configurable_component, schema};
 use vrl::value::Kind;
 
 use crate::{
     http::{HttpClient, get_http_scheme_from_uri},
     sinks::{
+        azure_common::config::AzureAuthentication,
         prelude::*,
         util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpStatusRetryLogic},
     },
@@ -126,191 +120,6 @@ impl Default for AzureLogsIngestionConfig {
             tls: None,
             acknowledgements: Default::default(),
         }
-    }
-}
-
-/// Configuration of the authentication strategy for interacting with Azure services.
-#[configurable_component]
-#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
-#[serde(deny_unknown_fields, untagged)]
-pub enum AzureAuthentication {
-    /// Use client credentials
-    #[derivative(Default)]
-    ClientSecretCredential {
-        /// The [Azure Tenant ID][azure_tenant_id].
-        ///
-        /// [azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
-        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
-        azure_tenant_id: String,
-
-        /// The [Azure Client ID][azure_client_id].
-        ///
-        /// [azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
-        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
-        azure_client_id: String,
-
-        /// The [Azure Client Secret][azure_client_secret].
-        ///
-        /// [azure_client_secret]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
-        #[configurable(metadata(docs::examples = "00-00~000000-0000000~0000000000000000000"))]
-        azure_client_secret: SensitiveString,
-    },
-
-    /// Use credentials from environment variables
-    #[configurable(metadata(docs::enum_tag_description = "The kind of Azure credential to use."))]
-    Specific(SpecificAzureCredential),
-}
-
-/// Specific Azure credential types.
-#[configurable_component]
-#[derive(Clone, Debug, Eq, PartialEq)]
-#[serde(
-    tag = "azure_credential_kind",
-    rename_all = "snake_case",
-    deny_unknown_fields
-)]
-pub enum SpecificAzureCredential {
-    /// Use Azure CLI credentials
-    #[cfg(not(target_arch = "wasm32"))]
-    AzureCli {},
-
-    /// Use Managed Identity credentials
-    ManagedIdentity {
-        /// The User Assigned Managed Identity (Client ID) to use.
-        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        user_assigned_managed_identity_id: Option<String>,
-    },
-
-    /// Use Managed Identity with Client Assertion credentials
-    ManagedIdentityClientAssertion {
-        /// The User Assigned Managed Identity (Client ID) to use for the managed identity.
-        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        user_assigned_managed_identity_id: Option<String>,
-
-        /// The target Tenant ID to use.
-        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
-        client_assertion_tenant_id: String,
-
-        /// The target Client ID to use.
-        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
-        client_assertion_client_id: String,
-    },
-
-    /// Use Workload Identity credentials
-    WorkloadIdentity {},
-}
-
-#[derive(Debug)]
-struct ManagedIdentityClientAssertion {
-    credential: Arc<dyn TokenCredential>,
-    scope: String,
-}
-
-#[cfg_attr(target_arch = "wasm32", async_trait::async_trait(?Send))]
-#[cfg_attr(not(target_arch = "wasm32"), async_trait::async_trait)]
-impl ClientAssertion for ManagedIdentityClientAssertion {
-    async fn secret(&self, options: Option<ClientMethodOptions<'_>>) -> azure_core::Result<String> {
-        Ok(self
-            .credential
-            .get_token(
-                &[&self.scope],
-                Some(TokenRequestOptions {
-                    method_options: options.unwrap_or_default(),
-                }),
-            )
-            .await?
-            .token
-            .secret()
-            .to_string())
-    }
-}
-
-impl AzureAuthentication {
-    /// Returns the provider for the credentials based on the authentication mechanism chosen.
-    pub async fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
-        match self {
-            Self::ClientSecretCredential {
-                azure_tenant_id,
-                azure_client_id,
-                azure_client_secret,
-            } => {
-                if azure_tenant_id.is_empty() {
-                    return Err(Error::with_message(ErrorKind::Credential,
-                        "`auth.azure_tenant_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
-                    ));
-                }
-                if azure_client_id.is_empty() {
-                    return Err(Error::with_message(ErrorKind::Credential,
-                        "`auth.azure_client_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
-                    ));
-                }
-                if azure_client_secret.inner().is_empty() {
-                    return Err(Error::with_message(ErrorKind::Credential,
-                        "`auth.azure_client_secret` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
-                    ));
-                }
-                let secret: String = azure_client_secret.inner().into();
-                let credential: Arc<dyn TokenCredential> = ClientSecretCredential::new(
-                    &azure_tenant_id.clone(),
-                    azure_client_id.clone(),
-                    secret.into(),
-                    None,
-                )?;
-                Ok(credential)
-            }
-
-            Self::Specific(specific) => specific.credential().await,
-        }
-    }
-}
-
-impl SpecificAzureCredential {
-    /// Returns the provider for the credentials based on the specific credential type.
-    pub async fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
-        let credential: Arc<dyn TokenCredential> = match self {
-            #[cfg(not(target_arch = "wasm32"))]
-            Self::AzureCli {} => AzureCliCredential::new(None)?,
-
-            Self::ManagedIdentity {
-                user_assigned_managed_identity_id,
-            } => {
-                let mut options = ManagedIdentityCredentialOptions::default();
-                if let Some(id) = user_assigned_managed_identity_id {
-                    options.user_assigned_id = Some(UserAssignedId::ClientId(id.clone()));
-                }
-                ManagedIdentityCredential::new(Some(options))?
-            }
-
-            Self::ManagedIdentityClientAssertion {
-                user_assigned_managed_identity_id,
-                client_assertion_tenant_id,
-                client_assertion_client_id,
-            } => {
-                let mut options = ManagedIdentityCredentialOptions::default();
-                if let Some(id) = user_assigned_managed_identity_id {
-                    options.user_assigned_id = Some(UserAssignedId::ClientId(id.clone()));
-                }
-                let msi: Arc<dyn TokenCredential> = ManagedIdentityCredential::new(Some(options))?;
-                let assertion = ManagedIdentityClientAssertion {
-                    credential: msi,
-                    // Future: make this configurable for sovereign clouds? (no way to test...)
-                    scope: "api://AzureADTokenExchange/.default".to_string(),
-                };
-
-                ClientAssertionCredential::new(
-                    client_assertion_tenant_id.clone(),
-                    client_assertion_client_id.clone(),
-                    assertion,
-                    None,
-                )?
-            }
-
-            Self::WorkloadIdentity {} => WorkloadIdentityCredential::new(None)?,
-        };
-        Ok(credential)
     }
 }
 
