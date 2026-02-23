@@ -273,6 +273,28 @@ components: sources: internal_metrics: {
 				reason: _reason
 			}
 		}
+		component_latency_seconds: {
+			description: """
+				The elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
+				"""
+			type:              "histogram"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
+		component_latency_mean_seconds: {
+			description: """
+				The mean elapsed time, in fractional seconds, that an event spends in a single transform.
+
+				This includes both the time spent queued in the transform’s input buffer and the time spent executing the transform itself.
+
+				This value is smoothed over time using an exponentially weighted moving average (EWMA).
+				"""
+			type:              "gauge"
+			default_namespace: "vector"
+			tags:              _internal_metrics_tags
+		}
 		buffer_byte_size: {
 			description:        "The number of bytes currently in the buffer."
 			type:               "gauge"
