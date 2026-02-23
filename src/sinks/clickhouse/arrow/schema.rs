@@ -75,7 +75,11 @@ pub async fn fetch_table_schema(
     let response = client.send(request).await?;
 
     if response.status() != StatusCode::OK {
-        return Err(format!("Failed to fetch schema from ClickHouse: HTTP {}", response.status()).into());
+        return Err(format!(
+            "Failed to fetch schema from ClickHouse: HTTP {}",
+            response.status()
+        )
+        .into());
     }
 
     let body_bytes = http_body::Body::collect(response.into_body())
@@ -150,13 +154,15 @@ impl SchemaProvider for ClickHouseSchemaProvider {
 mod tests {
     use super::*;
     use arrow::datatypes::{DataType, TimeUnit};
+    use indoc::indoc;
 
     #[test]
     fn test_parse_schema() {
-        let response = r#"{"name":"id","type":"Int64","default_kind":""}
-{"name":"message","type":"String","default_kind":""}
-{"name":"timestamp","type":"DateTime","default_kind":""}
-"#;
+        let response = indoc! {r#"
+            {"name":"id","type":"Int64","default_kind":""}
+            {"name":"message","type":"String","default_kind":""}
+            {"name":"timestamp","type":"DateTime","default_kind":""}
+        "#};
 
         let schema = parse_schema_from_response(response.as_bytes()).unwrap();
         assert_eq!(schema.fields().len(), 3);
@@ -173,10 +179,11 @@ mod tests {
 
     #[test]
     fn test_parse_schema_with_type_parameters() {
-        let response = r#"{"name":"bytes_sent","type":"Decimal(18, 2)","default_kind":""}
-{"name":"timestamp","type":"DateTime64(6)","default_kind":""}
-{"name":"duration_ms","type":"Decimal32(4)","default_kind":""}
-"#;
+        let response = indoc! {r#"
+            {"name":"bytes_sent","type":"Decimal(18, 2)","default_kind":""}
+            {"name":"timestamp","type":"DateTime64(6)","default_kind":""}
+            {"name":"duration_ms","type":"Decimal32(4)","default_kind":""}
+        "#};
 
         let schema = parse_schema_from_response(response.as_bytes()).unwrap();
         assert_eq!(schema.fields().len(), 3);
@@ -196,14 +203,15 @@ mod tests {
 
     #[test]
     fn test_schema_field_ordering() {
-        let response = r#"{"name":"timestamp","type":"DateTime64(3)","default_kind":""}
-{"name":"host","type":"String","default_kind":""}
-{"name":"message","type":"String","default_kind":""}
-{"name":"id","type":"Int64","default_kind":""}
-{"name":"score","type":"Float64","default_kind":""}
-{"name":"active","type":"Bool","default_kind":""}
-{"name":"name","type":"String","default_kind":""}
-"#;
+        let response = indoc! {r#"
+            {"name":"timestamp","type":"DateTime64(3)","default_kind":""}
+            {"name":"host","type":"String","default_kind":""}
+            {"name":"message","type":"String","default_kind":""}
+            {"name":"id","type":"Int64","default_kind":""}
+            {"name":"score","type":"Float64","default_kind":""}
+            {"name":"active","type":"Bool","default_kind":""}
+            {"name":"name","type":"String","default_kind":""}
+        "#};
 
         let schema = parse_schema_from_response(response.as_bytes()).unwrap();
         assert_eq!(schema.fields().len(), 7);
@@ -232,10 +240,11 @@ mod tests {
     fn test_default_columns_marked_nullable() {
         // The SQL query filters out MATERIALIZED/ALIAS/EPHEMERAL, so
         // parse_schema_from_response only sees regular and DEFAULT columns.
-        let response = r#"{"name":"id","type":"Int64","default_kind":""}
-{"name":"status","type":"String","default_kind":"DEFAULT"}
-{"name":"message","type":"String","default_kind":""}
-"#;
+        let response = indoc! {r#"
+            {"name":"id","type":"Int64","default_kind":""}
+            {"name":"status","type":"String","default_kind":"DEFAULT"}
+            {"name":"message","type":"String","default_kind":""}
+        "#};
 
         let schema = parse_schema_from_response(response.as_bytes()).unwrap();
         assert_eq!(schema.fields().len(), 3);
