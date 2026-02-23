@@ -14,6 +14,10 @@ use crate::http::{Auth, HttpClient};
 
 use super::parser::ClickHouseType;
 
+/// String constants for ClickHouse column `default_kind` values.
+const COLUMN_KIND_REGULAR: &str = "";
+const COLUMN_KIND_DEFAULT: &str = "DEFAULT";
+
 #[derive(Debug, Deserialize)]
 struct ColumnInfo {
     name: String,
@@ -31,7 +35,7 @@ impl TryFrom<ColumnInfo> for Field {
             .try_into()
             .map_err(|e| format!("Failed to convert column '{}': {e}", column.name))?;
         // DEFAULT columns have server-side defaults, so users don't need to provide them.
-        let nullable = nullable || column.default_kind == "DEFAULT";
+        let nullable = nullable || column.default_kind == COLUMN_KIND_DEFAULT;
         Ok(Field::new(column.name, dt, nullable))
     }
 }
@@ -44,16 +48,18 @@ pub async fn fetch_table_schema(
     table: &str,
     auth: Option<&Auth>,
 ) -> crate::Result<Schema> {
-    let query = "SELECT name, type, default_kind \
-                 FROM system.columns \
-                 WHERE database = {db:String} AND table = {tbl:String} \
-                 AND default_kind IN ('', 'DEFAULT') \
-                 ORDER BY position \
-                 FORMAT JSONEachRow";
+    let query = format!(
+        "SELECT name, type, default_kind \
+         FROM system.columns \
+         WHERE database = {{db:String}} AND table = {{tbl:String}} \
+         AND default_kind IN ('{COLUMN_KIND_REGULAR}', '{COLUMN_KIND_DEFAULT}') \
+         ORDER BY position \
+         FORMAT JSONEachRow"
+    );
 
     // Build URI with query and parameters
     let query_string = form_urlencoded::Serializer::new(String::new())
-        .append_pair("query", query)
+        .append_pair("query", &query)
         .append_pair("param_db", database)
         .append_pair("param_tbl", table)
         .finish();
