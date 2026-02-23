@@ -455,7 +455,7 @@ impl From<ObjectMap> for StructuredData {
                 let sd_id_str: String = sd_id.into();
                 let sanitized_id = sanitize_name(&sd_id_str);
 
-                let final_id = if sanitized_id.len() > SD_ID_MAX_LENGTH {
+                let final_id = if sanitized_id.chars().count() > SD_ID_MAX_LENGTH {
                     sanitized_id.chars().take(SD_ID_MAX_LENGTH).collect()
                 } else {
                     sanitized_id.into_owned()
