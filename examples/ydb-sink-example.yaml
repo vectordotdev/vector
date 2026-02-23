@@ -1,0 +1,21 @@
+sources:
+  demo_logs:
+    type: demo_logs
+    format: json
+    interval: 1.0
+    lines:
+      - '{"message": "Hello from Vector", "host": "localhost"}'
+      - '{"message": "Processing data", "host": "server01"}'
+      - '{"message": "Task completed", "host": "server02"}'
+
+sinks:
+  ydb_sink:
+    type: ydb
+    inputs:
+      - demo_logs
+    endpoint: "grpc://localhost:2136?database=/local"
+    table: "/local/logs"
+    batch:
+      max_events: 100
+      max_bytes: 1048576
+      timeout_secs: 5
