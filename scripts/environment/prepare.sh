@@ -52,7 +52,7 @@ ALL_MODULES=(
   wasm-pack
   markdownlint
   datadog-ci
-  release-flags
+  release-flags  # Not a tool - sources release-flags.sh to set CI env vars
   vdev
 )
 
@@ -118,14 +118,12 @@ contains_module() {
 }
 
 # Helper function to check version and install if needed
-# Usage: maybe_install_cargo_tool <tool-name> <version> <version-check-pattern> <match-mode>
-# match-mode: "grep" (default) or "exact"
+# Usage: maybe_install_cargo_tool <tool-name> <version> [<version-check-pattern>]
 # Note: cargo-* tools are invoked as "cargo <subcommand>", not as direct binaries
 maybe_install_cargo_tool() {
   local tool="$1"
   local version="$2"
-  local version_pattern="${3:-$version}"  # Optional custom pattern, defaults to version
-  local match_mode="${4:-grep}"           # "grep" (default) or "exact"
+  local version_pattern="${3:-${tool} ${version}}"  # Default to "tool version"
 
   if ! contains_module "$tool"; then
     return 0
@@ -137,20 +135,14 @@ maybe_install_cargo_tool() {
     version_cmd="cargo ${tool#cargo-}"
   fi
 
-  if [[ "$match_mode" == "exact" ]]; then
-    if [[ "$($version_cmd --version 2>/dev/null)" != "$version_pattern" ]]; then
-      cargo "${install[@]}" "$tool" --version "$version" --force --locked
-    fi
-  else
-    if ! $version_cmd --version 2>/dev/null | grep -q "^${version_pattern}"; then
-      cargo "${install[@]}" "$tool" --version "$version" --force --locked
-    fi
+  if ! $version_cmd --version 2>/dev/null | grep -q "^${version_pattern}"; then
+    cargo "${install[@]}" "$tool" --version "$version" --force --locked
   fi
 }
 
 # Helper for NPM packages
-# Usage: maybe_install_npm_tool <tool-name> <package-name> <version> <version-check-pattern> <version-command>
-maybe_install_npm_tool() {
+# Usage: maybe_install_npm_package <tool-name> <package-name> <version> <version-check-pattern> <version-command>
+maybe_install_npm_package() {
   local tool="$1"
   local package="$2"
   local version="$3"
@@ -170,9 +162,7 @@ maybe_install_npm_tool() {
 git config --global --add safe.directory "$(pwd)"
 
 REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack wasm-pack vdev)
-
-REQUIRES_BINSTALL=("${REQUIRES_RUSTUP[@]}")
-unset -v 'REQUIRES_BINSTALL[0]' # remove dd-rust-license-tool
+REQUIRES_BINSTALL=(cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack wasm-pack vdev)
 require_binstall=false
 
 for tool in "${REQUIRES_BINSTALL[@]}"; do
@@ -209,15 +199,15 @@ if contains_module rustup; then
 fi
 set -e -o verbose
 
-maybe_install_cargo_tool cargo-deb "${CARGO_DEB_VERSION}" "${CARGO_DEB_VERSION}" "exact"
-maybe_install_cargo_tool cross "${CROSS_VERSION}" "cross ${CROSS_VERSION}"
-maybe_install_cargo_tool cargo-nextest "${CARGO_NEXTEST_VERSION}" "cargo-nextest ${CARGO_NEXTEST_VERSION}"
-maybe_install_cargo_tool cargo-deny "${CARGO_DENY_VERSION}" "cargo-deny ${CARGO_DENY_VERSION}"
-maybe_install_cargo_tool cargo-msrv "${CARGO_MSRV_VERSION}" "cargo-msrv ${CARGO_MSRV_VERSION}"
-maybe_install_cargo_tool cargo-hack "${CARGO_HACK_VERSION}" "cargo-hack ${CARGO_HACK_VERSION}"
-maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}" "dd-rust-license-tool ${DD_RUST_LICENSE_TOOL_VERSION}"
-maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}" "wasm-pack ${WASM_PACK_VERSION}"
-maybe_install_cargo_tool vdev "${VDEV_VERSION}" "vdev ${VDEV_VERSION}"
+maybe_install_cargo_tool cargo-deb "${CARGO_DEB_VERSION}" "${CARGO_DEB_VERSION}"
+maybe_install_cargo_tool cross "${CROSS_VERSION}"
+maybe_install_cargo_tool cargo-nextest "${CARGO_NEXTEST_VERSION}"
+maybe_install_cargo_tool cargo-deny "${CARGO_DENY_VERSION}"
+maybe_install_cargo_tool cargo-msrv "${CARGO_MSRV_VERSION}"
+maybe_install_cargo_tool cargo-hack "${CARGO_HACK_VERSION}"
+maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}"
+maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
+maybe_install_cargo_tool vdev "${VDEV_VERSION}"
 
-maybe_install_npm_tool markdownlint markdownlint-cli "${MARKDOWNLINT_VERSION}"
-maybe_install_npm_tool datadog-ci "@datadog/datadog-ci" "${DATADOG_CI_VERSION}" "v${DATADOG_CI_VERSION}" "version"
+maybe_install_npm_package markdownlint markdownlint-cli "${MARKDOWNLINT_VERSION}"
+maybe_install_npm_package datadog-ci "@datadog/datadog-ci" "${DATADOG_CI_VERSION}" "v${DATADOG_CI_VERSION}" "version"
