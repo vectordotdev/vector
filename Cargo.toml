@@ -441,7 +441,7 @@ typetag = { version = "0.2.20", default-features = false }
 url.workspace = true
 warp = { version = "0.3.7", default-features = false }
 xxhash-rust = { version = "0.8", optional = true }
-ydb = { path = "../ydb-rs-sdk/ydb", optional = true }
+ydb = { git = "https://github.com/1NepuNep1/ydb-rs-sdk.git", optional = true }
 zstd = { version = "0.13.0", default-features = false }
 arr_macro = { version = "0.2.1" }
 
