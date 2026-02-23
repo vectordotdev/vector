@@ -1,0 +1,217 @@
+use chrono::{DateTime, Utc};
+use futures::stream;
+use vector_lib::event::{
+    BatchNotifier, BatchStatus, BatchStatusReceiver, Event, LogEvent, Metric, MetricKind,
+    MetricValue,
+};
+use ydb::{ClientBuilder, Query, TableClient};
+
+use crate::{
+    config::{SinkConfig, SinkContext},
+    sinks::{ydb::YdbConfig, util::test::load_sink},
+    test_util::{
+        components::run_and_assert_sink_compliance,
+        random_table_name, trace_init,
+    },
+};
+
+const YDB_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
+
+fn ydb_endpoint() -> String {
+    std::env::var("YDB_ENDPOINT")
+        .unwrap_or_else(|_| "grpc://localhost:2136?database=/local".into())
+}
+
+fn ydb_database() -> String {
+    std::env::var("YDB_DATABASE").unwrap_or_else(|_| "/local".into())
+}
+
+fn timestamp() -> DateTime<Utc> {
+    Utc::now()
+}
+
+fn create_event(id: i64) -> Event {
+    let mut event = LogEvent::from("test log message");
+    event.insert("id", id);
+    event.insert("host", "test-host.example.com");
+    event.insert("timestamp", timestamp());
+    event.into()
+}
+
+fn create_event_with_notifier(id: i64) -> (Event, BatchStatusReceiver) {
+    let (batch, receiver) = BatchNotifier::new_with_receiver();
+    let event = create_event(id).with_batch_notifier(&batch);
+    (event, receiver)
+}
+
+fn create_events(count: usize) -> (Vec<Event>, BatchStatusReceiver) {
+    let mut events = (0..count as i64).map(create_event).collect::<Vec<_>>();
+    let receiver = BatchNotifier::apply_to(&mut events);
+    (events, receiver)
+}
+
+fn create_metric(name: &str) -> Metric {
+    Metric::new(
+        name,
+        MetricKind::Absolute,
+        MetricValue::Counter { value: 42.0 },
+    )
+    .with_namespace(Some("vector"))
+    .with_tags(Some(metric_tags!("host" => "metric-host", "env" => "test")))
+    .with_timestamp(Some(timestamp()))
+}
+
+struct YdbTestClient {
+    table_client: TableClient,
+}
+
+impl YdbTestClient {
+    async fn new(endpoint: &str) -> Self {
+        let client = ClientBuilder::new_from_connection_string(endpoint)
+            .expect("Failed to parse YDB connection string")
+            .client()
+            .expect("Failed to create YDB client");
+        
+        client.wait().await.expect("Failed to connect to YDB");
+        
+        Self {
+            table_client: client.table_client(),
+        }
+    }
+    
+    async fn create_table(&self, table_path: &str) {
+        let create_table_sql = format!(
+            r#"CREATE TABLE `{}` (
+                id Utf8 NOT NULL,
+                id_hash Uint32 NOT NULL,
+                timestamp Timestamp,
+                host Utf8,
+                message Utf8,
+                payload JsonDocument,
+                PRIMARY KEY(id_hash, id)
+            )"#,
+            table_path
+        );
+        
+        self.table_client
+            .retry_execute_scheme_query(create_table_sql)
+            .await
+            .expect("Failed to create YDB table");
+    }
+    
+    async fn drop_table(&self, table_path: &str) {
+        let drop_table_sql = format!("DROP TABLE `{}`", table_path);
+        let _ = self.table_client
+            .retry_execute_scheme_query(drop_table_sql)
+            .await;
+    }
+    
+    async fn count_rows(&self, table_path: &str) -> u64 {
+        let table_client = self.table_client
+            .clone_with_transaction_options(
+                ydb::TransactionOptions::new()
+                    .with_mode(ydb::Mode::OnlineReadonly)
+                    .with_autocommit(true),
+            );
+        
+        let table_path = table_path.to_string();
+        table_client
+            .retry_transaction(|mut t| {
+                let table = table_path.clone();
+                async move {
+                    let select_query = format!("SELECT COUNT(*) as cnt FROM `{}`", table);
+                    let result_set = t.query(Query::new(&select_query)).await?;
+                    let value = result_set
+                        .into_only_row()?
+                        .remove_field_by_name("cnt")?;
+                    let cnt: Option<u64> = value.try_into()?;
+                    Ok(cnt.unwrap_or(0))
+                }
+            })
+            .await
+            .expect("Failed to count rows")
+    }
+}
+
+async fn prepare_config() -> (YdbConfig, String, YdbTestClient) {
+    let endpoint = ydb_endpoint();
+    let database = ydb_database();
+    let table_name = random_table_name();
+    let table = format!("{}/{}", database, table_name);
+    
+    let config_str = format!(
+        r#"
+            endpoint = "{endpoint}"
+            table = "{table}"
+            batch.max_events = 1
+        "#,
+    );
+    let (config, _) = load_sink::<YdbConfig>(&config_str).expect("Failed to parse config");
+    
+    let client = YdbTestClient::new(&endpoint).await;
+    
+    (config, table, client)
+}
+
+#[tokio::test]
+async fn healthcheck_passes() {
+    trace_init();
+    
+    let (config, table, client) = prepare_config().await;
+    client.create_table(&table).await;
+    
+    let (_sink, healthcheck) = config
+        .build(SinkContext::default())
+        .await
+        .expect("sink should build successfully");
+    
+    assert!(healthcheck.await.is_ok());
+    
+    client.drop_table(&table).await;
+}
+
+#[tokio::test]
+async fn insert_single_event() {
+    trace_init();
+    
+    let (config, table, client) = prepare_config().await;
+    client.create_table(&table).await;
+    
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    
+    let (input_event, mut receiver) = create_event_with_notifier(0);
+    
+    run_and_assert_sink_compliance(sink, stream::iter(vec![input_event]), &YDB_SINK_TAGS).await;
+    
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    
+    let count = client.count_rows(&table).await;
+    assert_eq!(count, 1, "Expected 1 row");
+    
+    client.drop_table(&table).await;
+}
+
+#[tokio::test]
+async fn insert_multiple_events() {
+    trace_init();
+    
+    let (config, table, client) = prepare_config().await;
+    client.create_table(&table).await;
+    
+    let (sink, _hc) = config.build(SinkContext::default()).await.unwrap();
+    
+    // Create 100 logs + 50 metrics
+    let (mut input_events, mut receiver) = create_events(100);
+    for i in 0..50 {
+        input_events.push(create_metric(&format!("metric_{}", i)).into());
+    }
+    
+    run_and_assert_sink_compliance(sink, stream::iter(input_events), &YDB_SINK_TAGS).await;
+    
+    assert_eq!(receiver.try_recv(), Ok(BatchStatus::Delivered));
+    
+    let count = client.count_rows(&table).await;
+    assert_eq!(count, 150, "Expected 150 events (100 logs + 50 metrics)");
+    
+    client.drop_table(&table).await;
+}
