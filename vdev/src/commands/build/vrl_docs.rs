@@ -1,5 +1,7 @@
 use anyhow::Result;
 use serde::Serialize;
+use serde_json::Serializer;
+use serde_json::ser::PrettyFormatter;
 use std::{collections::HashMap, fs, path::PathBuf};
 use vrl::compiler::Function;
 use vrl::compiler::value::kind;
@@ -97,7 +99,18 @@ impl Cli {
                 },
             };
 
-            let json = serde_json::to_string_pretty(&wrapper)?;
+            // Unrolling of `serde_json::to_string_pretty` but using 4 space indents instead
+            let mut vec = Vec::with_capacity(128);
+            // Define 4 spaces
+            let indent = b"    ";
+            let formatter = PrettyFormatter::with_indent(indent);
+            let mut serializer = Serializer::with_formatter(&mut vec, formatter);
+
+            wrapper.serialize(&mut serializer)?;
+
+            // Safe to expect - serde_json even uses from_utf8_unchecked here
+            let json = String::from_utf8(vec).expect("Invalid UTF-8 serialized");
+
             fs::write(&filepath, json)?;
 
             println!("Generated: {}", filepath.display());
