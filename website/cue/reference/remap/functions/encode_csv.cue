@@ -4,7 +4,7 @@ remap: functions: encode_csv: {
 	category: "Codec"
 	description: """
         Encodes the `value` to a single CSV formatted row.
-		"""
+        """
 
 	arguments: [
 		{
@@ -30,27 +30,19 @@ remap: functions: encode_csv: {
 
 	examples: [
 		{
-			title: "Encode object to a single CSV formatted row",
-			source: r#"encode_csv!(["foo","bar","foo \", bar"])"#,
-			result: Ok(
-				r#"
-					"foo,bar,\"foo \"\", bar\""
-				"#
-			)
+			title: "Encode object to a single CSV formatted row"
+			source: #"encode_csv!(["foo","bar","foo \", bar"])"#
+			return: #""foo,bar,\"foo \"\", bar\"""#
 		},
 		{
 			title: "Encode object to a single CSV formatted row with custom delimiter",
-			source: r#"encode_csv!(["foo","bar"], delimiter: " ")"#,
-			result: Ok(r#""foo bar""#)
+			source: #"encode_csv!(["foo","bar"], delimiter: " ")"#
+			return: #""foo bar""#
 		},
 		{
-			title: "Encode object to a single CSV formatted row with linebreaks",
-			source: r#"encode_csv!(["line", "with_linebreak", "here\n", "and", "\nhere"])"#,
-			result: Ok(
-				r#"
-					"line,with_linebreak,\"here\n\",and,\"\nhere\""
-				"#
-			)
+			title: "Encode object to a single CSV formatted row with linebreaks"
+			source: #"encode_csv!(["line", "with_linebreak", "here\n", "and", "\nhere"])"#
+			return: #""line,with_linebreak,\"here\n\",and,\"\nhere\"""#
 		},
 	]
 }
