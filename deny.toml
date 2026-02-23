@@ -48,6 +48,10 @@ ignore = [
   { id = "RUSTSEC-2024-0384", reason = "instant is unmaintained" },
   { id = "RUSTSEC-2020-0168", reason = "mach is unmaintained" },
   { id = "RUSTSEC-2024-0436", reason = "paste is unmaintained" },
+  # YDB sink dependencies (temporary, to be fixed in ydb-rs-sdk)
+  { id = "RUSTSEC-2020-0095", reason = "difference is unmaintained (from ydb-rs-sdk mockall)" },
+  { id = "RUSTSEC-2025-0009", reason = "ring 0.16.20 vulnerability (from ydb-rs-sdk jsonwebtoken)" },
+  { id = "RUSTSEC-2025-0010", reason = "ring 0.16.20 unmaintained (from ydb-rs-sdk jsonwebtoken)" },
   { id = "RUSTSEC-2025-0012", reason = "backoff is unmaintained" },
   # rustls-pemfile is unmaintained. Blocked by both async-nats and http 1.0.0 upgrade.
   { id = "RUSTSEC-2025-0134", reason = "rustls-pemfile is unmaintained" },
