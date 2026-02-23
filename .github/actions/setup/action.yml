@@ -211,7 +211,7 @@ runs:
         EOF
 
     - name: Install protoc
-      if: ${{ inputs.protoc == 'true' }}
+      if: ${{ inputs.protoc == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
       shell: bash
       run: |
         echo "Installing protoc"
