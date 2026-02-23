@@ -8,6 +8,7 @@ use indoc::indoc;
 use ordered_float::NotNan;
 use prost::Message;
 use rmp_serde;
+use serde_json::json;
 use vector_lib::event::{BatchNotifier, BatchStatus, Event};
 use vrl::event_path;
 
@@ -310,6 +311,41 @@ async fn multiple_traces() {
     assert_eq!(cgs_trace_1.resource, "trace_1");
     assert_eq!(cgs_trace_1.service, "a_service");
 }
+
+#[tokio::test]
+async fn stats_payload_uses_container_tags() {
+    let mut t = TraceEvent::default();
+
+    t.insert(event_path!("tags"), json!({
+        "_dd.tags.container": "env:container_env,location:container_location"
+    }));
+    t.insert(
+        event_path!("spans"),
+        Value::Array(vec![Value::from(simple_span("foo".to_string()))]),
+    );
+
+    let events = vec![Event::Trace(t)];
+    let rx = start_test(BatchStatus::Delivered, StatusCode::OK, events).await;
+
+    let output = rx.take(4).collect::<Vec<_>>().await;
+
+    let sp = output
+        .iter()
+        .find_map(|(_, body)| rmp_serde::from_slice::<StatsPayload>(body).ok())
+        .expect("expected stats payload");
+
+    let payload = &sp.stats[0];
+
+    assert_eq!(payload.env, "container_env");
+
+    assert!(
+        payload.tags.iter().any(|t| t == "location:container_location"),
+        "expected location:container_location in stats payload tags, got {:?}",
+        payload.tags
+    );
+}
+
+
 
 #[tokio::test]
 async fn global_options() {

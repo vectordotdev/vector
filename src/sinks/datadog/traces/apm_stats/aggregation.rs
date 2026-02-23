@@ -118,6 +118,9 @@ pub struct Aggregator {
 
     /// Default API key to use if api_key not set.
     default_api_key: Arc<str>,
+
+    /// Tags for stats payload, emptied on flush
+    payload_tags: BTreeMap<PayloadAggregationKey, Vec<String>>,
 }
 
 impl Aggregator {
@@ -135,6 +138,7 @@ impl Aggregator {
             agent_hostname: None,
             agent_version: None,
             api_key: None,
+            payload_tags: BTreeMap::new(),
         }
     }
 
@@ -182,15 +186,6 @@ impl Aggregator {
 
     /// Iterates over a trace's constituting spans and upon matching conditions it updates statistics (mostly using the top level span).
     pub(crate) fn handle_trace(&mut self, partition_key: &PartitionKey, trace: &TraceEvent) {
-        if let Some(v) = trace.get(event_path!("tags._dd.tags.container")) {
-            tracing::info!(
-            message = "found _dd.tags.container",
-            tags = %v.to_string_lossy()
-        );
-        } else {
-            tracing::info!("_dd.tags.container not found on trace");
-            tracing::info!("FULL TRACE EVENT = {:?}", trace.as_map());
-        }
         // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L148-L184
 
         let spans = match trace.get(event_path!("spans")) {
@@ -199,8 +194,20 @@ impl Aggregator {
         };
 
         let weight = super::weight::extract_weight_from_root_span(&spans);
+        let container_tags: Vec<String> = trace
+            .get(event_path!("tags"))
+            .and_then(|v| v.as_object())
+            .and_then(|tags| tags.get("_dd.tags.container"))
+            .and_then(|v| v.as_str())
+            .map(|s| s.split(',').map(|t| t.trim().to_string()).collect())
+            .unwrap_or_default();
         let payload_aggkey = PayloadAggregationKey {
-            env: partition_key.env.clone().unwrap_or_default(),
+            // prefer env from container tags but fallback if not present
+            env: container_tags
+                .iter()
+                .find_map(|tag| tag.strip_prefix("env:"))
+                .map(|s| s.to_string())
+                .unwrap_or_else(|| partition_key.env.clone().unwrap_or_default()),
             hostname: partition_key.hostname.clone().unwrap_or_default(),
             version: trace
                 .get(event_path!("app_version"))
@@ -211,6 +218,9 @@ impl Aggregator {
                 .map(|v| v.to_string_lossy().into_owned())
                 .unwrap_or_default(),
         };
+        self.payload_tags
+            .entry(payload_aggkey.clone())
+            .or_insert_with(|| container_tags.clone());
         let synthetics = trace
             .get(event_path!("origin"))
             .map(|v| v.to_string_lossy().starts_with(TAG_SYNTHETICS))
@@ -308,6 +318,9 @@ impl Aggregator {
 
         let client_stats_payloads = self.get_client_stats_payloads(flush_cutoff_time);
 
+        // tags are only valid for a flush window
+        self.payload_tags.clear();
+
         // update the oldest_timestamp allowed, to prevent having stats for an already flushed
         // bucket
         let new_oldest_ts =
@@ -332,6 +345,12 @@ impl Aggregator {
         client_stats_buckets
             .into_iter()
             .map(|(payload_aggkey, csb)| {
+                let tags = self
+                    .payload_tags
+                    .get(&payload_aggkey)
+                    .cloned()
+                    .unwrap_or_default();
+
                 ClientStatsPayload {
                     env: payload_aggkey.env,
                     hostname: payload_aggkey.hostname,
@@ -346,8 +365,7 @@ impl Aggregator {
                     runtime_id: "".to_string(),
                     lang: "".to_string(),
                     tracer_version: "".to_string(),
-                    //  TODO
-                    tags: vec![],
+                    tags,
                 }
             })
             .collect::<Vec<ClientStatsPayload>>()
