@@ -165,7 +165,7 @@ if contains_module cargo-nextest; then
 fi
 
 if contains_module cargo-deny; then
-  if ! cargo-deny --version 2>/dev/null | grep -q '^cargo-deny 0.18.9'; then
+  if ! cargo-deny --version 2>/dev/null | grep -q '^cargo-deny 0.19.0'; then
     cargo "${install[@]}" cargo-deny --version 0.18.9 --force --locked
   fi
 fi
@@ -177,8 +177,8 @@ if contains_module cargo-msrv; then
 fi
 
 if contains_module cargo-hack; then
-  if ! cargo-hack --version 2>/dev/null | grep -q '^cargo-hack 0.6.39'; then
-    cargo "${install[@]}" cargo-hack --version 0.6.39 --force --locked
+  if ! cargo-hack --version 2>/dev/null | grep -q '^cargo-hack 0.6.43'; then
+    cargo "${install[@]}" cargo-hack --version 0.6.43 --force --locked
   fi
 fi
 
