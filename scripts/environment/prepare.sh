@@ -164,7 +164,7 @@ fi
 
 if contains_module cargo-deny; then
   if ! cargo-deny --version 2>/dev/null | grep -q '^cargo-deny 0.19.0'; then
-    cargo "${install[@]}" cargo-deny --version 0.18.9 --force --locked
+    cargo "${install[@]}" cargo-deny --version 0.19.0 --force --locked
   fi
 fi
 
