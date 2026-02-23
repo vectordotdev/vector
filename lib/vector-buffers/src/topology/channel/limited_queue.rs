@@ -7,6 +7,7 @@ use std::{
         Arc,
         atomic::{AtomicUsize, Ordering},
     },
+    time::Instant,
 };
 
 #[cfg(test)]
@@ -17,9 +18,11 @@ use crossbeam_queue::{ArrayQueue, SegQueue};
 use futures::Stream;
 use metrics::{Gauge, Histogram, gauge, histogram};
 use tokio::sync::{Notify, OwnedSemaphorePermit, Semaphore, TryAcquireError};
-use vector_common::stats::EwmaGauge;
+use vector_common::stats::TimeEwmaGauge;
 
 use crate::{InMemoryBufferable, config::MemoryBufferSize};
+
+pub const DEFAULT_EWMA_HALF_LIFE_SECONDS: f64 = 5.0;
 
 /// Error returned by `LimitedSender::send` when the receiver has disconnected.
 #[derive(Debug, PartialEq, Eq)]
@@ -110,7 +113,7 @@ impl ChannelMetricMetadata {
 struct Metrics {
     histogram: Histogram,
     gauge: Gauge,
-    mean_gauge: EwmaGauge,
+    mean_gauge: TimeEwmaGauge,
     // We hold a handle to the max gauge to avoid it being dropped by the metrics collector, but
     // since the value is static, we never need to update it. The compiler detects this as an unused
     // field, so we need to suppress the warning here.
@@ -127,8 +130,10 @@ impl Metrics {
     fn new(
         limit: MemoryBufferSize,
         metadata: ChannelMetricMetadata,
-        ewma_alpha: Option<f64>,
+        ewma_half_life_seconds: Option<f64>,
     ) -> Self {
+        let ewma_half_life_seconds =
+            ewma_half_life_seconds.unwrap_or(DEFAULT_EWMA_HALF_LIFE_SECONDS);
         let ChannelMetricMetadata { prefix, output } = metadata;
         let (legacy_suffix, gauge_suffix, max_value) = match limit {
             MemoryBufferSize::MaxEvents(max_events) => (
@@ -157,7 +162,7 @@ impl Metrics {
             Self {
                 histogram: histogram!(histogram_name, "output" => label_value.clone()),
                 gauge: gauge!(gauge_name, "output" => label_value.clone()),
-                mean_gauge: EwmaGauge::new(mean_gauge_handle, ewma_alpha),
+                mean_gauge: TimeEwmaGauge::new(mean_gauge_handle, ewma_half_life_seconds),
                 max_gauge,
                 legacy_max_gauge,
                 #[cfg(test)]
@@ -173,7 +178,7 @@ impl Metrics {
             Self {
                 histogram: histogram!(histogram_name),
                 gauge: gauge!(gauge_name),
-                mean_gauge: EwmaGauge::new(mean_gauge_handle, ewma_alpha),
+                mean_gauge: TimeEwmaGauge::new(mean_gauge_handle, ewma_half_life_seconds),
                 max_gauge,
                 legacy_max_gauge,
                 #[cfg(test)]
@@ -183,10 +188,10 @@ impl Metrics {
     }
 
     #[expect(clippy::cast_precision_loss)]
-    fn record(&self, value: usize) {
+    fn record(&self, value: usize, reference: Instant) {
         self.histogram.record(value as f64);
         self.gauge.set(value as f64);
-        self.mean_gauge.record(value as f64);
+        self.mean_gauge.record(value as f64, reference);
         #[cfg(test)]
         if let Ok(mut recorded) = self.recorded_values.lock() {
             recorded.push(value);
@@ -221,10 +226,11 @@ impl<T: Send + Sync + Debug + 'static> Inner<T> {
     fn new(
         limit: MemoryBufferSize,
         metric_metadata: Option<ChannelMetricMetadata>,
-        ewma_alpha: Option<f64>,
+        ewma_half_life_seconds: Option<f64>,
     ) -> Self {
         let read_waker = Arc::new(Notify::new());
-        let metrics = metric_metadata.map(|metadata| Metrics::new(limit, metadata, ewma_alpha));
+        let metrics =
+            metric_metadata.map(|metadata| Metrics::new(limit, metadata, ewma_half_life_seconds));
         match limit {
             MemoryBufferSize::MaxEvents(max_events) => Inner {
                 data: Arc::new(ArrayQueue::new(max_events.get())),
@@ -256,7 +262,7 @@ impl<T: Send + Sync + Debug + 'static> Inner<T> {
             // acquired fewer permits than their true size, `size` is the correct utilization since
             // the queue must have been empty for the oversized acquire to succeed.
             let utilization = size.max(self.used_capacity());
-            metrics.record(utilization);
+            metrics.record(utilization, Instant::now());
         }
         self.data.push((permits, item));
         self.read_waker.notify_one();
@@ -275,7 +281,7 @@ impl<T> Inner<T> {
                 // been released yet, used_capacity is stable against racing senders acquiring those
                 // permits.
                 let utilization = self.used_capacity().saturating_sub(permit.num_permits());
-                metrics.record(utilization);
+                metrics.record(utilization, Instant::now());
             }
             // Release permits after recording so a waiting sender cannot enqueue a new item
             // before this pop's utilization measurement is taken.
@@ -446,9 +452,9 @@ impl<T> Drop for LimitedReceiver<T> {
 pub fn limited<T: InMemoryBufferable + fmt::Debug>(
     limit: MemoryBufferSize,
     metric_metadata: Option<ChannelMetricMetadata>,
-    ewma_alpha: Option<f64>,
+    ewma_half_life_seconds: Option<f64>,
 ) -> (LimitedSender<T>, LimitedReceiver<T>) {
-    let inner = Inner::new(limit, metric_metadata, ewma_alpha);
+    let inner = Inner::new(limit, metric_metadata, ewma_half_life_seconds);
 
     let sender = LimitedSender {
         inner: inner.clone(),
