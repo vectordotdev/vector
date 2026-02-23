@@ -1786,6 +1786,30 @@
          .b == "{\"field1\":{\"field2\":1,\"field3\":null}}"
        '''
 
+ [transforms.remap_function_encode_csv]
+   inputs = []
+   type = "remap"
+   source = '''
+     .encoded = encode_csv!([.name, .age, .city])
+   '''
+
+ [[tests]]
+   name = "remap_function_encode_csv"
+   [tests.input]
+     insert_at = "remap_function_encode_csv"
+     type = "log"
+     [tests.input.log_fields]
+       name = "John"
+       age = "30"
+       city = "New York"
+   [[tests.outputs]]
+     extract_from = "remap_function_encode_csv"
+     [[tests.outputs.conditions]]
+       type = "vrl"
+       source = '''
+         .encoded == "John,30,New York"
+       '''
+
  [transforms.remap_function_parse_regex]
    inputs = []
    type = "remap"
