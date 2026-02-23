@@ -27,6 +27,19 @@ ensure_active_toolchain_is_installed() {
 
 SCRIPT_DIR=$(realpath "$(dirname "${BASH_SOURCE[0]}")")
 
+# Tool version definitions - update versions here
+CARGO_DEB_VERSION="2.9.3"
+CROSS_VERSION="0.2.5"
+CARGO_NEXTEST_VERSION="0.9.95"
+CARGO_DENY_VERSION="0.19.0"
+CARGO_MSRV_VERSION="0.18.4"
+CARGO_HACK_VERSION="0.6.43"
+DD_RUST_LICENSE_TOOL_VERSION="1.0.5"
+WASM_PACK_VERSION="0.13.1"
+MARKDOWNLINT_VERSION="0.45.0"
+DATADOG_CI_VERSION="5.8.0"
+VDEV_VERSION="0.1.0"
+
 ALL_MODULES=(
   rustup
   cargo-deb
@@ -34,11 +47,12 @@ ALL_MODULES=(
   cargo-nextest
   cargo-deny
   cargo-msrv
+  cargo-hack
   dd-rust-license-tool
   wasm-pack
   markdownlint
   datadog-ci
-  release-flags
+  release-flags  # Not a tool - sources release-flags.sh to set CI env vars
   vdev
 )
 
@@ -72,6 +86,7 @@ Modules:
   cargo-nextest
   cargo-deny
   cargo-msrv
+  cargo-hack
   dd-rust-license-tool
   wasm-pack
   markdownlint
@@ -102,13 +117,52 @@ contains_module() {
   return 1
 }
 
+# Helper function to check version and install if needed
+# Usage: maybe_install_cargo_tool <tool-name> <version> [<version-check-pattern>]
+# Note: cargo-* tools are invoked as "cargo <subcommand>", not as direct binaries
+maybe_install_cargo_tool() {
+  local tool="$1"
+  local version="$2"
+  local version_pattern="${3:-${tool} ${version}}"  # Default to "tool version"
+
+  if ! contains_module "$tool"; then
+    return 0
+  fi
+
+  # For cargo-* tools, invoke as "cargo <subcommand>" not "cargo-<subcommand>"
+  local version_cmd="$tool"
+  if [[ "$tool" == cargo-* ]]; then
+    version_cmd="cargo ${tool#cargo-}"
+  fi
+
+  if ! $version_cmd --version 2>/dev/null | grep -q "^${version_pattern}"; then
+    cargo "${install[@]}" "$tool" --version "$version" --force --locked
+  fi
+}
+
+# Helper for NPM packages
+# Usage: maybe_install_npm_package <tool-name> <package-name> <version> <version-check-pattern> <version-command>
+maybe_install_npm_package() {
+  local tool="$1"
+  local package="$2"
+  local version="$3"
+  local version_pattern="${4:-$version}"
+  local version_cmd="${5:---version}"  # Default to --version, can override with "version" etc.
+
+  if ! contains_module "$tool"; then
+    return 0
+  fi
+
+  if [[ "$("$tool" "$version_cmd" 2>/dev/null)" != "$version_pattern" ]]; then
+    sudo npm install -g "${package}@${version}"
+  fi
+}
+
 # Always ensure git safe.directory is set
 git config --global --add safe.directory "$(pwd)"
 
-REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv wasm-pack vdev)
-
-REQUIRES_BINSTALL=("${REQUIRES_RUSTUP[@]}")
-unset -v 'REQUIRES_BINSTALL[0]' # remove dd-rust-license-tool
+REQUIRES_RUSTUP=(dd-rust-license-tool cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack wasm-pack vdev)
+REQUIRES_BINSTALL=(cargo-deb cross cargo-nextest cargo-deny cargo-msrv cargo-hack wasm-pack vdev)
 require_binstall=false
 
 for tool in "${REQUIRES_BINSTALL[@]}"; do
@@ -144,62 +198,16 @@ if contains_module rustup; then
   fi
 fi
 set -e -o verbose
-if contains_module cargo-deb; then
-  if [[ "$(cargo-deb --version 2>/dev/null)" != "2.9.3" ]]; then
-    cargo "${install[@]}" cargo-deb --version 2.9.3 --force --locked
-  fi
-fi
 
-if contains_module cross; then
-  if ! cross --version 2>/dev/null | grep -q '^cross 0.2.5'; then
-    cargo "${install[@]}" cross --version 0.2.5 --force --locked
-  fi
-fi
+maybe_install_cargo_tool cargo-deb "${CARGO_DEB_VERSION}" "${CARGO_DEB_VERSION}"
+maybe_install_cargo_tool cross "${CROSS_VERSION}"
+maybe_install_cargo_tool cargo-nextest "${CARGO_NEXTEST_VERSION}"
+maybe_install_cargo_tool cargo-deny "${CARGO_DENY_VERSION}"
+maybe_install_cargo_tool cargo-msrv "${CARGO_MSRV_VERSION}"
+maybe_install_cargo_tool cargo-hack "${CARGO_HACK_VERSION}"
+maybe_install_cargo_tool dd-rust-license-tool "${DD_RUST_LICENSE_TOOL_VERSION}"
+maybe_install_cargo_tool wasm-pack "${WASM_PACK_VERSION}"
+maybe_install_cargo_tool vdev "${VDEV_VERSION}"
 
-if contains_module cargo-nextest; then
-  if ! cargo-nextest --version 2>/dev/null | grep -q '^cargo-nextest 0.9.95'; then
-    cargo "${install[@]}" cargo-nextest --version 0.9.95 --force --locked
-  fi
-fi
-
-if contains_module cargo-deny; then
-  if ! cargo-deny --version 2>/dev/null | grep -q '^cargo-deny 0.19.0'; then
-    cargo "${install[@]}" cargo-deny --version 0.18.9 --force --locked
-  fi
-fi
-
-if contains_module cargo-msrv; then
-  if ! cargo-msrv --version 2>/dev/null | grep -q '^cargo-msrv 0.18.4'; then
-    cargo "${install[@]}" cargo-msrv --version 0.18.4 --force --locked
-  fi
-fi
-
-if contains_module dd-rust-license-tool; then
-  if ! dd-rust-license-tool --help &>/dev/null; then
-    cargo install dd-rust-license-tool --version 1.0.4 --force --locked
-  fi
-fi
-
-if contains_module wasm-pack; then
-  if ! wasm-pack --version | grep -q '^wasm-pack 0.13.1'; then
-    cargo "${install[@]}" --locked --version 0.13.1 wasm-pack
-  fi
-fi
-
-if contains_module markdownlint; then
-  if [[ "$(markdownlint --version 2>/dev/null)" != "0.45.0" ]]; then
-    sudo npm install -g markdownlint-cli@0.45.0
-  fi
-fi
-
-if contains_module datadog-ci; then
-  if [[ "$(datadog-ci version 2>/dev/null)" != "v3.16.0" ]]; then
-    sudo npm install -g @datadog/datadog-ci@3.16.0
-  fi
-fi
-
-if contains_module vdev; then
-  if [[ "$(vdev --version 2>/dev/null)" != "vdev 0.1.0" ]]; then
-    cargo "${install[@]}" vdev --version 0.1.0 --force --locked
-  fi
-fi
+maybe_install_npm_package markdownlint markdownlint-cli "${MARKDOWNLINT_VERSION}"
+maybe_install_npm_package datadog-ci "@datadog/datadog-ci" "${DATADOG_CI_VERSION}" "v${DATADOG_CI_VERSION}" "version"

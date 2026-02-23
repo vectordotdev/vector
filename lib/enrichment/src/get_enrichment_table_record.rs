@@ -108,11 +108,40 @@ impl Function for GetEnrichmentTableRecord {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[example!(
-            title: "find records",
-            source: r#"get_enrichment_table_record!("test", {"id": 1})"#,
-            result: Ok(r#"{"id": 1, "firstname": "Bob", "surname": "Smith"}"#),
-        )]
+        &[
+            example! {
+                title: "Exact match",
+                source: r#"get_enrichment_table_record!("test", {"id": 1})"#,
+                result: Ok(r#"{"id": 1, "firstname": "Bob", "surname": "Smith"}"#),
+            },
+            example! {
+                title: "Case insensitive match",
+                source: indoc !{r#"
+                    get_enrichment_table_record!(
+                        "test",
+                        {"surname": "bob", "firstname": "John"},
+                        case_sensitive: false
+                    )
+                "#},
+                result: Ok(r#"{"id": 1, "firstname": "Bob", "surname": "Smith"}"#),
+            },
+            example! {
+                title: "Date range search",
+                source: indoc! {r#"
+                    get_enrichment_table_record!(
+                        "test",
+                        {
+                            "surname": "Smith",
+                            "date_of_birth": {
+                                "from": t'1985-01-01T00:00:00Z',
+                                "to": t'1985-12-31T00:00:00Z'
+                            }
+                        }
+                    )
+                "#},
+                result: Ok(r#"{"id": 1, "firstname": "Bob", "surname": "Smith"}"#),
+            },
+        ]
     }
 
     fn compile(
