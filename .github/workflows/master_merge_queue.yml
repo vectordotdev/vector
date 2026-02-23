@@ -47,8 +47,22 @@ jobs:
     secrets: inherit
 
   test-cli:
-    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.cli-yml == 'true' }}
-    uses: ./.github/workflows/cli.yml
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-cli
+      job_name: CLI tests
+      upload_test_results: true
+    needs: changes
+    secrets: inherit
+
+  test-top:
+    if: ${{ needs.changes.outputs.source == 'true' || needs.changes.outputs.test-make-command-yml == 'true' }}
+    uses: ./.github/workflows/test-make-command.yml
+    with:
+      command: test-top
+      job_name: make test-top
+      upload_test_results: true
     needs: changes
     secrets: inherit
 
@@ -122,6 +136,7 @@ jobs:
     needs:
       - changes
       - test-cli
+      - test-top
       - make-test-behavior
       - make-check-examples
       - make-test-docs

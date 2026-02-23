@@ -31,13 +31,12 @@ impl Function for GetSecret {
     }
 
     fn parameters(&self) -> &'static [Parameter] {
-        &[Parameter {
-            keyword: "key",
-            kind: kind::BYTES,
-            required: true,
-            description: "The name of the secret.",
-            default: None,
-        }]
+        const PARAMETERS: &[Parameter] = &[Parameter::required(
+            "key",
+            kind::BYTES,
+            "The name of the secret.",
+        )];
+        PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {

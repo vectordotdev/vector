@@ -11,20 +11,17 @@ static DEFAULT_LOWERCASE_HOSTNAMES: LazyLock<Value> = LazyLock::new(|| Value::Bo
 
 static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
     vec![
-        Parameter {
-            keyword: "value",
-            kind: kind::BYTES,
-            required: true,
-            description: "The base64 encoded representation of the DNSTAP data to parse.",
-            default: None,
-        },
-        Parameter {
-            keyword: "lowercase_hostnames",
-            kind: kind::BOOLEAN,
-            required: false,
-            description: "Whether to turn all hostnames found in resulting data lowercase, for consistency.",
-            default: Some(&DEFAULT_LOWERCASE_HOSTNAMES),
-        },
+        Parameter::required(
+            "value",
+            kind::BYTES,
+            "The base64 encoded representation of the DNSTAP data to parse.",
+        ),
+        Parameter::optional(
+            "lowercase_hostnames",
+            kind::BOOLEAN,
+            "Whether to turn all hostnames found in resulting data lowercase, for consistency.",
+        )
+        .default(&DEFAULT_LOWERCASE_HOSTNAMES),
     ]
 });
 
