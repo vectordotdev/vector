@@ -129,10 +129,16 @@ pub trait SinkBuilderExt: Stream {
                 let _entered = span.enter();
 
                 // Split the input into metadata and events.
-                let (metadata, request_metadata_builder, events) = builder.split_input(input);
+                let (mut metadata, request_metadata_builder, events) = builder.split_input(input);
 
                 // Encode the events.
-                let payload = builder.encode_events(events)?;
+                let payload = match builder.encode_events(events) {
+                    Ok(payload) => payload,
+                    Err(err) => {
+                        builder.on_encode_error(&mut metadata);
+                        return Err(err);
+                    }
+                };
 
                 // Note: it would be nice for the RequestMetadataBuilder to build be created from the
                 // events here, and not need to be required by split_input(). But this then requires

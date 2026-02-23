@@ -106,6 +106,13 @@ pub trait RequestBuilder<Input> {
         Ok(result)
     }
 
+    /// Called when encoding fails, before the metadata is dropped.
+    ///
+    /// Implementations should use this to update event finalizers (e.g. mark them
+    /// as rejected) so that batch status is reported correctly.
+    /// The default implementation does nothing.
+    fn on_encode_error(&self, _metadata: &mut Self::Metadata) {}
+
     /// Builds a request for the given metadata and payload.
     fn build_request(
         &self,
