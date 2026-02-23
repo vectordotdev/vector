@@ -41,8 +41,8 @@ remap: functions: encode_csv: {
 		},
 		{
 			title: "Encode object to a single CSV formatted row with line breaks"
-			source: #"encode_csv!(["line", "with linebreaks", "here\n", "and", "\nhere"])"#
-			return: #""line,with linebreaks,\"here\n\",and,\"\nhere\"""#
+			source: #"encode_csv!(["line", "with line breaks", "here\n", "and", "\nhere"])"#
+			return: #""line,with line breaks,\"here\n\",and,\"\nhere\"""#
 		},
 	]
 }
