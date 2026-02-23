@@ -9,8 +9,14 @@ on:
   pull_request:
     types: [opened, edited, synchronize]
 
+permissions:
+  contents: read
+
 jobs:
   main:
+    permissions:
+      pull-requests: read  # for amannn/action-semantic-pull-request to analyze PRs
+      statuses: write  # for amannn/action-semantic-pull-request to mark status of analyzed PR
     name: Check Semantic PR
     runs-on: ubuntu-24.04
     steps:
@@ -55,6 +61,7 @@ jobs:
             external
             external docs
             filtering
+            feature flags
             healthchecks
             internal
             internal docs
@@ -206,6 +213,7 @@ jobs:
             aws_sqs sink
             axiom sink
             azure_blob sink
+            azure_logs_ingestion sink
             azure_monitor_logs sink
             blackhole sink
             clickhouse sink

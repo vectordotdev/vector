@@ -338,7 +338,7 @@ Vector requires all contributors to sign the Contributor License Agreement
 (CLA). This gives Vector the right to use your contribution as well as ensuring
 that you own your contributions and can use them for other purposes.
 
-The full text of the CLA can be found at [https://cla.datadoghq.com/vectordotdev/vector](https://cla.datadoghq.com/vectordotdev/vector).
+The full text of the CLA can be found [here](https://gist.github.com/bits-bot/55bdc97a4fdad52d97feb4d6c3d1d618).
 
 ### Granted rights and copyright assignment
 

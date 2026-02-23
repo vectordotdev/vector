@@ -24,6 +24,10 @@ inputs:
     required: false
     default: false
     description: "Install cue."
+  libsasl2:
+    required: false
+    default: false
+    description: "Install libsasl2." # Required to fully build Vector
 
   # prepare.sh - rust
   rust: # rustup module
@@ -79,7 +83,7 @@ runs:
     - name: Check vdev cache status
       id: check-vdev-cache
       if: ${{ inputs.vdev == 'true' }}
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: ~/.cargo/bin/vdev
         key: ${{ runner.os }}-vdev-${{ hashFiles('vdev/**', 'Cargo.toml', 'Cargo.lock') }}
@@ -144,7 +148,7 @@ runs:
 
     - name: Cache Cargo registry, index, and git DB
       if: ${{ inputs.cargo-cache == 'true' || env.NEEDS_RUST == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: |
           ~/.cargo/registry/index/
@@ -155,7 +159,7 @@ runs:
           ${{ runner.os }}-cargo-
 
     - name: Install mold
-      if: ${{ inputs.mold == 'true' || env.VDEV_NEEDS_COMPILE == 'true' }}
+      if: ${{ runner.os == 'Linux' && env.DISABLE_MOLD != 'true' && (inputs.mold == 'true' || env.VDEV_NEEDS_COMPILE == 'true') }}
       shell: bash
       run: |
         echo "Installing mold"
@@ -206,7 +210,11 @@ runs:
       shell: bash
       run: |
         echo "Installing protoc"
-        sudo bash ./scripts/environment/install-protoc.sh
+        if [[ "${{ runner.os }}" == "macOS" ]]; then
+          sudo bash ./scripts/environment/install-protoc.sh /usr/local/bin
+        else
+          sudo bash ./scripts/environment/install-protoc.sh
+        fi
 
     - name: Install cue
       if: ${{ inputs.cue == 'true' }}
@@ -223,6 +231,11 @@ runs:
         sudo cp "${TEMP}/cue" /usr/bin/cue
         rm -rf "$TEMP"
 
+    - name: Install libsasl2
+      if: ${{ inputs.libsasl2 == 'true' }}
+      shell: bash
+      run: sudo apt-get update && sudo apt-get install -y libsasl2-dev
+
     - name: Install vdev
       if: ${{ inputs.vdev == 'true' }}
       uses: ./.github/actions/install-vdev
@@ -231,7 +244,7 @@ runs:
 
     - name: Cache prepare.sh binaries
       id: cache-prepare-binaries
-      uses: actions/cache@5a3ec84eff668545956fd18022155c47e93e2684 # v4.2.3
+      uses: actions/cache@cdf6c1fa76f9f475f3d7449005a359c84ca0f306 # v5.0.3
       with:
         path: |
           ~/.cargo/bin/cargo-deb

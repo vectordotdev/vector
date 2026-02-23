@@ -1,4 +1,4 @@
-use std::{borrow::Cow, collections::HashMap, fmt};
+use std::{collections::HashMap, fmt};
 
 use vector_lib::{
     config::LegacyKey,
@@ -7,7 +7,7 @@ use vector_lib::{
 
 use crate::{
     conditions::Condition,
-    event::Event,
+    event::{Event, Value},
     internal_events::SampleEventDiscarded,
     sinks::prelude::TemplateRenderingError,
     template::Template,
@@ -53,16 +53,16 @@ impl SampleMode {
         }
     }
 
-    fn increment(&mut self, group_by_key: &Option<String>, value: &Option<Cow<'_, str>>) -> bool {
+    fn increment(&mut self, group_by_key: Option<String>, value: Option<&Value>) -> bool {
         let threshold_exceeded = match self {
             Self::Rate { rate, counters } => {
-                let counter_value = counters.entry(group_by_key.clone()).or_default();
+                let counter_value = counters.entry(group_by_key).or_default();
                 let old_counter_value = *counter_value;
                 *counter_value += 1;
                 old_counter_value % *rate == 0
             }
             Self::Ratio { ratio, values, .. } => {
-                let value = values.entry(group_by_key.clone()).or_insert(1.0 - *ratio);
+                let value = values.entry(group_by_key).or_insert(1.0 - *ratio);
                 let increment: f64 = *value + *ratio;
                 *value = if increment >= 1.0 {
                     increment - 1.0
@@ -73,7 +73,7 @@ impl SampleMode {
             }
         };
         if let Some(value) = value {
-            self.hash_within_ratio(value.as_bytes())
+            self.hash_within_ratio(value.to_string_lossy().as_bytes())
         } else {
             threshold_exceeded
         }
@@ -159,49 +159,36 @@ impl FunctionTransform for Sample {
             }
         };
 
-        let value = self
-            .key_field
-            .as_ref()
-            .and_then(|key_field| match &event {
-                Event::Log(event) => event
-                    .parse_path_and_get_value(key_field.as_str())
-                    .ok()
-                    .flatten(),
-                Event::Trace(event) => event
-                    .parse_path_and_get_value(key_field.as_str())
-                    .ok()
-                    .flatten(),
-                Event::Metric(_) => panic!("component can never receive metric events"),
-            })
-            .map(|v| v.to_string_lossy());
-
-        // Fetch actual field value if group_by option is set.
-        let group_by_key = self.group_by.as_ref().and_then(|group_by| match &event {
-            Event::Log(event) => group_by
-                .render_string(event)
-                .map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("group_by"),
-                        drop_event: false,
-                    })
-                })
-                .ok(),
-            Event::Trace(event) => group_by
-                .render_string(event)
-                .map_err(|error| {
-                    emit!(TemplateRenderingError {
-                        error,
-                        field: Some("group_by"),
-                        drop_event: false,
-                    })
-                })
-                .ok(),
+        let value = self.key_field.as_ref().and_then(|key_field| match &event {
+            Event::Log(event) => event
+                .parse_path_and_get_value(key_field.as_str())
+                .ok()
+                .flatten(),
+            Event::Trace(event) => event
+                .parse_path_and_get_value(key_field.as_str())
+                .ok()
+                .flatten(),
             Event::Metric(_) => panic!("component can never receive metric events"),
         });
 
-        let should_sample = self.rate.increment(&group_by_key, &value);
-        if should_sample {
+        // Fetch actual field value if group_by option is set.
+        let group_by_key = self.group_by.as_ref().and_then(|group_by| {
+            match &event {
+                Event::Log(event) => group_by.render_string(event),
+                Event::Trace(event) => group_by.render_string(event),
+                Event::Metric(_) => panic!("component can never receive metric events"),
+            }
+            .map_err(|error| {
+                emit!(TemplateRenderingError {
+                    error,
+                    field: Some("group_by"),
+                    drop_event: false,
+                })
+            })
+            .ok()
+        });
+
+        if self.rate.increment(group_by_key, value) {
             if let Some(path) = &self.sample_rate_key.path {
                 match event {
                     Event::Log(ref mut event) => {

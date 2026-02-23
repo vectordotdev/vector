@@ -3,6 +3,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
+use vector_vrl_category::Category;
 use vrl::{
     diagnostic::Label,
     path::{OwnedTargetPath, PathPrefix},
@@ -46,19 +47,24 @@ impl Function for SetSemanticMeaning {
         "}
     }
 
+    fn category(&self) -> &'static str {
+        Category::Event.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::NULL
+    }
+
     fn parameters(&self) -> &'static [Parameter] {
-        &[
-            Parameter {
-                keyword: "target",
-                kind: kind::ANY,
-                required: true,
-            },
-            Parameter {
-                keyword: "meaning",
-                kind: kind::BYTES,
-                required: true,
-            },
-        ]
+        const PARAMETERS: &[Parameter] = &[
+            Parameter::required(
+                "target",
+                kind::ANY,
+                "The path of the value that is assigned a meaning.",
+            ),
+            Parameter::required("meaning", kind::BYTES, "The name of the meaning to assign."),
+        ];
+        PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {

@@ -92,11 +92,12 @@ Automated steps include:
     - Refer to the internal releasing doc to monitor the deployment.
 - [ ] Release Linux packages. Refer to the internal releasing doc.
 - [ ] Release updated Helm chart. See [releasing Helm chart](https://github.com/vectordotdev/helm-charts/blob/develop/RELEASING.md).
+- [ ] Release Homebrew. Refer to the internal releasing doc.
 - [ ] Create internal Docker images. Refer to the internal releasing doc.
+- [ ] Update the latest [release tag](https://github.com/vectordotdev/vector/release) description with the release announcement.
 - [ ] Create a new PR with title starting as `chore(releasing):`
   - [ ] Cherry-pick any release commits from the release branch that are not on `master`, to `master`.
   - [ ] Run `cargo vdev build manifests` and commit changes.
   - [ ] Bump the release number in the `Cargo.toml` on master to the next minor release.
   - [ ] Also, update `Cargo.lock` with: `cargo update -p vector`.
   - [ ] If there is a VRL version update, revert it and make it track the git `main` branch and then run `cargo update -p vrl`.
-- [ ] Kick-off post-mortems for any regressions resolved by the release.

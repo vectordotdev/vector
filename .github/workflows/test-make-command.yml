@@ -11,9 +11,19 @@ on:
         description: 'Display name for the job/status check'
         required: true
         type: string
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
+      upload_test_results:
+        description: 'Whether to upload nextest test results (for commands that use cargo nextest)'
+        required: false
+        type: boolean
+        default: false
+
 
 permissions:
-  statuses: write
+  contents: read
 
 jobs:
   run-make-command:
@@ -22,47 +32,19 @@ jobs:
     env:
       CARGO_INCREMENTAL: 0
     steps:
-      - name: (PR review) Set latest commit status as pending
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: ${{ inputs.job_name }}
-          status: pending
-
-      - name: (PR review) Checkout review SHA
-        if: ${{ github.event_name == 'pull_request_review' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-        with:
-          ref: ${{ github.event.review.commit_id }}
-
       - name: Checkout branch
-        if: ${{ github.event_name != 'pull_request_review' }}
-        uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
-
-      - uses: actions/cache@9255dc7a253b0ccc959486e2bca901246202afeb # v5.0.1
-        name: Cache Cargo registry + index
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
-          path: |
-            ~/.cargo/bin/
-            ~/.cargo/registry/index/
-            ~/.cargo/registry/cache/
-            ~/.cargo/git/db/
-          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          restore-keys: |
-            ${{ runner.os }}-cargo-
+          ref: ${{ inputs.ref }}
 
-      - run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
-      - run: bash scripts/environment/prepare.sh --modules=rustup
-      - run: echo "::add-matcher::.github/matchers/rust.json"
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          libsasl2: true
+          cargo-nextest: ${{ inputs.upload_test_results }}
+          datadog-ci: ${{ inputs.upload_test_results }}
       - run: make ${{ inputs.command }}
-
-      - name: (PR review) Set latest commit status as ${{ job.status }}
-        uses: myrotvorets/set-commit-status-action@3730c0a348a2ace3c110851bed53331bc6406e9f # v2.0.1
-        if: always() && github.event_name == 'pull_request_review'
-        with:
-          sha: ${{ github.event.review.commit_id }}
-          token: ${{ secrets.GITHUB_TOKEN }}
-          context: ${{ inputs.job_name }}
-          status: ${{ job.status }}
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: ${{ always() && inputs.upload_test_results }}

@@ -125,6 +125,7 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
         encoder
             .encode(transformed_events, &mut bytes)
             .map_err(|error| {
+                #[cfg(feature = "codecs-arrow")]
                 if let vector_lib::codecs::encoding::Error::SchemaConstraintViolation(
                     ref constraint_error,
                 ) = error

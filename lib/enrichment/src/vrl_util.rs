@@ -1,5 +1,5 @@
 //! Utilities shared between both VRL functions.
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, sync::LazyLock};
 
 use vrl::{
     diagnostic::{Label, Span},
@@ -103,26 +103,24 @@ pub(crate) fn add_index(
 
     Ok(index)
 }
+pub(crate) static DEFAULT_CASE_SENSITIVE: LazyLock<Value> = LazyLock::new(|| Value::Boolean(true));
 
 #[allow(clippy::result_large_err)]
 pub(crate) fn is_case_sensitive(
     arguments: &ArgumentList,
     state: &TypeState,
 ) -> Result<Case, function::Error> {
-    Ok(arguments
+    let case_sensitive = arguments
         .optional_literal("case_sensitive", state)?
-        .map(|value| {
-            let case_sensitive = value
-                .as_boolean()
-                .expect("case_sensitive should be boolean"); // This will have been caught by the type checker.
+        .unwrap_or_else(|| DEFAULT_CASE_SENSITIVE.clone())
+        .as_boolean()
+        .expect("case_sensitive should be boolean"); // This will have been caught by the type checker.
 
-            if case_sensitive {
-                Case::Sensitive
-            } else {
-                Case::Insensitive
-            }
-        })
-        .unwrap_or(Case::Sensitive))
+    Ok(if case_sensitive {
+        Case::Sensitive
+    } else {
+        Case::Insensitive
+    })
 }
 
 #[cfg(test)]

@@ -47,12 +47,14 @@ jobs:
   build-test-runner:
     needs: changes
     if: ${{
-      github.event_name == 'workflow_dispatch' ||
+      always() &&
+      (github.event_name == 'workflow_dispatch' ||
       (github.event_name == 'merge_group' &&
-       (needs.changes.outputs.dependencies == 'true' ||
-        needs.changes.outputs.integration-yml == 'true' ||
-        needs.changes.outputs.int-tests-any == 'true' ||
-        needs.changes.outputs.e2e-tests-any == 'true'))
+      needs.changes.result == 'success' &&
+      (needs.changes.outputs.dependencies == 'true' ||
+      needs.changes.outputs.integration-yml == 'true' ||
+      needs.changes.outputs.int-tests-any == 'true' ||
+      needs.changes.outputs.e2e-tests-any == 'true')))
      }}
 
     uses: ./.github/workflows/build-test-runner.yml
@@ -65,7 +67,8 @@ jobs:
       - changes
       - build-test-runner
 
-    if: ${{ !failure() && !cancelled() && needs.build-test-runner.result == 'success' && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
         # TODO: Add "splunk" back once https://github.com/vectordotdev/vector/issues/23474 is fixed.
@@ -79,7 +82,7 @@ jobs:
         ]
     timeout-minutes: 90
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: "recursive"
 
@@ -133,14 +136,15 @@ jobs:
     needs:
       - changes
       - build-test-runner
-    if: ${{ !failure() && !cancelled() && needs.build-test-runner.result == 'success' && (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
+    if: ${{ always() && !failure() && !cancelled() && needs.build-test-runner.result == 'success' &&
+      (github.event_name == 'merge_group' || github.event_name == 'workflow_dispatch') }}
     strategy:
       matrix:
         service: [ "datadog-logs", "datadog-metrics", "opentelemetry-logs", "opentelemetry-metrics" ]
     timeout-minutes: 90
 
     steps:
-      - uses: actions/checkout@8e8c483db84b4bee98b60c0593521ed34d9990e8 # v6.0.1
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           submodules: "recursive"
 

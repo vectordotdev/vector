@@ -35,12 +35,11 @@ use tokio::{
     task::JoinSet,
     time::Sleep,
 };
-use tokio_util::codec::FramedRead;
 use tracing::{Instrument, Span};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        StreamDecodingError,
+        DecoderFramedRead, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace},
@@ -999,7 +998,7 @@ fn parse_stream<'a>(
 
     let payload = Cursor::new(Bytes::copy_from_slice(payload));
 
-    let mut stream = FramedRead::with_capacity(payload, decoder, msg.payload_len());
+    let mut stream = DecoderFramedRead::with_capacity(payload, decoder, msg.payload_len());
     let (count, _) = stream.size_hint();
     let stream = stream! {
         while let Some(result) = stream.next().await {
@@ -1099,7 +1098,6 @@ impl ReceivedMessage {
 
     fn apply(&self, keys: &Keys, event: &mut Event, log_namespace: LogNamespace) {
         if let Event::Log(log) = event {
-            log.metadata_mut().set_ingest_timestamp(Utc::now());
             match log_namespace {
                 LogNamespace::Vector => {
                     // We'll only use this function in Vector namespaces because we don't want
