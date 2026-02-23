@@ -8,7 +8,6 @@ use vector_lib::codecs::encoding::format::SchemaProvider;
 use vector_lib::codecs::encoding::{ArrowStreamSerializerConfig, BatchSerializerConfig};
 
 use super::{
-    RequiredFields,
     request_builder::ClickhouseRequestBuilder,
     service::{ClickhouseRetryLogic, ClickhouseServiceRequestBuilder},
     sink::{ClickhouseSink, PartitionKey},
@@ -79,17 +78,6 @@ pub struct ClickhouseConfig {
     /// The format to parse input data.
     #[serde(default)]
     pub format: Format,
-
-    /// Validate that events contain all non-nullable fields before encoding.
-    ///
-    /// When enabled (default), each batch is checked for missing non-nullable fields before
-    /// encoding. Batches with missing fields are rejected early with a clear error.
-    ///
-    /// Disable this to skip the per-batch validation for better throughput when you are
-    /// confident that events always contain all required fields. Has no effect when
-    /// `allow_nullable_fields` is true, or when `format` is not `arrow_stream`.
-    #[serde(default = "default_true")]
-    pub validate_schema: bool,
 
     /// Sets `input_format_skip_unknown_fields`, allowing ClickHouse to discard fields not present in the table schema.
     ///
@@ -200,10 +188,6 @@ pub struct AsyncInsertSettingsConfig {
     pub max_query_number: Option<u64>,
 }
 
-const fn default_true() -> bool {
-    true
-}
-
 impl_generate_config_from_default!(ClickhouseConfig);
 
 #[async_trait::async_trait]
@@ -246,7 +230,7 @@ impl SinkConfig for ClickhouseConfig {
         });
 
         // Resolve the encoding strategy (format + encoder) based on configuration
-        let (format, encoder_kind, required_fields) = self
+        let (format, encoder_kind) = self
             .resolve_strategy(&client, &endpoint, &database, auth.as_ref())
             .await?;
 
@@ -262,7 +246,6 @@ impl SinkConfig for ClickhouseConfig {
             self.table.clone(),
             format,
             request_builder,
-            required_fields,
         );
 
         let healthcheck = Box::pin(healthcheck(client, endpoint, auth));
@@ -290,7 +273,7 @@ impl ClickhouseConfig {
         endpoint: &Uri,
         database: &Template,
         auth: Option<&Auth>,
-    ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind, RequiredFields)> {
+    ) -> crate::Result<(Format, vector_lib::codecs::EncoderKind)> {
         use vector_lib::codecs::EncoderKind;
         use vector_lib::codecs::{
             JsonSerializerConfig, NewlineDelimitedEncoderConfig, encoding::Framer,
@@ -321,22 +304,12 @@ impl ClickhouseConfig {
             )
             .await?;
 
-            let required_fields = if arrow_config.allow_nullable_fields || !self.validate_schema {
-                None
-            } else {
-                arrow_config
-                    .schema
-                    .as_ref()
-                    .map(extract_required_fields)
-                    .filter(|fields| !fields.is_empty())
-            };
-
             let resolved_batch_config = BatchSerializerConfig::ArrowStream(arrow_config);
             let arrow_serializer = resolved_batch_config.build()?;
             let batch_serializer = BatchSerializer::Arrow(arrow_serializer);
             let encoder = EncoderKind::Batch(BatchEncoder::new(batch_serializer));
 
-            return Ok((Format::ArrowStream, encoder, required_fields));
+            return Ok((Format::ArrowStream, encoder));
         }
 
         let encoder = EncoderKind::Framed(Box::new(Encoder::<Framer>::new(
@@ -344,7 +317,7 @@ impl ClickhouseConfig {
             JsonSerializerConfig::default().build().into(),
         )));
 
-        Ok((self.format, encoder, None))
+        Ok((self.format, encoder))
     }
 
     async fn resolve_arrow_schema(
@@ -400,15 +373,6 @@ impl ClickhouseConfig {
 
         Ok(())
     }
-}
-
-fn extract_required_fields(schema: &arrow::datatypes::Schema) -> Vec<String> {
-    schema
-        .fields()
-        .iter()
-        .filter(|field| !field.is_nullable())
-        .map(|field| field.name().to_string())
-        .collect()
 }
 
 fn get_healthcheck_uri(endpoint: &Uri) -> String {

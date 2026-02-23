@@ -13,7 +13,6 @@ use arrow::{
 use async_trait::async_trait;
 use bytes::{BufMut, Bytes, BytesMut};
 use snafu::{ResultExt, Snafu, ensure};
-use std::sync::Arc;
 use vector_config::configurable_component;
 use vector_core::event::Event;
 
@@ -31,7 +30,7 @@ pub trait SchemaProvider: Send + Sync + std::fmt::Debug {
 
 /// Configuration for Arrow IPC stream serialization
 #[configurable_component]
-#[derive(Clone)]
+#[derive(Clone, Default)]
 pub struct ArrowStreamSerializerConfig {
     /// The Arrow schema to use for encoding
     #[serde(skip)]
@@ -49,15 +48,6 @@ pub struct ArrowStreamSerializerConfig {
     #[serde(default)]
     #[configurable(derived)]
     pub allow_nullable_fields: bool,
-}
-
-impl Default for ArrowStreamSerializerConfig {
-    fn default() -> Self {
-        Self {
-            schema: None,
-            allow_nullable_fields: false,
-        }
-    }
 }
 
 impl std::fmt::Debug for ArrowStreamSerializerConfig {
@@ -134,7 +124,7 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ArrowStreamSerializer {
             return Err(ArrowEncodingError::NoEvents);
         }
 
-        let bytes = encode_events_to_arrow_ipc_stream(&events, Arc::clone(&self.schema))?;
+        let bytes = encode_events_to_arrow_ipc_stream(&events, self.schema.clone())?;
 
         buffer.extend_from_slice(&bytes);
         Ok(())
@@ -277,20 +267,61 @@ fn make_field_nullable(field: &Field) -> Result<Field, ArrowEncodingError> {
         .with_nullable(true))
 }
 
+/// Returns true if the field is absent from the value's object map, or explicitly null.
+/// Find non-nullable schema fields that are missing or null in any of the given events.
+pub fn find_null_non_nullable_fields<'a>(
+    schema: &'a Schema,
+    values: &[&vrl::value::Value],
+) -> Vec<&'a str> {
+    schema
+        .fields()
+        .iter()
+        .filter(|field| {
+            !field.is_nullable()
+                && values.iter().any(|value| {
+                    value
+                        .as_object()
+                        .and_then(|map| map.get(field.name().as_str()))
+                        .is_none_or(vrl::value::Value::is_null)
+                })
+        })
+        .map(|field| field.name().as_str())
+        .collect()
+}
+
 /// Build an Arrow RecordBatch from a slice of events using the provided schema.
 fn build_record_batch(
     schema: SchemaRef,
     events: &[Event],
 ) -> Result<RecordBatch, ArrowEncodingError> {
-    let mut decoder = ReaderBuilder::new(Arc::clone(&schema))
-        .build_decoder()
-        .context(RecordBatchCreationSnafu)?;
-
-    let values: Vec<&vrl::value::Value> = events
+    let values: Vec<_> = events
         .iter()
         .filter_map(Event::maybe_as_log)
         .map(|log| log.value())
         .collect();
+
+    if values.is_empty() {
+        return Err(ArrowEncodingError::NoEvents);
+    }
+
+    let missing = find_null_non_nullable_fields(&schema, &values);
+    if !missing.is_empty() {
+        for field_name in &missing {
+            let error: vector_common::Error = Box::new(ArrowEncodingError::NullConstraint {
+                field_name: field_name.to_string(),
+            });
+            vector_common::internal_event::emit(
+                crate::internal_events::EncoderNullConstraintError { error: &error },
+            );
+        }
+        return Err(ArrowEncodingError::NullConstraint {
+            field_name: missing.join(", "),
+        });
+    }
+
+    let mut decoder = ReaderBuilder::new(schema)
+        .build_decoder()
+        .context(RecordBatchCreationSnafu)?;
 
     decoder.serialize(&values).context(ArrowJsonDecodeSnafu)?;
 
@@ -317,7 +348,7 @@ mod tests {
         events: Vec<Event>,
         schema: SchemaRef,
     ) -> Result<RecordBatch, Box<dyn std::error::Error>> {
-        let bytes = encode_events_to_arrow_ipc_stream(&events, Arc::clone(&schema))?;
+        let bytes = encode_events_to_arrow_ipc_stream(&events, schema.clone())?;
         let cursor = Cursor::new(bytes);
         let mut reader = StreamReader::try_new(cursor, None)?;
         Ok(reader.next().unwrap()?)
@@ -414,7 +445,7 @@ mod tests {
                 false,
             );
 
-            let schema = SchemaRef::new(Schema::new(vec![
+            let schema = Schema::new(vec![
                 Field::new("string_field", DataType::Utf8, true),
                 Field::new("int8_field", DataType::Int8, true),
                 Field::new("int16_field", DataType::Int16, true),
@@ -445,7 +476,8 @@ mod tests {
                     true,
                 ),
                 Field::new("map_field", DataType::Map(map_entries.into(), false), true),
-            ]));
+            ])
+            .into();
 
             let batch = encode_and_decode(events, schema).expect("Failed to encode");
 
@@ -532,11 +564,7 @@ mod tests {
 
         #[test]
         fn test_encode_empty_events() {
-            let schema = SchemaRef::new(Schema::new(vec![Field::new(
-                "message",
-                DataType::Utf8,
-                true,
-            )]));
+            let schema = Schema::new(vec![Field::new("message", DataType::Utf8, true)]).into();
             let events: Vec<Event> = vec![];
             let result = encode_events_to_arrow_ipc_stream(&events, schema);
             assert!(matches!(result.unwrap_err(), ArrowEncodingError::NoEvents));
@@ -546,11 +574,12 @@ mod tests {
         fn test_missing_non_nullable_field_errors() {
             let events = vec![create_event(vec![("other_field", "value")])];
 
-            let schema = SchemaRef::new(Schema::new(vec![Field::new(
+            let schema = Schema::new(vec![Field::new(
                 "required_field",
                 DataType::Utf8,
                 false, // non-nullable
-            )]));
+            )])
+            .into();
 
             let result = encode_events_to_arrow_ipc_stream(&events, schema);
             assert!(result.is_err());
@@ -575,7 +604,7 @@ mod tests {
 
             let events = vec![Event::Log(log)];
 
-            let schema = SchemaRef::new(Schema::new(vec![
+            let schema = Schema::new(vec![
                 Field::new(
                     "ts_second",
                     DataType::Timestamp(TimeUnit::Second, None),
@@ -596,7 +625,8 @@ mod tests {
                     DataType::Timestamp(TimeUnit::Nanosecond, None),
                     true,
                 ),
-            ]));
+            ])
+            .into();
 
             let batch = encode_and_decode(events, schema).unwrap();
 
@@ -635,11 +665,12 @@ mod tests {
 
             let events = vec![Event::Log(log1), Event::Log(log2), Event::Log(log3)];
 
-            let schema = SchemaRef::new(Schema::new(vec![Field::new(
+            let schema = Schema::new(vec![Field::new(
                 "ts",
                 DataType::Timestamp(TimeUnit::Nanosecond, Some("+00:00".into())),
                 true,
-            )]));
+            )])
+            .into();
 
             let batch = encode_and_decode(events, schema).unwrap();
 
@@ -795,6 +826,81 @@ mod tests {
             } else {
                 panic!("Expected Map type for my_map field");
             }
+        }
+    }
+
+    mod null_non_nullable {
+        use super::*;
+
+        #[test]
+        fn test_missing_non_nullable_field_error_names_fields() {
+            let schema: SchemaRef = Schema::new(vec![
+                Field::new("required_field", DataType::Utf8, false),
+                Field::new("optional_field", DataType::Utf8, true),
+            ])
+            .into();
+
+            // Event is missing "required_field" entirely
+            let event = create_event(vec![("optional_field", "hello")]);
+
+            let result = encode_events_to_arrow_ipc_stream(&[event], schema);
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("required_field"),
+                "Error should name the missing field, got: {err}"
+            );
+            assert!(
+                !err.contains("optional_field"),
+                "Error should not name nullable fields, got: {err}"
+            );
+        }
+
+        #[test]
+        fn test_null_value_in_non_nullable_field_error_names_fields() {
+            let schema: SchemaRef = Schema::new(vec![
+                Field::new("id", DataType::Int64, false),
+                Field::new("name", DataType::Utf8, false),
+            ])
+            .into();
+
+            // Event has "id" but "name" is null
+            let event = create_event(vec![("id", Value::Integer(1))]);
+
+            let result = encode_events_to_arrow_ipc_stream(&[event], schema);
+            let err = result.unwrap_err().to_string();
+            assert!(
+                err.contains("name"),
+                "Error should name the null field, got: {err}"
+            );
+        }
+
+        #[test]
+        fn test_find_null_non_nullable_fields_returns_empty_when_all_present() {
+            let schema = Schema::new(vec![
+                Field::new("a", DataType::Utf8, false),
+                Field::new("b", DataType::Int64, false),
+            ]);
+
+            let event = create_event(vec![
+                ("a", Value::Bytes("val".into())),
+                ("b", Value::Integer(42)),
+            ]);
+            let value = event.as_log().value();
+            let missing = find_null_non_nullable_fields(&schema, &[value]);
+            assert!(
+                missing.is_empty(),
+                "Expected no missing fields, got: {missing:?}"
+            );
+        }
+
+        #[test]
+        fn test_find_null_non_nullable_fields_detects_explicit_null() {
+            let schema = Schema::new(vec![Field::new("a", DataType::Utf8, false)]);
+
+            let event = create_event(vec![("a", Value::Null)]);
+            let value = event.as_log().value();
+            let missing = find_null_non_nullable_fields(&schema, &[value]);
+            assert_eq!(missing, vec!["a"]);
         }
     }
 }
