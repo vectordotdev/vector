@@ -32,7 +32,7 @@ pub struct YdbConfig {
     pub endpoint: String,
 
     /// The YDB table path to insert data into.
-    /// 
+    ///
     /// Must be a full absolute path from the database root, starting with `/`.
     /// The table must already exist with the required schema.
     #[configurable(metadata(docs::examples = "/local/logs"))]
@@ -72,11 +72,11 @@ impl SinkConfig for YdbConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let client = ClientBuilder::new_from_connection_string(&self.endpoint)?
             .client()?;
-        
+
         client.wait().await?;
-        
+
         let table_client = client.table_client();
-        
+
         let healthcheck = healthcheck(table_client.clone()).boxed();
 
         let service = YdbService::new(
@@ -84,7 +84,7 @@ impl SinkConfig for YdbConfig {
             self.table.clone(),
             self.endpoint.clone(),
         );
-        
+
         let batch_settings = self.batch.into_batcher_settings()?;
         let request_settings = self.request.into_settings();
         let service = ServiceBuilder::new()

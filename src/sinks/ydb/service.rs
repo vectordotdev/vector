@@ -146,13 +146,13 @@ impl Service<YdbRequest> for YdbService {
         let future = async move {
             let table_path = service.table_path;
             let metadata = request.metadata;
-            
+
             let rows: Result<Vec<Value>, YdbServiceError> = request
                 .events
                 .into_iter()
                 .map(|event| event_to_ydb_value(event))
                 .collect();
-            
+
             let rows = rows?;
 
             service
@@ -178,7 +178,7 @@ impl Service<YdbRequest> for YdbService {
 fn event_to_ydb_value(event: Event) -> Result<Value, YdbServiceError> {
     let id = Uuid::now_v7().to_string();
     let id_hash = xxhash_rust::xxh32::xxh32(id.as_bytes(), 0);
-    
+
     let timestamp: DateTime<Utc> = match &event {
         Event::Log(log) => log
             .get_timestamp()
@@ -188,7 +188,7 @@ fn event_to_ydb_value(event: Event) -> Result<Value, YdbServiceError> {
         Event::Trace(_) => None,
     }
     .unwrap_or_else(Utc::now);
-    
+
     let (host, message) = match &event {
         Event::Log(log) => {
             let host = log
@@ -203,15 +203,15 @@ fn event_to_ydb_value(event: Event) -> Result<Value, YdbServiceError> {
         }
         _ => (String::new(), String::new()),
     };
-    
+
     let json_serializer = JsonSerializerConfig::default().build();
     let payload_value = json_serializer
         .to_json_value(event)
         .context(VectorCommonSnafu)?;
-    
+
     let payload_json = serde_json::to_string(&payload_value)
         .context(SerializationSnafu)?;
-    
+
     Ok(ydb_struct!(
         "id" => Value::Text(id),
         "id_hash" => Value::Uint32(id_hash),
