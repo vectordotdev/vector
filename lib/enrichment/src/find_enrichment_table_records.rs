@@ -108,7 +108,7 @@ impl Function for FindEnrichmentTableRecords {
              {"id": 2, "firstname": "Fred", "surname": "Smith"}]
         "#});
 
-        const EXAMPLES: &'static [Example] = &[
+        const EXAMPLES: &[Example] = &[
             example! {
                 title: "Exact match",
                 source: indoc! {r#"
