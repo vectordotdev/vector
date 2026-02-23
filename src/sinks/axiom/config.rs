@@ -57,7 +57,6 @@ impl UrlOrRegion {
     fn validate(&self) -> crate::Result<()> {
         if self.url.is_some() && self.region.is_some() {
             return Err("Cannot set both `url` and `region`. Please use only one.".into());
-            return Err("Set either `url` or `region`, not both.".into());
         }
         Ok(())
     }
