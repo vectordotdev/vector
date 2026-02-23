@@ -40,7 +40,7 @@ remap: functions: encode_csv: {
 			return: #""foo bar""#
 		},
 		{
-			title: "Encode object to a single CSV formatted row with linebreaks"
+			title: "Encode object to a single CSV formatted row with line breaks"
 			source: #"encode_csv!(["line", "with_linebreak", "here\n", "and", "\nhere"])"#
 			return: #""line,with_linebreak,\"here\n\",and,\"\nhere\"""#
 		},
