@@ -132,13 +132,13 @@ impl SqsBatchMessagePublisher {
                 let failed = response.failed();
                 if !failed.is_empty() {
                     warn!(
-                        message = "Batch message send failed; retrying entire batch",
+                        message = "Batch message send failed; retrying entire batch.",
                         failed_count = failed.len(),
                         total_count = request.entries.len()
                     );
                     for failure in failed {
                         debug!(
-                            message = "Failed message in batch",
+                            message = "Failed message in batch.",
                             id = ?failure.id,
                             code = ?failure.code,
                         );
@@ -146,7 +146,7 @@ impl SqsBatchMessagePublisher {
 
                     // Return error so Vector's retry framework retries the entire batch.
                     let error = Box::new(std::io::Error::other(format!(
-                        "Batch send failed: {} of {} messages failed",
+                        "Batch send failed: {} of {} messages failed.",
                         failed.len(),
                         request.entries.len()
                     ))) as Box<dyn std::error::Error + Send + Sync>;
