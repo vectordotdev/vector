@@ -232,9 +232,7 @@ fn kind_to_types(kind_bits: u16) -> Vec<String> {
 
 fn pretty_value(v: &Value) -> String {
     if let Value::Bytes(b) = v {
-        str::from_utf8(&b)
-            .map(String::from)
-            .unwrap_or_else(|_| v.to_string())
+        str::from_utf8(b).map_or_else(|_| v.to_string(), String::from)
     } else {
         v.to_string()
     }
