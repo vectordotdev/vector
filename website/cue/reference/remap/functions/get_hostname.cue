@@ -1,25 +1,29 @@
-package metadata
-
-remap: functions: get_hostname: {
-	category: "System"
-	description: """
-		Returns the local system's hostname.
-		"""
-
-	arguments: []
-	internal_failure_reasons: [
-		"Internal hostname resolution failed.",
-	]
-	return: types: ["string"]
-
-	examples: [
-		{
-			title: "Get hostname"
-			input: log: {}
-			source: #"""
-				.hostname = get_hostname!()
-				"""#
-			output: log: hostname: "localhost.localdomain"
-		},
-	]
+{
+  "remap": {
+    "functions": {
+      "get_hostname": {
+        "anchor": "get_hostname",
+        "name": "get_hostname",
+        "category": "System",
+        "description": "Returns the local system's hostname.",
+        "arguments": [],
+        "return": {
+          "types": [
+            "string"
+          ]
+        },
+        "internal_failure_reasons": [
+          "Internal hostname resolution failed."
+        ],
+        "examples": [
+          {
+            "title": "Get hostname",
+            "source": "get_hostname!()",
+            "return": "my-hostname"
+          }
+        ],
+        "pure": true
+      }
+    }
+  }
 }
