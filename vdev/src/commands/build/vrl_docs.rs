@@ -4,8 +4,8 @@ use std::{collections::HashMap, fs, path::PathBuf};
 use vrl::compiler::Function;
 use vrl::compiler::value::kind;
 use vrl::core::Value;
-use vrl::prelude::Parameter;
 use vrl::prelude::function::EnumVariant;
+use vrl::prelude::{Example, Parameter};
 
 /// Generate VRL function documentation as JSON files.
 ///
@@ -70,6 +70,8 @@ struct ReturnDoc {
 struct ExampleDoc {
     title: String,
     source: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    input: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     r#return: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -153,7 +155,16 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
         .examples()
         .iter()
         .map(|example| {
-            let (r#return, raises) = match &example.result {
+            let Example {
+                title,
+                source,
+                result,
+                input,
+                file: _,
+                line: _,
+            } = example;
+
+            let (r#return, raises) = match result {
                 Ok(result) => {
                     // Try to parse as JSON, otherwise treat as string
                     let value = serde_json::from_str(result)
@@ -163,11 +174,13 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
                 Err(error) => (None, Some(error.to_string())),
             };
 
-            let source = example.source.to_string();
-            let title = example.title.to_string();
+            let source = source.to_string();
+            let title = title.to_string();
+            let input = input.map(String::from);
             ExampleDoc {
                 title,
                 source,
+                input,
                 r#return,
                 raises,
             }
