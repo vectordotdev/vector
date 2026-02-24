@@ -23,19 +23,19 @@
               "string"
             ],
             "enum": {
-              "TiB": "Terabytes (1024 gigabytes)",
-              "EB": "Exabytes (1 billion gigabytes in SI)",
-              "MiB": "Megabytes (1024 ** 2 bytes)",
-              "PiB": "Petabytes (1024 ** 2 gigabytes)",
-              "GiB": "Gigabytes (1024 ** 3 bytes)",
-              "kB": "Kilobytes (1 thousand bytes in SI)",
-              "kiB": "Kilobytes (1024 bytes)",
-              "PB": "Petabytes (1 million gigabytes in SI)",
-              "MB": "Megabytes (1 million bytes in SI)",
-              "GB": "Gigabytes (1 billion bytes in SI)",
               "TB": "Terabytes (1 thousand gigabytes in SI)",
+              "GB": "Gigabytes (1 billion bytes in SI)",
               "B": "Bytes",
-              "EiB": "Exabytes (1024 ** 3 gigabytes)"
+              "MB": "Megabytes (1 million bytes in SI)",
+              "PB": "Petabytes (1 million gigabytes in SI)",
+              "EB": "Exabytes (1 billion gigabytes in SI)",
+              "kiB": "Kilobytes (1024 bytes)",
+              "PiB": "Petabytes (1024 ** 2 gigabytes)",
+              "kB": "Kilobytes (1 thousand bytes in SI)",
+              "EiB": "Exabytes (1024 ** 3 gigabytes)",
+              "MiB": "Megabytes (1024 ** 2 bytes)",
+              "GiB": "Gigabytes (1024 ** 3 bytes)",
+              "TiB": "Terabytes (1024 gigabytes)"
             }
           },
           {

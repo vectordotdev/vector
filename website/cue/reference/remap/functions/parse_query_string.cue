@@ -26,8 +26,8 @@
             "title": "Parse simple query string",
             "source": "parse_query_string(\"foo=1&bar=2\")",
             "return": {
-              "bar": "2",
-              "foo": "1"
+              "foo": "1",
+              "bar": "2"
             }
           },
           {

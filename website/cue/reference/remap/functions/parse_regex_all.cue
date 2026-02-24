@@ -52,14 +52,14 @@
             "source": "parse_regex_all!(\"first group and second group.\", r'(?P<number>\\w+) group', numeric_groups: true)",
             "return": [
               {
+                "number": "first",
                 "0": "first group",
-                "1": "first",
-                "number": "first"
+                "1": "first"
               },
               {
+                "number": "second",
                 "0": "second group",
-                "1": "second",
-                "number": "second"
+                "1": "second"
               }
             ]
           },
@@ -82,18 +82,18 @@
             "source": "parse_regex_all!(\"apples and carrots, peaches and peas\", r'(?P<fruit>[\\w\\.]+) and (?P<veg>[\\w]+)', numeric_groups: true)",
             "return": [
               {
+                "fruit": "apples",
+                "veg": "carrots",
                 "0": "apples and carrots",
                 "1": "apples",
-                "2": "carrots",
-                "fruit": "apples",
-                "veg": "carrots"
+                "2": "carrots"
               },
               {
+                "fruit": "peaches",
+                "veg": "peas",
                 "0": "peaches and peas",
                 "1": "peaches",
-                "2": "peas",
-                "fruit": "peaches",
-                "veg": "peas"
+                "2": "peas"
               }
             ]
           },

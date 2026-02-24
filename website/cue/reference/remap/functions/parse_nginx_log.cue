@@ -23,10 +23,10 @@
               "string"
             ],
             "enum": {
+              "main": "Nginx main format used by Docker images",
               "combined": "Nginx combined format",
               "error": "Default Nginx error format",
-              "ingress_upstreaminfo": "Provides detailed upstream information (Nginx Ingress Controller)",
-              "main": "Nginx main format used by Docker images"
+              "ingress_upstreaminfo": "Provides detailed upstream information (Nginx Ingress Controller)"
             }
           },
           {

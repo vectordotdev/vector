@@ -23,15 +23,15 @@
               "string"
             ],
             "enum": {
-              "NON_ALPHANUMERIC": "Encode any non-alphanumeric characters. This is the safest option.",
-              "COMPONENT": "Encode only [component characters](https://url.spec.whatwg.org/#component-percent-encode-set)",
-              "PATH": "Encode only [path characters](https://url.spec.whatwg.org/#path-percent-encode-set)",
-              "QUERY": "Encode only [query characters](https://url.spec.whatwg.org/#query-percent-encode-set)",
-              "FRAGMENT": "Encode only [fragment characters](https://url.spec.whatwg.org/#fragment-percent-encode-set)",
-              "WWW_FORM_URLENCODED": "Encode only [`application/x-www-form-urlencoded`](https://url.spec.whatwg.org/#application-x-www-form-urlencoded-percent-encode-set)",
               "CONTROLS": "Encode only [control characters](https://infra.spec.whatwg.org/#c0-control).",
+              "QUERY": "Encode only [query characters](https://url.spec.whatwg.org/#query-percent-encode-set)",
+              "SPECIAL": "Encode only [special characters](https://url.spec.whatwg.org/#special-percent-encode-set)",
+              "FRAGMENT": "Encode only [fragment characters](https://url.spec.whatwg.org/#fragment-percent-encode-set)",
+              "PATH": "Encode only [path characters](https://url.spec.whatwg.org/#path-percent-encode-set)",
               "USERINFO": "Encode only [userinfo characters](https://url.spec.whatwg.org/#userinfo-percent-encode-set)",
-              "SPECIAL": "Encode only [special characters](https://url.spec.whatwg.org/#special-percent-encode-set)"
+              "COMPONENT": "Encode only [component characters](https://url.spec.whatwg.org/#component-percent-encode-set)",
+              "WWW_FORM_URLENCODED": "Encode only [`application/x-www-form-urlencoded`](https://url.spec.whatwg.org/#application-x-www-form-urlencoded-percent-encode-set)",
+              "NON_ALPHANUMERIC": "Encode any non-alphanumeric characters. This is the safest option."
             },
             "default": "NON_ALPHANUMERIC"
           }

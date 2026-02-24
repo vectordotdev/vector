@@ -24,8 +24,8 @@
             ],
             "enum": {
               "fast": "Fastest mode but most unreliable. Uses parser from project [Woothee](https://github.com/woothee/woothee).",
-              "reliable": "Provides greater reliability than `fast` and retains it's speed in common cases.\nParses with [Woothee](https://github.com/woothee/woothee) parser and with parser from\n[uap project](https://github.com/ua-parser/uap-core) if there are some missing fields\nthat the first parser wasn't able to parse out but the second one maybe can.\n",
-              "enriched": "Parses with both parser from [Woothee](https://github.com/woothee/woothee) and parser from\n[uap project](https://github.com/ua-parser/uap-core) and combines results. Result has the full schema.\n"
+              "enriched": "Parses with both parser from [Woothee](https://github.com/woothee/woothee) and parser from\n[uap project](https://github.com/ua-parser/uap-core) and combines results. Result has the full schema.\n",
+              "reliable": "Provides greater reliability than `fast` and retains it's speed in common cases.\nParses with [Woothee](https://github.com/woothee/woothee) parser and with parser from\n[uap project](https://github.com/ua-parser/uap-core) if there are some missing fields\nthat the first parser wasn't able to parse out but the second one maybe can.\n"
             },
             "default": "fast"
           }

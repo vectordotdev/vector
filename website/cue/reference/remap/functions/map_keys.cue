@@ -35,11 +35,11 @@
             "title": "Upcase keys",
             "source": ". = {\n    \"foo\": \"foo\",\n    \"bar\": \"bar\",\n    \"baz\": {\"nested key\": \"val\"}\n}\nmap_keys(.) -> |key| { upcase(key) }\n",
             "return": {
+              "FOO": "foo",
               "BAR": "bar",
               "BAZ": {
                 "nested key": "val"
-              },
-              "FOO": "foo"
+              }
             }
           },
           {

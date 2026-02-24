@@ -41,7 +41,8 @@
           },
           {
             "title": "Valid Boolean from path",
-            "source": ". = { \"value\": true }\nbool(.value)\n",
+            "source": "bool!(.value)",
+            "input": "{ \"value\": true }",
             "return": true
           }
         ],

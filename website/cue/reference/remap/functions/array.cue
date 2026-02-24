@@ -31,7 +31,8 @@
         "examples": [
           {
             "title": "Declare an array type",
-            "source": ".value = [1, 2, 3]\narray(.value)\n",
+            "source": "array!(.value)",
+            "input": "{\"value\": [1, 2, 3]}",
             "return": [
               1,
               2,

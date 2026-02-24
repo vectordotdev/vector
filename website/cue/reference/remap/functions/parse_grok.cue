@@ -37,9 +37,9 @@
             "title": "Parse using Grok",
             "source": "value = \"2020-10-02T23:22:12.223222Z info Hello world\"\npattern = \"%{TIMESTAMP_ISO8601:timestamp} %{LOGLEVEL:level} %{GREEDYDATA:message}\"\n\nparse_grok!(value, pattern)\n",
             "return": {
+              "timestamp": "2020-10-02T23:22:12.223222Z",
               "level": "info",
-              "message": "Hello world",
-              "timestamp": "2020-10-02T23:22:12.223222Z"
+              "message": "Hello world"
             }
           }
         ],

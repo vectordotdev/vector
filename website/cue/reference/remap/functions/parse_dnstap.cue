@@ -86,7 +86,6 @@
                 ],
                 "rcodeName": "NoError"
               },
-              "responseAddress": "2001:502:7094::30",
               "responseData": {
                 "fullRcode": 16,
                 "header": {
@@ -107,6 +106,8 @@
                 },
                 "opt": {
                   "do": false,
+                  "ednsVersion": 1,
+                  "extendedRcode": 1,
                   "ede": [
                     {
                       "extraText": "no SEP matching the DS found for dnssec-failed.org.",
@@ -114,8 +115,6 @@
                       "purpose": "DNSKEY Missing"
                     }
                   ],
-                  "ednsVersion": 1,
-                  "extendedRcode": 1,
                   "udpPayloadSize": 1232
                 },
                 "question": [
@@ -128,6 +127,7 @@
                 ],
                 "rcodeName": "BADVERS"
               },
+              "responseAddress": "2001:502:7094::30",
               "responsePort": 53,
               "serverId": "james-Virtual-Machine",
               "serverVersion": "BIND 9.16.3",

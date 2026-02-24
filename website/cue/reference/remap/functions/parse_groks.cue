@@ -58,9 +58,9 @@
             "title": "Parse using multiple Grok patterns",
             "source": "parse_groks!(\n    \"2020-10-02T23:22:12.223222Z info Hello world\",\n    patterns: [\n        \"%{common_prefix} %{_status} %{_message}\",\n        \"%{common_prefix} %{_message}\",\n    ],\n    aliases: {\n        \"common_prefix\": \"%{_timestamp} %{_loglevel}\",\n        \"_timestamp\": \"%{TIMESTAMP_ISO8601:timestamp}\",\n        \"_loglevel\": \"%{LOGLEVEL:level}\",\n        \"_status\": \"%{POSINT:status}\",\n        \"_message\": \"%{GREEDYDATA:message}\"\n    }\n)\n",
             "return": {
+              "timestamp": "2020-10-02T23:22:12.223222Z",
               "level": "info",
-              "message": "Hello world",
-              "timestamp": "2020-10-02T23:22:12.223222Z"
+              "message": "Hello world"
             }
           },
           {

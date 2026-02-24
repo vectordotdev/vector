@@ -63,8 +63,8 @@
             "title": "Exact match",
             "source": "get_enrichment_table_record!(\"test\", {\"id\": 1})",
             "return": {
-              "firstname": "Bob",
               "id": 1,
+              "firstname": "Bob",
               "surname": "Smith"
             }
           },
@@ -72,8 +72,8 @@
             "title": "Case insensitive match",
             "source": "get_enrichment_table_record!(\n    \"test\",\n    {\"surname\": \"bob\", \"firstname\": \"John\"},\n    case_sensitive: false\n)\n",
             "return": {
-              "firstname": "Bob",
               "id": 1,
+              "firstname": "Bob",
               "surname": "Smith"
             }
           },
@@ -81,8 +81,8 @@
             "title": "Date range search",
             "source": "get_enrichment_table_record!(\n    \"test\",\n    {\n        \"surname\": \"Smith\",\n        \"date_of_birth\": {\n            \"from\": t'1985-01-01T00:00:00Z',\n            \"to\": t'1985-12-31T00:00:00Z'\n        }\n    }\n)\n",
             "return": {
-              "firstname": "Bob",
               "id": 1,
+              "firstname": "Bob",
               "surname": "Smith"
             }
           }

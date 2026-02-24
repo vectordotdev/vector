@@ -60,13 +60,13 @@
             "source": "find_enrichment_table_records!(\n    \"test\",\n    {\"surname\": \"Smith\"}\n)\n",
             "return": [
               {
-                "firstname": "Bob",
                 "id": 1,
+                "firstname": "Bob",
                 "surname": "Smith"
               },
               {
-                "firstname": "Fred",
                 "id": 2,
+                "firstname": "Fred",
                 "surname": "Smith"
               }
             ]
@@ -76,13 +76,13 @@
             "source": "find_enrichment_table_records!(\n    \"test\",\n    {\"surname\": \"smith\"},\n    case_sensitive: false\n)\n",
             "return": [
               {
-                "firstname": "Bob",
                 "id": 1,
+                "firstname": "Bob",
                 "surname": "Smith"
               },
               {
-                "firstname": "Fred",
                 "id": 2,
+                "firstname": "Fred",
                 "surname": "Smith"
               }
             ]
@@ -92,13 +92,13 @@
             "source": "find_enrichment_table_records!(\n    \"test\",\n    {\"firstname\": \"Bob\"},\n    wildcard: \"fred\",\n    case_sensitive: false\n)\n",
             "return": [
               {
-                "firstname": "Bob",
                 "id": 1,
+                "firstname": "Bob",
                 "surname": "Smith"
               },
               {
-                "firstname": "Fred",
                 "id": 2,
+                "firstname": "Fred",
                 "surname": "Smith"
               }
             ]
@@ -108,13 +108,13 @@
             "source": "find_enrichment_table_records!(\n    \"test\",\n    {\n        \"surname\": \"Smith\",\n        \"date_of_birth\": {\n            \"from\": t'1985-01-01T00:00:00Z',\n            \"to\": t'1985-12-31T00:00:00Z'\n        }\n    }\n)\n",
             "return": [
               {
-                "firstname": "Bob",
                 "id": 1,
+                "firstname": "Bob",
                 "surname": "Smith"
               },
               {
-                "firstname": "Fred",
                 "id": 2,
+                "firstname": "Fred",
                 "surname": "Smith"
               }
             ]

@@ -36,7 +36,6 @@
             "source": "find_vector_metrics(\"utilization\")",
             "return": [
               {
-                "kind": "absolute",
                 "name": "utilization",
                 "tags": {
                   "component_id": [
@@ -44,6 +43,7 @@
                   ]
                 },
                 "type": "gauge",
+                "kind": "absolute",
                 "value": 0.5
               }
             ]
@@ -53,7 +53,6 @@
             "source": "find_vector_metrics(\"utilization\", tags: {\"component_id\": \"test\"})",
             "return": [
               {
-                "kind": "absolute",
                 "name": "utilization",
                 "tags": {
                   "component_id": [
@@ -61,6 +60,7 @@
                   ]
                 },
                 "type": "gauge",
+                "kind": "absolute",
                 "value": 0.5
               }
             ]

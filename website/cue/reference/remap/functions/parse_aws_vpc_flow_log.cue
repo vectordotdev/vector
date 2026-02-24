@@ -37,32 +37,32 @@
             "title": "Parse AWS VPC Flow log (default format)",
             "source": "parse_aws_vpc_flow_log!(\"2 123456789010 eni-1235b8ca123456789 - - - - - - - 1431280876 1431280934 - NODATA\")",
             "return": {
+              "version": 2,
               "account_id": "123456789010",
-              "action": null,
-              "bytes": null,
-              "dstaddr": null,
-              "dstport": null,
-              "end": 1431280934,
               "interface_id": "eni-1235b8ca123456789",
-              "log_status": "NODATA",
-              "packets": null,
-              "protocol": null,
               "srcaddr": null,
+              "dstaddr": null,
               "srcport": null,
+              "dstport": null,
+              "protocol": null,
+              "packets": null,
+              "bytes": null,
               "start": 1431280876,
-              "version": 2
+              "end": 1431280934,
+              "action": null,
+              "log_status": "NODATA"
             }
           },
           {
             "title": "Parse AWS VPC Flow log (custom format)",
             "source": "parse_aws_vpc_flow_log!(\n    \"- eni-1235b8ca123456789 10.0.1.5 10.0.0.220 10.0.1.5 203.0.113.5\",\n    \"instance_id interface_id srcaddr dstaddr pkt_srcaddr pkt_dstaddr\"\n)\n",
             "return": {
-              "dstaddr": "10.0.0.220",
               "instance_id": null,
               "interface_id": "eni-1235b8ca123456789",
-              "pkt_dstaddr": "203.0.113.5",
+              "srcaddr": "10.0.1.5",
+              "dstaddr": "10.0.0.220",
               "pkt_srcaddr": "10.0.1.5",
-              "srcaddr": "10.0.1.5"
+              "pkt_dstaddr": "203.0.113.5"
             }
           },
           {

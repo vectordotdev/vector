@@ -37,8 +37,8 @@
             "title": "Upcase values",
             "source": ". = {\n    \"foo\": \"foo\",\n    \"bar\": \"bar\"\n}\nmap_values(.) -> |value| { upcase(value) }\n",
             "return": {
-              "bar": "BAR",
-              "foo": "FOO"
+              "foo": "FOO",
+              "bar": "BAR"
             }
           },
           {

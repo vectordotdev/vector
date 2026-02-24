@@ -23,10 +23,10 @@
               "string"
             ],
             "enum": {
-              "SHA3-224": "SHA3-224 algorithm",
               "SHA3-512": "SHA3-512 algorithm",
               "SHA3-256": "SHA3-256 algorithm",
-              "SHA3-384": "SHA3-384 algorithm"
+              "SHA3-384": "SHA3-384 algorithm",
+              "SHA3-224": "SHA3-224 algorithm"
             },
             "default": "SHA3-512"
           }

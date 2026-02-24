@@ -23,12 +23,12 @@
               "string"
             ],
             "enum": {
-              "number": "Integer or float numbers",
-              "bool": "True or false",
-              "object": "JSON object - {}",
-              "array": "JSON array - []",
               "null": "Exact null value",
-              "string": "JSON-formatted string values wrapped with quote marks"
+              "object": "JSON object - {}",
+              "string": "JSON-formatted string values wrapped with quote marks",
+              "bool": "True or false",
+              "array": "JSON array - []",
+              "number": "Integer or float numbers"
             }
           }
         ],

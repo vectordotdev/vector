@@ -36,7 +36,6 @@
             "title": "Get a vector internal metric matching the name",
             "source": "get_vector_metric(\"utilization\")",
             "return": {
-              "kind": "absolute",
               "name": "utilization",
               "tags": {
                 "component_id": [
@@ -44,6 +43,7 @@
                 ]
               },
               "type": "gauge",
+              "kind": "absolute",
               "value": 0.5
             }
           },
@@ -51,7 +51,6 @@
             "title": "Get a vector internal metric matching the name and tags",
             "source": "get_vector_metric(\"utilization\", tags: {\"component_id\": \"test\"})",
             "return": {
-              "kind": "absolute",
               "name": "utilization",
               "tags": {
                 "component_id": [
@@ -59,6 +58,7 @@
                 ]
               },
               "type": "gauge",
+              "kind": "absolute",
               "value": 0.5
             }
           }

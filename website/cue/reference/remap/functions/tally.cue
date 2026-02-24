@@ -26,9 +26,9 @@
             "title": "tally",
             "source": "tally!([\"foo\", \"bar\", \"foo\", \"baz\"])",
             "return": {
+              "foo": 2,
               "bar": 1,
-              "baz": 1,
-              "foo": 2
+              "baz": 1
             }
           }
         ],

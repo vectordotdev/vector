@@ -32,8 +32,8 @@
               "string"
             ],
             "enum": {
-              "url_safe": "Modified Base64 for [URL variants](https://en.wikipedia.org/wiki/Base64#URL_applications).",
-              "standard": "[Standard](https://tools.ietf.org/html/rfc4648#section-4) Base64 format."
+              "standard": "[Standard](https://tools.ietf.org/html/rfc4648#section-4) Base64 format.",
+              "url_safe": "Modified Base64 for [URL variants](https://en.wikipedia.org/wiki/Base64#URL_applications)."
             },
             "default": "standard"
           }

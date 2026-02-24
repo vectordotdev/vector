@@ -47,16 +47,16 @@
             "source": ". = {\"hostname\": \"localhost\", \"event\": {\"messages\": [\"message 1\", \"message 2\"]}}\n. = unnest(.event.messages)\n",
             "return": [
               {
+                "hostname": "localhost",
                 "event": {
                   "messages": "message 1"
-                },
-                "hostname": "localhost"
+                }
               },
               {
+                "hostname": "localhost",
                 "event": {
                   "messages": "message 2"
-                },
-                "hostname": "localhost"
+                }
               }
             ]
           }

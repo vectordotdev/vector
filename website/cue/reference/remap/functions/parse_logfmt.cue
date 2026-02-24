@@ -29,8 +29,8 @@
             "title": "Parse simple logfmt log",
             "source": "parse_logfmt!(\"zork=zook zonk=nork\")",
             "return": {
-              "zonk": "nork",
-              "zork": "zook"
+              "zork": "zook",
+              "zonk": "nork"
             }
           },
           {
@@ -38,11 +38,11 @@
             "source": "parse_logfmt!(\n    \"@timestamp=\\\"Sun Jan 10 16:47:39 EST 2021\\\" level=info msg=\\\"Stopping all fetchers\\\" tag#production=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager\"\n)\n",
             "return": {
               "@timestamp": "Sun Jan 10 16:47:39 EST 2021",
-              "id": "ConsumerFetcherManager-1382721708341",
               "level": "info",
-              "module": "kafka.consumer.ConsumerFetcherManager",
               "msg": "Stopping all fetchers",
-              "tag#production": "stopping_fetchers"
+              "tag#production": "stopping_fetchers",
+              "id": "ConsumerFetcherManager-1382721708341",
+              "module": "kafka.consumer.ConsumerFetcherManager"
             }
           },
           {
@@ -50,8 +50,8 @@
             "source": "parse_logfmt!(\"zork=zook plonk zonk=nork\")",
             "return": {
               "plonk": true,
-              "zonk": "nork",
-              "zork": "zook"
+              "zork": "zook",
+              "zonk": "nork"
             }
           }
         ],

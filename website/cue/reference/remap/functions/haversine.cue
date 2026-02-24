@@ -47,8 +47,8 @@
               "string"
             ],
             "enum": {
-              "miles": "Use miles for the resulting distance.",
-              "kilometers": "Use kilometers for the resulting distance."
+              "kilometers": "Use kilometers for the resulting distance.",
+              "miles": "Use miles for the resulting distance."
             }
           }
         ],
@@ -62,16 +62,16 @@
             "title": "Haversine in kilometers",
             "source": "haversine(0.0, 0.0, 10.0, 10.0)",
             "return": {
-              "bearing": 44.561,
-              "distance": 1568.5227233
+              "distance": 1568.5227233,
+              "bearing": 44.561
             }
           },
           {
             "title": "Haversine in miles",
             "source": "haversine(0.0, 0.0, 10.0, 10.0, measurement_unit: \"miles\")",
             "return": {
-              "bearing": 44.561,
-              "distance": 974.6348468
+              "distance": 974.6348468,
+              "bearing": 44.561
             }
           }
         ],

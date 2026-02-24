@@ -91,18 +91,19 @@
           },
           {
             "title": "External target",
-            "source": ". = { \"foo\": true }\nset!(value: ., path: [\"bar\"], data: \"baz\")\n",
+            "source": "set!(value: ., path: [\"bar\"], data: \"baz\")",
+            "input": "{ \"foo\": true }",
             "return": {
-              "bar": "baz",
-              "foo": true
+              "foo": true,
+              "bar": "baz"
             }
           },
           {
             "title": "Variable",
             "source": "var = { \"foo\": true }\nset!(value: var, path: [\"bar\"], data: \"baz\")\n",
             "return": {
-              "bar": "baz",
-              "foo": true
+              "foo": true,
+              "bar": "baz"
             }
           },
           {

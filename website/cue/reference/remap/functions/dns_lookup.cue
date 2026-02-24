@@ -5,7 +5,7 @@
         "anchor": "dns_lookup",
         "name": "dns_lookup",
         "category": "System",
-        "description": "Performs a DNS lookup on the provided domain name. This function performs network calls and blocks on each request until a response is received. It is not recommended for frequent or performance-critical workflows.",
+        "description": "Performs a DNS lookup on the provided domain name.",
         "arguments": [
           {
             "name": "value",
@@ -253,6 +253,9 @@
               "rcodeName": "NOERROR"
             }
           }
+        ],
+        "notices": [
+          "This function performs network calls and blocks on each request until a response is\nreceived. It is not recommended for frequent or performance-critical workflows."
         ],
         "pure": true
       }

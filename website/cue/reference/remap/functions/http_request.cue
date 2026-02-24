@@ -5,7 +5,7 @@
         "anchor": "http_request",
         "name": "http_request",
         "category": "System",
-        "description": "Makes an HTTP request to the specified URL. This function performs synchronous blocking operations and is not recommended for frequent or performance-critical workflows due to potential network-related delays.",
+        "description": "Makes an HTTP request to the specified URL.",
         "arguments": [
           {
             "name": "url",
@@ -101,6 +101,9 @@
               "data": "{\"data\":{\"hello\":\"world\"}}"
             }
           }
+        ],
+        "notices": [
+          "This function performs synchronous blocking operations and is not recommended for\nfrequent or performance-critical workflows due to potential network-related delays."
         ],
         "pure": true
       }

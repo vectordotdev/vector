@@ -23,10 +23,10 @@
               "string"
             ],
             "enum": {
+              "milliseconds": "Express Unix time in milliseconds",
               "microseconds": "Express Unix time in microseconds",
               "seconds": "Express Unix time in seconds",
-              "nanoseconds": "Express Unix time in nanoseconds",
-              "milliseconds": "Express Unix time in milliseconds"
+              "nanoseconds": "Express Unix time in nanoseconds"
             },
             "default": "seconds"
           }

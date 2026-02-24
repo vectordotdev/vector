@@ -39,28 +39,28 @@
             "source": "parse_cef!(\n    \"CEF:0|CyberArk|PTA|12.6|1|Suspected credentials theft|8|suser=mike2@prod1.domain.com shost=prod1.domain.com src=1.1.1.1 duser=andy@dev1.domain.com dhost=dev1.domain.com dst=2.2.2.2 cs1Label=ExtraData cs1=None cs2Label=EventID cs2=52b06812ec3500ed864c461e deviceCustomDate1Label=detectionDate deviceCustomDate1=1388577900000 cs3Label=PTAlink cs3=https://1.1.1.1/incidents/52b06812ec3500ed864c461e cs4Label=ExternalLink cs4=None\"\n)\n",
             "return": {
               "cefVersion": "0",
-              "cs1": "None",
-              "cs1Label": "ExtraData",
-              "cs2": "52b06812ec3500ed864c461e",
-              "cs2Label": "EventID",
-              "cs3": "https://1.1.1.1/incidents/52b06812ec3500ed864c461e",
-              "cs3Label": "PTAlink",
-              "cs4": "None",
-              "cs4Label": "ExternalLink",
-              "deviceCustomDate1": "1388577900000",
-              "deviceCustomDate1Label": "detectionDate",
-              "deviceEventClassId": "1",
-              "deviceProduct": "PTA",
               "deviceVendor": "CyberArk",
+              "deviceProduct": "PTA",
               "deviceVersion": "12.6",
-              "dhost": "dev1.domain.com",
-              "dst": "2.2.2.2",
-              "duser": "andy@dev1.domain.com",
+              "deviceEventClassId": "1",
               "name": "Suspected credentials theft",
               "severity": "8",
+              "suser": "mike2@prod1.domain.com",
               "shost": "prod1.domain.com",
               "src": "1.1.1.1",
-              "suser": "mike2@prod1.domain.com"
+              "duser": "andy@dev1.domain.com",
+              "dhost": "dev1.domain.com",
+              "dst": "2.2.2.2",
+              "cs1Label": "ExtraData",
+              "cs1": "None",
+              "cs2Label": "EventID",
+              "cs2": "52b06812ec3500ed864c461e",
+              "deviceCustomDate1Label": "detectionDate",
+              "deviceCustomDate1": "1388577900000",
+              "cs3Label": "PTAlink",
+              "cs3": "https://1.1.1.1/incidents/52b06812ec3500ed864c461e",
+              "cs4Label": "ExternalLink",
+              "cs4": "None"
             }
           },
           {
@@ -68,29 +68,29 @@
             "source": "parse_cef!(\n    \"Sep 29 08:26:10 host CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|src=10.0.0.1 dst=2.1.2.2 spt=1232\"\n)\n",
             "return": {
               "cefVersion": "1",
-              "deviceEventClassId": "100",
-              "deviceProduct": "threatmanager",
               "deviceVendor": "Security",
+              "deviceProduct": "threatmanager",
               "deviceVersion": "1.0",
-              "dst": "2.1.2.2",
+              "deviceEventClassId": "100",
               "name": "worm successfully stopped",
               "severity": "10",
-              "spt": "1232",
-              "src": "10.0.0.1"
+              "src": "10.0.0.1",
+              "dst": "2.1.2.2",
+              "spt": "1232"
             }
           },
           {
             "title": "Translate custom fields",
             "source": "parse_cef!(\n    \"CEF:0|Dev|firewall|2.2|1|Connection denied|5|c6a1=2345:0425:2CA1:0000:0000:0567:5673:23b5 c6a1Label=Device IPv6 Address\",\n    translate_custom_fields: true\n)\n",
             "return": {
-              "Device IPv6 Address": "2345:0425:2CA1:0000:0000:0567:5673:23b5",
               "cefVersion": "0",
-              "deviceEventClassId": "1",
-              "deviceProduct": "firewall",
               "deviceVendor": "Dev",
+              "deviceProduct": "firewall",
               "deviceVersion": "2.2",
+              "deviceEventClassId": "1",
               "name": "Connection denied",
-              "severity": "5"
+              "severity": "5",
+              "Device IPv6 Address": "2345:0425:2CA1:0000:0000:0567:5673:23b5"
             }
           },
           {
@@ -98,10 +98,10 @@
             "source": "parse_cef!(\"CEF:1|Security|threatmanager|1.0|100|worm successfully stopped|10|\")",
             "return": {
               "cefVersion": "1",
-              "deviceEventClassId": "100",
-              "deviceProduct": "threatmanager",
               "deviceVendor": "Security",
+              "deviceProduct": "threatmanager",
               "deviceVersion": "1.0",
+              "deviceEventClassId": "100",
               "name": "worm successfully stopped",
               "severity": "10"
             }
@@ -111,32 +111,32 @@
             "source": "parse_cef!(\"CEF:0|CyberArk|PTA|12.6|1|Suspected credentials theft||suser=mike2@prod1.domain.com shost= src=1.1.1.1\")",
             "return": {
               "cefVersion": "0",
-              "deviceEventClassId": "1",
-              "deviceProduct": "PTA",
               "deviceVendor": "CyberArk",
+              "deviceProduct": "PTA",
               "deviceVersion": "12.6",
+              "deviceEventClassId": "1",
               "name": "Suspected credentials theft",
               "severity": "",
+              "suser": "mike2@prod1.domain.com",
               "shost": "",
-              "src": "1.1.1.1",
-              "suser": "mike2@prod1.domain.com"
+              "src": "1.1.1.1"
             }
           },
           {
             "title": "Parse CEF with escapes",
             "source": "parse_cef!(s'CEF:0|security|threatmanager|1.0|100|Detected a \\| in message. No action needed.|10|src=10.0.0.1 msg=Detected a threat.\\n No action needed act=blocked a \\= dst=1.1.1.1')",
             "return": {
-              "act": "blocked a =",
               "cefVersion": "0",
-              "deviceEventClassId": "100",
-              "deviceProduct": "threatmanager",
               "deviceVendor": "security",
+              "deviceProduct": "threatmanager",
               "deviceVersion": "1.0",
-              "dst": "1.1.1.1",
-              "msg": "Detected a threat.\n No action needed",
+              "deviceEventClassId": "100",
               "name": "Detected a | in message. No action needed.",
               "severity": "10",
-              "src": "10.0.0.1"
+              "src": "10.0.0.1",
+              "msg": "Detected a threat.\n No action needed",
+              "act": "blocked a =",
+              "dst": "1.1.1.1"
             }
           }
         ],

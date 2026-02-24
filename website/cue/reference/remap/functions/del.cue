@@ -69,8 +69,8 @@
             "title": "Delete object field",
             "source": "var = { \"foo\": {\"nested\": true}, \"bar\": 10 }\ndel(var.foo.nested, false)\nvar\n",
             "return": {
-              "bar": 10,
-              "foo": {}
+              "foo": {},
+              "bar": 10
             }
           },
           {

@@ -94,7 +94,8 @@
           },
           {
             "title": "External target",
-            "source": ". = { \"foo\": true }\nremove!(value: ., path: [\"foo\"])\n",
+            "source": "remove!(value: ., path: [\"foo\"])",
+            "input": "{ \"foo\": true }",
             "return": {}
           },
           {

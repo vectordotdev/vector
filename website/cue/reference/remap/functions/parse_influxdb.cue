@@ -32,64 +32,64 @@
             "source": "parse_influxdb!(\"cpu,host=A,region=us-west usage_system=64i,usage_user=10u,temperature=50.5,on=true,sleep=false 1590488773254420000\")",
             "return": [
               {
-                "gauge": {
-                  "value": 64.0
-                },
-                "kind": "absolute",
                 "name": "cpu_usage_system",
                 "tags": {
                   "host": "A",
                   "region": "us-west"
                 },
-                "timestamp": "2020-05-26T10:26:13.254420Z"
+                "timestamp": "2020-05-26T10:26:13.254420Z",
+                "kind": "absolute",
+                "gauge": {
+                  "value": 64.0
+                }
               },
               {
-                "gauge": {
-                  "value": 10.0
-                },
-                "kind": "absolute",
                 "name": "cpu_usage_user",
                 "tags": {
                   "host": "A",
                   "region": "us-west"
                 },
-                "timestamp": "2020-05-26T10:26:13.254420Z"
+                "timestamp": "2020-05-26T10:26:13.254420Z",
+                "kind": "absolute",
+                "gauge": {
+                  "value": 10.0
+                }
               },
               {
-                "gauge": {
-                  "value": 50.5
-                },
-                "kind": "absolute",
                 "name": "cpu_temperature",
                 "tags": {
                   "host": "A",
                   "region": "us-west"
                 },
-                "timestamp": "2020-05-26T10:26:13.254420Z"
+                "timestamp": "2020-05-26T10:26:13.254420Z",
+                "kind": "absolute",
+                "gauge": {
+                  "value": 50.5
+                }
               },
               {
-                "gauge": {
-                  "value": 1.0
-                },
-                "kind": "absolute",
                 "name": "cpu_on",
                 "tags": {
                   "host": "A",
                   "region": "us-west"
                 },
-                "timestamp": "2020-05-26T10:26:13.254420Z"
+                "timestamp": "2020-05-26T10:26:13.254420Z",
+                "kind": "absolute",
+                "gauge": {
+                  "value": 1.0
+                }
               },
               {
-                "gauge": {
-                  "value": 0.0
-                },
-                "kind": "absolute",
                 "name": "cpu_sleep",
                 "tags": {
                   "host": "A",
                   "region": "us-west"
                 },
-                "timestamp": "2020-05-26T10:26:13.254420Z"
+                "timestamp": "2020-05-26T10:26:13.254420Z",
+                "kind": "absolute",
+                "gauge": {
+                  "value": 0.0
+                }
               }
             ]
           }

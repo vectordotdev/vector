@@ -69,8 +69,8 @@
             "title": "Parse simple key value pairs",
             "source": "parse_key_value!(\"zork=zook zonk=nork\")",
             "return": {
-              "zonk": "nork",
-              "zork": "zook"
+              "zork": "zook",
+              "zonk": "nork"
             }
           },
           {
@@ -78,36 +78,36 @@
             "source": "parse_key_value!(\n    \"@timestamp=\\\"Sun Jan 10 16:47:39 EST 2021\\\" level=info msg=\\\"Stopping all fetchers\\\" tag#production=stopping_fetchers id=ConsumerFetcherManager-1382721708341 module=kafka.consumer.ConsumerFetcherManager\"\n)\n",
             "return": {
               "@timestamp": "Sun Jan 10 16:47:39 EST 2021",
-              "id": "ConsumerFetcherManager-1382721708341",
               "level": "info",
-              "module": "kafka.consumer.ConsumerFetcherManager",
               "msg": "Stopping all fetchers",
-              "tag#production": "stopping_fetchers"
+              "tag#production": "stopping_fetchers",
+              "id": "ConsumerFetcherManager-1382721708341",
+              "module": "kafka.consumer.ConsumerFetcherManager"
             }
           },
           {
             "title": "Parse comma delimited log",
             "source": "parse_key_value!(\n    \"path:\\\"/cart_link\\\", host:store.app.com, fwd: \\\"102.30.171.16\\\", dyno: web.1, connect:0ms, service:87ms, status:304, bytes:632, protocol:https\",\n    field_delimiter: \",\",\n    key_value_delimiter: \":\"\n)\n",
             "return": {
-              "bytes": "632",
-              "connect": "0ms",
-              "dyno": "web.1",
-              "fwd": "102.30.171.16",
-              "host": "store.app.com",
               "path": "/cart_link",
-              "protocol": "https",
+              "host": "store.app.com",
+              "fwd": "102.30.171.16",
+              "dyno": "web.1",
+              "connect": "0ms",
               "service": "87ms",
-              "status": "304"
+              "status": "304",
+              "bytes": "632",
+              "protocol": "https"
             }
           },
           {
             "title": "Parse comma delimited log with standalone keys",
             "source": "parse_key_value!(\n    \"env:prod,service:backend,region:eu-east1,beta\",\n    field_delimiter: \",\",\n    key_value_delimiter: \":\",\n)\n",
             "return": {
-              "beta": true,
               "env": "prod",
+              "service": "backend",
               "region": "eu-east1",
-              "service": "backend"
+              "beta": true
             }
           },
           {
@@ -130,8 +130,8 @@
             "return": {
               "app": "my-app",
               "ip": "1.2.3.4",
-              "msg": "hello-world",
-              "user": ""
+              "user": "",
+              "msg": "hello-world"
             }
           }
         ],
