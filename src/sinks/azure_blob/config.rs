@@ -16,7 +16,8 @@ use crate::{
     sinks::{
         Healthcheck, VectorSink,
         azure_common::{
-            self, config::AzureBlobRetryLogic, service::AzureBlobService, sink::AzureBlobSink,
+            self, config::AzureAuthentication, config::AzureBlobRetryLogic,
+            service::AzureBlobService, sink::AzureBlobSink,
         },
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
@@ -41,6 +42,10 @@ impl TowerRequestConfigDefaults for AzureBlobTowerRequestConfigDefaults {
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]
 pub struct AzureBlobSinkConfig {
+    #[configurable(derived)]
+    #[serde(default)]
+    pub auth: Option<AzureAuthentication>,
+
     /// The Azure Blob Storage Account connection string.
     ///
     /// Authentication with an access key or shared access signature (SAS)
@@ -147,6 +152,7 @@ pub fn default_blob_prefix() -> Template {
 impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
+            auth: None,
             connection_string: String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into(),
             container_name: String::from("logs"),
             blob_prefix: default_blob_prefix(),

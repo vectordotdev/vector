@@ -14,6 +14,8 @@ use super::{config::AzureBlobSinkConfig, request_builder::AzureBlobRequestOption
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming},
     event::{Event, LogEvent},
+    sinks::azure_common::config::AzureAuthentication,
+    sinks::prelude::*,
     sinks::util::{
         Compression,
         request_builder::{EncodeResult, RequestBuilder},
@@ -22,6 +24,7 @@ use crate::{
 
 fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {
     AzureBlobSinkConfig {
+        auth: Default::default(),
         connection_string: Default::default(),
         container_name: Default::default(),
         blob_prefix: Default::default(),
@@ -233,4 +236,45 @@ fn azure_blob_build_request_with_uuid() {
     assert_ne!(request.metadata.partition_key, "blob.log".to_string());
     assert_eq!(request.content_encoding, None);
     assert_eq!(request.content_type, "text/plain");
+}
+
+#[tokio::test]
+async fn azure_blob_build_config_with_client_id_and_secret() {
+    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
+        r#"
+            connection_string = "AccountName=mylogstorage"
+            container_name = "my-logs"
+
+            [encoding]
+            codec = "json"
+
+            [auth]
+            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
+            azure_client_id = "mock-client-id"
+            azure_client_secret = "mock-client-secret"
+        "#,
+    )
+    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+
+    assert!(&config.auth.is_some());
+
+    match &config.auth.clone().unwrap() {
+        AzureAuthentication::ClientSecretCredential {
+            azure_tenant_id,
+            azure_client_id,
+            azure_client_secret,
+        } => {
+            assert_eq!(azure_tenant_id, "00000000-0000-0000-0000-000000000000");
+            assert_eq!(azure_client_id, "mock-client-id");
+            let secret: String = azure_client_secret.inner().into();
+            assert_eq!(secret, "mock-client-secret");
+        }
+        _ => panic!("Expected ClientSecretCredential variant"),
+    }
+
+    let cx = SinkContext::default();
+    let _sink = config
+        .build(cx)
+        .await
+        .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
 }
