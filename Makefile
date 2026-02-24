@@ -408,7 +408,7 @@ test-cli: ## Runs cli tests
 
 .PHONY: test-vector-api
 test-vector-api: ## Runs vector API tests (top and tap)
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features vector-api-tests --test vector_api --test-threads 4
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features vector-api-tests --test vector_api
 
 .PHONY: test-component-validation
 test-component-validation: ## Runs component validation tests
