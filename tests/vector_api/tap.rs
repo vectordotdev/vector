@@ -53,6 +53,21 @@ impl TestHarness {
             _client: subscription_client,
         })
     }
+
+    /// Creates a tap subscription and collects initial events
+    ///
+    /// Returns both the collected events and the subscription handle.
+    /// If you need to collect more events later, keep the handle; otherwise it will be dropped.
+    /// For input pattern filtering, use `tap_subscription` directly.
+    pub async fn tap_and_collect(
+        &self,
+        outputs_patterns: &[&str],
+        count: usize,
+    ) -> Result<(Vec<TapEvent>, TapSubscription), String> {
+        let mut tap = self.tap_subscription(outputs_patterns, &[]).await?;
+        let events = tap.take_events(count, TAP_TIMEOUT).await?;
+        Ok((events, tap))
+    }
 }
 
 /// Wrapper around a tap subscription stream with helper methods
@@ -127,15 +142,9 @@ async fn tap_receives_events() {
         .await
         .expect("Failed to start Vector");
 
-    // Tap the source output with wildcard pattern
-    let mut tap = harness
-        .tap_subscription(&["*"], &[])
-        .await
-        .expect("Failed to create tap subscription");
-
-    // Collect events - first ones are usually notifications, then log events follow
-    let events = tap
-        .take_events(10, TAP_TIMEOUT)
+    // Tap the source output with wildcard pattern and collect events
+    let (events, _tap) = harness
+        .tap_and_collect(&["*"], 10)
         .await
         .expect("Should receive events");
 
@@ -172,13 +181,8 @@ async fn tap_specific_component() {
         .expect("Failed to start Vector");
 
     // Tap only demo1, not demo2
-    let mut tap = harness
-        .tap_subscription(&["demo1"], &[])
-        .await
-        .expect("Failed to create tap subscription");
-
-    let events = tap
-        .take_events(10, TAP_TIMEOUT)
+    let (events, _tap) = harness
+        .tap_and_collect(&["demo1"], 10)
         .await
         .expect("Should receive events");
 
@@ -212,15 +216,9 @@ async fn tap_survives_config_reload() {
         .await
         .expect("Failed to start Vector");
 
-    // Start tap with wildcard
-    let mut tap = harness
-        .tap_subscription(&["*"], &[])
-        .await
-        .expect("Failed to create tap subscription");
-
-    // Collect initial events
-    let initial_events = tap
-        .take_events(5, TAP_TIMEOUT)
+    // Start tap with wildcard and collect initial events
+    let (initial_events, mut tap) = harness
+        .tap_and_collect(&["*"], 5)
         .await
         .expect("Should receive initial events");
 
@@ -289,24 +287,13 @@ async fn multiple_concurrent_subscriptions() {
         .expect("Failed to start Vector");
 
     // Create two separate tap subscriptions using the same harness
-    let mut tap1 = harness
-        .tap_subscription(&["demo1"], &[])
-        .await
-        .expect("Failed to create first tap subscription");
-
-    let mut tap2 = harness
-        .tap_subscription(&["demo2"], &[])
-        .await
-        .expect("Failed to create second tap subscription");
-
-    // Both subscriptions should work independently
-    let events1 = tap1
-        .take_events(5, TAP_TIMEOUT)
+    let (events1, _tap1) = harness
+        .tap_and_collect(&["demo1"], 5)
         .await
         .expect("Should receive events from tap1");
 
-    let events2 = tap2
-        .take_events(5, TAP_TIMEOUT)
+    let (events2, _tap2) = harness
+        .tap_and_collect(&["demo2"], 5)
         .await
         .expect("Should receive events from tap2");
 
