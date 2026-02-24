@@ -11,6 +11,7 @@ use futures::{
     future::{ok, ready},
     stream,
 };
+use chrono::{TimeZone, Utc};
 use http::StatusCode;
 use ordered_float::NotNan;
 use serde::Deserialize;
@@ -1258,7 +1259,12 @@ async fn arrow_schema_excludes_non_insertable_columns() {
         event.insert("host", format!("host-{i}.example.com"));
 
         if i == 1 {
-            event.insert("timestamp_date", "2025-06-15 12:00:00");
+            event.insert(
+                "timestamp_date",
+                vector_lib::event::Value::Timestamp(
+                    Utc.with_ymd_and_hms(2025, 6, 15, 12, 0, 0).unwrap(),
+                ),
+            );
         }
 
         let mut attrs = vector_lib::event::ObjectMap::new();
