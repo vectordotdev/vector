@@ -23,7 +23,7 @@ remap: {
 			rules?: [string, ...string]
 		}
 		internal_failure_reasons: [...string]
-		examples?: [remap.#Example, ...remap.#Example]
+		examples?: [remap.#FunctionExample, ...remap.#FunctionExample]
 		deprecated: bool | *false
 		pure:       bool | *true
 	}
