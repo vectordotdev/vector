@@ -456,7 +456,7 @@ byteorder = "1.5.0"
 windows-service = "0.8.0"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.26.4", default-features = false, features = ["socket", "signal", "fs"] }
+nix = { version = "0.27", default-features = false, features = ["socket", "signal", "fs"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 netlink-packet-utils = "0.5.2"
