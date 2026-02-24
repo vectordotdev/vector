@@ -138,7 +138,7 @@ pub mod service_control {
         let service_status = service.query_status().context(ServiceSnafu)?;
 
         if service_status.current_state != ServiceState::StartPending
-            || service_status.current_state != ServiceState::Running
+            && service_status.current_state != ServiceState::Running
         {
             service.start(&[] as &[OsString]).context(ServiceSnafu)?;
             emit!(WindowsServiceStart {
@@ -159,21 +159,26 @@ pub mod service_control {
         let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP;
         let service = open_service(service_def, service_access)?;
         let service_status = service.query_status().context(ServiceSnafu)?;
+        let already_stopped = service_status.current_state == ServiceState::Stopped;
 
-        if service_status.current_state != ServiceState::StopPending
-            || service_status.current_state != ServiceState::Stopped
-        {
+        if service_status.current_state != ServiceState::StopPending && !already_stopped {
             service.stop().context(ServiceSnafu)?;
-            emit!(WindowsServiceStop {
-                name: &*service_def.name.to_string_lossy(),
-                already_stopped: false,
-            });
-        } else {
-            emit!(WindowsServiceStop {
-                name: &*service_def.name.to_string_lossy(),
-                already_stopped: true,
-            });
         }
+
+        if !already_stopped {
+            let service_status = ensure_state(
+                &service,
+                ServiceState::Stopped,
+                Duration::from_secs(10),
+                Duration::from_secs(1),
+            )?;
+            handle_service_exit_code(service_status.exit_code);
+        }
+
+        emit!(WindowsServiceStop {
+            name: &*service_def.name.to_string_lossy(),
+            already_stopped,
+        });
 
         Ok(())
     }
