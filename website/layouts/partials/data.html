@@ -1783,6 +1783,16 @@
     </span>
 
     <div class="flex flex-col space-y-2">
+      {{ with .ctx.input }}
+        <div>
+          <span class="font-light"> Input </span>
+
+          <div class="text-sm">
+            {{ template "code" .log }}
+          </div>
+        </div>
+      {{ end }}
+
       <div>
         <span class="font-light"> Source </span>
 
