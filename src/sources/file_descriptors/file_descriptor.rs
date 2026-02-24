@@ -149,7 +149,7 @@ mod tests {
                 host_key: Default::default(),
                 framing: None,
                 decoding: default_decoding(),
-                fd: read_fd.as_raw_fd() as u32,
+                fd: read_fd.into_raw_fd() as u32,
                 log_namespace: None,
             };
 
@@ -190,7 +190,7 @@ mod tests {
                 host_key: Default::default(),
                 framing: None,
                 decoding: default_decoding(),
-                fd: read_fd.as_raw_fd() as u32,
+                fd: read_fd.into_raw_fd() as u32,
                 log_namespace: Some(true),
             };
 
@@ -246,7 +246,10 @@ mod tests {
 
             let mut stream = rx;
 
-            write(write_fd, b"hello world\nhello world again\n").unwrap();
+            write(&write_fd, b"hello world\nhello world again\n").unwrap();
+            // Consume the OwnedFd without closing it to avoid double-close
+            // with the File created in build().
+            let _ = write_fd.into_raw_fd();
 
             let context = SourceContext::new_test(tx, None);
             config.build(context).await.unwrap().await.unwrap();
