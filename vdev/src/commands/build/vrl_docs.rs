@@ -101,7 +101,7 @@ impl Cli {
             };
 
             let mut json = serde_json::to_string_pretty(&wrapper)?;
-            json.push_str("\n");
+            json.push('\n');
 
             fs::write(&filepath, json)?;
 
