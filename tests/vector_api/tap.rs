@@ -29,8 +29,8 @@ impl TestHarness {
     /// Uses sensible defaults: format=JSON, limit=1000, interval=100ms
     pub async fn tap_subscription(
         &self,
-        outputs_patterns: Vec<String>,
-        inputs_patterns: Vec<String>,
+        outputs_patterns: &[&str],
+        inputs_patterns: &[&str],
     ) -> Result<TapSubscription, String> {
         const DEFAULT_LIMIT: i64 = 1000;
         const DEFAULT_INTERVAL_MS: i64 = 100;
@@ -41,8 +41,8 @@ impl TestHarness {
             .map_err(|e| format!("Failed to connect to WebSocket: {e}"))?;
 
         let stream = subscription_client.output_events_by_component_id_patterns_subscription(
-            outputs_patterns,
-            inputs_patterns,
+            outputs_patterns.iter().map(|s| s.to_string()).collect(),
+            inputs_patterns.iter().map(|s| s.to_string()).collect(),
             TapEncodingFormat::Json,
             DEFAULT_LIMIT,
             DEFAULT_INTERVAL_MS,
@@ -129,7 +129,7 @@ async fn tap_receives_events() {
 
     // Tap the source output with wildcard pattern
     let mut tap = harness
-        .tap_subscription(vec!["*".to_string()], vec![])
+        .tap_subscription(&["*"], &[])
         .await
         .expect("Failed to create tap subscription");
 
@@ -173,7 +173,7 @@ async fn tap_specific_component() {
 
     // Tap only demo1, not demo2
     let mut tap = harness
-        .tap_subscription(vec!["demo1".to_string()], vec![])
+        .tap_subscription(&["demo1"], &[])
         .await
         .expect("Failed to create tap subscription");
 
@@ -214,7 +214,7 @@ async fn tap_survives_config_reload() {
 
     // Start tap with wildcard
     let mut tap = harness
-        .tap_subscription(vec!["*".to_string()], vec![])
+        .tap_subscription(&["*"], &[])
         .await
         .expect("Failed to create tap subscription");
 
@@ -290,12 +290,12 @@ async fn multiple_concurrent_subscriptions() {
 
     // Create two separate tap subscriptions using the same harness
     let mut tap1 = harness
-        .tap_subscription(vec!["demo1".to_string()], vec![])
+        .tap_subscription(&["demo1"], &[])
         .await
         .expect("Failed to create first tap subscription");
 
     let mut tap2 = harness
-        .tap_subscription(vec!["demo2".to_string()], vec![])
+        .tap_subscription(&["demo2"], &[])
         .await
         .expect("Failed to create second tap subscription");
 
