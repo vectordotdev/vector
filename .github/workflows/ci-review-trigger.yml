@@ -93,6 +93,7 @@ jobs:
       ref: ${{ github.event.review.commit_id }}
       command: test-cli
       job_name: CLI tests
+      cargo_nextest: true
     secrets: inherit
 
   make-test-vector-api:
@@ -103,6 +104,7 @@ jobs:
       ref: ${{ github.event.review.commit_id }}
       command: test-vector-api
       job_name: make test-vector-api
+      cargo_nextest: true
     secrets: inherit
 
   make-test-behavior:

@@ -52,6 +52,7 @@ jobs:
     with:
       command: test-cli
       job_name: CLI tests
+      cargo_nextest: true
       upload_test_results: true
     needs: changes
     secrets: inherit
@@ -62,6 +63,7 @@ jobs:
     with:
       command: test-vector-api
       job_name: make test-vector-api
+      cargo_nextest: true
       upload_test_results: true
     needs: changes
     secrets: inherit
