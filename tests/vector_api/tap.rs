@@ -127,9 +127,6 @@ async fn tap_receives_events() {
         .await
         .expect("Failed to start Vector");
 
-    // Give Vector time to start generating events
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
     // Tap the source output with wildcard pattern
     let mut tap = harness
         .tap_subscription(vec!["*".to_string()], vec![])
@@ -174,8 +171,6 @@ async fn tap_specific_component() {
         .await
         .expect("Failed to start Vector");
 
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
-
     // Tap only demo1, not demo2
     let mut tap = harness
         .tap_subscription(vec!["demo1".to_string()], vec![])
@@ -216,8 +211,6 @@ async fn tap_survives_config_reload() {
     let mut harness = TestHarness::new(&config)
         .await
         .expect("Failed to start Vector");
-
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     // Start tap with wildcard
     let mut tap = harness
@@ -260,8 +253,6 @@ async fn tap_survives_config_reload() {
         .await
         .expect("Failed to reload config");
 
-    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-
     // Tap should still work and see events from both sources
     let after_reload = tap
         .take_events(5, TAP_TIMEOUT)
@@ -296,8 +287,6 @@ async fn multiple_concurrent_subscriptions() {
     let harness = TestHarness::new(&config)
         .await
         .expect("Failed to start Vector");
-
-    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
     // Create two separate tap subscriptions using the same harness
     let mut tap1 = harness
