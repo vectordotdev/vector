@@ -1,6 +1,7 @@
 use anyhow::Result;
+use indexmap::IndexMap;
 use serde::Serialize;
-use std::{collections::HashMap, fs, path::PathBuf};
+use std::{fs, path::PathBuf};
 use vrl::compiler::Function;
 use vrl::compiler::value::kind;
 use vrl::core::Value;
@@ -53,8 +54,8 @@ struct ArgumentDoc {
     description: String,
     required: bool,
     r#type: Vec<String>,
-    #[serde(skip_serializing_if = "HashMap::is_empty")]
-    r#enum: HashMap<String, String>,
+    #[serde(skip_serializing_if = "IndexMap::is_empty")]
+    r#enum: IndexMap<String, String>,
     #[serde(skip_serializing_if = "Option::is_none")]
     default: Option<String>,
 }
