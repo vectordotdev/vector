@@ -374,8 +374,14 @@ async fn multiple_concurrent_subscriptions() {
         .expect("Should receive events from tap2 again");
 
     // Verify second round of taps still work
-    assert!(!events1_again.is_empty(), "Tap1 again should receive events");
-    assert!(!events2_again.is_empty(), "Tap2 again should receive events");
+    assert!(
+        !events1_again.is_empty(),
+        "Tap1 again should receive events"
+    );
+    assert!(
+        !events2_again.is_empty(),
+        "Tap2 again should receive events"
+    );
 
     // Verify component isolation is maintained
     let log_events1_again: Vec<_> = events1_again
@@ -400,8 +406,14 @@ async fn multiple_concurrent_subscriptions() {
         })
         .collect();
 
-    assert!(!log_events1_again.is_empty(), "Should have log events from demo1 again");
-    assert!(!log_events2_again.is_empty(), "Should have log events from demo2 again");
+    assert!(
+        !log_events1_again.is_empty(),
+        "Should have log events from demo1 again"
+    );
+    assert!(
+        !log_events2_again.is_empty(),
+        "Should have log events from demo2 again"
+    );
 
     for log in &log_events1_again {
         assert_eq!(
