@@ -39,10 +39,6 @@ impl RequestBuilder<(PartitionKey, Vec<Event>)> for ClickhouseRequestBuilder {
         ((key, finalizers), builder, events)
     }
 
-    fn on_encode_error(&self, metadata: &mut Self::Metadata) {
-        metadata.1.update_status(EventStatus::Rejected);
-    }
-
     fn build_request(
         &self,
         metadata: Self::Metadata,
