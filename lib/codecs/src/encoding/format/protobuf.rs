@@ -110,6 +110,15 @@ impl ProtobufSerializer {
     pub fn descriptor_proto(&self) -> &prost_reflect::prost_types::DescriptorProto {
         self.message_descriptor.descriptor_proto()
     }
+
+    /// Encode the descriptor proto to bytes.
+    ///
+    /// This is useful when the caller needs the descriptor in a different version of prost_types
+    /// than the one used by prost_reflect internally.
+    pub fn encode_descriptor_proto(&self) -> Vec<u8> {
+        use prost_reflect::prost::Message as _;
+        self.message_descriptor.descriptor_proto().encode_to_vec()
+    }
 }
 
 impl Encoder<Event> for ProtobufSerializer {

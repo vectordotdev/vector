@@ -7,9 +7,11 @@ use tonic::service::Interceptor;
 use tonic::transport::Channel;
 use tonic::{Request, Status};
 use tower::Service;
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_core::event::EventStatus;
-use vector_core::stream::DriverResponse;
+use vector_lib::{
+    event::EventStatus,
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    stream::DriverResponse,
+};
 
 use super::proto::google::cloud::bigquery::storage::v1 as proto;
 use crate::event::{EventFinalizers, Finalizable};

@@ -2,9 +2,9 @@ use futures_util::{
     stream::{self, BoxStream},
     StreamExt,
 };
-use vector_core::event::Event;
-use vector_core::sink::StreamSink;
-use vector_core::stream::BatcherSettings;
+use crate::event::Event;
+use vector_lib::sink::StreamSink;
+use vector_lib::stream::BatcherSettings;
 
 use super::request_builder::BigqueryRequestBuilder;
 use super::service::BigqueryService;

@@ -1,4 +1,4 @@
-use codecs::encoding::ProtobufSerializerConfig;
+use crate::codecs::encoding::ProtobufSerializerConfig;
 use futures::FutureExt;
 use http::Uri;
 use indoc::indoc;
@@ -75,7 +75,7 @@ pub struct BigqueryConfig {
     #[serde(
         default,
         deserialize_with = "crate::serde::bool_or_struct",
-        skip_serializing_if = "crate::serde::skip_serializing_if_default"
+        skip_serializing_if = "crate::serde::is_default"
     )]
     acknowledgements: AcknowledgementsConfig,
 }

@@ -1,10 +1,10 @@
 use bytes::BytesMut;
-use codecs::encoding::ProtobufSerializer;
+use crate::codecs::encoding::ProtobufSerializer;
 use prost::Message;
 use std::num::NonZeroUsize;
 use tokio_util::codec::Encoder;
-use vector_common::request_metadata::RequestMetadata;
-use vector_core::event::Finalizable;
+use vector_lib::event::Finalizable;
+use vector_lib::request_metadata::RequestMetadata;
 
 use super::proto::google::cloud::bigquery::storage::v1 as proto;
 use super::service::BigqueryRequest;
@@ -46,9 +46,14 @@ impl BigqueryRequestBuilder {
         &self,
         serialized_rows: Vec<Vec<u8>>,
     ) -> (NonZeroUsize, proto::append_rows_request::ProtoData) {
+        // The codecs library uses prost-reflect (prost 0.13), but the generated BigQuery proto
+        // uses tonic (prost 0.12). We bridge the version gap by encoding to bytes and decoding.
+        let descriptor_bytes = self.protobuf_serializer.encode_descriptor_proto();
+        let descriptor_proto = prost_types::DescriptorProto::decode(descriptor_bytes.as_slice())
+            .expect("DescriptorProto wire format is stable across prost versions");
         let proto_data = proto::append_rows_request::ProtoData {
             writer_schema: Some(proto::ProtoSchema {
-                proto_descriptor: Some(self.protobuf_serializer.descriptor_proto().clone()),
+                proto_descriptor: Some(descriptor_proto),
             }),
             rows: Some(proto::ProtoRows { serialized_rows }),
         };
@@ -139,10 +144,10 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
 #[cfg(test)]
 mod test {
     use bytes::{BufMut, Bytes, BytesMut};
-    use codecs::encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions};
+    use crate::codecs::encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions};
     use std::collections::BTreeMap;
     use std::path::PathBuf;
-    use vector_core::event::{Event, EventMetadata, LogEvent, Value};
+    use crate::event::{Event, EventMetadata, LogEvent, Value};
 
     use super::BigqueryRequestBuilder;
     use crate::sinks::util::IncrementalRequestBuilder;
@@ -156,6 +161,7 @@ mod test {
             protobuf: ProtobufSerializerOptions {
                 desc_file,
                 message_type: "test.Bytes".into(),
+                use_json_names: false,
             },
         }
         .build()
