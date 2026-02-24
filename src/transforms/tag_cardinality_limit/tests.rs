@@ -78,7 +78,7 @@ fn make_transform_bloom(
     }
 }
 
-const fn make_transform_hashset_with_per_metric_limits(
+fn make_transform_hashset_with_per_metric_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
     per_metric_limits: HashMap<String, PerMetricConfig>,
@@ -94,7 +94,7 @@ const fn make_transform_hashset_with_per_metric_limits(
     }
 }
 
-const fn make_transform_bloom_with_per_metric_limits(
+fn make_transform_bloom_with_per_metric_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
     per_metric_limits: HashMap<String, PerMetricConfig>,
