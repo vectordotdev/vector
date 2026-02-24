@@ -1,0 +1,410 @@
+//! Integration tests for `vector tap` command
+//!
+//! Provides extensions for WebSocket subscriptions and tests for event streaming.
+
+use std::time::{Duration, Instant};
+use indoc::indoc;
+use tokio_stream::StreamExt;
+use vector_lib::api_client::{
+    connect_subscription_client,
+    gql::{
+        TapEncodingFormat, TapSubscriptionExt,
+        output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns as TapEvent,
+    },
+};
+use super::harness::*;
+
+pub const TAP_TIMEOUT: Duration = Duration::from_secs(10);
+
+impl TestHarness {
+    /// Returns WebSocket URL for subscriptions
+    fn websocket_url(&self) -> url::Url {
+        format!("ws://127.0.0.1:{}/graphql", self.api_port())
+            .parse()
+            .expect("Valid WebSocket URL")
+    }
+
+    /// Creates a tap subscription for the given patterns
+    ///
+    /// Uses sensible defaults: format=JSON, limit=1000, interval=100ms
+    pub async fn tap_subscription(
+        &self,
+        outputs_patterns: Vec<String>,
+        inputs_patterns: Vec<String>,
+    ) -> Result<TapSubscription, String> {
+        const DEFAULT_LIMIT: i64 = 1000;
+        const DEFAULT_INTERVAL_MS: i64 = 100;
+        let url = self.websocket_url();
+
+        let subscription_client = connect_subscription_client(url)
+            .await
+            .map_err(|e| format!("Failed to connect to WebSocket: {e}"))?;
+
+        let stream = subscription_client.output_events_by_component_id_patterns_subscription(
+            outputs_patterns,
+            inputs_patterns,
+            TapEncodingFormat::Json,
+            DEFAULT_LIMIT,
+            DEFAULT_INTERVAL_MS,
+        );
+
+        Ok(TapSubscription {
+            stream,
+            _client: subscription_client,
+        })
+    }
+}
+
+/// Wrapper around a tap subscription stream with helper methods
+pub struct TapSubscription {
+    stream: vector_lib::api_client::BoxedSubscription<
+        vector_lib::api_client::gql::OutputEventsByComponentIdPatternsSubscription,
+    >,
+    _client: vector_lib::api_client::SubscriptionClient,  // Keep client alive!
+}
+
+impl TapSubscription {
+    /// Collects tap events until count is reached or timeout occurs
+    pub async fn take_events(&mut self, count: usize, timeout: Duration) -> Result<Vec<TapEvent>, String> {
+        let start = Instant::now();
+        let mut events = Vec::new();
+
+        while events.len() < count {
+            if start.elapsed() >= timeout {
+                return Err(format!(
+                    "Timeout: collected {}/{} events in {:?}",
+                    events.len(),
+                    count,
+                    timeout
+                ));
+            }
+
+            match tokio::time::timeout(timeout - start.elapsed(), self.stream.as_mut().next()).await {
+                Ok(Some(Some(response))) => {
+                    if let Some(data) = response.data {
+                        for event in data.output_events_by_component_id_patterns {
+                            events.push(event);
+                        }
+                    } else if let Some(errors) = response.errors
+                        && !errors.is_empty()
+                    {
+                        return Err(format!("GraphQL errors: {:?}", errors));
+                    }
+                }
+                Ok(Some(None)) => {
+                    // No response in this poll, continue
+                    continue;
+                }
+                Ok(None) => {
+                    return Err(format!("Stream ended unexpectedly after {} events", events.len()));
+                }
+                Err(_) => {
+                    return Err("Timeout waiting for next event".to_string());
+                }
+            }
+        }
+
+        Ok(events)
+    }
+}
+
+// ============================================================================
+// Tests
+// ============================================================================
+
+#[tokio::test]
+async fn tap_receives_events() {
+    let harness = TestHarness::new(indoc! {"
+        sources:
+          demo:
+            type: demo_logs
+            format: json
+            interval: 0.01
+            count: 100
+
+        sinks:
+          blackhole:
+            type: blackhole
+            inputs: ['demo']
+    "})
+    .await
+    .expect("Failed to start Vector");
+
+    // Give Vector time to start generating events
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // Tap the source output with wildcard pattern
+    let mut tap = harness
+        .tap_subscription(vec!["*".to_string()], vec![])
+        .await
+        .expect("Failed to create tap subscription");
+
+    // Collect events - first ones are usually notifications, then log events follow
+    let events = tap
+        .take_events(10, TAP_TIMEOUT)
+        .await
+        .expect("Should receive events");
+
+    assert!(!events.is_empty(), "Should receive at least one event");
+
+    // Verify we got at least one log event (not just notifications)
+    let log_events: Vec<_> = events
+        .iter()
+        .filter_map(|e| {
+            if let TapEvent::Log(log) = e {
+                Some(log)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    assert!(
+        !log_events.is_empty(),
+        "Should receive at least one log event, got {} events total ({} notifications)",
+        events.len(),
+        events.iter().filter(|e| matches!(e, TapEvent::EventNotification(_))).count()
+    );
+}
+
+#[tokio::test]
+async fn tap_specific_component() {
+    let harness = TestHarness::new(indoc! {"
+        sources:
+          demo1:
+            type: demo_logs
+            format: json
+            interval: 0.01
+            count: 100
+
+          demo2:
+            type: demo_logs
+            format: json
+            interval: 0.01
+            count: 100
+
+        sinks:
+          blackhole:
+            type: blackhole
+            inputs: ['demo1', 'demo2']
+    "})
+    .await
+    .expect("Failed to start Vector");
+
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // Tap only demo1, not demo2
+    let mut tap = harness
+        .tap_subscription(vec!["demo1".to_string()], vec![])
+        .await
+        .expect("Failed to create tap subscription");
+
+    let events = tap
+        .take_events(10, TAP_TIMEOUT)
+        .await
+        .expect("Should receive events");
+
+    // Verify we only got events from demo1
+    let log_events: Vec<_> = events
+        .iter()
+        .filter_map(|e| {
+            if let TapEvent::Log(log) = e {
+                Some(log)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    assert!(!log_events.is_empty(), "Should receive log events");
+
+    // All log events should be from demo1
+    for log in &log_events {
+        assert_eq!(log.component_id, "demo1", "Should only receive events from demo1");
+    }
+}
+
+#[tokio::test]
+async fn tap_survives_config_reload() {
+    let mut harness = TestHarness::new(indoc! {"
+        sources:
+          demo:
+            type: demo_logs
+            format: json
+            interval: 0.05
+            count: 100
+
+        sinks:
+          blackhole:
+            type: blackhole
+            inputs: ['demo']
+    "})
+    .await
+    .expect("Failed to start Vector");
+
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // Start tap with wildcard
+    let mut tap = harness
+        .tap_subscription(vec!["*".to_string()], vec![])
+        .await
+        .expect("Failed to create tap subscription");
+
+    // Collect initial events
+    let initial_events = tap
+        .take_events(5, TAP_TIMEOUT)
+        .await
+        .expect("Should receive initial events");
+
+    assert!(!initial_events.is_empty(), "Should receive initial events");
+
+    // Reload config with a new component
+    harness
+        .reload_with_config(
+            indoc! {"
+                sources:
+                  demo:
+                    type: demo_logs
+                    format: json
+                    interval: 0.05
+                    count: 100
+
+                  new_demo:
+                    type: demo_logs
+                    format: json
+                    interval: 0.05
+                    count: 100
+
+                sinks:
+                  blackhole:
+                    type: blackhole
+                    inputs: ['demo', 'new_demo']
+            "},
+            &["demo", "new_demo", "blackhole"],
+        )
+        .await
+        .expect("Failed to reload config");
+
+    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
+
+    // Tap should still work and see events from both sources
+    let after_reload = tap
+        .take_events(5, TAP_TIMEOUT)
+        .await
+        .expect("Should receive events after reload");
+
+    assert!(!after_reload.is_empty(), "Should receive events after reload");
+
+    let log_events: Vec<_> = after_reload
+        .iter()
+        .filter_map(|e| {
+            if let TapEvent::Log(log) = e {
+                Some(log)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    assert!(!log_events.is_empty(), "Should receive log events after reload");
+}
+
+#[tokio::test]
+async fn multiple_concurrent_subscriptions() {
+    let harness = TestHarness::new(indoc! {"
+        sources:
+          demo1:
+            type: demo_logs
+            format: json
+            interval: 0.01
+            count: 100
+
+          demo2:
+            type: demo_logs
+            format: json
+            interval: 0.01
+            count: 100
+
+        sinks:
+          blackhole:
+            type: blackhole
+            inputs: ['demo1', 'demo2']
+    "})
+        .await
+        .expect("Failed to start Vector");
+
+    tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+
+    // Create two separate tap subscriptions using the same harness
+    let mut tap1 = harness
+        .tap_subscription(vec!["demo1".to_string()], vec![])
+        .await
+        .expect("Failed to create first tap subscription");
+
+    let mut tap2 = harness
+        .tap_subscription(vec!["demo2".to_string()], vec![])
+        .await
+        .expect("Failed to create second tap subscription");
+
+    // Both subscriptions should work independently
+    let events1 = tap1
+        .take_events(5, TAP_TIMEOUT)
+        .await
+        .expect("Should receive events from tap1");
+
+    let events2 = tap2
+        .take_events(5, TAP_TIMEOUT)
+        .await
+        .expect("Should receive events from tap2");
+
+    assert!(!events1.is_empty(), "Tap1 should receive events");
+    assert!(!events2.is_empty(), "Tap2 should receive events");
+
+    // Verify we got at least the requested number of events (may get more due to batching)
+    assert!(events1.len() >= 5, "Should receive at least 5 events from tap1, got {}", events1.len());
+    assert!(events2.len() >= 5, "Should receive at least 5 events from tap2, got {}", events2.len());
+
+    // Verify tap1 only sees demo1
+    let log_events1: Vec<_> = events1
+        .iter()
+        .filter_map(|e| {
+            if let TapEvent::Log(log) = e {
+                Some(log)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for log in &log_events1 {
+        assert_eq!(log.component_id, "demo1", "Tap1 should only see demo1 events");
+    }
+
+    // Verify tap2 only sees demo2
+    let log_events2: Vec<_> = events2
+        .iter()
+        .filter_map(|e| {
+            if let TapEvent::Log(log) = e {
+                Some(log)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    for log in &log_events2 {
+        assert_eq!(log.component_id, "demo2", "Tap2 should only see demo2 events");
+    }
+
+    // Verify we got different sets of events
+    assert_ne!(
+        log_events1.len(),
+        0,
+        "Should have some log events from demo1"
+    );
+    assert_ne!(
+        log_events2.len(),
+        0,
+        "Should have some log events from demo2"
+    );
+}
