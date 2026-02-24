@@ -51,4 +51,3 @@ pub fn dual_source_config(
             inputs: ['{source1}', '{source2}']
     "}
 }
-
