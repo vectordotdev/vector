@@ -23,10 +23,10 @@
               "string"
             ],
             "enum": {
-              "warn": "Log at the `warn` level.",
-              "info": "Log at the `info` level.",
-              "debug": "Log at the `debug` level.",
               "trace": "Log at the `trace` level.",
+              "debug": "Log at the `debug` level.",
+              "info": "Log at the `info` level.",
+              "warn": "Log at the `warn` level.",
               "error": "Log at the `error` level."
             },
             "default": "info"

@@ -23,9 +23,9 @@
               "string"
             ],
             "enum": {
+              "common": "Common format",
               "combined": "Apache combined format",
-              "error": "Default Apache error format",
-              "common": "Common format"
+              "error": "Default Apache error format"
             }
           },
           {

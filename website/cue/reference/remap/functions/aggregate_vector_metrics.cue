@@ -15,10 +15,10 @@
               "string"
             ],
             "enum": {
-              "max": "Find the highest metric value of all the matched metrics.",
               "sum": "Sum the values of all the matched metrics.",
-              "min": "Find the lowest metric value of all the matched metrics.",
-              "avg": "Find the average of the values of all the matched metrics."
+              "avg": "Find the average of the values of all the matched metrics.",
+              "max": "Find the highest metric value of all the matched metrics.",
+              "min": "Find the lowest metric value of all the matched metrics."
             }
           },
           {

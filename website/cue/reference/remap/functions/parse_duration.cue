@@ -23,16 +23,16 @@
               "string"
             ],
             "enum": {
-              "m": "Minutes (60 seconds in a minute)",
-              "ms": "Milliseconds (1 thousand microseconds in a second)",
-              "s": "Seconds",
-              "h": "Hours (60 minutes in an hour)",
-              "d": "Days (24 hours in a day)",
               "ns": "Nanoseconds (1 billion nanoseconds in a second)",
-              "cs": "Centiseconds (100 centiseconds in a second)",
-              "µs": "Microseconds (1 million microseconds in a second)",
               "us": "Microseconds (1 million microseconds in a second)",
-              "ds": "Deciseconds (10 deciseconds in a second)"
+              "µs": "Microseconds (1 million microseconds in a second)",
+              "ms": "Milliseconds (1 thousand microseconds in a second)",
+              "cs": "Centiseconds (100 centiseconds in a second)",
+              "ds": "Deciseconds (10 deciseconds in a second)",
+              "s": "Seconds",
+              "m": "Minutes (60 seconds in a minute)",
+              "h": "Hours (60 minutes in an hour)",
+              "d": "Days (24 hours in a day)"
             }
           }
         ],

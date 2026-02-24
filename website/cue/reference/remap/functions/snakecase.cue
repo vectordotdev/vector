@@ -23,11 +23,11 @@
               "string"
             ],
             "enum": {
-              "SCREAMING_SNAKE": "[SCREAMING_SNAKE](https://en.wikipedia.org/wiki/Snake_case)",
-              "snake_case": "[snake_case](https://en.wikipedia.org/wiki/Snake_case)",
               "kebab-case": "[kebab-case](https://en.wikipedia.org/wiki/Letter_case#Kebab_case)",
               "camelCase": "[camelCase](https://en.wikipedia.org/wiki/Camel_case)",
-              "PascalCase": "[PascalCase](https://en.wikipedia.org/wiki/Camel_case)"
+              "PascalCase": "[PascalCase](https://en.wikipedia.org/wiki/Camel_case)",
+              "SCREAMING_SNAKE": "[SCREAMING_SNAKE](https://en.wikipedia.org/wiki/Snake_case)",
+              "snake_case": "[snake_case](https://en.wikipedia.org/wiki/Snake_case)"
             }
           },
           {
@@ -39,12 +39,12 @@
             ],
             "enum": {
               "lower_upper": "Lowercase to uppercase transitions (e.g., 'camelCase' → 'camel' + 'case')",
-              "lower_digit": "Lowercase to digit transitions (e.g., 'foo2bar' → 'foo2_bar')",
-              "digit_lower": "Digit to lowercase transitions (e.g., 'Foo123barBaz' → 'foo' + '123bar' + 'baz')",
-              "digit_upper": "Digit to uppercase transitions (e.g., 'Version123Test' → 'version' + '123test')",
-              "upper_digit": "Uppercase to digit transitions (e.g., 'versionV2' → 'version_v2')",
               "upper_lower": "Uppercase to lowercase transitions (e.g., 'CamelCase' → 'Camel' + 'Case')",
-              "acronym": "Acronyms from words (e.g., 'XMLHttpRequest' → 'xmlhttp' + 'request')"
+              "acronym": "Acronyms from words (e.g., 'XMLHttpRequest' → 'xmlhttp' + 'request')",
+              "lower_digit": "Lowercase to digit transitions (e.g., 'foo2bar' → 'foo2_bar')",
+              "upper_digit": "Uppercase to digit transitions (e.g., 'versionV2' → 'version_v2')",
+              "digit_lower": "Digit to lowercase transitions (e.g., 'Foo123barBaz' → 'foo' + '123bar' + 'baz')",
+              "digit_upper": "Digit to uppercase transitions (e.g., 'Version123Test' → 'version' + '123test')"
             }
           }
         ],

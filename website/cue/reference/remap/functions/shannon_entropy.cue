@@ -23,9 +23,9 @@
               "string"
             ],
             "enum": {
-              "grapheme": "Considers graphemes when calculating entropy",
+              "byte": "Considers individual bytes when calculating entropy",
               "codepoint": "Considers codepoints when calculating entropy",
-              "byte": "Considers individual bytes when calculating entropy"
+              "grapheme": "Considers graphemes when calculating entropy"
             },
             "default": "byte"
           }

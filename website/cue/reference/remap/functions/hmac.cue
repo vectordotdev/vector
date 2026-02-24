@@ -31,11 +31,11 @@
               "string"
             ],
             "enum": {
+              "SHA1": "SHA1 algorithm",
               "SHA-224": "SHA-224 algorithm",
               "SHA-256": "SHA-256 algorithm",
-              "SHA-512": "SHA-512 algorithm",
-              "SHA1": "SHA1 algorithm",
-              "SHA-384": "SHA-384 algorithm"
+              "SHA-384": "SHA-384 algorithm",
+              "SHA-512": "SHA-512 algorithm"
             },
             "default": "SHA-256"
           }

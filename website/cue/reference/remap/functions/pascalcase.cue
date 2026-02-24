@@ -23,11 +23,11 @@
               "string"
             ],
             "enum": {
-              "SCREAMING_SNAKE": "[SCREAMING_SNAKE](https://en.wikipedia.org/wiki/Snake_case)",
               "kebab-case": "[kebab-case](https://en.wikipedia.org/wiki/Letter_case#Kebab_case)",
-              "snake_case": "[snake_case](https://en.wikipedia.org/wiki/Snake_case)",
               "camelCase": "[camelCase](https://en.wikipedia.org/wiki/Camel_case)",
-              "PascalCase": "[PascalCase](https://en.wikipedia.org/wiki/Camel_case)"
+              "PascalCase": "[PascalCase](https://en.wikipedia.org/wiki/Camel_case)",
+              "SCREAMING_SNAKE": "[SCREAMING_SNAKE](https://en.wikipedia.org/wiki/Snake_case)",
+              "snake_case": "[snake_case](https://en.wikipedia.org/wiki/Snake_case)"
             }
           }
         ],
