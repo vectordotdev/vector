@@ -29,7 +29,7 @@ package metadata
 
 	#Example: {
 		#BaseExample
-		input?:  #Event
+		input?: #Event
 		output?: #Event | [#Event, ...#Event]
 	}
 
