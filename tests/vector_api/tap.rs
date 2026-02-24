@@ -361,4 +361,59 @@ async fn multiple_concurrent_subscriptions() {
         0,
         "Should have some log events from demo2"
     );
+
+    // Create new taps to the same components to verify repeatability
+    let (events1_again, _tap1_again) = harness
+        .tap_and_collect(&["demo1"], 5)
+        .await
+        .expect("Should receive events from tap1 again");
+
+    let (events2_again, _tap2_again) = harness
+        .tap_and_collect(&["demo2"], 5)
+        .await
+        .expect("Should receive events from tap2 again");
+
+    // Verify second round of taps still work
+    assert!(!events1_again.is_empty(), "Tap1 again should receive events");
+    assert!(!events2_again.is_empty(), "Tap2 again should receive events");
+
+    // Verify component isolation is maintained
+    let log_events1_again: Vec<_> = events1_again
+        .iter()
+        .filter_map(|e| {
+            if let TapEvent::Log(log) = e {
+                Some(log)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    let log_events2_again: Vec<_> = events2_again
+        .iter()
+        .filter_map(|e| {
+            if let TapEvent::Log(log) = e {
+                Some(log)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    assert!(!log_events1_again.is_empty(), "Should have log events from demo1 again");
+    assert!(!log_events2_again.is_empty(), "Should have log events from demo2 again");
+
+    for log in &log_events1_again {
+        assert_eq!(
+            log.component_id, "demo1",
+            "Second tap1 should only see demo1 events"
+        );
+    }
+
+    for log in &log_events2_again {
+        assert_eq!(
+            log.component_id, "demo2",
+            "Second tap2 should only see demo2 events"
+        );
+    }
 }
