@@ -2,8 +2,9 @@
 //!
 //! Provides extensions for WebSocket subscriptions and tests for event streaming.
 
-use std::time::{Duration, Instant};
+use super::{common::*, harness::*};
 use indoc::indoc;
+use std::time::{Duration, Instant};
 use tokio_stream::StreamExt;
 use vector_lib::api_client::{
     connect_subscription_client,
@@ -12,7 +13,6 @@ use vector_lib::api_client::{
         output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns as TapEvent,
     },
 };
-use super::harness::*;
 
 pub const TAP_TIMEOUT: Duration = Duration::from_secs(10);
 
@@ -60,12 +60,16 @@ pub struct TapSubscription {
     stream: vector_lib::api_client::BoxedSubscription<
         vector_lib::api_client::gql::OutputEventsByComponentIdPatternsSubscription,
     >,
-    _client: vector_lib::api_client::SubscriptionClient,  // Keep client alive!
+    _client: vector_lib::api_client::SubscriptionClient, // Keep client alive!
 }
 
 impl TapSubscription {
     /// Collects tap events until count is reached or timeout occurs
-    pub async fn take_events(&mut self, count: usize, timeout: Duration) -> Result<Vec<TapEvent>, String> {
+    pub async fn take_events(
+        &mut self,
+        count: usize,
+        timeout: Duration,
+    ) -> Result<Vec<TapEvent>, String> {
         let start = Instant::now();
         let mut events = Vec::new();
 
@@ -79,7 +83,8 @@ impl TapSubscription {
                 ));
             }
 
-            match tokio::time::timeout(timeout - start.elapsed(), self.stream.as_mut().next()).await {
+            match tokio::time::timeout(timeout - start.elapsed(), self.stream.as_mut().next()).await
+            {
                 Ok(Some(Some(response))) => {
                     if let Some(data) = response.data {
                         for event in data.output_events_by_component_id_patterns {
@@ -96,7 +101,10 @@ impl TapSubscription {
                     continue;
                 }
                 Ok(None) => {
-                    return Err(format!("Stream ended unexpectedly after {} events", events.len()));
+                    return Err(format!(
+                        "Stream ended unexpectedly after {} events",
+                        events.len()
+                    ));
                 }
                 Err(_) => {
                     return Err("Timeout waiting for next event".to_string());
@@ -114,21 +122,10 @@ impl TapSubscription {
 
 #[tokio::test]
 async fn tap_receives_events() {
-    let harness = TestHarness::new(indoc! {"
-        sources:
-          demo:
-            type: demo_logs
-            format: json
-            interval: 0.01
-            count: 100
-
-        sinks:
-          blackhole:
-            type: blackhole
-            inputs: ['demo']
-    "})
-    .await
-    .expect("Failed to start Vector");
+    let config = single_source_config("demo", 0.01, Some(100));
+    let harness = TestHarness::new(&config)
+        .await
+        .expect("Failed to start Vector");
 
     // Give Vector time to start generating events
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
@@ -163,33 +160,19 @@ async fn tap_receives_events() {
         !log_events.is_empty(),
         "Should receive at least one log event, got {} events total ({} notifications)",
         events.len(),
-        events.iter().filter(|e| matches!(e, TapEvent::EventNotification(_))).count()
+        events
+            .iter()
+            .filter(|e| matches!(e, TapEvent::EventNotification(_)))
+            .count()
     );
 }
 
 #[tokio::test]
 async fn tap_specific_component() {
-    let harness = TestHarness::new(indoc! {"
-        sources:
-          demo1:
-            type: demo_logs
-            format: json
-            interval: 0.01
-            count: 100
-
-          demo2:
-            type: demo_logs
-            format: json
-            interval: 0.01
-            count: 100
-
-        sinks:
-          blackhole:
-            type: blackhole
-            inputs: ['demo1', 'demo2']
-    "})
-    .await
-    .expect("Failed to start Vector");
+    let config = dual_source_config("demo1", "demo2", 0.01, Some(100));
+    let harness = TestHarness::new(&config)
+        .await
+        .expect("Failed to start Vector");
 
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
@@ -220,27 +203,19 @@ async fn tap_specific_component() {
 
     // All log events should be from demo1
     for log in &log_events {
-        assert_eq!(log.component_id, "demo1", "Should only receive events from demo1");
+        assert_eq!(
+            log.component_id, "demo1",
+            "Should only receive events from demo1"
+        );
     }
 }
 
 #[tokio::test]
 async fn tap_survives_config_reload() {
-    let mut harness = TestHarness::new(indoc! {"
-        sources:
-          demo:
-            type: demo_logs
-            format: json
-            interval: 0.05
-            count: 100
-
-        sinks:
-          blackhole:
-            type: blackhole
-            inputs: ['demo']
-    "})
-    .await
-    .expect("Failed to start Vector");
+    let config = single_source_config("demo", 0.05, Some(100));
+    let mut harness = TestHarness::new(&config)
+        .await
+        .expect("Failed to start Vector");
 
     tokio::time::sleep(std::time::Duration::from_millis(200)).await;
 
@@ -293,7 +268,10 @@ async fn tap_survives_config_reload() {
         .await
         .expect("Should receive events after reload");
 
-    assert!(!after_reload.is_empty(), "Should receive events after reload");
+    assert!(
+        !after_reload.is_empty(),
+        "Should receive events after reload"
+    );
 
     let log_events: Vec<_> = after_reload
         .iter()
@@ -306,30 +284,16 @@ async fn tap_survives_config_reload() {
         })
         .collect();
 
-    assert!(!log_events.is_empty(), "Should receive log events after reload");
+    assert!(
+        !log_events.is_empty(),
+        "Should receive log events after reload"
+    );
 }
 
 #[tokio::test]
 async fn multiple_concurrent_subscriptions() {
-    let harness = TestHarness::new(indoc! {"
-        sources:
-          demo1:
-            type: demo_logs
-            format: json
-            interval: 0.01
-            count: 100
-
-          demo2:
-            type: demo_logs
-            format: json
-            interval: 0.01
-            count: 100
-
-        sinks:
-          blackhole:
-            type: blackhole
-            inputs: ['demo1', 'demo2']
-    "})
+    let config = dual_source_config("demo1", "demo2", 0.01, Some(100));
+    let harness = TestHarness::new(&config)
         .await
         .expect("Failed to start Vector");
 
@@ -361,8 +325,16 @@ async fn multiple_concurrent_subscriptions() {
     assert!(!events2.is_empty(), "Tap2 should receive events");
 
     // Verify we got at least the requested number of events (may get more due to batching)
-    assert!(events1.len() >= 5, "Should receive at least 5 events from tap1, got {}", events1.len());
-    assert!(events2.len() >= 5, "Should receive at least 5 events from tap2, got {}", events2.len());
+    assert!(
+        events1.len() >= 5,
+        "Should receive at least 5 events from tap1, got {}",
+        events1.len()
+    );
+    assert!(
+        events2.len() >= 5,
+        "Should receive at least 5 events from tap2, got {}",
+        events2.len()
+    );
 
     // Verify tap1 only sees demo1
     let log_events1: Vec<_> = events1
@@ -377,7 +349,10 @@ async fn multiple_concurrent_subscriptions() {
         .collect();
 
     for log in &log_events1 {
-        assert_eq!(log.component_id, "demo1", "Tap1 should only see demo1 events");
+        assert_eq!(
+            log.component_id, "demo1",
+            "Tap1 should only see demo1 events"
+        );
     }
 
     // Verify tap2 only sees demo2
@@ -393,7 +368,10 @@ async fn multiple_concurrent_subscriptions() {
         .collect();
 
     for log in &log_events2 {
-        assert_eq!(log.component_id, "demo2", "Tap2 should only see demo2 events");
+        assert_eq!(
+            log.component_id, "demo2",
+            "Tap2 should only see demo2 events"
+        );
     }
 
     // Verify we got different sets of events

@@ -3,7 +3,7 @@
 //! Provides extensions for GraphQL queries and tests for component discovery,
 //! metrics collection, and config reloading.
 
-use super::harness::*;
+use super::{common::*, harness::*};
 use indoc::indoc;
 
 impl TestHarness {
@@ -134,26 +134,16 @@ async fn displays_pipeline_topology_and_metrics() {
 #[tokio::test]
 async fn config_reload_updates_components() {
     // Initial config: 1 source -> 1 sink
-    let mut runner = TestHarness::new(indoc! {"
-        sources:
-          demo1:
-            type: demo_logs
-            format: json
-            interval: 0.1
-
-        sinks:
-          blackhole1:
-            type: blackhole
-            inputs: ['demo1']
-    "})
-    .await
-    .expect("Failed to start Vector");
+    let config = single_source_config("demo1", 0.1, None);
+    let mut runner = TestHarness::new(&config)
+        .await
+        .expect("Failed to start Vector");
 
     // Verify initial components
     let component_ids = runner.query_component_ids().await.expect("Failed to query");
 
     assert!(component_ids.contains(&"demo1".to_string()));
-    assert!(component_ids.contains(&"blackhole1".to_string()));
+    assert!(component_ids.contains(&"blackhole".to_string()));
     assert_eq!(component_ids.len(), 2);
 
     // RELOAD 1: Add components
@@ -237,20 +227,10 @@ async fn config_reload_updates_components() {
 #[tokio::test]
 async fn watch_mode_auto_reloads() {
     // Start Vector with watch mode enabled
-    let mut runner = TestHarness::new_with_watch_mode(indoc! {"
-        sources:
-          demo:
-            type: demo_logs
-            format: json
-            interval: 0.1
-
-        sinks:
-          blackhole:
-            type: blackhole
-            inputs: ['demo']
-    "})
-    .await
-    .expect("Failed to start Vector");
+    let config = single_source_config("demo", 0.1, None);
+    let mut runner = TestHarness::new_with_watch_mode(&config)
+        .await
+        .expect("Failed to start Vector");
 
     // Verify initial state: 1 source + 1 sink
     let data = runner.query_components().await.expect("Failed to query");
