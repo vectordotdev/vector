@@ -131,6 +131,12 @@ impl From<LogEvent> for TraceEvent {
     }
 }
 
+impl From<TraceEvent> for LogEvent {
+    fn from(trace: TraceEvent) -> Self {
+        trace.0
+    }
+}
+
 impl From<ObjectMap> for TraceEvent {
     fn from(map: ObjectMap) -> Self {
         Self(map.into())

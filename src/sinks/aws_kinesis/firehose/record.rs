@@ -66,6 +66,8 @@ impl SendRecord for KinesisFirehoseClient {
             .map(|output: PutRecordBatchOutput| KinesisResponse {
                 failure_count: output.failed_put_count() as usize,
                 events_byte_size: CountByteSize(rec_count, JsonSize::new(total_size)).into(),
+                #[cfg(feature = "sinks-aws_kinesis_streams")]
+                failed_records: vec![], // Firehose doesn't support partial failure retry
             })
     }
 }

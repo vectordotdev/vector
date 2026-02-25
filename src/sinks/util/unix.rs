@@ -3,7 +3,6 @@ use std::{
     os::fd::{AsFd, BorrowedFd},
     path::PathBuf,
     pin::Pin,
-    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -124,11 +123,9 @@ impl UnixConnector {
         Self { path, mode }
     }
 
-    const fn fresh_backoff() -> ExponentialBackoff {
+    fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
-        ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60))
+        ExponentialBackoff::default()
     }
 
     async fn connect(&self) -> Result<UnixEither, UnixError> {
@@ -278,6 +275,7 @@ where
                 DatagramSocket::Unix(socket, self.connector.path.clone()),
                 &self.transformer,
                 &mut encoder,
+                &None,
                 &bytes_sent,
             )
             .await;

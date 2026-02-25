@@ -65,10 +65,14 @@ fn write_vrl_constants(lockfile: &Lockfile, output_file: &mut File) {
                     .precise()
                     .expect("git reference should have precise")
                     .to_string();
-                (
-                    precise.clone(),
-                    Some(format!("{}/tree/{precise}", vrl_source.url())),
-                )
+
+                let mut url = vrl_source.url().to_string();
+                url = url
+                    .trim_end_matches(".git")
+                    .trim_end_matches('/')
+                    .to_string();
+
+                (precise.clone(), Some(format!("{url}/tree/{precise}")))
             }
             SourceKind::Registry if vrl_source.is_default_registry() => {
                 let version = vrl_dep.version.to_string();

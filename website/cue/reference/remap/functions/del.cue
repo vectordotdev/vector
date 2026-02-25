@@ -36,7 +36,7 @@ remap: functions: del: {
 			""",
 	]
 	return: {
-		types: ["any"]
+		types: ["any", "null"]
 		rules: [
 			"Returns the value of the field being deleted. Returns `null` if the field doesn't exist.",
 		]

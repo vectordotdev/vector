@@ -1,0 +1,41 @@
+version: '3'
+
+services:
+  zookeeper:
+    image: docker.io/confluentinc/cp-zookeeper:${CONFIG_VERSION}
+    ports:
+    - 2181:2181
+    environment:
+    - ZOOKEEPER_CLIENT_PORT=2181
+  kafka:
+    image: docker.io/confluentinc/cp-kafka:7.6.1
+    depends_on:
+    - zookeeper
+    environment:
+    - KAFKA_BROKER_ID=1
+    - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
+    - ZOOKEEPER_SASL_ENABLED=false
+    - KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR=1
+    - KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS=0
+    - KAFKA_LISTENERS=PLAINTEXT://:9091,SSL://:9092,SASL_PLAINTEXT://:9093
+    - KAFKA_ADVERTISED_LISTENERS=PLAINTEXT://kafka:9091,SSL://kafka:9092,SASL_PLAINTEXT://kafka:9093
+    - KAFKA_SSL_KEYSTORE_TYPE=PKCS12
+    - KAFKA_SSL_KEY_CREDENTIALS=kafka.pass
+    - KAFKA_SSL_KEYSTORE_CREDENTIALS=kafka.pass
+    - KAFKA_SSL_KEYSTORE_FILENAME=kafka.p12
+    - KAFKA_SSL_CLIENT_AUTH=none
+    - KAFKA_OPTS=-Djava.security.auth.login.config=/etc/kafka/kafka_server_jaas.conf
+    - KAFKA_SASL_ENABLED_MECHANISMS=PLAIN
+    ports:
+    - 9091:9091
+    - 9092:9092
+    - 9093:9093
+    volumes:
+    - ../../../data/ca/intermediate_server/private/kafka.pass:/etc/kafka/secrets/kafka.pass:ro
+    - ../../../data/ca/intermediate_server/private/kafka.p12:/etc/kafka/secrets/kafka.p12:ro
+    - ../../shared/data/kafka_server_jaas.conf:/etc/kafka/kafka_server_jaas.conf
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

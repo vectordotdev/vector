@@ -63,8 +63,9 @@ use metrics_util::{
 };
 use parking_lot::Mutex;
 use quanta::{Clock, Instant};
+use vector_common::atomic::AtomicF64;
 
-use super::storage::{AtomicF64, Histogram};
+use super::storage::Histogram;
 
 /// The generation of a metric.
 ///

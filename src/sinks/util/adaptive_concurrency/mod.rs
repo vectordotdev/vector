@@ -59,12 +59,12 @@ pub struct AdaptiveConcurrencySettings {
 
     /// Scale of RTT deviations which are not considered anomalous.
     ///
-    /// Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
+    /// Valid values are greater than or equal to `0`, and reasonable values range from `1.0` to `3.0`.
     ///
-    /// When calculating the past RTT average, we also compute a secondary “deviation” value that indicates how variable
-    /// those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
+    /// When calculating the past RTT average, a secondary “deviation” value is also computed that indicates how variable
+    /// those values are. That deviation is used when comparing the past RTT average to the current measurements, so we
     /// can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
-    /// an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
+    /// an appropriate range. Larger values cause the algorithm to ignore larger increases in the RTT.
     #[configurable(validation(range(min = 0.0)))]
     #[serde(default = "default_rtt_deviation_scale")]
     pub(super) rtt_deviation_scale: f64,

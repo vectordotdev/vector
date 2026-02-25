@@ -165,10 +165,7 @@ impl RedisConnection {
             if !repairing {
                 // Wait until a repair is needed
                 if let Err(error) = conn_recv.wait_for(|state| state.needs_repair()).await {
-                    warn!(
-                        internal_log_rate_limit = true,
-                        "Connection state channel was dropped {error:?}."
-                    );
+                    warn!("Connection state channel was dropped {error:?}.");
                     continue;
                 }
 
@@ -192,7 +189,6 @@ impl RedisConnection {
                 }
                 Err(error) => {
                     warn!(
-                        internal_log_rate_limit = true,
                         "Failed to repair ConnectionManager via sentinel (gen: {current_generation}): {error:?}."
                     );
                     sleep(Duration::from_millis(250)).await;
@@ -257,8 +253,8 @@ impl RedisConnection {
 
 pub(super) struct RedisSink {
     request: TowerRequestConfig<RedisTowerRequestConfigDefaults>,
-    encoder: crate::codecs::Encoder<()>,
-    transformer: crate::codecs::Transformer,
+    encoder: vector_lib::codecs::Encoder<()>,
+    transformer: vector_lib::codecs::Transformer,
     conn: RedisConnection,
     data_type: super::DataType,
     key: Template,

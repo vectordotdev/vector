@@ -1,7 +1,6 @@
 use std::{
     net::{IpAddr, Ipv4Addr, Ipv6Addr, SocketAddr},
     pin::Pin,
-    time::Duration,
 };
 
 use async_trait::async_trait;
@@ -10,6 +9,7 @@ use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
 use vector_lib::{
+    codecs::encoding::Chunker,
     configurable::configurable_component,
     internal_event::{BytesSent, Protocol, Registered},
 };
@@ -84,9 +84,10 @@ impl UdpSinkConfig {
         + Send
         + Sync
         + 'static,
+        chunker: Option<Chunker>,
     ) -> crate::Result<(VectorSink, Healthcheck)> {
         let connector = self.build_connector()?;
-        let sink = UdpSink::new(connector.clone(), transformer, encoder);
+        let sink = UdpSink::new(connector.clone(), transformer, encoder, chunker);
         Ok((
             VectorSink::from_event_streamsink(sink),
             async move { connector.healthcheck().await }.boxed(),
@@ -110,11 +111,9 @@ impl UdpConnector {
         }
     }
 
-    const fn fresh_backoff() -> ExponentialBackoff {
+    fn fresh_backoff() -> ExponentialBackoff {
         // TODO: make configurable
-        ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60))
+        ExponentialBackoff::default()
     }
 
     async fn connect(&self) -> Result<UdpSocket, UdpError> {
@@ -169,6 +168,7 @@ where
     connector: UdpConnector,
     transformer: Transformer,
     encoder: E,
+    chunker: Option<Chunker>,
     bytes_sent: Registered<BytesSent>,
 }
 
@@ -176,11 +176,17 @@ impl<E> UdpSink<E>
 where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
-    fn new(connector: UdpConnector, transformer: Transformer, encoder: E) -> Self {
+    fn new(
+        connector: UdpConnector,
+        transformer: Transformer,
+        encoder: E,
+        chunker: Option<Chunker>,
+    ) -> Self {
         Self {
             connector,
             transformer,
             encoder,
+            chunker,
             bytes_sent: register!(BytesSent::from(Protocol::UDP)),
         }
     }
@@ -195,6 +201,7 @@ where
         let mut input = input.peekable();
 
         let mut encoder = self.encoder.clone();
+        let chunker = self.chunker.clone();
         while Pin::new(&mut input).peek().await.is_some() {
             let socket = self.connector.connect_backoff().await;
             send_datagrams(
@@ -202,6 +209,7 @@ where
                 DatagramSocket::Udp(socket),
                 &self.transformer,
                 &mut encoder,
+                &chunker,
                 &self.bytes_sent,
             )
             .await;

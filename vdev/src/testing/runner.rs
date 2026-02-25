@@ -1,16 +1,19 @@
-use std::{collections::HashSet, env, path::PathBuf, process::Command};
-
 use anyhow::Result;
+use std::{collections::HashSet, env, process::Command};
 
 use super::config::{IntegrationRunnerConfig, RustToolchainConfig};
 use crate::{
     app::{self, CommandExt as _},
-    environment::{Environment, append_environment_variables},
     testing::{
         build::prepare_build_command,
         docker::{DOCKER_SOCKET, docker_command},
+        test_runner_dockerfile,
     },
-    util::{ChainArgs as _, IS_A_TTY},
+    utils::{
+        IS_A_TTY,
+        command::ChainArgs as _,
+        environment::{Environment, append_environment_variables},
+    },
 };
 
 const MOUNT_PATH: &str = "/home/vector";
@@ -27,8 +30,7 @@ const TEST_COMMAND: &[&str] = &[
     "--no-default-features",
 ];
 // The upstream container we publish artifacts to on a successful master build.
-const UPSTREAM_IMAGE: &str =
-    "docker.io/timberio/vector-dev:sha-3eadc96742a33754a5859203b58249f6a806972a";
+const UPSTREAM_IMAGE: &str = "docker.io/timberio/vector-dev:latest";
 
 pub enum RunnerState {
     Running,
@@ -56,7 +58,7 @@ pub trait TestRunner {
         inner_env: &Environment,
         features: Option<&[String]>,
         args: &[String],
-        directory: &str,
+        build: bool,
     ) -> Result<()>;
 }
 
@@ -103,8 +105,8 @@ pub trait ContainerTestRunner: TestRunner {
     fn ensure_running(
         &self,
         features: Option<&[String]>,
-        directory: &str,
         config_environment_variables: &Environment,
+        build: bool,
     ) -> Result<()> {
         match self.state()? {
             RunnerState::Running | RunnerState::Restarting => (),
@@ -116,8 +118,7 @@ pub trait ContainerTestRunner: TestRunner {
                 self.start()?;
             }
             RunnerState::Missing => {
-                self.build(features, directory, config_environment_variables)?;
-                self.ensure_volumes()?;
+                self.build(features, config_environment_variables, build)?;
                 self.create()?;
                 self.start()?;
             }
@@ -148,20 +149,20 @@ pub trait ContainerTestRunner: TestRunner {
     fn build(
         &self,
         features: Option<&[String]>,
-        directory: &str,
         config_env_vars: &Environment,
+        build: bool,
     ) -> Result<()> {
-        let dockerfile: PathBuf = [app::path(), "scripts", directory, "Dockerfile"]
-            .iter()
-            .collect();
+        let image_name = self.image_name();
 
+        let dockerfile = test_runner_dockerfile();
         let mut command =
-            prepare_build_command(&self.image_name(), &dockerfile, features, config_env_vars);
-        waiting!("Building image {}", self.image_name());
+            prepare_build_command(&image_name, &dockerfile, features, config_env_vars, build);
+        waiting!("Building image {}", image_name);
         command.check_run()
     }
 
     fn start(&self) -> Result<()> {
+        self.ensure_volumes()?;
         docker_command(["start", &self.container_name()])
             .wait(format!("Starting container {}", self.container_name()))
     }
@@ -196,6 +197,7 @@ pub trait ContainerTestRunner: TestRunner {
             .flat_map(|volume| ["--volume", volume])
             .collect();
 
+        self.ensure_volumes()?;
         docker_command(
             [
                 "create",
@@ -234,9 +236,9 @@ where
         config_environment_variables: &Environment,
         features: Option<&[String]>,
         args: &[String],
-        directory: &str,
+        build: bool,
     ) -> Result<()> {
-        self.ensure_running(features, directory, config_environment_variables)?;
+        self.ensure_running(features, config_environment_variables, build)?;
 
         let mut command = docker_command(["exec"]);
         if *IS_A_TTY {
@@ -276,16 +278,25 @@ impl IntegrationTestRunner {
         config: &IntegrationRunnerConfig,
         network: Option<String>,
     ) -> Result<Self> {
+        let mut volumes: Vec<String> = config
+            .volumes
+            .iter()
+            .map(|(a, b)| format!("{a}:{b}"))
+            .collect();
+
+        volumes.push(format!("{VOLUME_TARGET}:/output"));
+
         Ok(Self {
             integration,
             needs_docker_socket: config.needs_docker_socket,
             network,
-            volumes: config
-                .volumes
-                .iter()
-                .map(|(a, b)| format!("{a}:{b}"))
-                .collect(),
+            volumes,
         })
+    }
+
+    /// Returns true if this runner uses the shared image (with all features)
+    pub(super) fn is_shared_runner(&self) -> bool {
+        self.integration.is_none()
     }
 
     pub(super) fn ensure_network(&self) -> Result<()> {
@@ -304,6 +315,26 @@ impl IntegrationTestRunner {
         } else {
             Ok(())
         }
+    }
+
+    pub(super) fn ensure_external_volumes(&self) -> Result<()> {
+        // Get list of existing volumes
+        let mut command = docker_command(["volume", "ls", "--format", "{{.Name}}"]);
+        let existing_volumes: HashSet<String> =
+            command.check_output()?.lines().map(String::from).collect();
+
+        // Extract volume names from self.volumes (format is "volume_name:/mount/path")
+        for volume_spec in &self.volumes {
+            if let Some((volume_name, _)) = volume_spec.split_once(':') {
+                // Only create named volumes (not paths like /host/path)
+                if !volume_name.starts_with('/') && !existing_volumes.contains(volume_name) {
+                    docker_command(["volume", "create", volume_name])
+                        .wait(format!("Creating volume {volume_name}"))?;
+                }
+            }
+        }
+
+        Ok(())
     }
 }
 
@@ -370,7 +401,7 @@ impl TestRunner for LocalTestRunner {
         inner_env: &Environment,
         _features: Option<&[String]>,
         args: &[String],
-        _directory: &str,
+        _build: bool,
     ) -> Result<()> {
         let mut command = Command::new(TEST_COMMAND[0]);
         command.args(&TEST_COMMAND[1..]);

@@ -82,6 +82,7 @@ pub struct SimpleHttpConfig {
     /// The expected encoding of received data.
     ///
     /// For `json` and `ndjson` encodings, the fields of the JSON objects are output as separate fields.
+    #[configurable(deprecated)]
     #[serde(default)]
     encoding: Option<Encoding>,
 
@@ -504,7 +505,7 @@ impl HttpSource for SimpleHttpSource {
                 }
                 Ok(None) => break,
                 Err(error) => {
-                    // Error is logged / emitted by `crate::codecs::Decoder`, no further
+                    // Error is logged / emitted by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here
                     return Err(ErrorMessage::new(
                         StatusCode::BAD_REQUEST,
@@ -557,8 +558,9 @@ mod tests {
         event::{Event, EventStatus, Value},
         sources::http_server::HttpMethod,
         test_util::{
+            addr::next_addr,
             components::{self, HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
-            next_addr, spawn_collect_n, wait_for_tcp,
+            spawn_collect_n, wait_for_tcp,
         },
     };
 
@@ -584,7 +586,7 @@ mod tests {
         decoding: Option<DeserializerConfig>,
     ) -> (impl Stream<Item = Event> + 'a, SocketAddr) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let path = path.to_owned();
         let host_key = OptionalValuePath::from(owned_value_path!(host_key));
         let path_key = OptionalValuePath::from(owned_value_path!(path_key));

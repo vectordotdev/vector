@@ -32,7 +32,7 @@ use self::task::{Task, TaskError, TaskResult};
 pub use self::{
     builder::TopologyPieces,
     controller::{ReloadOutcome, SharedTopologyController, TopologyController},
-    running::{RunningTopology, ShutdownErrorReceiver},
+    running::{ReloadError, RunningTopology, ShutdownErrorReceiver},
 };
 use crate::{
     config::{ComponentKey, Config, ConfigDiff},

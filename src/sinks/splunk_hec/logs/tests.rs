@@ -27,7 +27,7 @@ use crate::{
         },
     },
     template::Template,
-    test_util::next_addr,
+    test_util::addr::next_addr,
 };
 
 #[derive(Deserialize, Debug)]
@@ -216,7 +216,7 @@ fn splunk_encode_log_event_text() {
 
 #[tokio::test]
 async fn splunk_passthrough_token() {
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
     let config = HecLogsSinkConfig {
         default_token: "token".to_string().into(),
         endpoint: format!("http://{addr}"),

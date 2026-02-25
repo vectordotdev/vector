@@ -12,8 +12,9 @@ use crate::{
     config::log_schema,
     sources::okta::OktaConfig,
     test_util::{
+        addr::next_addr,
         components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
-        next_addr, test_generate_config, wait_for_tcp,
+        test_generate_config, wait_for_tcp,
     },
 };
 
@@ -60,7 +61,7 @@ register_validatable_component!(OktaConfig);
 
 #[tokio::test]
 async fn okta_compliance() {
-    let in_addr = next_addr();
+    let (_guard, in_addr) = next_addr();
 
     let dummy_endpoint = warp::path!("api" / "v1" / "logs")
         .and(warp::query::<std::collections::HashMap<String, String>>())
@@ -119,7 +120,7 @@ async fn okta_compliance() {
 
 #[tokio::test]
 async fn okta_follows_rel() {
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
 
     let dummy_endpoint = warp::path!("api" / "v1" / "logs")
         .and(warp::query::<std::collections::HashMap<String, String>>())
@@ -182,7 +183,7 @@ async fn okta_follows_rel() {
 async fn okta_persists_rel() {
     // the client follows `next` links; on the next interval it should pick up where it left off
     // and not start over from the beginning
-    let addr = next_addr();
+    let (_guard, addr) = next_addr();
 
     let init_guard: Arc<AtomicBool> = Arc::new(AtomicBool::new(false));
 

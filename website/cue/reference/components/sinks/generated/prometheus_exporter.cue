@@ -12,7 +12,7 @@ generated: components: sinks: prometheus_exporter: configuration: {
 		required: false
 		type: object: options: enabled: {
 			description: """
-				Whether or not end-to-end acknowledgements are enabled.
+				Controls whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source that supports end-to-end
 				acknowledgements that is connected to that sink waits for events
@@ -203,6 +203,7 @@ generated: components: sinks: prometheus_exporter: configuration: {
 
 						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
 						"""
+					custom: "Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`"
 				}
 			}
 			token: {
@@ -216,6 +217,12 @@ generated: components: sinks: prometheus_exporter: configuration: {
 				relevant_when: "strategy = \"basic\""
 				required:      true
 				type: string: examples: ["${USERNAME}", "username"]
+			}
+			value: {
+				description:   "Custom string value of the Authorization header"
+				relevant_when: "strategy = \"custom\""
+				required:      true
+				type: string: examples: ["${AUTH_HEADER_VALUE}", "CUSTOM_PREFIX ${TOKEN}"]
 			}
 		}
 	}

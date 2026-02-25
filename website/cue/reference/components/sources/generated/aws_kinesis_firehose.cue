@@ -144,6 +144,14 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 															[vector_native_json]: https://github.com/vectordotdev/vector/blob/master/lib/codecs/tests/data/native_encoding/schema.cue
 															[experimental]: https://vector.dev/highlights/2022-03-31-native-event-codecs
 															"""
+						otlp: """
+															Decodes the raw bytes as [OTLP (OpenTelemetry Protocol)][otlp] protobuf format.
+
+															This decoder handles the three OTLP signal types: logs, metrics, and traces.
+															It automatically detects which type of OTLP message is being decoded.
+
+															[otlp]: https://opentelemetry.io/docs/specs/otlp/
+															"""
 						protobuf: """
 															Decodes the raw bytes as [protobuf][protobuf].
 
@@ -170,16 +178,34 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 				description:   "GELF-specific decoding options."
 				relevant_when: "codec = \"gelf\""
 				required:      false
-				type: object: options: lossy: {
-					description: """
-						Determines whether to replace invalid UTF-8 sequences instead of failing.
+				type: object: options: {
+					lossy: {
+						description: """
+																Determines whether to replace invalid UTF-8 sequences instead of failing.
 
-						When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
+																When true, invalid UTF-8 sequences are replaced with the [`U+FFFD REPLACEMENT CHARACTER`][U+FFFD].
 
-						[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
-						"""
-					required: false
-					type: bool: default: true
+																[U+FFFD]: https://en.wikipedia.org/wiki/Specials_(Unicode_block)#Replacement_character
+																"""
+						required: false
+						type: bool: default: true
+					}
+					validation: {
+						description: "Configures the decoding validation mode."
+						required:    false
+						type: string: {
+							default: "strict"
+							enum: {
+								relaxed: """
+																			Uses more relaxed validation that skips strict GELF specification checks.
+
+																			This mode will not treat specification violations as errors, allowing the decoder
+																			to accept messages from sources that don't strictly follow the GELF spec.
+																			"""
+								strict: "Uses strict validation that closely follows the GELF spec."
+							}
+						}
+					}
 				}
 			}
 			influxdb: {
@@ -239,7 +265,7 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 						description: """
 																The path to the protobuf descriptor set file.
 
-																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+																This file is the output of `protoc -I <include path> -o <desc output path> <proto>`.
 
 																You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
 																"""
@@ -253,6 +279,41 @@ generated: components: sources: aws_kinesis_firehose: configuration: {
 							default: ""
 							examples: ["package.Message"]
 						}
+					}
+					use_json_names: {
+						description: """
+																Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+
+																When enabled, the deserializer will output fields using their JSON names as defined
+																in the `.proto` file (e.g., `jobDescription` instead of `job_description`).
+
+																This is useful when working with data that needs to be converted to JSON or
+																when interfacing with systems that use JSON naming conventions.
+																"""
+						required: false
+						type: bool: default: false
+					}
+				}
+			}
+			signal_types: {
+				description: """
+					Signal types to attempt parsing, in priority order.
+
+					The deserializer will try parsing in the order specified. This allows you to optimize
+					performance when you know the expected signal types. For example, if you only receive
+					traces, set this to `["traces"]` to avoid attempting to parse as logs or metrics first.
+
+					If not specified, defaults to trying all types in order: logs, metrics, traces.
+					Duplicate signal types are automatically removed while preserving order.
+					"""
+				relevant_when: "codec = \"otlp\""
+				required:      false
+				type: array: {
+					default: ["logs", "metrics", "traces"]
+					items: type: string: enum: {
+						logs:    "OTLP logs signal (ExportLogsServiceRequest)"
+						metrics: "OTLP metrics signal (ExportMetricsServiceRequest)"
+						traces:  "OTLP traces signal (ExportTraceServiceRequest)"
 					}
 				}
 			}

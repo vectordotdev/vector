@@ -10,6 +10,8 @@ mod influxdb;
 mod json;
 mod native;
 mod native_json;
+#[cfg(feature = "opentelemetry")]
+mod otlp;
 mod protobuf;
 #[cfg(feature = "syslog")]
 mod syslog;
@@ -25,6 +27,8 @@ pub use native::{NativeDeserializer, NativeDeserializerConfig};
 pub use native_json::{
     NativeJsonDeserializer, NativeJsonDeserializerConfig, NativeJsonDeserializerOptions,
 };
+#[cfg(feature = "opentelemetry")]
+pub use otlp::{OtlpDeserializer, OtlpDeserializerConfig, OtlpSignalType};
 pub use protobuf::{ProtobufDeserializer, ProtobufDeserializerConfig, ProtobufDeserializerOptions};
 use smallvec::SmallVec;
 #[cfg(feature = "syslog")]
@@ -51,11 +55,6 @@ pub trait Deserializer: DynClone + Send + Sync {
         bytes: Bytes,
         log_namespace: LogNamespace,
     ) -> vector_common::Result<SmallVec<[Event; 1]>>;
-
-    /// Parses trace events from bytes.
-    fn parse_traces(&self, _bytes: Bytes) -> vector_common::Result<SmallVec<[Event; 1]>> {
-        unimplemented!()
-    }
 }
 
 dyn_clone::clone_trait_object!(Deserializer);

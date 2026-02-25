@@ -405,8 +405,7 @@ fn line_to_events(
     } else {
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
-            fields = parts.len(),
-            internal_log_rate_limit = true
+            fields = parts.len()
         );
 
         events.push(LogEvent::from_str_legacy(line).into())
@@ -445,8 +444,9 @@ mod tests {
         config::{SourceConfig, SourceContext, log_schema},
         serde::{default_decoding, default_framing_message_based},
         test_util::{
+            addr::{PortGuard, next_addr},
             components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
-            next_addr, random_string, spawn_collect_n, wait_for_tcp,
+            random_string, spawn_collect_n, wait_for_tcp,
         },
     };
 
@@ -460,9 +460,9 @@ mod tests {
         query_parameters: Vec<String>,
         status: EventStatus,
         acknowledgements: bool,
-    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let context = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             LogplexConfig {
@@ -483,7 +483,7 @@ mod tests {
             .unwrap()
         });
         wait_for_tcp(address).await;
-        (recv, address)
+        (recv, address, _guard)
     }
 
     async fn send(
@@ -522,7 +522,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let auth = make_auth();
 
-            let (rx, addr) = source(
+            let (rx, addr, _guard) = source(
                 Some(auth.clone()),
                 vec!["appname".to_string(), "absent".to_string()],
                 EventStatus::Delivered,
@@ -568,7 +568,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let auth = make_auth();
 
-            let (rx, addr) = source(
+            let (rx, addr, _guard) = source(
                 Some(auth.clone()),
                 vec!["*".to_string()],
                 EventStatus::Delivered,
@@ -613,7 +613,8 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let auth = make_auth();
 
-            let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
+            let (rx, addr, _guard) =
+                source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
 
             let events = spawn_collect_n(
                 async move {
@@ -636,7 +637,8 @@ mod tests {
     async fn logplex_ignores_disabled_acknowledgements() {
         let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, false).await;
+        let (rx, addr, _guard) =
+            source(Some(auth.clone()), vec![], EventStatus::Rejected, false).await;
 
         let events = spawn_collect_n(
             async move {
@@ -655,7 +657,8 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_auth_failure() {
-        let (_rx, addr) = source(Some(make_auth()), vec![], EventStatus::Delivered, true).await;
+        let (_rx, addr, _guard) =
+            source(Some(make_auth()), vec![], EventStatus::Delivered, true).await;
 
         assert_eq!(
             401,

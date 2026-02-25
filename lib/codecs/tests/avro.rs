@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use std::{
     fs::File,
     io::Read,
@@ -33,7 +35,9 @@ fn roundtrip_avro_fixtures(
 fn roundtrip_avro(data_path: PathBuf, schema_path: PathBuf, reserialize: bool) {
     let schema = load_file(&schema_path);
     let schema = from_utf8(&schema).unwrap().to_string();
-    let deserializer = AvroDeserializerConfig::new(schema.clone(), false).build();
+    let deserializer = AvroDeserializerConfig::new(schema.clone(), false)
+        .build()
+        .unwrap();
     let mut serializer = AvroSerializerConfig::new(schema.clone()).build().unwrap();
 
     let (buf, event) = load_deserialize(&data_path, &deserializer);

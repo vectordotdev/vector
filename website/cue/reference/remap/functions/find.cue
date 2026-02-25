@@ -51,7 +51,7 @@ remap: functions: find: {
 			source: #"""
 				find("foobar", "baz")
 				"""#
-			return: -1
+			return: null
 		},
 		{
 			title: "With an offset"

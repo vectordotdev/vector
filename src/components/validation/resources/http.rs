@@ -13,6 +13,7 @@ use axum::{
 };
 use bytes::{BufMut as _, BytesMut};
 use http::{Method, Request, StatusCode, Uri};
+use http_body::{Body as _, Collected};
 use hyper::{Body, Client, Server};
 use tokio::{
     select,
@@ -328,10 +329,29 @@ impl HttpResourceOutputContext<'_> {
                 let mut decoder = decoder.clone();
 
                 async move {
-                    match hyper::body::to_bytes(request.into_body()).await {
+                    // Extract the Content-Encoding header before consuming the request
+                    let content_encoding = request
+                        .headers()
+                        .get("content-encoding")
+                        .and_then(|v| v.to_str().ok())
+                        .map(|s| s.to_string());
+
+                    match request.into_body().collect().await.map(Collected::to_bytes) {
                         Err(_) => StatusCode::INTERNAL_SERVER_ERROR.into_response(),
                         Ok(body) => {
                             let byte_size = body.len();
+
+                            // Validation tests should not use compression - error if we receive compressed data
+                            if let Some(encoding) = &content_encoding
+                                && encoding != "identity"
+                            {
+                                error!(
+                                    "Received compressed data (Content-Encoding: {encoding}). \
+                                        Validation tests assert on bytes sizes and compressed size might not be deterministic."
+                                );
+                                return StatusCode::BAD_REQUEST.into_response();
+                            }
+
                             let mut body = BytesMut::from(&body[..]);
                             loop {
                                 match decoder.decode_eof(&mut body) {
@@ -340,14 +360,12 @@ impl HttpResourceOutputContext<'_> {
                                     Ok(Some((events, decoded_byte_size))) => {
                                         if should_reject {
                                             info!(
-                                                internal_log_rate_limit = true,
                                                 "HTTP server external output resource decoded {decoded_byte_size:?} bytes but test case configured to reject.",
                                             );
                                         } else {
                                             let mut output_runner_metrics =
                                                 output_runner_metrics.lock().await;
                                             info!(
-                                                internal_log_rate_limit = true,
                                                 "HTTP server external output resource decoded {decoded_byte_size:?} bytes."
                                             );
 
@@ -382,7 +400,7 @@ impl HttpResourceOutputContext<'_> {
                                     }
                                     Err(_) => {
                                         error!(
-                                            "HTTP server failed to decode {:?}",
+                                            "HTTP server failed to decode body: {:?}",
                                             String::from_utf8_lossy(&body)
                                         );
                                         return StatusCode::INTERNAL_SERVER_ERROR.into_response();

@@ -2,6 +2,8 @@ use futures::StreamExt;
 use heim::units::information::byte;
 #[cfg(not(windows))]
 use heim::units::ratio::ratio;
+#[cfg(unix)]
+use nix::sys::statvfs::statvfs;
 use vector_lib::{configurable::configurable_component, metric_tags};
 
 use super::{FilterList, HostMetrics, default_all_devices, example_devices, filter_result};
@@ -128,8 +130,32 @@ impl HostMetrics {
                     output.gauge(
                         "filesystem_used_ratio",
                         usage.ratio().get::<ratio>() as f64,
-                        tags,
+                        tags.clone(),
                     );
+
+                    // inode metrics via a second statvfs call - heim's Usage wraps
+                    // libc::statvfs internally but doesn't expose inode fields
+                    // (f_files, f_ffree). the kernel caches statvfs for local
+                    // filesystems so the overhead is negligible, but network mounts
+                    // may pay a small extra cost.
+                    #[cfg(unix)]
+                    if let Ok(stat) = statvfs(partition.mount_point()) {
+                        let inodes_total = stat.files() as f64;
+                        let inodes_free = stat.files_free() as f64;
+                        let inodes_used = (inodes_total - inodes_free).max(0.0);
+                        let inodes_used_ratio = if inodes_total > 0.0 {
+                            inodes_used / inodes_total
+                        } else {
+                            0.0
+                        };
+
+                        output.gauge("filesystem_inodes_total", inodes_total, tags.clone());
+                        output.gauge("filesystem_inodes_free", inodes_free, tags.clone());
+                        output.gauge("filesystem_inodes_used", inodes_used, tags.clone());
+                        output.gauge("filesystem_inodes_used_ratio", inodes_used_ratio, tags);
+                    }
+                    #[cfg(windows)]
+                    drop(tags);
                 }
             }
             Err(error) => {
@@ -161,17 +187,40 @@ mod tests {
             .await;
         let metrics = buffer.metrics;
         assert!(!metrics.is_empty());
-        assert!(metrics.len() % 4 == 0);
         assert!(all_gauges(&metrics));
 
-        // There are exactly three filesystem_* names
-        for name in &[
+        // Base metrics (these are always present)
+        let base_metrics = [
             "filesystem_free_bytes",
             "filesystem_total_bytes",
             "filesystem_used_bytes",
             "filesystem_used_ratio",
-        ] {
-            assert_eq!(count_name(&metrics, name), metrics.len() / 4, "name={name}");
+        ];
+
+        // Each filesystem should have all 4 base metrics
+        let num_filesystems = count_name(&metrics, "filesystem_free_bytes");
+        assert!(num_filesystems > 0);
+        for name in &base_metrics {
+            assert_eq!(count_name(&metrics, name), num_filesystems, "name={name}");
+        }
+
+        // Inode metrics are present for filesystems that support statvfs
+        // (some virtual filesystems like /proc, /sys might not)
+        let inode_metrics = [
+            "filesystem_inodes_total",
+            "filesystem_inodes_free",
+            "filesystem_inodes_used",
+            "filesystem_inodes_used_ratio",
+        ];
+        let num_inode_total = count_name(&metrics, "filesystem_inodes_total");
+        assert!(
+            num_inode_total > 0,
+            "Expected at least one filesystem to report inode metrics"
+        );
+
+        // For filesystems that report inodes, all 4 inode metrics should be present
+        for name in &inode_metrics {
+            assert_eq!(count_name(&metrics, name), num_inode_total, "name={name}");
         }
 
         // They should all have "filesystem" and "mountpoint" tags

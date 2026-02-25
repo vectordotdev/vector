@@ -6,7 +6,7 @@ use std::sync::Arc;
 use tokio::sync::{Mutex, mpsc};
 use vector_lib::{
     codecs::{
-        BytesEncoder,
+        BytesEncoder, Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming,
         decoding::{self, DeserializerConfig},
         encoding::{
             self, Framer, FramingConfig, JsonSerializerConfig, SerializerConfig,
@@ -26,7 +26,6 @@ use super::{
     RunnerMetrics,
     sync::{Configuring, TaskCoordinator},
 };
-use crate::codecs::{Decoder, DecodingConfig, Encoder, EncodingConfig, EncodingConfigWithFraming};
 
 /// The codec used by the external resource.
 ///
@@ -157,6 +156,7 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
                 protobuf: vector_lib::codecs::encoding::ProtobufSerializerOptions {
                     desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
+                    use_json_names: config.protobuf.use_json_names,
                 },
             })
         }
@@ -167,11 +167,13 @@ fn deserializer_config_to_serializer(config: &DeserializerConfig) -> encoding::S
         DeserializerConfig::Syslog { .. } => SerializerConfig::Logfmt,
         DeserializerConfig::Native => SerializerConfig::Native,
         DeserializerConfig::NativeJson { .. } => SerializerConfig::NativeJson,
-        DeserializerConfig::Gelf { .. } => SerializerConfig::Gelf,
+        DeserializerConfig::Gelf { .. } => SerializerConfig::Gelf(Default::default()),
         DeserializerConfig::Avro { avro } => SerializerConfig::Avro { avro: avro.into() },
         // TODO: Influxdb has no serializer yet
         DeserializerConfig::Influxdb { .. } => todo!(),
         DeserializerConfig::Vrl { .. } => unimplemented!(),
+        #[cfg(feature = "codecs-opentelemetry")]
+        DeserializerConfig::Otlp { .. } => SerializerConfig::Otlp,
     };
 
     serializer_config
@@ -219,7 +221,7 @@ fn serializer_config_to_deserializer(
         SerializerConfig::Avro { .. } => todo!(),
         SerializerConfig::Cef { .. } => todo!(),
         SerializerConfig::Csv { .. } => todo!(),
-        SerializerConfig::Gelf => DeserializerConfig::Gelf(Default::default()),
+        SerializerConfig::Gelf { .. } => DeserializerConfig::Gelf(Default::default()),
         SerializerConfig::Json(_) => DeserializerConfig::Json(Default::default()),
         SerializerConfig::Logfmt => todo!(),
         SerializerConfig::Native => DeserializerConfig::Native,
@@ -229,10 +231,15 @@ fn serializer_config_to_deserializer(
                 protobuf: vector_lib::codecs::decoding::ProtobufDeserializerOptions {
                     desc_file: config.protobuf.desc_file.clone(),
                     message_type: config.protobuf.message_type.clone(),
+                    use_json_names: config.protobuf.use_json_names,
                 },
             })
         }
         SerializerConfig::RawMessage | SerializerConfig::Text(_) => DeserializerConfig::Bytes,
+        #[cfg(feature = "codecs-opentelemetry")]
+        SerializerConfig::Otlp => todo!(),
+        #[cfg(feature = "codecs-syslog")]
+        SerializerConfig::Syslog(_) => todo!(),
     };
 
     deserializer_config.build()

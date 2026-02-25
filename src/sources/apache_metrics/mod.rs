@@ -173,7 +173,7 @@ fn apache_metrics(
                     .map_err(crate::Error::from)
                     .and_then(|response| async {
                         let (header, body) = response.into_parts();
-                        let body = hyper::body::to_bytes(body).await?;
+                        let body = http_body::Body::collect(body).await?.to_bytes();
                         Ok((header, body))
                     })
                     .into_stream()
@@ -290,9 +290,10 @@ mod test {
         Error,
         config::SourceConfig,
         test_util::{
+            addr::next_addr,
             collect_ready,
             components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
-            next_addr, wait_for_tcp,
+            wait_for_tcp,
         },
     };
 
@@ -303,7 +304,7 @@ mod test {
 
     #[tokio::test]
     async fn test_apache_up() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
@@ -396,7 +397,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
 
     #[tokio::test]
     async fn test_apache_error() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
@@ -448,7 +449,7 @@ Scoreboard: ____S_____I______R____I_______KK___D__C__G_L____________W___________
     #[tokio::test]
     async fn test_apache_down() {
         // will have nothing bound
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let (tx, rx) = SourceSender::new_test();
 

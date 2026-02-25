@@ -1,4 +1,4 @@
-CUE = ./scripts/cue.sh
+CUE = ../scripts/cue.sh
 
 # Override to specify which network address to use in Hugo/HTTP servers for binding
 export SERVER_BIND ?= 127.0.0.1
@@ -15,25 +15,9 @@ setup:
 cargo-data:
 	cp -f ../Cargo.lock data/cargo-lock.toml
 
-# Build JSON from CUE sources
-cue-build:
-	${CUE} build
-
-# Other CUE commands
-cue-check:
-	${CUE} check
-
-cue-fmt:
-	${CUE} fmt
-
-cue-help:
-	${CUE} help
-
-cue-list:
-	${CUE} list
-
-cue-vet:
-	${CUE} vet
+# Build JSON from CUE sources with `make cue-build`. Run other commands with `make cue-*`
+cue-%:
+	${CUE} $*
 
 config-examples:
 	yarn config-examples

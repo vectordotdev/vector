@@ -1,6 +1,31 @@
 package metadata
 
 generated: configuration: configuration: {
+	healthchecks: {
+		type: object: options: {
+			enabled: {
+				type: bool: default: true
+				description: """
+					Whether or not healthchecks are enabled for all sinks.
+
+					Can be overridden on a per-sink basis.
+					"""
+				required: false
+			}
+			require_healthy: {
+				type: bool: default: false
+				description: """
+					Whether or not to require a sink to report as being healthy during startup.
+
+					When enabled and a sink reports not being healthy, Vector will exit during start-up.
+
+					Can be alternatively set, and overridden by, the `--require-healthy` command-line flag.
+					"""
+				required: false
+			}
+		}
+		description: "Healthcheck options."
+	}
 	enrichment_tables: {
 		type: object: options: {
 			file: {
@@ -169,10 +194,18 @@ generated: configuration: configuration: {
 														"""
 						required: false
 					}
+					export_expired_items: {
+						type: bool: default: false
+						description: """
+														Set to true to export expired items via the `expired` output port.
+														Expired items ignore other settings and are exported as they are flushed from the table.
+														"""
+						required: false
+					}
 					export_interval: {
 						type: uint: {}
 						description: "Interval for exporting all data from the table when used as a source."
-						required:    true
+						required:    false
 					}
 					remove_after_export: {
 						type: bool: default: false
@@ -204,6 +237,12 @@ generated: configuration: configuration: {
 					When TTL expires, data behind a specific key in the cache is removed.
 					TTL is reset when the key is replaced.
 					"""
+				required:      false
+				relevant_when: "type = \"memory\""
+			}
+			ttl_field: {
+				type: string: default: ""
+				description:   "Field in the incoming value used as the TTL override."
 				required:      false
 				relevant_when: "type = \"memory\""
 			}
@@ -650,7 +689,7 @@ generated: configuration: configuration: {
 		required: false
 		type: object: options: enabled: {
 			description: """
-				Whether or not end-to-end acknowledgements are enabled.
+				Controls whether or not end-to-end acknowledgements are enabled.
 
 				When enabled for a sink, any source that supports end-to-end
 				acknowledgements that is connected to that sink waits for events
@@ -664,6 +703,27 @@ generated: configuration: configuration: {
 			required: false
 			type: bool: {}
 		}
+	}
+	buffer_utilization_ewma_half_life_seconds: {
+		description: """
+			The half-life, in seconds, for the exponential weighted moving average (EWMA) of source
+			and transform buffer utilization metrics.
+
+			This controls how quickly the `*_buffer_utilization_mean` gauges respond to new
+			observations. Longer half-lives retain more of the previous value, leading to slower
+			adjustments.
+
+			- Lower values (< 1): Metrics update quickly but may be volatile
+			- Default (5): Balanced between responsiveness and stability
+			- Higher values (> 5): Smooth, stable metrics that update slowly
+
+			Adjust based on whether you need fast detection of buffer issues (lower)
+			or want to see sustained trends without noise (higher).
+
+			Must be greater than 0.
+			"""
+		required: false
+		type: float: {}
 	}
 	data_dir: {
 		common: false
@@ -782,6 +842,20 @@ generated: configuration: configuration: {
 		required: false
 		type: float: {}
 	}
+	latency_ewma_alpha: {
+		description: """
+			The alpha value for the exponential weighted moving average (EWMA) of transform latency
+			metrics.
+
+			This controls how quickly the `component_latency_mean_seconds` gauge responds to new
+			observations. Values closer to 1.0 retain more of the previous value, leading to slower
+			adjustments. The default value of 0.9 is equivalent to a "half life" of 6-7 measurements.
+
+			Must be between 0 and 1 exclusively (0 < alpha < 1).
+			"""
+		required: false
+		type: float: {}
+	}
 	log_schema: {
 		common: false
 		description: """
@@ -836,6 +910,17 @@ generated: configuration: configuration: {
 				type: string: default: ".timestamp"
 			}
 		}
+	}
+	metrics_storage_refresh_period: {
+		description: """
+			The interval, in seconds, at which the internal metrics cache for VRL is refreshed.
+			This must be set to be able to access metrics in VRL functions.
+
+			Higher values lead to stale metric values from `get_vector_metric`,
+			`find_vector_metrics`, and `aggregate_vector_metrics` functions.
+			"""
+		required: false
+		type: float: {}
 	}
 	proxy: {
 		common: false

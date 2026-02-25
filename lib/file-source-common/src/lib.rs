@@ -1,9 +1,6 @@
 #![deny(warnings)]
 #![deny(clippy::all)]
 
-#[macro_use]
-extern crate scan_fmt;
-
 pub mod buffer;
 pub mod checkpointer;
 mod fingerprinter;
@@ -16,7 +13,7 @@ pub use self::{
     checkpointer::{CHECKPOINT_FILE_NAME, Checkpointer, CheckpointsView},
     fingerprinter::{FileFingerprint, FingerprintStrategy, Fingerprinter},
     internal_events::FileSourceInternalEvents,
-    metadata_ext::PortableFileExt,
+    metadata_ext::{AsyncFileInfo, PortableFileExt},
 };
 
 pub type FilePosition = u64;

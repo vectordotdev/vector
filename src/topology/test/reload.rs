@@ -20,7 +20,8 @@ use crate::{
         internal_metrics::InternalMetricsConfig, prometheus::PrometheusRemoteWriteConfig,
         splunk_hec::SplunkConfig,
     },
-    test_util::{self, mock::basic_sink, next_addr, start_topology, temp_dir, wait_for_tcp},
+    test_util::{self, addr::next_addr, mock::basic_sink, start_topology, temp_dir, wait_for_tcp},
+    topology::ReloadError::*,
 };
 
 fn internal_metrics_source() -> InternalMetricsConfig {
@@ -56,7 +57,7 @@ fn splunk_source_config(addr: SocketAddr) -> SplunkConfig {
 async fn topology_reuse_old_port() {
     test_util::trace_init();
 
-    let address = next_addr();
+    let (_guard, address) = next_addr();
 
     let mut old_config = Config::builder();
     old_config.add_source("in1", prom_remote_write_source(address));
@@ -67,20 +68,18 @@ async fn topology_reuse_old_port() {
     new_config.add_sink("out", &["in2"], basic_sink(1).1);
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
 async fn topology_rebuild_old() {
     test_util::trace_init();
 
-    let address_0 = next_addr();
-    let address_1 = next_addr();
+    let (_guard_0, address_0) = next_addr();
+    let (_guard_1, address_1) = next_addr();
 
     let mut old_config = Config::builder();
     old_config.add_source("in", splunk_source_config(address_0));
@@ -94,31 +93,29 @@ async fn topology_rebuild_old() {
     let _bind = TcpListener::bind(address_1).unwrap();
 
     let (mut topology, _) = start_topology(old_config.build().unwrap(), false).await;
-    assert!(
-        !topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    let result = topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await;
+
+    // Should fail with TopologyBuildFailed error due to port conflict
+    assert!(matches!(result, Err(TopologyBuildFailed)));
 }
 
 #[tokio::test]
 async fn topology_old() {
     test_util::trace_init();
 
-    let address = next_addr();
+    let (_guard, address) = next_addr();
 
     let mut old_config = Config::builder();
     old_config.add_source("in", prom_remote_write_source(address));
     old_config.add_sink("out", &["in"], basic_sink(1).1);
 
     let (mut topology, _) = start_topology(old_config.clone().build().unwrap(), false).await;
-    assert!(
-        topology
-            .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
 }
 
 #[tokio::test]
@@ -128,7 +125,7 @@ async fn topology_reuse_old_port_sink() {
     // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
     test_util::trace_init();
 
-    let address = next_addr();
+    let (_guard, address) = next_addr();
 
     let mut old_config = Config::builder();
     old_config.add_source("in", internal_metrics_source());
@@ -155,8 +152,8 @@ async fn topology_reuse_old_port_cross_dependency() {
     test_util::trace_init();
 
     // Reload with source that uses address of changed sink.
-    let address_0 = next_addr();
-    let address_1 = next_addr();
+    let (_guard_0, address_0) = next_addr();
+    let (_guard_1, address_1) = next_addr();
 
     let mut old_config = Config::builder();
     old_config.add_source("in", internal_metrics_source());
@@ -182,8 +179,8 @@ async fn topology_disk_buffer_conflict() {
     // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
     test_util::trace_init();
 
-    let address_0 = next_addr();
-    let address_1 = next_addr();
+    let (_guard_0, address_0) = next_addr();
+    let (_guard_1, address_1) = next_addr();
 
     let data_dir = temp_dir();
     std::fs::create_dir(&data_dir).unwrap();
@@ -224,8 +221,8 @@ async fn topology_reload_with_new_components() {
 
     // This specifically exercises that we can add new components -- no changed or removed
     // components -- via the reload mechanism and without any issues.
-    let address_0 = next_addr();
-    let address_1 = next_addr();
+    let (_guard_0, address_0) = next_addr();
+    let (_guard_1, address_1) = next_addr();
 
     let mut old_config = Config::builder();
     old_config.add_source("in1", internal_metrics_source());
@@ -253,7 +250,7 @@ async fn topology_readd_input() {
     // is enabled to use `internal_metrics`, otherwise it throws an error when trying to build the component.
     test_util::trace_init();
 
-    let address_0 = next_addr();
+    let (_guard, address_0) = next_addr();
 
     let mut old_config = Config::builder();
     old_config.add_source("in1", internal_metrics_source());
@@ -266,24 +263,20 @@ async fn topology_readd_input() {
     new_config.add_source("in1", internal_metrics_source());
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1"], prom_exporter_sink(address_0, 1));
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
 
     // re-add in2
     let mut new_config = Config::builder();
     new_config.add_source("in1", internal_metrics_source());
     new_config.add_source("in2", internal_metrics_source());
     new_config.add_sink("out", &["in1", "in2"], prom_exporter_sink(address_0, 1));
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
 
     sleep(Duration::from_secs(1)).await;
     topology.stop().await;
@@ -301,7 +294,7 @@ async fn topology_readd_input() {
 async fn topology_reload_component() {
     test_util::trace_init();
 
-    let address_0 = next_addr();
+    let (_guard, address_0) = next_addr();
 
     let mut old_config = Config::builder();
     old_config.add_source("in1", internal_metrics_source());
@@ -312,12 +305,10 @@ async fn topology_reload_component() {
 
     topology.extend_reload_set(HashSet::from_iter(vec![ComponentKey::from("out")]));
 
-    assert!(
-        topology
-            .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(old_config.build().unwrap(), Default::default())
+        .await
+        .unwrap();
 
     // TODO: Implement notification to avoid the sleep()
     // Give the old topology configuration a chance to shutdown cleanly, etc.
@@ -345,12 +336,10 @@ async fn reload_sink_test(
     sleep(Duration::from_secs(1)).await;
 
     // Now reload the topology with the "new" configuration, and make sure that a component is now listening on `new_address`.
-    assert!(
-        topology
-            .reload_config_and_respawn(new_config, Default::default())
-            .await
-            .unwrap()
-    );
+    topology
+        .reload_config_and_respawn(new_config, Default::default())
+        .await
+        .unwrap();
 
     // Give the old topology configuration a chance to shutdown cleanly, etc.
     sleep(Duration::from_secs(2)).await;

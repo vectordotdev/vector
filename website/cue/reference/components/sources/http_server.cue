@@ -110,10 +110,10 @@ components: sources: http_server: {
 			}
 		}
 		metrics: "": {
-			description: "The input `metric` event."
+			description: "Metric events that may be emitted by this source."
 		}
 		traces: "": {
-			description: "The input `trace` event."
+			description: "Trace events that may be emitted by this source."
 		}
 	}
 
@@ -125,8 +125,13 @@ components: sources: http_server: {
 			title:       "text/plain"
 
 			configuration: {
-				address:  "0.0.0.0:\(_port)"
-				encoding: "text"
+				address: "0.0.0.0:\(_port)"
+				decoding: {
+					codec: "text"
+				}
+				framing: {
+					method: "newline_delimited"
+				}
 				headers: ["User-Agent"]
 			}
 			input: """
@@ -158,8 +163,13 @@ components: sources: http_server: {
 			title:       "application/json"
 
 			configuration: {
-				address:  "0.0.0.0:\(_port)"
-				encoding: "json"
+				address: "0.0.0.0:\(_port)"
+				decoding: {
+					codec: "json"
+				}
+				framing: {
+					method: "bytes"
+				}
 				headers: ["User-Agent"]
 				_path:    _path
 				path_key: _path_key

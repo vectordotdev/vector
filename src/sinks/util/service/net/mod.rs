@@ -8,7 +8,6 @@ use std::{
     io,
     net::SocketAddr,
     task::{Context, Poll, ready},
-    time::Duration,
 };
 
 use futures_util::{FutureExt, future::BoxFuture};
@@ -242,9 +241,7 @@ impl NetworkConnector {
 
     async fn connect_backoff(&self) -> NetworkConnection {
         // TODO: Make this configurable.
-        let mut backoff = ExponentialBackoff::from_millis(2)
-            .factor(250)
-            .max_delay(Duration::from_secs(60));
+        let mut backoff = ExponentialBackoff::default();
 
         loop {
             match self.connect().await {

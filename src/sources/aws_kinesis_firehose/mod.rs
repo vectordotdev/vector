@@ -291,9 +291,10 @@ mod tests {
         event::{Event, EventStatus},
         log_event,
         test_util::{
+            addr::{PortGuard, next_addr},
             collect_ready,
             components::{SOURCE_TAGS, assert_source_compliance},
-            next_addr, wait_for_tcp,
+            wait_for_tcp,
         },
     };
 
@@ -334,11 +335,11 @@ mod tests {
         record_compression: Compression,
         delivered: bool,
         log_namespace: bool,
-    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
         use EventStatus::*;
         let status = if delivered { Delivered } else { Rejected };
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let cx = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             AwsKinesisFirehoseConfig {
@@ -360,8 +361,9 @@ mod tests {
             .await
             .unwrap()
         });
+        // Wait for the component to bind to the port
         wait_for_tcp(address).await;
-        (recv, address)
+        (recv, address, _guard)
     }
 
     /// Sends the body to the address with the appropriate Firehose headers
@@ -430,7 +432,7 @@ mod tests {
         let handle = tokio::spawn(async move {
             send(address, timestamp, records, key, gzip, record_compression).await
         });
-        sleep(Duration::from_millis(100)).await;
+        sleep(Duration::from_millis(500)).await;
         handle
     }
 
@@ -513,7 +515,7 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) =
+            let (rx, addr, _guard) =
                 source(None, None, false, source_record_compression, true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
@@ -614,7 +616,8 @@ mod tests {
                 Vec::new(),
             ),
         ] {
-            let (rx, addr) = source(None, None, false, source_record_compression, true, true).await;
+            let (rx, addr, _guard) =
+                source(None, None, false, source_record_compression, true, true).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -686,7 +689,8 @@ mod tests {
     #[tokio::test]
     async fn aws_kinesis_firehose_forwards_events_gzip_request() {
         assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr) = source(None, None, false, Default::default(), true, false).await;
+            let (rx, addr, _guard) =
+                source(None, None, false, Default::default(), true, false).await;
 
             let timestamp: DateTime<Utc> = Utc::now();
 
@@ -723,7 +727,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key() {
-        let (_rx, addr) = source(
+        let (_rx, addr, _guard) = source(
             Some("an access key".to_string().into()),
             Some(vec!["an access key in list".to_string().into()]),
             Default::default(),
@@ -751,7 +755,7 @@ mod tests {
 
     #[tokio::test]
     async fn aws_kinesis_firehose_rejects_bad_access_key_from_list() {
-        let (_rx, addr) = source(
+        let (_rx, addr, _guard) = source(
             None,
             Some(vec!["an access key in list".to_string().into()]),
             Default::default(),
@@ -781,7 +785,7 @@ mod tests {
     async fn aws_kinesis_firehose_accepts_merged_access_keys() {
         let valid_access_key = SensitiveString::from(String::from("an access key in list"));
 
-        let (_rx, addr) = source(
+        let (_rx, addr, _guard) = source(
             Some(valid_access_key.clone()),
             Some(vec!["valid access key 2".to_string().into()]),
             Default::default(),
@@ -812,7 +816,7 @@ mod tests {
     async fn aws_kinesis_firehose_accepts_access_keys_from_list() {
         let valid_access_key = "an access key in list".to_string();
 
-        let (_rx, addr) = source(
+        let (_rx, addr, _guard) = source(
             None,
             Some(vec![
                 valid_access_key.clone().into(),
@@ -846,7 +850,7 @@ mod tests {
     async fn handles_acknowledgement_failure() {
         let expected = RECORD.as_bytes().to_owned();
 
-        let (rx, addr) = source(None, None, false, Compression::None, false, false).await;
+        let (rx, addr, _guard) = source(None, None, false, Compression::None, false, false).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 
@@ -882,7 +886,7 @@ mod tests {
 
     #[tokio::test]
     async fn event_access_key_passthrough_enabled() {
-        let (rx, address) = source(
+        let (rx, address, _guard) = source(
             None,
             Some(vec!["an access key".to_string().into()]),
             true,
@@ -915,7 +919,7 @@ mod tests {
 
     #[tokio::test]
     async fn no_authorization_access_key_passthrough_enabled() {
-        let (rx, address) = source(None, None, true, Default::default(), true, true).await;
+        let (rx, address, _guard) = source(None, None, true, Default::default(), true, true).await;
 
         let timestamp: DateTime<Utc> = Utc::now();
 

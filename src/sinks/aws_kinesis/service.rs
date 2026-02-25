@@ -38,6 +38,17 @@ where
 pub struct KinesisResponse {
     pub(crate) failure_count: usize,
     pub(crate) events_byte_size: GroupedCountByteSize,
+    #[cfg(feature = "sinks-aws_kinesis_streams")]
+    /// Track individual failed records for retry logic (Streams only)
+    pub(crate) failed_records: Vec<RecordResult>,
+}
+
+#[derive(Clone)]
+pub struct RecordResult {
+    pub index: usize, // Original position in batch
+    pub success: bool,
+    pub error_code: Option<String>,
+    pub error_message: Option<String>,
 }
 
 impl DriverResponse for KinesisResponse {

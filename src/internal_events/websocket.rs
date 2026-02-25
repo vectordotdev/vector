@@ -11,11 +11,12 @@ use vector_common::{
     internal_event::{error_stage, error_type},
     json_size::JsonSize,
 };
+use vector_lib::NamedInternalEvent;
 use vector_lib::internal_event::InternalEvent;
 
 pub const PROTOCOL: &str = "websocket";
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WebSocketConnectionEstablished;
 
 impl InternalEvent for WebSocketConnectionEstablished {
@@ -23,13 +24,9 @@ impl InternalEvent for WebSocketConnectionEstablished {
         debug!(message = "Connected.");
         counter!("connection_established_total").increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketConnectionEstablished")
-    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WebSocketConnectionFailedError {
     pub error: Box<dyn Error>,
 }
@@ -42,23 +39,19 @@ impl InternalEvent for WebSocketConnectionFailedError {
             error_code = "websocket_connection_error",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
+            "protocol" => PROTOCOL,
             "error_code" => "websocket_connection_failed",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::SENDING,
         )
         .increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketConnectionFailedError")
-    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WebSocketConnectionShutdown;
 
 impl InternalEvent for WebSocketConnectionShutdown {
@@ -66,13 +59,9 @@ impl InternalEvent for WebSocketConnectionShutdown {
         warn!(message = "Closed by the server.");
         counter!("connection_shutdown_total").increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketConnectionShutdown")
-    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WebSocketConnectionError {
     pub error: tokio_tungstenite::tungstenite::Error,
 }
@@ -85,7 +74,6 @@ impl InternalEvent for WebSocketConnectionError {
             error_code = "websocket_connection_error",
             error_type = error_type::WRITER_FAILED,
             stage = error_stage::SENDING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -95,10 +83,6 @@ impl InternalEvent for WebSocketConnectionError {
             "stage" => error_stage::SENDING,
         )
         .increment(1);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketConnectionError")
     }
 }
 
@@ -119,7 +103,7 @@ impl Display for WebSocketKind {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WebSocketBytesReceived<'a> {
     pub byte_size: usize,
     pub url: &'a str,
@@ -146,7 +130,7 @@ impl InternalEvent for WebSocketBytesReceived<'_> {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WebSocketMessageReceived<'a> {
     pub count: usize,
     pub byte_size: JsonSize,
@@ -183,13 +167,9 @@ impl InternalEvent for WebSocketMessageReceived<'_> {
         );
         counter.increment(self.byte_size.get() as u64);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketMessageReceived")
-    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WebSocketReceiveError<'a> {
     pub error: &'a TungsteniteError,
 }
@@ -202,7 +182,6 @@ impl InternalEvent for WebSocketReceiveError<'_> {
             error_code = "websocket_receive_error",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
@@ -213,13 +192,9 @@ impl InternalEvent for WebSocketReceiveError<'_> {
         )
         .increment(1);
     }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketReceiveError")
-    }
 }
 
-#[derive(Debug)]
+#[derive(Debug, NamedInternalEvent)]
 pub struct WebSocketSendError<'a> {
     pub error: &'a TungsteniteError,
 }
@@ -232,18 +207,14 @@ impl InternalEvent for WebSocketSendError<'_> {
             error_code = "websocket_send_error",
             error_type = error_type::CONNECTION_FAILED,
             stage = error_stage::PROCESSING,
-            internal_log_rate_limit = true,
         );
         counter!(
             "component_errors_total",
+            "protocol" => PROTOCOL,
             "error_code" => "websocket_send_error",
             "error_type" => error_type::CONNECTION_FAILED,
             "stage" => error_stage::PROCESSING,
         )
         .increment(1);
-    }
-
-    fn name(&self) -> Option<&'static str> {
-        Some("WebSocketSendError")
     }
 }

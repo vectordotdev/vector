@@ -2,10 +2,9 @@ use async_nats::jetstream::consumer::pull::Stream as PullConsumerStream;
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::ResultExt;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::decoding::StreamDecodingError,
+    codecs::{DecoderFramedRead, decoding::StreamDecodingError},
     config::{LegacyKey, LogNamespace},
     internal_event::{
         ByteSize, BytesReceived, CountByteSize, EventsReceived, EventsReceivedHandle,
@@ -44,7 +43,7 @@ pub async fn process_message(
     out: &mut SourceSender,
     events_received: &EventsReceivedHandle,
 ) -> ProcessingStatus {
-    let mut framed = FramedRead::new(msg.payload.as_ref(), decoder.clone());
+    let mut framed = DecoderFramedRead::new(msg.payload.as_ref(), decoder.clone());
     let mut success = true;
 
     while let Some(next) = framed.next().await {
@@ -88,7 +87,7 @@ pub async fn process_message(
             }
             Err(error) => {
                 success = false;
-                // Error is logged by `crate::codecs::Decoder`, no further
+                // Error is logged by `vector_lib::codecs::Decoder`, no further
                 // handling is needed here.
                 if !error.can_continue() {
                     break;

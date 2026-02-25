@@ -19,7 +19,7 @@ vector-common = { path = "../vector-common" }
 vector-core = { path = "../vector-core" }
 
 [dev-dependencies]
-proptest = "1.7"
+proptest = "1.8"
 rand.workspace = true
 rand_distr.workspace = true
 tokio = { workspace = true, features = ["test-util"] }

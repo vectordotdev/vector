@@ -1,6 +1,7 @@
 use std::{env, time::Duration};
 
 use futures::StreamExt;
+use http_body::Collected;
 use hyper::{Body, Request};
 use serde_with::serde_as;
 use tokio::time;
@@ -193,7 +194,10 @@ async fn aws_ecs_metrics(
 
         match http_client.send(request).await {
             Ok(response) if response.status() == hyper::StatusCode::OK => {
-                match hyper::body::to_bytes(response).await {
+                match http_body::Body::collect(response.into_body())
+                    .await
+                    .map(Collected::to_bytes)
+                {
                     Ok(body) => {
                         bytes_received.emit(ByteSize(body.len()));
 
@@ -259,14 +263,15 @@ mod test {
         Error,
         event::MetricValue,
         test_util::{
+            addr::next_addr,
             components::{SOURCE_TAGS, run_and_assert_source_compliance},
-            next_addr, wait_for_tcp,
+            wait_for_tcp,
         },
     };
 
     #[tokio::test]
     async fn test_aws_ecs_metrics_source() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {

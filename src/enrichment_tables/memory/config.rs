@@ -8,17 +8,17 @@ use vector_lib::{
     configurable::configurable_component,
     enrichment::Table,
     id::ComponentKey,
+    lookup::lookup_v2::OptionalValuePath,
     schema::{self},
     sink::VectorSink,
 };
 use vrl::{path::OwnedTargetPath, value::Kind};
 
-use super::{internal_events::InternalMetricsConfig, source::MemorySourceConfig};
+use super::{Memory, internal_events::InternalMetricsConfig, source::EXPIRED_ROUTE};
 use crate::{
     config::{
         EnrichmentTableConfig, SinkConfig, SinkContext, SourceConfig, SourceContext, SourceOutput,
     },
-    enrichment_tables::memory::Memory,
     sinks::Healthcheck,
     sources::Source,
 };
@@ -64,9 +64,42 @@ pub struct MemoryConfig {
     #[configurable(derived)]
     #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
     pub source_config: Option<MemorySourceConfig>,
+    /// Field in the incoming value used as the TTL override.
+    #[configurable(derived)]
+    #[serde(default)]
+    pub ttl_field: OptionalValuePath,
 
     #[serde(skip)]
     memory: Arc<Mutex<Option<Box<Memory>>>>,
+}
+
+/// Configuration for memory enrichment table source functionality.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq, Eq)]
+#[serde(deny_unknown_fields)]
+pub struct MemorySourceConfig {
+    /// Interval for exporting all data from the table when used as a source.
+    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
+    pub export_interval: Option<NonZeroU64>,
+    /// Batch size for data exporting. Used to prevent exporting entire table at
+    /// once and blocking the system.
+    ///
+    /// By default, batches are not used and entire table is exported.
+    #[serde(skip_serializing_if = "vector_lib::serde::is_default")]
+    pub export_batch_size: Option<u64>,
+    /// If set to true, all data will be removed from cache after exporting.
+    /// Only valid if used as a source and export_interval > 0
+    ///
+    /// By default, export will not remove data from cache
+    #[serde(default = "crate::serde::default_false")]
+    pub remove_after_export: bool,
+    /// Set to true to export expired items via the `expired` output port.
+    /// Expired items ignore other settings and are exported as they are flushed from the table.
+    #[serde(default = "crate::serde::default_false")]
+    pub export_expired_items: bool,
+    /// Key to use for this component when used as a source. This must be different from the
+    /// component key.
+    pub source_key: String,
 }
 
 impl PartialEq for MemoryConfig {
@@ -89,6 +122,7 @@ impl Default for MemoryConfig {
             log_namespace: None,
             source_config: None,
             internal_metrics: InternalMetricsConfig::default(),
+            ttl_field: OptionalValuePath::none(),
         }
     }
 }
@@ -181,10 +215,23 @@ impl SourceConfig for MemoryConfig {
         }
         .with_standard_vector_source_metadata();
 
-        vec![SourceOutput::new_maybe_logs(
-            DataType::Log,
-            schema_definition,
-        )]
+        if self
+            .source_config
+            .as_ref()
+            .map(|c| c.export_expired_items)
+            .unwrap_or_default()
+        {
+            vec![
+                SourceOutput::new_maybe_logs(DataType::Log, schema_definition.clone()),
+                SourceOutput::new_maybe_logs(DataType::Log, schema_definition)
+                    .with_port(EXPIRED_ROUTE),
+            ]
+        } else {
+            vec![SourceOutput::new_maybe_logs(
+                DataType::Log,
+                schema_definition,
+            )]
+        }
     }
 
     fn can_acknowledge(&self) -> bool {

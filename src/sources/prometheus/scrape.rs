@@ -318,6 +318,7 @@ impl HttpClientContext for PrometheusScrapeContext {
 
 #[cfg(all(test, feature = "sinks-prometheus"))]
 mod test {
+    use http_body::Body as _;
     use hyper::{
         Body, Client, Response, Server,
         service::{make_service_fn, service_fn},
@@ -332,8 +333,9 @@ mod test {
         http::{ParameterValue, QueryParameterValue},
         sinks::prometheus::exporter::PrometheusExporterConfig,
         test_util::{
+            addr::next_addr,
             components::{HTTP_PULL_SOURCE_TAGS, run_and_assert_source_compliance},
-            next_addr, start_topology, trace_init, wait_for_tcp,
+            start_topology, trace_init, wait_for_tcp,
         },
     };
 
@@ -344,7 +346,7 @@ mod test {
 
     #[tokio::test]
     async fn test_prometheus_sets_headers() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let dummy_endpoint = warp::path!("metrics").and(warp::header::exact("Accept", "text/plain")).map(|| {
             r#"
@@ -378,7 +380,7 @@ mod test {
 
     #[tokio::test]
     async fn test_prometheus_honor_labels() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let dummy_endpoint = warp::path!("metrics").map(|| {
                 r#"
@@ -430,7 +432,7 @@ mod test {
 
     #[tokio::test]
     async fn test_prometheus_do_not_honor_labels() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let dummy_endpoint = warp::path!("metrics").map(|| {
                 r#"
@@ -496,7 +498,7 @@ mod test {
     /// we accept the metric, but take the last label in the list.
     #[tokio::test]
     async fn test_prometheus_duplicate_tags() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let dummy_endpoint = warp::path!("metrics").map(|| {
             r#"
@@ -549,7 +551,7 @@ mod test {
 
     #[tokio::test]
     async fn test_prometheus_request_query() {
-        let in_addr = next_addr();
+        let (_guard, in_addr) = next_addr();
 
         let dummy_endpoint = warp::path!("metrics").and(warp::query::raw()).map(|query| {
             format!(
@@ -630,8 +632,8 @@ mod test {
     #[tokio::test]
     async fn test_prometheus_routing() {
         trace_init();
-        let in_addr = next_addr();
-        let out_addr = next_addr();
+        let (_in_guard, in_addr) = next_addr();
+        let (_out_guard, out_addr) = next_addr();
 
         let make_svc = make_service_fn(|_| async {
             Ok::<_, Error>(service_fn(|_| async {
@@ -716,7 +718,7 @@ mod test {
             .unwrap();
 
         assert!(response.status().is_success());
-        let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+        let body = response.into_body().collect().await.unwrap().to_bytes();
         let lines = std::str::from_utf8(&body)
             .unwrap()
             .lines()

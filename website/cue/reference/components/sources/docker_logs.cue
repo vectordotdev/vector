@@ -70,7 +70,11 @@ components: sources: docker_logs: {
 	}
 
 	support: {
-		requirements: []
+		requirements: [
+			"""
+				This source requires permissions to run `docker`.  Please ensure the running user is part of the `docker` group.
+				""",
+		]
 		warnings: [
 			"""
 				To avoid collecting logs from itself when deployed as a container,

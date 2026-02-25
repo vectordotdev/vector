@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet};
 
 use bytes::BytesMut;
-use futures::executor;
 use futures_util::StreamExt;
 use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, time};
@@ -121,15 +120,13 @@ impl SecretBackend for ExecBackend {
         secret_keys: HashSet<String>,
         signal_rx: &mut signal::SignalRx,
     ) -> crate::Result<HashMap<String, String>> {
-        let mut output = executor::block_on(async {
-            query_backend(
-                &self.command,
-                self.protocol.new_query(secret_keys.clone()),
-                self.timeout,
-                signal_rx,
-            )
-            .await
-        })?;
+        let mut output = query_backend(
+            &self.command,
+            self.protocol.new_query(secret_keys.clone()),
+            self.timeout,
+            signal_rx,
+        )
+        .await?;
         let mut secrets = HashMap::new();
         for k in secret_keys.into_iter() {
             if let Some(secret) = output.get_mut(&k) {

@@ -7,7 +7,7 @@ ARG FEATURES=api,api-client,sources-datadog_agent,sources-fluent,sources-host_me
 # VECTOR BUILDER
 #
 FROM docker.io/rust:${RUST_VERSION}-${DEBIAN_RELEASE} as builder
-RUN apt-get update && apt-get -y --no-install-recommends install build-essential git clang cmake libclang-dev libsasl2-dev libstdc++-11-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g
+RUN apt-get update && apt-get -y --no-install-recommends install build-essential git clang cmake libclang-dev libsasl2-dev libssl-dev libxxhash-dev zlib1g-dev zlib1g
 RUN git clone https://github.com/rui314/mold.git \
     && mkdir mold/build \
     && cd mold/build \

@@ -64,9 +64,10 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
     let metrics_layer =
         metrics_layer_enabled().then(|| MetricsLayer::new().with_filter(LevelFilter::INFO));
 
-    let broadcast_layer = RateLimitedLayer::new(BroadcastLayer::new())
-        .with_default_limit(internal_log_rate_limit)
-        .with_filter(fmt_filter.clone());
+    // BroadcastLayer should NOT be rate limited because it feeds the internal_logs source,
+    // which users rely on to capture ALL internal Vector logs for debugging/monitoring.
+    // Console output (stdout/stderr) has its own separate rate limiting below.
+    let broadcast_layer = BroadcastLayer::new().with_filter(fmt_filter.clone());
 
     let subscriber = tracing_subscriber::registry()
         .with(metrics_layer)

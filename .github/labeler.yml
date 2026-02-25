@@ -29,7 +29,7 @@
 
 "domain: ci":
   - changed-files:
-    - any-glob-to-any-file: ["scripts/**/*"]
+    - any-glob-to-any-file: [".github/workflows/*", ".github/actions/**/*", ".github/*.yml"]
 
 "domain: vdev":
   - changed-files:

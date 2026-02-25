@@ -1,3 +1,5 @@
+mod active_projects;
+
 pub(crate) mod ci_paths;
 pub(crate) mod show;
 pub(crate) mod start;

@@ -46,8 +46,10 @@ pub const DATA_STREAM_TIMESTAMP_KEY: &str = "@timestamp";
 #[configurable_component]
 #[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, rename_all = "lowercase")]
+#[derive(Default)]
 pub enum OpenSearchServiceType {
     /// Elasticsearch or OpenSearch Managed domain
+    #[default]
     Managed,
     /// OpenSearch Serverless collection
     Serverless,
@@ -59,12 +61,6 @@ impl OpenSearchServiceType {
             OpenSearchServiceType::Managed => "es",
             OpenSearchServiceType::Serverless => "aoss",
         }
-    }
-}
-
-impl Default for OpenSearchServiceType {
-    fn default() -> Self {
-        Self::Managed
     }
 }
 
@@ -556,11 +552,10 @@ impl SinkConfig for ElasticsearchConfig {
 
         let services = commons
             .iter()
-            .cloned()
             .map(|common| {
                 let endpoint = common.base_url.clone();
 
-                let http_request_builder = HttpRequestBuilder::new(&common, self);
+                let http_request_builder = HttpRequestBuilder::new(common, self);
                 let service = ElasticsearchService::new(client.clone(), http_request_builder);
 
                 (endpoint, service)

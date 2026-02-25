@@ -1,0 +1,55 @@
+name: Test Make Command - Linux
+
+on:
+  workflow_call:
+    inputs:
+      command:
+        description: 'Make command to run (e.g., test-behavior, check-examples, test-docs)'
+        required: true
+        type: string
+      job_name:
+        description: 'Display name for the job/status check'
+        required: true
+        type: string
+      ref:
+        description: 'Git ref to checkout'
+        required: false
+        type: string
+      cargo_nextest:
+        description: 'Whether to install cargo-nextest'
+        required: false
+        type: boolean
+        default: false
+      upload_test_results:
+        description: 'Whether to upload nextest test results (for commands that use cargo nextest)'
+        required: false
+        type: boolean
+        default: false
+
+
+permissions:
+  contents: read
+
+jobs:
+  run-make-command:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    env:
+      CARGO_INCREMENTAL: 0
+    steps:
+      - name: Checkout branch
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+        with:
+          ref: ${{ inputs.ref }}
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          protoc: true
+          libsasl2: true
+          cargo-nextest: ${{ inputs.cargo_nextest }}
+          datadog-ci: ${{ inputs.upload_test_results }}
+      - run: make ${{ inputs.command }}
+      - name: Upload test results
+        run: scripts/upload-test-results.sh
+        if: ${{ always() && inputs.upload_test_results }}

@@ -1,10 +1,10 @@
 use vector_lib::{TimeZone, compile_vrl, configurable::configurable_component, emit};
+use vector_vrl_metrics::MetricsStorage;
 use vrl::{
     compiler::{
         CompilationResult, CompileConfig, Program, TypeState, VrlRuntime,
         runtime::{Runtime, RuntimeResult, Terminate},
     },
-    diagnostic::Formatter,
     value::Value,
 };
 
@@ -12,6 +12,7 @@ use crate::{
     conditions::{Condition, Conditional, ConditionalConfig},
     config::LogNamespace,
     event::{Event, TargetEvents, VrlTarget},
+    format_vrl_diagnostics,
     internal_events::VrlConditionExecutionError,
 };
 
@@ -33,6 +34,7 @@ impl ConditionalConfig for VrlConfig {
     fn build(
         &self,
         enrichment_tables: &vector_lib::enrichment::TableRegistry,
+        metrics_storage: &MetricsStorage,
     ) -> crate::Result<Condition> {
         // TODO(jean): re-add this to VRL
         // let constraint = TypeConstraint {
@@ -44,38 +46,28 @@ impl ConditionalConfig for VrlConfig {
         //     },
         // };
 
-        let functions = vrl::stdlib::all()
-            .into_iter()
-            .chain(vector_lib::enrichment::vrl_functions());
-        #[cfg(feature = "sources-dnstap")]
-        let functions = functions.chain(dnstap_parser::vrl_functions());
-
-        let functions = functions
-            .chain(vector_vrl_functions::all())
-            .collect::<Vec<_>>();
+        let functions = vector_vrl_functions::all();
 
         let state = TypeState::default();
 
         let mut config = CompileConfig::default();
         config.set_custom(enrichment_tables.clone());
+        config.set_custom(metrics_storage.clone());
         config.set_read_only();
 
         let CompilationResult {
             program,
             warnings,
             config: _,
-        } = compile_vrl(&self.source, &functions, &state, config).map_err(|diagnostics| {
-            Formatter::new(&self.source, diagnostics)
-                .colored()
-                .to_string()
-        })?;
+        } = compile_vrl(&self.source, &functions, &state, config)
+            .map_err(|diagnostics| format_vrl_diagnostics(&self.source, diagnostics))?;
 
         if !program.final_type_info().result.is_boolean() {
             return Err("VRL conditions must return a boolean.".into());
         }
 
         if !warnings.is_empty() {
-            let warnings = Formatter::new(&self.source, warnings).colored().to_string();
+            let warnings = format_vrl_diagnostics(&self.source, warnings);
             warn!(message = "VRL compilation warning.", %warnings);
         }
 
@@ -136,25 +128,21 @@ impl Conditional for Vrl {
 
         let value_result = result.map_err(|err| match err {
             Terminate::Abort(err) => {
-                let err = Formatter::new(
+                let err = format_vrl_diagnostics(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
                         Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
-                )
-                .colored()
-                .to_string();
+                );
                 format!("source execution aborted: {err}")
             }
             Terminate::Error(err) => {
-                let err = Formatter::new(
+                let err = format_vrl_diagnostics(
                     &self.source,
                     vrl::diagnostic::Diagnostic::from(
                         Box::new(err) as Box<dyn vrl::diagnostic::DiagnosticMessage>
                     ),
-                )
-                .colored()
-                .to_string();
+                );
                 format!("source execution failed: {err}")
             }
         });
@@ -261,13 +249,13 @@ mod test {
 
             assert_eq!(
                 config
-                    .build(&Default::default())
+                    .build(&Default::default(), &Default::default())
                     .map(|_| ())
                     .map_err(|e| e.to_string()),
                 build
             );
 
-            if let Ok(cond) = config.build(&Default::default()) {
+            if let Ok(cond) = config.build(&Default::default(), &Default::default()) {
                 assert_eq!(
                     cond.check_with_context(event.clone()).0,
                     check.map_err(|e| e.to_string())

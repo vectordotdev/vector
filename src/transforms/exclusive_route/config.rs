@@ -5,7 +5,7 @@ use vector_lib::config::clone_input_definitions;
 use crate::{
     conditions::{AnyCondition, ConditionConfig, VrlConfig},
     config::{
-        DataType, GenerateConfig, Input, LogNamespace, OutputId, TransformConfig, TransformContext,
+        DataType, GenerateConfig, Input, OutputId, TransformConfig, TransformContext,
         TransformOutput,
     },
     schema,
@@ -55,6 +55,8 @@ impl Eq for Route {}
 #[serde(deny_unknown_fields)]
 pub struct ExclusiveRouteConfig {
     /// An array of named routes. The route names are expected to be unique.
+    /// Routes are evaluated in order from first to last, and only the first matching route receives each event
+    /// (first-match-wins).
     #[configurable(metadata(docs::examples = "routes_example()"))]
     pub routes: Vec<Route>,
 }
@@ -134,9 +136,8 @@ impl TransformConfig for ExclusiveRouteConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         let mut outputs: Vec<_> = self
             .routes

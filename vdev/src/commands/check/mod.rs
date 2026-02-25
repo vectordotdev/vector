@@ -1,17 +1,26 @@
+mod component_docs;
+mod component_features;
+mod deny;
+mod examples;
+mod fmt;
+mod licenses;
+mod markdown;
+mod rust;
+mod scripts;
+
 crate::cli_subcommands! {
     "Check parts of the Vector code base..."
-    mod component_docs,
-    mod component_features,
-    mod deny,
+    component_docs,
+    component_features,
+    deny,
     docs,
     events,
-    mod examples,
-    mod fmt,
-    mod licenses,
-    mod markdown,
-    mod rust,
-    mod scripts,
-    version,
+    examples,
+    fmt,
+    licenses,
+    markdown,
+    rust,
+    scripts,
 }
 
 // These should eventually be migrated to Rust code
@@ -24,9 +33,4 @@ crate::script_wrapper! {
 crate::script_wrapper! {
     events = "Check that events satisfy patterns set in <https://github.com/vectordotdev/vector/blob/master/docs/specs/instrumentation.md>"
         => "check-events"
-}
-
-crate::script_wrapper! {
-    version = "Check that Vector's version is correct, accounting for recent changes"
-        => "check-version.rb"
 }

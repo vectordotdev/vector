@@ -4,6 +4,15 @@ use std::{
     time::{Duration, Instant},
 };
 
+use crate::{
+    codecs::{Encoder, Transformer},
+    common::websocket::{PingInterval, WebSocketConnector, is_closed},
+    event::{Event, EventStatus, Finalizable},
+    internal_events::{
+        ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
+    },
+    sinks::{util::StreamSink, websocket::config::WebSocketSinkConfig},
+};
 use async_trait::async_trait;
 use bytes::BytesMut;
 use futures::{Sink, Stream, StreamExt, pin_mut, sink::SinkExt, stream::BoxStream};
@@ -14,16 +23,6 @@ use vector_lib::{
     internal_event::{
         ByteSize, BytesSent, CountByteSize, EventsSent, InternalEventHandle as _, Output, Protocol,
     },
-};
-
-use crate::{
-    codecs::{Encoder, Transformer},
-    common::websocket::{PingInterval, WebSocketConnector, is_closed},
-    event::{Event, EventStatus, Finalizable},
-    internal_events::{
-        ConnectionOpen, OpenGauge, WebSocketConnectionError, WebSocketConnectionShutdown,
-    },
-    sinks::{util::StreamSink, websocket::config::WebSocketSinkConfig},
 };
 
 pub struct WebSocketSink {
@@ -75,17 +74,6 @@ impl WebSocketSink {
         Ok(())
     }
 
-    const fn should_encode_as_binary(&self) -> bool {
-        use vector_lib::codecs::encoding::Serializer::{
-            Avro, Cef, Csv, Gelf, Json, Logfmt, Native, NativeJson, Protobuf, RawMessage, Text,
-        };
-
-        match self.encoder.serializer() {
-            RawMessage(_) | Avro(_) | Native(_) | Protobuf(_) => true,
-            Cef(_) | Csv(_) | Logfmt(_) | Gelf(_) | Json(_) | Text(_) | NativeJson(_) => false,
-        }
-    }
-
     async fn handle_events<I, WS, O>(
         &mut self,
         input: &mut I,
@@ -111,7 +99,7 @@ impl WebSocketSink {
 
         let bytes_sent = register!(BytesSent::from(Protocol("websocket".into())));
         let events_sent = register!(EventsSent::from(Output(None)));
-        let encode_as_binary = self.should_encode_as_binary();
+        let encode_as_binary = self.encoder.serializer().is_binary();
 
         loop {
             let result = tokio::select! {
@@ -238,8 +226,9 @@ mod tests {
         http::Auth,
         test_util::{
             CountReceiver,
+            addr::next_addr,
             components::{SINK_TAGS, run_and_assert_sink_compliance},
-            next_addr, random_lines_with_stream, trace_init,
+            random_lines_with_stream, trace_init,
         },
         tls::{self, MaybeTlsSettings, TlsConfig, TlsEnableableConfig},
     };
@@ -248,7 +237,7 @@ mod tests {
     async fn test_websocket() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
@@ -273,7 +262,7 @@ mod tests {
             token: "OiJIUzI1NiIsInR5cCI6IkpXVCJ".to_string().into(),
         });
         let auth_clone = auth.clone();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
@@ -294,7 +283,7 @@ mod tests {
     async fn test_tls_websocket() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let tls_config = Some(TlsEnableableConfig::test_config());
         let tls = MaybeTlsSettings::from_config(tls_config.as_ref(), true).unwrap();
 
@@ -325,7 +314,7 @@ mod tests {
     async fn test_websocket_reconnect() {
         trace_init();
 
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let config = WebSocketSinkConfig {
             common: WebSocketCommonConfig {
                 uri: format!("ws://{addr}"),
@@ -431,6 +420,7 @@ mod tests {
                                                 user: _user,
                                                 password: _password,
                                             } => { /* Not needed for tests at the moment */ }
+                                            Auth::Custom { .. } => { /* Not needed for tests at the moment */ }
                                             #[cfg(feature = "aws-core")]
                                             _ => {}
                                         }

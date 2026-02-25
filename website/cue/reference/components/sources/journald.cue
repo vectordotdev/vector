@@ -31,7 +31,6 @@ components: sources: journald: {
 
 	support: {
 		targets: {
-			"x86_64-apple-darwin":   false
 			"x86_64-pc-windows-msv": false
 		}
 

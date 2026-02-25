@@ -14,6 +14,7 @@
   - [Minimum Supported Rust Version](#minimum-supported-rust-version)
 - [Guidelines](#guidelines)
   - [Sink healthchecks](#sink-healthchecks)
+  - [Disabling internal log rate limiting](#disabling-internal-log-rate-limiting)
 - [Testing](#testing)
   - [Unit tests](#unit-tests)
   - [Integration tests](#integration-tests)
@@ -327,6 +328,28 @@ option to disable individual health checks, there's an escape hatch for users
 that fall into a false negative circumstance. Our goal should be to minimize the
 likelihood of users needing to pull that lever while still making a good effort
 to detect common problems.
+
+### Disabling internal log rate limiting
+
+Vector rate limits its own internal logs by default (10-second windows). During development, you may want to see all log occurrences.
+
+**Globally** (CLI flag or environment variable):
+
+```bash
+vector --config vector.yaml -r 1
+# or
+VECTOR_INTERNAL_LOG_RATE_LIMIT=1 vector --config vector.yaml
+```
+
+**Per log statement**:
+
+```rust
+// Disable rate limiting for this log
+warn!(message = "Error occurred.", %error, internal_log_rate_limit = false);
+
+// Override rate limit window to 1 second
+info!(message = "Processing batch.", batch_size, internal_log_rate_secs = 1);
+```
 
 ## Testing
 

@@ -266,7 +266,7 @@ mod tests {
         parse_auth(
             r#"
             strategy = "credentials_file"
-            credentials_file.path = "tests/data/nats/nats.creds"
+            credentials_file.path = "tests/integration/nats/data/nats.creds"
         "#,
         )
         .unwrap();

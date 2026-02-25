@@ -50,6 +50,17 @@ where
         self.map.get(k).map(|(v, _)| v)
     }
 
+    /// Get a reference to the value by key with the expiration information.
+    pub fn get_with_deadline<Q>(&self, k: &Q) -> Option<(&V, Instant)>
+    where
+        K: Borrow<Q>,
+        Q: ?Sized + Hash + Eq,
+    {
+        let (value, delay_queue_key) = self.map.get(k)?;
+        let deadline = self.expiration_queue.deadline(delay_queue_key);
+        Some((value, deadline.into()))
+    }
+
     /// Get a mut reference to the value by key.
     pub fn get_mut<Q>(&mut self, k: &Q) -> Option<&mut V>
     where

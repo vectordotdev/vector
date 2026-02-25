@@ -15,7 +15,8 @@ administration: {
 			tag:              string | *strings.ToLower(arch)
 			extra?:           string
 			filename:         string
-			version?:         string
+			min_version?:     string
+			max_version?:     string
 
 			if extra == _|_ {
 				filename: "\(tag).\(_file_type)"
@@ -124,15 +125,16 @@ administration: {
 				type: "archive"
 				options: [
 					{
-						target: "x86_64-apple-darwin-tar-gz"
-						arch:   "x86_64"
-						extra:  "apple-darwin"
+						target:      "x86_64-apple-darwin-tar-gz"
+						arch:        "x86_64"
+						extra:       "apple-darwin"
+						max_version: "0.50.0"
 					},
 					{
-						target:  "arm64-apple-darwin-tar-gz"
-						arch:    "ARM64"
-						extra:   "apple-darwin"
-						version: "0.44.0"
+						target:      "arm64-apple-darwin-tar-gz"
+						arch:        "ARM64"
+						extra:       "apple-darwin"
+						min_version: "0.44.0"
 					},
 				]
 			},
