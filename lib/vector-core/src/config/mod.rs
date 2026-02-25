@@ -9,6 +9,7 @@ mod log_schema;
 pub(crate) mod metrics_expiration;
 pub mod output_id;
 pub mod proxy;
+pub mod proxy_http_1;
 mod telemetry;
 
 pub use global_options::{GlobalOptions, WildcardMatching};

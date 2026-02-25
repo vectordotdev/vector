@@ -2,7 +2,8 @@ use std::collections::{HashMap, HashSet};
 
 use bytes::{Bytes, BytesMut};
 use futures::SinkExt;
-use http::{Request, Uri};
+use http_1::{Request, Uri};
+use http_body_util::Full;
 use indoc::indoc;
 use vector_lib::{
     config::log_schema,
@@ -20,13 +21,13 @@ use crate::{
     codecs::Transformer,
     config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext},
     event::{Event, KeyString, MetricTags, Value},
-    http::HttpClient,
+    http::http_1::HttpClient,
     internal_events::InfluxdbEncodingError,
     sinks::{
         Healthcheck, VectorSink,
         util::{
             BatchConfig, Buffer, Compression, SinkBatchSettings, TowerRequestConfig,
-            http::{BatchedHttpSink, HttpEventEncoder, HttpSink},
+            http_1::{BatchedHttpSink, HttpEventEncoder, HttpSink},
         },
     },
     tls::{TlsConfig, TlsSettings},
@@ -162,7 +163,7 @@ impl SinkConfig for InfluxDbLogsConfig {
         let tags: HashSet<KeyString> = self.tags.iter().cloned().collect();
 
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client = HttpClient::new(tls_settings, cx.http_1_proxy())?;
         let healthcheck = self.healthcheck(client.clone())?;
 
         let batch = self.batch.into_batch_settings()?;
@@ -364,7 +365,7 @@ impl InfluxDbLogsConfig {
         }
     }
 
-    fn healthcheck(&self, client: HttpClient) -> crate::Result<Healthcheck> {
+    fn healthcheck(&self, client: HttpClient<Full<Bytes>>) -> crate::Result<Healthcheck> {
         let config = self.clone();
 
         let healthcheck = healthcheck(
@@ -391,7 +392,7 @@ fn to_field(value: &Value) -> Field {
 mod tests {
     use chrono::{Utc, offset::TimeZone};
     use futures::{StreamExt, channel::mpsc, stream};
-    use http::{StatusCode, request::Parts};
+    use http_1::{StatusCode, request::Parts};
     use indoc::indoc;
     use vector_lib::{
         event::{BatchNotifier, BatchStatus, Event, LogEvent},
