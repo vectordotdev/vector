@@ -348,7 +348,7 @@ pub fn build_client(
     // Prepare options; attach Shared Key policy if needed
     let mut options = BlobContainerClientOptions::default();
     match (parsed.auth(), &auth) {
-        (Auth::None { .. }, None) => {
+        (Auth::None, None) => {
             warn!("No authentication method provided, requests will be anonymous");
         }
         (Auth::Sas { .. }, None) => {
@@ -375,14 +375,14 @@ pub fn build_client(
                 .per_call_policies
                 .push(Arc::new(policy));
         }
-        (Auth::None { .. }, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
+        (Auth::None, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
             info!("Using Client Secret authentication");
             let async_credential_result = task::block_in_place(|| {
                 Handle::current().block_on(async { auth.unwrap().credential().await.unwrap() })
             });
             credential = Some(async_credential_result);
         }
-        (Auth::None { .. }, Some(AzureAuthentication::Specific(..))) => {
+        (Auth::None, Some(AzureAuthentication::Specific(..))) => {
             info!("Using specific Azure Authentication method");
             let async_credential_result = task::block_in_place(|| {
                 Handle::current().block_on(async { auth.unwrap().credential().await.unwrap() })
@@ -435,15 +435,15 @@ pub fn build_client(
         }
     }
 
-    if let Some(tls_config) = tls {
-        if let Some(ca_file) = tls_config.ca_file {
-            let mut buf = Vec::new();
-            File::open(&ca_file)?.read_to_end(&mut buf)?;
-            let cert = reqwest_12::Certificate::from_pem(&buf)?;
+    if let Some(tls_config) = tls
+        && let Some(ca_file) = tls_config.ca_file
+    {
+        let mut buf = Vec::new();
+        File::open(&ca_file)?.read_to_end(&mut buf)?;
+        let cert = reqwest_12::Certificate::from_pem(&buf)?;
 
-            warn!("Adding TLS root certificate from {}", ca_file.display());
-            reqwest_builder = reqwest_builder.add_root_certificate(cert);
-        }
+        warn!("Adding TLS root certificate from {}", ca_file.display());
+        reqwest_builder = reqwest_builder.add_root_certificate(cert);
     }
 
     options.client_options.transport = Some(azure_core::http::Transport::new(std::sync::Arc::new(
