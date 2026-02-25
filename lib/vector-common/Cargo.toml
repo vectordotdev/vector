@@ -56,5 +56,5 @@ vector-config.workspace = true
 vector-common-macros.workspace = true
 
 [dev-dependencies]
-futures = { version = "0.3.31", default-features = false, features = ["async-await"] }
+futures = { version = "0.3.32", default-features = false, features = ["async-await"] }
 tokio = { workspace = true, features = ["rt", "time"] }
