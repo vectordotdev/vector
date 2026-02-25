@@ -795,7 +795,7 @@ fn tap_payload_to_output_events(payload: TapPayload) -> Vec<OutputEvent> {
         TapPayload::Log(output, log_array) => log_array
             .into_iter()
             .map(|log_event| {
-                // Convert Vector's internal LogEvent to proto Log
+                // Convert Vector's internal LogEvent to proto Log (metadata is preserved in Log.metadata_full)
                 let proto_log: crate::event::proto::Log = log_event.into();
                 let event_wrapper = Some(EventWrapper {
                     event: Some(Event::Log(proto_log)),
