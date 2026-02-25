@@ -152,8 +152,8 @@ mod tests {
     use procfs::net::TcpState;
 
     use super::{
-        tcp_state_to_string, STATE, TCP_CONNS_TOTAL, TCP_RX_QUEUED_BYTES_TOTAL,
-        TCP_TX_QUEUED_BYTES_TOTAL,
+        STATE, TCP_CONNS_TOTAL, TCP_RX_QUEUED_BYTES_TOTAL, TCP_TX_QUEUED_BYTES_TOTAL,
+        tcp_state_to_string,
     };
     use crate::sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer};
 
@@ -176,7 +176,7 @@ mod tests {
 
     #[test]
     fn parse_tcp_entries_handles_empty_list() {
-        use super::{parse_tcp_entries, TcpStats};
+        use super::{TcpStats, parse_tcp_entries};
 
         let mut stats = TcpStats::default();
         parse_tcp_entries(vec![], &mut stats);
