@@ -8,7 +8,7 @@ use vector_lib::sink::VectorSink;
 
 use crate::config::SinkConfig;
 use crate::sinks::gcp::bigquery::BigqueryConfig;
-use crate::test_util::components::{run_and_assert_sink_compliance, SINK_TAGS};
+use crate::test_util::components::{SINK_TAGS, run_and_assert_sink_compliance};
 use crate::test_util::{generate_events_with_stream, random_string, trace_init};
 
 struct SinkParams {
@@ -23,10 +23,9 @@ impl SinkParams {
     fn from_env() -> Self {
         if let Ok(write_stream) = std::env::var("TEST_GCP_BIGQUERY_WRITE_STREAM") {
             // Real BigQuery write stream is specified. We'll need to use real GCP credentials.
-            let re = Regex::new(
-                "^projects/([^/]+)/datasets/([^/]+)/tables/([^/]+)/streams/_default$",
-            )
-            .unwrap();
+            let re =
+                Regex::new("^projects/([^/]+)/datasets/([^/]+)/tables/([^/]+)/streams/_default$")
+                    .unwrap();
             let captures = re
                 .captures(&write_stream)
                 .expect("TEST_GCP_BIGQUERY_WRITE_STREAM is not a valid write stream path");

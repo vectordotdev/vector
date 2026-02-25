@@ -1,8 +1,8 @@
-use futures_util::{
-    stream::{self, BoxStream},
-    StreamExt,
-};
 use crate::event::Event;
+use futures_util::{
+    StreamExt,
+    stream::{self, BoxStream},
+};
 use vector_lib::sink::StreamSink;
 use vector_lib::stream::BatcherSettings;
 

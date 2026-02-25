@@ -9,7 +9,7 @@ use super::request_builder::{BigqueryRequestBuilder, MAX_BATCH_PAYLOAD_SIZE};
 use super::service::{AuthInterceptor, BigqueryService};
 use super::sink::BigquerySink;
 use crate::config::{AcknowledgementsConfig, GenerateConfig, Input, SinkConfig, SinkContext};
-use crate::gcp::{GcpAuthConfig, GcpAuthenticator, Scope, BIGQUERY_STORAGE_URL};
+use crate::gcp::{BIGQUERY_STORAGE_URL, GcpAuthConfig, GcpAuthenticator, Scope};
 use crate::sinks::util::{BatchConfig, SinkBatchSettings, TowerRequestConfig};
 use crate::sinks::{Healthcheck, VectorSink};
 
@@ -141,12 +141,7 @@ impl SinkConfig for BigqueryConfig {
 
         // Kick off the healthcheck
         let healthcheck: Healthcheck = if cx.healthcheck.enabled {
-            healthcheck_future(
-                channel.clone(),
-                auth.clone(),
-                self.get_write_stream(),
-            )
-            .boxed()
+            healthcheck_future(channel.clone(), auth.clone(), self.get_write_stream()).boxed()
         } else {
             Box::pin(async move { Ok(()) })
         };

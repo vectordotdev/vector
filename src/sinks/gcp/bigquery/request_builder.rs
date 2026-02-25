@@ -1,5 +1,5 @@
-use bytes::BytesMut;
 use crate::codecs::encoding::ProtobufSerializer;
+use bytes::BytesMut;
 use prost::Message;
 use std::num::NonZeroUsize;
 use tokio_util::codec::Encoder;
@@ -9,8 +9,8 @@ use vector_lib::request_metadata::RequestMetadata;
 use super::proto::google::cloud::bigquery::storage::v1 as proto;
 use super::service::BigqueryRequest;
 use crate::event::{Event, EventFinalizers};
-use crate::sinks::util::metadata::RequestMetadataBuilder;
 use crate::sinks::util::IncrementalRequestBuilder;
+use crate::sinks::util::metadata::RequestMetadataBuilder;
 
 // 10MB maximum message size:
 // https://cloud.google.com/bigquery/docs/reference/storage/rpc/google.cloud.bigquery.storage.v1#appendrowsrequest
@@ -53,11 +53,9 @@ impl BigqueryRequestBuilder {
         // The codecs library uses prost-reflect (prost 0.13), but the generated BigQuery proto
         // uses tonic (prost 0.12). We bridge the version gap by encoding to bytes and decoding.
         let descriptor_bytes = protobuf_serializer.encode_descriptor_proto();
-        let descriptor_proto =
-            prost_types::DescriptorProto::decode(descriptor_bytes.as_slice()).map_err(|e| {
-                BigqueryRequestBuilderError::ProtobufEncoding {
-                    message: format!("{e}"),
-                }
+        let descriptor_proto = prost_types::DescriptorProto::decode(descriptor_bytes.as_slice())
+            .map_err(|e| BigqueryRequestBuilderError::ProtobufEncoding {
+                message: format!("{e}"),
             })?;
         let proto_schema = proto::ProtoSchema {
             proto_descriptor: Some(descriptor_proto),
@@ -170,11 +168,11 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
 
 #[cfg(test)]
 mod test {
-    use bytes::{BufMut, Bytes, BytesMut};
     use crate::codecs::encoding::{ProtobufSerializerConfig, ProtobufSerializerOptions};
+    use crate::event::{Event, EventMetadata, LogEvent, Value};
+    use bytes::{BufMut, Bytes, BytesMut};
     use std::collections::BTreeMap;
     use std::path::PathBuf;
-    use crate::event::{Event, EventMetadata, LogEvent, Value};
 
     use super::BigqueryRequestBuilder;
     use crate::sinks::util::IncrementalRequestBuilder;

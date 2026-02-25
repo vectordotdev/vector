@@ -2,8 +2,8 @@ use futures::future::BoxFuture;
 use snafu::Snafu;
 use std::task::{Context, Poll};
 use tonic::metadata::MetadataValue;
-use tonic::service::interceptor::InterceptedService;
 use tonic::service::Interceptor;
+use tonic::service::interceptor::InterceptedService;
 use tonic::transport::Channel;
 use tonic::{Request, Status};
 use tower::Service;
@@ -164,10 +164,7 @@ impl Service<BigqueryRequest> for BigqueryService {
             let response = client.append_rows(stream).await?;
             match response.into_inner().message().await? {
                 Some(body) => {
-                    trace!(
-                        message = "Received response body from BigQuery.",
-                        ?body,
-                    );
+                    trace!(message = "Received response body from BigQuery.", ?body,);
                     Ok(BigqueryResponse {
                         body,
                         request_byte_size,
@@ -183,12 +180,12 @@ impl Service<BigqueryRequest> for BigqueryService {
 #[cfg(test)]
 mod test {
     use futures::FutureExt;
-    use tokio::sync::mpsc::{unbounded_channel, UnboundedReceiver, UnboundedSender};
+    use tokio::sync::mpsc::{UnboundedReceiver, UnboundedSender, unbounded_channel};
     use tokio_stream::wrappers::UnboundedReceiverStream;
     use tonic::{Request, Response, Status};
     use tower::Service;
 
-    use super::{proto, BigqueryRequest, BigqueryService};
+    use super::{BigqueryRequest, BigqueryService, proto};
 
     /// A dumb BigQueryWrite server that can be used to test the BigqueryService.
     struct BigqueryServer {
@@ -325,11 +322,13 @@ mod test {
         let (mut service, mut receiver, shutdown, server_future) = run_server().await;
         // send a request and process the response
         let client_future = tokio::spawn(async move {
-            assert!(service
-                .poll_ready(&mut std::task::Context::from_waker(
-                    futures::task::noop_waker_ref(),
-                ))
-                .is_ready());
+            assert!(
+                service
+                    .poll_ready(&mut std::task::Context::from_waker(
+                        futures::task::noop_waker_ref(),
+                    ))
+                    .is_ready()
+            );
             let response = service
                 .call(BigqueryRequest {
                     request: proto::AppendRowsRequest {
