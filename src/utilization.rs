@@ -580,7 +580,12 @@ mod tests {
         assert!(Pin::new(&mut pipeline).poll_next(&mut cx).is_ready());
         // T=110: MockClock advanced 2s inside transform. Period: 2s work / 0s wait → util = 1.0.
         // EWMA: 0.9×1.0 + 0.1×0.09 ≈ 0.909
-        check_timer_utilization(&mut emitter, &key, 0.909, "0.909 (phase 4: queued event processed)");
+        check_timer_utilization(
+            &mut emitter,
+            &key,
+            0.909,
+            "0.909 (phase 4: queued event processed)",
+        );
     }
 
     /// Drain pending timer messages and assert the current EWMA utilization
