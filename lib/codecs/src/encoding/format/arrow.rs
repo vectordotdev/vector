@@ -135,14 +135,14 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ArrowStreamSerializer {
 #[derive(Debug, Snafu)]
 pub enum ArrowEncodingError {
     /// Failed to create Arrow record batch
-    #[snafu(display("Failed to create Arrow record batch: {}", source))]
+    #[snafu(display("Failed to create Arrow record batch: {source}"))]
     RecordBatchCreation {
         /// The underlying Arrow error
         source: arrow::error::ArrowError,
     },
 
     /// Failed to write Arrow IPC data
-    #[snafu(display("Failed to write Arrow IPC data: {}", source))]
+    #[snafu(display("Failed to write Arrow IPC data: {source}"))]
     IpcWrite {
         /// The underlying Arrow error
         source: arrow::error::ArrowError,
@@ -153,14 +153,14 @@ pub enum ArrowEncodingError {
     NoEvents,
 
     /// Failed to fetch schema from provider
-    #[snafu(display("Failed to fetch schema from provider: {}", message))]
+    #[snafu(display("Failed to fetch schema from provider: {message}"))]
     SchemaFetchError {
         /// Error message from the provider
         message: String,
     },
 
     /// Null value encountered for non-nullable field
-    #[snafu(display("Null value for non-nullable field '{}'", field_name))]
+    #[snafu(display("Null value for non-nullable field '{field_name}'"))]
     NullConstraint {
         /// The field name
         field_name: String,
@@ -171,21 +171,21 @@ pub enum ArrowEncodingError {
     MissingSchema,
 
     /// IO error during encoding
-    #[snafu(display("IO error: {}", source), context(false))]
+    #[snafu(display("IO error: {source}"), context(false))]
     Io {
         /// The underlying IO error
         source: std::io::Error,
     },
 
     /// Arrow JSON decoding error
-    #[snafu(display("Arrow JSON decoding error: {}", source))]
+    #[snafu(display("Arrow JSON decoding error: {source}"))]
     ArrowJsonDecode {
         /// The underlying Arrow error
         source: arrow::error::ArrowError,
     },
 
     /// Invalid Map schema structure
-    #[snafu(display("Invalid Map schema for field '{}': {}", field_name, reason))]
+    #[snafu(display("Invalid Map schema for field '{field_name}': {reason}"))]
     InvalidMapSchema {
         /// The field name
         field_name: String,
