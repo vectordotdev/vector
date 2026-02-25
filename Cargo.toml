@@ -144,7 +144,7 @@ members = [
 
 [workspace.dependencies]
 anyhow = { version = "1.0.101", default-features = false, features = ["std"] }
-arc-swap = { version = "1.7.1", default-features = false }
+arc-swap = { version = "1.8.2", default-features = false }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
