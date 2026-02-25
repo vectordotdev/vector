@@ -19,13 +19,13 @@ pub const MAX_BATCH_PAYLOAD_SIZE: usize = 10_000_000;
 #[derive(Debug, snafu::Snafu)]
 pub enum BigqueryRequestBuilderError {
     #[snafu(display("Encoding protobuf failed: {}", message))]
-    ProtobufEncoding { message: String }, // `error` needs to be some concrete type
+    ProtobufEncoding { message: String },
 }
 
 impl From<vector_common::Error> for BigqueryRequestBuilderError {
     fn from(error: vector_common::Error) -> Self {
         BigqueryRequestBuilderError::ProtobufEncoding {
-            message: format!("{:?}", error),
+            message: format!("{error}"),
         }
     }
 }
@@ -37,24 +37,52 @@ pub struct BigqueryRequestMetadata {
 }
 
 pub struct BigqueryRequestBuilder {
-    pub protobuf_serializer: ProtobufSerializer,
-    pub write_stream: String,
+    protobuf_serializer: ProtobufSerializer,
+    write_stream: String,
+    // Cached schema for inclusion in every AppendRowsRequest.
+    proto_schema: proto::ProtoSchema,
+    // Encoded size of the ProtoData structure with no rows, used to compute batch size limits.
+    schema_overhead: usize,
 }
 
 impl BigqueryRequestBuilder {
+    pub fn new(
+        protobuf_serializer: ProtobufSerializer,
+        write_stream: String,
+    ) -> Result<Self, BigqueryRequestBuilderError> {
+        // The codecs library uses prost-reflect (prost 0.13), but the generated BigQuery proto
+        // uses tonic (prost 0.12). We bridge the version gap by encoding to bytes and decoding.
+        let descriptor_bytes = protobuf_serializer.encode_descriptor_proto();
+        let descriptor_proto =
+            prost_types::DescriptorProto::decode(descriptor_bytes.as_slice()).map_err(|e| {
+                BigqueryRequestBuilderError::ProtobufEncoding {
+                    message: format!("{e}"),
+                }
+            })?;
+        let proto_schema = proto::ProtoSchema {
+            proto_descriptor: Some(descriptor_proto),
+        };
+        let schema_overhead = proto::append_rows_request::ProtoData {
+            writer_schema: Some(proto_schema.clone()),
+            rows: Some(proto::ProtoRows {
+                serialized_rows: vec![],
+            }),
+        }
+        .encoded_len();
+        Ok(Self {
+            protobuf_serializer,
+            write_stream,
+            proto_schema,
+            schema_overhead,
+        })
+    }
+
     fn build_proto_data(
         &self,
         serialized_rows: Vec<Vec<u8>>,
     ) -> (NonZeroUsize, proto::append_rows_request::ProtoData) {
-        // The codecs library uses prost-reflect (prost 0.13), but the generated BigQuery proto
-        // uses tonic (prost 0.12). We bridge the version gap by encoding to bytes and decoding.
-        let descriptor_bytes = self.protobuf_serializer.encode_descriptor_proto();
-        let descriptor_proto = prost_types::DescriptorProto::decode(descriptor_bytes.as_slice())
-            .expect("DescriptorProto wire format is stable across prost versions");
         let proto_data = proto::append_rows_request::ProtoData {
-            writer_schema: Some(proto::ProtoSchema {
-                proto_descriptor: Some(descriptor_proto),
-            }),
+            writer_schema: Some(self.proto_schema.clone()),
             rows: Some(proto::ProtoRows { serialized_rows }),
         };
         let size = NonZeroUsize::new(proto_data.encoded_len())
@@ -73,8 +101,7 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
         &mut self,
         input: Vec<Event>,
     ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>> {
-        let base_proto_data_size: NonZeroUsize = self.build_proto_data(vec![]).0;
-        let max_serialized_rows_len: usize = MAX_BATCH_PAYLOAD_SIZE - base_proto_data_size.get();
+        let max_serialized_rows_len = MAX_BATCH_PAYLOAD_SIZE - self.schema_overhead;
         let metadata = RequestMetadataBuilder::from_events(&input);
         let mut errors: Vec<Self::Error> = vec![];
         let mut bodies: Vec<(EventFinalizers, (NonZeroUsize, Self::Payload))> = vec![];
@@ -86,7 +113,7 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
             let mut bytes = BytesMut::new();
             if let Err(e) = self.protobuf_serializer.encode(event, &mut bytes) {
                 errors.push(BigqueryRequestBuilderError::ProtobufEncoding {
-                    message: format!("{:?}", e),
+                    message: format!("{e}"),
                 });
             } else {
                 if bytes.len() + serialized_rows_len > max_serialized_rows_len {
@@ -166,10 +193,11 @@ mod test {
         }
         .build()
         .unwrap();
-        let mut request_builder = BigqueryRequestBuilder {
+        let mut request_builder = BigqueryRequestBuilder::new(
             protobuf_serializer,
-            write_stream: "/projects/123/datasets/456/tables/789/streams/_default".to_string(),
-        };
+            "/projects/123/datasets/456/tables/789/streams/_default".to_string(),
+        )
+        .unwrap();
         // check that we break up large batches to avoid api limits
         let mut events = vec![];
         let mut data = BytesMut::with_capacity(63336);

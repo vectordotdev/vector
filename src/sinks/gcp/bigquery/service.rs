@@ -74,7 +74,6 @@ impl DriverResponse for BigqueryResponse {
             return EventStatus::Rejected;
         }
         match &self.body.response {
-            None => EventStatus::Dropped,
             Some(proto::append_rows_response::Response::AppendResult(_)) => EventStatus::Delivered,
             Some(proto::append_rows_response::Response::Error(status)) => {
                 match super::proto::google::rpc::Code::try_from(status.code) {
@@ -88,6 +87,8 @@ impl DriverResponse for BigqueryResponse {
                     _ => EventStatus::Errored,
                 }
             }
+            // Unexpected response from BigQuery. We should mark the request as Errored.
+            None => EventStatus::Errored,
         }
     }
     fn events_sent(&self) -> &GroupedCountByteSize {
@@ -104,8 +105,6 @@ pub enum BigqueryServiceError {
     Transport { error: tonic::transport::Error },
     #[snafu(display("BigQuery request failure: {}", status))]
     Request { status: tonic::Status },
-    #[snafu(display("BigQuery row write failures: {:?}", row_errors))]
-    RowWrite { row_errors: Vec<proto::RowError> },
 }
 
 impl From<tonic::transport::Error> for BigqueryServiceError {
@@ -120,12 +119,6 @@ impl From<tonic::Status> for BigqueryServiceError {
     }
 }
 
-impl From<Vec<proto::RowError>> for BigqueryServiceError {
-    fn from(row_errors: Vec<proto::RowError>) -> Self {
-        Self::RowWrite { row_errors }
-    }
-}
-
 type BigQueryWriteClient = proto::big_query_write_client::BigQueryWriteClient<
     InterceptedService<tonic::transport::Channel, AuthInterceptor>,
 >;
@@ -135,12 +128,12 @@ pub struct BigqueryService {
 }
 
 impl BigqueryService {
-    pub async fn with_auth(channel: Channel, auth: GcpAuthenticator) -> crate::Result<Self> {
+    pub fn with_auth(channel: Channel, auth: GcpAuthenticator) -> Self {
         let service = proto::big_query_write_client::BigQueryWriteClient::with_interceptor(
             channel,
             AuthInterceptor { auth },
         );
-        Ok(Self { service })
+        Self { service }
     }
 }
 
@@ -164,26 +157,22 @@ impl Service<BigqueryRequest> for BigqueryService {
             // Ideally, we would maintain the gRPC stream, detect when auth expired and re-request with new auth.
             // But issuing a new request every time leads to more comprehensible code with reasonable performance.
             trace!(
-                message = "Sending request to BigQuery",
-                request = format!("{:?}", request.request),
+                message = "Sending request to BigQuery.",
+                ?request.request,
             );
             let stream = tokio_stream::once(request.request);
             let response = client.append_rows(stream).await?;
             match response.into_inner().message().await? {
                 Some(body) => {
                     trace!(
-                        message = "Received response body from BigQuery",
-                        body = format!("{:?}", body),
+                        message = "Received response body from BigQuery.",
+                        ?body,
                     );
-                    if body.row_errors.is_empty() {
-                        Ok(BigqueryResponse {
-                            body,
-                            request_byte_size,
-                            request_uncompressed_size,
-                        })
-                    } else {
-                        Err(body.row_errors.into())
-                    }
+                    Ok(BigqueryResponse {
+                        body,
+                        request_byte_size,
+                        request_uncompressed_size,
+                    })
                 }
                 None => Err(tonic::Status::unknown("response stream closed").into()),
             }
@@ -327,9 +316,7 @@ mod test {
                 .await
                 .unwrap();
         });
-        let service = BigqueryService::with_auth(channel, crate::gcp::GcpAuthenticator::None)
-            .await
-            .unwrap();
+        let service = BigqueryService::with_auth(channel, crate::gcp::GcpAuthenticator::None);
         (service, receiver, shutdown_tx, join_handle)
     }
 

@@ -18,7 +18,7 @@ pub struct BigquerySink {
 }
 
 impl BigquerySink {
-    async fn run_inner(self: Box<BigquerySink>, input: BoxStream<'_, Event>) -> Result<(), ()> {
+    async fn run_inner(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         input
             .batched(self.batcher_settings.as_byte_size_config())
             .incremental_request_builder(self.request_builder)

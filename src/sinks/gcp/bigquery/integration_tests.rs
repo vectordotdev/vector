@@ -1,19 +1,59 @@
-use chrono::{Local, Utc};
+use chrono::Utc;
 use indoc::formatdoc;
 use regex::Regex;
 use std::collections::BTreeMap;
 use vector_common::finalization::BatchStatus;
-use vector_core::event::{BatchNotifier, Event, LogEvent, Value};
-use vector_core::sink::VectorSink;
+use vector_lib::event::{BatchNotifier, Event, LogEvent, Value};
+use vector_lib::sink::VectorSink;
 
 use crate::config::SinkConfig;
 use crate::sinks::gcp::bigquery::BigqueryConfig;
 use crate::test_util::components::{run_and_assert_sink_compliance, SINK_TAGS};
 use crate::test_util::{generate_events_with_stream, random_string, trace_init};
 
+struct SinkParams {
+    project: String,
+    dataset: String,
+    table: String,
+    endpoint: String,
+    skip_authentication: bool,
+}
+
+impl SinkParams {
+    fn from_env() -> Self {
+        if let Ok(write_stream) = std::env::var("TEST_GCP_BIGQUERY_WRITE_STREAM") {
+            // Real BigQuery write stream is specified. We'll need to use real GCP credentials.
+            let re = Regex::new(
+                "^projects/([^/]+)/datasets/([^/]+)/tables/([^/]+)/streams/_default$",
+            )
+            .unwrap();
+            let captures = re
+                .captures(&write_stream)
+                .expect("TEST_GCP_BIGQUERY_WRITE_STREAM is not a valid write stream path");
+            Self {
+                project: captures[1].to_string(),
+                dataset: captures[2].to_string(),
+                table: captures[3].to_string(),
+                endpoint: crate::gcp::BIGQUERY_STORAGE_URL.to_string(),
+                skip_authentication: false,
+            }
+        } else {
+            // Otherwise, use the local emulator.
+            Self {
+                project: "testproject".to_string(),
+                dataset: "testdataset".to_string(),
+                table: "integration".to_string(),
+                endpoint: std::env::var("BIGQUERY_EMULATOR_ADDRESS")
+                    .unwrap_or_else(|_| "http://localhost:9060".to_string()),
+                skip_authentication: true,
+            }
+        }
+    }
+}
+
 /// An event generator that can be used with `generate_events_with_stream`
 fn event_generator(index: usize) -> Event {
-    let now = Local::now().with_timezone(&Utc);
+    let now = Utc::now();
     let value = Value::Object(BTreeMap::from([
         ("time".into(), Value::Timestamp(now)),
         ("count".into(), Value::Integer(index as i64)),
@@ -29,23 +69,27 @@ async fn create_sink() -> VectorSink {
         .join("lib/codecs/tests/data/protobuf/integration.desc")
         .to_string_lossy()
         .into_owned();
-    let message_type = "test.Integration";
-    let write_stream = std::env::var("TEST_GCP_BIGQUERY_WRITE_STREAM")
-        .expect("couldn't find the BigQuery write stream in environment variables");
-    let re =
-        Regex::new("^projects/([^/]+)/datasets/([^/]+)/tables/([^/]+)/streams/_default$").unwrap();
-    let captures = re
-        .captures(&write_stream)
-        .expect("malformed BigQuery write stream in environment variables");
-    let project = captures.get(1).unwrap().as_str();
-    let dataset = captures.get(2).unwrap().as_str();
-    let table = captures.get(3).unwrap().as_str();
+    let desc_file_toml = toml::Value::String(desc_file).to_string();
+    let SinkParams {
+        project,
+        dataset,
+        table,
+        endpoint,
+        skip_authentication,
+    } = SinkParams::from_env();
+    let auth_line = if skip_authentication {
+        "skip_authentication = true".to_string()
+    } else {
+        String::new()
+    };
     let config = formatdoc! {r#"
         project = "{project}"
         dataset = "{dataset}"
         table = "{table}"
-        encoding.protobuf.desc_file = "{desc_file}"
-        encoding.protobuf.message_type = "{message_type}"
+        endpoint = "{endpoint}"
+        {auth_line}
+        encoding.protobuf.desc_file = {desc_file_toml}
+        encoding.protobuf.message_type = "test.Integration"
     "#};
     let (bigquery_config, cx) =
         crate::sinks::util::test::load_sink::<BigqueryConfig>(&config).unwrap();

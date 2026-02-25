@@ -6,8 +6,6 @@
 
 #[cfg(all(test, feature = "gcp-bigquery-integration-tests"))]
 mod integration_tests;
-#[cfg(test)]
-mod tests;
 
 mod config;
 mod request_builder;

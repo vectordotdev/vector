@@ -1,6 +1,5 @@
 use crate::codecs::encoding::ProtobufSerializerConfig;
 use futures::FutureExt;
-use http::Uri;
 use indoc::indoc;
 use tonic::transport::Channel;
 use vector_config::configurable_component;
@@ -22,7 +21,7 @@ fn default_endpoint() -> String {
 pub struct BigqueryDefaultBatchSettings;
 
 impl SinkBatchSettings for BigqueryDefaultBatchSettings {
-    const MAX_EVENTS: Option<usize> = Some(50_000); // i made this number up, there's no hard limit in BigQuery
+    const MAX_EVENTS: Option<usize> = Some(50_000); // Arbitrary limit, there's no hard limit in BigQuery.
     const MAX_BYTES: Option<usize> = Some(MAX_BATCH_PAYLOAD_SIZE);
     const TIMEOUT_SECS: f64 = 1.0;
 }
@@ -40,7 +39,7 @@ pub struct BigqueryConfig {
     #[configurable(metadata(docs::examples = "this-is-a-dataset"))]
     pub dataset: String,
 
-    /// The dataset within the dataset to which to publish events.
+    /// The table within the dataset to which to publish events.
     #[configurable(metadata(docs::examples = "this-is-a-table"))]
     pub table: String,
 
@@ -104,36 +103,22 @@ impl GenerateConfig for BigqueryConfig {
     }
 }
 
-/// Create a future that sends a single nothing-request to BigQuery
+/// Create a future that calls GetWriteStream to verify connectivity and auth.
 async fn healthcheck_future(
-    uri: Uri,
+    channel: Channel,
     auth: GcpAuthenticator,
     write_stream: String,
 ) -> crate::Result<()> {
-    let channel = Channel::builder(uri)
-        .tls_config(tonic::transport::channel::ClientTlsConfig::new())
-        .unwrap()
-        .connect_timeout(std::time::Duration::from_secs(10))
-        .connect()
-        .await?;
     let mut client = proto::big_query_write_client::BigQueryWriteClient::with_interceptor(
         channel,
         AuthInterceptor { auth },
     );
-    // specify the write_stream so that there's enough information to perform an IAM check
-    let stream = tokio_stream::once(proto::AppendRowsRequest {
-        write_stream,
-        ..proto::AppendRowsRequest::default()
-    });
-    let mut response = client.append_rows(stream).await?;
-    // the result is expected to be `InvalidArgument`
-    // because we use a bunch of empty values in the request
-    // (and `InvalidArgument` specifically means we made it past the auth check)
-    if let Err(status) = response.get_mut().message().await {
-        if status.code() != tonic::Code::InvalidArgument {
-            return Err(status.into());
-        }
-    }
+    client
+        .get_write_stream(proto::GetWriteStreamRequest {
+            name: write_stream,
+            view: proto::WriteStreamView::Full as i32,
+        })
+        .await?;
     Ok(())
 }
 
@@ -148,10 +133,16 @@ impl SinkConfig for BigqueryConfig {
         let auth = self.auth.build(Scope::BigQueryInsertdata).await?;
         auth.spawn_regenerate_token();
 
+        // Create the gRPC channel; tonic channels are cheap to clone and share the underlying connection.
+        let channel = Channel::builder(self.endpoint.parse()?)
+            .connect_timeout(std::time::Duration::from_secs(10))
+            .connect()
+            .await?;
+
         // Kick off the healthcheck
         let healthcheck: Healthcheck = if cx.healthcheck.enabled {
             healthcheck_future(
-                self.endpoint.parse()?,
+                channel.clone(),
                 auth.clone(),
                 self.get_write_stream(),
             )
@@ -160,12 +151,7 @@ impl SinkConfig for BigqueryConfig {
             Box::pin(async move { Ok(()) })
         };
 
-        // Create the gRPC client
-        let channel = Channel::builder(self.endpoint.parse()?)
-            .connect_timeout(std::time::Duration::from_secs(10))
-            .connect()
-            .await?;
-        let service = BigqueryService::with_auth(channel, auth).await?;
+        let service = BigqueryService::with_auth(channel, auth);
 
         let batcher_settings = self
             .batch
@@ -175,10 +161,7 @@ impl SinkConfig for BigqueryConfig {
 
         let protobuf_serializer = self.encoding.build()?;
         let write_stream = self.get_write_stream();
-        let request_builder = BigqueryRequestBuilder {
-            protobuf_serializer,
-            write_stream,
-        };
+        let request_builder = BigqueryRequestBuilder::new(protobuf_serializer, write_stream)?;
 
         let sink = BigquerySink {
             service,
