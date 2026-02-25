@@ -316,9 +316,13 @@ async fn multiple_traces() {
 async fn stats_payload_uses_container_tags() {
     let mut t = TraceEvent::default();
 
-    t.insert(event_path!("tags"), json!({
-        "_dd.tags.container": "env:container_env,location:container_location"
-    }));
+    t.insert(
+        event_path!("tags"),
+        json!({
+            "_dd.tags.container": "env:container_env,location:container_location"
+        }),
+    );
+    t.insert(event_path!("container_id"), "container123");
     t.insert(
         event_path!("spans"),
         Value::Array(vec![Value::from(simple_span("foo".to_string()))]),
@@ -339,13 +343,14 @@ async fn stats_payload_uses_container_tags() {
     assert_eq!(payload.env, "container_env");
 
     assert!(
-        payload.tags.iter().any(|t| t == "location:container_location"),
+        payload
+            .tags
+            .iter()
+            .any(|t| t == "location:container_location"),
         "expected location:container_location in stats payload tags, got {:?}",
         payload.tags
     );
 }
-
-
 
 #[tokio::test]
 async fn global_options() {

@@ -75,7 +75,6 @@ pub(crate) struct ClientStatsBucket {
     pub(crate) duration: u64,
     pub(crate) stats: Vec<ClientGroupedStats>,
     pub(crate) agent_time_shift: i64,
-    // TODO add tags here
 }
 
 #[derive(Debug, PartialEq, Deserialize, Serialize)]
