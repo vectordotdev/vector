@@ -38,5 +38,9 @@ pub use error::{Error, Result};
 
 /// Re-export generated protobuf types
 pub mod proto {
+    pub mod event {
+        tonic::include_proto!("event");
+    }
+
     tonic::include_proto!("vector.observability");
 }

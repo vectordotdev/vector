@@ -134,7 +134,8 @@ fn main() {
         let mut prost_build = prost_build::Config::new();
         prost_build
             .btree_map(["."])
-            .file_descriptor_set_path(protobuf_fds_path);
+            .file_descriptor_set_path(protobuf_fds_path)
+            .extern_path(".event", "crate::event::proto"); // Use existing event types from vector-core
 
         tonic_build::configure()
             .protoc_arg("--experimental_allow_proto3_optional")

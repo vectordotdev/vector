@@ -67,7 +67,6 @@ pub async fn tap(opts: &super::Opts, mut signal_rx: SignalRx) -> exitcode::ExitC
         opts.inputs_of.clone(),
         opts.outputs_patterns().clone(),
         &output_channel,
-        opts.format,
     );
 
     loop {

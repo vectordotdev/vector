@@ -2,6 +2,7 @@ syntax = "proto3";
 package vector.observability;
 
 import "google/protobuf/timestamp.proto";
+import "event.proto";
 
 // Observability service for monitoring Vector instances.
 // This replaces the GraphQL API with a more efficient gRPC interface.
@@ -160,48 +161,21 @@ message OutputEventsRequest {
 
   // Sampling interval in milliseconds
   int32 interval_ms = 4;
-
-  // Encoding format for event serialization
-  EventEncoding encoding = 5;
-}
-
-enum EventEncoding {
-  JSON = 0;
-  YAML = 1;
-  LOGFMT = 2;
 }
 
 message OutputEvent {
   oneof event {
-    LogEvent log = 1;
-    MetricEvent metric = 2;
-    TraceEvent trace = 3;
-    EventNotification notification = 4;
+    TappedEvent tapped_event = 1;
+    EventNotification notification = 2;
   }
 }
 
-message LogEvent {
+// Event captured from a component with metadata about where it came from
+message TappedEvent {
   string component_id = 1;
   string component_type = 2;
   string component_kind = 3;
-  string message = 4;
-  google.protobuf.Timestamp timestamp = 5;
-  string encoded_string = 6;  // Serialized according to requested encoding
-}
-
-message MetricEvent {
-  string component_id = 1;
-  string component_type = 2;
-  string component_kind = 3;
-  google.protobuf.Timestamp timestamp = 4;
-  string encoded_string = 5;  // Serialized according to requested encoding
-}
-
-message TraceEvent {
-  string component_id = 1;
-  string component_type = 2;
-  string component_kind = 3;
-  string encoded_string = 4;  // Serialized according to requested encoding
+  event.EventWrapper event = 4;  // The actual event data (uses canonical proto definition)
 }
 
 message EventNotification {

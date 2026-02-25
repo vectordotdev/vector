@@ -4,7 +4,6 @@ use std::sync::{Arc, Mutex};
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use futures::{StreamExt as FuturesStreamExt, stream};
-use prost_types::Timestamp;
 use rand::{Rng, SeedableRng, rngs::SmallRng};
 use tokio::select;
 use tokio::sync::mpsc;
@@ -14,21 +13,15 @@ use tokio_stream::{
     wrappers::{IntervalStream, ReceiverStream},
 };
 use tonic::{Request, Response, Status};
-use vector_lib::{
-    encode_logfmt,
-    event::{LogEvent as VectorLogEvent, Metric as VectorMetric, TraceEvent as VectorTraceEvent},
-    tap::{
-        controller::{TapController, TapPatterns, TapPayload},
-        topology::WatchRx,
-    },
+use vector_lib::tap::{
+    controller::{TapController, TapPatterns, TapPayload},
+    topology::WatchRx,
 };
-use vrl::event_path;
 
 use crate::event::{Metric, MetricValue};
 use crate::metrics::Controller;
 use crate::proto::observability::{
-    self, Component as ProtoComponent, ComponentType, EventNotification, LogEvent, MetricEvent,
-    TraceEvent, *,
+    self, Component as ProtoComponent, ComponentType, EventNotification, TappedEvent, *,
 };
 
 /// Helper function to extract metric value as f64
@@ -691,7 +684,6 @@ impl observability::Service for ObservabilityService {
         let req = request.into_inner();
         let interval_ms = req.interval_ms as u64;
         let limit = req.limit as usize;
-        let encoding = req.encoding();
 
         if interval_ms == 0 {
             return Err(Status::invalid_argument("interval_ms must be positive"));
@@ -744,7 +736,7 @@ impl observability::Service for ObservabilityService {
                 select! {
                     Some(tap_payload) = tokio_stream::StreamExt::next(&mut tap_rx) => {
                         // Convert TapPayload to OutputEvent(s)
-                        let events = tap_payload_to_output_events(tap_payload, encoding);
+                        let events = tap_payload_to_output_events(tap_payload);
 
                         for event in events {
                             // Handle notifications immediately
@@ -796,34 +788,25 @@ impl observability::Service for ObservabilityService {
 }
 
 /// Convert TapPayload to gRPC OutputEvent(s)
-fn tap_payload_to_output_events(payload: TapPayload, encoding: EventEncoding) -> Vec<OutputEvent> {
+fn tap_payload_to_output_events(payload: TapPayload) -> Vec<OutputEvent> {
+    use crate::event::proto::{EventWrapper, Event};
+
     match payload {
         TapPayload::Log(output, log_array) => log_array
             .into_iter()
             .map(|log_event| {
-                let message = log_event
-                    .get(event_path!("message"))
-                    .map(|v| v.to_string_lossy().into_owned())
-                    .unwrap_or_default();
-
-                let timestamp = log_event
-                    .get(event_path!("timestamp"))
-                    .and_then(|v| v.as_timestamp())
-                    .map(|dt| Timestamp {
-                        seconds: dt.timestamp(),
-                        nanos: dt.timestamp_subsec_nanos() as i32,
-                    });
-
-                let encoded_string = encode_log_event(&log_event, encoding);
+                // Convert Vector's internal LogEvent to proto Log
+                let proto_log: crate::event::proto::Log = log_event.into();
+                let event_wrapper = Some(EventWrapper {
+                    event: Some(Event::Log(proto_log)),
+                });
 
                 OutputEvent {
-                    event: Some(output_event::Event::Log(LogEvent {
+                    event: Some(output_event::Event::TappedEvent(TappedEvent {
                         component_id: output.output_id.component.id().to_string(),
                         component_type: output.component_type.to_string(),
                         component_kind: output.component_kind.to_string(),
-                        message,
-                        timestamp,
-                        encoded_string,
+                        event: event_wrapper,
                     })),
                 }
             })
@@ -831,20 +814,18 @@ fn tap_payload_to_output_events(payload: TapPayload, encoding: EventEncoding) ->
         TapPayload::Metric(output, metric_array) => metric_array
             .into_iter()
             .map(|metric_event| {
-                let timestamp = metric_event.timestamp().map(|dt| Timestamp {
-                    seconds: dt.timestamp(),
-                    nanos: dt.timestamp_subsec_nanos() as i32,
+                // Convert Vector's internal Metric to proto Metric
+                let proto_metric: crate::event::proto::Metric = metric_event.into();
+                let event_wrapper = Some(EventWrapper {
+                    event: Some(Event::Metric(proto_metric)),
                 });
 
-                let encoded_string = encode_metric_event(&metric_event, encoding);
-
                 OutputEvent {
-                    event: Some(output_event::Event::Metric(MetricEvent {
+                    event: Some(output_event::Event::TappedEvent(TappedEvent {
                         component_id: output.output_id.component.id().to_string(),
                         component_type: output.component_type.to_string(),
                         component_kind: output.component_kind.to_string(),
-                        timestamp,
-                        encoded_string,
+                        event: event_wrapper,
                     })),
                 }
             })
@@ -852,59 +833,24 @@ fn tap_payload_to_output_events(payload: TapPayload, encoding: EventEncoding) ->
         TapPayload::Trace(output, trace_array) => trace_array
             .into_iter()
             .map(|trace_event| {
-                let encoded_string = encode_trace_event(&trace_event, encoding);
+                // Convert Vector's internal TraceEvent to proto Trace
+                let proto_trace: crate::event::proto::Trace = trace_event.into();
+                let event_wrapper = Some(EventWrapper {
+                    event: Some(Event::Trace(proto_trace)),
+                });
 
                 OutputEvent {
-                    event: Some(output_event::Event::Trace(TraceEvent {
+                    event: Some(output_event::Event::TappedEvent(TappedEvent {
                         component_id: output.output_id.component.id().to_string(),
                         component_type: output.component_type.to_string(),
                         component_kind: output.component_kind.to_string(),
-                        encoded_string,
+                        event: event_wrapper,
                     })),
                 }
             })
             .collect(),
         TapPayload::Notification(notification) => {
             vec![create_notification_event(notification.as_str())]
-        }
-    }
-}
-
-fn encode_log_event(log_event: &VectorLogEvent, encoding: EventEncoding) -> String {
-    match encoding {
-        EventEncoding::Json => serde_json::to_string(log_event)
-            .unwrap_or_else(|_| "JSON serialization failed".to_string()),
-        EventEncoding::Yaml => serde_yaml::to_string(log_event)
-            .unwrap_or_else(|_| "YAML serialization failed".to_string()),
-        EventEncoding::Logfmt => encode_logfmt::encode_value(log_event.value())
-            .unwrap_or_else(|_| "logfmt serialization failed".to_string()),
-    }
-}
-
-fn encode_metric_event(metric_event: &VectorMetric, encoding: EventEncoding) -> String {
-    match encoding {
-        EventEncoding::Json => serde_json::to_string(metric_event)
-            .unwrap_or_else(|_| "JSON serialization failed".to_string()),
-        EventEncoding::Yaml => serde_yaml::to_string(metric_event)
-            .unwrap_or_else(|_| "YAML serialization failed".to_string()),
-        EventEncoding::Logfmt => {
-            // Metrics don't have logfmt encoding, fall back to JSON
-            serde_json::to_string(metric_event)
-                .unwrap_or_else(|_| "JSON serialization failed".to_string())
-        }
-    }
-}
-
-fn encode_trace_event(trace_event: &VectorTraceEvent, encoding: EventEncoding) -> String {
-    match encoding {
-        EventEncoding::Json => serde_json::to_string(trace_event)
-            .unwrap_or_else(|_| "JSON serialization failed".to_string()),
-        EventEncoding::Yaml => serde_yaml::to_string(trace_event)
-            .unwrap_or_else(|_| "YAML serialization failed".to_string()),
-        EventEncoding::Logfmt => {
-            // Traces don't have logfmt encoding, fall back to JSON
-            serde_json::to_string(trace_event)
-                .unwrap_or_else(|_| "JSON serialization failed".to_string())
         }
     }
 }

@@ -18,7 +18,7 @@ use tokio_stream::StreamExt;
 use url::Url;
 use vector_api_client::{
     Client,
-    proto::{EventEncoding, OutputEvent, OutputEventsRequest},
+    proto::{OutputEvent, OutputEventsRequest},
 };
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
@@ -28,21 +28,8 @@ pub enum TapEncodingFormat {
     Logfmt,
 }
 
-impl From<TapEncodingFormat> for EventEncoding {
-    fn from(format: TapEncodingFormat) -> Self {
-        match format {
-            TapEncodingFormat::Json => EventEncoding::Json,
-            TapEncodingFormat::Yaml => EventEncoding::Yaml,
-            TapEncodingFormat::Logfmt => EventEncoding::Logfmt,
-        }
-    }
-}
-
-impl From<TapEncodingFormat> for i32 {
-    fn from(format: TapEncodingFormat) -> Self {
-        EventEncoding::from(format) as i32
-    }
-}
+// Note: TapEncodingFormat is kept for CLI compatibility but not used in the gRPC API
+// The server now sends proto events directly, which clients serialize as needed
 
 #[derive(Clone, Debug)]
 pub struct EventFormatter {
@@ -145,7 +132,6 @@ pub struct TapRunner<'a> {
     input_patterns: Vec<String>,
     output_patterns: Vec<String>,
     output_channel: &'a OutputChannel,
-    format: TapEncodingFormat,
 }
 
 impl<'a> TapRunner<'a> {
@@ -154,14 +140,12 @@ impl<'a> TapRunner<'a> {
         input_patterns: Vec<String>,
         output_patterns: Vec<String>,
         output_channel: &'a OutputChannel,
-        format: TapEncodingFormat,
     ) -> Self {
         TapRunner {
             url,
             input_patterns,
             output_patterns,
             output_channel,
-            format,
         }
     }
 
@@ -180,7 +164,6 @@ impl<'a> TapRunner<'a> {
             inputs_patterns: self.input_patterns.clone(),
             limit: limit as i32,
             interval_ms: interval as i32,
-            encoding: self.format.into(),
         };
 
         let mut stream = client.stream_output_events(request).await?;
@@ -244,36 +227,23 @@ impl<'a> TapRunner<'a> {
         use vector_api_client::proto::output_event::Event;
 
         match &output_event.event {
-            Some(Event::Log(ev)) => {
+            Some(Event::TappedEvent(ev)) => {
+                // Format the proto event for display
+                let encoded_string = if let Some(ref event_wrapper) = ev.event {
+                    // Use Debug format for the event (shows all fields)
+                    // TODO: Implement proper JSON/YAML/logfmt formatting
+                    format!("{:?}", event_wrapper)
+                } else {
+                    "No event data".to_string()
+                };
+
                 println!(
                     "{}",
                     formatter.format(
                         &ev.component_id,
                         &ev.component_kind,
                         &ev.component_type,
-                        &ev.encoded_string
-                    )
-                );
-            }
-            Some(Event::Metric(ev)) => {
-                println!(
-                    "{}",
-                    formatter.format(
-                        &ev.component_id,
-                        &ev.component_kind,
-                        &ev.component_type,
-                        &ev.encoded_string
-                    )
-                );
-            }
-            Some(Event::Trace(ev)) => {
-                println!(
-                    "{}",
-                    formatter.format(
-                        &ev.component_id,
-                        &ev.component_kind,
-                        &ev.component_type,
-                        &ev.encoded_string
+                        &encoded_string
                     )
                 );
             }
