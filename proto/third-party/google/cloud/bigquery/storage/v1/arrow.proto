@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -58,7 +58,32 @@ message ArrowSerializationOptions {
     ZSTD = 2;
   }
 
+  // The precision of the timestamp value in the Avro message. This precision
+  // will **only** be applied to the column(s) with the `TIMESTAMP_PICOS` type.
+  enum PicosTimestampPrecision {
+    // Unspecified timestamp precision. The default precision is microseconds.
+    PICOS_TIMESTAMP_PRECISION_UNSPECIFIED = 0;
+
+    // Timestamp values returned by Read API will be truncated to microsecond
+    // level precision. The value will be encoded as Arrow TIMESTAMP type in a
+    // 64 bit integer.
+    TIMESTAMP_PRECISION_MICROS = 1;
+
+    // Timestamp values returned by Read API will be truncated to nanosecond
+    // level precision. The value will be encoded as Arrow TIMESTAMP type in a
+    // 64 bit integer.
+    TIMESTAMP_PRECISION_NANOS = 2;
+
+    // Read API will return full precision picosecond value. The value will be
+    // encoded as a string which conforms to ISO 8601 format.
+    TIMESTAMP_PRECISION_PICOS = 3;
+  }
+
   // The compression codec to use for Arrow buffers in serialized record
   // batches.
   CompressionCodec buffer_compression = 2;
+
+  // Optional. Set timestamp precision option. If not set, the default precision
+  // is microseconds.
+  PicosTimestampPrecision picos_timestamp_precision = 3;
 }

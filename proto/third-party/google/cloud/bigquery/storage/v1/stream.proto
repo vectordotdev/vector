@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -59,6 +59,21 @@ message ReadSession {
 
   // Options dictating how we read a table.
   message TableReadOptions {
+    // Specifies which compression codec to attempt on the entire serialized
+    // response payload (either Arrow record batch or Avro rows). This is
+    // not to be confused with the Apache Arrow native compression codecs
+    // specified in ArrowSerializationOptions. For performance reasons, when
+    // creating a read session requesting Arrow responses, setting both native
+    // Arrow compression and application-level response compression will not be
+    // allowed - choose, at most, one kind of compression.
+    enum ResponseCompressionCodec {
+      // Default is no compression.
+      RESPONSE_COMPRESSION_CODEC_UNSPECIFIED = 0;
+
+      // Use raw LZ4 compression.
+      RESPONSE_COMPRESSION_CODEC_LZ4 = 2;
+    }
+
     // Optional. The names of the fields in the table to be returned. If no
     // field names are specified, then all fields in the table are returned.
     //
@@ -137,6 +152,11 @@ message ReadSession {
     // block. For more details, see
     // https://cloud.google.com/bigquery/docs/table-sampling)
     optional double sample_percentage = 5
+        [(google.api.field_behavior) = OPTIONAL];
+
+    // Optional. Set response_compression_codec when creating a read session to
+    // enable application-level compression of ReadRows responses.
+    optional ResponseCompressionCodec response_compression_codec = 6
         [(google.api.field_behavior) = OPTIONAL];
   }
 
@@ -308,8 +328,8 @@ message WriteStream {
   // Immutable. Mode of the stream.
   WriteMode write_mode = 7 [(google.api.field_behavior) = IMMUTABLE];
 
-  // Immutable. The geographic location where the stream's dataset resides. See
-  // https://cloud.google.com/bigquery/docs/locations for supported
+  // Output only. The geographic location where the stream's dataset resides.
+  // See https://cloud.google.com/bigquery/docs/locations for supported
   // locations.
-  string location = 8 [(google.api.field_behavior) = IMMUTABLE];
+  string location = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
 }

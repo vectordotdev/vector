@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -78,9 +78,9 @@ service BigQueryRead {
   }
 
   // Reads rows from the stream in the format prescribed by the ReadSession.
-  // Each response contains one or more table rows, up to a maximum of 100 MiB
+  // Each response contains one or more table rows, up to a maximum of 128 MB
   // per response; read requests which attempt to read individual rows larger
-  // than 100 MiB will fail.
+  // than 128 MB will fail.
   //
   // Each request also returns a set of stream statistics reflecting the current
   // state of the stream.
@@ -348,6 +348,23 @@ message ReadRowsResponse {
     // Output only. Arrow schema.
     ArrowSchema arrow_schema = 8 [(google.api.field_behavior) = OUTPUT_ONLY];
   }
+
+  // Optional. If the row data in this ReadRowsResponse is compressed, then
+  // uncompressed byte size is the original size of the uncompressed row data.
+  // If it is set to a value greater than 0, then decompress into a buffer of
+  // size uncompressed_byte_size using the compression codec that was requested
+  // during session creation time and which is specified in
+  // TableReadOptions.response_compression_codec in ReadSession.
+  // This value is not set if no response_compression_codec was not requested
+  // and it is -1 if the requested compression would not have reduced the size
+  // of this ReadRowsResponse's row data. This attempts to match Apache Arrow's
+  // behavior described here https://github.com/apache/arrow/issues/15102 where
+  // the uncompressed length may be set to -1 to indicate that the data that
+  // follows is not compressed, which can be useful for cases where compression
+  // does not yield appreciable savings. When uncompressed_byte_size is not
+  // greater than 0, the client should skip decompression.
+  optional int64 uncompressed_byte_size = 9
+      [(google.api.field_behavior) = OPTIONAL];
 }
 
 // Request message for `SplitReadStream`.
@@ -405,11 +422,20 @@ message CreateWriteStreamRequest {
 // The size of a single AppendRowsRequest must be less than 10 MB in size.
 // Requests larger than this return an error, typically `INVALID_ARGUMENT`.
 message AppendRowsRequest {
+  // Arrow schema and data.
+  message ArrowData {
+    // Optional. Arrow Schema used to serialize the data.
+    ArrowSchema writer_schema = 1;
+
+    // Required. Serialized row data in Arrow format.
+    ArrowRecordBatch rows = 2;
+  }
+
   // ProtoData contains the data rows and schema when constructing append
   // requests.
   message ProtoData {
-    // The protocol buffer schema used to serialize the data. Provide this value
-    // whenever:
+    // Optional. The protocol buffer schema used to serialize the data. Provide
+    // this value whenever:
     //
     // * You send the first request of an RPC connection.
     //
@@ -418,7 +444,7 @@ message AppendRowsRequest {
     // * You specify a new destination table.
     ProtoSchema writer_schema = 1;
 
-    // Serialized row data in protobuf message format.
+    // Required. Serialized row data in protobuf message format.
     // Currently, the backend expects the serialized rows to adhere to
     // proto2 semantics when appending rows, particularly with respect to
     // how default values are encoded.
@@ -493,6 +519,9 @@ message AppendRowsRequest {
   oneof rows {
     // Rows in proto format.
     ProtoData proto_rows = 4;
+
+    // Rows in arrow format.
+    ArrowData arrow_rows = 5;
   }
 
   // Id set by client to annotate its identity. Only initial request setting is
@@ -521,8 +550,8 @@ message AppendRowsRequest {
 
   // Optional. Default missing value interpretation for all columns in the
   // table. When a value is specified on an `AppendRowsRequest`, it is applied
-  // to all requests on the connection from that point forward, until a
-  // subsequent `AppendRowsRequest` sets it to a different value.
+  // to all requests from that point forward, until a subsequent
+  // `AppendRowsRequest` sets it to a different value.
   // `missing_value_interpretation` can override
   // `default_missing_value_interpretation`. For example, if you want to write
   // `NULL` instead of using default values for some columns, you can set

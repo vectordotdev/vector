@@ -1,4 +1,4 @@
-// Copyright 2023 Google LLC
+// Copyright 2025 Google LLC
 //
 // Licensed under the Apache License, Version 2.0 (the "License");
 // you may not use this file except in compliance with the License.
@@ -17,6 +17,7 @@ syntax = "proto3";
 package google.cloud.bigquery.storage.v1;
 
 import "google/api/field_behavior.proto";
+import "google/protobuf/wrappers.proto";
 
 option csharp_namespace = "Google.Cloud.BigQuery.Storage.V1";
 option go_package = "cloud.google.com/go/bigquery/storage/apiv1/storagepb;storagepb";
@@ -83,6 +84,9 @@ message TableFieldSchema {
 
     // JSON, String
     JSON = 15;
+
+    // RANGE
+    RANGE = 16;
   }
 
   enum Mode {
@@ -94,6 +98,12 @@ message TableFieldSchema {
     REQUIRED = 2;
 
     REPEATED = 3;
+  }
+
+  // Represents the type of a field element.
+  message FieldElementType {
+    // Required. The type of a field element.
+    Type type = 1 [(google.api.field_behavior) = REQUIRED];
   }
 
   // Required. The field name. The name must contain only letters (a-z, A-Z),
@@ -168,4 +178,23 @@ message TableFieldSchema {
   // Optional. A SQL expression to specify the [default value]
   // (https://cloud.google.com/bigquery/docs/default-values) for this field.
   string default_value_expression = 10 [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. Precision (maximum number of total digits in base 10) for seconds
+  // of TIMESTAMP type.
+  //
+  // Possible values include:
+  //
+  // * 6 (Default, for TIMESTAMP type with microsecond precision)
+  // * 12 (For TIMESTAMP type with picosecond precision)
+  google.protobuf.Int64Value timestamp_precision = 27
+      [(google.api.field_behavior) = OPTIONAL];
+
+  // Optional. The subtype of the RANGE, if the type of this field is RANGE. If
+  // the type is RANGE, this field is required. Possible values for the field
+  // element type of a RANGE include:
+  // * DATE
+  // * DATETIME
+  // * TIMESTAMP
+  FieldElementType range_element_type = 11
+      [(google.api.field_behavior) = OPTIONAL];
 }
