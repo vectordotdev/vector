@@ -7,11 +7,11 @@ use std::{
     },
 };
 
+use chrono::{TimeZone, Utc};
 use futures::{
     future::{ok, ready},
     stream,
 };
-use chrono::{TimeZone, Utc};
 use http::StatusCode;
 use ordered_float::NotNan;
 use serde::Deserialize;
