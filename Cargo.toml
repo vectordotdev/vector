@@ -222,7 +222,6 @@ serial_test = { version = "3.2" }
 [dependencies]
 cfg-if.workspace = true
 reqwest.workspace = true
-reqwest_12 = { package = "reqwest", version = "0.12", features = ["json"] }
 clap.workspace = true
 clap_complete.workspace = true
 indoc.workspace = true
