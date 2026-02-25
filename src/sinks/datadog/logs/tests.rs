@@ -6,7 +6,7 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::{
     StreamExt,
-    channel::mpsc::{Receiver, TryRecvError},
+    channel::mpsc::Receiver,
 };
 use http::request::Parts;
 use indoc::indoc;
@@ -192,12 +192,12 @@ async fn telemetry() {
 /// In the event that delivery fails -- in this case because it is BAD_REQUEST --
 /// there should be no outbound messages from the sink. That is, receiving from
 /// its Receiver must fail.
-async fn handles_failure_v1() {
+async fn qhandles_failure_v1() {
     let (_expected, mut rx) =
         start_test_error(ApiStatus::BadRequestv1, BatchStatus::Rejected).await;
-    let res = rx.try_next();
+    let res = rx.try_recv();
 
-    assert!(matches!(res, Err(TryRecvError { .. })));
+    assert!(res.is_err());
 }
 
 #[tokio::test]
@@ -209,9 +209,9 @@ async fn handles_failure_v1() {
 async fn handles_failure_v2() {
     let (_expected, mut rx) =
         start_test_error(ApiStatus::BadRequestv2, BatchStatus::Rejected).await;
-    let res = rx.try_next();
+    let res = rx.try_recv();
 
-    assert!(matches!(res, Err(TryRecvError { .. })));
+    assert!(res.is_err());
 }
 
 #[tokio::test]
