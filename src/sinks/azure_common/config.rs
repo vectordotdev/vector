@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use azure_core::error::Error as AzureCoreError;
+use tokio::runtime::Handle;
+use tokio::task;
 
 use crate::sinks::azure_common::connection_string::{Auth, ParsedConnectionString};
 use crate::sinks::azure_common::shared_key_policy::SharedKeyAuthorizationPolicy;
@@ -323,6 +325,7 @@ pub fn build_healthcheck(
 }
 
 pub fn build_client(
+    auth: Option<AzureAuthentication>,
     connection_string: String,
     container_name: String,
     proxy: &crate::config::ProxyConfig,
@@ -336,16 +339,26 @@ pub fn build_client(
         .map_err(|e| format!("Failed to build container URL: {e}"))?;
     let url = Url::parse(&container_url).map_err(|e| format!("Invalid container URL: {e}"))?;
 
+    let mut credential: Option<Arc<dyn TokenCredential>> = None;
+
     // Prepare options; attach Shared Key policy if needed
     let mut options = BlobContainerClientOptions::default();
-    match parsed.auth() {
-        Auth::Sas { .. } | Auth::None => {
-            // No extra policy; SAS is in the URL already (or anonymous)
+    match (parsed.auth(), &auth) {
+        (Auth::None { .. }, None) => {
+            warn!("No authentication method provided, requests will be anonymous");
         }
+        (Auth::Sas { .. }, None) => {
+            info!("Using SAS token authentication");
+        }
+        (
         Auth::SharedKey {
             account_name,
             account_key,
-        } => {
+            },
+            None,
+        ) => {
+            info!("Using Shared Key authentication");
+
             let policy = SharedKeyAuthorizationPolicy::new(
                 account_name,
                 account_key,
@@ -357,6 +370,36 @@ pub fn build_client(
                 .client_options
                 .per_call_policies
                 .push(Arc::new(policy));
+        }
+        (Auth::None { .. }, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
+            info!("Using Client Secret authentication");
+            let async_credential_result = task::block_in_place(|| {
+                Handle::current().block_on(async { auth.unwrap().credential().await.unwrap() })
+            });
+            credential = Some(async_credential_result);
+        }
+        (Auth::None { .. }, Some(AzureAuthentication::Specific(..))) => {
+            info!("Using specific Azure Authentication method");
+            let async_credential_result = task::block_in_place(|| {
+                Handle::current().block_on(async { auth.unwrap().credential().await.unwrap() })
+            });
+            credential = Some(async_credential_result);
+        }
+        (Auth::Sas { .. }, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
+            panic!("Cannot use both SAS token and Client ID/Secret at the same time");
+        }
+        (Auth::SharedKey { .. }, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
+            panic!("Cannot use both Shared Key and Client ID/Secret at the same time");
+        }
+        (Auth::Sas { .. }, Some(AzureAuthentication::Specific(..))) => {
+            panic!(
+                "Cannot use both SAS token and another Azure Authentication method at the same time"
+            );
+        }
+        (Auth::SharedKey { .. }, Some(AzureAuthentication::Specific(..))) => {
+            panic!(
+                "Cannot use both Shared Key and another Azure Authentication method at the same time"
+            );
         }
     }
 
@@ -392,7 +435,7 @@ pub fn build_client(
             .build()
             .map_err(|e| format!("Failed to build reqwest client: {e}"))?,
     )));
-    let client =
-        BlobContainerClient::from_url(url, None, Some(options)).map_err(|e| format!("{e}"))?;
+    let client = BlobContainerClient::from_url(url, credential, Some(options))
+        .map_err(|e| format!("{e}"))?;
     Ok(Arc::new(client))
 }
