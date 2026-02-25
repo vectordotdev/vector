@@ -52,7 +52,7 @@ use crate::{
     config::{
         ComponentKey, Config, DataType, EnrichmentTableConfig, Input, Inputs, OutputId,
         ProxyConfig, SinkContext, SinkOuter, SourceContext, SourceOuter, TransformContext,
-        TransformOuter, TransformOutput,
+        TransformOuter, TransformOutput, http_1::ProxyConfig as Http1ProxyConfig,
     },
     cpu_time::{CpuTimedExt, spawn_timed},
     event::{EventArray, EventContainer},
@@ -715,6 +715,10 @@ impl<'a> Builder<'a> {
             enrichment_tables: enrichment_tables.clone(),
             metrics_storage: METRICS_STORAGE.clone(),
             proxy: ProxyConfig::merge_with_env(&self.config.global.proxy, sink.proxy()),
+            http_1_proxy: Http1ProxyConfig::merge_with_env(
+                &self.config.global.http_1_proxy,
+                sink.http_1_proxy(),
+            ),
             schema: self.config.schema,
             app_name: crate::get_app_name().to_string(),
             app_name_slug: crate::get_slugified_app_name(),

@@ -9,13 +9,16 @@ use vector_lib::{
     event::metric::{MetricSketch, MetricTags, Quantile},
 };
 
+use http_1::Request;
+use http_body_util::Full;
+
 use crate::{
     config::{AcknowledgementsConfig, Input, SinkConfig, SinkContext},
     event::{
         Event, KeyString,
         metric::{Metric, MetricValue, Sample, StatisticKind},
     },
-    http::HttpClient,
+    http::http_1::HttpClient,
     internal_events::InfluxdbEncodingError,
     sinks::{
         Healthcheck, VectorSink,
@@ -27,7 +30,7 @@ use crate::{
             BatchConfig, EncodedEvent, SinkBatchSettings, TowerRequestConfig,
             buffer::metrics::{MetricNormalize, MetricNormalizer, MetricSet, MetricsBuffer},
             encode_namespace,
-            http::{HttpBatchService, HttpRetryLogic},
+            http_1::{HttpBatchService, HttpRetryLogic},
             statistic::{DistributionStatistic, validate_quantiles},
         },
     },
@@ -38,7 +41,7 @@ use crate::{
 struct InfluxDbSvc {
     config: InfluxDbConfig,
     protocol_version: ProtocolVersion,
-    inner: HttpBatchService<BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>>,
+    inner: HttpBatchService<BoxFuture<'static, crate::Result<Request<Bytes>>>>,
 }
 
 #[derive(Clone, Copy, Debug, Default)]
@@ -119,7 +122,7 @@ impl_generate_config_from_default!(InfluxDbConfig);
 impl SinkConfig for InfluxDbConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
         let tls_settings = TlsSettings::from_options(self.tls.as_ref())?;
-        let client = HttpClient::new(tls_settings, cx.proxy())?;
+        let client: HttpClient<Full<Bytes>> = HttpClient::new(tls_settings, cx.http_1_proxy())?;
         let healthcheck = healthcheck(
             self.clone().endpoint,
             self.clone().influxdb1_settings,
@@ -141,7 +144,10 @@ impl SinkConfig for InfluxDbConfig {
 }
 
 impl InfluxDbSvc {
-    pub fn new(config: InfluxDbConfig, client: HttpClient) -> crate::Result<VectorSink> {
+    pub fn new(
+        config: InfluxDbConfig,
+        client: HttpClient<Full<Bytes>>,
+    ) -> crate::Result<VectorSink> {
         let settings = influxdb_settings(
             config.influxdb1_settings.clone(),
             config.influxdb2_settings.clone(),
@@ -190,7 +196,7 @@ impl InfluxDbSvc {
 }
 
 impl Service<Vec<Metric>> for InfluxDbSvc {
-    type Response = http::Response<Bytes>;
+    type Response = http_1::Response<Bytes>;
     type Error = crate::Error;
     type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
 
@@ -215,17 +221,14 @@ impl Service<Vec<Metric>> for InfluxDbSvc {
 }
 
 fn create_build_request(
-    uri: http::Uri,
+    uri: http_1::Uri,
     token: &str,
-) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<hyper::Request<Bytes>>>
-+ Sync
-+ Send
-+ 'static
-+ use<> {
+) -> impl Fn(Bytes) -> BoxFuture<'static, crate::Result<Request<Bytes>>> + Sync + Send + 'static + use<>
+{
     let auth = format!("Token {token}");
     move |body| {
         Box::pin(ready(
-            hyper::Request::post(uri.clone())
+            Request::post(uri.clone())
                 .header("Content-Type", "text/plain")
                 .header("Authorization", auth.clone())
                 .body(body)

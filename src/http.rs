@@ -46,6 +46,252 @@ pub mod status {
     pub const TOO_MANY_REQUESTS: u16 = 429;
 }
 
+pub mod http_1 {
+    use futures::future::BoxFuture;
+    use http_1::{Request, Response, header::HeaderValue, uri::InvalidUri};
+    use hyper_1::{body::Incoming, service::Service};
+    use hyper_openssl_10::client::legacy::HttpsConnector;
+    use hyper_proxy2::ProxyConnector;
+    use hyper_util::{
+        client::legacy::{Client, connect::HttpConnector},
+        rt::TokioExecutor,
+    };
+    use snafu::{ResultExt, Snafu};
+    use tracing::Instrument;
+
+    use crate::{
+        config::http_1::ProxyConfig,
+        internal_events::http_client::http_1 as http_client,
+        tls::{MaybeTlsSettings, TlsError, tls_connector_builder},
+    };
+    use std::fmt;
+
+    #[derive(Debug, Snafu)]
+    #[snafu(visibility(pub(crate)))]
+    pub enum HttpError {
+        #[snafu(display("Failed to build TLS connector: {}", source))]
+        BuildTlsConnector { source: TlsError },
+        #[snafu(display("Failed to build HTTPS connector: {}", source))]
+        MakeHttpsConnector { source: openssl::error::ErrorStack },
+        #[snafu(display("Failed to build Proxy connector: {}", source))]
+        MakeProxyConnector { source: InvalidUri },
+        #[snafu(display("Failed to make HTTP(S) request: {}", source))]
+        CallRequest {
+            source: hyper_util::client::legacy::Error,
+        },
+        #[snafu(display("Failed to build HTTP request: {}", source))]
+        BuildRequest { source: http_1::Error },
+        #[snafu(display("Failed to collect response body: {}", source))]
+        CollectBody { source: hyper_1::Error },
+    }
+
+    impl HttpError {
+        pub const fn is_retriable(&self) -> bool {
+            match self {
+                HttpError::BuildRequest { .. } | HttpError::MakeProxyConnector { .. } => false,
+                HttpError::CallRequest { .. }
+                | HttpError::BuildTlsConnector { .. }
+                | HttpError::MakeHttpsConnector { .. }
+                | HttpError::CollectBody { .. } => true,
+            }
+        }
+    }
+
+    pub type HttpClientFuture<B> = <HttpClient<B> as Service<Request<B>>>::Future;
+    type HttpProxyConnector = ProxyConnector<HttpsConnector<HttpConnector>>;
+
+    pub struct HttpClient<B> {
+        client: Client<HttpProxyConnector, B>,
+        user_agent: HeaderValue,
+        proxy_connector: HttpProxyConnector,
+    }
+
+    impl<B> HttpClient<B>
+    where
+        B: fmt::Debug + hyper_1::body::Body + Send + Unpin + 'static,
+        B::Data: Send,
+        B::Error: Into<crate::Error>,
+    {
+        pub fn new(
+            tls_settings: impl Into<MaybeTlsSettings>,
+            proxy_config: &ProxyConfig,
+        ) -> Result<HttpClient<B>, HttpError> {
+            HttpClient::new_with_custom_client(
+                tls_settings,
+                proxy_config,
+                Client::builder(TokioExecutor::new()),
+            )
+        }
+
+        pub fn new_with_custom_client(
+            tls_settings: impl Into<MaybeTlsSettings>,
+            proxy_config: &ProxyConfig,
+            client_builder: hyper_util::client::legacy::Builder,
+        ) -> Result<HttpClient<B>, HttpError> {
+            let proxy_connector = build_proxy_connector(tls_settings.into(), proxy_config)?;
+            let client = client_builder.build(proxy_connector.clone());
+
+            let app_name = crate::get_app_name();
+            let version = crate::get_version();
+            let user_agent = HeaderValue::from_str(&format!("{app_name}/{version}"))
+                .expect("Invalid header value for user-agent!");
+
+            Ok(HttpClient {
+                client,
+                user_agent,
+                proxy_connector,
+            })
+        }
+
+        pub fn send(
+            &self,
+            mut request: Request<B>,
+        ) -> BoxFuture<'static, Result<Response<Incoming>, HttpError>> {
+            let span = tracing::info_span!("http");
+            let _enter = span.enter();
+
+            default_request_headers(&mut request, &self.user_agent);
+            self.maybe_add_proxy_headers(&mut request);
+
+            emit!(http_client::AboutToSendHttpRequest { request: &request });
+
+            let response = self.client.request(request);
+
+            let fut = async move {
+                // Capture the time right before we issue the request.
+                // Request doesn't start the processing until we start polling it.
+                let before = std::time::Instant::now();
+
+                // Send request and wait for the result.
+                let response_result = response.await;
+
+                // Compute the roundtrip time it took to send the request and get
+                // the response or error.
+                let roundtrip = before.elapsed();
+
+                // Handle the errors and extract the response.
+                let response = response_result
+                    .inspect_err(|error| {
+                        // Emit the error into the internal events system.
+                        emit!(http_client::GotHttpWarning { error, roundtrip });
+                    })
+                    .context(CallRequestSnafu)?;
+
+                // Emit the response into the internal events system.
+                emit!(http_client::GotHttpResponse {
+                    response: &response,
+                    roundtrip
+                });
+                Ok(response)
+            }
+            .instrument(span.clone().or_current());
+
+            Box::pin(fut)
+        }
+
+        fn maybe_add_proxy_headers(&self, request: &mut Request<B>) {
+            if let Some(proxy_headers) = self.proxy_connector.http_headers(request.uri()) {
+                for (k, v) in proxy_headers {
+                    let request_headers = request.headers_mut();
+                    if !request_headers.contains_key(k) {
+                        request_headers.insert(k, v.into());
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn build_proxy_connector(
+        tls_settings: MaybeTlsSettings,
+        proxy_config: &ProxyConfig,
+    ) -> Result<ProxyConnector<HttpsConnector<HttpConnector>>, HttpError> {
+        // Create dedicated TLS connector for the proxied connection with user TLS settings.
+        let tls = tls_connector_builder(&tls_settings)
+            .context(BuildTlsConnectorSnafu)?
+            .build();
+        let https = build_tls_connector(tls_settings)?;
+        let mut proxy = ProxyConnector::new(https).unwrap();
+        // Make proxy connector aware of user TLS settings by setting the TLS connector:
+        // https://github.com/vectordotdev/vector/issues/13683
+        proxy.set_tls(Some(tls));
+        proxy_config
+            .configure(&mut proxy)
+            .context(MakeProxyConnectorSnafu)?;
+        Ok(proxy)
+    }
+
+    pub fn build_tls_connector(
+        tls_settings: MaybeTlsSettings,
+    ) -> Result<HttpsConnector<HttpConnector>, HttpError> {
+        let mut http = HttpConnector::new();
+        http.enforce_http(false);
+
+        let tls = tls_connector_builder(&tls_settings).context(BuildTlsConnectorSnafu)?;
+        let mut https =
+            HttpsConnector::with_connector(http, tls).context(MakeHttpsConnectorSnafu)?;
+
+        let settings = tls_settings.tls().cloned();
+        https.set_callback(move |c, _uri| {
+            if let Some(settings) = &settings {
+                settings.apply_connect_configuration(c)
+            } else {
+                Ok(())
+            }
+        });
+        Ok(https)
+    }
+
+    fn default_request_headers<B>(request: &mut Request<B>, user_agent: &HeaderValue) {
+        if !request.headers().contains_key("User-Agent") {
+            request
+                .headers_mut()
+                .insert("User-Agent", user_agent.clone());
+        }
+
+        if !request.headers().contains_key("Accept-Encoding") {
+            // hardcoding until we support compressed responses:
+            // https://github.com/vectordotdev/vector/issues/5440
+            request
+                .headers_mut()
+                .insert("Accept-Encoding", HeaderValue::from_static("identity"));
+        }
+    }
+
+    impl<B> Service<Request<B>> for HttpClient<B>
+    where
+        B: fmt::Debug + hyper_1::body::Body + Send + Unpin + 'static,
+        B::Data: Send,
+        B::Error: Into<crate::Error> + Send,
+    {
+        type Response = Response<Incoming>;
+        type Error = HttpError;
+        type Future = BoxFuture<'static, Result<Self::Response, Self::Error>>;
+
+        fn call(&self, request: Request<B>) -> Self::Future {
+            self.send(request)
+        }
+    }
+
+    impl<B> Clone for HttpClient<B> {
+        fn clone(&self) -> Self {
+            Self {
+                client: self.client.clone(),
+                user_agent: self.user_agent.clone(),
+                proxy_connector: self.proxy_connector.clone(),
+            }
+        }
+    }
+
+    impl<B> fmt::Debug for HttpClient<B> {
+        fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+            f.debug_struct("HttpClient")
+                .field("client", &self.client)
+                .field("user_agent", &self.user_agent)
+                .finish()
+        }
+    }
+}
+
 #[derive(Debug, Snafu)]
 #[snafu(visibility(pub(crate)))]
 pub enum HttpError {
