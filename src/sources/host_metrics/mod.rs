@@ -6,8 +6,9 @@ use std::{
 use chrono::{DateTime, Utc};
 use futures::StreamExt;
 use glob::{Pattern, PatternError};
-#[cfg(not(windows))]
+#[cfg(all(unix, feature = "sources-host_metrics-cpu-host"))]
 use heim::units::ratio::ratio;
+#[cfg(feature = "sources-host_metrics-cpu-host")]
 use heim::units::time::second;
 use serde_with::serde_as;
 use sysinfo::System;
@@ -32,6 +33,7 @@ use crate::{
 
 #[cfg(target_os = "linux")]
 mod cgroups;
+#[cfg(feature = "sources-host_metrics-cpu-host")]
 mod cpu;
 mod disk;
 mod filesystem;
@@ -202,15 +204,19 @@ const fn example_collectors() -> [&'static str; 9] {
 
 fn default_collectors() -> Option<Vec<Collector>> {
     let mut collectors = vec![
-        Collector::Cpu,
         Collector::Disk,
         Collector::Filesystem,
-        Collector::Load,
-        Collector::Host,
         Collector::Memory,
         Collector::Network,
         Collector::Process,
     ];
+
+    #[cfg(feature = "sources-host_metrics-cpu-host")]
+    {
+        collectors.insert(0, Collector::Cpu);
+        collectors.insert(3, Collector::Load);
+        collectors.insert(4, Collector::Host);
+    }
 
     #[cfg(target_os = "linux")]
     {
@@ -297,6 +303,18 @@ impl SourceConfig for HostMetricsConfig {
             }
             if self.has_collector(Collector::TCP) {
                 return Err("TCP collector is only available on Linux systems".into());
+            }
+        }
+        #[cfg(not(feature = "sources-host_metrics-cpu-host"))]
+        {
+            if self.has_collector(Collector::Cpu) {
+                return Err("CPU collector is unavailable for this build target".into());
+            }
+            if self.has_collector(Collector::Load) {
+                return Err("Load collector is unavailable for this build target".into());
+            }
+            if self.has_collector(Collector::Host) {
+                return Err("Host collector is unavailable for this build target".into());
             }
         }
 
@@ -391,6 +409,7 @@ impl HostMetrics {
         if self.config.has_collector(Collector::CGroups) {
             self.cgroups_metrics(&mut buffer).await;
         }
+        #[cfg(feature = "sources-host_metrics-cpu-host")]
         if self.config.has_collector(Collector::Cpu) {
             self.cpu_metrics(&mut buffer).await;
         }
@@ -403,9 +422,11 @@ impl HostMetrics {
         if self.config.has_collector(Collector::Filesystem) {
             self.filesystem_metrics(&mut buffer).await;
         }
+        #[cfg(feature = "sources-host_metrics-cpu-host")]
         if self.config.has_collector(Collector::Load) {
             self.loadavg_metrics(&mut buffer).await;
         }
+        #[cfg(feature = "sources-host_metrics-cpu-host")]
         if self.config.has_collector(Collector::Host) {
             self.host_metrics(&mut buffer).await;
         }
@@ -429,6 +450,7 @@ impl HostMetrics {
         metrics
     }
 
+    #[cfg(feature = "sources-host_metrics-cpu-host")]
     pub async fn loadavg_metrics(&self, output: &mut MetricsBuffer) {
         output.name = "load";
         #[cfg(unix)]
@@ -459,6 +481,7 @@ impl HostMetrics {
         }
     }
 
+    #[cfg(feature = "sources-host_metrics-cpu-host")]
     pub async fn host_metrics(&self, output: &mut MetricsBuffer) {
         output.name = "host";
         match heim::host::uptime().await {
@@ -754,11 +777,14 @@ mod tests {
         for collector in &[
             #[cfg(target_os = "linux")]
             Collector::CGroups,
+            #[cfg(feature = "sources-host_metrics-cpu-host")]
             Collector::Cpu,
             Collector::Process,
             Collector::Disk,
             Collector::Filesystem,
+            #[cfg(feature = "sources-host_metrics-cpu-host")]
             Collector::Load,
+            #[cfg(feature = "sources-host_metrics-cpu-host")]
             Collector::Host,
             Collector::Memory,
             Collector::Network,
@@ -823,7 +849,7 @@ mod tests {
     }
 
     // Windows does not produce load average metrics.
-    #[cfg(not(windows))]
+    #[cfg(all(not(windows), feature = "sources-host_metrics-cpu-host"))]
     #[tokio::test]
     async fn generates_loadavg_metrics() {
         let mut buffer = MetricsBuffer::new(None);
@@ -842,6 +868,7 @@ mod tests {
         );
     }
 
+    #[cfg(feature = "sources-host_metrics-cpu-host")]
     #[tokio::test]
     async fn generates_host_metrics() {
         let mut buffer = MetricsBuffer::new(None);
