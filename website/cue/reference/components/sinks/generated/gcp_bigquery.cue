@@ -7,16 +7,16 @@ generated: components: sinks: gcp_bigquery: configuration: {
 
 			See [End-to-end Acknowledgements][e2e_acks] for more information on how event acknowledgement is handled.
 
-			[e2e_acks]: https://vector.dev/docs/about/under-the-hood/architecture/end-to-end-acknowledgements/
+			[e2e_acks]: https://vector.dev/docs/architecture/end-to-end-acknowledgements/
 			"""
 		required: false
 		type: object: options: enabled: {
 			description: """
-				Whether or not end-to-end acknowledgements are enabled.
+				Controls whether or not end-to-end acknowledgements are enabled.
 
-				When enabled for a sink, any source connected to that sink, where the source supports
-				end-to-end acknowledgements as well, waits for events to be acknowledged by the sink
-				before acknowledging them at the source.
+				When enabled for a sink, any source that supports end-to-end
+				acknowledgements that is connected to that sink waits for events
+				to be acknowledged by **all connected sinks** before acknowledging them at the source.
 
 				Enabling or disabling acknowledgements at the sink level takes precedence over any global
 				[`acknowledgements`][global_acks] configuration.
@@ -52,7 +52,7 @@ generated: components: sinks: gcp_bigquery: configuration: {
 					The maximum size of a batch that is processed by a sink.
 
 					This is based on the uncompressed size of the batched events, before they are
-					serialized/compressed.
+					serialized or compressed.
 					"""
 				required: false
 				type: uint: {
@@ -110,7 +110,9 @@ generated: components: sinks: gcp_bigquery: configuration: {
 					description: """
 						The path to the protobuf descriptor set file.
 
-						This file is the output of `protoc -o <path> ...`
+						This file is the output of `protoc -I <include path> -o <desc output path> <proto>`
+
+						You can read more [here](https://buf.build/docs/reference/images/#how-buf-images-work).
 						"""
 					required: true
 					type: string: examples: ["/etc/vector/protobuf_descriptor_set.desc"]
@@ -119,6 +121,19 @@ generated: components: sinks: gcp_bigquery: configuration: {
 					description: "The name of the message type to use for serializing."
 					required:    true
 					type: string: examples: ["package.Message"]
+				}
+				use_json_names: {
+					description: """
+						Use JSON field names (camelCase) instead of protobuf field names (snake_case).
+
+						When enabled, the serializer looks for fields using their JSON names as defined
+						in the `.proto` file (for example `jobDescription` instead of `job_description`).
+
+						This is useful when working with data that has already been converted from JSON or
+						when interfacing with systems that use JSON naming conventions.
+						"""
+					required: false
+					type: bool: default: false
 				}
 			}
 		}
@@ -149,7 +164,9 @@ generated: components: sinks: gcp_bigquery: configuration: {
 		description: """
 			Middleware settings for outbound requests.
 
-			Various settings can be configured, such as concurrency and rate limits, timeouts, etc.
+			Various settings can be configured, such as concurrency and rate limits, timeouts, and retry behavior.
+
+			Note that the retry backoff policy follows the Fibonacci sequence.
 			"""
 		required: false
 		type: object: options: {
@@ -169,7 +186,7 @@ generated: components: sinks: gcp_bigquery: configuration: {
 																Valid values are greater than `0` and less than `1`. Smaller values cause the algorithm to scale back rapidly
 																when latency increases.
 
-																Note that the new limit is rounded down after applying this ratio.
+																**Note**: The new limit is rounded down after applying this ratio.
 																"""
 						required: false
 						type: float: default: 0.9
@@ -189,25 +206,34 @@ generated: components: sinks: gcp_bigquery: configuration: {
 					}
 					initial_concurrency: {
 						description: """
-																The initial concurrency limit to use. If not specified, the initial limit will be 1 (no concurrency).
+																The initial concurrency limit to use. If not specified, the initial limit is 1 (no concurrency).
 
-																It is recommended to set this value to your service's average limit if you're seeing that it takes a
+																Datadog recommends setting this value to your service's average limit if you're seeing that it takes a
 																long time to ramp up adaptive concurrency after a restart. You can find this value by looking at the
 																`adaptive_concurrency_limit` metric.
 																"""
 						required: false
 						type: uint: default: 1
 					}
+					max_concurrency_limit: {
+						description: """
+																The maximum concurrency limit.
+
+																The adaptive request concurrency limit does not go above this bound. This is put in place as a safeguard.
+																"""
+						required: false
+						type: uint: default: 200
+					}
 					rtt_deviation_scale: {
 						description: """
 																Scale of RTT deviations which are not considered anomalous.
 
-																Valid values are greater than or equal to `0`, and we expect reasonable values to range from `1.0` to `3.0`.
+																Valid values are greater than or equal to `0`, and reasonable values range from `1.0` to `3.0`.
 
-																When calculating the past RTT average, we also compute a secondary “deviation” value that indicates how variable
-																those values are. We use that deviation when comparing the past RTT average to the current measurements, so we
+																When calculating the past RTT average, a secondary “deviation” value is also computed that indicates how variable
+																those values are. That deviation is used when comparing the past RTT average to the current measurements, so we
 																can ignore increases in RTT that are within an expected range. This factor is used to scale up the deviation to
-																an appropriate range.  Larger values cause the algorithm to ignore larger increases in the RTT.
+																an appropriate range. Larger values cause the algorithm to ignore larger increases in the RTT.
 																"""
 						required: false
 						type: float: default: 2.5
@@ -227,9 +253,9 @@ generated: components: sinks: gcp_bigquery: configuration: {
 						default: "adaptive"
 						enum: {
 							adaptive: """
-															Concurrency will be managed by Vector's [Adaptive Request Concurrency][arc] feature.
+															Concurrency is managed by Vector's [Adaptive Request Concurrency][arc] feature.
 
-															[arc]: https://vector.dev/docs/about/under-the-hood/networking/arc/
+															[arc]: https://vector.dev/docs/architecture/arc/
 															"""
 							none: """
 															A fixed concurrency of 1.
@@ -258,12 +284,8 @@ generated: components: sinks: gcp_bigquery: configuration: {
 				}
 			}
 			retry_attempts: {
-				description: """
-					The maximum number of retries to make for failed requests.
-
-					The default, for all intents and purposes, represents an infinite number of retries.
-					"""
-				required: false
+				description: "The maximum number of retries to make for failed requests."
+				required:    false
 				type: uint: {
 					default: 9223372036854775807
 					unit:    "retries"
@@ -273,7 +295,7 @@ generated: components: sinks: gcp_bigquery: configuration: {
 				description: """
 					The amount of time to wait before attempting the first retry for a failed request.
 
-					After the first retry has failed, the fibonacci sequence is used to select future backoffs.
+					After the first retry has failed, the Fibonacci sequence is used to select future backoffs.
 					"""
 				required: false
 				type: uint: {
@@ -281,11 +303,31 @@ generated: components: sinks: gcp_bigquery: configuration: {
 					unit:    "seconds"
 				}
 			}
+			retry_jitter_mode: {
+				description: "The jitter mode to use for retry backoff behavior."
+				required:    false
+				type: string: {
+					default: "Full"
+					enum: {
+						Full: """
+															Full jitter.
+
+															The random delay is anywhere from 0 up to the maximum current delay calculated by the backoff
+															strategy.
+
+															Incorporating full jitter into your backoff strategy can greatly reduce the likelihood
+															of creating accidental denial of service (DoS) conditions against your own systems when
+															many clients are recovering from a failure state.
+															"""
+						None: "No jitter."
+					}
+				}
+			}
 			retry_max_duration_secs: {
 				description: "The maximum amount of time to wait between retries."
 				required:    false
 				type: uint: {
-					default: 3600
+					default: 30
 					unit:    "seconds"
 				}
 			}
@@ -305,7 +347,7 @@ generated: components: sinks: gcp_bigquery: configuration: {
 		}
 	}
 	table: {
-		description: "The dataset within the dataset to which to publish events."
+		description: "The table within the dataset to which to publish events."
 		required:    true
 		type: string: examples: ["this-is-a-table"]
 	}
