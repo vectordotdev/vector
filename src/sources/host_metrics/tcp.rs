@@ -15,7 +15,19 @@ const STATE: &str = "state";
 
 impl HostMetrics {
     pub async fn tcp_metrics(&self, output: &mut super::MetricsBuffer) {
-        match build_tcp_stats() {
+        // Spawn blocking task to avoid blocking the async runtime with synchronous I/O
+        let result = tokio::task::spawn_blocking(build_tcp_stats)
+            .await
+            .unwrap_or_else(|join_error| {
+                Err(TcpError::ReadTcpTable {
+                    source: procfs::ProcError::Other(format!(
+                        "Failed to join blocking task: {}",
+                        join_error
+                    )),
+                })
+            });
+
+        match result {
             Ok(stats) => {
                 output.name = "tcp";
                 for (state, count) in stats.conn_states {
@@ -50,8 +62,6 @@ impl HostMetrics {
 enum TcpError {
     #[snafu(display("Could not read TCP socket table: {}", source))]
     ReadTcpTable { source: procfs::ProcError },
-    #[snafu(display("Could not read TCP6 socket table: {}", source))]
-    ReadTcp6Table { source: procfs::ProcError },
 }
 
 #[derive(Debug, Default)]
@@ -87,6 +97,26 @@ fn parse_tcp_entries(entries: Vec<TcpNetEntry>, tcp_stats: &mut TcpStats) {
     }
 }
 
+/// Collects TCP socket statistics from `/proc/net/tcp` and `/proc/net/tcp6`.
+///
+/// # Behavior
+///
+/// IPv4 and IPv6 statistics are **merged together** into a single set of metrics.
+/// This means connection counts and queue bytes are aggregated across both address families.
+///
+/// **Note:** This merging behavior preserves compatibility with the previous netlink-based
+/// implementation. While not ideal (it prevents distinguishing IPv4 vs IPv6 traffic),
+/// changing this would alter the existing metric semantics that users may depend on.
+/// We can consider changing this behavior in the future.
+///
+/// # Error Handling
+///
+/// - IPv4 read errors are **fatal** and return an error (no metrics emitted)
+/// - IPv6 read errors are **non-fatal** - a warning is emitted but IPv4 metrics are still returned
+///
+/// This asymmetry exists because:
+/// - IPv4 is ubiquitous and essential
+/// - IPv6 may be partially configured (enabled but `/proc/net/tcp6` unreadable)
 fn build_tcp_stats() -> Result<TcpStats, TcpError> {
     let mut tcp_stats = TcpStats::default();
 
@@ -95,9 +125,19 @@ fn build_tcp_stats() -> Result<TcpStats, TcpError> {
     parse_tcp_entries(tcp_entries, &mut tcp_stats);
 
     // Read IPv6 TCP sockets if IPv6 is enabled
+    // Note: IPv6 errors are non-fatal - we still return IPv4 metrics
     if is_ipv6_enabled() {
-        let tcp6_entries = procfs::net::tcp6().context(ReadTcp6TableSnafu)?;
-        parse_tcp_entries(tcp6_entries, &mut tcp_stats);
+        match procfs::net::tcp6() {
+            Ok(tcp6_entries) => {
+                parse_tcp_entries(tcp6_entries, &mut tcp_stats);
+            }
+            Err(error) => {
+                emit!(HostMetricsScrapeDetailError {
+                    message: "Failed to read IPv6 TCP stats, continuing with IPv4 only.",
+                    error,
+                });
+            }
+        }
     }
 
     Ok(tcp_stats)
@@ -132,6 +172,19 @@ mod tests {
         assert_eq!(tcp_state_to_string(TcpState::Listen), "listen");
         assert_eq!(tcp_state_to_string(TcpState::Closing), "closing");
         assert_eq!(tcp_state_to_string(TcpState::NewSynRecv), "new_syn_recv");
+    }
+
+    #[test]
+    fn parse_tcp_entries_handles_empty_list() {
+        use super::{parse_tcp_entries, TcpStats};
+
+        let mut stats = TcpStats::default();
+        parse_tcp_entries(vec![], &mut stats);
+
+        // Empty input should result in zero metrics
+        assert_eq!(stats.tx_queued_bytes, 0.0);
+        assert_eq!(stats.rx_queued_bytes, 0.0);
+        assert!(stats.conn_states.is_empty());
     }
 
     #[tokio::test]
@@ -170,11 +223,31 @@ mod tests {
             }
         }
 
-        assert!(
-            n_conn_total_metrics > 0,
-            "Expected at least one tcp_connections_total metric"
+        // Queue metrics should always be present (even if zero)
+        assert_eq!(
+            n_tx_queued_bytes_metric, 1,
+            "Expected exactly one tcp_tx_queued_bytes_total metric"
         );
-        assert_eq!(n_tx_queued_bytes_metric, 1);
-        assert_eq!(n_rx_queued_bytes_metric, 1);
+        assert_eq!(
+            n_rx_queued_bytes_metric, 1,
+            "Expected exactly one tcp_rx_queued_bytes_total metric"
+        );
+
+        // Connection metrics depend on actual TCP connections on the host
+        // In minimal test environments, there may be zero connections, which is valid
+        // Each connection state present should have the correct tag structure
+        for metric in buffer.metrics {
+            if metric.name() == TCP_CONNS_TOTAL {
+                let tags = metric.tags();
+                assert!(
+                    tags.is_some(),
+                    "tcp_connections_total metric must have tags"
+                );
+                assert!(
+                    tags.unwrap().contains_key(STATE),
+                    "tcp_connections_total metric must have a state tag"
+                );
+            }
+        }
     }
 }
