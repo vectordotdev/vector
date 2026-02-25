@@ -459,10 +459,9 @@ windows-service = "0.8.0"
 nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-netlink-packet-utils = "0.5.2"
 netlink-packet-sock-diag = "0.4.2"
-netlink-packet-core = "0.7.0"
-netlink-sys = { version = "0.8.7", features = ["tokio_socket"] }
+netlink-packet-core = "0.8.1"
+netlink-sys = { version = "0.8.8", features = ["tokio_socket"] }
 
 [build-dependencies]
 prost-build = { workspace = true, optional = true }
