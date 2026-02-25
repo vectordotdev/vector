@@ -41,6 +41,11 @@ path = "tests/integration/lib.rs"
 name = "e2e"
 path = "tests/e2e/mod.rs"
 
+[[test]]
+name = "vector_api"
+path = "tests/vector_api/lib.rs"
+required-features = ["vector-api-tests"]
+
 # CI-based builds use full release optimization. See scripts/environment/release-flags.sh.
 # This results in roughly a 5% reduction in performance when compiling locally vs when
 # compiled via the CI pipeline.
@@ -149,7 +154,7 @@ chrono = { version = "0.4.41", default-features = false, features = ["clock", "s
 chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"] }
 clap = { version = "4.5.56", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
 clap_complete = "4.5.65"
-colored = { version = "3.0.0", default-features = false }
+colored = { version = "3.1.1", default-features = false }
 const-str = { version = "1.0.0", default-features = false }
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
@@ -174,7 +179,7 @@ nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
 paste = { version = "1.0.15" }
 pin-project = { version = "1.1.10", default-features = false }
-proptest = { version = "1.8" }
+proptest = { version = "1.10" }
 proptest-derive = { version = "0.6.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
@@ -199,8 +204,8 @@ tokio-tungstenite = { version = "0.20.1", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
-tracing = { version = "0.1.34", default-features = false }
-tracing-subscriber = { version = "0.3.20", default-features = false, features = ["fmt"]  }
+tracing = { version = "0.1.44", default-features = false }
+tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"]  }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
 uuid = { version = "1.18.1", features = ["v4", "v7", "serde", "fast-rng"] }
 vector-config = { path = "lib/vector-config" }
@@ -298,6 +303,7 @@ aws-smithy-types = { version = "1.2.11", default-features = false, features = ["
 
 # Azure
 azure_core = { version = "0.30", features = ["reqwest", "hmac_openssl"], optional = true }
+azure_identity = { version = "0.30", optional = true }
 
 # Azure Storage
 azure_storage_blob = { version = "0.7", optional = true }
@@ -307,7 +313,7 @@ opendal = { version = "0.54", default-features = false, features = ["services-we
 
 # Tower
 tower = { version = "0.5.2", default-features = false, features = ["buffer", "limit", "retry", "timeout", "util", "balance", "discover"] }
-tower-http = { version = "0.4.4", default-features = false, features = ["compression-full", "decompression-gzip", "trace"] }
+tower-http = { version = "0.4.4", default-features = false, features = ["compression-full", "decompression-full", "trace"] }
 # Serde
 serde.workspace = true
 serde-toml-merge = { version = "0.3.11", default-features = false }
@@ -450,7 +456,7 @@ byteorder = "1.5.0"
 windows-service = "0.8.0"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.26.2", default-features = false, features = ["socket", "signal", "fs"] }
+nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 netlink-packet-utils = "0.5.2"
@@ -489,11 +495,6 @@ vrl.workspace = true
 
 wiremock = "0.6.4"
 zstd = { version = "0.13.0", default-features = false }
-
-[patch.crates-io]
-# The upgrade for `tokio-util` >= 0.6.9 is blocked on https://github.com/vectordotdev/vector/issues/11257.
-tokio-util = { git = "https://github.com/vectordotdev/tokio", branch = "tokio-util-0.7.13-framed-read-continue-on-error" }
-nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
@@ -784,6 +785,7 @@ sinks-logs = [
   "sinks-aws_sqs",
   "sinks-axiom",
   "sinks-azure_blob",
+  "sinks-azure_logs_ingestion",
   "sinks-azure_monitor_logs",
   "sinks-blackhole",
   "sinks-chronicle",
@@ -851,6 +853,7 @@ sinks-aws_sqs = ["aws-core", "dep:aws-sdk-sqs"]
 sinks-aws_sns = ["aws-core", "dep:aws-sdk-sns"]
 sinks-axiom = ["sinks-http"]
 sinks-azure_blob = ["dep:azure_core", "dep:azure_storage_blob"]
+sinks-azure_logs_ingestion = ["dep:azure_core", "dep:azure_identity"]
 sinks-azure_monitor_logs = []
 sinks-blackhole = []
 sinks-chronicle = []
@@ -940,6 +943,7 @@ all-integration-tests = [
   "pulsar-integration-tests",
   "redis-integration-tests",
   "splunk-integration-tests",
+  "vector-api-tests",
   "webhdfs-integration-tests",
 ]
 
@@ -1038,6 +1042,9 @@ e2e-tests-opentelemetry = [
 ]
 
 vector-api-tests = [
+  "top",
+  "api",
+  "api-client-minimal",
   "sources-demo_logs",
   "transforms-log_to_metric",
   "transforms-remap",

@@ -9,10 +9,12 @@ use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{Channel, acker::Acker, message::Delivery, options::BasicQosOptions};
 use snafu::Snafu;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::decoding::{DeserializerConfig, FramingConfig},
+    codecs::{
+        DecoderFramedRead,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, log_schema},
     configurable::configurable_component,
     event::{Event, LogEvent},
@@ -322,7 +324,7 @@ async fn receive_event(
 ) -> Result<(), ()> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
     let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
-    let mut stream = FramedRead::new(payload, decoder);
+    let mut stream = DecoderFramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
     let timestamp = msg
