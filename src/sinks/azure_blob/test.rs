@@ -35,6 +35,7 @@ fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {
         batch: Default::default(),
         request: Default::default(),
         acknowledgements: Default::default(),
+        tls: Default::default(),
     }
 }
 

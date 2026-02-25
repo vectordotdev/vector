@@ -4,7 +4,8 @@ features:
 test_filter: ::azure_
 
 env:
-  AZURE_ADDRESS: local-azure-blob
+  AZURITE_ADDRESS: local-azure-blob
+  AZURITE_OAUTH_ADDRESS: azurite
   HEARTBEAT_ADDRESS: 0.0.0.0:8080
   LOGSTASH_ADDRESS: 0.0.0.0:8081
 

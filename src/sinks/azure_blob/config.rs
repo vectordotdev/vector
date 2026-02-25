@@ -25,6 +25,7 @@ use crate::{
         },
     },
     template::Template,
+    tls::TlsConfig,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -143,6 +144,10 @@ pub struct AzureBlobSinkConfig {
         skip_serializing_if = "crate::serde::is_default"
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
+
+    #[serde(default)]
+    #[configurable(derived)]
+    pub tls: Option<TlsConfig>,
 }
 
 pub fn default_blob_prefix() -> Template {
@@ -163,6 +168,7 @@ impl GenerateConfig for AzureBlobSinkConfig {
             batch: BatchConfig::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
+            tls: None,
         })
         .unwrap()
     }
@@ -173,9 +179,11 @@ impl GenerateConfig for AzureBlobSinkConfig {
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(
+            self.auth.clone(),
             self.connection_string.clone().into(),
             self.container_name.clone(),
             cx.proxy(),
+            self.tls.clone(),
         )?;
 
         let healthcheck = azure_common::config::build_healthcheck(

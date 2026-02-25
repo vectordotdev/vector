@@ -1,3 +1,5 @@
+use std::fs::File;
+use std::io::Read;
 use std::sync::Arc;
 
 use azure_core::error::Error as AzureCoreError;
@@ -33,6 +35,7 @@ use vector_lib::{
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     sinks::{Healthcheck, util::retries::RetryLogic},
+    tls::TlsConfig,
 };
 
 /// Configuration of the authentication strategy for interacting with Azure services.
@@ -329,6 +332,7 @@ pub fn build_client(
     connection_string: String,
     container_name: String,
     proxy: &crate::config::ProxyConfig,
+    tls: Option<TlsConfig>,
 ) -> crate::Result<Arc<BlobContainerClient>> {
     // Parse connection string without legacy SDK
     let parsed = ParsedConnectionString::parse(&connection_string)
@@ -351,9 +355,9 @@ pub fn build_client(
             info!("Using SAS token authentication");
         }
         (
-        Auth::SharedKey {
-            account_name,
-            account_key,
+            Auth::SharedKey {
+                account_name,
+                account_key,
             },
             None,
         ) => {
@@ -430,6 +434,18 @@ pub fn build_client(
             reqwest_builder = reqwest_builder.proxy(p);
         }
     }
+
+    if let Some(tls_config) = tls {
+        if let Some(ca_file) = tls_config.ca_file {
+            let mut buf = Vec::new();
+            File::open(&ca_file)?.read_to_end(&mut buf)?;
+            let cert = reqwest_12::Certificate::from_pem(&buf)?;
+
+            warn!("Adding TLS root certificate from {}", ca_file.display());
+            reqwest_builder = reqwest_builder.add_root_certificate(cert);
+        }
+    }
+
     options.client_options.transport = Some(azure_core::http::Transport::new(std::sync::Arc::new(
         reqwest_builder
             .build()
