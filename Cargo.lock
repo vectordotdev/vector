@@ -1004,9 +1004,9 @@ dependencies = [
 
 [[package]]
 name = "aws-runtime"
-version = "1.5.10"
+version = "1.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c034a1bc1d70e16e7f4e4caf7e9f7693e4c9c24cd91cf17c2a0b21abaebc7c8b"
+checksum = "2e1ed337dabcf765ad5f2fb426f13af22d576328aaf09eac8f70953530798ec0"
 dependencies = [
  "aws-credential-types",
  "aws-sigv4",
@@ -1344,9 +1344,9 @@ dependencies = [
 
 [[package]]
 name = "aws-sigv4"
-version = "1.3.4"
+version = "1.3.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "084c34162187d39e3740cb635acd73c4e3a551a36146ad6fe8883c929c9f876c"
+checksum = "69e523e1c4e8e7e8ff219d732988e22bfeae8a1cafdbe6d9eca1546fa080be7c"
 dependencies = [
  "aws-credential-types",
  "aws-smithy-eventstream",
