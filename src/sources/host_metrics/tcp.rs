@@ -61,19 +61,20 @@ struct TcpStats {
     tx_queued_bytes: f64,
 }
 
-fn tcp_state_to_string(state: TcpState) -> String {
+fn tcp_state_to_string(state: TcpState) -> &'static str {
     match state {
-        TcpState::Established => "established".into(),
-        TcpState::SynSent => "syn_sent".into(),
-        TcpState::SynRecv => "syn_recv".into(),
-        TcpState::FinWait1 => "fin_wait1".into(),
-        TcpState::FinWait2 => "fin_wait2".into(),
-        TcpState::TimeWait => "time_wait".into(),
-        TcpState::Close => "close".into(),
-        TcpState::CloseWait => "close_wait".into(),
-        TcpState::LastAck => "last_ack".into(),
-        TcpState::Listen => "listen".into(),
-        TcpState::Closing => "closing".into(),
+        TcpState::Established => "established",
+        TcpState::SynSent => "syn_sent",
+        TcpState::SynRecv => "syn_recv",
+        TcpState::FinWait1 => "fin_wait1",
+        TcpState::FinWait2 => "fin_wait2",
+        TcpState::TimeWait => "time_wait",
+        TcpState::Close => "close",
+        TcpState::CloseWait => "close_wait",
+        TcpState::LastAck => "last_ack",
+        TcpState::Listen => "listen",
+        TcpState::Closing => "closing",
+        TcpState::NewSynRecv => "new_syn_recv",
     }
 }
 
@@ -108,8 +109,30 @@ fn is_ipv6_enabled() -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{STATE, TCP_CONNS_TOTAL, TCP_RX_QUEUED_BYTES_TOTAL, TCP_TX_QUEUED_BYTES_TOTAL};
+    use procfs::net::TcpState;
+
+    use super::{
+        tcp_state_to_string, STATE, TCP_CONNS_TOTAL, TCP_RX_QUEUED_BYTES_TOTAL,
+        TCP_TX_QUEUED_BYTES_TOTAL,
+    };
     use crate::sources::host_metrics::{HostMetrics, HostMetricsConfig, MetricsBuffer};
+
+    #[test]
+    fn tcp_state_to_string_handles_all_variants() {
+        // Verify all 12 TCP states map correctly
+        assert_eq!(tcp_state_to_string(TcpState::Established), "established");
+        assert_eq!(tcp_state_to_string(TcpState::SynSent), "syn_sent");
+        assert_eq!(tcp_state_to_string(TcpState::SynRecv), "syn_recv");
+        assert_eq!(tcp_state_to_string(TcpState::FinWait1), "fin_wait1");
+        assert_eq!(tcp_state_to_string(TcpState::FinWait2), "fin_wait2");
+        assert_eq!(tcp_state_to_string(TcpState::TimeWait), "time_wait");
+        assert_eq!(tcp_state_to_string(TcpState::Close), "close");
+        assert_eq!(tcp_state_to_string(TcpState::CloseWait), "close_wait");
+        assert_eq!(tcp_state_to_string(TcpState::LastAck), "last_ack");
+        assert_eq!(tcp_state_to_string(TcpState::Listen), "listen");
+        assert_eq!(tcp_state_to_string(TcpState::Closing), "closing");
+        assert_eq!(tcp_state_to_string(TcpState::NewSynRecv), "new_syn_recv");
+    }
 
     #[tokio::test]
     async fn generates_tcp_metrics() {
