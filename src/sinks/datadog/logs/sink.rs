@@ -6,6 +6,7 @@ use vector_lib::{
     event::{ObjectMap, Value},
     internal_event::{ComponentEventsDropped, UNINTENTIONAL},
     lookup::event_path,
+    partition::PartitionError,
 };
 use vrl::path::{OwnedSegment, OwnedTargetPath, PathPrefix};
 
@@ -25,7 +26,7 @@ impl Partitioner for EventPartitioner {
     type Key = Option<Arc<str>>;
     type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
         Ok(item.metadata().datadog_api_key())
     }
 }

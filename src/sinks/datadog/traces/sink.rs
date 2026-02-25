@@ -10,7 +10,7 @@ use tower::Service;
 use vector_lib::{
     config::log_schema,
     event::Event,
-    partition::Partitioner,
+    partition::{PartitionError, Partitioner},
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
 };
@@ -43,7 +43,7 @@ impl Partitioner for EventPartitioner {
     type Key = PartitionKey;
     type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
         match item {
             Event::Metric(_) => {
                 panic!("unexpected metric");

@@ -1,4 +1,7 @@
-use vector_lib::{event::Event, partition::Partitioner};
+use vector_lib::{
+    event::Event,
+    partition::{PartitionError, Partitioner},
+};
 
 use crate::{internal_events::TemplateRenderingError, template::Template};
 
@@ -25,7 +28,7 @@ impl Partitioner for KeyPartitioner {
     type Key = String;
     type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
         self.key_prefix_template
             .render_string(item)
             .or_else(|error| {
@@ -42,7 +45,7 @@ impl Partitioner for KeyPartitioner {
                         field: Some("key_prefix"),
                         drop_event: true,
                     });
-                    Err(error)
+                    Err(PartitionError::new(error))
                 }
             })
     }

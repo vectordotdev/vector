@@ -1,4 +1,7 @@
-use vector_lib::{event::Event, partition::Partitioner};
+use vector_lib::{
+    event::Event,
+    partition::{PartitionError, Partitioner},
+};
 
 use crate::{internal_events::TemplateRenderingError, template::Template};
 
@@ -34,7 +37,7 @@ impl Partitioner for ChroniclePartitioner {
     type Key = ChroniclePartitionKey;
     type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
         let log_type = self.log_type.render_string(item).or_else(|error| {
             if let Some(fallback_log_type) = &self.fallback_log_type {
                 emit!(TemplateRenderingError {
@@ -49,7 +52,7 @@ impl Partitioner for ChroniclePartitioner {
                     field: Some("log_type"),
                     drop_event: true,
                 });
-                Err(error)
+                Err(PartitionError::new(error))
             }
         })?;
 
@@ -65,7 +68,8 @@ impl Partitioner for ChroniclePartitioner {
                     });
                 })
             })
-            .transpose()?;
+            .transpose()
+            .map_err(PartitionError::new)?;
 
         Ok(ChroniclePartitionKey {
             log_type,

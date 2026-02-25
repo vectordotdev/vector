@@ -1,7 +1,10 @@
 use std::{fmt, sync::Arc};
 
 use serde::Serialize;
-use vector_lib::event::{Metric, MetricValue};
+use vector_lib::{
+    event::{Metric, MetricValue},
+    partition::PartitionError,
+};
 use vrl::path::OwnedValuePath;
 
 use super::request_builder::HecMetricsRequestBuilder;
@@ -95,7 +98,7 @@ impl Partitioner for EventPartitioner {
     type Key = Option<Arc<str>>;
     type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
         Ok(item.event.metadata().splunk_hec_token())
     }
 }

@@ -3,6 +3,7 @@ use std::{collections::HashMap, num::NonZeroUsize};
 use bytes::{Bytes, BytesMut};
 use snafu::{ResultExt, Snafu};
 use tokio_util::codec::Encoder as _;
+use vector_lib::partition::PartitionError;
 use vrl::path::parse_target_path;
 
 use super::{
@@ -34,7 +35,7 @@ impl Partitioner for KeyPartitioner {
     type Key = Option<String>;
     type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
         self.0
             .as_ref()
             .map(|t| {
@@ -47,6 +48,7 @@ impl Partitioner for KeyPartitioner {
                 })
             })
             .transpose()
+            .map_err(PartitionError::new)
     }
 }
 
@@ -54,12 +56,12 @@ impl Partitioner for KeyPartitioner {
 struct RecordPartitioner;
 
 impl Partitioner for RecordPartitioner {
-    type Item = Option<FilteredRecord>;
+    type Item = MaybeFilteredRecord;
     type Key = Option<PartitionKey>;
     type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
-        Ok(item.as_ref().map(|inner| inner.partition()))
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
+        Ok(item.0.as_ref().map(|inner| inner.partition()))
     }
 }
 
@@ -317,7 +319,11 @@ impl EventEncoder {
         let tenant_id = self
             .key_partitioner
             .partition(&event)
-            .inspect_err(|_| finalizers.update_status(EventStatus::Errored))
+            .map_err(|partition_error| {
+                // Finalizers were already taken from the event above.
+                // Handle them here to mark as errored and get the inner error.
+                partition_error.handle(&finalizers)
+            })
             .context(PartitioningSnafu)?;
         let json_byte_size = event.estimated_json_encoded_size_of();
         let mut labels: Vec<(String, String)> = self.build_labels(&event);
@@ -408,6 +414,34 @@ impl ByteSizeOf for FilteredRecord {
 
     fn allocated_bytes(&self) -> usize {
         self.inner.allocated_bytes()
+    }
+}
+
+impl Finalizable for FilteredRecord {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.inner.take_finalizers()
+    }
+}
+
+/// Newtype wrapper around `Option<FilteredRecord>` to allow implementing `Finalizable`.
+struct MaybeFilteredRecord(Option<FilteredRecord>);
+
+impl ByteSizeOf for MaybeFilteredRecord {
+    fn size_of(&self) -> usize {
+        self.0.as_ref().map_or(0, |r| r.size_of())
+    }
+
+    fn allocated_bytes(&self) -> usize {
+        self.0.as_ref().map_or(0, |r| r.allocated_bytes())
+    }
+}
+
+impl Finalizable for MaybeFilteredRecord {
+    fn take_finalizers(&mut self) -> EventFinalizers {
+        self.0
+            .as_mut()
+            .map(|record| record.take_finalizers())
+            .unwrap_or_default()
     }
 }
 
@@ -544,7 +578,7 @@ impl LokiSink {
                         .ok()
                 }
             })
-            .map(|record| filter.filter_record(record))
+            .map(|record| MaybeFilteredRecord(filter.filter_record(record)))
             .batched_partitioned(RecordPartitioner, || batch_settings.as_byte_size_config())
             .unwrap_infallible()
             .filter_map(|(partition, batch)| async {
@@ -552,7 +586,7 @@ impl LokiSink {
                     let mut count: usize = 0;
                     let result = batch
                         .into_iter()
-                        .flatten()
+                        .filter_map(|r| r.0)
                         .map(|event| {
                             if event.rewritten {
                                 count += 1;

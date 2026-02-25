@@ -3,6 +3,7 @@ use std::fmt;
 use vector_lib::{
     byte_size_of::ByteSizeOf,
     event::Metric,
+    partition::PartitionError,
     stream::batcher::{data::BatchData, limiter::ByteSizeOfItemSize},
 };
 
@@ -57,7 +58,7 @@ impl Partitioner for PrometheusTenantIdPartitioner {
     type Key = PartitionKey;
     type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
         Ok(PartitionKey {
             tenant_id: item.tenant_id.clone(),
         })

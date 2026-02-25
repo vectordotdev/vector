@@ -1,5 +1,7 @@
 //! Implementation of the `clickhouse` sink.
 
+use vector_lib::partition::PartitionError;
+
 use super::{config::Format, request_builder::ClickhouseRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
 
@@ -129,9 +131,10 @@ impl Partitioner for KeyPartitioner {
     type Key = PartitionKey;
     type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
-        let database = Self::render(&self.database, item, "database_key")?;
-        let table = Self::render(&self.table, item, "table_key")?;
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
+        let database =
+            Self::render(&self.database, item, "database_key").map_err(PartitionError::new)?;
+        let table = Self::render(&self.table, item, "table_key").map_err(PartitionError::new)?;
         Ok(PartitionKey {
             database,
             table,

@@ -12,7 +12,7 @@ use pin_project::pin_project;
 use tokio_util::time::{DelayQueue, delay_queue::Key};
 use twox_hash::XxHash64;
 use vector_common::byte_size_of::ByteSizeOf;
-use vector_core::{partition::Partitioner, time::KeyedTimer};
+use vector_core::{event::Finalizable, partition::Partitioner, time::KeyedTimer};
 
 use crate::batcher::{
     BatchConfig,
@@ -253,7 +253,7 @@ where
     St: Stream<Item = Prt::Item>,
     Prt: Partitioner + Unpin,
     Prt::Key: Eq + Hash + Clone,
-    Prt::Item: ByteSizeOf,
+    Prt::Item: ByteSizeOf + Finalizable,
     KT: KeyedTimer<Prt::Key>,
     C: BatchConfig<Prt::Item, Batch = B>,
     F: Fn() -> C + Send,
@@ -300,10 +300,14 @@ where
                     }
                     return Poll::Ready(None);
                 }
-                Poll::Ready(Some(item)) => {
+                Poll::Ready(Some(mut item)) => {
                     let item_key = match this.partitioner.partition(&item) {
                         Ok(item_key) => item_key,
-                        Err(e) => return Poll::Ready(Some(Err(e))),
+                        Err(partition_error) => {
+                            // Handle finalizers and return the inner error
+                            let error = partition_error.handle_from(&mut item);
+                            return Poll::Ready(Some(Err(error)));
+                        }
                     };
 
                     // Get the batch for this partition, or create a new one.
@@ -363,12 +367,42 @@ mod test {
     use pin_project::pin_project;
     use proptest::prelude::*;
     use tokio::{pin, time::advance};
-    use vector_core::{partition::Partitioner, time::KeyedTimer};
+    use vector_common::byte_size_of::ByteSizeOf;
+    use vector_core::{
+        event::{EventFinalizers, Finalizable},
+        partition::{PartitionError, Partitioner},
+        time::KeyedTimer,
+    };
 
     use crate::{
         BatcherSettings,
         partitioned_batcher::{ExpirationQueue, PartitionedBatcher},
     };
+
+    /// A simple wrapper around u64 that implements Finalizable for testing.
+    #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+    struct TestItem(u64);
+
+    impl ByteSizeOf for TestItem {
+        fn allocated_bytes(&self) -> usize {
+            0
+        }
+    }
+
+    impl Finalizable for TestItem {
+        fn take_finalizers(&mut self) -> EventFinalizers {
+            EventFinalizers::default()
+        }
+    }
+
+    impl Arbitrary for TestItem {
+        type Parameters = ();
+        type Strategy = proptest::strategy::Map<proptest::num::u64::Any, fn(u64) -> TestItem>;
+
+        fn arbitrary_with(_: Self::Parameters) -> Self::Strategy {
+            any::<u64>().prop_map(TestItem)
+        }
+    }
 
     #[derive(Debug)]
     /// A test keyed timer
@@ -447,13 +481,16 @@ mod test {
     }
 
     impl Partitioner for TestPartitioner {
-        type Item = u64;
+        type Item = TestItem;
         type Key = u8;
         type Error = std::convert::Infallible;
 
         #[allow(clippy::cast_possible_truncation)]
-        fn partition(&self, item: &Self::Item) -> Result<Self::Key, std::convert::Infallible> {
-            let key = *item % u64::from(self.key_space.get());
+        fn partition(
+            &self,
+            item: &Self::Item,
+        ) -> Result<Self::Key, PartitionError<std::convert::Infallible>> {
+            let key = item.0 % u64::from(self.key_space.get());
             Ok(key as Self::Key)
         }
     }
@@ -466,7 +503,7 @@ mod test {
 
     proptest! {
         #[test]
-        fn size_hint_eq(stream: Vec<u64>,
+        fn size_hint_eq(stream: Vec<TestItem>,
                         item_limit in 1..u16::MAX,
                         allocation_limit in 8..128,
                         partitioner in arb_partitioner(),
@@ -492,7 +529,7 @@ mod test {
 
     proptest! {
         #[test]
-        fn batch_item_size_leq_limit(stream: Vec<u64>,
+        fn batch_item_size_leq_limit(stream: Vec<TestItem>,
                                      item_limit in 1..u16::MAX,
                                      allocation_limit in 8..128,
                                      partitioner in arb_partitioner(),
@@ -539,9 +576,9 @@ mod test {
     /// of the items in reverse. This allows for efficient popping to compare
     /// ordering of receipt.
     fn separate_partitions(
-        stream: Vec<u64>,
+        stream: Vec<TestItem>,
         partitioner: &TestPartitioner,
-    ) -> HashMap<u8, Vec<u64>> {
+    ) -> HashMap<u8, Vec<TestItem>> {
         let mut map = stream
             .into_iter()
             .map(|item| {
@@ -550,8 +587,8 @@ mod test {
             })
             .fold(
                 HashMap::default(),
-                |mut acc: HashMap<u8, Vec<u64>>, (key, item)| {
-                    let arr: &mut Vec<u64> = acc.entry(key).or_default();
+                |mut acc: HashMap<u8, Vec<TestItem>>, (key, item)| {
+                    let arr: &mut Vec<TestItem> = acc.entry(key).or_default();
                     arr.push(item);
                     acc
                 },
@@ -564,7 +601,7 @@ mod test {
 
     proptest! {
         #[test]
-        fn batch_does_not_reorder(stream: Vec<u64>,
+        fn batch_does_not_reorder(stream: Vec<TestItem>,
                                   item_limit in 1..u16::MAX,
                                   allocation_limit in 8..128,
                                   partitioner in arb_partitioner(),
@@ -613,7 +650,7 @@ mod test {
 
     proptest! {
         #[test]
-        fn batch_does_not_lose_items(stream: Vec<u64>,
+        fn batch_does_not_lose_items(stream: Vec<TestItem>,
                                      item_limit in 1..u16::MAX,
                                      allocation_limit in 8..128,
                                      partitioner in arb_partitioner(),

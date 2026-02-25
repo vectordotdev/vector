@@ -1,4 +1,7 @@
-use vector_lib::{event::Event, partition::Partitioner};
+use vector_lib::{
+    event::Event,
+    partition::{PartitionError, Partitioner},
+};
 
 use crate::{internal_events::TemplateRenderingError, template::Template};
 
@@ -34,7 +37,7 @@ impl Partitioner for S3KeyPartitioner {
     type Key = S3PartitionKey;
     type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
         let key_prefix = self
             .key_prefix_template
             .render_string(item)
@@ -52,7 +55,7 @@ impl Partitioner for S3KeyPartitioner {
                         field: Some("key_prefix"),
                         drop_event: true,
                     });
-                    Err(error)
+                    Err(PartitionError::new(error))
                 }
             })?;
 
@@ -68,7 +71,8 @@ impl Partitioner for S3KeyPartitioner {
                     });
                 })
             })
-            .transpose()?;
+            .transpose()
+            .map_err(PartitionError::new)?;
 
         Ok(S3PartitionKey {
             key_prefix,

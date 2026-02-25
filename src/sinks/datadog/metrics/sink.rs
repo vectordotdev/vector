@@ -10,7 +10,7 @@ use futures_util::{
 use tower::Service;
 use vector_lib::{
     event::{Event, Metric, MetricValue},
-    partition::Partitioner,
+    partition::{PartitionError, Partitioner},
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
 };
@@ -40,7 +40,7 @@ impl Partitioner for DatadogMetricsTypePartitioner {
     type Key = (Option<Arc<str>>, DatadogMetricsEndpoint);
     type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
         let endpoint = match item.data().value() {
             MetricValue::Counter { .. } => DatadogMetricsEndpoint::series(),
             MetricValue::Gauge { .. } => DatadogMetricsEndpoint::series(),

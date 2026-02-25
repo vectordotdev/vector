@@ -5,7 +5,7 @@ use chrono::{Duration, Utc};
 use futures::{StreamExt, future, stream::BoxStream};
 use tower::Service;
 use vector_lib::{
-    partition::Partitioner,
+    partition::{PartitionError, Partitioner},
     request_metadata::{MetaDescriptive, RequestMetadata},
     sink::StreamSink,
     stream::{BatcherSettings, DriverResponse},
@@ -100,7 +100,7 @@ impl Partitioner for CloudwatchPartitioner {
     type Key = CloudwatchKey;
     type Error = std::convert::Infallible;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
         Ok(item.key.clone())
     }
 }

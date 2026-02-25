@@ -2,6 +2,8 @@
 
 use std::collections::BTreeMap;
 
+use vector_lib::partition::PartitionError;
+
 use super::{batch::HttpBatchSizer, request_builder::HttpRequestBuilder};
 use crate::sinks::{prelude::*, util::http::HttpRequest};
 
@@ -116,24 +118,31 @@ impl Partitioner for KeyPartitioner {
     type Key = PartitionKey;
     type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, event: &Event) -> Result<Self::Key, Self::Error> {
-        let uri = self.uri.render_string(event).inspect_err(|error| {
-            emit!(TemplateRenderingError {
-                error: error.clone(),
-                field: Some("uri"),
-                drop_event: true,
-            });
-        })?;
+    fn partition(&self, event: &Event) -> Result<Self::Key, PartitionError<Self::Error>> {
+        let uri = self
+            .uri
+            .render_string(event)
+            .inspect_err(|error| {
+                emit!(TemplateRenderingError {
+                    error: error.clone(),
+                    field: Some("uri"),
+                    drop_event: true,
+                });
+            })
+            .map_err(PartitionError::new)?;
 
         let mut headers = BTreeMap::new();
         for (name, template) in &self.headers {
-            let value = template.render_string(event).inspect_err(|error| {
-                emit!(TemplateRenderingError {
-                    error: error.clone(),
-                    field: Some("headers"),
-                    drop_event: true,
-                });
-            })?;
+            let value = template
+                .render_string(event)
+                .inspect_err(|error| {
+                    emit!(TemplateRenderingError {
+                        error: error.clone(),
+                        field: Some("headers"),
+                        drop_event: true,
+                    });
+                })
+                .map_err(PartitionError::new)?;
             headers.insert(name.clone(), value);
         }
 

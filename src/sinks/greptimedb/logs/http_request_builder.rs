@@ -7,7 +7,7 @@ use http::{
 };
 use hyper::Body;
 use snafu::ResultExt;
-use vector_lib::codecs::encoding::Framer;
+use vector_lib::{codecs::encoding::Framer, partition::PartitionError};
 
 use crate::{
     Error,
@@ -73,15 +73,17 @@ impl Partitioner for KeyPartitioner {
     type Key = PartitionKey;
     type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
-        let dbname = Self::render(&self.dbname, item, "dbname_key")?;
-        let table = Self::render(&self.table, item, "table_key")?;
-        let pipeline_name = Self::render(&self.pipeline_name, item, "pipeline_name")?;
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
+        let dbname = Self::render(&self.dbname, item, "dbname_key").map_err(PartitionError::new)?;
+        let table = Self::render(&self.table, item, "table_key").map_err(PartitionError::new)?;
+        let pipeline_name = Self::render(&self.pipeline_name, item, "pipeline_name")
+            .map_err(PartitionError::new)?;
         let pipeline_version = self
             .pipeline_version
             .as_ref()
             .map(|template| Self::render(template, item, "pipeline_version"))
-            .transpose()?;
+            .transpose()
+            .map_err(PartitionError::new)?;
         Ok(PartitionKey {
             dbname,
             table,

@@ -3,6 +3,7 @@ use std::{fmt, sync::Arc};
 use vector_lib::{
     config::{LogNamespace, log_schema},
     lookup::{OwnedValuePath, PathPrefix, event_path, lookup_v2::OptionalTargetPath},
+    partition::PartitionError,
     schema::meaning,
 };
 use vrl::path::OwnedTargetPath;
@@ -163,7 +164,7 @@ impl Partitioner for EventPartitioner {
     type Key = Partitioned;
     type Error = crate::template::TemplateRenderingError;
 
-    fn partition(&self, item: &Self::Item) -> Result<Self::Key, Self::Error> {
+    fn partition(&self, item: &Self::Item) -> Result<Self::Key, PartitionError<Self::Error>> {
         let emit_err = |error, field| {
             emit!(TemplateRenderingError {
                 error,
@@ -180,7 +181,8 @@ impl Partitioner for EventPartitioner {
                     .render_string(&item.event)
                     .inspect_err(|error| emit_err(error.clone(), SOURCE_FIELD))
             })
-            .transpose()?;
+            .transpose()
+            .map_err(PartitionError::new)?;
 
         let sourcetype = self
             .sourcetype
@@ -190,7 +192,8 @@ impl Partitioner for EventPartitioner {
                     .render_string(&item.event)
                     .inspect_err(|error| emit_err(error.clone(), SOURCETYPE_FIELD))
             })
-            .transpose()?;
+            .transpose()
+            .map_err(PartitionError::new)?;
 
         let index = self
             .index
@@ -200,7 +203,8 @@ impl Partitioner for EventPartitioner {
                     .render_string(&item.event)
                     .inspect_err(|error| emit_err(error.clone(), INDEX_FIELD))
             })
-            .transpose()?;
+            .transpose()
+            .map_err(PartitionError::new)?;
 
         let host = user_or_namespaced_path(
             &item.event,
