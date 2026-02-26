@@ -503,20 +503,20 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["_default-unix", "rdkafka?/gssapi-vendored"]
+default = ["enable-unix", "rdkafka?/gssapi-vendored"]
 # Default features for `cargo docs`. The same as `default` but without `rdkafka?/gssapi-vendored` which would require installing libsasl in our doc build environment.
-docs = ["_default-unix"]
+docs = ["enable-unix"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["_default-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build"]
+default-cmake = ["enable-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-_default-base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets"]
-_default-api-client = ["_default-base", "api-client"]
-_default-unix = ["_default-api-client", "sources-dnstap", "unix"]
+base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets"]
+enable-api-client = ["base", "api-client"]
+enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
 
-default-msvc = ["_default-api-client", "rdkafka?/cmake_build"]
-default-musl = ["_default-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build"]
-default-no-api-client = ["_default-base", "sources-dnstap", "unix", "rdkafka?/gssapi-vendored"]
+default-msvc = ["enable-api-client", "rdkafka?/cmake_build"]
+default-musl = ["enable-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build"]
+default-no-api-client = ["base", "sources-dnstap", "unix", "rdkafka?/gssapi-vendored"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
 
@@ -529,15 +529,15 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-_target-default = ["_default-api-client", "rdkafka?/cmake_build", "sources-dnstap"]
-target-aarch64-unknown-linux-gnu =      ["_target-default", "unix"]
-target-aarch64-unknown-linux-musl =     ["_target-default", "unix"]
-target-armv7-unknown-linux-gnueabihf =  ["_target-default", "unix"]
-target-armv7-unknown-linux-musleabihf = ["_target-default"]
-target-arm-unknown-linux-gnueabi =      ["_target-default", "unix"]
-target-arm-unknown-linux-musleabi =     ["_target-default"]
-target-x86_64-unknown-linux-gnu =       ["_target-default", "unix", "rdkafka?/gssapi-vendored"]
-target-x86_64-unknown-linux-musl =      ["_target-default", "unix"]
+target-base = ["enable-api-client", "rdkafka?/cmake_build", "sources-dnstap"]
+target-aarch64-unknown-linux-gnu =      ["target-base", "unix"]
+target-aarch64-unknown-linux-musl =     ["target-base", "unix"]
+target-armv7-unknown-linux-gnueabihf =  ["target-base", "unix"]
+target-armv7-unknown-linux-musleabihf = ["target-base"]
+target-arm-unknown-linux-gnueabi =      ["target-base", "unix"]
+target-arm-unknown-linux-musleabi =     ["target-base"]
+target-x86_64-unknown-linux-gnu =       ["target-base", "unix", "rdkafka?/gssapi-vendored"]
+target-x86_64-unknown-linux-musl =      ["target-base", "unix"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
