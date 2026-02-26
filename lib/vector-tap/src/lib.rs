@@ -9,17 +9,20 @@ pub mod topology;
 
 use std::{borrow::Cow, collections::BTreeMap};
 
+use bytes::BytesMut;
 use colored::{ColoredString, Colorize};
 use tokio::{
     sync::mpsc as tokio_mpsc,
     time::{Duration, Instant, timeout},
 };
 use tokio_stream::StreamExt;
+use tokio_util::codec::Encoder;
 use url::Url;
 use vector_api_client::{
     Client,
     proto::{OutputEvent, OutputEventsRequest},
 };
+use vector_core::event::Event;
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
 pub enum TapEncodingFormat {
@@ -224,15 +227,39 @@ impl<'a> TapRunner<'a> {
 
     #[allow(clippy::print_stdout)]
     fn output_event_stdout(&self, output_event: &OutputEvent, formatter: &EventFormatter) {
-        use vector_api_client::proto::output_event::Event;
+        use vector_api_client::proto::output_event::Event as OutputEventType;
 
         match &output_event.event {
-            Some(Event::TappedEvent(ev)) => {
+            Some(OutputEventType::TappedEvent(ev)) => {
                 // Format the proto event for display
                 let encoded_string = if let Some(ref event_wrapper) = ev.event {
-                    // Use Debug format for the event (shows all fields)
-                    // TODO: Implement proper JSON/YAML/logfmt formatting
-                    format!("{:?}", event_wrapper)
+                    // Convert protobuf EventWrapper to Vector Event
+                    let event: Event = event_wrapper.clone().into();
+
+                    // Serialize based on the requested format
+                    match formatter.format {
+                        TapEncodingFormat::Json => {
+                            // Use serde_json for JSON serialization
+                            serde_json::to_string(&event)
+                                .unwrap_or_else(|e| format!("Error encoding JSON: {}", e))
+                        }
+                        TapEncodingFormat::Yaml => {
+                            // Use serde_yaml for YAML serialization
+                            serde_yaml::to_string(&event)
+                                .unwrap_or_else(|e| format!("Error encoding YAML: {}", e))
+                        }
+                        TapEncodingFormat::Logfmt => {
+                            // Use logfmt encoder for logfmt serialization
+                            use codecs::encoding::format::LogfmtSerializer;
+                            let mut serializer = LogfmtSerializer;
+                            let mut buffer = BytesMut::new();
+                            serializer
+                                .encode(event, &mut buffer)
+                                .ok()
+                                .and_then(|_| String::from_utf8(buffer.to_vec()).ok())
+                                .unwrap_or_else(|| "Error encoding logfmt".to_string())
+                        }
+                    }
                 } else {
                     "No event data".to_string()
                 };
@@ -248,7 +275,7 @@ impl<'a> TapRunner<'a> {
                 );
             }
             #[allow(clippy::print_stderr)]
-            Some(Event::Notification(ev)) => {
+            Some(OutputEventType::Notification(ev)) => {
                 eprintln!("{}", ev.message);
             }
             None => {

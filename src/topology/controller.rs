@@ -86,10 +86,17 @@ impl TopologyController {
                     self.api_server = Some(api_server);
                 }
                 Err(error) => {
+                    let error_string = error.to_string();
                     error!(
-                        message = "Failed to start gRPC API server.",
-                        %error,
+                        message = "An error occurred that Vector couldn't handle.",
+                        error = %error_string,
+                        internal_log_rate_limit = false,
                     );
+                    // Fail fast when API is explicitly enabled but fails to start
+                    // This ensures users don't run with a broken configuration thinking top/tap will work
+                    return ReloadOutcome::FatalError(ShutdownError::ApiFailed {
+                        error: error_string,
+                    });
                 }
             }
         }

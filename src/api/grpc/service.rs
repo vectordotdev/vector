@@ -258,11 +258,20 @@ impl observability::Service for ObservabilityService {
             return Err(Status::invalid_argument("interval_ms must be positive"));
         }
 
-        let start_time = std::time::Instant::now();
+        let controller =
+            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
+
         let duration = Duration::from_millis(interval_ms as u64);
         let stream =
             tokio_stream::StreamExt::map(IntervalStream::new(interval(duration)), move |_| {
-                let uptime_seconds = start_time.elapsed().as_secs() as i64;
+                // Query the actual Vector uptime from the metrics system
+                let metrics = controller.capture_metrics();
+                let uptime_seconds = metrics
+                    .iter()
+                    .find(|m| m.name() == "uptime_seconds")
+                    .and_then(get_metric_value)
+                    .unwrap_or(0.0) as i64;
+
                 Ok(UptimeResponse { uptime_seconds })
             });
 
@@ -720,16 +729,18 @@ impl observability::Service for ObservabilityService {
         request: Request<OutputEventsRequest>,
     ) -> Result<Response<Self::StreamOutputEventsStream>, Status> {
         let req = request.into_inner();
-        let interval_ms = req.interval_ms as u64;
-        let limit = req.limit as usize;
 
-        if interval_ms == 0 {
+        // Validate before casting to prevent negative values from becoming large positive values
+        if req.interval_ms <= 0 {
             return Err(Status::invalid_argument("interval_ms must be positive"));
         }
 
-        if limit == 0 {
+        if req.limit <= 0 {
             return Err(Status::invalid_argument("limit must be positive"));
         }
+
+        let interval_ms = req.interval_ms as u64;
+        let limit = req.limit as usize;
 
         let patterns = TapPatterns {
             for_outputs: req.outputs_patterns.into_iter().collect(),

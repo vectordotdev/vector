@@ -159,22 +159,19 @@ async fn received_bytes_totals(
         return;
     };
 
-    let mut batch = Vec::new();
     while let Some(Ok(response)) = stream.next().await {
         let component_id = &response.component_id;
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
 
-        batch.push((ComponentKey::from(component_id.as_str()), response.total));
-
-        // Send in batches (gRPC streams one at a time, but we want to batch)
-        if batch.len() >= 10 {
-            _ = tx
-                .send(state::EventType::ReceivedBytesTotals(batch.clone()))
-                .await;
-            batch.clear();
-        }
+        // Send immediately to ensure live updates for systems with <10 components
+        _ = tx
+            .send(state::EventType::ReceivedBytesTotals(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.total,
+            )]))
+            .await;
     }
 }
 
@@ -192,27 +189,22 @@ async fn received_bytes_throughputs(
         return;
     };
 
-    let mut batch = Vec::new();
     while let Some(Ok(response)) = stream.next().await {
         let component_id = &response.component_id;
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
 
-        batch.push((
-            ComponentKey::from(component_id.as_str()),
-            response.throughput as i64,
-        ));
-
-        if batch.len() >= 10 {
-            _ = tx
-                .send(state::EventType::ReceivedBytesThroughputs(
-                    interval,
-                    batch.clone(),
-                ))
-                .await;
-            batch.clear();
-        }
+        // Send immediately to ensure live updates for systems with <10 components
+        _ = tx
+            .send(state::EventType::ReceivedBytesThroughputs(
+                interval,
+                vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    response.throughput as i64,
+                )],
+            ))
+            .await;
     }
 }
 
@@ -230,21 +222,19 @@ async fn received_events_totals(
         return;
     };
 
-    let mut batch = Vec::new();
     while let Some(Ok(response)) = stream.next().await {
         let component_id = &response.component_id;
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
 
-        batch.push((ComponentKey::from(component_id.as_str()), response.total));
-
-        if batch.len() >= 10 {
-            _ = tx
-                .send(state::EventType::ReceivedEventsTotals(batch.clone()))
-                .await;
-            batch.clear();
-        }
+        // Send immediately to ensure live updates for systems with <10 components
+        _ = tx
+            .send(state::EventType::ReceivedEventsTotals(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.total,
+            )]))
+            .await;
     }
 }
 
@@ -262,27 +252,22 @@ async fn received_events_throughputs(
         return;
     };
 
-    let mut batch = Vec::new();
     while let Some(Ok(response)) = stream.next().await {
         let component_id = &response.component_id;
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
 
-        batch.push((
-            ComponentKey::from(component_id.as_str()),
-            response.throughput as i64,
-        ));
-
-        if batch.len() >= 10 {
-            _ = tx
-                .send(state::EventType::ReceivedEventsThroughputs(
-                    interval,
-                    batch.clone(),
-                ))
-                .await;
-            batch.clear();
-        }
+        // Send immediately to ensure live updates for systems with <10 components
+        _ = tx
+            .send(state::EventType::ReceivedEventsThroughputs(
+                interval,
+                vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    response.throughput as i64,
+                )],
+            ))
+            .await;
     }
 }
 
@@ -300,21 +285,19 @@ async fn sent_bytes_totals(
         return;
     };
 
-    let mut batch = Vec::new();
     while let Some(Ok(response)) = stream.next().await {
         let component_id = &response.component_id;
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
 
-        batch.push((ComponentKey::from(component_id.as_str()), response.total));
-
-        if batch.len() >= 10 {
-            _ = tx
-                .send(state::EventType::SentBytesTotals(batch.clone()))
-                .await;
-            batch.clear();
-        }
+        // Send immediately to ensure live updates for systems with <10 components
+        _ = tx
+            .send(state::EventType::SentBytesTotals(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.total,
+            )]))
+            .await;
     }
 }
 
@@ -332,27 +315,22 @@ async fn sent_bytes_throughputs(
         return;
     };
 
-    let mut batch = Vec::new();
     while let Some(Ok(response)) = stream.next().await {
         let component_id = &response.component_id;
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
 
-        batch.push((
-            ComponentKey::from(component_id.as_str()),
-            response.throughput as i64,
-        ));
-
-        if batch.len() >= 10 {
-            _ = tx
-                .send(state::EventType::SentBytesThroughputs(
-                    interval,
-                    batch.clone(),
-                ))
-                .await;
-            batch.clear();
-        }
+        // Send immediately to ensure live updates for systems with <10 components
+        _ = tx
+            .send(state::EventType::SentBytesThroughputs(
+                interval,
+                vec![(
+                    ComponentKey::from(component_id.as_str()),
+                    response.throughput as i64,
+                )],
+            ))
+            .await;
     }
 }
 
@@ -370,27 +348,21 @@ async fn sent_events_totals(
         return;
     };
 
-    let mut batch = Vec::new();
     while let Some(Ok(response)) = stream.next().await {
         let component_id = &response.component_id;
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
 
+        // Send immediately to ensure live updates for systems with <10 components
         // Note: gRPC doesn't have output-level metrics in the streaming response
-        // We only have component-level totals
-        batch.push(SentEventsMetric {
-            key: ComponentKey::from(component_id.as_str()),
-            total: response.total,
-            outputs: HashMap::new(), // No per-output data in gRPC streams
-        });
-
-        if batch.len() >= 10 {
-            _ = tx
-                .send(state::EventType::SentEventsTotals(batch.clone()))
-                .await;
-            batch.clear();
-        }
+        _ = tx
+            .send(state::EventType::SentEventsTotals(vec![SentEventsMetric {
+                key: ComponentKey::from(component_id.as_str()),
+                total: response.total,
+                outputs: HashMap::new(), // No per-output data in gRPC streams
+            }]))
+            .await;
     }
 }
 
@@ -408,28 +380,23 @@ async fn sent_events_throughputs(
         return;
     };
 
-    let mut batch = Vec::new();
     while let Some(Ok(response)) = stream.next().await {
         let component_id = &response.component_id;
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
 
-        batch.push(SentEventsMetric {
-            key: ComponentKey::from(component_id.as_str()),
-            total: response.throughput as i64,
-            outputs: HashMap::new(), // No per-output data in gRPC streams
-        });
-
-        if batch.len() >= 10 {
-            _ = tx
-                .send(state::EventType::SentEventsThroughputs(
-                    interval,
-                    batch.clone(),
-                ))
-                .await;
-            batch.clear();
-        }
+        // Send immediately to ensure live updates for systems with <10 components
+        _ = tx
+            .send(state::EventType::SentEventsThroughputs(
+                interval,
+                vec![SentEventsMetric {
+                    key: ComponentKey::from(component_id.as_str()),
+                    total: response.throughput as i64,
+                    outputs: HashMap::new(), // No per-output data in gRPC streams
+                }],
+            ))
+            .await;
     }
 }
 
@@ -443,19 +410,19 @@ async fn errors_totals(
         return;
     };
 
-    let mut batch = Vec::new();
     while let Some(Ok(response)) = stream.next().await {
         let component_id = &response.component_id;
         if !component_matches_patterns(component_id, &components_patterns) {
             continue;
         }
 
-        batch.push((ComponentKey::from(component_id.as_str()), response.total));
-
-        if batch.len() >= 10 {
-            _ = tx.send(state::EventType::ErrorsTotals(batch.clone())).await;
-            batch.clear();
-        }
+        // Send immediately to ensure live updates for systems with <10 components
+        _ = tx
+            .send(state::EventType::ErrorsTotals(vec![(
+                ComponentKey::from(component_id.as_str()),
+                response.total,
+            )]))
+            .await;
     }
 }
 

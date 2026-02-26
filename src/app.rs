@@ -146,7 +146,17 @@ impl ApplicationConfig {
                 }
                 Err(error) => {
                     let error = error.to_string();
-                    error!(message = "Failed to start gRPC API server.", %error);
+                    error!(
+                        message = "An error occurred that Vector couldn't handle.",
+                        %error,
+                        internal_log_rate_limit = false
+                    );
+                    // Trigger shutdown because the API was explicitly enabled but failed to start
+                    // This ensures users don't run Vector thinking top/tap will work when they won't
+                    _ = self
+                        .topology
+                        .abort_tx
+                        .send(crate::signal::ShutdownError::ApiFailed { error });
                     None
                 }
             }
