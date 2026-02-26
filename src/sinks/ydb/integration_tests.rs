@@ -8,18 +8,14 @@ use ydb::{ClientBuilder, Query, TableClient};
 
 use crate::{
     config::{SinkConfig, SinkContext},
-    sinks::{ydb::YdbConfig, util::test::load_sink},
-    test_util::{
-        components::run_and_assert_sink_compliance,
-        random_table_name, trace_init,
-    },
+    sinks::{util::test::load_sink, ydb::YdbConfig},
+    test_util::{components::run_and_assert_sink_compliance, random_table_name, trace_init},
 };
 
 const YDB_SINK_TAGS: [&str; 2] = ["endpoint", "protocol"];
 
 fn ydb_endpoint() -> String {
-    std::env::var("YDB_ENDPOINT")
-        .unwrap_or_else(|_| "grpc://localhost:2136?database=/local".into())
+    std::env::var("YDB_ENDPOINT").unwrap_or_else(|_| "grpc://localhost:2136?database=/local".into())
 }
 
 fn ydb_database() -> String {
@@ -101,18 +97,18 @@ impl YdbTestClient {
 
     async fn drop_table(&self, table_path: &str) {
         let drop_table_sql = format!("DROP TABLE `{}`", table_path);
-        let _ = self.table_client
+        let _ = self
+            .table_client
             .retry_execute_scheme_query(drop_table_sql)
             .await;
     }
 
     async fn count_rows(&self, table_path: &str) -> u64 {
-        let table_client = self.table_client
-            .clone_with_transaction_options(
-                ydb::TransactionOptions::new()
-                    .with_mode(ydb::Mode::OnlineReadonly)
-                    .with_autocommit(true),
-            );
+        let table_client = self.table_client.clone_with_transaction_options(
+            ydb::TransactionOptions::new()
+                .with_mode(ydb::Mode::OnlineReadonly)
+                .with_autocommit(true),
+        );
 
         let table_path = table_path.to_string();
         table_client
@@ -121,9 +117,7 @@ impl YdbTestClient {
                 async move {
                     let select_query = format!("SELECT COUNT(*) as cnt FROM `{}`", table);
                     let result_set = t.query(Query::new(&select_query)).await?;
-                    let value = result_set
-                        .into_only_row()?
-                        .remove_field_by_name("cnt")?;
+                    let value = result_set.into_only_row()?.remove_field_by_name("cnt")?;
                     let cnt: Option<u64> = value.try_into()?;
                     Ok(cnt.unwrap_or(0))
                 }

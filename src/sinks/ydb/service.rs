@@ -8,7 +8,6 @@ use futures::future::BoxFuture;
 use snafu::{ResultExt, Snafu};
 use tower::Service;
 use uuid::Uuid;
-use ydb::{TableClient, Value, YdbError, ydb_struct};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::JsonSerializerConfig,
@@ -16,11 +15,9 @@ use vector_lib::{
     request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     stream::DriverResponse,
 };
+use ydb::{TableClient, Value, YdbError, ydb_struct};
 
-use crate::{
-    internal_events::EndpointBytesSent,
-    sinks::prelude::RequestMetadataBuilder,
-};
+use crate::{internal_events::EndpointBytesSent, sinks::prelude::RequestMetadataBuilder};
 
 const YDB_PROTOCOL: &str = "ydb";
 
@@ -37,7 +34,9 @@ impl crate::sinks::util::retries::RetryLogic for YdbRetryLogic {
             YdbServiceError::Ydb { source } => {
                 matches!(
                     source,
-                    YdbError::TransportDial(_) | YdbError::Transport(_) | YdbError::TransportGRPCStatus(_)
+                    YdbError::TransportDial(_)
+                        | YdbError::Transport(_)
+                        | YdbError::TransportGRPCStatus(_)
                 )
             }
             YdbServiceError::VectorCommon { .. } | YdbServiceError::Serialization { .. } => false,
@@ -209,8 +208,7 @@ fn event_to_ydb_value(event: Event) -> Result<Value, YdbServiceError> {
         .to_json_value(event)
         .context(VectorCommonSnafu)?;
 
-    let payload_json = serde_json::to_string(&payload_value)
-        .context(SerializationSnafu)?;
+    let payload_json = serde_json::to_string(&payload_value).context(SerializationSnafu)?;
 
     Ok(ydb_struct!(
         "id" => Value::Text(id),

@@ -14841,6 +14841,7 @@ checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 [[package]]
 name = "ydb"
 version = "0.12.0"
+source = "git+https://github.com/1NepuNep1/ydb-rs-sdk.git#ba72b18095d0484b5efe818106567ede01bf161e"
 dependencies = [
  "async-trait",
  "chrono",
@@ -14879,6 +14880,7 @@ dependencies = [
 [[package]]
 name = "ydb-grpc"
 version = "0.2.0"
+source = "git+https://github.com/1NepuNep1/ydb-rs-sdk.git#ba72b18095d0484b5efe818106567ede01bf161e"
 dependencies = [
  "pbjson",
  "pbjson-build",
