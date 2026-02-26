@@ -26,7 +26,7 @@ directories = "6.0.0"
 glob.workspace = true
 hex = "0.4.3"
 indexmap.workspace = true
-indicatif = { version = "0.18.3", features = ["improved_unicode"] }
+indicatif = { version = "0.18.4", features = ["improved_unicode"] }
 itertools.workspace = true
 log = "0.4.29"
 # watch https://github.com/epage/anstyle for official interop with Clap

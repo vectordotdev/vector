@@ -16,7 +16,9 @@ use crate::{
     event::{Event, Metric, MetricTags, metric, metric::TagValue},
     test_util::components::assert_transform_compliance,
     transforms::{
-        tag_cardinality_limit::config::{BloomFilterConfig, Mode, default_cache_size},
+        tag_cardinality_limit::config::{
+            BloomFilterConfig, Mode, TagCardinalityLimitInternalMetricsConfig, default_cache_size,
+        },
         test::create_topology,
     },
 };
@@ -53,6 +55,7 @@ fn make_transform_hashset(
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
+            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
         },
         per_metric_limits: HashMap::new(),
     }
@@ -69,12 +72,13 @@ fn make_transform_bloom(
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
+            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
         },
         per_metric_limits: HashMap::new(),
     }
 }
 
-const fn make_transform_hashset_with_per_metric_limits(
+fn make_transform_hashset_with_per_metric_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
     per_metric_limits: HashMap<String, PerMetricConfig>,
@@ -84,12 +88,13 @@ const fn make_transform_hashset_with_per_metric_limits(
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
+            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
         },
         per_metric_limits,
     }
 }
 
-const fn make_transform_bloom_with_per_metric_limits(
+fn make_transform_bloom_with_per_metric_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
     per_metric_limits: HashMap<String, PerMetricConfig>,
@@ -101,6 +106,7 @@ const fn make_transform_bloom_with_per_metric_limits(
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
+            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
         },
         per_metric_limits,
     }

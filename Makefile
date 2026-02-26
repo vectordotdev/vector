@@ -692,6 +692,7 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
+	./scripts/cue.sh fmt
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
