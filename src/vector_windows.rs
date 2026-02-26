@@ -81,9 +81,9 @@ pub mod service_control {
     #[derive(Debug, Copy, Clone, PartialEq)]
     pub enum ControlAction {
         Install,
-        Uninstall,
+        Uninstall { stop_timeout: Duration },
         Start,
-        Stop,
+        Stop { stop_timeout: Duration },
         Restart { stop_timeout: Duration },
     }
 
@@ -114,9 +114,13 @@ pub mod service_control {
         fn from_str(s: &str) -> std::result::Result<Self, Self::Err> {
             match s {
                 "install" => Ok(ControlAction::Install),
-                "uninstall" => Ok(ControlAction::Uninstall),
+                "uninstall" => Ok(ControlAction::Uninstall {
+                    stop_timeout: Duration::from_secs(10),
+                }),
                 "start" => Ok(ControlAction::Start),
-                "stop" => Ok(ControlAction::Stop),
+                "stop" => Ok(ControlAction::Stop {
+                    stop_timeout: Duration::from_secs(10),
+                }),
                 _ => Err(format!("invalid option {} for ControlAction", s)),
             }
         }
@@ -125,10 +129,12 @@ pub mod service_control {
     pub fn control(service_def: &ServiceDefinition, action: ControlAction) -> crate::Result<()> {
         match action {
             ControlAction::Start => start_service(service_def),
-            ControlAction::Stop => stop_service(service_def),
+            ControlAction::Stop { stop_timeout } => stop_service(service_def, stop_timeout),
             ControlAction::Restart { stop_timeout } => restart_service(service_def, stop_timeout),
             ControlAction::Install => install_service(service_def),
-            ControlAction::Uninstall => uninstall_service(service_def),
+            ControlAction::Uninstall { stop_timeout } => {
+                uninstall_service(service_def, stop_timeout)
+            }
         }
     }
 
@@ -155,7 +161,7 @@ pub mod service_control {
         Ok(())
     }
 
-    fn stop_service(service_def: &ServiceDefinition) -> crate::Result<()> {
+    fn stop_service(service_def: &ServiceDefinition, stop_timeout: Duration) -> crate::Result<()> {
         let service_access = ServiceAccess::QUERY_STATUS | ServiceAccess::STOP;
         let service = open_service(service_def, service_access)?;
         let service_status = service.query_status().context(ServiceSnafu)?;
@@ -169,7 +175,7 @@ pub mod service_control {
             let service_status = ensure_state(
                 &service,
                 ServiceState::Stopped,
-                Duration::from_secs(10),
+                stop_timeout,
                 Duration::from_secs(1),
             )?;
             handle_service_exit_code(service_status.exit_code);
@@ -247,7 +253,10 @@ pub mod service_control {
         Ok(())
     }
 
-    fn uninstall_service(service_def: &ServiceDefinition) -> crate::Result<()> {
+    fn uninstall_service(
+        service_def: &ServiceDefinition,
+        stop_timeout: Duration,
+    ) -> crate::Result<()> {
         let service_access =
             ServiceAccess::QUERY_STATUS | ServiceAccess::STOP | ServiceAccess::DELETE;
         let service = open_service(service_def, service_access)?;
@@ -264,7 +273,7 @@ pub mod service_control {
         let service_status = ensure_state(
             &service,
             ServiceState::Stopped,
-            Duration::from_secs(10),
+            stop_timeout,
             Duration::from_secs(1),
         )?;
         handle_service_exit_code(service_status.exit_code);
