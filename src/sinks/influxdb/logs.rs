@@ -403,7 +403,7 @@ mod tests {
     use crate::{
         sinks::{
             influxdb::test_util::{assert_fields, split_line_protocol, ts},
-            util::test::{build_test_server_status, load_sink},
+            util::test::{build_test_http_1_server_status, load_sink},
         },
         test_util::{
             addr::next_addr,
@@ -769,7 +769,7 @@ mod tests {
 
         let (sink, _) = config.build(cx).await.unwrap();
 
-        let (rx, _trigger, server) = build_test_server_status(addr, status_code);
+        let (rx, _trigger, server) = build_test_http_1_server_status(addr, status_code);
         tokio::spawn(server);
 
         let (batch, mut receiver) = BatchNotifier::new_with_receiver();

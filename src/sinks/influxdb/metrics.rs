@@ -962,13 +962,16 @@ mod integration_tests {
     use similar_asserts::assert_eq;
     use vector_lib::metric_tags;
 
+    use http_body_util::Full;
+    use hyper_1::body::Bytes;
+
     use crate::{
         config::{SinkConfig, SinkContext},
         event::{
             Event,
             metric::{Metric, MetricKind, MetricValue},
         },
-        http::HttpClient,
+        http::http_1::HttpClient,
         sinks::influxdb::{
             InfluxDb1Settings, InfluxDb2Settings,
             metrics::{InfluxDbConfig, InfluxDbSvc, default_summary_quantiles},
@@ -1138,7 +1141,7 @@ mod integration_tests {
             events.push(event);
         }
 
-        let client = HttpClient::new(None, cx.proxy()).unwrap();
+        let client: HttpClient<Full<Bytes>> = HttpClient::new(None, cx.http_1_proxy()).unwrap();
         let sink = InfluxDbSvc::new(config, client).unwrap();
         run_and_assert_sink_compliance(sink, stream::iter(events), &HTTP_SINK_TAGS).await;
 
