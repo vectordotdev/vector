@@ -530,14 +530,15 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
 target-base = ["enable-api-client", "rdkafka?/cmake_build", "sources-dnstap"]
-target-aarch64-unknown-linux-gnu =      ["target-base", "unix"]
-target-aarch64-unknown-linux-musl =     ["target-base", "unix"]
-target-armv7-unknown-linux-gnueabihf =  ["target-base", "unix"]
+target-unix = ["target-base", "unix"]
+target-aarch64-unknown-linux-gnu =      ["target-unix"]
+target-aarch64-unknown-linux-musl =     ["target-unix"]
+target-armv7-unknown-linux-gnueabihf =  ["target-unix"]
 target-armv7-unknown-linux-musleabihf = ["target-base"]
-target-arm-unknown-linux-gnueabi =      ["target-base", "unix"]
+target-arm-unknown-linux-gnueabi =      ["target-unix"]
 target-arm-unknown-linux-musleabi =     ["target-base"]
-target-x86_64-unknown-linux-gnu =       ["target-base", "unix", "rdkafka?/gssapi-vendored"]
-target-x86_64-unknown-linux-musl =      ["target-base", "unix"]
+target-x86_64-unknown-linux-gnu =       ["target-unix", "rdkafka?/gssapi-vendored"]
+target-x86_64-unknown-linux-musl =      ["target-unix"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
