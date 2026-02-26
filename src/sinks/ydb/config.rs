@@ -1,11 +1,11 @@
 use futures::FutureExt;
 use tower::ServiceBuilder;
-use ydb::ClientBuilder;
 use vector_lib::{
     config::AcknowledgementsConfig,
     configurable::{component::GenerateConfig, configurable_component},
     sink::VectorSink,
 };
+use ydb::ClientBuilder;
 
 use super::{
     service::{YdbRetryLogic, YdbService},
@@ -70,8 +70,7 @@ impl GenerateConfig for YdbConfig {
 #[typetag::serde(name = "ydb")]
 impl SinkConfig for YdbConfig {
     async fn build(&self, _cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
-        let client = ClientBuilder::new_from_connection_string(&self.endpoint)?
-            .client()?;
+        let client = ClientBuilder::new_from_connection_string(&self.endpoint)?.client()?;
 
         client.wait().await?;
 
@@ -79,11 +78,7 @@ impl SinkConfig for YdbConfig {
 
         let healthcheck = healthcheck(table_client.clone()).boxed();
 
-        let service = YdbService::new(
-            table_client,
-            self.table.clone(),
-            self.endpoint.clone(),
-        );
+        let service = YdbService::new(table_client, self.table.clone(), self.endpoint.clone());
 
         let batch_settings = self.batch.into_batcher_settings()?;
         let request_settings = self.request.into_settings();

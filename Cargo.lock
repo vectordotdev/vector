@@ -3229,8 +3229,8 @@ checksum = "109c1ca6e6b7f82cc233a97004ea8ed7ca123a9af07a8230878fcfda9b158bf0"
 dependencies = [
  "fnv",
  "ident_case",
- "proc-macro2 1.0.101",
- "quote 1.0.40",
+ "proc-macro2 1.0.106",
+ "quote 1.0.44",
  "strsim 0.10.0",
  "syn 1.0.109",
 ]
@@ -3245,7 +3245,7 @@ dependencies = [
  "ident_case",
  "proc-macro2 1.0.106",
  "quote 1.0.44",
- "strsim",
+ "strsim 0.11.1",
  "syn 2.0.115",
 ]
 
@@ -3259,7 +3259,7 @@ dependencies = [
  "ident_case",
  "proc-macro2 1.0.106",
  "quote 1.0.44",
- "strsim",
+ "strsim 0.11.1",
  "syn 2.0.115",
 ]
 
@@ -3270,7 +3270,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a4aab4dbc9f7611d8b55048a3a16d2d010c2c8334e46304b40ac1cc14bf3b48e"
 dependencies = [
  "darling_core 0.14.4",
- "quote 1.0.40",
+ "quote 1.0.44",
  "syn 1.0.109",
 ]
 
@@ -3480,8 +3480,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "c11bdc11a0c47bc7d37d582b5285da6849c96681023680b906673c5707af7b0f"
 dependencies = [
  "darling 0.14.4",
- "proc-macro2 1.0.101",
- "quote 1.0.40",
+ "proc-macro2 1.0.106",
+ "quote 1.0.44",
  "syn 1.0.109",
 ]
 
@@ -3513,7 +3513,7 @@ version = "0.20.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "206868b8242f27cecce124c19fd88157fbd0dd334df2587f36417bafbc85097b"
 dependencies = [
- "derive_builder_core",
+ "derive_builder_core 0.20.0",
  "syn 2.0.115",
 ]
 
@@ -7034,8 +7034,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e7e25b214433f669161f414959594216d8e6ba83b6679d3db96899c0b4639033"
 dependencies = [
  "cfg-if",
- "proc-macro2 1.0.101",
- "quote 1.0.40",
+ "proc-macro2 1.0.106",
+ "quote 1.0.44",
  "syn 1.0.109",
 ]
 
@@ -8826,7 +8826,7 @@ dependencies = [
  "pulldown-cmark",
  "pulldown-cmark-to-cmark",
  "regex",
- "syn 2.0.106",
+ "syn 2.0.115",
  "tempfile",
 ]
 
@@ -8877,9 +8877,9 @@ checksum = "27c6023962132f4b30eb4c172c91ce92d933da334c59c23cddee82358ddafb0b"
 dependencies = [
  "anyhow",
  "itertools 0.14.0",
- "proc-macro2 1.0.101",
- "quote 1.0.40",
- "syn 2.0.106",
+ "proc-macro2 1.0.106",
+ "quote 1.0.44",
+ "syn 2.0.115",
 ]
 
 [[package]]
@@ -11307,8 +11307,8 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d06aaeeee809dbc59eb4556183dd927df67db1540de5be8d3ec0b6636358a5ec"
 dependencies = [
  "heck 0.3.3",
- "proc-macro2 1.0.101",
- "quote 1.0.40",
+ "proc-macro2 1.0.106",
+ "quote 1.0.44",
  "syn 1.0.109",
 ]
 
@@ -12163,7 +12163,7 @@ dependencies = [
  "axum 0.8.8",
  "base64 0.22.1",
  "bytes 1.11.1",
- "h2 0.4.12",
+ "h2 0.4.13",
  "http 1.3.1",
  "http-body 1.0.0",
  "http-body-util",
@@ -12181,7 +12181,7 @@ dependencies = [
  "tower 0.5.2",
  "tower-layer",
  "tower-service",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "webpki-roots 1.0.4",
 ]
 
@@ -12218,9 +12218,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1882ac3bf5ef12877d7ed57aad87e75154c11931c2ba7e6cde5e22d63522c734"
 dependencies = [
  "prettyplease 0.2.15",
- "proc-macro2 1.0.101",
- "quote 1.0.40",
- "syn 2.0.106",
+ "proc-macro2 1.0.106",
+ "quote 1.0.44",
+ "syn 2.0.115",
 ]
 
 [[package]]
@@ -12241,11 +12241,11 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f3144df636917574672e93d0f56d7edec49f90305749c668df5101751bb8f95a"
 dependencies = [
  "prettyplease 0.2.15",
- "proc-macro2 1.0.101",
+ "proc-macro2 1.0.106",
  "prost-build 0.14.3",
  "prost-types 0.14.3",
- "quote 1.0.40",
- "syn 2.0.106",
+ "quote 1.0.44",
+ "syn 2.0.115",
  "tempfile",
  "tonic-build 0.14.5",
 ]
@@ -14609,6 +14609,7 @@ checksum = "fdd20c5420375476fbd4394763288da7eb0cc0b8c11deed431a91562af7335d3"
 [[package]]
 name = "ydb"
 version = "0.10.1"
+source = "git+https://github.com/1NepuNep1/ydb-rs-sdk.git#8f8bbdffc31851a58ca4f6b98afa0aac39a9d78c"
 dependencies = [
  "async-trait",
  "chrono",
@@ -14636,7 +14637,7 @@ dependencies = [
  "tokio-util",
  "tonic 0.14.5",
  "tower 0.4.13",
- "tracing 0.1.41",
+ "tracing 0.1.44",
  "tracing-subscriber",
  "tracing-test",
  "url",
@@ -14647,6 +14648,7 @@ dependencies = [
 [[package]]
 name = "ydb-grpc"
 version = "0.2.0"
+source = "git+https://github.com/1NepuNep1/ydb-rs-sdk.git#8f8bbdffc31851a58ca4f6b98afa0aac39a9d78c"
 dependencies = [
  "pbjson",
  "pbjson-build",
