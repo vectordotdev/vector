@@ -540,22 +540,28 @@ package: build ## Build the Vector archive
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) package archive
 
 .PHONY: package-x86_64-unknown-linux-gnu-all
-package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64-unknown-linux-gnu package-rpm-x86_64-unknown-linux-gnu # Build all x86_64 GNU packages
+package-x86_64-unknown-linux-gnu-all: package-x86_64-unknown-linux-gnu package-deb-x86_64-unknown-linux-gnu package-rpm-x86_64-unknown-linux-gnu # .tar.gz, .deb, .rpm
 
 .PHONY: package-x86_64-unknown-linux-musl-all
-package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl # Build all x86_64 MUSL packages
+package-x86_64-unknown-linux-musl-all: package-x86_64-unknown-linux-musl # .tar.gz
 
 .PHONY: package-aarch64-unknown-linux-musl-all
-package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl # Build all aarch64 MUSL packages
+package-aarch64-unknown-linux-musl-all: package-aarch64-unknown-linux-musl # .tar.gz
 
 .PHONY: package-aarch64-unknown-linux-gnu-all
-package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu package-deb-aarch64 package-rpm-aarch64 # Build all aarch64 GNU packages
+package-aarch64-unknown-linux-gnu-all: package-aarch64-unknown-linux-gnu package-deb-aarch64 package-rpm-aarch64 # .tar.gz, .deb, .rpm
 
 .PHONY: package-armv7-unknown-linux-gnueabihf-all
-package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu  # Build all armv7-unknown-linux-gnueabihf MUSL packages
+package-armv7-unknown-linux-gnueabihf-all: package-armv7-unknown-linux-gnueabihf package-deb-armv7-gnu package-rpm-armv7hl-gnu # .tar.gz, .deb, .rpm
+
+.PHONY: package-armv7-unknown-linux-musleabihf-all
+package-armv7-unknown-linux-musleabihf-all: package-armv7-unknown-linux-musleabihf # .tar.gz
 
 .PHONY: package-arm-unknown-linux-gnueabi-all
-package-arm-unknown-linux-gnueabi-all: package-arm-unknown-linux-gnueabi package-deb-arm-gnu  # Build all arm-unknown-linux-gnueabihf GNU packages
+package-arm-unknown-linux-gnueabi-all: package-arm-unknown-linux-gnueabi package-deb-arm-gnu # .tar.gz, .deb
+
+.PHONY: package-arm-unknown-linux-musleabi-all
+package-arm-unknown-linux-musleabi-all: package-arm-unknown-linux-musleabi # .tar.gz
 
 .PHONY: package-x86_64-unknown-linux-gnu
 package-x86_64-unknown-linux-gnu: target/artifacts/vector-${VERSION}-x86_64-unknown-linux-gnu.tar.gz ## Build an archive suitable for the `x86_64-unknown-linux-gnu` triple.
