@@ -14,6 +14,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Then, generate observability.proto using extern_path to reference the event types
     let mut prost_config = prost_build::Config::new();
     prost_config.extern_path(".event", "crate::proto::event");
+    // Allow clippy warning for large enum variant in generated code
+    // TappedEvent contains a large EventWrapper while EventNotification is small
+    prost_config.type_attribute(
+        ".vector.observability.OutputEvent",
+        "#[allow(clippy::large_enum_variant)]",
+    );
 
     tonic_build::configure()
         .build_server(false)

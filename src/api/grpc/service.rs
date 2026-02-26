@@ -49,6 +49,35 @@ fn filter_and_group_metrics(metrics: &[Metric], metric_name: &str) -> HashMap<St
     result
 }
 
+/// Extract all component metrics and group by component_id
+fn extract_component_metrics(metrics: &[Metric]) -> HashMap<String, ComponentMetrics> {
+    let received_bytes = filter_and_group_metrics(metrics, "component_received_bytes_total");
+    let received_events = filter_and_group_metrics(metrics, "component_received_events_total");
+    let sent_bytes = filter_and_group_metrics(metrics, "component_sent_bytes_total");
+    let sent_events = filter_and_group_metrics(metrics, "component_sent_events_total");
+
+    let mut all_component_ids = HashSet::new();
+    all_component_ids.extend(received_bytes.keys().cloned());
+    all_component_ids.extend(received_events.keys().cloned());
+    all_component_ids.extend(sent_bytes.keys().cloned());
+    all_component_ids.extend(sent_events.keys().cloned());
+
+    let mut result = HashMap::new();
+    for component_id in all_component_ids {
+        result.insert(
+            component_id.clone(),
+            ComponentMetrics {
+                received_bytes_total: received_bytes.get(&component_id).map(|v| *v as i64),
+                received_events_total: received_events.get(&component_id).map(|v| *v as i64),
+                sent_bytes_total: sent_bytes.get(&component_id).map(|v| *v as i64),
+                sent_events_total: sent_events.get(&component_id).map(|v| *v as i64),
+            },
+        );
+    }
+
+    result
+}
+
 /// Helper function to calculate throughput by comparing current and previous values
 fn calculate_throughput(
     current: &HashMap<String, f64>,
@@ -119,6 +148,12 @@ impl observability::Service for ObservabilityService {
         // Get the current topology snapshot
         let tap_resource = self.watch_rx.borrow().clone();
 
+        // Get metrics for all components
+        let controller =
+            Controller::get().map_err(|_| Status::internal("Metrics system not initialized"))?;
+        let metrics = controller.capture_metrics();
+        let component_metrics_map = extract_component_metrics(&metrics);
+
         // Collect all component keys and their types
         let mut components = Vec::new();
         let mut seen_keys = HashSet::new();
@@ -126,12 +161,13 @@ impl observability::Service for ObservabilityService {
         // Add sources
         for source_key in &tap_resource.source_keys {
             if seen_keys.insert(source_key.clone()) {
+                let metrics = component_metrics_map.get(source_key.as_str()).cloned();
                 components.push(ProtoComponent {
                     component_id: source_key.clone(),
                     component_type: ComponentType::Source as i32,
                     on_type: "source".to_string(), // Generic type, actual type not available from TapResource
                     outputs: vec![],
-                    metrics: None,
+                    metrics,
                 });
             }
         }
@@ -152,12 +188,13 @@ impl observability::Service for ObservabilityService {
                     ComponentType::Sink
                 };
 
+                let metrics = component_metrics_map.get(&key_str).cloned();
                 components.push(ProtoComponent {
                     component_id: key_str,
                     component_type: component_type as i32,
                     on_type: if has_outputs { "transform" } else { "sink" }.to_string(),
                     outputs: vec![],
-                    metrics: None,
+                    metrics,
                 });
             }
         }
@@ -165,12 +202,13 @@ impl observability::Service for ObservabilityService {
         // Also explicitly add sinks from sink_keys if they weren't in inputs
         for sink_key in &tap_resource.sink_keys {
             if seen_keys.insert(sink_key.clone()) {
+                let metrics = component_metrics_map.get(sink_key.as_str()).cloned();
                 components.push(ProtoComponent {
                     component_id: sink_key.clone(),
                     component_type: ComponentType::Sink as i32,
                     on_type: "sink".to_string(),
                     outputs: vec![],
-                    metrics: None,
+                    metrics,
                 });
             }
         }
