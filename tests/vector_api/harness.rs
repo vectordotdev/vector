@@ -168,7 +168,12 @@ impl TestHarness {
         sleep(Duration::from_millis(500)).await;
 
         // Poll for reload completion with crash detection
-        wait_for_topology_match(&mut self.vector, &mut self.api_client, expected_component_ids).await
+        wait_for_topology_match(
+            &mut self.vector,
+            &mut self.api_client,
+            expected_component_ids,
+        )
+        .await
     }
 
     /// Checks if Vector is still running
@@ -309,7 +314,10 @@ pub async fn wait_for_topology_match(
                 .collect();
             current_ids.sort_unstable();
 
-            let mut expected_sorted: Vec<String> = expected_component_ids.iter().map(|s| s.to_string()).collect();
+            let mut expected_sorted: Vec<String> = expected_component_ids
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
             expected_sorted.sort_unstable();
 
             // Track last seen components for better error reporting
@@ -326,8 +334,7 @@ pub async fn wait_for_topology_match(
         if start.elapsed() >= STARTUP_TIMEOUT {
             return Err(format!(
                 "Topology did not match expected components within {STARTUP_TIMEOUT:?}. Last seen: {:?}, expected: {:?}",
-                last_components,
-                expected_component_ids
+                last_components, expected_component_ids
             ));
         }
 

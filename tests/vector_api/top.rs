@@ -96,8 +96,8 @@ async fn displays_pipeline_topology_and_metrics() {
     use vector_lib::api_client::proto::ComponentType;
     for component in &response.components {
         let component_id = &component.component_id;
-        let component_type = ComponentType::try_from(component.component_type)
-            .expect("Valid component type");
+        let component_type =
+            ComponentType::try_from(component.component_type).expect("Valid component type");
 
         match component_id.as_str() {
             "demo" => assert_eq!(component_type, ComponentType::Source),

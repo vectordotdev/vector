@@ -827,7 +827,7 @@ impl observability::Service for ObservabilityService {
 
 /// Convert TapPayload to gRPC OutputEvent(s)
 fn tap_payload_to_output_events(payload: TapPayload) -> Vec<OutputEvent> {
-    use crate::event::proto::{EventWrapper, Event};
+    use crate::event::proto::{Event, EventWrapper};
 
     match payload {
         TapPayload::Log(output, log_array) => log_array
