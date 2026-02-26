@@ -280,7 +280,6 @@ fn generate_avro_test_case_record() -> Result<()> {
     generate_test_case(schema, value, "record")
 }
 
-#[allow(unused)]
 fn generate_avro_test_case_date() -> Result<()> {
     let schema = r#"
     {
@@ -488,6 +487,7 @@ fn main() -> Result<()> {
     generate_avro_test_case_array()?;
     generate_avro_test_case_boolean()?;
     generate_avro_test_case_bytes()?;
+    generate_avro_test_case_date()?;
     generate_avro_test_case_double()?;
     generate_avro_test_case_enum()?;
     generate_avro_test_case_float()?;

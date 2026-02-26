@@ -22,7 +22,7 @@ use vector_core::{config::LogNamespace, event::Event};
 #[case(false)]
 fn roundtrip_avro_fixtures(
     #[files("tests/data/avro/generated/*.avro")]
-    #[exclude(".*(date|fixed|time_millis).avro")]
+    #[exclude(".*(fixed|time_millis).avro")]
     path: PathBuf,
     #[case] reserialize: bool,
 ) {
