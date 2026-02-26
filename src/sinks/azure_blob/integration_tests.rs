@@ -343,7 +343,7 @@ impl AzureBlobSinkConfig {
             &crate::config::ProxyConfig::default(),
         )
         .unwrap();
-        let result = client.create_container(None).await;
+        let result: Result<_, azure_core::Error> = client.create(None).await;
 
         let response = match result {
             Ok(_) => Ok(()),

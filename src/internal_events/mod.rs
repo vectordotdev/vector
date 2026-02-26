@@ -27,6 +27,11 @@ mod aws_kinesis;
 mod aws_kinesis_firehose;
 #[cfg(any(feature = "sources-aws_s3", feature = "sources-aws_sqs",))]
 mod aws_sqs;
+#[cfg(any(
+    feature = "sources-azure_event_hubs",
+    feature = "sinks-azure_event_hubs"
+))]
+pub(crate) mod azure_event_hubs;
 mod batch;
 mod common;
 mod conditions;
