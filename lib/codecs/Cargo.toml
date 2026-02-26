@@ -61,6 +61,7 @@ toml = { version = "0.9.8", optional = true }
 futures.workspace = true
 indoc.workspace = true
 tokio = { workspace = true, features = ["test-util"] }
+toml.workspace = true
 similar-asserts = "1.7.0"
 vector-core = { path = "../vector-core", default-features = false, features = ["vrl", "test"] }
 rstest = "0.26.1"
