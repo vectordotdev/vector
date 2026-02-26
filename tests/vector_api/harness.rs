@@ -1,7 +1,7 @@
-//! Test harness for `vector top` integration tests
+//! Shared test harness for Vector integration tests
 //!
-//! Provides TestHarness for managing Vector process lifecycle
-//! and helper functions for testing.
+//! Provides TestHarness for managing Vector process lifecycle with API enabled.
+//! Used by both `vector top` and `vector tap` integration tests.
 
 use std::fs::{OpenOptions, create_dir};
 use std::io::Write;
@@ -18,7 +18,7 @@ use nix::{
 };
 use tokio::time::sleep;
 use vector::test_util::{temp_dir, temp_file};
-use vector_lib::api_client::{Client, gql::ComponentsQueryExt};
+use vector_lib::api_client::Client;
 
 // Constants
 pub const STARTUP_TIMEOUT: Duration = Duration::from_secs(2);
@@ -30,7 +30,7 @@ pub const EVENT_PROCESSING_TIMEOUT: Duration = Duration::from_secs(30);
 /// helper methods for common test operations.
 pub struct TestHarness {
     vector: Child,
-    client: Client,
+    api_client: Client,
     api_port: u16,
     config_path: PathBuf,
     watch_mode: bool,
@@ -112,63 +112,35 @@ impl TestHarness {
             .spawn()
             .map_err(|e| format!("Failed to spawn vector: {e}"))?;
 
-        let client = Client::new(
+        let api_client = Client::new(
             format!("http://127.0.0.1:{api_port}/graphql")
                 .parse()
                 .map_err(|e| format!("Invalid URL: {e}"))?,
         );
 
         // Wait for Vector startup with crash detection
-        wait_for_startup(&mut vector, &client, STARTUP_TIMEOUT).await?;
+        wait_for_startup(&mut vector, &api_client, STARTUP_TIMEOUT).await?;
 
         Ok(Self {
             vector,
-            client,
+            api_client,
             api_port,
             config_path,
             watch_mode,
         })
     }
 
-    /// Queries all components from the GraphQL API
-    pub async fn query_components(
-        &self,
-    ) -> Result<vector_lib::api_client::gql::components_query::ResponseData, String> {
-        self.client
-            .components_query(100)
-            .await
-            .map_err(|e| format!("Query failed: {e}"))?
-            .data
-            .ok_or_else(|| "No data in response".to_string())
+    /// Returns reference to the API client
+    pub fn api_client(&self) -> &Client {
+        &self.api_client
     }
 
-    /// Queries component IDs from the GraphQL API
-    pub async fn query_component_ids(&self) -> Result<Vec<String>, String> {
-        let data = self.query_components().await?;
-        Ok(data
-            .components
-            .edges
-            .iter()
-            .map(|e| e.node.component_id.clone())
-            .collect())
+    /// Returns the API port number
+    pub fn api_port(&self) -> u16 {
+        self.api_port
     }
 
-    /// Waits for a component to process at least the expected number of events
-    pub async fn wait_for_events(
-        &self,
-        component_id: &str,
-        expected_events: i64,
-    ) -> Result<i64, String> {
-        wait_for_component_events(
-            &self.client,
-            component_id,
-            expected_events,
-            EVENT_PROCESSING_TIMEOUT,
-        )
-        .await
-    }
-
-    /// Reloads Vector configuration by sending SIGHUP
+    /// Reloads Vector configuration by sending SIGHUP or using watch mode
     ///
     /// Polls Vector to detect crashes early and succeed fast when reload completes.
     /// Waits until the expected component IDs are present in the topology.
@@ -198,7 +170,7 @@ impl TestHarness {
         }
 
         // Poll for reload completion with crash detection
-        wait_for_topology_match(&mut self.vector, &self.client, expected_component_ids).await
+        wait_for_topology_match(&mut self.vector, &self.api_client, expected_component_ids).await
     }
 
     /// Checks if Vector is still running
@@ -212,7 +184,7 @@ impl Drop for TestHarness {
         // Send SIGTERM for graceful shutdown
         kill(Pid::from_raw(self.vector.id() as i32), Signal::SIGTERM).ok();
 
-        // Wait for process to exit (without consuming self.vector)
+        // Wait for process to exit
         self.vector.wait().ok();
     }
 }
@@ -315,6 +287,8 @@ pub async fn wait_for_topology_match(
     client: &Client,
     expected_component_ids: &[&str],
 ) -> Result<(), String> {
+    use vector_lib::api_client::gql::ComponentsQueryExt;
+
     let start = Instant::now();
 
     loop {
@@ -358,12 +332,14 @@ pub async fn wait_for_topology_match(
 ///
 /// Polls the GraphQL API until the component's sent_events_total
 /// reaches or exceeds the expected count.
-async fn wait_for_component_events(
+pub async fn wait_for_component_events(
     client: &Client,
     component_id: &str,
     expected_events: i64,
     timeout: Duration,
 ) -> Result<i64, String> {
+    use vector_lib::api_client::gql::ComponentsQueryExt;
+
     let start = Instant::now();
     let mut last_count = 0;
 

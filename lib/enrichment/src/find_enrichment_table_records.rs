@@ -103,15 +103,64 @@ impl Function for FindEnrichmentTableRecords {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[example!(
-            title: "find records",
-            source: r#"find_enrichment_table_records!("test", {"surname": "Smith"})"#,
-            result: Ok(
-                indoc! { r#"[{"id": 1, "firstname": "Bob", "surname": "Smith"},
-                             {"id": 2, "firstname": "Fred", "surname": "Smith"}]"#,
-                },
-            ),
-        )]
+        const RESULT: Result<&'static str, &'static str> = Ok(indoc! {r#"
+            [{"id": 1, "firstname": "Bob", "surname": "Smith"},
+             {"id": 2, "firstname": "Fred", "surname": "Smith"}]
+        "#});
+
+        const EXAMPLES: &[Example] = &[
+            example! {
+                title: "Exact match",
+                source: indoc! {r#"
+                    find_enrichment_table_records!(
+                        "test",
+                        {"surname": "Smith"}
+                    )
+                "#},
+                result: RESULT,
+            },
+            example! {
+                title: "Case insensitive match",
+                source: indoc! {r#"
+                    find_enrichment_table_records!(
+                        "test",
+                        {"surname": "smith"},
+                        case_sensitive: false
+                    )
+                "#},
+                result: RESULT,
+            },
+            example! {
+                title: "Wildcard match",
+                source: indoc! {r#"
+                    find_enrichment_table_records!(
+                        "test",
+                        {"firstname": "Bob"},
+                        wildcard: "fred",
+                        case_sensitive: false
+                    )
+                "#},
+                result: RESULT,
+            },
+            example! {
+                title: "Date range search",
+                source: indoc! {r#"
+                    find_enrichment_table_records!(
+                        "test",
+                        {
+                            "surname": "Smith",
+                            "date_of_birth": {
+                                "from": t'1985-01-01T00:00:00Z',
+                                "to": t'1985-12-31T00:00:00Z'
+                            }
+                        }
+                    )
+                "#},
+                result: RESULT,
+            },
+        ];
+
+        EXAMPLES
     }
 
     fn compile(
