@@ -11,7 +11,7 @@ UTF-8 Safety Fix:
    - Implements character-based truncation for all fields
    - Prevents crashes with emojis, Cyrillic text, etc.
 
-RFC 3164 Compliance Improvements:**
+RFC 3164 Compliance Improvements:
    - Bug fix: Structured data is now properly ignored (previously incorrectly prepended)
    - TAG field sanitized to ASCII printable characters (33-126)
    - Adds debug logging when structured data is ignored
