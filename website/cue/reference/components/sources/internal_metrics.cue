@@ -935,14 +935,14 @@ components: sources: internal_metrics: {
 						The name of the metric whose tag value limit was exceeded.
 						Only present when `internal_metrics.include_extended_tags` is enabled.
 						"""
-					required:    false
+					required: false
 				}
 				tag_key: {
 					description: """
 						The key of the tag whose value limit was exceeded.
 						Only present when `internal_metrics.include_extended_tags` is enabled.
 						"""
-					required:    false
+					required: false
 				}
 			}
 		}
