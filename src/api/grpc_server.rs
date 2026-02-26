@@ -31,15 +31,13 @@ impl GrpcServer {
 
         // Bind the TCP listener first to ensure the port is available
         // This will fail fast if the address is already in use
-        let listener = tokio::net::TcpListener::bind(addr)
-            .await
-            .map_err(|e| {
-                crate::Error::from(format!("Failed to bind gRPC API server to {}: {}", addr, e))
-            })?;
-
-        let actual_addr = listener.local_addr().map_err(|e| {
-            crate::Error::from(format!("Failed to get local address: {}", e))
+        let listener = tokio::net::TcpListener::bind(addr).await.map_err(|e| {
+            crate::Error::from(format!("Failed to bind gRPC API server to {}: {}", addr, e))
         })?;
+
+        let actual_addr = listener
+            .local_addr()
+            .map_err(|e| crate::Error::from(format!("Failed to get local address: {}", e)))?;
 
         info!("GRPC API server bound to {}.", actual_addr);
 

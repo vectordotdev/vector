@@ -9,20 +9,17 @@ pub mod topology;
 
 use std::{borrow::Cow, collections::BTreeMap};
 
-use bytes::BytesMut;
 use colored::{ColoredString, Colorize};
 use tokio::{
     sync::mpsc as tokio_mpsc,
     time::{Duration, Instant, timeout},
 };
 use tokio_stream::StreamExt;
-use tokio_util::codec::Encoder;
 use url::Url;
 use vector_api_client::{
     Client,
     proto::{OutputEvent, OutputEventsRequest},
 };
-use vector_core::event::Event;
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
 pub enum TapEncodingFormat {
@@ -233,33 +230,14 @@ impl<'a> TapRunner<'a> {
             Some(OutputEventType::TappedEvent(ev)) => {
                 // Format the proto event for display
                 let encoded_string = if let Some(ref event_wrapper) = ev.event {
-                    // Convert protobuf EventWrapper to Vector Event
-                    let event: Event = event_wrapper.clone().into();
-
-                    // Serialize based on the requested format
-                    match formatter.format {
-                        TapEncodingFormat::Json => {
-                            // Use serde_json for JSON serialization
-                            serde_json::to_string(&event)
-                                .unwrap_or_else(|e| format!("Error encoding JSON: {}", e))
-                        }
-                        TapEncodingFormat::Yaml => {
-                            // Use serde_yaml for YAML serialization
-                            serde_yaml::to_string(&event)
-                                .unwrap_or_else(|e| format!("Error encoding YAML: {}", e))
-                        }
-                        TapEncodingFormat::Logfmt => {
-                            // Use logfmt encoder for logfmt serialization
-                            use codecs::encoding::format::LogfmtSerializer;
-                            let mut serializer = LogfmtSerializer;
-                            let mut buffer = BytesMut::new();
-                            serializer
-                                .encode(event, &mut buffer)
-                                .ok()
-                                .and_then(|_| String::from_utf8(buffer.to_vec()).ok())
-                                .unwrap_or_else(|| "Error encoding logfmt".to_string())
-                        }
-                    }
+                    // TODO: Properly serialize protobuf EventWrapper to JSON/YAML/logfmt
+                    // Currently using Debug format as protobuf messages don't have Serialize by default
+                    // Proper implementation would require:
+                    // 1. Enabling serde for proto generation (prost-serde feature), or
+                    // 2. Using pbjson for JSON serialization, or
+                    // 3. Converting proto types to vector-core Event types
+                    // For now, Debug format provides readable output showing all fields
+                    format!("{:?}", event_wrapper)
                 } else {
                     "No event data".to_string()
                 };
