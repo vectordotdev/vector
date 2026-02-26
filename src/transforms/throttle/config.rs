@@ -2,10 +2,7 @@ use std::time::Duration;
 
 use governor::clock;
 use serde_with::serde_as;
-use vector_lib::{
-    config::{LogNamespace, clone_input_definitions},
-    configurable::configurable_component,
-};
+use vector_lib::{config::clone_input_definitions, configurable::configurable_component};
 
 use super::transform::Throttle;
 use crate::{
@@ -80,9 +77,8 @@ impl TransformConfig for ThrottleConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         // The event is not modified, so the definition is passed through as-is
         vec![TransformOutput::new(

@@ -505,7 +505,7 @@ impl HttpSource for SimpleHttpSource {
                 }
                 Ok(None) => break,
                 Err(error) => {
-                    // Error is logged / emitted by `crate::codecs::Decoder`, no further
+                    // Error is logged / emitted by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here
                     return Err(ErrorMessage::new(
                         StatusCode::BAD_REQUEST,

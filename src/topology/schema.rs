@@ -5,7 +5,7 @@ use vector_lib::config::SourceOutput;
 
 pub(super) use crate::schema::Definition;
 use crate::{
-    config::{ComponentKey, Config, OutputId, SinkOuter, TransformOutput},
+    config::{ComponentKey, Config, OutputId, SinkOuter, TransformContext, TransformOutput},
     topology,
 };
 
@@ -427,9 +427,12 @@ impl ComponentContainer for Config {
     ) -> Option<Vec<TransformOutput>> {
         self.transform(key).map(|source| {
             source.inner.outputs(
-                enrichment_tables,
+                &TransformContext {
+                    schema: self.schema,
+                    enrichment_tables,
+                    ..Default::default()
+                },
                 input_definitions,
-                self.schema.log_namespace(),
             )
         })
     }

@@ -67,6 +67,9 @@ on:
     - 'reopened'
     - 'synchronize'
 
+permissions:
+  contents: read
+
 jobs:
   spelling:
     name: Check Spelling

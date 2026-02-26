@@ -3,7 +3,8 @@ mod receiver;
 mod sender;
 
 pub use limited_queue::{
-    ChannelMetricMetadata, LimitedReceiver, LimitedSender, SendError, limited,
+    ChannelMetricMetadata, DEFAULT_EWMA_HALF_LIFE_SECONDS, LimitedReceiver, LimitedSender,
+    SendError, limited,
 };
 pub use receiver::*;
 pub use sender::*;

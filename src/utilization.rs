@@ -20,9 +20,7 @@ use tokio::{
     time::interval,
 };
 use tokio_stream::wrappers::IntervalStream;
-use vector_lib::{id::ComponentKey, shutdown::ShutdownSignal};
-
-use crate::stats;
+use vector_lib::{id::ComponentKey, shutdown::ShutdownSignal, stats};
 
 const UTILIZATION_EMITTER_DURATION: Duration = Duration::from_secs(5);
 

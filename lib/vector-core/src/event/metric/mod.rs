@@ -897,6 +897,33 @@ mod test {
     }
 
     #[test]
+    fn subtract_aggregated_histograms_bucket_redistribution() {
+        // Test for issue #24415: when total count is higher but individual bucket counts is sometimes lower
+        let old_histogram = Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 15,
+                sum: 15.0,
+                buckets: buckets!(1.0 => 10, 2.0 => 5),
+            },
+        );
+
+        let mut new_histogram_with_redistribution = Metric::new(
+            "histogram",
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                count: 20,
+                sum: 20.0,
+                // Total count is higher (20 > 15), but bucket1 count is lower (8 < 10)
+                buckets: buckets!(1.0 => 8, 2.0 => 12),
+            },
+        );
+
+        assert!(!new_histogram_with_redistribution.subtract(&old_histogram));
+    }
+
+    #[test]
     // `too_many_lines` is mostly just useful for production code but we're not
     // able to flag the lint on only for non-test.
     #[allow(clippy::too_many_lines)]

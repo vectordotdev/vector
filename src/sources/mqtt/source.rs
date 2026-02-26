@@ -1,6 +1,7 @@
 use itertools::Itertools;
 use rumqttc::{Event as MqttEvent, Incoming, Publish, QoS, SubscribeFilter};
 use vector_lib::{
+    codecs::Decoder,
     config::{LegacyKey, LogNamespace},
     internal_event::EventsReceived,
     lookup::path,
@@ -8,7 +9,6 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    codecs::Decoder,
     common::mqtt::MqttConnector,
     event::{BatchNotifier, Event},
     internal_events::{EndpointBytesReceived, StreamClosedError},
@@ -96,7 +96,7 @@ impl MqttSource {
         let events_received = register!(EventsReceived);
 
         let (batch, _batch_receiver) = BatchNotifier::maybe_new_with_receiver(false);
-        // Error is logged by `crate::codecs::Decoder`, no further handling
+        // Error is logged by `vector_lib::codecs::Decoder`, no further handling
         // is needed here.
         let decoded = util::decode_message(
             self.decoder.clone(),

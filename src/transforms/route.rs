@@ -1,8 +1,6 @@
 use indexmap::IndexMap;
 use vector_lib::{
-    config::{LogNamespace, clone_input_definitions},
-    configurable::configurable_component,
-    transform::SyncTransform,
+    config::clone_input_definitions, configurable::configurable_component, transform::SyncTransform,
 };
 
 use crate::{
@@ -28,7 +26,8 @@ impl Route {
     pub fn new(config: &RouteConfig, context: &TransformContext) -> crate::Result<Self> {
         let mut conditions = Vec::with_capacity(config.route.len());
         for (output_name, condition) in config.route.iter() {
-            let condition = condition.build(&context.enrichment_tables)?;
+            let condition =
+                condition.build(&context.enrichment_tables, &context.metrics_storage)?;
             conditions.push((output_name.clone(), condition));
         }
         Ok(Self {
@@ -144,9 +143,8 @@ impl TransformConfig for RouteConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         let mut result: Vec<TransformOutput> = self
             .route
@@ -181,7 +179,7 @@ mod test {
     use std::collections::HashMap;
 
     use indoc::indoc;
-    use vector_lib::transform::TransformOutputsBuf;
+    use vector_lib::{config::LogNamespace, transform::TransformOutputsBuf};
 
     use super::*;
     use crate::{
