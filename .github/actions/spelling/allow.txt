@@ -558,3 +558,4 @@ ZTE
 Zync
 sighup
 CLAUDE
+grpcurl
