@@ -32,7 +32,13 @@
           {
             "title": "Declare an array type",
             "source": "array!(.value)",
-            "input": "{\"value\": [1, 2, 3]}",
+            "input": {
+              "value": [
+                1,
+                2,
+                3
+              ]
+            },
             "return": [
               1,
               2,

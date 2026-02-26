@@ -67,7 +67,9 @@
           {
             "title": "External target",
             "source": "get!(value: ., path: [\"foo\"])",
-            "input": "{ \"foo\": true }",
+            "input": {
+              "foo": true
+            },
             "return": true
           },
           {

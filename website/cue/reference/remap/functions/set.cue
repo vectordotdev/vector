@@ -92,7 +92,9 @@
           {
             "title": "External target",
             "source": "set!(value: ., path: [\"bar\"], data: \"baz\")",
-            "input": "{ \"foo\": true }",
+            "input": {
+              "foo": true
+            },
             "return": {
               "foo": true,
               "bar": "baz"

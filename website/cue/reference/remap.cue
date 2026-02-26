@@ -35,7 +35,7 @@ package metadata
 
 	#FunctionExample: {
 		#BaseExample
-		input?: string
+		input?: {...}
 	}
 
 	#Type: "any" | "array" | "boolean" | "float" | "integer" | "object" | "null" | "path" | "string" | "regex" | "timestamp"

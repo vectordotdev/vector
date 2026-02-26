@@ -72,7 +72,7 @@ struct ExampleDoc {
     title: String,
     source: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    input: Option<String>,
+    input: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     r#return: Option<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -177,7 +177,10 @@ fn build_function_doc(func: &dyn Function) -> FunctionDoc {
 
             let source = source.to_string();
             let title = title.to_string();
-            let input = input.map(String::from);
+            let input = input.map(|s| {
+                serde_json::from_str(s)
+                    .expect("VRL example input must be valid JSON")
+            });
             ExampleDoc {
                 title,
                 source,
