@@ -35,7 +35,6 @@ on:
 permissions:
   contents: read
   statuses: write
-  packages: read
 
 env:
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
@@ -83,6 +82,8 @@ jobs:
           status: pending
 
   build-test-runner:
+    permissions:
+      packages: write
     needs: prep-pr
     uses: ./.github/workflows/build-test-runner.yml
     with:
