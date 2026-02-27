@@ -12,7 +12,13 @@ mod request_builder;
 mod service;
 mod sink;
 
-#[allow(warnings, clippy::pedantic, clippy::nursery)]
+#[allow(
+    warnings,
+    clippy::pedantic,
+    clippy::nursery,
+    clippy::missing_const_for_fn,
+    clippy::trivially_copy_pass_by_ref
+)]
 pub(crate) mod proto {
     pub(crate) mod google {
         pub(crate) mod cloud {

@@ -54,7 +54,7 @@ components: sinks: gcp_bigquery: {
 							url:   urls.gcp_bigquery
 						}
 						direction: "outgoing"
-						protocols: ["grpc"]
+						protocols: ["http"]
 						ssl: "required"
 					}
 				}
