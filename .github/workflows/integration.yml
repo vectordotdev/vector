@@ -18,7 +18,6 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  packages: write
   contents: read
 
 env:
@@ -56,7 +55,9 @@ jobs:
       needs.changes.outputs.int-tests-any == 'true' ||
       needs.changes.outputs.e2e-tests-any == 'true')))
      }}
-
+    # Elevated permission required by build-test-runner.yml to push test runner image to GHCR
+    permissions:
+      packages: write
     uses: ./.github/workflows/build-test-runner.yml
     with:
       commit_sha: ${{ github.sha }}

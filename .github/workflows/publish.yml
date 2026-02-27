@@ -1,8 +1,7 @@
 name: Publish
 
 permissions:
-  contents: write
-  packages: write
+  contents: read
 
 on:
   workflow_call:
@@ -491,6 +490,9 @@ jobs:
     name: Publish to Docker
     runs-on: ubuntu-24.04
     timeout-minutes: 15
+    # Elevated permission required to push Docker images to GitHub Container Registry
+    permissions:
+      packages: write
     needs:
       - generate-publish-metadata
       - build-aarch64-unknown-linux-gnu-packages
@@ -672,6 +674,9 @@ jobs:
     if: inputs.channel == 'release'
     runs-on: ubuntu-24.04
     timeout-minutes: 10
+    # Elevated permission required to create GitHub releases and upload release assets
+    permissions:
+      contents: write
     needs:
       - generate-publish-metadata
       - build-x86_64-unknown-linux-gnu-packages

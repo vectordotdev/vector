@@ -8,14 +8,15 @@ on:
     types: [checks_requested]
 
 permissions:
-  contents: read
-  pull-requests: write
-  id-token: write # Needed to federate tokens.
-  actions: write
+  contents: read  # Restrictive default
 
 jobs:
   CLAAssistant:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write   # Required to comment on PRs
+      id-token: write        # Required to federate tokens with dd-octo-sts-action
+      actions: write         # Required to create/update workflow runs
     steps:
       - name: CLA already verified on PR
         if: github.event_name == 'merge_group'
