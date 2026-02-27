@@ -33,7 +33,7 @@ on:
     types: [ submitted ]
 
 permissions:
-  contents: read  # Restrictive default
+  contents: read
 
 env:
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}

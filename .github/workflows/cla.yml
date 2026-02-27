@@ -8,7 +8,7 @@ on:
     types: [checks_requested]
 
 permissions:
-  contents: read  # Restrictive default
+  contents: read
 
 jobs:
   CLAAssistant:

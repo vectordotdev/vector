@@ -44,6 +44,9 @@ jobs:
     secrets: inherit
 
   build-test-runner:
+    permissions:
+      contents: read
+      packages: write
     needs: changes
     if: ${{
       always() &&

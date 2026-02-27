@@ -23,9 +23,9 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-24.04
-    # Elevated permission required to push test runner image to GitHub Container Registry
     permissions:
-      packages: write
+      contents: read   # Required by actions/checkout
+      packages: write  # Required to push test runner image to GitHub Container Registry
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
