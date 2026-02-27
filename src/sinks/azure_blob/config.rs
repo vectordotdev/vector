@@ -67,7 +67,22 @@ pub struct AzureBlobSinkConfig {
     #[configurable(metadata(
         docs::examples = "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"
     ))]
-    pub connection_string: SensitiveString,
+    #[configurable(metadata(docs::examples = "AccountName=mylogstorage"))]
+    pub connection_string: Option<SensitiveString>,
+
+    /// The Azure Blob Storage Account name.
+    ///
+    /// If provided, this will be used instead of the `connection_string`.
+    /// This is useful for authenticating with an Azure credential.
+    #[configurable(metadata(docs::examples = "mylogstorage"))]
+    pub(super) account_name: Option<String>,
+
+    /// The Azure Blob Storage endpoint.
+    ///
+    /// If provided, this will be used instead of the `connection_string`.
+    /// This is useful for authenticating with an Azure credential.
+    #[configurable(metadata(docs::examples = "https://mylogstorage.blob.core.windows.net/"))]
+    pub(super) blob_endpoint: Option<String>,
 
     /// The Azure Blob Storage Account container name.
     #[configurable(metadata(docs::examples = "my-logs"))]
@@ -158,7 +173,9 @@ impl GenerateConfig for AzureBlobSinkConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
             auth: None,
-            connection_string: String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into(),
+            connection_string: Some(String::from("DefaultEndpointsProtocol=https;AccountName=some-account-name;AccountKey=some-account-key;").into()),
+            account_name: None,
+            blob_endpoint: None,
             container_name: String::from("logs"),
             blob_prefix: default_blob_prefix(),
             blob_time_format: Some(String::from("%s")),
@@ -178,9 +195,41 @@ impl GenerateConfig for AzureBlobSinkConfig {
 #[typetag::serde(name = "azure_blob")]
 impl SinkConfig for AzureBlobSinkConfig {
     async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
+        let connection_string: String = match (
+            &self.connection_string,
+            &self.account_name,
+            &self.blob_endpoint,
+        ) {
+            (Some(connstr), None, None) => connstr.inner().into(),
+            (None, Some(account_name), None) => {
+                format!("AccountName={}", account_name)
+            }
+            (None, None, Some(blob_endpoint)) => {
+                // BlobEndpoint must always end in a trailing slash
+                let blob_endpoint = if blob_endpoint.ends_with('/') {
+                    blob_endpoint.clone()
+                } else {
+                    format!("{}/", blob_endpoint)
+                };
+                format!("BlobEndpoint={}", blob_endpoint)
+            }
+            (None, None, None) => {
+                return Err("One of `connection_string`, `account_name`, or `blob_endpoint` must be provided".into());
+            }
+            (Some(_), Some(_), _) => {
+                return Err("Cannot provide both `connection_string` and `account_name`".into());
+            }
+            (Some(_), _, Some(_)) => {
+                return Err("Cannot provide both `connection_string` and `blob_endpoint`".into());
+            }
+            (_, Some(_), Some(_)) => {
+                return Err("Cannot provide both `account_name` and `blob_endpoint`".into());
+            }
+        };
+
         let client = azure_common::config::build_client(
             self.auth.clone(),
-            self.connection_string.clone().into(),
+            connection_string.clone(),
             self.container_name.clone(),
             cx.proxy(),
             self.tls.clone(),

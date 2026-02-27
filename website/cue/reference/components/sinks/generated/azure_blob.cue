@@ -1,6 +1,16 @@
 package metadata
 
 generated: components: sinks: azure_blob: configuration: {
+	account_name: {
+		description: """
+			The Azure Blob Storage Account name.
+
+			If provided, this will be used instead of the `connection_string`.
+			This is useful for authenticating with an Azure credential.
+			"""
+		required: false
+		type: string: examples: ["mylogstorage"]
+	}
 	acknowledgements: {
 		description: """
 			Controls how acknowledgements are handled for this sink.
@@ -135,6 +145,16 @@ generated: components: sinks: azure_blob: configuration: {
 		required: false
 		type: bool: {}
 	}
+	blob_endpoint: {
+		description: """
+			The Azure Blob Storage endpoint.
+
+			If provided, this will be used instead of the `connection_string`.
+			This is useful for authenticating with an Azure credential.
+			"""
+		required: false
+		type: string: examples: ["https://mylogstorage.blob.core.windows.net/"]
+	}
 	blob_prefix: {
 		description: """
 			A prefix to apply to all blob keys.
@@ -226,8 +246,8 @@ generated: components: sinks: azure_blob: configuration: {
 			| Allowed resource types | Container & Object |
 			| Allowed permissions    | Read & Create      |
 			"""
-		required: true
-		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken"]
+		required: false
+		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
 	}
 	container_name: {
 		description: "The Azure Blob Storage Account container name."

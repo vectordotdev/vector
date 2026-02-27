@@ -26,6 +26,8 @@ fn default_config(encoding: EncodingConfigWithFraming) -> AzureBlobSinkConfig {
     AzureBlobSinkConfig {
         auth: Default::default(),
         connection_string: Default::default(),
+        account_name: Default::default(),
+        blob_endpoint: Default::default(),
         container_name: Default::default(),
         blob_prefix: Default::default(),
         blob_time_format: Default::default(),
@@ -278,4 +280,92 @@ async fn azure_blob_build_config_with_client_id_and_secret() {
         .build(cx)
         .await
         .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
+}
+
+#[tokio::test]
+async fn azure_blob_build_config_with_account_name() {
+    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
+        r#"
+            account_name = "mylogstorage"
+            container_name = "my-logs"
+
+            [encoding]
+            codec = "json"
+        "#,
+    )
+    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+
+    let cx = SinkContext::default();
+    let _ = config
+        .build(cx)
+        .await
+        .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
+}
+
+#[tokio::test]
+async fn azure_blob_build_config_with_conflicting_connection_string_and_account_name() {
+    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
+        r#"
+            connection_string = "AccountName=mylogstorage"
+            account_name = "mylogstorage"
+            container_name = "my-logs"
+
+            [encoding]
+            codec = "json"
+        "#,
+    )
+    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+
+    let cx = SinkContext::default();
+    let sink = config.build(cx).await;
+    match sink {
+        Ok(_) => panic!(
+            "Config build should have errored due to conflicting connection_string and account_name"
+        ),
+        Err(e) => {
+            let err_str = e.to_string();
+            assert!(
+                err_str.contains("`connection_string` and `account_name`"),
+                "Config build did not complain about conflicting connection_string and account_name: {}",
+                err_str
+            );
+        }
+    }
+}
+
+#[tokio::test]
+async fn azure_blob_build_config_with_conflicting_connection_string_and_client_id_and_secret() {
+    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
+        r#"
+            connection_string = "AccountName=mylogstorage;AccountKey=mockkey"
+            container_name = "my-logs"
+
+            [encoding]
+            codec = "json"
+
+            [auth]
+            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
+            azure_client_id = "mock-client-id"
+            azure_client_secret = "mock-client-secret"
+        "#,
+    )
+    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+
+    assert!(&config.auth.is_some());
+
+    let cx = SinkContext::default();
+    let sink = config.build(cx).await;
+    match sink {
+        Ok(_) => {
+            panic!("Config build should have errored due to conflicting Shared Key and Client ID")
+        }
+        Err(e) => {
+            let err_str = e.to_string();
+            assert!(
+                err_str.contains("Cannot use both Shared Key and Client ID"),
+                "Config build did not complain about conflicting Shared Key and Client ID: {}",
+                err_str
+            );
+        }
+    }
 }

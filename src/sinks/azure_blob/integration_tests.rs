@@ -33,7 +33,12 @@ async fn azure_blob_healthcheck_passed() {
     let config = AzureBlobSinkConfig::new_emulator().await;
     let client = azure_common::config::build_client(
         None,
-        config.connection_string.clone().into(),
+        config
+            .connection_string
+            .clone()
+            .expect("failed to unwrap connection_string")
+            .inner()
+            .to_string(),
         config.container_name.clone(),
         &crate::config::ProxyConfig::default(),
         None,
@@ -55,7 +60,12 @@ async fn azure_blob_healthcheck_unknown_container() {
     };
     let client = azure_common::config::build_client(
         None,
-        config.connection_string.clone().into(),
+        config
+            .connection_string
+            .clone()
+            .expect("failed to unwrap connection_string")
+            .inner()
+            .to_string(),
         config.container_name.clone(),
         &crate::config::ProxyConfig::default(),
         None,
@@ -244,17 +254,19 @@ impl AzureBlobSinkConfig {
         let config = AzureBlobSinkConfig {
             auth: None,
             tls: None,
-            connection_string: format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{address}:10000/devstoreaccount1;QueueEndpoint=http://{address}:10001/devstoreaccount1;TableEndpoint=http://{address}:10002/devstoreaccount1;").into(),
-                container_name: "logs".to_string(),
-                blob_prefix: Default::default(),
-                blob_time_format: None,
-                blob_append_uuid: None,
-                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
-                compression: Compression::None,
-                batch: Default::default(),
-                request: TowerRequestConfig::default(),
-                acknowledgements: Default::default(),
-            };
+            connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{address}:10000/devstoreaccount1;QueueEndpoint=http://{address}:10001/devstoreaccount1;TableEndpoint=http://{address}:10002/devstoreaccount1;").into()),
+            account_name: None,
+            blob_endpoint: None,
+            container_name: "logs".to_string(),
+            blob_prefix: Default::default(),
+            blob_time_format: None,
+            blob_append_uuid: None,
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            compression: Compression::None,
+            batch: Default::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
+        };
 
         config.ensure_container().await;
 
@@ -275,17 +287,19 @@ impl AzureBlobSinkConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
                 ..Default::default()
             }),
-            connection_string: format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;BlobEndpoint=https://{address}:14430/devstoreaccount1;QueueEndpoint=https://{address}:14431/devstoreaccount1;TableEndpoint=https://{address}:14432/devstoreaccount1;").into(),
-                container_name: "logs".to_string(),
-                blob_prefix: Default::default(),
-                blob_time_format: None,
-                blob_append_uuid: None,
-                encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
-                compression: Compression::None,
-                batch: Default::default(),
-                request: TowerRequestConfig::default(),
-                acknowledgements: Default::default(),
-            };
+            connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;BlobEndpoint=https://{address}:14430/devstoreaccount1;QueueEndpoint=https://{address}:14431/devstoreaccount1;TableEndpoint=https://{address}:14432/devstoreaccount1;").into()),
+            account_name: None,
+            blob_endpoint: None,
+            container_name: "logs".to_string(),
+            blob_prefix: Default::default(),
+            blob_time_format: None,
+            blob_append_uuid: None,
+            encoding: (None::<FramingConfig>, TextSerializerConfig::default()).into(),
+            compression: Compression::None,
+            batch: Default::default(),
+            request: TowerRequestConfig::default(),
+            acknowledgements: Default::default(),
+        };
 
         config.ensure_container().await;
 
@@ -295,7 +309,11 @@ impl AzureBlobSinkConfig {
     fn to_sink(&self) -> VectorSink {
         let client = azure_common::config::build_client(
             None,
-            self.connection_string.clone().into(),
+            self.connection_string
+                .clone()
+                .expect("failed to unwrap connection_string")
+                .inner()
+                .to_string(),
             self.container_name.clone(),
             &crate::config::ProxyConfig::default(),
             None,
@@ -315,7 +333,11 @@ impl AzureBlobSinkConfig {
     pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
         let client = azure_common::config::build_client(
             None,
-            self.connection_string.clone().into(),
+            self.connection_string
+                .clone()
+                .expect("failed to unwrap connection_string")
+                .inner()
+                .to_string(),
             self.container_name.clone(),
             &crate::config::ProxyConfig::default(),
             None,
@@ -342,7 +364,11 @@ impl AzureBlobSinkConfig {
     pub async fn get_blob(&self, blob: String) -> (Option<String>, Option<String>, Vec<String>) {
         let client = azure_common::config::build_client(
             None,
-            self.connection_string.clone().into(),
+            self.connection_string
+                .clone()
+                .expect("failed to unwrap connection_string")
+                .inner()
+                .to_string(),
             self.container_name.clone(),
             &crate::config::ProxyConfig::default(),
             None,
@@ -405,7 +431,11 @@ impl AzureBlobSinkConfig {
     async fn ensure_container(&self) {
         let client = azure_common::config::build_client(
             None,
-            self.connection_string.clone().into(),
+            self.connection_string
+                .clone()
+                .expect("failed to unwrap connection_string")
+                .inner()
+                .to_string(),
             self.container_name.clone(),
             &crate::config::ProxyConfig::default(),
             None,

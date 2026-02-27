@@ -390,20 +390,28 @@ pub fn build_client(
             credential = Some(async_credential_result);
         }
         (Auth::Sas { .. }, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
-            panic!("Cannot use both SAS token and Client ID/Secret at the same time");
+            return Err(Box::new(Error::with_message(
+                ErrorKind::Credential,
+                "Cannot use both SAS token and Client ID/Secret at the same time",
+            )));
         }
         (Auth::SharedKey { .. }, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
-            panic!("Cannot use both Shared Key and Client ID/Secret at the same time");
+            return Err(Box::new(Error::with_message(
+                ErrorKind::Credential,
+                "Cannot use both Shared Key and Client ID/Secret at the same time",
+            )));
         }
         (Auth::Sas { .. }, Some(AzureAuthentication::Specific(..))) => {
-            panic!(
-                "Cannot use both SAS token and another Azure Authentication method at the same time"
-            );
+            return Err(Box::new(Error::with_message(
+                ErrorKind::Credential,
+                "Cannot use both SAS token and another Azure Authentication method at the same time",
+            )));
         }
         (Auth::SharedKey { .. }, Some(AzureAuthentication::Specific(..))) => {
-            panic!(
-                "Cannot use both Shared Key and another Azure Authentication method at the same time"
-            );
+            return Err(Box::new(Error::with_message(
+                ErrorKind::Credential,
+                "Cannot use both Shared Key and another Azure Authentication method at the same time",
+            )));
         }
     }
 
