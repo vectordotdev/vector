@@ -137,6 +137,7 @@ dsmith
 DVB
 ede
 emoji
+emojis
 emqx
 enableable
 Enot
