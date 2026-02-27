@@ -49,8 +49,15 @@ impl GrpcServer {
         tokio::spawn(async move {
             let incoming = TcpListenerStream::new(listener);
 
+            // Build reflection service for tools like grpcurl
+            let reflection_service = tonic_reflection::server::Builder::configure()
+                .register_encoded_file_descriptor_set(crate::proto::observability::FILE_DESCRIPTOR_SET)
+                .build()
+                .expect("Failed to build reflection service");
+
             let result = TonicServer::builder()
                 .add_service(ObservabilityServer::new(service))
+                .add_service(reflection_service)
                 .serve_with_incoming_shutdown(incoming, async {
                     rx.await.ok();
                     info!("GRPC API server shutting down.");

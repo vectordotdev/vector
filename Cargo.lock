@@ -11632,6 +11632,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "tonic-reflection"
+version = "0.11.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "548c227bd5c0fae5925812c4ec6c66ffcfced23ea370cb823f4d18f0fc1cb6a7"
+dependencies = [
+ "prost 0.12.6",
+ "prost-types 0.12.6",
+ "tokio",
+ "tokio-stream",
+ "tonic 0.11.0",
+]
+
+[[package]]
 name = "tower"
 version = "0.4.13"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12537,6 +12550,7 @@ dependencies = [
  "toml 0.9.8",
  "tonic 0.11.0",
  "tonic-build 0.11.0",
+ "tonic-reflection",
  "tower 0.5.3",
  "tower-http 0.4.4",
  "tower-test",
