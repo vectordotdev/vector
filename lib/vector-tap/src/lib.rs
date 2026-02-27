@@ -9,17 +9,21 @@ pub mod topology;
 
 use std::{borrow::Cow, collections::BTreeMap};
 
+use bytes::Bytes;
 use colored::{ColoredString, Colorize};
+use prost::Message;
 use tokio::{
     sync::mpsc as tokio_mpsc,
     time::{Duration, Instant, timeout},
 };
 use tokio_stream::StreamExt;
+use tokio_util::codec::Encoder;
 use url::Url;
 use vector_api_client::{
     Client,
     proto::{OutputEvent, OutputEventsRequest},
 };
+use vector_core::event::Event;
 
 #[derive(Clone, Copy, Debug, clap::ValueEnum)]
 pub enum TapEncodingFormat {
@@ -222,6 +226,56 @@ impl<'a> TapRunner<'a> {
         }
     }
 
+    /// Convert and serialize a protobuf EventWrapper to the requested format
+    fn serialize_event(
+        event_wrapper: &vector_api_client::proto::event::EventWrapper,
+        format: TapEncodingFormat,
+    ) -> Result<String, String> {
+        // Encode the vector-api-client EventWrapper to protobuf bytes
+        let bytes = event_wrapper.encode_to_vec();
+
+        // Decode as vector-core EventWrapper
+        let core_event_wrapper = vector_core::event::proto::EventWrapper::decode(Bytes::from(bytes))
+            .map_err(|e| format!("Failed to decode event: {}", e))?;
+
+        // Convert to vector-core Event (which has Serialize)
+        let event: Event = core_event_wrapper.into();
+
+        // Serialize based on format
+        match format {
+            TapEncodingFormat::Json => {
+                serde_json::to_string(&event).map_err(|e| format!("JSON serialization failed: {}", e))
+            }
+            TapEncodingFormat::Yaml => {
+                serde_yaml::to_string(&event).map_err(|e| format!("YAML serialization failed: {}", e))
+            }
+            TapEncodingFormat::Logfmt => {
+                // For logfmt, we need to extract the log event and serialize it
+                match event {
+                    Event::Log(log_event) => {
+                        let mut serializer = codecs::encoding::format::LogfmtSerializerConfig.build();
+                        let mut bytes = bytes::BytesMut::new();
+                        // Wrap the LogEvent back into Event for the serializer
+                        serializer.encode(Event::Log(log_event), &mut bytes)
+                            .map_err(|e| format!("Logfmt serialization failed: {}", e))?;
+                        String::from_utf8(bytes.to_vec())
+                            .map_err(|e| format!("UTF-8 conversion failed: {}", e))
+                    }
+                    Event::Metric(_) => {
+                        // Metrics don't serialize well to logfmt, use JSON as fallback
+                        serde_json::to_string(&event)
+                            .map_err(|e| format!("JSON serialization failed: {}", e))
+                    }
+                    Event::Trace(_) => {
+                        // Traces don't serialize well to logfmt, use JSON as fallback
+                        serde_json::to_string(&event)
+                            .map_err(|e| format!("JSON serialization failed: {}", e))
+                    }
+                }
+            }
+        }
+    }
+
     #[allow(clippy::print_stdout)]
     fn output_event_stdout(&self, output_event: &OutputEvent, formatter: &EventFormatter) {
         use vector_api_client::proto::output_event::Event as OutputEventType;
@@ -230,14 +284,13 @@ impl<'a> TapRunner<'a> {
             Some(OutputEventType::TappedEvent(ev)) => {
                 // Format the proto event for display
                 let encoded_string = if let Some(ref event_wrapper) = ev.event {
-                    // TODO: Properly serialize protobuf EventWrapper to JSON/YAML/logfmt
-                    // Currently using Debug format as protobuf messages don't have Serialize by default
-                    // Proper implementation would require:
-                    // 1. Enabling serde for proto generation (prost-serde feature), or
-                    // 2. Using pbjson for JSON serialization, or
-                    // 3. Converting proto types to vector-core Event types
-                    // For now, Debug format provides readable output showing all fields
-                    format!("{:?}", event_wrapper)
+                    match Self::serialize_event(event_wrapper, formatter.format) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            error!(message = "Failed to serialize event.", error = %e);
+                            format!("{:?}", event_wrapper)
+                        }
+                    }
                 } else {
                     "No event data".to_string()
                 };
