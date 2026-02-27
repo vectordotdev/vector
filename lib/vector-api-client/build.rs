@@ -6,7 +6,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // First, generate event.proto types
     tonic_build::configure().build_server(false).compile(
         &["../../lib/vector-core/proto/event.proto"],
-        &["../../lib/vector-core/proto"],
+        &["../../lib/vector-core/proto", "../../proto/third-party"],
     )?;
 
     // Then, generate observability.proto using extern_path to reference the event types
