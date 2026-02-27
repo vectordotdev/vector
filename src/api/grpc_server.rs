@@ -51,7 +51,9 @@ impl GrpcServer {
 
             // Build reflection service for tools like grpcurl
             let reflection_service = tonic_reflection::server::Builder::configure()
-                .register_encoded_file_descriptor_set(crate::proto::observability::FILE_DESCRIPTOR_SET)
+                .register_encoded_file_descriptor_set(
+                    crate::proto::observability::FILE_DESCRIPTOR_SET,
+                )
                 .build()
                 .expect("Failed to build reflection service");
 
