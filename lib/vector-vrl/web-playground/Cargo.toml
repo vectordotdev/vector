@@ -23,4 +23,4 @@ enrichment = { path = "../../enrichment" }
 getrandom = { version = "0.2.15", features = ["js"] }
 
 [build-dependencies]
-cargo-lock = "10.1.0"
+cargo-lock = "11.0.1"
