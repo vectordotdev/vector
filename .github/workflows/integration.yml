@@ -18,8 +18,8 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  packages: write
   contents: read
+  packages: read
 
 env:
   CONTAINER_TOOL: "docker"

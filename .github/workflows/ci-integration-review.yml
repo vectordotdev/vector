@@ -33,8 +33,9 @@ on:
     types: [ submitted ]
 
 permissions:
+  contents: read
   statuses: write
-  packages: write
+  packages: read
 
 env:
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
