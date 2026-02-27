@@ -2,17 +2,12 @@ use anyhow::Result;
 use indexmap::IndexMap;
 use serde::Serialize;
 use std::{fs, path::PathBuf};
-use vrl::compiler::Function;
-use vrl::compiler::value::kind;
-use vrl::core::Value;
-use vrl::prelude::function::EnumVariant;
-use vrl::prelude::{Example, Parameter};
+use vrl::docs::{FunctionDoc, build_functions_doc};
 
 /// Generate VRL function documentation as JSON files.
 ///
-/// This command iterates over all VRL functions available in Vector and generates
-/// JSON documentation files that are compatible with the CUE-based documentation
-/// pipeline (valid JSON is valid CUE).
+/// This command iterates over all VRL functions available in Vector and VRL and
+/// generates a generated.cue documentation file with all functions' documentation.
 #[derive(clap::Args, Debug)]
 #[command()]
 pub struct Cli {
@@ -28,239 +23,36 @@ struct FunctionDocWrapper {
 
 #[derive(Serialize)]
 struct RemapWrapper {
-    functions: std::collections::HashMap<String, FunctionDoc>,
-}
-
-#[derive(Serialize)]
-struct FunctionDoc {
-    anchor: String,
-    name: String,
-    category: String,
-    description: String,
-    arguments: Vec<ArgumentDoc>,
-    r#return: ReturnDoc,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    internal_failure_reasons: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    examples: Vec<ExampleDoc>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    notices: Vec<String>,
-    pure: bool,
-}
-
-#[derive(Serialize)]
-struct ArgumentDoc {
-    name: String,
-    description: String,
-    required: bool,
-    r#type: Vec<String>,
-    #[serde(skip_serializing_if = "IndexMap::is_empty")]
-    r#enum: IndexMap<String, String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    default: Option<String>,
-}
-
-#[derive(Serialize)]
-struct ReturnDoc {
-    types: Vec<String>,
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    rules: Vec<String>,
-}
-
-#[derive(Serialize)]
-struct ExampleDoc {
-    title: String,
-    source: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    input: Option<serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    r#return: Option<serde_json::Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    raises: Option<String>,
+    functions: IndexMap<String, FunctionDoc>,
 }
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
         let functions = vector_vrl_functions::all();
 
+        let docs = build_functions_doc(&functions);
+        let functions_map = docs
+            .into_iter()
+            .map(|doc| (doc.name.clone(), doc))
+            .collect();
+
+        let wrapper = FunctionDocWrapper {
+            remap: RemapWrapper {
+                functions: functions_map,
+            },
+        };
+
         // Ensure output directory exists
         fs::create_dir_all(&self.output_dir)?;
 
-        for func in functions {
-            let doc = build_function_doc(func.as_ref());
-            let filename = format!("{}.cue", doc.name);
-            let filepath = self.output_dir.join(&filename);
+        let mut json = serde_json::to_string(&wrapper)?;
+        json.push('\n');
+        let filepath = self.output_dir.join("generated.cue");
+        fs::write(&filepath, json)?;
 
-            // Wrap in the expected CUE structure
-            let mut functions_map = std::collections::HashMap::new();
-            functions_map.insert(doc.name.clone(), doc);
-            let wrapper = FunctionDocWrapper {
-                remap: RemapWrapper {
-                    functions: functions_map,
-                },
-            };
-
-            let mut json = serde_json::to_string_pretty(&wrapper)?;
-            json.push('\n');
-
-            fs::write(&filepath, json)?;
-
-            println!("Generated: {}", filepath.display());
-        }
+        println!("Generated: {}", filepath.display());
 
         println!("\nVRL documentation generation complete.");
         Ok(())
     }
-}
-
-fn build_function_doc(func: &dyn Function) -> FunctionDoc {
-    let name = func.identifier().to_string();
-
-    let arguments: Vec<ArgumentDoc> = func
-        .parameters()
-        .iter()
-        .map(|param| {
-            let Parameter {
-                keyword,
-                kind,
-                required,
-                description,
-                default,
-                enum_variants,
-            } = param;
-
-            let name = keyword.trim().to_string();
-            let description = description.trim().to_string();
-            let default = default.map(pretty_value);
-            let r#type = kind_to_types(*kind);
-            let r#enum = enum_variants
-                .unwrap_or_default()
-                .iter()
-                .map(|EnumVariant { value, description }| {
-                    (value.to_string(), description.to_string())
-                })
-                .collect();
-
-            ArgumentDoc {
-                name,
-                description,
-                required: *required,
-                r#type,
-                default,
-                r#enum,
-            }
-        })
-        .collect();
-
-    let examples: Vec<ExampleDoc> = func
-        .examples()
-        .iter()
-        .map(|example| {
-            let Example {
-                title,
-                source,
-                result,
-                input,
-                file: _,
-                line: _,
-            } = example;
-
-            let (r#return, raises) = match result {
-                Ok(result) => {
-                    // Try to parse as JSON, otherwise treat as string
-                    let value = serde_json::from_str(result)
-                        .unwrap_or_else(|_| serde_json::Value::String(result.to_string()));
-                    (Some(value), None)
-                }
-                Err(error) => (None, Some(error.to_string())),
-            };
-
-            let source = source.to_string();
-            let title = title.to_string();
-            let input = input.map(|s| {
-                serde_json::from_str(s)
-                    .expect("VRL example input must be valid JSON")
-            });
-            ExampleDoc {
-                title,
-                source,
-                input,
-                r#return,
-                raises,
-            }
-        })
-        .collect();
-
-    FunctionDoc {
-        anchor: name.clone(),
-        name,
-        category: func.category().to_string(),
-        description: trim_str(func.usage()),
-        arguments,
-        r#return: ReturnDoc {
-            types: kind_to_types(func.return_kind()),
-            rules: trim_slice(func.return_rules()),
-        },
-        internal_failure_reasons: trim_slice(func.internal_failure_reasons()),
-        examples,
-        notices: trim_slice(func.notices()),
-        pure: func.pure(),
-    }
-}
-
-fn kind_to_types(kind_bits: u16) -> Vec<String> {
-    // All type bits combined
-    if (kind_bits & kind::ANY) == kind::ANY {
-        return vec!["any".to_string()];
-    }
-
-    let mut types = Vec::new();
-
-    if (kind_bits & kind::BYTES) == kind::BYTES {
-        types.push("string".to_string());
-    }
-    if (kind_bits & kind::INTEGER) == kind::INTEGER {
-        types.push("integer".to_string());
-    }
-    if (kind_bits & kind::FLOAT) == kind::FLOAT {
-        types.push("float".to_string());
-    }
-    if (kind_bits & kind::BOOLEAN) == kind::BOOLEAN {
-        types.push("boolean".to_string());
-    }
-    if (kind_bits & kind::OBJECT) == kind::OBJECT {
-        types.push("object".to_string());
-    }
-    if (kind_bits & kind::ARRAY) == kind::ARRAY {
-        types.push("array".to_string());
-    }
-    if (kind_bits & kind::TIMESTAMP) == kind::TIMESTAMP {
-        types.push("timestamp".to_string());
-    }
-    if (kind_bits & kind::REGEX) == kind::REGEX {
-        types.push("regex".to_string());
-    }
-    if (kind_bits & kind::NULL) == kind::NULL {
-        types.push("null".to_string());
-    }
-
-    assert!(!types.is_empty(), "kind_bits {kind_bits} produced no types");
-
-    types
-}
-
-fn pretty_value(v: &Value) -> String {
-    if let Value::Bytes(b) = v {
-        str::from_utf8(b).map_or_else(|_| v.to_string(), String::from)
-    } else {
-        v.to_string()
-    }
-}
-
-fn trim_str(s: &'static str) -> String {
-    s.trim().to_string()
-}
-
-fn trim_slice(slice: &'static [&'static str]) -> Vec<String> {
-    slice.iter().map(|s| s.trim().to_string()).collect()
 }
