@@ -406,9 +406,9 @@ test-e2e-kubernetes: ## Runs Kubernetes E2E tests (Sorry, no `ENVIRONMENT=true` 
 test-cli: ## Runs cli tests
 	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features cli-tests --test integration --test-threads 4
 
-.PHONY: test-top
-test-top: ## Runs top tests
-	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features top-tests --test top --test-threads 4
+.PHONY: test-vector-api
+test-vector-api: ## Runs vector API tests (top and tap)
+	${MAYBE_ENVIRONMENT_EXEC} cargo nextest run --no-fail-fast --no-default-features --features vector-api-tests --test vector_api
 
 .PHONY: test-component-validation
 test-component-validation: ## Runs component validation tests
@@ -692,6 +692,7 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 	target/debug/vector generate-schema > /tmp/vector-config-schema.json 2>/dev/null
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build component-docs /tmp/vector-config-schema.json \
 		$(if $(findstring true,$(CI)),>/dev/null,)
+	./scripts/cue.sh fmt
 
 .PHONY: generate-vrl-docs
 generate-vrl-docs: ## Generate VRL function documentation from Rust source.
