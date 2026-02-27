@@ -14,7 +14,6 @@ jobs:
   CLAAssistant:
     runs-on: ubuntu-latest
     permissions:
-      contents: read
       pull-requests: write
       id-token: write # Needed to federate tokens.
       actions: write
