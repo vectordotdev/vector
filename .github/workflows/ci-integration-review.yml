@@ -84,6 +84,7 @@ jobs:
 
   build-test-runner:
     permissions:
+      contents: read
       packages: write
     needs: prep-pr
     uses: ./.github/workflows/build-test-runner.yml
