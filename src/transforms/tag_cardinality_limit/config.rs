@@ -11,6 +11,20 @@ use crate::{
     transforms::{Transform, tag_cardinality_limit::TagCardinalityLimit},
 };
 
+/// Configuration of internal metrics for the TagCardinalityLimit transform.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
+#[serde(deny_unknown_fields)]
+pub struct InternalMetricsConfig {
+    /// Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
+    ///
+    /// This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
+    /// increase metric cardinality. Defaults to `false` because these tags have potentially unbounded cardinality.
+    #[serde(default = "default_include_extended_tags")]
+    #[configurable(metadata(docs::human_name = "Include Extended Tags"))]
+    pub include_extended_tags: bool,
+}
+
 /// Configuration for the `tag_cardinality_limit` transform.
 #[configurable_component(transform(
     "tag_cardinality_limit",
@@ -44,6 +58,10 @@ pub struct Inner {
 
     #[serde(flatten)]
     pub mode: Mode,
+
+    #[configurable(derived)]
+    #[serde(default)]
+    pub internal_metrics: InternalMetricsConfig,
 }
 
 /// Controls the approach taken for tracking tag cardinality.
@@ -115,6 +133,10 @@ const fn default_value_limit() -> usize {
     500
 }
 
+const fn default_include_extended_tags() -> bool {
+    false
+}
+
 pub(crate) const fn default_cache_size() -> usize {
     5 * 1024 // 5KB
 }
@@ -126,6 +148,7 @@ impl GenerateConfig for Config {
                 mode: Mode::Exact,
                 value_limit: default_value_limit(),
                 limit_exceeded_action: default_limit_exceeded_action(),
+                internal_metrics: InternalMetricsConfig::default(),
             },
             per_metric_limits: HashMap::default(),
         })
