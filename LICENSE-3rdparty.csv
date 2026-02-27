@@ -786,6 +786,7 @@ toml_parser,https://github.com/toml-rs/toml,MIT OR Apache-2.0,The toml_parser Au
 toml_write,https://github.com/toml-rs/toml,MIT OR Apache-2.0,The toml_write Authors
 toml_writer,https://github.com/toml-rs/toml,MIT OR Apache-2.0,The toml_writer Authors
 tonic,https://github.com/hyperium/tonic,MIT,Lucio Franco <luciofranco14@gmail.com>
+tonic-reflection,https://github.com/hyperium/tonic,MIT,"James Nugent <james@jen20.com>, Samani G. Gikandi <samani@gojulas.com>"
 tower,https://github.com/tower-rs/tower,MIT,Tower Maintainers <team@tower-rs.com>
 tower-http,https://github.com/tower-rs/tower-http,MIT,Tower Maintainers <team@tower-rs.com>
 tower-layer,https://github.com/tower-rs/tower,MIT,Tower Maintainers <team@tower-rs.com>
