@@ -15,7 +15,7 @@ remap: functions: encode_csv: {
 		},
 		{
 			name:        "delimiter"
-			description: "The field delimiter to use when encoding. Must be a single-byte utf8 character."
+			description: "The field delimiter to use when encoding. Must be a single-byte UTF-8 character."
 			required:    false
 			default:     ","
 			type: ["string"]
