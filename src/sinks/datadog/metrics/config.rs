@@ -25,12 +25,6 @@ use crate::{
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
 
-// This default is centered around "series" data, which should be the lion's share of what we
-// process.  Given that a single series, when encoded, is in the 150-300 byte range, we can fit a
-// lot of these into a single request, something like 150-200K series.  Simply to be a little more
-// conservative, though, we use 100K here.  This will also get a little more tricky when it comes to
-// distributions and sketches, but we're going to have to implement incremental encoding to handle
-// "we've exceeded our maximum payload size, split this batch" scenarios anyways.
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
     const MAX_BYTES: Option<usize> = None;
@@ -40,6 +34,9 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
 pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
 pub(super) const SERIES_V2_PATH: &str = "/api/v2/series";
 pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
+
+// TODO: the series V1 endpoint support is considered deprecated and should be removed in a future release.
+// At that time when the V1 support is removed, the SeriesApiVersion stops being useful and can be removed.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SeriesApiVersion {
@@ -54,12 +51,12 @@ impl SeriesApiVersion {
             Self::V2 => SERIES_V2_PATH,
         }
     }
-    fn get_api_version() -> Self {
+    fn get_api_version_backwards_compatible() -> Self {
         static API_VERSION: OnceLock<SeriesApiVersion> = OnceLock::new();
         *API_VERSION.get_or_init(|| {
-            match std::env::var("VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API") {
-                Ok(_) => Self::V2,
-                Err(_) => Self::V1,
+            match std::env::var("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API") {
+                Ok(_) => Self::V1,
+                Err(_) => Self::V2,
             }
         })
     }
@@ -96,12 +93,11 @@ impl DatadogMetricsEndpoint {
 
     // Creates an instance of the `Series` variant with the default API version.
     pub fn series() -> Self {
-        Self::Series(SeriesApiVersion::get_api_version())
+        Self::Series(SeriesApiVersion::get_api_version_backwards_compatible())
     }
 
     pub(super) const fn payload_limits(self) -> DatadogMetricsPayloadLimits {
         // from https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
-
         let (uncompressed, compressed) = match self {
             // Sketches use the same payload size limits as v1 series
             DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
@@ -222,7 +218,12 @@ impl DatadogMetricsConfig {
     ) -> crate::Result<DatadogMetricsEndpointConfiguration> {
         let base_uri = self.get_base_agent_endpoint(dd_common);
 
-        let series_endpoint = build_uri(&base_uri, SeriesApiVersion::get_api_version().get_path())?;
+        // TODO: the V1 endpoint support is considered deprecated and should be removed in a future release.
+        // At that time, the get_api_version_backwards_compatible() should be replaced with statically using the v2.
+        let series_endpoint = build_uri(
+            &base_uri,
+            SeriesApiVersion::get_api_version_backwards_compatible().get_path(),
+        )?;
         let sketches_endpoint = build_uri(&base_uri, SKETCHES_PATH)?;
 
         Ok(DatadogMetricsEndpointConfiguration::new(
