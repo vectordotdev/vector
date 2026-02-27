@@ -235,28 +235,29 @@ impl<'a> TapRunner<'a> {
         let bytes = event_wrapper.encode_to_vec();
 
         // Decode as vector-core EventWrapper
-        let core_event_wrapper = vector_core::event::proto::EventWrapper::decode(Bytes::from(bytes))
-            .map_err(|e| format!("Failed to decode event: {}", e))?;
+        let core_event_wrapper =
+            vector_core::event::proto::EventWrapper::decode(Bytes::from(bytes))
+                .map_err(|e| format!("Failed to decode event: {}", e))?;
 
         // Convert to vector-core Event (which has Serialize)
         let event: Event = core_event_wrapper.into();
 
         // Serialize based on format
         match format {
-            TapEncodingFormat::Json => {
-                serde_json::to_string(&event).map_err(|e| format!("JSON serialization failed: {}", e))
-            }
-            TapEncodingFormat::Yaml => {
-                serde_yaml::to_string(&event).map_err(|e| format!("YAML serialization failed: {}", e))
-            }
+            TapEncodingFormat::Json => serde_json::to_string(&event)
+                .map_err(|e| format!("JSON serialization failed: {}", e)),
+            TapEncodingFormat::Yaml => serde_yaml::to_string(&event)
+                .map_err(|e| format!("YAML serialization failed: {}", e)),
             TapEncodingFormat::Logfmt => {
                 // For logfmt, we need to extract the log event and serialize it
                 match event {
                     Event::Log(log_event) => {
-                        let mut serializer = codecs::encoding::format::LogfmtSerializerConfig.build();
+                        let mut serializer =
+                            codecs::encoding::format::LogfmtSerializerConfig.build();
                         let mut bytes = bytes::BytesMut::new();
                         // Wrap the LogEvent back into Event for the serializer
-                        serializer.encode(Event::Log(log_event), &mut bytes)
+                        serializer
+                            .encode(Event::Log(log_event), &mut bytes)
                             .map_err(|e| format!("Logfmt serialization failed: {}", e))?;
                         String::from_utf8(bytes.to_vec())
                             .map_err(|e| format!("UTF-8 conversion failed: {}", e))
