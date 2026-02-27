@@ -341,6 +341,7 @@ async fn stats_payload_has_container_tags() {
 
     let flush = agg.flush(true);
     assert_eq!(flush.len(), 1);
+    assert_eq!(agg.get_payload_tags_len(), 0);
 
     let csp = &flush[0];
     assert_eq!(csp.env, "container_env");

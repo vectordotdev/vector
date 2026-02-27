@@ -184,6 +184,11 @@ impl Aggregator {
             .unwrap_or_else(|| Arc::clone(&self.default_api_key))
     }
 
+    #[cfg(test)]
+    pub(crate) fn get_payload_tags_len(&self) -> usize {
+        self.payload_tags.len()
+    }
+
     /// Iterates over a trace's constituting spans and upon matching conditions it updates statistics (mostly using the top level span).
     pub(crate) fn handle_trace(&mut self, partition_key: &PartitionKey, trace: &TraceEvent) {
         // Based on https://github.com/DataDog/datadog-agent/blob/cfa750c7412faa98e87a015f8ee670e5828bbe7f/pkg/trace/stats/concentrator.go#L148-L184
