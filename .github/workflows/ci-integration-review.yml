@@ -34,7 +34,6 @@ on:
 
 permissions:
   contents: read
-  statuses: write
 
 env:
   AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
@@ -52,6 +51,8 @@ env:
 jobs:
   prep-pr:
     name: (PR review) Signal pending to PR
+    permissions:
+      statuses: write
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: startsWith(github.event.review.body, '/ci-run-integration') || startsWith(github.event.review.body, '/ci-run-e2e') || contains(github.event.review.body, '/ci-run-all')
@@ -169,6 +170,8 @@ jobs:
 
   update-pr-status:
     name: Signal result to PR
+    permissions:
+      statuses: write
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     needs:
