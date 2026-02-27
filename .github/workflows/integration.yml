@@ -19,7 +19,6 @@ concurrency:
 
 permissions:
   contents: read
-  packages: read
 
 env:
   CONTAINER_TOOL: "docker"
@@ -45,6 +44,8 @@ jobs:
     secrets: inherit
 
   build-test-runner:
+    permissions:
+      packages: write
     needs: changes
     if: ${{
       always() &&
