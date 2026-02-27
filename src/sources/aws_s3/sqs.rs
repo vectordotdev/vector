@@ -43,7 +43,7 @@ use vector_lib::{
 
 use crate::{
     SourceSender,
-    aws::AwsTimeout,
+    aws::{AwsAuthentication, AwsTimeout},
     codecs::Decoder,
     common::backoff::ExponentialBackoff,
     config::{SourceAcknowledgementsConfig, SourceContext},
@@ -95,6 +95,14 @@ pub(super) struct DeferredConfig {
 #[derivative(Default)]
 #[serde(deny_unknown_fields)]
 pub(super) struct Config {
+    /// AWS configuration options for SQS
+    /// If not included, the values of the source's `auth` configuration will be used.
+    /// Can be reverted to the AWS SDK's default authentication strategy by setting this to
+    /// the string "default"
+    #[configurable(derived)]
+    #[serde(default)]
+    pub(super) auth: Option<AwsAuthentication>,
+
     /// The URL of the SQS queue to poll for bucket notifications.
     #[configurable(metadata(
         docs::examples = "https://sqs.us-east-2.amazonaws.com/123456789012/MyQueue"
