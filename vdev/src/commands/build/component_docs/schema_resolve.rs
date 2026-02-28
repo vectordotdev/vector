@@ -200,7 +200,7 @@ impl SchemaContext {
             Some("enum") => {
                 debug!("Resolving enum const schema.");
                 if let Some(Value::Array(enum_vals)) = schema.get("enum") {
-                    let mut grouped: std::collections::HashMap<String, Vec<Value>> = std::collections::HashMap::new();
+                    let mut grouped: indexmap::IndexMap<String, Vec<Value>> = indexmap::IndexMap::new();
                     for val in enum_vals {
                         let t = docs_type_str(val);
                         grouped.entry(t.to_string()).or_default().push(val.clone());
