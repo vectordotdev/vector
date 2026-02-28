@@ -233,7 +233,7 @@ impl SinkConfig for AzureBlobSinkConfig {
             self.container_name.clone(),
             cx.proxy(),
             self.tls.clone(),
-        )?;
+        ).await?;
 
         let healthcheck = azure_common::config::build_healthcheck(
             self.container_name.clone(),

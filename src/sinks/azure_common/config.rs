@@ -3,8 +3,6 @@ use std::io::Read;
 use std::sync::Arc;
 
 use azure_core::error::Error as AzureCoreError;
-use tokio::runtime::Handle;
-use tokio::task;
 
 use crate::sinks::azure_common::connection_string::{Auth, ParsedConnectionString};
 use crate::sinks::azure_common::shared_key_policy::SharedKeyAuthorizationPolicy;
@@ -327,7 +325,7 @@ pub fn build_healthcheck(
     Ok(healthcheck.boxed())
 }
 
-pub fn build_client(
+pub async fn build_client(
     auth: Option<AzureAuthentication>,
     connection_string: String,
     container_name: String,
@@ -377,17 +375,13 @@ pub fn build_client(
         }
         (Auth::None, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
             info!("Using Client Secret authentication");
-            let async_credential_result = task::block_in_place(|| {
-                Handle::current().block_on(async { auth.unwrap().credential().await.unwrap() })
-            });
-            credential = Some(async_credential_result);
+            let credential_result: Arc<dyn TokenCredential> = auth.unwrap().credential().await.unwrap();
+            credential = Some(credential_result);
         }
         (Auth::None, Some(AzureAuthentication::Specific(..))) => {
             info!("Using specific Azure Authentication method");
-            let async_credential_result = task::block_in_place(|| {
-                Handle::current().block_on(async { auth.unwrap().credential().await.unwrap() })
-            });
-            credential = Some(async_credential_result);
+            let credential_result: Arc<dyn TokenCredential> = auth.unwrap().credential().await.unwrap();
+            credential = Some(credential_result);
         }
         (Auth::Sas { .. }, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
             return Err(Box::new(Error::with_message(

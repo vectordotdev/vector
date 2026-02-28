@@ -43,6 +43,7 @@ async fn azure_blob_healthcheck_passed() {
         &crate::config::ProxyConfig::default(),
         None,
     )
+    .await
     .expect("Failed to create client");
 
     azure_common::config::build_healthcheck(config.container_name, client)
@@ -70,6 +71,7 @@ async fn azure_blob_healthcheck_unknown_container() {
         &crate::config::ProxyConfig::default(),
         None,
     )
+    .await
     .expect("Failed to create client");
 
     assert_eq!(
@@ -253,7 +255,6 @@ impl AzureBlobSinkConfig {
         let address = std::env::var("AZURITE_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
             auth: None,
-            tls: None,
             connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://{address}:10000/devstoreaccount1;QueueEndpoint=http://{address}:10001/devstoreaccount1;TableEndpoint=http://{address}:10002/devstoreaccount1;").into()),
             account_name: None,
             blob_endpoint: None,
@@ -266,6 +267,7 @@ impl AzureBlobSinkConfig {
             batch: Default::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
+            tls: None,
         };
 
         config.ensure_container().await;
@@ -283,10 +285,6 @@ impl AzureBlobSinkConfig {
         let address = std::env::var("AZURITE_OAUTH_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
             auth: Some(client_secret_credential),
-            tls: Some(TlsConfig {
-                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
-                ..Default::default()
-            }),
             connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;BlobEndpoint=https://{address}:14430/devstoreaccount1;QueueEndpoint=https://{address}:14431/devstoreaccount1;TableEndpoint=https://{address}:14432/devstoreaccount1;").into()),
             account_name: None,
             blob_endpoint: None,
@@ -299,6 +297,10 @@ impl AzureBlobSinkConfig {
             batch: Default::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
+            tls: Some(TlsConfig {
+                ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
+                ..Default::default()
+            }),
         };
 
         config.ensure_container().await;
@@ -306,7 +308,7 @@ impl AzureBlobSinkConfig {
         config
     }
 
-    fn to_sink(&self) -> VectorSink {
+    async fn to_sink(&self) -> VectorSink {
         let client = azure_common::config::build_client(
             None,
             self.connection_string
@@ -318,6 +320,7 @@ impl AzureBlobSinkConfig {
             &crate::config::ProxyConfig::default(),
             None,
         )
+        .await
         .expect("Failed to create client");
 
         self.build_processor(client).expect("Failed to create sink")
@@ -325,7 +328,7 @@ impl AzureBlobSinkConfig {
 
     async fn run_assert(&self, input: impl Stream<Item = EventArray> + Send) {
         // `to_sink` needs to be inside the assertion check
-        assert_sink_compliance(&SINK_TAGS, async move { self.to_sink().run(input).await })
+        assert_sink_compliance(&SINK_TAGS, async move { self.to_sink().await.run(input).await })
             .await
             .expect("Running sink failed");
     }
@@ -342,6 +345,7 @@ impl AzureBlobSinkConfig {
             &crate::config::ProxyConfig::default(),
             None,
         )
+        .await
         .unwrap();
 
         // Iterate pager results and collect blob names. Filter by prefix server-side.
@@ -373,6 +377,7 @@ impl AzureBlobSinkConfig {
             &crate::config::ProxyConfig::default(),
             None,
         )
+        .await
         .unwrap();
 
         let blob_client = client.blob_client(&blob);
@@ -440,6 +445,7 @@ impl AzureBlobSinkConfig {
             &crate::config::ProxyConfig::default(),
             None,
         )
+        .await
         .unwrap();
         let result = client.create_container(None).await;
 
