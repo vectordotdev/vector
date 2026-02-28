@@ -40,11 +40,18 @@ impl Function for GetSecret {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[example!(
-            title: "Get the datadog api key",
-            source: r#"get_secret("datadog_api_key")"#,
-            result: Ok("secret value"),
-        )]
+        &[
+            example! {
+                title: "Get the Datadog API key from the event metadata",
+                source: r#"get_secret("datadog_api_key")"#,
+                result: Ok("secret value"),
+            },
+            example! {
+                title: "Get a non existent secret",
+                source: r#"get_secret("i_dont_exist")"#,
+                result: Ok("null"),
+            },
+        ]
     }
 
     fn compile(

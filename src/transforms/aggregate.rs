@@ -24,7 +24,7 @@ use crate::{
 
 /// Configuration for the `aggregate` transform.
 #[configurable_component(transform("aggregate", "Aggregate metrics passing through a topology."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
@@ -42,7 +42,7 @@ pub struct AggregateConfig {
 }
 
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[configurable(description = "The aggregation mode to use.")]
 pub enum AggregationMode {
     /// Default mode. Sums incremental metrics and uses the latest value for absolute metrics.
@@ -122,7 +122,7 @@ impl Aggregate {
             map: Default::default(),
             prev_map: Default::default(),
             multi_map: Default::default(),
-            mode: config.mode.clone(),
+            mode: config.mode,
         })
     }
 
