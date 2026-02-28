@@ -5,7 +5,7 @@ use serde_json::Value;
 impl SchemaContext {
     pub fn get_json_schema_instance_type<'a>(&self, schema: &'a Value) -> Option<&'a str> {
         let maybe_type = schema.get("type")?;
-        
+
         if maybe_type.is_null() || maybe_type.as_str() == Some("null") {
             return None;
         }
@@ -18,7 +18,7 @@ impl SchemaContext {
         } else if let Some(s) = maybe_type.as_str() {
             return Some(s);
         }
-        
+
         None
     }
 
@@ -46,17 +46,17 @@ impl SchemaContext {
             .get("definitions")
             .and_then(|defs| defs.get(&name))
             .cloned();
-        
+
         if let Some(d) = def {
             Ok(d)
         } else {
-            Err(anyhow!("Could not find schema definition '{}' in given schema.", name))
+            Err(anyhow!("Could not find schema definition '{name}' in given schema."))
         }
     }
 
     pub fn expand_schema_references(&mut self, unexpanded_schema: &Value) -> Result<Value> {
         let mut schema = unexpanded_schema.clone();
-        
+
         let original_title = schema.get("title").cloned();
         let original_description = schema.get("description").cloned();
 
@@ -74,14 +74,14 @@ impl SchemaContext {
 
             let obj = schema.as_object_mut().unwrap();
             obj.remove("$ref");
-            
+
             let mut new_schema = expanded_ref.clone();
             nested_merge(&mut new_schema, &Value::Object(obj.clone()));
             schema = new_schema;
         }
 
-        if let Some(items) = schema.get("items").cloned() {
-            if items.get("$ref").is_some() {
+        if let Some(items) = schema.get("items").cloned()
+            && items.get("$ref").is_some() {
                 let expanded_items = self.expand_schema_references(&items)?;
                 let items_mut = schema.get_mut("items").unwrap().as_object_mut().unwrap();
                 items_mut.remove("$ref");
@@ -90,7 +90,6 @@ impl SchemaContext {
                 nested_merge(&mut new_items, &Value::Object(items_mut.clone()));
                 *schema.get_mut("items").unwrap() = new_items;
             }
-        }
 
         if let Some(Value::Object(properties)) = schema.get_mut("properties") {
             for (_, prop_schema) in properties.iter_mut() {

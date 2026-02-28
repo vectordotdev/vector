@@ -14,22 +14,21 @@ pub fn run(schema_path: &Path) -> Result<()> {
 
     let mut context = SchemaContext::new(root_schema.clone())?;
 
-    let component_types = vec!["source", "transform", "sink"];
+    let component_types = ["source", "transform", "sink"];
 
     // 1. Process Component Bases
     let mut component_bases = serde_json::Map::new();
     if let Some(definitions) = root_schema.get("definitions").and_then(|d| d.as_object()) {
         for (key, definition) in definitions {
-            if let Some(base_type) = super::schema::get_schema_metadata(definition, "docs::component_base_type").and_then(|v| v.as_str()) {
-                if component_types.contains(&base_type) {
+            if let Some(base_type) = super::schema::get_schema_metadata(definition, "docs::component_base_type").and_then(|v| v.as_str())
+                && component_types.contains(&base_type) {
                     component_bases.insert(base_type.to_string(), Value::String(key.clone()));
                 }
-            }
         }
     }
 
     for (comp_type, schema_name) in component_bases {
-        render_and_import_generated_component_schema(&mut context, &schema_name.as_str().unwrap(), &comp_type)?;
+        render_and_import_generated_component_schema(&mut context, schema_name.as_str().unwrap(), &comp_type)?;
     }
 
     // 2. Process All Components
@@ -39,11 +38,10 @@ pub fn run(schema_path: &Path) -> Result<()> {
             let comp_type = super::schema::get_schema_metadata(definition, "docs::component_type").and_then(|v| v.as_str());
             let comp_name = super::schema::get_schema_metadata(definition, "docs::component_name").and_then(|v| v.as_str());
 
-            if let (Some(t), Some(n)) = (comp_type, comp_name) {
-                if component_types.contains(&t) {
+            if let (Some(t), Some(n)) = (comp_type, comp_name)
+                && component_types.contains(&t) {
                     all_components.entry(t.to_string()).or_default().insert(n.to_string(), Value::String(key.clone()));
                 }
-            }
         }
     }
 
@@ -60,11 +58,10 @@ pub fn run(schema_path: &Path) -> Result<()> {
             let comp_type = super::schema::get_schema_metadata(definition, "docs::component_type").and_then(|v| v.as_str());
             let comp_name = super::schema::get_schema_metadata(definition, "docs::component_name").and_then(|v| v.as_str());
 
-            if comp_type == Some("api") {
-                if let Some(n) = comp_name {
+            if comp_type == Some("api")
+                && let Some(n) = comp_name {
                     apis.insert(n.to_string(), Value::String(key.clone()));
                 }
-            }
         }
     }
     render_and_import_generated_api_schema(&mut context, apis)?;
@@ -76,11 +73,10 @@ pub fn run(schema_path: &Path) -> Result<()> {
             let comp_type = super::schema::get_schema_metadata(definition, "docs::component_type").and_then(|v| v.as_str());
             let comp_name = super::schema::get_schema_metadata(definition, "docs::component_name").and_then(|v| v.as_str());
 
-            if comp_type == Some("global_option") {
-                if let Some(n) = comp_name {
+            if comp_type == Some("global_option")
+                && let Some(n) = comp_name {
                     global_options.insert(n.to_string(), Value::String(key.clone()));
                 }
-            }
         }
     }
     render_and_import_generated_global_option_schema(&mut context, global_options)?;
@@ -106,7 +102,7 @@ fn render_and_import_schema(
     let mut data = serde_json::Map::new();
     // Simplified nesting since serde doesn't make building deeply nested objects inline easy
     // In practice, this needs to build a nested path of objects and put `configuration` at the end
-    
+
     let mut current_obj = &mut data;
     for segment in config_map_path {
         current_obj.insert((*segment).to_string(), Value::Object(serde_json::Map::new()));
@@ -144,29 +140,29 @@ fn render_and_import_schema(
 }
 
 fn render_and_import_generated_component_schema(context: &mut SchemaContext, schema_name: &str, component_type: &str) -> Result<()> {
-    let friendly_name = format!("generated {} configuration", component_type);
+    let friendly_name = format!("generated {component_type} configuration");
     let unwrapped = context.unwrap_resolved_schema(schema_name, &friendly_name)?;
-    let cue_path = format!("components/generated/{}s.cue", component_type);
+    let cue_path = format!("components/generated/{component_type}s.cue");
 
     render_and_import_schema(
         context,
         Value::Object(unwrapped),
         &friendly_name,
-        &["generated", "components", &format!("{}s", component_type)],
+        &["generated", "components", &format!("{component_type}s")],
         &cue_path,
     )
 }
 
 fn render_and_import_component_schema(context: &mut SchemaContext, schema_name: &str, component_type: &str, component_name: &str) -> Result<()> {
-    let friendly_name = format!("'{}' {} configuration", component_name, component_type);
+    let friendly_name = format!("'{component_name}' {component_type} configuration");
     let unwrapped = context.unwrap_resolved_schema(schema_name, &friendly_name)?;
-    let cue_path = format!("components/{}s/generated/{}.cue", component_type, component_name);
+    let cue_path = format!("components/{component_type}s/generated/{component_name}.cue");
 
     render_and_import_schema(
         context,
         Value::Object(unwrapped),
         &friendly_name,
-        &["generated", "components", &format!("{}s", component_type), component_name],
+        &["generated", "components", &format!("{component_type}s"), component_name],
         &cue_path,
     )
 }
@@ -175,7 +171,7 @@ fn render_and_import_generated_api_schema(context: &mut SchemaContext, apis: ser
     let mut api_schema = serde_json::Map::new();
     for (component_name, schema_name) in apis {
         if let Some(name_str) = schema_name.as_str() {
-            let friendly_name = format!("'{}' api configuration", component_name);
+            let friendly_name = format!("'{component_name}' api configuration");
             let resolved = context.unwrap_resolved_schema(name_str, &friendly_name)?;
             api_schema.insert(component_name, Value::Object(resolved));
         }
@@ -195,7 +191,7 @@ fn render_and_import_generated_global_option_schema(context: &mut SchemaContext,
 
     for (component_name, schema_name) in global_options {
         if let Some(name_str) = schema_name.as_str() {
-            let friendly_name = format!("'{}' global options configuration", component_name);
+            let friendly_name = format!("'{component_name}' global options configuration");
 
             if component_name == "global_option" {
                 let flattened = context.unwrap_resolved_schema(name_str, &friendly_name)?;

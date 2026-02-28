@@ -4,6 +4,7 @@ use serde_json::{json, Map, Value};
 use std::collections::{HashMap, HashSet};
 
 impl SchemaContext {
+    #[allow(clippy::too_many_lines)]
     pub fn resolve_enum_schema(&mut self, schema: &Value) -> Result<Value> {
         let mut subschemas = if let Some(one) = schema.get("oneOf") {
             one.as_array().unwrap().clone()
@@ -14,7 +15,7 @@ impl SchemaContext {
             std::process::exit(1);
         };
 
-        let is_optional = get_schema_metadata(schema, "docs::optional").and_then(|v| v.as_bool()).unwrap_or(false);
+        let is_optional = get_schema_metadata(schema, "docs::optional").and_then(serde_json::Value::as_bool).unwrap_or(false);
         subschemas.retain(|sub| {
             sub.get("type").and_then(|t| t.as_str()) != Some("null")
                 && get_schema_metadata(sub, "docs::hidden").is_none()
@@ -32,14 +33,13 @@ impl SchemaContext {
                 obj.remove("anyOf");
                 obj.insert("allOf".to_string(), sub.get("allOf").unwrap().clone());
                 return Ok(json!({ "_resolved": self.resolve_schema(&unwrapped)? }));
-            } else {
-                let mut unwrapped = schema.clone();
-                let obj = unwrapped.as_object_mut().unwrap();
-                obj.remove("oneOf");
-                obj.remove("anyOf");
-                schema_aware_nested_merge(&mut unwrapped, sub);
-                return Ok(json!({ "_resolved": self.resolve_schema(&unwrapped)? }));
             }
+            let mut unwrapped = schema.clone();
+            let obj = unwrapped.as_object_mut().unwrap();
+            obj.remove("oneOf");
+            obj.remove("anyOf");
+            schema_aware_nested_merge(&mut unwrapped, sub);
+            return Ok(json!({ "_resolved": self.resolve_schema(&unwrapped)? }));
         }
 
         let enum_tagging = get_schema_metadata(schema, "docs::enum_tagging").and_then(|v| v.as_str());
@@ -55,7 +55,7 @@ impl SchemaContext {
             let array_idx = subschemas.iter().position(|s| s.get("type").and_then(|t| t.as_str()) == Some("array"));
             if let Some(idx) = array_idx {
                 debug!("Detected likely 'X or array of X' enum schema, applying further validation...");
-                let single_idx = if idx == 0 { 1 } else { 0 };
+                let single_idx = usize::from(idx == 0);
 
                 let single_reduced = self.get_reduced_schema(&subschemas[single_idx]);
                 let array_reduced = self.get_reduced_schema(&subschemas[idx]);
@@ -91,7 +91,7 @@ impl SchemaContext {
                 let mut unique_tag_values: HashMap<String, Value> = HashMap::new();
                 let tag_field = enum_tag_field.unwrap();
 
-                for resolved_subschema in resolved_subschemas.iter_mut() {
+                for resolved_subschema in &mut resolved_subschemas {
                     let title = resolved_subschema.get("title").cloned();
                     let desc = resolved_subschema.get("description").cloned();
 
@@ -107,12 +107,11 @@ impl SchemaContext {
 
                     let mut tag_value = None;
                     for allowed in ["string", "number", "integer", "boolean"] {
-                        if let Some(enum_vals) = tag_subschema.pointer(&format!("/type/{}/enum", allowed)).and_then(|v| v.as_object()) {
-                            if let Some(first_key) = enum_vals.keys().next() {
+                        if let Some(enum_vals) = tag_subschema.pointer(&format!("/type/{allowed}/enum")).and_then(|v| v.as_object())
+                            && let Some(first_key) = enum_vals.keys().next() {
                                 tag_value = Some(first_key.clone());
                                 break;
                             }
-                        }
                     }
 
                     if tag_value.is_none() {
@@ -144,14 +143,14 @@ impl SchemaContext {
                 }
 
                 let unique_tags: HashSet<String> = unique_tag_values.keys().cloned().collect();
-                for (_, val) in unique_resolved_properties.iter_mut() {
+                for (_, val) in &mut unique_resolved_properties {
                     let val_obj = val.as_object_mut().unwrap();
                     if let Some(Value::Array(relevant)) = val_obj.get("relevant_when") {
                         let rel_set: HashSet<String> = relevant.iter().map(|v| v.as_str().unwrap().to_string()).collect();
                         if rel_set.len() == unique_tags.len() && rel_set == unique_tags {
                             val_obj.remove("relevant_when");
                         } else {
-                            let mapped: Vec<String> = relevant.iter().map(|v| format!("{} = {}", tag_field, v)).collect();
+                            let mapped: Vec<String> = relevant.iter().map(|v| format!("{tag_field} = {v}")).collect();
                             val_obj.insert("relevant_when".to_string(), Value::String(mapped.join(" or ")));
                         }
                     }
@@ -173,7 +172,7 @@ impl SchemaContext {
                     std::process::exit(1);
                 }
                 resolved_tag_property_obj.insert("description".to_string(), tag_desc.unwrap().clone());
-                
+
                 unique_resolved_properties.insert(tag_field.to_string(), Value::Object(resolved_tag_property_obj));
 
                 return Ok(json!({ "_resolved": { "type": { "object": { "options": unique_resolved_properties } } } }));
@@ -181,7 +180,7 @@ impl SchemaContext {
         }
 
         // ... remaining modes (external tagged unit variants, untagged narrowed, general fallback) ...
-        
+
         // Return dummy for now, to be filled out.
         Ok(json!({ "_resolved": { "type": { "*": {} } } }))
     }
