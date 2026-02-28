@@ -5,6 +5,7 @@ use std::{
     pin::Pin,
     sync::Arc,
     task::{Context, Poll},
+    time::Duration,
 };
 
 use futures::{FutureExt, Stream, future::BoxFuture, stream};
@@ -54,6 +55,7 @@ impl MaybeTlsSettings {
             listener,
             acceptor,
             origin_filter: None,
+            retry_accept: false,
         })
     }
 
@@ -73,6 +75,7 @@ impl MaybeTlsSettings {
             listener,
             acceptor,
             origin_filter: Some(allow_origin),
+            retry_accept: false,
         })
     }
 }
@@ -81,13 +84,34 @@ pub struct MaybeTlsListener {
     listener: TcpListener,
     acceptor: Option<SslAcceptor>,
     origin_filter: Option<Vec<IpNet>>,
+    retry_accept: bool,
 }
 
 impl MaybeTlsListener {
+    pub fn set_retry_accept(&mut self, retry: bool) {
+        self.retry_accept = retry;
+    }
+
+    async fn retrying_accept(&mut self) -> tokio::io::Result<(TcpStream, SocketAddr)> {
+        if !self.retry_accept {
+            return self.listener.accept().await;
+        }
+        loop {
+            // Accept can error on too many open FDs or the other end closing
+            // This doesn't have to be fatal, we can retry
+            match self.listener.accept().await {
+                Ok(v) => return Ok(v),
+                Err(e) => {
+                    error!("accept error: {e}");
+                    tokio::time::sleep(Duration::from_secs(1)).await;
+                    continue;
+                }
+            }
+        }
+    }
     pub async fn accept(&mut self) -> crate::tls::Result<MaybeTlsIncomingStream<TcpStream>> {
         let listener = self
-            .listener
-            .accept()
+            .retrying_accept()
             .await
             .map(|(stream, peer_addr)| {
                 MaybeTlsIncomingStream::new(stream, peer_addr, self.acceptor.clone())
@@ -183,6 +207,7 @@ impl From<TcpListener> for MaybeTlsListener {
             listener,
             acceptor: None,
             origin_filter: None,
+            retry_accept: false,
         }
     }
 }
