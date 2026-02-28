@@ -7,10 +7,15 @@ services:
     - 2181:2181
     environment:
     - ZOOKEEPER_CLIENT_PORT=2181
+    tmpfs:
+    - /var/lib/zookeeper/data:uid=1000,gid=1000
+    - /var/lib/zookeeper/log:uid=1000,gid=1000
   kafka:
     image: docker.io/confluentinc/cp-kafka:7.6.1
     depends_on:
     - zookeeper
+    tmpfs:
+    - /var/lib/kafka/data:uid=1000,gid=1000
     environment:
     - KAFKA_BROKER_ID=1
     - KAFKA_ZOOKEEPER_CONNECT=zookeeper:2181
