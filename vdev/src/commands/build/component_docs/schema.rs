@@ -35,9 +35,9 @@ impl SchemaContext {
 
 pub fn find_command_on_path(command: &str) -> Option<String> {
     let exts = env::var("PATHEXT")
-        .unwrap_or_else(|_| "".to_string())
+        .unwrap_or_else(|_| String::new())
         .split(';')
-        .map(|s| s.to_string())
+        .map(std::string::ToString::to_string)
         .collect::<Vec<String>>();
 
     let path_var = env::var("PATH").unwrap_or_default();
@@ -46,10 +46,10 @@ pub fn find_command_on_path(command: &str) -> Option<String> {
     for path in paths {
         for ext in &exts {
             let mut expected = path.join(command);
-            expected.set_extension(ext.replace(".", ""));
+            expected.set_extension(ext.replace('.', ""));
 
             if expected.is_file() {
-                return expected.to_str().map(|s| s.to_string());
+                return expected.to_str().map(std::string::ToString::to_string);
             }
         }
     }
@@ -81,7 +81,7 @@ pub fn get_schema_metadata<'a>(schema: &'a Value, key: &str) -> Option<&'a Value
     schema.get("_metadata").and_then(|m| m.get(key))
 }
 
-pub fn get_schema_ref<'a>(schema: &'a Value) -> Option<&'a str> {
+pub fn get_schema_ref(schema: &Value) -> Option<&str> {
     schema.get("$ref").and_then(|r| r.as_str())
 }
 
@@ -130,7 +130,7 @@ pub fn schema_aware_nested_merge(base: &mut Value, override_val: &Value) {
         let over_obj = override_val.as_object().unwrap();
 
         for (k, v) in over_obj {
-            if k == "const" && base_obj.contains_key("value") && v.as_object().map_or(false, |o| o.contains_key("value")) {
+            if k == "const" && base_obj.contains_key("value") && v.as_object().is_some_and(|o| o.contains_key("value")) {
                 let base_vals = std::mem::take(base_obj.get_mut("const").unwrap());
                 let mut result = Vec::new();
 

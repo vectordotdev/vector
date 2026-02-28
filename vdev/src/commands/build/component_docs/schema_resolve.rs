@@ -10,14 +10,14 @@ impl SchemaContext {
 
         let schema = self.get_schema_by_name(schema_name)?;
         let resolved = self.resolve_schema(&schema)?;
-        
+
         self.resolved_schema_cache.insert(schema_name.to_string(), resolved.clone());
         Ok(resolved)
     }
 
     pub fn resolve_schema(&mut self, schema: &Value) -> Result<Value> {
         let expanded = self.expand_schema_references(schema)?;
-        
+
         if get_schema_metadata(&expanded, "docs::hidden").is_some() {
             debug!("Instructed to skip resolution for the given schema.");
             return Ok(Value::Null); // Returning null to indicate skipped
@@ -27,6 +27,7 @@ impl SchemaContext {
             let mut resolved = if type_override == "ascii_char" {
                 if let Some(Value::Number(n)) = expanded.get("default") {
                     if let Some(c) = n.as_u64() {
+                        #[allow(clippy::cast_possible_truncation)]
                         let c_char = (c as u8) as char;
                         json!({ "type": { type_override: { "default": c_char.to_string() } } })
                     } else {
@@ -52,11 +53,10 @@ impl SchemaContext {
         }
 
         // Remove description from array items
-        if let Some(items_schema) = resolved.pointer_mut("/type/array/items") {
-            if let Value::Object(obj) = items_schema {
+        if let Some(items_schema) = resolved.pointer_mut("/type/array/items")
+            && let Value::Object(obj) = items_schema {
                 obj.remove("description");
             }
-        }
 
         self.apply_schema_default_value(&expanded, &mut resolved)?;
         self.apply_schema_metadata(&expanded, &mut resolved);
@@ -66,7 +66,7 @@ impl SchemaContext {
             resolved.as_object_mut().unwrap().insert("description".to_string(), Value::String(desc));
         }
 
-        if expanded.get("deprecated").and_then(|v| v.as_bool()).unwrap_or(false) {
+        if expanded.get("deprecated").and_then(serde_json::Value::as_bool).unwrap_or(false) {
             resolved.as_object_mut().unwrap().insert("deprecated".to_string(), Value::Bool(true));
             if let Some(msg) = get_schema_metadata(&expanded, "deprecated_message") {
                 resolved.as_object_mut().unwrap().insert("deprecated_message".to_string(), msg.clone());
@@ -86,6 +86,7 @@ impl SchemaContext {
         Ok(resolved)
     }
 
+    #[allow(clippy::too_many_lines)]
     pub fn resolve_bare_schema(&mut self, schema: &Value) -> Result<Value> {
         let schema_type = self.get_json_schema_type(schema);
 
@@ -108,7 +109,7 @@ impl SchemaContext {
                     Value::Null
                 }
             }
-            Some("one-of") | Some("any-of") => {
+            Some("one-of" | "any-of") => {
                 debug!("Resolving enum schema.");
                 let mut wrapped = self.resolve_enum_schema(schema)?;
                 wrapped.get_mut("_resolved").and_then(|r| r.get_mut("type")).cloned().unwrap_or(Value::Null)
@@ -164,12 +165,12 @@ impl SchemaContext {
                 }
                 json!({ "string": def })
             }
-            Some("number") | Some("integer") => {
+            Some("number" | "integer") => {
                 debug!("Resolving number schema.");
                 let num_type = get_schema_metadata(schema, "docs::numeric_type")
                     .and_then(|n| n.as_str())
                     .unwrap_or("number");
-                
+
                 let mut def = json!({});
                 if let Some(d) = schema.get("default") {
                     def.as_object_mut().unwrap().insert("default".to_string(), d.clone());
@@ -188,7 +189,7 @@ impl SchemaContext {
                 debug!("Resolving const schema.");
                 let const_val = schema.get("const").unwrap();
                 let type_str = self.get_docs_type_for_value(schema, const_val);
-                
+
                 let mut def = json!({ "value": const_val.clone() });
                 let desc = self.get_rendered_description_from_schema(schema);
                 if !desc.is_empty() {
@@ -209,7 +210,12 @@ impl SchemaContext {
 
                     let mut res = serde_json::Map::new();
                     for (k, v) in grouped {
-                        res.insert(k, json!({ "enum": v }));
+                        let mut enum_map = serde_json::Map::new();
+                        for item in v {
+                            let key_str = item.as_str().map_or_else(|| item.to_string(), std::string::ToString::to_string);
+                            enum_map.insert(key_str, json!({}));
+                        }
+                        res.insert(k, json!({ "enum": enum_map }));
                     }
                     Value::Object(res)
                 } else {
