@@ -40,12 +40,12 @@ impl SchemaContext {
         Ok(sorted_map)
     }
 
-    pub fn fix_grouped_enums_if_numeric(&self, grouped: &mut std::collections::HashMap<String, Vec<Value>>) {
+    pub fn fix_grouped_enums_if_numeric(&self, grouped: &mut indexmap::IndexMap<String, Vec<Value>>) {
         let mut numeric_vals = Vec::new();
-        if let Some(ints) = grouped.remove("integer") {
+        if let Some(ints) = grouped.shift_remove("integer") {
             numeric_vals.extend(ints);
         }
-        if let Some(nums) = grouped.remove("number") {
+        if let Some(nums) = grouped.shift_remove("number") {
             numeric_vals.extend(nums);
         }
 
