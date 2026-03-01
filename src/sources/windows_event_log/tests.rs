@@ -105,8 +105,9 @@ mod config_tests {
         assert_eq!(config.connection_timeout_secs, 30);
         assert_eq!(config.event_timeout_ms, 5000);
         assert!(!config.read_existing_events);
-        assert_eq!(config.batch_size, 10);
+        assert_eq!(config.batch_size, 100);
         assert!(!config.include_xml);
+        assert!(config.render_message);
         assert!(config.field_filter.include_system_fields);
         assert!(config.field_filter.include_event_data);
         assert!(config.field_filter.include_user_data);
@@ -511,7 +512,6 @@ mod error_tests {
         let converted: WindowsEventLogError = io_error.into();
         assert!(matches!(converted, WindowsEventLogError::IoError { .. }));
     }
-
 }
 
 #[cfg(test)]
@@ -580,14 +580,8 @@ mod subscription_tests {
         </Event>
         "#;
 
-        assert_eq!(
-            extract_xml_value(xml, "EventID"),
-            Some("1".to_string())
-        );
-        assert_eq!(
-            extract_xml_value(xml, "Level"),
-            Some("4".to_string())
-        );
+        assert_eq!(extract_xml_value(xml, "EventID"), Some("1".to_string()));
+        assert_eq!(extract_xml_value(xml, "Level"), Some("4".to_string()));
         assert_eq!(
             extract_xml_value(xml, "EventRecordID"),
             Some("12345".to_string())
@@ -600,10 +594,7 @@ mod subscription_tests {
             extract_xml_value(xml, "Computer"),
             Some("TEST-MACHINE".to_string())
         );
-        assert_eq!(
-            extract_xml_value(xml, "NonExistent"),
-            None
-        );
+        assert_eq!(extract_xml_value(xml, "NonExistent"), None);
     }
 
     #[test]
@@ -625,10 +616,7 @@ mod subscription_tests {
             extract_xml_attribute(xml, "SystemTime"),
             Some("2025-08-29T00:15:41.123456Z".to_string())
         );
-        assert_eq!(
-            extract_xml_attribute(xml, "NonExistent"),
-            None
-        );
+        assert_eq!(extract_xml_attribute(xml, "NonExistent"), None);
     }
 
     #[test]
@@ -724,16 +712,6 @@ async fn test_source_acknowledgements() {
     assert!(config.can_acknowledge());
 }
 
-#[test]
-fn test_inventory_registration() {
-    // Verify that the source is properly registered in the inventory
-    // This tests the inventory::submit! macro
-    // The registration happens automatically via the inventory::submit! macro
-    // We can't directly test it here, but we can verify the config builds correctly
-    let config = create_test_config();
-    assert!(config.validate().is_ok());
-}
-
 // Compliance tests
 #[tokio::test]
 async fn test_source_compliance() {
@@ -743,37 +721,6 @@ async fn test_source_compliance() {
         &SOURCE_TAGS,
     )
     .await;
-}
-
-// Performance and stress tests
-#[tokio::test]
-async fn test_high_volume_events() {
-    // This would test the source under high event volume
-    // Implementation would depend on ability to generate test events
-    let config = create_test_config();
-    assert!(config.validate().is_ok());
-}
-
-#[tokio::test]
-async fn test_memory_usage() {
-    // This would test memory usage under various conditions
-    // Implementation would measure memory before/after processing events
-    let config = create_test_config();
-    assert!(config.validate().is_ok());
-}
-
-#[tokio::test]
-async fn test_concurrent_channels() {
-    let mut config = create_test_config();
-    config.channels = vec![
-        "System".to_string(),
-        "Application".to_string(),
-        "Setup".to_string(),
-        "Forwarded Events".to_string(),
-    ];
-
-    assert!(config.validate().is_ok());
-    assert_eq!(config.channels.len(), 4);
 }
 
 // ================================================================================================
@@ -1052,18 +999,6 @@ mod buffer_safety_tests {
 // CONCURRENCY AND RACE CONDITION TESTS
 // ================================================================================================
 
-#[cfg(test)]
-mod concurrency_tests {
-    use super::*;
-
-    #[tokio::test]
-    async fn test_concurrent_subscription_creation() {
-        // Test that multiple subscription attempts don't interfere
-        let config = create_test_config();
-        assert!(config.validate().is_ok());
-    }
-}
-
 // ================================================================================================
 // ERROR INJECTION AND FAULT TOLERANCE TESTS
 // ================================================================================================
@@ -1112,7 +1047,7 @@ mod fault_tolerance_tests {
 #[cfg(test)]
 mod acknowledgement_tests {
     use super::*;
-    use crate::config::SourceAcknowledgementsConfig;
+    use crate::config::{SourceAcknowledgementsConfig, SourceConfig};
 
     #[test]
     fn test_acknowledgements_config_default_disabled() {
@@ -1136,7 +1071,6 @@ mod acknowledgement_tests {
 
     #[test]
     fn test_can_acknowledge_returns_true() {
-        use crate::config::SourceConfig;
         let config = WindowsEventLogConfig::default();
         assert!(
             config.can_acknowledge(),
@@ -1458,15 +1392,20 @@ mod truncation_tests {
         let parser = EventLogParser::new(&config, LogNamespace::Legacy);
         let log_event = parser.parse_event(event).unwrap();
 
-        // Check if string_inserts contains truncation marker
-        if let Some(Value::Array(inserts)) = log_event.get("string_inserts") {
-            if !inserts.is_empty() {
-                let first = inserts[0].to_string_lossy();
-                if first.len() > 50 {
-                    // If truncation is applied, it should have the marker
-                    // Note: This depends on implementation details
-                }
-            }
+        let inserts = log_event
+            .get("string_inserts")
+            .expect("string_inserts should be present");
+        if let Value::Array(arr) = inserts {
+            assert!(!arr.is_empty(), "string_inserts should not be empty");
+            let first = arr[0].to_string_lossy();
+            assert!(
+                first.len() <= 50 || first.ends_with("[truncated]"),
+                "Truncated field should be at most {max_len} chars or end with '[truncated]', got length {len}: {first}",
+                max_len = 50,
+                len = first.len(),
+            );
+        } else {
+            panic!("string_inserts should be an array");
         }
     }
 
@@ -1498,19 +1437,18 @@ mod truncation_tests {
         let mut config = create_test_config();
 
         // 63 channels should be fine (MAXIMUM_WAIT_OBJECTS - 1 for shutdown event)
-        config.channels = (0..63)
-            .map(|i| format!("Channel{i}"))
-            .collect();
+        config.channels = (0..63).map(|i| format!("Channel{i}")).collect();
         assert!(config.validate().is_ok(), "63 channels should be accepted");
 
         // 64 channels should fail
-        config.channels = (0..64)
-            .map(|i| format!("Channel{i}"))
-            .collect();
+        config.channels = (0..64).map(|i| format!("Channel{i}")).collect();
         let result = config.validate();
         assert!(result.is_err(), "64 channels should be rejected");
         assert!(
-            result.unwrap_err().to_string().contains("Too many channels"),
+            result
+                .unwrap_err()
+                .to_string()
+                .contains("Too many channels"),
             "Error should mention too many channels"
         );
     }

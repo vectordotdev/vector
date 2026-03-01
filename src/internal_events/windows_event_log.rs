@@ -1,6 +1,9 @@
 use metrics::counter;
 use tracing::warn;
-use vector_lib::{NamedInternalEvent, internal_event::{InternalEvent, error_stage, error_type}};
+use vector_lib::{
+    NamedInternalEvent,
+    internal_event::{InternalEvent, error_stage, error_type},
+};
 
 #[derive(Debug, NamedInternalEvent)]
 pub struct WindowsEventLogParseError {
@@ -110,8 +113,6 @@ mod tests {
         };
         event.emit();
     }
-
-
 
     #[test]
     fn test_bookmark_error() {

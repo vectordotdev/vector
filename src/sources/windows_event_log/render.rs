@@ -4,6 +4,12 @@
 //! subscription lifecycle and event pulling.
 
 use metrics::Gauge;
+use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
+use windows::Win32::System::EventLog::{
+    EVT_HANDLE, EVT_LOG_PROPERTY_ID, EvtClose, EvtGetLogInfo, EvtLogNumberOfLogRecords, EvtOpenLog,
+    EvtRender, EvtRenderEventXml,
+};
+use windows::core::HSTRING;
 
 use super::error::WindowsEventLogError;
 
@@ -11,11 +17,8 @@ use super::error::WindowsEventLogError;
 pub(super) fn render_event_xml(
     render_buffer: &mut Vec<u8>,
     decode_buffer: &mut Vec<u16>,
-    event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
+    event_handle: EVT_HANDLE,
 ) -> Result<String, WindowsEventLogError> {
-    use windows::Win32::Foundation::ERROR_INSUFFICIENT_BUFFER;
-    use windows::Win32::System::EventLog::{EvtRender, EvtRenderEventXml};
-
     const MAX_BUFFER_SIZE: u32 = 10 * 1024 * 1024; // 10MB limit
 
     let buffer_size = render_buffer.len() as u32;
@@ -94,11 +97,6 @@ pub(super) fn render_event_xml(
 /// `rate(events_read_total)` to detect ingestion lag.
 /// Best-effort: if any API call fails, the gauge is left unchanged.
 pub(super) fn update_channel_records(channel: &str, gauge: &Gauge) {
-    use windows::Win32::System::EventLog::{
-        EvtGetLogInfo, EvtLogNumberOfLogRecords, EvtOpenLog, EVT_LOG_PROPERTY_ID,
-    };
-    use windows::core::HSTRING;
-
     let channel_hstring = HSTRING::from(channel);
     let log_handle = unsafe {
         // EvtOpenChannelPath = 1
@@ -123,7 +121,7 @@ pub(super) fn update_channel_records(channel: &str, gauge: &Gauge) {
     };
 
     unsafe {
-        let _ = windows::Win32::System::EventLog::EvtClose(log_handle);
+        let _ = EvtClose(log_handle);
     }
 
     if result.is_ok() {

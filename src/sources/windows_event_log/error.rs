@@ -10,24 +10,16 @@ pub enum WindowsEventLogError {
     },
 
     #[snafu(display("Failed to create event subscription: {}", source))]
-    CreateSubscriptionError {
-        source: windows::core::Error,
-    },
+    CreateSubscriptionError { source: windows::core::Error },
 
     #[snafu(display("Failed to query events: {}", source))]
-    QueryEventsError {
-        source: windows::core::Error,
-    },
+    QueryEventsError { source: windows::core::Error },
 
     #[snafu(display("Failed to read event: {}", source))]
-    ReadEventError {
-        source: windows::core::Error,
-    },
+    ReadEventError { source: windows::core::Error },
 
     #[snafu(display("Failed to render event message: {}", source))]
-    RenderMessageError {
-        source: windows::core::Error,
-    },
+    RenderMessageError { source: windows::core::Error },
 
     #[snafu(display("Failed to parse event XML: {}", source))]
     ParseXmlError { source: quick_xml::Error },
@@ -60,9 +52,7 @@ pub enum WindowsEventLogError {
     TimeoutError { timeout_secs: u64 },
 
     #[snafu(display("Failed to create render context: {}", source))]
-    CreateRenderContextError {
-        source: windows::core::Error,
-    },
+    CreateRenderContextError { source: windows::core::Error },
 
     #[snafu(display("Failed to format message: {}", message))]
     FormatMessageError { message: String },
@@ -71,14 +61,10 @@ pub enum WindowsEventLogError {
     RenderError { message: String },
 
     #[snafu(display("Failed to create subscription: {}", source))]
-    SubscriptionError {
-        source: windows::core::Error,
-    },
+    SubscriptionError { source: windows::core::Error },
 
     #[snafu(display("Failed to seek events: {}", source))]
-    SeekEventsError {
-        source: windows::core::Error,
-    },
+    SeekEventsError { source: windows::core::Error },
 
     #[snafu(display("Failed to load publisher metadata for '{}': {}", provider, source))]
     LoadPublisherMetadataError {
@@ -159,13 +145,6 @@ impl WindowsEventLogError {
             }
             _ => self.to_string(),
         }
-    }
-}
-
-// Implement conversion from Windows errors
-impl From<windows::core::Error> for WindowsEventLogError {
-    fn from(error: windows::core::Error) -> Self {
-        Self::QueryEventsError { source: error }
     }
 }
 

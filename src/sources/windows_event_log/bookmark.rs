@@ -3,7 +3,7 @@
 //! Provides bookmark-based checkpointing for Windows Event Log subscriptions.
 //! Bookmarks survive channel clears and log rotations, and provide O(1) seeking.
 
-use tracing::{debug, error, warn};
+use tracing::{debug, error};
 use windows::{
     Win32::System::EventLog::{
         EVT_HANDLE, EvtClose, EvtCreateBookmark, EvtRender, EvtRenderBookmark, EvtUpdateBookmark,
@@ -34,11 +34,11 @@ impl BookmarkManager {
     pub fn new() -> Result<Self, WindowsEventLogError> {
         unsafe {
             let handle = EvtCreateBookmark(None).map_err(|e| {
-                error!(message = "Failed to create bookmark", error = %e);
+                error!(message = "Failed to create bookmark.", error = %e);
                 WindowsEventLogError::CreateSubscriptionError { source: e }
             })?;
 
-            debug!(message = "Created new bookmark", handle = ?handle);
+            debug!(message = "Created new bookmark.", handle = ?handle);
 
             Ok(Self { handle })
         }
@@ -64,16 +64,13 @@ impl BookmarkManager {
             let xml_hstring = HSTRING::from(xml);
             match EvtCreateBookmark(&xml_hstring) {
                 Ok(handle) => {
-                    debug!(message = "Created bookmark from XML", handle = ?handle);
+                    debug!(message = "Created bookmark from XML.", handle = ?handle);
                     Ok(Self { handle })
                 }
                 Err(e) => {
-                    warn!(
-                        message = "Corrupted bookmark XML detected, creating fresh bookmark to recover gracefully",
-                        error = %e
-                    );
-                    // Gracefully degrade - start fresh rather than failing the entire subscription
-                    Self::new()
+                    // Propagate the error so the caller can decide how to handle it
+                    // (e.g., fall back to a fresh bookmark with has_valid_checkpoint = false)
+                    Err(WindowsEventLogError::CreateSubscriptionError { source: e })
                 }
             }
         }
@@ -93,11 +90,11 @@ impl BookmarkManager {
     pub fn update(&mut self, event_handle: EVT_HANDLE) -> Result<(), WindowsEventLogError> {
         unsafe {
             EvtUpdateBookmark(self.handle, event_handle).map_err(|e| {
-                error!(message = "Failed to update bookmark", error = %e);
+                error!(message = "Failed to update bookmark.", error = %e);
                 WindowsEventLogError::SubscriptionError { source: e }
             })?;
 
-            debug!(message = "Updated bookmark", event_handle = ?event_handle);
+            debug!(message = "Updated bookmark.", event_handle = ?event_handle);
             Ok(())
         }
     }
@@ -137,7 +134,7 @@ impl BookmarkManager {
             if required_size == 0 {
                 // Bookmark hasn't been updated with any events yet - return empty string
                 // This is normal for fresh bookmarks before first event
-                debug!(message = "Bookmark not yet updated, skipping serialization");
+                debug!(message = "Bookmark not yet updated, skipping serialization.");
                 return Ok(String::new());
             }
 
@@ -168,7 +165,7 @@ impl BookmarkManager {
             let xml = String::from_utf16_lossy(&buffer[0..((actual_used / 2) as usize)]);
 
             debug!(
-                message = "Serialized bookmark to XML",
+                message = "Serialized bookmark to XML.",
                 xml_length = xml.len()
             );
 
@@ -256,7 +253,7 @@ impl BookmarkManager {
         if self.handle.0 != 0 {
             unsafe {
                 let _ = EvtClose(self.handle);
-                debug!(message = "Closed bookmark handle", handle = ?self.handle);
+                debug!(message = "Closed bookmark handle.", handle = ?self.handle);
                 self.handle = EVT_HANDLE(0);
             }
         }

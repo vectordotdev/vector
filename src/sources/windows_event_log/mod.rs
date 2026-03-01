@@ -8,7 +8,11 @@ use vector_lib::internal_event::{
     ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
 };
 use vector_lib::{EstimatedJsonEncodedSizeOf, config::LogNamespace};
-use vrl::value::Kind;
+use vrl::value::{Kind, kind::Collection};
+
+use vector_config::component::SourceDescription;
+use windows::Win32::Foundation::{DUPLICATE_SAME_ACCESS, DuplicateHandle, HANDLE};
+use windows::Win32::System::Threading::GetCurrentProcess;
 
 use crate::{
     SourceSender,
@@ -41,7 +45,9 @@ mod integration_tests;
 
 pub use self::config::*;
 use self::{
-    checkpoint::Checkpointer, error::WindowsEventLogError, parser::EventLogParser,
+    checkpoint::Checkpointer,
+    error::WindowsEventLogError,
+    parser::EventLogParser,
     subscription::{EventLogSubscription, WaitResult},
 };
 
@@ -86,23 +92,23 @@ impl Finalizer {
                     if status == BatchStatus::Delivered {
                         if let Err(e) = checkpointer.set_batch(entry.bookmarks.clone()).await {
                             warn!(
-                                message = "Failed to update checkpoint after acknowledgement",
+                                message = "Failed to update checkpoint after acknowledgement.",
                                 error = %e
                             );
                         } else {
                             debug!(
-                                message = "Checkpoint updated after acknowledgement",
+                                message = "Checkpoint updated after acknowledgement.",
                                 channels = entry.bookmarks.len()
                             );
                         }
                     } else {
                         debug!(
-                            message = "Events not delivered, checkpoint not updated",
+                            message = "Events not delivered, checkpoint not updated.",
                             status = ?status
                         );
                     }
                 }
-                debug!("Acknowledgement stream completed");
+                debug!(message = "Acknowledgement stream completed.");
             });
 
             Self::Async(finalizer)
@@ -119,7 +125,7 @@ impl Finalizer {
             (Self::Sync(checkpointer), None) => {
                 if let Err(e) = checkpointer.set_batch(entry.bookmarks.clone()).await {
                     warn!(
-                        message = "Failed to update checkpoint",
+                        message = "Failed to update checkpoint.",
                         error = %e
                     );
                 }
@@ -128,10 +134,12 @@ impl Finalizer {
                 finalizer.add(entry, receiver);
             }
             (Self::Sync(_), Some(_)) => {
-                warn!("Received acknowledgement receiver in sync mode, ignoring");
+                warn!(message = "Received acknowledgement receiver in sync mode, ignoring.");
             }
             (Self::Async(_), None) => {
-                warn!("No acknowledgement receiver in async mode, checkpoint may be lost");
+                warn!(
+                    message = "No acknowledgement receiver in async mode, checkpoint may be lost."
+                );
             }
         }
     }
@@ -191,7 +199,7 @@ impl WindowsEventLogSource {
         let acknowledgements = self.acknowledgements;
 
         info!(
-            message = "Starting Windows Event Log source (pull mode)",
+            message = "Starting Windows Event Log source (pull mode).",
             acknowledgements = acknowledgements,
         );
 
@@ -202,23 +210,31 @@ impl WindowsEventLogSource {
         // We duplicate the handle so the watcher owns an independent kernel reference.
         // This prevents use-after-close if the subscription panics and drops before
         // the watcher fires — the duplicate remains valid until explicitly closed.
-        let watcher_handle_raw: isize = {
-            use windows::Win32::Foundation::{DuplicateHandle, DUPLICATE_SAME_ACCESS, HANDLE};
-            use windows::Win32::System::Threading::GetCurrentProcess;
-
+        let (watcher_handle_raw, watcher_owns_handle): (isize, bool) = {
             unsafe {
                 let src = HANDLE(subscription.shutdown_event_raw());
                 let process = GetCurrentProcess();
                 let mut dup = HANDLE::default();
-                if DuplicateHandle(process, src, process, &mut dup, 0, false, DUPLICATE_SAME_ACCESS)
-                    .is_ok()
+                if DuplicateHandle(
+                    process,
+                    src,
+                    process,
+                    &mut dup,
+                    0,
+                    false,
+                    DUPLICATE_SAME_ACCESS,
+                )
+                .is_ok()
                 {
-                    dup.0 as isize
+                    (dup.0 as isize, true)
                 } else {
-                    // Fallback: use the original raw pointer (pre-existing behavior).
-                    // This path should not be reached in practice.
-                    warn!(message = "Failed to duplicate shutdown event handle, falling back to shared handle.");
-                    src.0 as isize
+                    // Fallback: use the original handle without ownership.
+                    // The watcher will signal but NOT close — EventLogSubscription::drop
+                    // owns the handle and will close it.
+                    warn!(
+                        message = "Failed to duplicate shutdown event handle, falling back to shared handle."
+                    );
+                    (src.0 as isize, false)
                 }
             }
         };
@@ -226,15 +242,19 @@ impl WindowsEventLogSource {
         tokio::spawn(async move {
             shutdown_watcher.await;
             unsafe {
-                let handle = windows::Win32::Foundation::HANDLE(watcher_handle_raw as *mut std::ffi::c_void);
+                let handle =
+                    windows::Win32::Foundation::HANDLE(watcher_handle_raw as *mut std::ffi::c_void);
                 let _ = windows::Win32::System::Threading::SetEvent(handle);
-                let _ = windows::Win32::Foundation::CloseHandle(handle);
+                if watcher_owns_handle {
+                    let _ = windows::Win32::Foundation::CloseHandle(handle);
+                }
             }
         });
 
         // Track when we last flushed checkpoints
         let mut last_checkpoint = std::time::Instant::now();
-        let checkpoint_interval = std::time::Duration::from_secs(self.config.checkpoint_interval_secs);
+        let checkpoint_interval =
+            std::time::Duration::from_secs(self.config.checkpoint_interval_secs);
 
         // Exponential backoff on consecutive recoverable errors
         let mut error_backoff = std::time::Duration::from_millis(100);
@@ -293,7 +313,7 @@ impl WindowsEventLogSource {
                         Ok(events) => {
                             error_backoff = std::time::Duration::from_millis(100);
                             debug!(
-                                message = "Pulled Windows Event Log events",
+                                message = "Pulled Windows Event Log events.",
                                 event_count = events.len()
                             );
 
@@ -310,13 +330,11 @@ impl WindowsEventLogSource {
                                 let event_id = event.event_id;
                                 match parser.parse_event(event) {
                                     Ok(mut log_event) => {
-                                        let byte_size =
-                                            log_event.estimated_json_encoded_size_of();
+                                        let byte_size = log_event.estimated_json_encoded_size_of();
                                         total_byte_size += byte_size.get();
 
                                         if let Some(ref batch) = batch {
-                                            log_event =
-                                                log_event.with_batch_notifier(batch);
+                                            log_event = log_event.with_batch_notifier(batch);
                                         }
 
                                         log_events.push(log_event);
@@ -333,8 +351,7 @@ impl WindowsEventLogSource {
 
                             if !log_events.is_empty() {
                                 let count = log_events.len();
-                                events_received
-                                    .emit(CountByteSize(count, total_byte_size.into()));
+                                events_received.emit(CountByteSize(count, total_byte_size.into()));
                                 bytes_received.emit(ByteSize(total_byte_size));
 
                                 // BACK PRESSURE: block here until the pipeline accepts
@@ -394,7 +411,7 @@ impl WindowsEventLogSource {
                     if !acknowledgements && last_checkpoint.elapsed() >= checkpoint_interval {
                         if let Err(e) = subscription.flush_bookmarks().await {
                             warn!(
-                                message = "Failed to flush bookmarks during periodic checkpoint",
+                                message = "Failed to flush bookmarks during periodic checkpoint.",
                                 error = %e
                             );
                         }
@@ -422,11 +439,11 @@ impl WindowsEventLogSource {
                 }
 
                 WaitResult::Shutdown => {
-                    info!("Windows Event Log wait received shutdown signal");
+                    info!(message = "Windows Event Log wait received shutdown signal.");
                     if !acknowledgements {
-                        info!("Flushing bookmarks before shutdown");
+                        info!(message = "Flushing bookmarks before shutdown.");
                         if let Err(e) = subscription.flush_bookmarks().await {
-                            warn!("Failed to flush bookmarks on shutdown: {}", e);
+                            warn!(message = "Failed to flush bookmarks on shutdown.", error = %e);
                         }
                     }
                     break;
@@ -454,7 +471,7 @@ impl SourceConfig for WindowsEventLogConfig {
         Ok(Box::pin(async move {
             let mut source = source;
             if let Err(error) = source.run_internal(cx.out, cx.shutdown).await {
-                error!(message = "Windows Event Log source failed", %error);
+                error!(message = "Windows Event Log source failed.", %error);
             }
             Ok(())
         }))
@@ -492,7 +509,31 @@ impl SourceConfig for WindowsEventLogConfig {
                     ("channel".into(), Kind::bytes().or_undefined()),
                     ("opcode".into(), Kind::integer().or_undefined()),
                     ("task".into(), Kind::integer().or_undefined()),
-                    ("keywords".into(), Kind::integer().or_undefined()),
+                    ("keywords".into(), Kind::bytes().or_undefined()),
+                    ("level_value".into(), Kind::integer().or_undefined()),
+                    ("provider_guid".into(), Kind::bytes().or_undefined()),
+                    ("version".into(), Kind::integer().or_undefined()),
+                    ("qualifiers".into(), Kind::integer().or_undefined()),
+                    (
+                        "string_inserts".into(),
+                        Kind::array(Collection::empty().with_unknown(Kind::bytes()))
+                        .or_undefined(),
+                    ),
+                    (
+                        "event_data".into(),
+                        Kind::object(std::collections::BTreeMap::new()).or_undefined(),
+                    ),
+                    (
+                        "user_data".into(),
+                        Kind::object(std::collections::BTreeMap::new()).or_undefined(),
+                    ),
+                    ("task_name".into(), Kind::bytes().or_undefined()),
+                    ("opcode_name".into(), Kind::bytes().or_undefined()),
+                    (
+                        "keyword_names".into(),
+                        Kind::array(Collection::empty().with_unknown(Kind::bytes()))
+                        .or_undefined(),
+                    ),
                 ])),
                 [LogNamespace::Vector],
             ),
@@ -516,8 +557,6 @@ impl SourceConfig for WindowsEventLogConfig {
         true
     }
 }
-
-use vector_config::component::SourceDescription;
 
 inventory::submit! {
     SourceDescription::new::<WindowsEventLogConfig>(

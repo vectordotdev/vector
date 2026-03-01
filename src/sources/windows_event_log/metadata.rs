@@ -3,6 +3,11 @@ use std::num::NonZeroUsize;
 
 use lru::LruCache;
 use metrics::Counter;
+use windows::Win32::System::EventLog::{
+    EVT_HANDLE, EvtFormatMessage, EvtFormatMessageEvent, EvtFormatMessageKeyword,
+    EvtFormatMessageOpcode, EvtFormatMessageTask, EvtOpenPublisherMetadata,
+};
+use windows::core::HSTRING;
 
 use super::subscription::{FORMAT_CACHE_CAPACITY, PublisherHandle};
 
@@ -12,17 +17,12 @@ pub fn resolve_event_metadata(
     format_cache: &mut HashMap<String, LruCache<(u32, u64), Option<String>>>,
     cache_hits_counter: &Counter,
     cache_misses_counter: &Counter,
-    event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
+    event_handle: EVT_HANDLE,
     provider_name: &str,
     task: u64,
     opcode: u64,
     keywords: u64,
 ) -> (Option<String>, Option<String>, Vec<String>) {
-    use windows::Win32::System::EventLog::{
-        EVT_HANDLE, EvtFormatMessageKeyword, EvtFormatMessageOpcode,
-        EvtFormatMessageTask,
-    };
-
     let raw_handle = get_or_open_publisher(publisher_cache, provider_name);
 
     if raw_handle == 0 {
@@ -36,16 +36,34 @@ pub fn resolve_event_metadata(
     let keyword_flag = EvtFormatMessageKeyword.0 as u32;
 
     let task_name = cached_format(
-        format_cache, cache_hits_counter, cache_misses_counter,
-        metadata_handle, event_handle, provider_name, task_flag, task,
+        format_cache,
+        cache_hits_counter,
+        cache_misses_counter,
+        metadata_handle,
+        event_handle,
+        provider_name,
+        task_flag,
+        task,
     );
     let opcode_name = cached_format(
-        format_cache, cache_hits_counter, cache_misses_counter,
-        metadata_handle, event_handle, provider_name, opcode_flag, opcode,
+        format_cache,
+        cache_hits_counter,
+        cache_misses_counter,
+        metadata_handle,
+        event_handle,
+        provider_name,
+        opcode_flag,
+        opcode,
     );
     let keyword_str = cached_format(
-        format_cache, cache_hits_counter, cache_misses_counter,
-        metadata_handle, event_handle, provider_name, keyword_flag, keywords,
+        format_cache,
+        cache_hits_counter,
+        cache_misses_counter,
+        metadata_handle,
+        event_handle,
+        provider_name,
+        keyword_flag,
+        keywords,
     );
 
     let keyword_names = keyword_str
@@ -68,9 +86,6 @@ fn get_or_open_publisher(
         return handle.0;
     }
 
-    use windows::Win32::System::EventLog::EvtOpenPublisherMetadata;
-    use windows::core::HSTRING;
-
     let provider_hstring = HSTRING::from(provider_name);
     let raw = unsafe {
         EvtOpenPublisherMetadata(None, &provider_hstring, None, 0, 0)
@@ -88,8 +103,8 @@ fn cached_format(
     cache: &mut HashMap<String, LruCache<(u32, u64), Option<String>>>,
     cache_hits_counter: &Counter,
     cache_misses_counter: &Counter,
-    metadata_handle: windows::Win32::System::EventLog::EVT_HANDLE,
-    event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
+    metadata_handle: EVT_HANDLE,
+    event_handle: EVT_HANDLE,
     provider: &str,
     flag: u32,
     field_value: u64,
@@ -118,15 +133,21 @@ fn cached_format(
 }
 
 fn format_metadata_field(
-    metadata_handle: windows::Win32::System::EventLog::EVT_HANDLE,
-    event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
+    metadata_handle: EVT_HANDLE,
+    event_handle: EVT_HANDLE,
     flags: u32,
 ) -> Option<String> {
-    use windows::Win32::System::EventLog::EvtFormatMessage;
-
     let mut buffer_used: u32 = 0;
     let _ = unsafe {
-        EvtFormatMessage(metadata_handle, event_handle, 0, None, flags, None, &mut buffer_used)
+        EvtFormatMessage(
+            metadata_handle,
+            event_handle,
+            0,
+            None,
+            flags,
+            None,
+            &mut buffer_used,
+        )
     };
 
     if buffer_used == 0 || buffer_used > 4096 {
@@ -159,11 +180,9 @@ fn format_metadata_field(
 /// Renders a human-readable event message using the Windows EvtFormatMessage API.
 pub fn format_event_message(
     publisher_cache: &mut LruCache<String, PublisherHandle>,
-    event_handle: windows::Win32::System::EventLog::EVT_HANDLE,
+    event_handle: EVT_HANDLE,
     provider_name: &str,
 ) -> Option<String> {
-    use windows::Win32::System::EventLog::{EVT_HANDLE, EvtFormatMessage, EvtFormatMessageEvent};
-
     let raw_handle = get_or_open_publisher(publisher_cache, provider_name);
 
     if raw_handle == 0 {
@@ -176,7 +195,15 @@ pub fn format_event_message(
 
     let mut buffer_used: u32 = 0;
     let _ = unsafe {
-        EvtFormatMessage(metadata_handle, event_handle, 0, None, flags, None, &mut buffer_used)
+        EvtFormatMessage(
+            metadata_handle,
+            event_handle,
+            0,
+            None,
+            flags,
+            None,
+            &mut buffer_used,
+        )
     };
 
     if buffer_used == 0 || buffer_used as usize > max_size {

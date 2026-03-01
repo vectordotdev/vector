@@ -331,9 +331,7 @@ impl WindowsEventLogConfig {
 
         // Validate checkpoint interval
         if self.checkpoint_interval_secs == 0 || self.checkpoint_interval_secs > 3600 {
-            return Err(
-                "Checkpoint interval must be between 1 and 3600 seconds".into(),
-            );
+            return Err("Checkpoint interval must be between 1 and 3600 seconds".into());
         }
 
         // Prevent resource exhaustion via excessive batch sizes

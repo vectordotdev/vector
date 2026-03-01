@@ -12,6 +12,18 @@ use governor::{
     state::{InMemoryState, NotKeyed},
 };
 use metrics::{Counter, Gauge, counter, gauge};
+use windows::Win32::Foundation::{CloseHandle, HANDLE, WAIT_OBJECT_0, WAIT_TIMEOUT};
+use windows::Win32::System::EventLog::{
+    EVT_HANDLE, EvtClose, EvtNext, EvtOpenChannelConfig, EvtSubscribe,
+    EvtSubscribeStartAfterBookmark, EvtSubscribeStartAtOldestRecord, EvtSubscribeStrict,
+    EvtSubscribeToFutureEvents,
+};
+use windows::Win32::System::Threading::{
+    CreateEventW, ResetEvent, WaitForMultipleObjects,
+};
+#[cfg(test)]
+use windows::Win32::System::Threading::SetEvent;
+use windows::core::HSTRING;
 
 use super::{
     bookmark::BookmarkManager, checkpoint::Checkpointer, config::WindowsEventLogConfig, error::*,
@@ -33,9 +45,7 @@ impl Drop for PublisherHandle {
     fn drop(&mut self) {
         if self.0 != 0 {
             unsafe {
-                let _ = windows::Win32::System::EventLog::EvtClose(
-                    windows::Win32::System::EventLog::EVT_HANDLE(self.0),
-                );
+                let _ = EvtClose(EVT_HANDLE(self.0));
             }
         }
     }
@@ -54,8 +64,8 @@ const ERROR_EVT_QUERY_RESULT_INVALID_POSITION: u32 = 0x4239; // 16953
 /// Per-channel subscription state for pull model.
 struct ChannelSubscription {
     channel: String,
-    subscription_handle: windows::Win32::System::EventLog::EVT_HANDLE,
-    signal_event: windows::Win32::Foundation::HANDLE,
+    subscription_handle: EVT_HANDLE,
+    signal_event: HANDLE,
     bookmark: BookmarkManager,
     /// Pre-registered counter for events read on this channel.
     events_read_counter: Counter,
@@ -98,7 +108,7 @@ pub struct EventLogSubscription {
     channels: Vec<ChannelSubscription>,
     checkpointer: Arc<Checkpointer>,
     rate_limiter: Option<RateLimiter<NotKeyed, InMemoryState, DefaultClock>>,
-    shutdown_event: windows::Win32::Foundation::HANDLE,
+    shutdown_event: HANDLE,
     render_buffer: Vec<u8>,
     /// Cached EvtOpenPublisherMetadata handles keyed by provider name.
     /// Bounded LRU; evicted handles are closed via `PublisherHandle::drop`.
@@ -135,15 +145,6 @@ impl EventLogSubscription {
         checkpointer: Arc<Checkpointer>,
         _acknowledgements: bool,
     ) -> Result<Self, WindowsEventLogError> {
-        use windows::{
-            Win32::System::EventLog::{
-                EvtSubscribe, EvtSubscribeStartAfterBookmark,
-                EvtSubscribeStartAtOldestRecord, EvtSubscribeToFutureEvents,
-            },
-            Win32::System::Threading::CreateEventW,
-            core::HSTRING,
-        };
-
         // Create rate limiter if configured
         let rate_limiter = if config.events_per_second > 0 {
             NonZeroU32::new(config.events_per_second).map(|rate| {
@@ -178,11 +179,23 @@ impl EventLogSubscription {
             // Initialize bookmark from checkpoint or create fresh
             let (bookmark, has_valid_checkpoint) =
                 if let Some(checkpoint) = checkpointer.get(channel).await {
-                    info!(
-                        message = "Resuming from checkpoint bookmark.",
-                        channel = %channel
-                    );
-                    (BookmarkManager::from_xml(&checkpoint.bookmark_xml)?, true)
+                    match BookmarkManager::from_xml(&checkpoint.bookmark_xml) {
+                        Ok(bm) => {
+                            info!(
+                                message = "Resuming from checkpoint bookmark.",
+                                channel = %channel
+                            );
+                            (bm, true)
+                        }
+                        Err(e) => {
+                            warn!(
+                                message = "Corrupted bookmark XML in checkpoint, creating fresh bookmark. Potential re-delivery of events.",
+                                channel = %channel,
+                                error = %e
+                            );
+                            (BookmarkManager::new()?, false)
+                        }
+                    }
                 } else {
                     info!(
                         message = "No checkpoint found, creating fresh bookmark.",
@@ -209,10 +222,19 @@ impl EventLogSubscription {
             let query = Self::build_xpath_query(&config)?;
             let query_hstring = HSTRING::from(query.clone());
 
-            // Determine subscription flags
+            // Determine subscription flags.
+            // When resuming from a bookmark, OR in EvtSubscribeStrict (0x10000) so that
+            // Windows fails explicitly if the bookmark position is stale/invalid,
+            // rather than silently falling back to oldest-record.
             let subscription_flags = if has_valid_checkpoint {
-                EvtSubscribeStartAfterBookmark.0
+                EvtSubscribeStartAfterBookmark.0 | EvtSubscribeStrict.0
             } else if config.read_existing_events {
+                EvtSubscribeStartAtOldestRecord.0
+            } else {
+                EvtSubscribeToFutureEvents.0
+            };
+
+            let fallback_flags = if config.read_existing_events {
                 EvtSubscribeStartAtOldestRecord.0
             } else {
                 EvtSubscribeToFutureEvents.0
@@ -223,14 +245,15 @@ impl EventLogSubscription {
                 channel = %channel,
                 query = %query,
                 has_valid_checkpoint = has_valid_checkpoint,
-                read_existing = config.read_existing_events
+                read_existing = config.read_existing_events,
+                flags = format!("{:#x}", subscription_flags)
             );
 
             // EvtSubscribe with signal event and NULL callback = pull mode
             let bookmark_handle = bookmark.as_handle();
             let subscription_result = unsafe {
                 if has_valid_checkpoint {
-                    EvtSubscribe(
+                    let strict_result = EvtSubscribe(
                         None,
                         signal_event,
                         &channel_hstring,
@@ -239,16 +262,37 @@ impl EventLogSubscription {
                         None, // NULL context = pull mode
                         None, // NULL callback = pull mode
                         subscription_flags,
-                    )
+                    );
+                    match strict_result {
+                        Ok(handle) => Ok(handle),
+                        Err(e) => {
+                            warn!(
+                                message = "Strict bookmark subscribe failed, retrying without bookmark. Potential re-delivery of events.",
+                                channel = %channel,
+                                error = %e,
+                                fallback_flags = format!("{:#x}", fallback_flags)
+                            );
+                            EvtSubscribe(
+                                None,
+                                signal_event,
+                                &channel_hstring,
+                                &query_hstring,
+                                None, // No bookmark for fallback
+                                None,
+                                None,
+                                fallback_flags,
+                            )
+                        }
+                    }
                 } else {
                     EvtSubscribe(
                         None,
                         signal_event,
                         &channel_hstring,
                         &query_hstring,
-                        None,  // No bookmark for fresh start
-                        None,  // NULL context
-                        None,  // NULL callback
+                        None, // No bookmark for fresh start
+                        None, // NULL context
+                        None, // NULL callback
                         subscription_flags,
                     )
                 }
@@ -306,7 +350,7 @@ impl EventLogSubscription {
                             error_code = error_code
                         );
                         unsafe {
-                            let _ = windows::Win32::Foundation::CloseHandle(signal_event);
+                            let _ = CloseHandle(signal_event);
                         }
                         continue;
                     } else if error_code == ERROR_ACCESS_DENIED {
@@ -315,28 +359,22 @@ impl EventLogSubscription {
                             channel = %channel
                         );
                         unsafe {
-                            let _ = windows::Win32::Foundation::CloseHandle(signal_event);
+                            let _ = CloseHandle(signal_event);
                         }
                         continue;
                     } else {
                         // Clean up already-created subscriptions on failure
                         for sub in channel_subscriptions {
                             unsafe {
-                                let _ = windows::Win32::System::EventLog::EvtClose(
-                                    sub.subscription_handle,
-                                );
-                                let _ =
-                                    windows::Win32::Foundation::CloseHandle(sub.signal_event);
+                                let _ = EvtClose(sub.subscription_handle);
+                                let _ = CloseHandle(sub.signal_event);
                             }
                         }
                         unsafe {
-                            let _ = windows::Win32::Foundation::CloseHandle(
-                                windows::Win32::Foundation::HANDLE(shutdown_event_raw as *mut std::ffi::c_void),
-                            );
+                            let _ =
+                                CloseHandle(HANDLE(shutdown_event_raw as *mut std::ffi::c_void));
                         }
-                        return Err(WindowsEventLogError::CreateSubscriptionError {
-                            source: e,
-                        });
+                        return Err(WindowsEventLogError::CreateSubscriptionError { source: e });
                     }
                 }
             }
@@ -345,9 +383,7 @@ impl EventLogSubscription {
         // Verify we subscribed to at least one channel
         if channel_subscriptions.is_empty() {
             unsafe {
-                let _ = windows::Win32::Foundation::CloseHandle(
-                    windows::Win32::Foundation::HANDLE(shutdown_event_raw as *mut std::ffi::c_void),
-                );
+                let _ = CloseHandle(HANDLE(shutdown_event_raw as *mut std::ffi::c_void));
             }
             return Err(WindowsEventLogError::ConfigError {
                 message: "No channels could be subscribed to. All channels may be inaccessible or direct/analytic channels.".into(),
@@ -359,7 +395,7 @@ impl EventLogSubscription {
             channel_count = channel_subscriptions.len()
         );
 
-        let shutdown_event = windows::Win32::Foundation::HANDLE(shutdown_event_raw as *mut std::ffi::c_void);
+        let shutdown_event = HANDLE(shutdown_event_raw as *mut std::ffi::c_void);
         Ok(Self {
             config,
             channels: channel_subscriptions,
@@ -383,12 +419,8 @@ impl EventLogSubscription {
     /// Tokio runtime. The wait array includes all channel signal events plus the
     /// shutdown event.
     pub fn wait_for_events_blocking(&self, timeout_ms: u32) -> WaitResult {
-        use windows::Win32::Foundation::{WAIT_OBJECT_0, WAIT_TIMEOUT};
-        use windows::Win32::System::Threading::WaitForMultipleObjects;
-
         // Build wait handle array: [channel0_signal, channel1_signal, ..., shutdown_event]
-        let mut handles: Vec<windows::Win32::Foundation::HANDLE> =
-            self.channels.iter().map(|c| c.signal_event).collect();
+        let mut handles: Vec<HANDLE> = self.channels.iter().map(|c| c.signal_event).collect();
         handles.push(self.shutdown_event);
 
         let result = unsafe { WaitForMultipleObjects(&handles, false, timeout_ms) };
@@ -397,9 +429,7 @@ impl EventLogSubscription {
 
         match result {
             r if r == WAIT_TIMEOUT => WaitResult::Timeout,
-            r if r.0 < WAIT_OBJECT_0.0 + shutdown_index => {
-                WaitResult::EventsAvailable
-            }
+            r if r.0 < WAIT_OBJECT_0.0 + shutdown_index => WaitResult::EventsAvailable,
             r if r.0 == WAIT_OBJECT_0.0 + shutdown_index => WaitResult::Shutdown,
             _ => {
                 // WAIT_FAILED or unexpected - treat as timeout to avoid tight loop
@@ -419,13 +449,18 @@ impl EventLogSubscription {
     /// The starting channel rotates each call via round-robin. Channels that
     /// don't use their budget simply leave slots unused — the next pull_events
     /// call reclaims them naturally since the signal stays set.
+    ///
+    /// # At-least-once delivery semantics
+    ///
+    /// If a bookmark update fails mid-batch, events processed *before* the
+    /// failure are still returned and sent downstream, but the bookmark position
+    /// does not advance. On restart, those events will be re-read from the
+    /// channel, resulting in duplicates. This is an intentional trade-off:
+    /// at-least-once delivery is preferable to data loss.
     pub fn pull_events(
         &mut self,
         max_events: usize,
     ) -> Result<Vec<xml_parser::WindowsEvent>, WindowsEventLogError> {
-        use windows::Win32::System::EventLog::{EvtNext, EVT_HANDLE};
-        use windows::Win32::System::Threading::ResetEvent;
-
         let mut all_events = Vec::with_capacity(max_events.min(1000));
         let num_channels = self.channels.len().max(1);
         let per_channel_budget = (max_events / num_channels).max(1);
@@ -520,15 +555,19 @@ impl EventLogSubscription {
                 }
 
                 channel_sub.events_read_counter.increment(returned as u64);
-                channel_sub.last_event_timestamp_gauge.set(
-                    chrono::Utc::now().timestamp() as f64
-                );
+                channel_sub
+                    .last_event_timestamp_gauge
+                    .set(chrono::Utc::now().timestamp() as f64);
 
                 let batch_handles = &event_handles[..returned as usize];
                 for (idx, &raw_handle) in batch_handles.iter().enumerate() {
                     let event_handle = EVT_HANDLE(raw_handle);
 
-                    match super::render::render_event_xml(&mut self.render_buffer, &mut self.decode_buffer, event_handle) {
+                    match super::render::render_event_xml(
+                        &mut self.render_buffer,
+                        &mut self.decode_buffer,
+                        event_handle,
+                    ) {
                         Ok(xml) => {
                             // Single-pass: parse all System fields in one traversal
                             let system_fields = xml_parser::parse_system_section(&xml);
@@ -560,17 +599,16 @@ impl EventLogSubscription {
                                     (None, None, Vec::new())
                                 };
 
-                            let rendered_message = if self.config.render_message
-                                && !provider_name.is_empty()
-                            {
-                                metadata::format_event_message(
-                                    &mut self.publisher_cache,
-                                    event_handle,
-                                    &provider_name,
-                                )
-                            } else {
-                                None
-                            };
+                            let rendered_message =
+                                if self.config.render_message && !provider_name.is_empty() {
+                                    metadata::format_event_message(
+                                        &mut self.publisher_cache,
+                                        event_handle,
+                                        &provider_name,
+                                    )
+                                } else {
+                                    None
+                                };
 
                             if let Ok(Some(mut event)) = xml_parser::build_event(
                                 xml,
@@ -596,18 +634,16 @@ impl EventLogSubscription {
                                         error: e.to_string(),
                                     });
                                     bookmark_failed = true;
+                                    // Events already in all_events will still be delivered
+                                    // (at-least-once semantics — see doc comment on pull_events).
                                     // Close current handle normally
                                     unsafe {
-                                        let _ = windows::Win32::System::EventLog::EvtClose(
-                                            event_handle,
-                                        );
+                                        let _ = EvtClose(event_handle);
                                     }
                                     // Close remaining unprocessed handles to prevent leak
                                     for &h in &batch_handles[idx + 1..] {
                                         unsafe {
-                                            let _ = windows::Win32::System::EventLog::EvtClose(
-                                                EVT_HANDLE(h),
-                                            );
+                                            let _ = EvtClose(EVT_HANDLE(h));
                                         }
                                     }
                                     break 'drain;
@@ -629,7 +665,7 @@ impl EventLogSubscription {
                     }
 
                     unsafe {
-                        let _ = windows::Win32::System::EventLog::EvtClose(event_handle);
+                        let _ = EvtClose(event_handle);
                     }
                 }
             }
@@ -640,7 +676,10 @@ impl EventLogSubscription {
                 }
 
                 // Update channel record count gauge for lag detection.
-                super::render::update_channel_records(&channel_sub.channel, &channel_sub.channel_records_gauge);
+                super::render::update_channel_records(
+                    &channel_sub.channel,
+                    &channel_sub.channel_records_gauge,
+                );
             }
         }
 
@@ -654,16 +693,9 @@ impl EventLogSubscription {
         channel_sub: &mut ChannelSubscription,
         config: &WindowsEventLogConfig,
     ) -> Result<(), WindowsEventLogError> {
-        use windows::Win32::System::EventLog::{
-            EvtSubscribe, EvtSubscribeStartAfterBookmark, EvtSubscribeStartAtOldestRecord,
-        };
-        use windows::core::HSTRING;
-
         // Close the stale subscription handle
         unsafe {
-            let _ = windows::Win32::System::EventLog::EvtClose(
-                channel_sub.subscription_handle,
-            );
+            let _ = EvtClose(channel_sub.subscription_handle);
         }
 
         let channel_hstring = HSTRING::from(channel_sub.channel.as_str());
@@ -673,15 +705,24 @@ impl EventLogSubscription {
         let bookmark_handle = channel_sub.bookmark.as_handle();
         let has_bookmark = bookmark_handle.0 != 0;
 
+        // Use EvtSubscribeStrict when resuming from bookmark so Windows fails
+        // explicitly if the bookmark position is stale, rather than silently
+        // falling back to oldest-record.
         let subscription_flags = if has_bookmark {
-            EvtSubscribeStartAfterBookmark.0
+            EvtSubscribeStartAfterBookmark.0 | EvtSubscribeStrict.0
         } else {
             EvtSubscribeStartAtOldestRecord.0
         };
 
+        let fallback_flags = if config.read_existing_events {
+            EvtSubscribeStartAtOldestRecord.0
+        } else {
+            EvtSubscribeToFutureEvents.0
+        };
+
         let new_handle = unsafe {
             if has_bookmark {
-                EvtSubscribe(
+                let strict_result = EvtSubscribe(
                     None,
                     channel_sub.signal_event,
                     &channel_hstring,
@@ -690,7 +731,28 @@ impl EventLogSubscription {
                     None,
                     None,
                     subscription_flags,
-                )
+                );
+                match strict_result {
+                    Ok(handle) => Ok(handle),
+                    Err(e) => {
+                        warn!(
+                            message = "Strict bookmark resubscribe failed, retrying without bookmark. Potential re-delivery of events.",
+                            channel = %channel_sub.channel,
+                            error = %e,
+                            fallback_flags = format!("{:#x}", fallback_flags)
+                        );
+                        EvtSubscribe(
+                            None,
+                            channel_sub.signal_event,
+                            &channel_hstring,
+                            &query_hstring,
+                            None,
+                            None,
+                            None,
+                            fallback_flags,
+                        )
+                    }
+                }
             } else {
                 EvtSubscribe(
                     None,
@@ -729,7 +791,9 @@ impl EventLogSubscription {
     }
 
     /// Returns a reference to the rate limiter, if configured.
-    pub const fn rate_limiter(&self) -> Option<&RateLimiter<NotKeyed, InMemoryState, DefaultClock>> {
+    pub const fn rate_limiter(
+        &self,
+    ) -> Option<&RateLimiter<NotKeyed, InMemoryState, DefaultClock>> {
         self.rate_limiter.as_ref()
     }
 
@@ -754,8 +818,8 @@ impl EventLogSubscription {
         let bookmark_xmls: Vec<(String, String)> = self
             .channels
             .iter()
-            .filter_map(|sub| {
-                match BookmarkManager::serialize_handle(sub.bookmark.as_handle()) {
+            .filter_map(
+                |sub| match BookmarkManager::serialize_handle(sub.bookmark.as_handle()) {
                     Ok(xml) if xml_parser::is_valid_bookmark_xml(&xml) => {
                         Some((sub.channel.clone(), xml))
                     }
@@ -767,18 +831,12 @@ impl EventLogSubscription {
                         });
                         None
                     }
-                }
-            })
+                },
+            )
             .collect();
 
-        if !bookmark_xmls.is_empty()
-            && let Err(e) = self.checkpointer.set_batch(bookmark_xmls).await
-        {
-            warn!(
-                message = "Failed to flush bookmarks on shutdown.",
-                error = %e
-            );
-        } else {
+        if !bookmark_xmls.is_empty() {
+            self.checkpointer.set_batch(bookmark_xmls).await?;
             counter!("windows_event_log_checkpoint_writes_total").increment(1);
         }
 
@@ -791,12 +849,15 @@ impl EventLogSubscription {
     /// Used for acknowledgment-based checkpointing where the bookmark
     /// state needs to be captured when events are read (not when they're acknowledged).
     pub fn get_bookmark_xml(&self, channel: &str) -> Option<String> {
-        self.channels.iter().find(|sub| sub.channel == channel).and_then(|sub| {
-            match BookmarkManager::serialize_handle(sub.bookmark.as_handle()) {
-                Ok(xml) if xml_parser::is_valid_bookmark_xml(&xml) => Some(xml),
-                _ => None,
-            }
-        })
+        self.channels
+            .iter()
+            .find(|sub| sub.channel == channel)
+            .and_then(
+                |sub| match BookmarkManager::serialize_handle(sub.bookmark.as_handle()) {
+                    Ok(xml) if xml_parser::is_valid_bookmark_xml(&xml) => Some(xml),
+                    _ => None,
+                },
+            )
     }
 
     fn build_xpath_query(config: &WindowsEventLogConfig) -> Result<String, WindowsEventLogError> {
@@ -810,9 +871,6 @@ impl EventLogSubscription {
     }
 
     fn validate_channels(config: &WindowsEventLogConfig) -> Result<(), WindowsEventLogError> {
-        use windows::Win32::System::EventLog::{EvtClose, EvtOpenChannelConfig};
-        use windows::core::HSTRING;
-
         for channel in &config.channels {
             let channel_hstring = HSTRING::from(channel.as_str());
             let channel_handle = unsafe { EvtOpenChannelConfig(None, &channel_hstring, 0) };
@@ -820,7 +878,7 @@ impl EventLogSubscription {
             match channel_handle {
                 Ok(handle) => {
                     if let Err(e) = unsafe { EvtClose(handle) } {
-                        warn!("Failed to close channel config handle: {e}");
+                        warn!(message = "Failed to close channel config handle.", error = %e);
                     }
                 }
                 Err(e) => {
@@ -861,8 +919,8 @@ impl Drop for EventLogSubscription {
         // Close subscription handles and signal events
         for sub in &self.channels {
             unsafe {
-                let _ = windows::Win32::System::EventLog::EvtClose(sub.subscription_handle);
-                let _ = windows::Win32::Foundation::CloseHandle(sub.signal_event);
+                let _ = EvtClose(sub.subscription_handle);
+                let _ = CloseHandle(sub.signal_event);
             }
         }
         // Publisher metadata handles are closed automatically by PublisherHandle::drop
@@ -870,7 +928,7 @@ impl Drop for EventLogSubscription {
 
         // Close shutdown event
         unsafe {
-            let _ = windows::Win32::Foundation::CloseHandle(self.shutdown_event);
+            let _ = CloseHandle(self.shutdown_event);
         }
     }
 }
@@ -920,7 +978,11 @@ mod tests {
         );
 
         let sub = subscription.unwrap();
-        assert_eq!(sub.channels.len(), 1, "Should have one channel subscription");
+        assert_eq!(
+            sub.channels.len(),
+            1,
+            "Should have one channel subscription"
+        );
     }
 
     /// Test that wait_for_events_blocking returns timeout or events available
@@ -987,8 +1049,8 @@ mod tests {
         tokio::time::sleep(tokio::time::Duration::from_millis(50)).await;
 
         unsafe {
-            let handle = windows::Win32::Foundation::HANDLE(shutdown_event_raw as *mut std::ffi::c_void);
-            let _ = windows::Win32::System::Threading::SetEvent(handle);
+            let handle = HANDLE(shutdown_event_raw as *mut std::ffi::c_void);
+            let _ = SetEvent(handle);
         }
 
         let (subscription, result) = wait_handle.await.unwrap();

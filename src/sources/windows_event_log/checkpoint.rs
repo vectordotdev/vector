@@ -11,6 +11,8 @@ use tokio::{
     sync::Mutex,
 };
 use tracing::{debug, error, info, warn};
+use windows::Win32::Storage::FileSystem::ReplaceFileW;
+use windows::core::HSTRING;
 
 use super::error::WindowsEventLogError;
 
@@ -75,7 +77,7 @@ impl Checkpointer {
         let state = Self::load_from_disk(&checkpoint_path).await?;
 
         info!(
-            message = "Windows Event Log checkpointer initialized",
+            message = "Windows Event Log checkpointer initialized.",
             checkpoint_path = %checkpoint_path.display(),
             channels = state.channels.len()
         );
@@ -119,7 +121,7 @@ impl Checkpointer {
         self.save_to_disk(&state).await?;
 
         debug!(
-            message = "Updated checkpoint for channel",
+            message = "Updated checkpoint for channel.",
             channel = %channel
         );
 
@@ -159,7 +161,7 @@ impl Checkpointer {
         self.save_to_disk(&state).await?;
 
         debug!(
-            message = "Batch updated checkpoints",
+            message = "Batch updated checkpoints.",
             channels_updated = updates.len()
         );
 
@@ -172,7 +174,7 @@ impl Checkpointer {
             Ok(contents) => match serde_json::from_slice::<CheckpointState>(&contents) {
                 Ok(state) => {
                     info!(
-                        message = "Loaded existing checkpoints",
+                        message = "Loaded existing checkpoints.",
                         channels = state.channels.len(),
                         path = %path.display()
                     );
@@ -180,7 +182,7 @@ impl Checkpointer {
                 }
                 Err(e) => {
                     warn!(
-                        message = "Failed to parse checkpoint file, starting fresh",
+                        message = "Failed to parse checkpoint file, starting fresh.",
                         error = %e,
                         path = %path.display()
                     );
@@ -189,14 +191,14 @@ impl Checkpointer {
             },
             Err(e) if e.kind() == ErrorKind::NotFound => {
                 debug!(
-                    message = "No existing checkpoint file, starting fresh",
+                    message = "No existing checkpoint file, starting fresh.",
                     path = %path.display()
                 );
                 Ok(CheckpointState::default())
             }
             Err(e) => {
                 error!(
-                    message = "Failed to read checkpoint file",
+                    message = "Failed to read checkpoint file.",
                     error = %e,
                     path = %path.display()
                 );
@@ -215,7 +217,7 @@ impl Checkpointer {
             Ok(c) => c,
             Err(e) => {
                 error!(
-                    message = "Failed to serialize checkpoint state",
+                    message = "Failed to serialize checkpoint state.",
                     error = %e
                 );
                 return Err(WindowsEventLogError::IoError {
@@ -247,9 +249,6 @@ impl Checkpointer {
         // rename when the destination doesn't exist yet (first run).
         #[cfg(windows)]
         {
-            use windows::Win32::Storage::FileSystem::ReplaceFileW;
-            use windows::core::HSTRING;
-
             let dst = HSTRING::from(self.checkpoint_path.to_string_lossy().as_ref());
             let src = HSTRING::from(temp_path.to_string_lossy().as_ref());
             let replaced = unsafe {
@@ -287,7 +286,7 @@ impl Checkpointer {
         self.save_to_disk(&state).await?;
 
         info!(
-            message = "Removed checkpoint for channel",
+            message = "Removed checkpoint for channel.",
             channel = %channel
         );
 

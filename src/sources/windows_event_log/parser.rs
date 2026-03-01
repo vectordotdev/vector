@@ -17,10 +17,7 @@ pub struct EventLogParser {
 
 impl EventLogParser {
     /// Create a new parser with the given configuration and resolved namespace
-    pub fn new(
-        config: &WindowsEventLogConfig,
-        log_namespace: LogNamespace,
-    ) -> Self {
+    pub fn new(config: &WindowsEventLogConfig, log_namespace: LogNamespace) -> Self {
         Self {
             config: config.clone(),
             log_namespace,
@@ -191,7 +188,10 @@ impl EventLogParser {
         }
 
         if event.keywords != 0 {
-            log_event.insert("keywords", Value::Integer(event.keywords as i64));
+            log_event.insert(
+                "keywords",
+                Value::Bytes(format!("0x{:016X}", event.keywords).into()),
+            );
 
             if !event.keyword_names.is_empty() {
                 let kw_values: Vec<Value> = event
@@ -743,5 +743,55 @@ mod tests {
         let value = Value::Integer(789);
         let result = parser.format_value(&value, &EventDataFormat::Auto).unwrap();
         assert_eq!(result, Value::Integer(789));
+    }
+
+    #[test]
+    fn test_include_and_exclude_fields_interaction() {
+        let mut config = WindowsEventLogConfig::default();
+        // Include a set of fields, then exclude one from that set
+        config.field_filter.include_fields = Some(vec![
+            "event_id".to_string(),
+            "level".to_string(),
+            "channel".to_string(),
+        ]);
+        config.field_filter.exclude_fields = Some(vec!["channel".to_string()]);
+
+        let parser = EventLogParser::new(&config, LogNamespace::Legacy);
+        let event = create_test_event();
+        let log_event = parser.parse_event(event).unwrap();
+
+        // event_id and level should be present (in include list, not in exclude list)
+        assert!(log_event.get("event_id").is_some());
+        assert!(log_event.get("level").is_some());
+        // channel should be excluded (in both include and exclude, exclude wins)
+        assert!(log_event.get("channel").is_none());
+        // Fields not in include list should be absent
+        assert!(log_event.get("computer").is_none());
+        assert!(log_event.get("record_id").is_none());
+    }
+
+    #[test]
+    fn test_apply_custom_formatting_error_on_invalid_conversion() {
+        let mut config = WindowsEventLogConfig::default();
+        // Configure event_id to be formatted as integer — it already is an integer,
+        // so this succeeds. Instead, configure a string field to be converted to integer.
+        config
+            .event_data_format
+            .insert("level".to_string(), EventDataFormat::Integer);
+
+        let parser = EventLogParser::new(&config, LogNamespace::Legacy);
+        let event = create_test_event();
+
+        // level is stored as a string like "Information" — converting to integer should fail
+        let result = parser.parse_event(event);
+        assert!(
+            result.is_err(),
+            "Should fail when converting non-numeric string to integer"
+        );
+        let err = result.unwrap_err();
+        assert!(
+            err.to_string().contains("Cannot convert"),
+            "Error should describe the conversion failure, got: {err}"
+        );
     }
 }

@@ -1,6 +1,10 @@
 use std::num::NonZeroUsize;
 
 use lru::LruCache;
+use windows::Win32::Foundation::{HLOCAL, LocalFree};
+use windows::Win32::Security::Authorization::ConvertStringSidToSidW;
+use windows::Win32::Security::{LookupAccountSidW, PSID, SID_NAME_USE};
+use windows::core::{HSTRING, PWSTR};
 
 /// Maximum number of SID-to-account name mappings to cache.
 const SID_CACHE_CAPACITY: usize = 4096;
@@ -37,13 +41,6 @@ impl SidResolver {
 /// Convert a SID string to a PSID via ConvertStringSidToSidW, then call
 /// LookupAccountSidW to get the account name.
 fn lookup_sid(sid_string: &str) -> Option<String> {
-    use windows::Win32::Foundation::{HLOCAL, LocalFree};
-    use windows::Win32::Security::{
-        LookupAccountSidW, SID_NAME_USE, PSID,
-    };
-    use windows::Win32::Security::Authorization::ConvertStringSidToSidW;
-    use windows::core::{HSTRING, PWSTR};
-
     let sid_hstring = HSTRING::from(sid_string);
 
     // Convert string SID to binary PSID
@@ -71,7 +68,9 @@ fn lookup_sid(sid_string: &str) -> Option<String> {
     };
 
     if name_len == 0 {
-        unsafe { let _ = LocalFree(HLOCAL(psid.0)); }
+        unsafe {
+            let _ = LocalFree(HLOCAL(psid.0));
+        }
         return None;
     }
 
@@ -92,7 +91,9 @@ fn lookup_sid(sid_string: &str) -> Option<String> {
     };
 
     // Free the PSID allocated by ConvertStringSidToSidW
-    unsafe { let _ = LocalFree(HLOCAL(psid.0)); }
+    unsafe {
+        let _ = LocalFree(HLOCAL(psid.0));
+    }
 
     if result.is_err() {
         return None;

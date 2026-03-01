@@ -260,9 +260,7 @@ fn parse_keywords_hex(s: &str) -> u64 {
 fn extract_provider_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut SystemFields) {
     for attr in e.attributes().flatten() {
         match attr.key.local_name().as_ref() {
-            b"Name" => {
-                fields.provider_name = String::from_utf8_lossy(&attr.value).into_owned()
-            }
+            b"Name" => fields.provider_name = String::from_utf8_lossy(&attr.value).into_owned(),
             b"Guid" => {
                 fields.provider_guid = Some(String::from_utf8_lossy(&attr.value).into_owned())
             }
@@ -294,8 +292,7 @@ fn extract_correlation_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut
                 fields.activity_id = Some(String::from_utf8_lossy(&attr.value).into_owned())
             }
             b"RelatedActivityID" => {
-                fields.related_activity_id =
-                    Some(String::from_utf8_lossy(&attr.value).into_owned())
+                fields.related_activity_id = Some(String::from_utf8_lossy(&attr.value).into_owned())
             }
             _ => {}
         }
@@ -306,12 +303,10 @@ fn extract_execution_attrs(e: &quick_xml::events::BytesStart<'_>, fields: &mut S
     for attr in e.attributes().flatten() {
         match attr.key.local_name().as_ref() {
             b"ProcessID" => {
-                fields.process_id =
-                    String::from_utf8_lossy(&attr.value).parse().unwrap_or(0)
+                fields.process_id = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0)
             }
             b"ThreadID" => {
-                fields.thread_id =
-                    String::from_utf8_lossy(&attr.value).parse().unwrap_or(0)
+                fields.thread_id = String::from_utf8_lossy(&attr.value).parse().unwrap_or(0)
             }
             _ => {}
         }
@@ -537,15 +532,15 @@ fn parse_section(
                     inside_data = false;
 
                     if !current_data_name.is_empty() {
-                        named_data
-                            .insert(current_data_name.clone(), current_data_value.clone());
+                        named_data.insert(current_data_name.clone(), current_data_value.clone());
                     } else if section_name == "EventData" && inserts.len() < MAX_FIELDS {
                         inserts.push(current_data_value.clone());
                     }
                 }
             }
             Ok(XmlEvent::Text(ref e)) => {
-                if inside_section && inside_data
+                if inside_section
+                    && inside_data
                     && let Ok(text) = e.unescape()
                 {
                     const MAX_VALUE_SIZE: usize = 1024 * 1024;
@@ -586,7 +581,7 @@ pub fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
 
     loop {
         if iterations >= MAX_ITERATIONS {
-            warn!("XML parsing iteration limit exceeded.");
+            warn!(message = "XML parsing iteration limit exceeded.");
             return None;
         }
         iterations += 1;
@@ -605,7 +600,7 @@ pub fn extract_xml_value(xml: &str, tag: &str) -> Option<String> {
                     match e.unescape() {
                         Ok(text) => {
                             if current_element.len() + text.len() > 4096 {
-                                warn!("XML element text too long, truncating.");
+                                warn!(message = "XML element text too long, truncating.");
                                 break;
                             }
                             current_element.push_str(&text);
@@ -986,10 +981,7 @@ mod tests {
             "Should accept valid bookmark with RecordId"
         );
 
-        assert!(
-            !is_valid_bookmark_xml(""),
-            "Should reject empty string"
-        );
+        assert!(!is_valid_bookmark_xml(""), "Should reject empty string");
 
         let empty_list = "<BookmarkList/>";
         assert!(
@@ -1078,5 +1070,61 @@ mod tests {
         assert_eq!(parse_keywords_hex("12345"), 12345);
         assert_eq!(parse_keywords_hex("invalid"), 0);
         assert_eq!(parse_keywords_hex("0x0020000000000000"), 0x0020000000000000);
+    }
+
+    #[test]
+    fn test_max_event_age_secs_filters_old_events() {
+        let xml = r#"
+        <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+            <System>
+                <Provider Name="TestProvider"/>
+                <EventID>1000</EventID>
+                <Level>4</Level>
+                <EventRecordID>12345</EventRecordID>
+                <TimeCreated SystemTime="2020-01-01T00:00:00.000000Z"/>
+                <Channel>Application</Channel>
+                <Computer>TEST-PC</Computer>
+            </System>
+        </Event>
+        "#;
+
+        let mut config = WindowsEventLogConfig::default();
+        config.max_event_age_secs = Some(3600); // 1 hour
+
+        let result = parse_event_xml(xml.to_string(), "Application", &config, None);
+        assert!(
+            result.unwrap().is_none(),
+            "Old event should be filtered by max_event_age_secs"
+        );
+    }
+
+    #[test]
+    fn test_max_event_age_secs_allows_recent_events() {
+        // Use a timestamp very close to now
+        let now = Utc::now().format("%Y-%m-%dT%H:%M:%S%.6fZ").to_string();
+        let xml = format!(
+            r#"
+            <Event xmlns="http://schemas.microsoft.com/win/2004/08/events/event">
+                <System>
+                    <Provider Name="TestProvider"/>
+                    <EventID>1000</EventID>
+                    <Level>4</Level>
+                    <EventRecordID>12345</EventRecordID>
+                    <TimeCreated SystemTime="{now}"/>
+                    <Channel>Application</Channel>
+                    <Computer>TEST-PC</Computer>
+                </System>
+            </Event>
+            "#
+        );
+
+        let mut config = WindowsEventLogConfig::default();
+        config.max_event_age_secs = Some(3600); // 1 hour
+
+        let result = parse_event_xml(xml, "Application", &config, None);
+        assert!(
+            result.unwrap().is_some(),
+            "Recent event should pass max_event_age_secs filter"
+        );
     }
 }

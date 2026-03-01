@@ -119,7 +119,14 @@ async fn test_basic_event_ingestion() {
     );
 
     let log = events[0].as_log();
-    for field in ["timestamp", "message", "provider_name", "channel", "event_id", "level"] {
+    for field in [
+        "timestamp",
+        "message",
+        "provider_name",
+        "channel",
+        "event_id",
+        "level",
+    ] {
         assert!(
             log.contains(field),
             "Event is missing required field '{field}'. \
@@ -170,7 +177,8 @@ async fn test_backlog_drain_no_duplicates() {
         }
     }
     assert_eq!(
-        duplicate_count, 0,
+        duplicate_count,
+        0,
         "Found {duplicate_count} duplicate record_ids out of {} events. \
          Bookmark advancement or checkpoint logic may be broken.",
         events.len()
@@ -190,8 +198,7 @@ async fn test_checkpoint_resume_no_redelivery() {
     // Phase 1: emit and consume
     emit_event("INFORMATION", 1000, "checkpoint-test-phase1");
     let config = vectortest_config(data_dir.path());
-    let first_run =
-        run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
+    let first_run = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
     assert!(
         !first_run.is_empty(),
         "Phase 1 produced 0 events. Cannot test checkpoint resume."
@@ -204,8 +211,7 @@ async fn test_checkpoint_resume_no_redelivery() {
     // Phase 2: emit one more, reuse same data_dir
     emit_event("INFORMATION", 1000, "checkpoint-test-phase2");
     let config = vectortest_config(data_dir.path());
-    let second_run =
-        run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
+    let second_run = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
 
     assert!(
         second_run.len() < first_count,
@@ -607,10 +613,9 @@ async fn test_event_field_completeness() {
     // Verify event_id is a positive integer
     if let Some(eid) = log.get("event_id") {
         match eid {
-            vrl::value::Value::Integer(i) => assert!(
-                *i > 0,
-                "event_id should be a positive integer, got {i}"
-            ),
+            vrl::value::Value::Integer(i) => {
+                assert!(*i > 0, "event_id should be a positive integer, got {i}")
+            }
             other => panic!(
                 "event_id should be an integer, got: {other:?}. \
                  Check parser set_windows_fields."
@@ -621,13 +626,10 @@ async fn test_event_field_completeness() {
     // Verify record_id is a positive integer
     if let Some(rid) = log.get("record_id") {
         match rid {
-            vrl::value::Value::Integer(i) => assert!(
-                *i > 0,
-                "record_id should be a positive integer, got {i}"
-            ),
-            other => panic!(
-                "record_id should be an integer, got: {other:?}."
-            ),
+            vrl::value::Value::Integer(i) => {
+                assert!(*i > 0, "record_id should be a positive integer, got {i}")
+            }
+            other => panic!("record_id should be an integer, got: {other:?}."),
         }
     }
 
@@ -765,9 +767,10 @@ async fn test_event_data_format_coercion() {
     config.field_filter.include_event_data = true;
     // event_id is a system field set as Integer by the parser, so test
     // that event_data_format can convert it to a string
-    config
-        .event_data_format
-        .insert("event_id".to_string(), super::config::EventDataFormat::String);
+    config.event_data_format.insert(
+        "event_id".to_string(),
+        super::config::EventDataFormat::String,
+    );
 
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
 
@@ -903,12 +906,7 @@ async fn test_source_compliance_metrics() {
 /// many matching channels.
 #[tokio::test]
 async fn test_wildcard_channels_rejected() {
-    let wildcards = vec![
-        "Microsoft-Windows-*",
-        "*",
-        "System?",
-        "[Ss]ystem",
-    ];
+    let wildcards = vec!["Microsoft-Windows-*", "*", "System?", "[Ss]ystem"];
 
     for pattern in wildcards {
         let config = WindowsEventLogConfig {
@@ -957,11 +955,7 @@ async fn test_xpath_injection_rejected() {
 /// Channel names with control characters or null bytes must be rejected.
 #[tokio::test]
 async fn test_dangerous_channel_names_rejected() {
-    let dangerous = vec![
-        "System\0",
-        "System\r\nEvil",
-        "System\n",
-    ];
+    let dangerous = vec!["System\0", "System\r\nEvil", "System\n"];
 
     for name in dangerous {
         let config = WindowsEventLogConfig {
@@ -982,8 +976,8 @@ async fn test_dangerous_channel_names_rejected() {
 #[tokio::test]
 async fn test_unbalanced_xpath_rejected() {
     let unbalanced = vec![
-        "*[System[Level=1]",       // missing closing ]
-        "*[System[(Level=1]]",     // mismatched
+        "*[System[Level=1]",   // missing closing ]
+        "*[System[(Level=1]]", // mismatched
     ];
 
     for query in &unbalanced {
@@ -1439,5 +1433,84 @@ async fn test_full_data_path_produces_checkpoint() {
         "Checkpoint file should contain valid JSON with version and channels. \
          Got: {}",
         &contents[..contents.len().min(200)]
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Checkpoint resume: no duplicate record IDs across runs
+// ---------------------------------------------------------------------------
+
+/// Run the source twice with the same data_dir, emitting distinct events
+/// before each run. Assert that the record_id sets from run 1 and run 2
+/// do not overlap, proving the bookmark/checkpoint correctly prevents
+/// re-delivery.
+#[tokio::test]
+async fn test_checkpoint_resume_no_duplicate_record_ids() {
+    let data_dir = temp_data_dir();
+
+    // Phase 1: emit events and collect record IDs
+    for i in 0..5 {
+        emit_event(
+            "INFORMATION",
+            1000,
+            &format!("ckpt-dup-test-phase1-{i}"),
+        );
+    }
+
+    let config = vectortest_config(data_dir.path());
+    let first_run = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
+    assert!(
+        !first_run.is_empty(),
+        "Phase 1 produced 0 events. Cannot test checkpoint resume."
+    );
+
+    let first_ids: HashSet<String> = first_run
+        .iter()
+        .filter_map(|e| {
+            e.as_log()
+                .get("record_id")
+                .map(|v| v.to_string_lossy().into_owned())
+        })
+        .collect();
+    assert!(
+        !first_ids.is_empty(),
+        "Phase 1 events have no record_id field. Cannot verify uniqueness."
+    );
+
+    // Let checkpoint flush to disk
+    tokio::time::sleep(Duration::from_secs(1)).await;
+
+    // Phase 2: emit new events, reuse same data_dir
+    for i in 0..5 {
+        emit_event(
+            "INFORMATION",
+            1000,
+            &format!("ckpt-dup-test-phase2-{i}"),
+        );
+    }
+
+    let config = vectortest_config(data_dir.path());
+    let second_run = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
+
+    let second_ids: HashSet<String> = second_run
+        .iter()
+        .filter_map(|e| {
+            e.as_log()
+                .get("record_id")
+                .map(|v| v.to_string_lossy().into_owned())
+        })
+        .collect();
+
+    // The intersection of record IDs should be empty
+    let overlap: HashSet<_> = first_ids.intersection(&second_ids).collect();
+    assert!(
+        overlap.is_empty(),
+        "Found {} duplicate record_ids between run 1 and run 2: {:?}. \
+         Bookmark checkpoint is not preventing re-delivery. \
+         Run 1 had {} IDs, run 2 had {} IDs.",
+        overlap.len(),
+        overlap,
+        first_ids.len(),
+        second_ids.len()
     );
 }
