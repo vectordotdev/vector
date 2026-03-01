@@ -3950,12 +3950,12 @@ dependencies = [
 
 [[package]]
 name = "evmap"
-version = "11.0.0"
+version = "10.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b8874945f036109c72242964c1174cf99434e30cfa45bf45fedc983f50046f8"
+checksum = "6e3ea06a83f97d3dc2eb06e51e7a729b418f0717a5558a5c870e3d5156dc558d"
 dependencies = [
  "hashbag",
- "left-right",
+ "slab",
  "smallvec",
 ]
 
@@ -4395,21 +4395,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "generator"
-version = "0.8.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52f04ae4152da20c76fe800fa48659201d5cf627c5149ca0b707b69d7eef6cf9"
-dependencies = [
- "cc",
- "cfg-if",
- "libc",
- "log",
- "rustversion",
- "windows-link 0.2.0",
- "windows-result",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4507,7 +4492,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "simpl",
- "smpl_jwt 0.8.0",
+ "smpl_jwt",
  "time",
  "tokio",
 ]
@@ -6195,17 +6180,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "left-right"
-version = "0.11.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f0c21e4c8ff95f487fb34e6f9182875f42c84cef966d29216bf115d9bba835a"
-dependencies = [
- "crossbeam-utils",
- "loom",
- "slab",
-]
-
-[[package]]
 name = "lexical-core"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6462,19 +6436,6 @@ dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-types 0.12.6",
-]
-
-[[package]]
-name = "loom"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "419e0dc8046cb947daa77eb95ae174acfbddb7673b4151f56d1eed8e93fbfaca"
-dependencies = [
- "cfg-if",
- "generator",
- "scoped-tls",
- "tracing 0.1.44",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -7748,9 +7709,9 @@ checksum = "4030760ffd992bef45b0ae3f10ce1aba99e33464c90d14dd7c039884963ddc7a"
 
 [[package]]
 name = "owo-colors"
-version = "4.2.3"
+version = "4.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9c6901729fa79e91a0913333229e9ca5dc725089d1c363b2f4b4760709dc4a52"
+checksum = "d211803b9b6b570f68772237e415a029d5a50c65d382910b879fb19d3271f94d"
 dependencies = [
  "supports-color 2.1.0",
  "supports-color 3.0.1",
@@ -10479,22 +10440,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "smpl_jwt"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a45432dc6b645c982d4ef68966b4507fb57d98ca67289df780cd7ca4a4369f5e"
-dependencies = [
- "base64 0.22.1",
- "log",
- "openssl",
- "serde",
- "serde_derive",
- "serde_json",
- "simpl",
- "time",
-]
-
-[[package]]
 name = "snafu"
 version = "0.7.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12688,7 +12633,7 @@ dependencies = [
  "serial_test",
  "similar-asserts",
  "smallvec",
- "smpl_jwt 0.9.0",
+ "smpl_jwt",
  "snafu 0.8.9",
  "snap",
  "socket2 0.5.10",
