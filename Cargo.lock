@@ -3950,12 +3950,12 @@ dependencies = [
 
 [[package]]
 name = "evmap"
-version = "11.0.0"
+version = "10.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1b8874945f036109c72242964c1174cf99434e30cfa45bf45fedc983f50046f8"
+checksum = "6e3ea06a83f97d3dc2eb06e51e7a729b418f0717a5558a5c870e3d5156dc558d"
 dependencies = [
  "hashbag",
- "left-right",
+ "slab",
  "smallvec",
 ]
 
@@ -4395,21 +4395,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "generator"
-version = "0.8.8"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "52f04ae4152da20c76fe800fa48659201d5cf627c5149ca0b707b69d7eef6cf9"
-dependencies = [
- "cc",
- "cfg-if",
- "libc",
- "log",
- "rustversion",
- "windows-link 0.2.0",
- "windows-result",
-]
-
-[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4457,7 +4442,7 @@ dependencies = [
  "libc",
  "libgit2-sys",
  "log",
- "openssl-probe",
+ "openssl-probe 0.1.6",
  "openssl-sys",
  "url",
 ]
@@ -4507,7 +4492,7 @@ dependencies = [
  "serde_derive",
  "serde_json",
  "simpl",
- "smpl_jwt 0.8.0",
+ "smpl_jwt",
  "time",
  "tokio",
 ]
@@ -6195,17 +6180,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "left-right"
-version = "0.11.7"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f0c21e4c8ff95f487fb34e6f9182875f42c84cef966d29216bf115d9bba835a"
-dependencies = [
- "crossbeam-utils",
- "loom",
- "slab",
-]
-
-[[package]]
 name = "lexical-core"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6462,19 +6436,6 @@ dependencies = [
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-types 0.12.6",
-]
-
-[[package]]
-name = "loom"
-version = "0.7.2"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "419e0dc8046cb947daa77eb95ae174acfbddb7673b4151f56d1eed8e93fbfaca"
-dependencies = [
- "cfg-if",
- "generator",
- "scoped-tls",
- "tracing 0.1.44",
- "tracing-subscriber",
 ]
 
 [[package]]
@@ -6988,7 +6949,7 @@ dependencies = [
  "libc",
  "log",
  "openssl",
- "openssl-probe",
+ "openssl-probe 0.1.6",
  "openssl-sys",
  "schannel",
  "security-framework 2.10.0",
@@ -7665,6 +7626,12 @@ name = "openssl-probe"
 version = "0.1.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d05e27ee213611ffe7d6348b942e8f942b37114c00cc03cec254295a4a17852e"
+
+[[package]]
+name = "openssl-probe"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7c87def4c32ab89d880effc9e097653c8da5d6ef28e6b539d313baaacfbafcbe"
 
 [[package]]
 name = "openssl-src"
@@ -9728,7 +9695,7 @@ version = "0.7.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8f1fb85efa936c42c6d5fc28d2629bb51e4b2f4b8a5211e297d599cc5a093792"
 dependencies = [
- "openssl-probe",
+ "openssl-probe 0.1.6",
  "rustls-pemfile 2.1.0",
  "rustls-pki-types",
  "schannel",
@@ -9741,7 +9708,7 @@ version = "0.8.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7fcff2dd52b58a8d98a70243663a0d234c4e2b79235637849d15913394a247d3"
 dependencies = [
- "openssl-probe",
+ "openssl-probe 0.1.6",
  "rustls-pki-types",
  "schannel",
  "security-framework 3.5.1",
@@ -10469,22 +10436,6 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fff23fdd767425c13e6f354b7443b3cc0c23097ae077e2211ef8143fa68ad014"
 dependencies = [
  "base64 0.21.7",
- "log",
- "openssl",
- "serde",
- "serde_derive",
- "serde_json",
- "simpl",
- "time",
-]
-
-[[package]]
-name = "smpl_jwt"
-version = "0.9.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a45432dc6b645c982d4ef68966b4507fb57d98ca67289df780cd7ca4a4369f5e"
-dependencies = [
- "base64 0.22.1",
  "log",
  "openssl",
  "serde",
@@ -12648,7 +12599,7 @@ dependencies = [
  "notify",
  "opendal",
  "openssl",
- "openssl-probe",
+ "openssl-probe 0.2.1",
  "openssl-src",
  "ordered-float 4.6.0",
  "paste",
@@ -12688,7 +12639,7 @@ dependencies = [
  "serial_test",
  "similar-asserts",
  "smallvec",
- "smpl_jwt 0.9.0",
+ "smpl_jwt",
  "snafu 0.8.9",
  "snap",
  "socket2 0.5.10",
