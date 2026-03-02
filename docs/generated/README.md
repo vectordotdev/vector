@@ -7,5 +7,5 @@ Do **not** alter these files directly as they will be overwritten by CI.
 To regenerate:
 
 ```sh
-make generate-vrl-docs
+make generate-vector-vrl-docs
 ```

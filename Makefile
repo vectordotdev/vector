@@ -483,7 +483,7 @@ check-clippy: ## Check code with Clippy
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check rust
 
 .PHONY: check-docs
-check-docs: generate-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
+check-docs: generate-vector-vrl-docs ## Check that all /docs file are valid - vrl docs due to remap.functions.* references
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) check docs
 
 .PHONY: check-fmt
@@ -700,13 +700,13 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 		$(if $(findstring true,$(CI)),>/dev/null,)
 	./scripts/cue.sh fmt
 
-.PHONY: generate-vrl-docs
-generate-vrl-docs: ## Generate VRL function documentation from Rust source.
-	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build vrl-docs --output docs/generated/ \
+.PHONY: generate-vector-vrl-docs
+generate-vector-vrl-docs: ## Generate VRL function documentation from Rust source.
+	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build vector-vrl-docs --output docs/generated/ \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
 .PHONY: generate-docs
-generate-docs: generate-component-docs generate-vrl-docs
+generate-docs: generate-component-docs generate-vector-vrl-docs
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
