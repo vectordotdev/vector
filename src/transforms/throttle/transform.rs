@@ -227,10 +227,16 @@ where
         match result {
             Ok(value) => {
                 let cost = match value {
-                    vrl::value::Value::Integer(n) if n > 0 => n as u32,
+                    vrl::value::Value::Integer(n) if n > 0 => {
+                        if n > u32::MAX as i64 { u32::MAX } else { n as u32 }
+                    }
                     vrl::value::Value::Float(f) => {
                         let n = f.into_inner().ceil() as i64;
-                        if n > 0 { n as u32 } else { 1 }
+                        if n > 0 {
+                            if n > u32::MAX as i64 { u32::MAX } else { n as u32 }
+                        } else {
+                            1
+                        }
                     }
                     _ => {
                         warn!(
@@ -266,7 +272,7 @@ where
 
         if let Some(ref limiter) = self.json_bytes_limiter
             && json_bytes > 0
-            && let Some(n) = NonZeroU32::new(json_bytes as u32)
+            && let Some(n) = NonZeroU32::new(json_bytes.min(u32::MAX as usize) as u32)
             && !limiter.check_key_n(key, n)
         {
             return Some(ThresholdType::JsonBytes);
