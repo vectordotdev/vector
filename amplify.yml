@@ -52,4 +52,4 @@ applications:
       cache:
         paths:
           - website/node_modules/**/*
-    appRoot: /
+    appRoot: .
