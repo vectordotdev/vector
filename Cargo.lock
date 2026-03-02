@@ -13112,7 +13112,7 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 [[package]]
 name = "vrl"
 version = "0.30.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=doc-generation#add558d8225f252dc560303cd85c84fd998d2cca"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=doc-generation#5316c01b75db3508dedc6c7248b6965f6a76862b"
 dependencies = [
  "aes",
  "aes-siv",
