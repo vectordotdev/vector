@@ -116,6 +116,49 @@ classDiagram
     NativeLogEvent --> Scope
 ```
 
+### Native trace event structure
+
+```mermaid
+classDiagram
+    class NativeTraceEvent {
+        +trace_id: String
+        +span_id: String
+        +parent_span_id: String
+        +name: String
+        +kind: i32
+        +start_time_unix_nano: u64
+        +end_time_unix_nano: u64
+        +trace_state: String
+        +attributes: Object
+        +resources: Object
+        +events: Array
+        +links: Array
+        +status: Object
+    }
+
+    class SpanEvent {
+        +name: String
+        +time_unix_nano: u64
+        +attributes: Object
+    }
+
+    class SpanLink {
+        +trace_id: String
+        +span_id: String
+        +trace_state: String
+        +attributes: Object
+    }
+
+    class Status {
+        +code: i32
+        +message: String
+    }
+
+    NativeTraceEvent --> SpanEvent
+    NativeTraceEvent --> SpanLink
+    NativeTraceEvent --> Status
+```
+
 ### OTLP output structure
 
 ```mermaid
@@ -330,7 +373,43 @@ xychart-beta
 }
 ```
 
+### 3. Native trace event
+
+```json
+{
+  "trace_id": "0123456789abcdef0123456789abcdef",
+  "span_id": "fedcba9876543210",
+  "parent_span_id": "abcdef0123456789",
+  "name": "HTTP GET /api/users",
+  "kind": 2,
+  "start_time_unix_nano": 1705312200000000000,
+  "end_time_unix_nano": 1705312200042000000,
+  "attributes": {
+    "http.method": "GET",
+    "http.status_code": 200
+  },
+  "resources": {
+    "service.name": "api-gateway",
+    "host.name": "gateway-01"
+  },
+  "status": {
+    "code": 1,
+    "message": "OK"
+  },
+  "events": [
+    {
+      "name": "request.start",
+      "time_unix_nano": 1705312200000000000,
+      "attributes": { "component": "handler" }
+    }
+  ],
+  "links": []
+}
+```
+
 ## Field mapping reference
+
+### Log field mapping
 
 ```mermaid
 flowchart LR
@@ -368,6 +447,28 @@ flowchart LR
     H --> Q
     I --> R
 ```
+
+### Trace field mapping
+
+| Native Field | OTLP Field | Notes |
+|--------------|------------|-------|
+| `.trace_id` | `traceId` | Hex string → 16 bytes |
+| `.span_id` | `spanId` | Hex string → 8 bytes |
+| `.parent_span_id` | `parentSpanId` | Hex string → 8 bytes |
+| `.name` | `name` | Span operation name |
+| `.kind` | `kind` | SpanKind enum (0-5) |
+| `.start_time_unix_nano` | `startTimeUnixNano` | Nanosecond timestamp |
+| `.end_time_unix_nano` | `endTimeUnixNano` | Nanosecond timestamp |
+| `.trace_state` | `traceState` | W3C trace state string |
+| `.attributes.*` | `attributes[]` | Object → KeyValue array |
+| `.resources.*` | `resource.attributes[]` | Object → KeyValue array |
+| `.events[]` | `events[]` | Span events (name, time, attributes) |
+| `.links[]` | `links[]` | Span links (trace_id, span_id, attributes) |
+| `.status.code` | `status.code` | StatusCode enum |
+| `.status.message` | `status.message` | Status description |
+| `.dropped_attributes_count` | `droppedAttributesCount` | |
+| `.dropped_events_count` | `droppedEventsCount` | |
+| `.dropped_links_count` | `droppedLinksCount` | |
 
 ### Type conversion
 
@@ -422,7 +523,7 @@ sinks:
       codec: otlp
 ```
 
-### OTLP → Enrich → OTLP
+### OTLP → Enrich → OTLP (logs)
 
 ```yaml
 sources:
@@ -448,6 +549,51 @@ sinks:
       codec: otlp
 ```
 
+### OTLP traces → Enrich → OTLP
+
+```yaml
+sources:
+  otel_in:
+    type: opentelemetry
+    grpc:
+      address: 0.0.0.0:4317
+
+transforms:
+  enrich_traces:
+    type: remap
+    inputs: ["otel_in.traces"]
+    source: |
+      .attributes.processed_by = "vector"
+      .resources."deployment.environment" = "production"
+
+sinks:
+  otel_out:
+    type: opentelemetry
+    inputs: ["enrich_traces"]
+    endpoint: http://destination:4317
+    encoding:
+      codec: otlp  # Native traces auto-converted to OTLP protobuf
+```
+
+### Metrics passthrough (no native conversion)
+
+```yaml
+sources:
+  otel_in:
+    type: opentelemetry
+    grpc:
+      address: 0.0.0.0:4317
+    use_otlp_decoding: true  # Required for metrics passthrough
+
+sinks:
+  otel_out:
+    type: opentelemetry
+    inputs: ["otel_in.metrics"]
+    endpoint: http://destination:4317
+    encoding:
+      codec: otlp  # Passthrough only - native metric conversion not yet supported
+```
+
 ## Error handling
 
 Invalid fields are handled gracefully:
@@ -455,7 +601,9 @@ Invalid fields are handled gracefully:
 | Invalid Input | Behavior |
 |---------------|----------|
 | Malformed hex trace_id | Empty (with warning) |
+| Wrong-length trace_id/span_id | Empty (with warning) |
 | Wrong type for severity | Default to 0 |
+| Severity number out of range | Clamped to 0-24 |
 | Negative timestamp | Use 0 |
 | Invalid UTF-8 | Lossy conversion |
 
