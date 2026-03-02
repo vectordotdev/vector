@@ -76,6 +76,7 @@ When introducing a new source, sink, or transform, you need to create documentat
    ```
 
    This creates an auto-generated CUE file in `website/cue/reference/components/{sources,sinks,transforms}/generated/<component_name>.cue` containing all the configuration options from your Rust code.
+   Note that documentation for config parameters behavior should be part of the Rust docs. The above command will generate a CUE file populated with the Rust docs.
 
 2. **Create a manual CUE file** with additional metadata that cannot be auto-generated:
    - Create a new file at `website/cue/reference/components/{sources,sinks,transforms}/<component_name>.cue`
@@ -97,6 +98,8 @@ When introducing a new source, sink, or transform, you need to create documentat
    ```bash
    make check-component-docs
    ```
+
+6. It is recommended to `cd website && make serve` to view how the documentation renders on the Vector website.
 
 ### Formatting
 
