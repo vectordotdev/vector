@@ -48,21 +48,6 @@ pub const METRICS: &str = "metrics";
 pub const TRACES: &str = "traces";
 
 /// Configuration for OTLP decoding behavior.
-///
-/// This configuration controls how OpenTelemetry Protocol (OTLP) data is decoded for each
-/// signal type (logs, metrics, traces).
-///
-/// When a signal is configured to use OTLP decoding (`true`), the raw OTLP format is preserved,
-/// allowing the data to be forwarded to downstream OTLP collectors without transformation.
-/// When set to `false`, the signal is converted to Vector's native event format, enabling
-/// compatibility with Vector's transforms and sinks.
-///
-/// # Important Considerations
-///
-/// When OTLP decoding is enabled for metrics:
-/// - Metrics are parsed as logs while preserving the OTLP format
-/// - Vector's metric transforms will NOT be compatible with this output
-/// - The events can be forwarded directly (passthrough) to a downstream OTLP collector
 #[configurable_component]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
@@ -141,12 +126,22 @@ pub struct OpentelemetryConfig {
     #[serde(default)]
     pub log_namespace: Option<bool>,
 
-    /// Configuration for how OTLP data is decoded for each signal type.
+    /// Configuration for OTLP decoding behavior.
     ///
-    /// This field supports both a simple boolean form (for backward compatibility) and a
-    /// per-signal configuration. See [`OtlpDecodingConfig`] for detailed documentation
-    /// and configuration examples.
-    #[configurable(derived)]
+    /// This configuration controls how OpenTelemetry Protocol (OTLP) data is decoded for each
+    /// signal type (logs, metrics, traces).
+    ///
+    /// When a signal is configured to use OTLP decoding (`true`), the raw OTLP format is preserved,
+    /// allowing the data to be forwarded to downstream OTLP collectors without transformation.
+    /// When set to `false`, the signal is converted to Vector's native event format, enabling
+    /// compatibility with Vector's transforms and sinks.
+    ///
+    /// # Important Considerations
+    ///
+    /// When OTLP decoding is enabled for metrics:
+    /// - Metrics are parsed as logs while preserving the OTLP format
+    /// - Vector's metric transforms will NOT be compatible with this output
+    /// - The events can be forwarded directly (passthrough) to a downstream OTLP collector
     #[serde(default, deserialize_with = "bool_or_struct")]
     pub use_otlp_decoding: OtlpDecodingConfig,
 }
