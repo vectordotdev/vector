@@ -7,6 +7,7 @@ use opentelemetry_proto::{
         RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, RESOURCE_SPANS_JSON_FIELD,
         TRACES_REQUEST_MESSAGE_TYPE,
     },
+    spans::native_trace_to_otlp_request,
 };
 use prost::Message;
 use tokio_util::codec::Encoder;
@@ -147,9 +148,14 @@ impl Encoder<Event> for OtlpSerializer {
                 if trace.contains(RESOURCE_SPANS_JSON_FIELD) {
                     self.traces_descriptor.encode(event, buffer)
                 } else {
-                    Err(
-                        "Trace event does not contain OTLP structure and native conversion is not yet supported".into(),
-                    )
+                    // Native Vector format - convert to OTLP
+                    // This handles trace events from any source (otlp with
+                    // use_otlp_decoding: false, datadog_agent, etc.) with
+                    // graceful degradation for invalid fields
+                    let otlp_request = native_trace_to_otlp_request(trace);
+                    otlp_request
+                        .encode(buffer)
+                        .map_err(|e| format!("Failed to encode OTLP trace request: {e}").into())
                 }
             }
             Event::Metric(_) => {
