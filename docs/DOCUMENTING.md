@@ -16,11 +16,11 @@ documentation in tandem with code changes.
    5. [Validating](#validating)
       1. [Tips & tricks](#tips--tricks)
          1. [Make small incremental changes](#make-small-incremental-changes)
-3. [Changelog](#changelog)
-4. [Release highlights](#release-highlights)
-   1. [FAQ](#faq)
-      1. [What makes a release highlight noteworthy?](#what-makes-a-release-highlight-noteworthy)
-      2. [How is a release highlight different from a blog post?](#how-is-a-release-highlight-different-from-a-blog-post)
+   6. [Changelog](#changelog)
+   7. [Release highlights](#release-highlights)
+      1. [FAQ](#faq)
+         1. [What makes a release highlight noteworthy?](#what-makes-a-release-highlight-noteworthy)
+         2. [How is a release highlight different from a blog post?](#how-is-a-release-highlight-different-from-a-blog-post)
 
 <!-- /MarkdownTOC -->
 
