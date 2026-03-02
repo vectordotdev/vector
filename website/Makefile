@@ -25,7 +25,7 @@ config-examples:
 VDEV ?= cargo vdev
 
 generate-vrl-docs:
-	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions $(if $(VECTOR_SHA),--vector-sha $(VECTOR_SHA))
+	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions
 
 structured-data: generate-vrl-docs cue-build config-examples
 

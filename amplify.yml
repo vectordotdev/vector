@@ -28,8 +28,19 @@ applications:
             - tar xzf hugo_extended_${HUGO_VERSION}_Linux-64bit.tar.gz
             - mv hugo /usr/local/bin/
             - hugo version
+            - echo "Installing vdev..."
+            - VDEV_TAG=$(git ls-remote --tags https://github.com/vectordotdev/vector.git 'refs/tags/vdev-v*' | sed 's|.*refs/tags/||' | grep -v '\^{}' | sort -V | tail -1)
+            - echo "Latest vdev release: ${VDEV_TAG}"
+            - VDEV_VERSION=${VDEV_TAG#vdev-}
+            - curl -LO "https://github.com/vectordotdev/vector/releases/download/${VDEV_TAG}/vdev-x86_64-unknown-linux-gnu-${VDEV_VERSION}.tgz"
+            - tar xzf vdev-x86_64-unknown-linux-gnu-${VDEV_VERSION}.tgz
+            - mv vdev-x86_64-unknown-linux-gnu-${VDEV_VERSION}/vdev /usr/local/bin/
+            - rm -rf vdev-x86_64-unknown-linux-gnu-*
+            - vdev version
+            - export VDEV=vdev
         build:
           commands:
+            - export VDEV=vdev
             - DEPLOY_PRIME_URL=$(echo "https://$(echo "${AWS_BRANCH}" | sed 's/[./]/-/g').d1a7j77663uxsc.amplifyapp.com" )
             - if [[ "${AWS_BRANCH}" == "website" ]]; then DEPLOY_COMMAND="ci-production-build"; fi
             - make $DEPLOY_COMMAND | tee -a /var/log/amplify-build.log
