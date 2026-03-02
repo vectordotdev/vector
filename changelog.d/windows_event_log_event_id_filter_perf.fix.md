@@ -1,0 +1,3 @@
+Fixed a performance issue in the `windows_event_log` source where configuring `only_event_ids` still pulled every event from the Windows Event Log, performed full XML rendering, metadata resolution, and message formatting, then discarded non-matching events at the end of the pipeline. The source now auto-generates an XPath query from `only_event_ids` (e.g., `*[System[EventID=4624 or EventID=4625]]`) so the Windows API filters at the source. An early pre-filter in the event drain loop also discards non-matching events immediately after parsing the System section, before the expensive metadata and message formatting calls. On a Security log with 252k events and ~1,000 matches this eliminates the majority of wasted CPU.
+
+authors: tot19

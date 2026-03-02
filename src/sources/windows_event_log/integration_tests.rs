@@ -339,6 +339,58 @@ async fn test_ignore_event_ids_filter() {
     }
 }
 
+/// Verify that only_event_ids generates an XPath filter when no explicit
+/// event_query is set. The existing `test_only_event_ids_filter` always sets
+/// both `only_event_ids` AND `event_query`, so the auto-generated XPath path
+/// in `build_xpath_query()` was never exercised — that is how the original
+/// performance bug shipped.
+///
+/// This test sets only_event_ids=[1000] WITHOUT event_query, so the source
+/// must auto-generate `*[System[EventID=1000]]` and only receive matching
+/// events from the Windows API.
+#[tokio::test]
+async fn test_only_event_ids_generates_xpath_filter() {
+    let data_dir = temp_data_dir();
+
+    // Emit events with different IDs. Only ID 1000 should be returned.
+    emit_event("INFORMATION", 999, "xpath-filter-exclude");
+    emit_event("INFORMATION", 1000, "xpath-filter-include");
+    emit_event("INFORMATION", 998, "xpath-filter-exclude-2");
+
+    let config = WindowsEventLogConfig {
+        data_dir: Some(data_dir.path().to_path_buf()),
+        channels: vec!["Application".to_string()],
+        read_existing_events: true,
+        only_event_ids: Some(vec![1000]),
+        // Intentionally NOT setting event_query — this forces
+        // build_xpath_query() to auto-generate the XPath from only_event_ids.
+        ..Default::default()
+    };
+
+    let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
+
+    // We must receive at least one event (the 1000 we emitted).
+    assert!(
+        !events.is_empty(),
+        "Expected at least one event with ID 1000 from XPath-filtered subscription"
+    );
+
+    // Every event must have event_id == 1000.
+    for event in &events {
+        if let Some(eid) = event.as_log().get("event_id") {
+            let id: i64 = match eid {
+                vrl::value::Value::Integer(i) => *i,
+                other => other.to_string_lossy().parse().unwrap_or(-1),
+            };
+            assert_eq!(
+                id, 1000,
+                "only_event_ids=[1000] (without event_query) but got event_id={id}. \
+                 XPath generation in build_xpath_query may be broken."
+            );
+        }
+    }
+}
+
 // ---------------------------------------------------------------------------
 // Event level / type variety
 // ---------------------------------------------------------------------------

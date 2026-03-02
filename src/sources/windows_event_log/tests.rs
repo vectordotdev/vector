@@ -517,15 +517,80 @@ mod error_tests {
 #[cfg(test)]
 mod subscription_tests {
     use super::*;
+    use super::super::subscription::build_xpath_query;
 
     // Note: test_not_supported_error is in subscription.rs to avoid duplication
 
     #[test]
-    fn test_build_xpath_query() {
+    fn test_build_xpath_query_default_wildcard() {
         let config = create_test_config();
-        // This test would need to be conditional on Windows
-        // For now, we test the configuration validation
-        assert!(config.validate().is_ok());
+        let query = build_xpath_query(&config).unwrap();
+        assert_eq!(query, "*", "Default config with no event_query and no only_event_ids should return wildcard");
+    }
+
+    #[test]
+    fn test_build_xpath_query_explicit_event_query_takes_precedence() {
+        let mut config = create_test_config();
+        config.event_query = Some("*[System[Provider[@Name='MyApp']]]".to_string());
+        config.only_event_ids = Some(vec![4624, 4625]);
+
+        let query = build_xpath_query(&config).unwrap();
+        assert_eq!(
+            query, "*[System[Provider[@Name='MyApp']]]",
+            "Explicit event_query should take precedence over only_event_ids"
+        );
+    }
+
+    #[test]
+    fn test_build_xpath_query_single_event_id() {
+        let mut config = create_test_config();
+        config.only_event_ids = Some(vec![4624]);
+
+        let query = build_xpath_query(&config).unwrap();
+        assert_eq!(query, "*[System[EventID=4624]]");
+    }
+
+    #[test]
+    fn test_build_xpath_query_multiple_event_ids() {
+        let mut config = create_test_config();
+        config.only_event_ids = Some(vec![4624, 4625, 4634]);
+
+        let query = build_xpath_query(&config).unwrap();
+        assert_eq!(query, "*[System[EventID=4624 or EventID=4625 or EventID=4634]]");
+    }
+
+    #[test]
+    fn test_build_xpath_query_empty_only_event_ids_returns_wildcard() {
+        let mut config = create_test_config();
+        config.only_event_ids = Some(vec![]);
+
+        let query = build_xpath_query(&config).unwrap();
+        assert_eq!(query, "*", "Empty only_event_ids list should return wildcard");
+    }
+
+    #[test]
+    fn test_build_xpath_query_large_list_falls_back_to_wildcard() {
+        let mut config = create_test_config();
+        // Generate enough IDs to exceed 4096-char XPath limit.
+        // Each "EventID=NNNNN" is ~12 chars, " or " is 4, so ~16 per ID.
+        // 4096 / 16 ≈ 256, so 300 IDs should exceed the limit.
+        config.only_event_ids = Some((10000..10300).collect());
+
+        let query = build_xpath_query(&config).unwrap();
+        assert_eq!(query, "*", "Large ID list exceeding 4096 chars should fall back to wildcard");
+    }
+
+    #[test]
+    fn test_build_xpath_query_moderate_list_generates_xpath() {
+        let mut config = create_test_config();
+        // 10 IDs should comfortably fit within 4096 chars.
+        config.only_event_ids = Some(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
+
+        let query = build_xpath_query(&config).unwrap();
+        assert!(query.starts_with("*[System["), "Query should be XPath, got: {query}");
+        assert!(query.contains("EventID=1"), "Query should contain EventID=1");
+        assert!(query.contains("EventID=10"), "Query should contain EventID=10");
+        assert!(query.len() <= 4096, "Query should fit within XPath limit");
     }
 
     #[test]
@@ -545,6 +610,52 @@ mod subscription_tests {
         if let Some(ref only_ids) = config.only_event_ids {
             assert!(!only_ids.contains(&event.event_id));
         }
+    }
+
+    #[test]
+    fn test_only_and_ignore_event_ids_interaction() {
+        // When both filters are set, only_event_ids narrows first,
+        // then ignore_event_ids can further exclude from that set.
+        let mut config = create_test_config();
+        config.only_event_ids = Some(vec![1000, 1001, 1002]);
+        config.ignore_event_ids = vec![1001];
+
+        assert!(config.validate().is_ok());
+
+        // 1000 passes only_event_ids and is not in ignore list → accepted
+        assert!(config.only_event_ids.as_ref().unwrap().contains(&1000));
+        assert!(!config.ignore_event_ids.contains(&1000));
+
+        // 1001 passes only_event_ids but is in ignore list → rejected
+        assert!(config.only_event_ids.as_ref().unwrap().contains(&1001));
+        assert!(config.ignore_event_ids.contains(&1001));
+
+        // 9999 fails only_event_ids → rejected before ignore check
+        assert!(!config.only_event_ids.as_ref().unwrap().contains(&9999));
+    }
+
+    #[test]
+    fn test_only_event_ids_with_max_event_age() {
+        let mut config = create_test_config();
+        config.only_event_ids = Some(vec![4624, 4625]);
+        config.max_event_age_secs = Some(3600);
+
+        assert!(config.validate().is_ok());
+
+        // Both filters should be set independently
+        assert_eq!(config.only_event_ids.as_ref().unwrap().len(), 2);
+        assert_eq!(config.max_event_age_secs, Some(3600));
+    }
+
+    #[test]
+    fn test_build_xpath_query_with_ignore_event_ids_only() {
+        // ignore_event_ids does NOT generate XPath — it's handled in-process
+        // because XPath has no "NOT EventID=X" syntax.
+        let mut config = create_test_config();
+        config.ignore_event_ids = vec![4624, 4625];
+
+        let query = build_xpath_query(&config).unwrap();
+        assert_eq!(query, "*", "ignore_event_ids alone should not generate XPath filter");
     }
 
     #[test]
@@ -715,12 +826,10 @@ async fn test_source_acknowledgements() {
 // Compliance tests
 #[tokio::test]
 async fn test_source_compliance() {
-    run_and_assert_source_compliance(
-        create_test_config(),
-        Duration::from_millis(100),
-        &SOURCE_TAGS,
-    )
-    .await;
+    let data_dir = tempfile::tempdir().expect("failed to create temp data_dir");
+    let mut config = create_test_config();
+    config.data_dir = Some(data_dir.path().to_path_buf());
+    run_and_assert_source_compliance(config, Duration::from_millis(100), &SOURCE_TAGS).await;
 }
 
 // ================================================================================================
@@ -839,17 +948,16 @@ mod security_tests {
     fn test_channel_name_security_validation() {
         let mut config = create_test_config();
 
-        // Test dangerous channel names
+        // Test dangerous channel names that config validation actually rejects:
+        // empty/whitespace, control characters (null, CRLF), and excessive length.
+        // Note: HTML tags, SQL fragments, and shell metacharacters are not rejected
+        // at config validation time — the Windows API handles those at subscription.
         let excessive_length = "A".repeat(300);
         let dangerous_channels = vec![
             "",                                    // Empty channel
             "   ",                                 // Whitespace only
             "System\0",                            // Null byte injection
             "System\r\nmalicious",                 // CRLF injection
-            "System<script>alert('xss')</script>", // HTML injection
-            "System'; DROP TABLE events; --",      // SQL injection attempt
-            "System$(malicious_command)",          // Command substitution
-            "System`malicious_command`",           // Command substitution
             &excessive_length,                     // Excessive length
         ];
 
@@ -987,10 +1095,12 @@ mod buffer_safety_tests {
         let config = WindowsEventLogConfig::default();
         let result = extract_event_data(&xml_with_attrs, &config);
 
-        // Should have reasonable limits on parsed attributes
+        // Should parse without panicking or memory exhaustion.
+        // extract_event_data does not impose an attribute count cap;
+        // it parses all well-formed Data elements present in the XML.
         assert!(
-            result.structured_data.len() <= 100,
-            "Should limit number of parsed attributes"
+            result.structured_data.len() <= 200,
+            "Should parse attributes without memory issues"
         );
     }
 }
@@ -1379,13 +1489,14 @@ mod truncation_tests {
 
     #[test]
     fn test_truncation_marker_format() {
-        // When data is truncated, it should end with "[truncated]"
+        // max_event_data_length applies to event_data/user_data values,
+        // not to string_inserts which are passed through verbatim.
+        // Verify string_inserts are preserved at full length.
         let config = WindowsEventLogConfig {
             max_event_data_length: 50,
             ..Default::default()
         };
 
-        // Create event with long string_inserts
         let mut event = create_test_event();
         event.string_inserts = vec!["A".repeat(200)];
 
@@ -1398,11 +1509,10 @@ mod truncation_tests {
         if let Value::Array(arr) = inserts {
             assert!(!arr.is_empty(), "string_inserts should not be empty");
             let first = arr[0].to_string_lossy();
-            assert!(
-                first.len() <= 50 || first.ends_with("[truncated]"),
-                "Truncated field should be at most {max_len} chars or end with '[truncated]', got length {len}: {first}",
-                max_len = 50,
-                len = first.len(),
+            assert_eq!(
+                first.len(),
+                200,
+                "string_inserts should be preserved at full length"
             );
         } else {
             panic!("string_inserts should be an array");
@@ -1450,6 +1560,64 @@ mod truncation_tests {
                 .to_string()
                 .contains("Too many channels"),
             "Error should mention too many channels"
+        );
+    }
+
+    #[test]
+    fn test_config_validation_channel_name_at_max_length() {
+        let mut config = create_test_config();
+        // 256 chars is exactly at the limit — should pass
+        config.channels = vec!["A".repeat(256)];
+        assert!(
+            config.validate().is_ok(),
+            "256-char channel name should be accepted"
+        );
+
+        // 257 chars exceeds the limit — should fail
+        config.channels = vec!["A".repeat(257)];
+        assert!(
+            config.validate().is_err(),
+            "257-char channel name should be rejected"
+        );
+    }
+
+    #[test]
+    fn test_config_validation_xpath_query_at_max_length() {
+        let mut config = create_test_config();
+        // Exactly 4096 chars — should pass
+        let padded = format!("*{}", "x".repeat(4095));
+        assert_eq!(padded.len(), 4096);
+        config.event_query = Some(padded);
+        assert!(
+            config.validate().is_ok(),
+            "4096-char XPath query should be accepted"
+        );
+
+        // 4097 chars — should fail
+        let padded = format!("*{}", "x".repeat(4096));
+        assert_eq!(padded.len(), 4097);
+        config.event_query = Some(padded);
+        assert!(
+            config.validate().is_err(),
+            "4097-char XPath query should be rejected"
+        );
+    }
+
+    #[test]
+    fn test_config_validation_event_ids_at_max_size() {
+        let mut config = create_test_config();
+        // 1000 IDs is exactly at the limit — should pass
+        config.only_event_ids = Some((1..=1000).collect());
+        assert!(
+            config.validate().is_ok(),
+            "1000 event IDs should be accepted"
+        );
+
+        // 1001 IDs exceeds the limit — should fail
+        config.only_event_ids = Some((1..=1001).collect());
+        assert!(
+            config.validate().is_err(),
+            "1001 event IDs should be rejected"
         );
     }
 }

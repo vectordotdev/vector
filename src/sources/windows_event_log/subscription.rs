@@ -572,6 +572,33 @@ impl EventLogSubscription {
                             // Single-pass: parse all System fields in one traversal
                             let system_fields = xml_parser::parse_system_section(&xml);
 
+                            // Early pre-filter: discard non-matching event IDs before
+                            // the expensive resolve_event_metadata / format_event_message
+                            // calls. This guarantees improved performance even when
+                            // XPath-level filtering is not applied (e.g. large ID lists).
+                            if let Some(ref only_ids) = self.config.only_event_ids
+                                && !only_ids.contains(&system_fields.event_id)
+                            {
+                                counter!("windows_event_log_events_filtered_total", "reason" => "event_id_prefilter")
+                                    .increment(1);
+                                unsafe {
+                                    let _ = EvtClose(event_handle);
+                                }
+                                continue;
+                            }
+                            if self
+                                .config
+                                .ignore_event_ids
+                                .contains(&system_fields.event_id)
+                            {
+                                counter!("windows_event_log_events_filtered_total", "reason" => "event_id_prefilter")
+                                    .increment(1);
+                                unsafe {
+                                    let _ = EvtClose(event_handle);
+                                }
+                                continue;
+                            }
+
                             let channel_name = if system_fields.channel.is_empty() {
                                 channel_sub.channel.clone()
                             } else {
@@ -861,13 +888,7 @@ impl EventLogSubscription {
     }
 
     fn build_xpath_query(config: &WindowsEventLogConfig) -> Result<String, WindowsEventLogError> {
-        let query = if let Some(ref custom_query) = config.event_query {
-            custom_query.clone()
-        } else {
-            "*".to_string()
-        };
-
-        Ok(query)
+        build_xpath_query(config)
     }
 
     fn validate_channels(config: &WindowsEventLogConfig) -> Result<(), WindowsEventLogError> {
@@ -912,6 +933,56 @@ impl EventLogSubscription {
 
         Ok(())
     }
+}
+
+/// Maximum XPath query length supported by Windows Event Log API.
+/// Queries exceeding this limit fall back to `"*"` (all events).
+const XPATH_MAX_LENGTH: usize = 4096;
+
+/// Build an XPath query from config, incorporating `only_event_ids` when no
+/// explicit `event_query` is set.
+///
+/// When `only_event_ids` is configured and no custom `event_query` is provided,
+/// generates a query like `*[System[EventID=4624 or EventID=4625]]` so that
+/// the Windows API filters events at the source, avoiding the cost of pulling,
+/// rendering, and discarding non-matching events.
+///
+/// If the generated query exceeds [`XPATH_MAX_LENGTH`] (4096 chars), falls back
+/// to `"*"` and lets the downstream filter in `build_event()` handle it.
+pub(super) fn build_xpath_query(
+    config: &WindowsEventLogConfig,
+) -> Result<String, WindowsEventLogError> {
+    // Explicit event_query always takes precedence.
+    if let Some(ref custom_query) = config.event_query {
+        return Ok(custom_query.clone());
+    }
+
+    // Generate XPath from only_event_ids if present and non-empty.
+    if let Some(ref ids) = config.only_event_ids
+        && !ids.is_empty()
+    {
+        let query = if ids.len() == 1 {
+            format!("*[System[EventID={}]]", ids[0])
+        } else {
+            let predicates: Vec<String> =
+                ids.iter().map(|id| format!("EventID={id}")).collect();
+            format!("*[System[{}]]", predicates.join(" or "))
+        };
+
+        if query.len() <= XPATH_MAX_LENGTH {
+            return Ok(query);
+        }
+        // Query too long — fall back to wildcard and rely on
+        // the in-process filter in build_event().
+        warn!(
+            message = "Generated XPath query exceeds maximum length, falling back to wildcard.",
+            query_len = query.len(),
+            max_len = XPATH_MAX_LENGTH,
+            num_event_ids = ids.len(),
+        );
+    }
+
+    Ok("*".to_string())
 }
 
 impl Drop for EventLogSubscription {
