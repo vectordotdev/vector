@@ -18,7 +18,6 @@ concurrency:
   cancel-in-progress: true
 
 permissions:
-  packages: write
   contents: read
 
 env:
@@ -45,6 +44,9 @@ jobs:
     secrets: inherit
 
   build-test-runner:
+    permissions:
+      contents: read
+      packages: write
     needs: changes
     if: ${{
       always() &&

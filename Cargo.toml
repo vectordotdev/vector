@@ -42,9 +42,9 @@ name = "e2e"
 path = "tests/e2e/mod.rs"
 
 [[test]]
-name = "top"
-path = "tests/top/lib.rs"
-required-features = ["top-tests"]
+name = "vector_api"
+path = "tests/vector_api/lib.rs"
+required-features = ["vector-api-tests"]
 
 # CI-based builds use full release optimization. See scripts/environment/release-flags.sh.
 # This results in roughly a 5% reduction in performance when compiling locally vs when
@@ -143,18 +143,18 @@ members = [
 ]
 
 [workspace.dependencies]
-anyhow = { version = "1.0.101", default-features = false, features = ["std"] }
-arc-swap = { version = "1.7.1", default-features = false }
+anyhow = { version = "1.0.102", default-features = false, features = ["std"] }
+arc-swap = { version = "1.8.2", default-features = false }
 async-stream = { version = "0.3.6", default-features = false }
 async-trait = { version = "0.1.89", default-features = false }
 base64 = { version = "0.22.1", default-features = false }
 bytes = { version = "1.11.1", default-features = false, features = ["serde"] }
 cfg-if = { version = "1.0.4", default-features = false }
-chrono = { version = "0.4.41", default-features = false, features = ["clock", "serde"] }
+chrono = { version = "0.4.44", default-features = false, features = ["clock", "serde"] }
 chrono-tz = { version = "0.10.4", default-features = false, features = ["serde"] }
-clap = { version = "4.5.56", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
-clap_complete = "4.5.65"
-colored = { version = "3.0.0", default-features = false }
+clap = { version = "4.5.60", default-features = false, features = ["derive", "error-context", "env", "help", "std", "string", "usage", "wrap_help"] }
+clap_complete = "4.5.66"
+colored = { version = "3.1.1", default-features = false }
 const-str = { version = "1.0.0", default-features = false }
 crossbeam-utils = { version = "0.8.21", default-features = false }
 darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
@@ -179,7 +179,7 @@ nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
 paste = { version = "1.0.15" }
 pin-project = { version = "1.1.10", default-features = false }
-proptest = { version = "1.8" }
+proptest = { version = "1.10" }
 proptest-derive = { version = "0.6.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
 prost-build = { version = "0.12", default-features = false }
@@ -215,7 +215,7 @@ vector-common-macros = { path = "lib/vector-common-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
-vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "compiler","value", "diagnostic", "path", "parser", "stdlib", "datadog", "core"] }
 mock_instant = { version = "0.6" }
 serial_test = { version = "3.2" }
 
@@ -456,7 +456,7 @@ byteorder = "1.5.0"
 windows-service = "0.8.0"
 
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.26.2", default-features = false, features = ["socket", "signal", "fs"] }
+nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
 netlink-packet-utils = "0.5.2"
@@ -497,24 +497,33 @@ wiremock = "0.6.4"
 zstd = { version = "0.13.0", default-features = false }
 
 [patch.crates-io]
-nix = { git = "https://github.com/vectordotdev/nix.git", branch = "memfd/gnu/musl" }
 # The `heim` crates depend on `ntapi` 0.3.7 on Windows, but that version has an
 # unaligned access bug fixed in the following revision.
 ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e38e5f154e6011dc9b270da6" }
 
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
-default = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
+default = ["enable-unix", "rdkafka?/gssapi-vendored"]
 # Default features for `cargo docs`. The same as `default` but without `rdkafka?/gssapi-vendored` which would require installing libsasl in our doc build environment.
-docs = ["api", "api-client", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
+docs = ["enable-unix"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
-default-cmake = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
+default-cmake = ["enable-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-default-msvc = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "transforms", "secrets"]
-default-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
-default-no-api-client = ["api", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
+base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl-functions-env", "vrl-functions-system", "vrl-functions-network"]
+enable-api-client = ["base", "api-client"]
+enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
+
+default-msvc = ["enable-api-client", "rdkafka?/cmake_build"]
+default-musl = ["enable-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build"]
+default-no-api-client = ["base", "sources-dnstap", "unix", "rdkafka?/gssapi-vendored"]
+
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
+
+# VRL functions control features
+vrl-functions-env = ["vrl/enable_env_functions"]
+vrl-functions-system = ["vrl/enable_system_functions"]
+vrl-functions-network = ["vrl/enable_network_functions"]
 
 # Enables the binary secret-backend-example
 secret-backend-example = ["transforms"]
@@ -525,14 +534,16 @@ all-metrics = ["sinks-metrics", "sources-metrics", "transforms-metrics"]
 # Target specific release features.
 # The `make` tasks will select this according to the appropriate triple.
 # Use this section to turn off or on specific features for specific triples.
-target-aarch64-unknown-linux-gnu = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
-target-aarch64-unknown-linux-musl = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
-target-armv7-unknown-linux-gnueabihf = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
-target-armv7-unknown-linux-musleabihf = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "secrets"]
-target-arm-unknown-linux-gnueabi = ["api", "api-client", "enrichment-tables", "rdkafka?/cmake_build", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
-target-arm-unknown-linux-musleabi = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "secrets"]
-target-x86_64-unknown-linux-gnu = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "rdkafka?/gssapi-vendored", "secrets"]
-target-x86_64-unknown-linux-musl = ["api", "api-client", "rdkafka?/cmake_build", "enrichment-tables", "sinks", "sources", "sources-dnstap", "transforms", "unix", "secrets"]
+target-base = ["enable-api-client", "rdkafka?/cmake_build", "sources-dnstap"]
+target-unix = ["target-base", "unix"]
+target-aarch64-unknown-linux-gnu =      ["target-unix"]
+target-aarch64-unknown-linux-musl =     ["target-unix"]
+target-armv7-unknown-linux-gnueabihf =  ["target-unix"]
+target-armv7-unknown-linux-musleabihf = ["target-base"]
+target-arm-unknown-linux-gnueabi =      ["target-unix"]
+target-arm-unknown-linux-musleabi =     ["target-base"]
+target-x86_64-unknown-linux-gnu =       ["target-unix", "rdkafka?/gssapi-vendored"]
+target-x86_64-unknown-linux-musl =      ["target-unix"]
 
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
@@ -948,7 +959,7 @@ all-integration-tests = [
   "pulsar-integration-tests",
   "redis-integration-tests",
   "splunk-integration-tests",
-  "top-tests",
+  "vector-api-tests",
   "webhdfs-integration-tests",
 ]
 
@@ -1016,7 +1027,6 @@ pulsar-integration-tests = ["sinks-pulsar", "sources-pulsar"]
 redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
-top-tests = ["top", "api", "sources-demo_logs", "sinks-blackhole"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
@@ -1048,6 +1058,9 @@ e2e-tests-opentelemetry = [
 ]
 
 vector-api-tests = [
+  "top",
+  "api",
+  "api-client-minimal",
   "sources-demo_logs",
   "transforms-log_to_metric",
   "transforms-remap",
