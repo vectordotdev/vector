@@ -94,14 +94,6 @@ When introducing a new source, sink, or transform, you need to create documentat
    make check-component-docs
    ```
 
-The manual CUE file typically includes:
-- Component title and description
-- Feature classifications (delivery guarantees, deployment roles, etc.)
-- Configuration examples
-- "How it works" sections explaining component behavior
-- Output event descriptions
-- Telemetry metrics
-
 ### Formatting
 
 Vector has some CUE-related CI checks that are run whenever changes are made to
