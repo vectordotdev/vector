@@ -28,10 +28,8 @@ jobs:
     env:
       # We're not actually doing a debug build, we're just turning off the logic
       # in release-flags.sh so that we don't override the Cargo "release" profile
-      # with full LTO. We also override codegen-units back to the default since
-      # Cargo.toml now sets codegen-units=1 for release builds.
+      # with full LTO / single codegen unit.
       PROFILE: debug
-      CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2

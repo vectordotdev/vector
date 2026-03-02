@@ -46,10 +46,11 @@ name = "vector_api"
 path = "tests/vector_api/lib.rs"
 required-features = ["vector-api-tests"]
 
-# CI-based builds additionally enable full LTO. See scripts/environment/release-flags.sh.
+# CI-based builds use full release optimization. See scripts/environment/release-flags.sh.
+# This results in roughly a 5% reduction in performance when compiling locally vs when
+# compiled via the CI pipeline.
 [profile.release]
 debug = false # Do not include debug symbols in the executable.
-codegen-units = 1
 
 [profile.bench]
 debug = true
