@@ -22,10 +22,10 @@ cue-%:
 config-examples:
 	yarn config-examples
 
-VDEV = cargo vdev
+VDEV ?= cargo vdev
 
 generate-vrl-docs:
-	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions
+	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions $(if $(VECTOR_SHA),--vector-sha $(VECTOR_SHA))
 
 structured-data: generate-vrl-docs cue-build config-examples
 
