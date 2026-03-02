@@ -63,26 +63,6 @@ pub const TRACES: &str = "traces";
 /// - Metrics are parsed as logs while preserving the OTLP format
 /// - Vector's metric transforms will NOT be compatible with this output
 /// - The events can be forwarded directly to a downstream OTLP collector
-///
-/// # Configuration Examples
-///
-/// This configuration supports both a simple boolean form (for backward compatibility)
-/// and a per-signal configuration:
-///
-/// ## Simple boolean form (applies to all signals):
-/// ```yaml
-/// use_otlp_decoding: true  # All signals preserve OTLP format
-/// # or
-/// use_otlp_decoding: false # All signals use Vector native format (default)
-/// ```
-///
-/// ## Per-signal configuration:
-/// ```yaml
-/// use_otlp_decoding:
-///   logs: false     # Convert to Vector native format
-///   metrics: false  # Convert to Vector native format
-///   traces: true    # Preserve OTLP format
-/// ```
 #[configurable_component]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
