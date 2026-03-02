@@ -171,7 +171,13 @@ where
 
         let events_threshold = config.threshold.events_threshold().unwrap_or(0) as u64;
         let bytes_threshold = config.threshold.json_bytes_threshold().unwrap_or(0) as u64;
-        let tokens_threshold = config.threshold.json_bytes_threshold().unwrap_or(0) as u64;
+        // Token limiter reuses json_bytes as its budget — they share the same numerical capacity.
+        // This is intentional: the token cost from VRL is measured against the json_bytes budget.
+        let tokens_threshold = config
+            .threshold
+            .tokens_expression()
+            .and(config.threshold.json_bytes_threshold())
+            .unwrap_or(0) as u64;
 
         Ok(Self {
             quota_events,
@@ -228,12 +234,20 @@ where
             Ok(value) => {
                 let cost = match value {
                     vrl::value::Value::Integer(n) if n > 0 => {
-                        if n > u32::MAX as i64 { u32::MAX } else { n as u32 }
+                        if n > u32::MAX as i64 {
+                            u32::MAX
+                        } else {
+                            n as u32
+                        }
                     }
                     vrl::value::Value::Float(f) => {
                         let n = f.into_inner().ceil() as i64;
                         if n > 0 {
-                            if n > u32::MAX as i64 { u32::MAX } else { n as u32 }
+                            if n > u32::MAX as i64 {
+                                u32::MAX
+                            } else {
+                                n as u32
+                            }
                         } else {
                             1
                         }
@@ -293,6 +307,7 @@ where
         key: &Option<String>,
         json_bytes: usize,
         token_cost: Option<NonZeroU32>,
+        exceeded: &Option<ThresholdType>,
     ) {
         let util = self.utilization.entry(key.clone()).or_insert_with(|| {
             KeyUtilization::new(
@@ -302,10 +317,32 @@ where
             )
         });
 
+        // Only track consumption for limiters that were actually checked by the governor.
+        // check_thresholds short-circuits: if events fails, bytes/tokens governors never
+        // consumed tokens, so we must not count them in utilization.
         util.events_consumed += 1;
-        util.bytes_consumed += json_bytes as u64;
-        if let Some(cost) = token_cost {
-            util.tokens_consumed += cost.get() as u64;
+        match exceeded {
+            Some(ThresholdType::Events) => {
+                // Events limiter failed first — bytes/tokens were never checked
+            }
+            Some(ThresholdType::JsonBytes) => {
+                // Events passed, bytes failed — tokens was never checked
+                util.bytes_consumed += json_bytes as u64;
+            }
+            Some(ThresholdType::Tokens) => {
+                // Events and bytes passed, tokens failed
+                util.bytes_consumed += json_bytes as u64;
+                if let Some(cost) = token_cost {
+                    util.tokens_consumed += cost.get() as u64;
+                }
+            }
+            None => {
+                // All limiters passed — all consumed
+                util.bytes_consumed += json_bytes as u64;
+                if let Some(cost) = token_cost {
+                    util.tokens_consumed += cost.get() as u64;
+                }
+            }
         }
 
         let key_str = key.as_deref().unwrap_or("").to_owned();
@@ -392,7 +429,7 @@ where
         let exceeded = self.check_thresholds(&key, json_bytes, token_cost);
 
         if self.internal_metrics.emit_detailed_metrics {
-            self.update_utilization(&key, json_bytes, token_cost);
+            self.update_utilization(&key, json_bytes, token_cost, &exceeded);
         }
 
         match exceeded {
@@ -541,11 +578,8 @@ mod tests {
 
     fn make_buf(config: &ThrottleConfig) -> TransformOutputsBuf {
         let context = TransformContext::default();
-        let outputs = <ThrottleConfig as crate::config::TransformConfig>::outputs(
-            config,
-            &context,
-            &[],
-        );
+        let outputs =
+            <ThrottleConfig as crate::config::TransformConfig>::outputs(config, &context, &[]);
         TransformOutputsBuf::new_with_capacity(outputs, 10)
     }
 
@@ -560,8 +594,7 @@ window_secs = 5
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -593,8 +626,7 @@ events = 2
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -619,8 +651,7 @@ json_bytes = 500
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -639,7 +670,10 @@ json_bytes = 500
         }
 
         assert!(passed > 0, "Some events should pass");
-        assert!(dropped > 0, "Some events should be dropped (byte limit exceeded)");
+        assert!(
+            dropped > 0,
+            "Some events should be dropped (byte limit exceeded)"
+        );
         assert!(passed < 20, "Not all events should pass");
 
         clock.advance(Duration::from_secs(5));
@@ -663,8 +697,7 @@ exists(.special)
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -692,8 +725,7 @@ key_field = "{{ bucket }}"
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -724,8 +756,7 @@ reroute_dropped = true
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -748,8 +779,7 @@ window_secs = 5
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -777,8 +807,7 @@ reroute_dropped = true
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -808,8 +837,7 @@ reroute_dropped = true
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -885,8 +913,7 @@ reroute_dropped = true
                 }
                 unsafe {
                     let mut info = MaybeUninit::<MachTaskBasicInfo>::uninit();
-                    let mut count =
-                        (std::mem::size_of::<MachTaskBasicInfo>() / 4) as u32;
+                    let mut count = (std::mem::size_of::<MachTaskBasicInfo>() / 4) as u32;
                     let kr = task_info(
                         mach_task_self(),
                         MACH_TASK_BASIC_INFO,
@@ -922,10 +949,7 @@ reroute_dropped = true
             Triple,
         }
 
-        fn populate_keys(
-            num_keys: usize,
-            variant: &ThresholdVariant,
-        ) -> Box<dyn SyncTransform> {
+        fn populate_keys(num_keys: usize, variant: &ThresholdVariant) -> Box<dyn SyncTransform> {
             let config_str = match variant {
                 ThresholdVariant::Single => {
                     "threshold = 100000\nwindow_secs = 60\nkey_field = \"{{ service }}\"\n"
@@ -942,10 +966,8 @@ reroute_dropped = true
             };
             let config = toml::from_str::<ThrottleConfig>(&config_str).unwrap();
             let clock = clock::FakeRelativeClock::default();
-            let throttle =
-                Throttle::new(&config, &TransformContext::default(), clock).unwrap();
-            let mut transform: Box<dyn SyncTransform> =
-                Box::new(throttle.into_sync_transform());
+            let throttle = Throttle::new(&config, &TransformContext::default(), clock).unwrap();
+            let mut transform: Box<dyn SyncTransform> = Box::new(throttle.into_sync_transform());
             let mut buf = make_buf(&config);
 
             for i in 0..num_keys {
@@ -985,11 +1007,7 @@ reroute_dropped = true
             }
             eprintln!(
                 "  {:>22} {:>7} B/k {:>7} B/k {:>7} B/k {:>7} B/k",
-                label,
-                results[0].1,
-                results[1].1,
-                results[2].1,
-                results[3].1,
+                label, results[0].1, results[1].1, results[2].1, results[3].1,
             );
         }
 
@@ -1015,8 +1033,7 @@ key_field = "{{ service }}"
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -1045,8 +1062,7 @@ reroute_dropped = true
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -1087,8 +1103,7 @@ json_bytes = 200
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
@@ -1133,8 +1148,7 @@ tokens = 'strlen(string!(.message))'
         )
         .unwrap();
 
-        let throttle =
-            Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
+        let throttle = Throttle::new(&config, &TransformContext::default(), clock.clone()).unwrap();
         let mut transform = throttle.into_sync_transform();
         let mut buf = make_buf(&config);
 
