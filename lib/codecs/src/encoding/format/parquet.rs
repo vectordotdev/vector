@@ -242,22 +242,26 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
             return Ok(());
         }
 
-        // In strict mode, check for extra fields not in the schema (O(1) per field via HashSet)
+        // In strict mode, check for extra top-level fields not in the schema
         if self.schema_mode == SchemaMode::Strict {
             for event in &events {
                 if let Some(log) = event.maybe_as_log() {
-                    for (key, _) in log
-                        .all_event_fields()
-                        .expect("log event should have fields")
-                    {
-                        let field_name = key.strip_prefix('.').unwrap_or(&key);
-                        if !self.schema_field_names.contains(field_name) {
-                            return Err(Box::new(ArrowEncodingError::SchemaFetchError {
-                                message: format!(
-                                    "Strict schema mode: event contains field '{}' not in schema",
-                                    field_name
-                                ),
-                            }));
+                    if let Some(fields) = log.all_event_fields() {
+                        for (key, _) in fields {
+                            // Extract only the top-level field name (before first '.' or '[')
+                            let field_name = key.strip_prefix('.').unwrap_or(&key);
+                            let top_level = field_name
+                                .find(|c: char| c == '.' || c == '[')
+                                .map(|pos| &field_name[..pos])
+                                .unwrap_or(field_name);
+                            if !self.schema_field_names.contains(top_level) {
+                                return Err(Box::new(ArrowEncodingError::SchemaFetchError {
+                                    message: format!(
+                                        "Strict schema mode: event contains field '{}' not in schema",
+                                        top_level
+                                    ),
+                                }));
+                            }
                         }
                     }
                 }
