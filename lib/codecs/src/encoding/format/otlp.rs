@@ -53,9 +53,13 @@ impl OtlpSerializerConfig {
 /// - `resourceMetrics` → `ExportMetricsServiceRequest` (pre-formatted OTLP passthrough)
 /// - `resourceSpans` → `ExportTraceServiceRequest` (pre-formatted OTLP passthrough)
 /// - Native logs (without `resourceLogs`) → Automatic conversion to `ExportLogsServiceRequest`
+/// - Native traces (without `resourceSpans`) → Automatic conversion to `ExportTraceServiceRequest`
 ///
 /// The implementation is the inverse of what the `opentelemetry` source does when decoding,
 /// ensuring round-trip compatibility.
+///
+/// **Note:** Native metrics are not yet supported. Metrics require `use_otlp_decoding: true`
+/// on the source for passthrough encoding.
 ///
 /// # Native Log Conversion
 ///
@@ -75,6 +79,22 @@ impl OtlpSerializerConfig {
 /// - `.scope.name/version` → `scopeLogs[].scope`
 /// - `.trace_id` → `logRecords[].traceId` (hex string → bytes)
 /// - `.span_id` → `logRecords[].spanId` (hex string → bytes)
+///
+/// # Native Trace Conversion
+///
+/// When a trace event does not contain pre-formatted OTLP structure (`resourceSpans`), it is
+/// automatically converted to OTLP format. Field mapping mirrors the decode path in `spans.rs`:
+/// - `.trace_id` → `traceId` (hex string → 16 bytes)
+/// - `.span_id` → `spanId` (hex string → 8 bytes)
+/// - `.parent_span_id` → `parentSpanId` (hex string → 8 bytes)
+/// - `.name` → `name`
+/// - `.kind` → `kind`
+/// - `.start_time_unix_nano` / `.end_time_unix_nano` → timestamps (nanos)
+/// - `.attributes.*` → `attributes[]`
+/// - `.resources.*` → `resource.attributes[]`
+/// - `.events` → `events[]` (span events with name, time, attributes)
+/// - `.links` → `links[]` (span links with trace_id, span_id, attributes)
+/// - `.status` → `status` (message, code)
 #[derive(Debug, Clone)]
 #[allow(dead_code)] // Fields will be used once encoding is implemented
 pub struct OtlpSerializer {
