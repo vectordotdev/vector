@@ -244,7 +244,19 @@ fn extract_trace_string(trace: &TraceEvent, key: &str) -> String {
 #[inline]
 fn extract_trace_i32(trace: &TraceEvent, key: &str) -> i32 {
     match trace.get(event_path!(key)) {
-        Some(Value::Integer(i)) => *i as i32,
+        Some(Value::Integer(i)) => {
+            let i = *i;
+            if i < i32::MIN as i64 || i > i32::MAX as i64 {
+                warn!(
+                    message = "Value out of i32 range, clamping.",
+                    field = key,
+                    value = i
+                );
+                i.clamp(i32::MIN as i64, i32::MAX as i64) as i32
+            } else {
+                i as i32
+            }
+        }
         Some(Value::Bytes(b)) => {
             let s = String::from_utf8_lossy(b);
             s.parse::<i32>().unwrap_or_else(|_| {
@@ -378,7 +390,7 @@ fn extract_trace_id(trace: &TraceEvent) -> Vec<u8> {
             let mut bytes = Vec::with_capacity(arr.len().min(16));
             for v in arr.iter() {
                 if let Value::Integer(i) = v {
-                    bytes.push(*i as u8);
+                    bytes.push((*i).clamp(0, 255) as u8);
                 }
             }
             validate_trace_id(&bytes)
@@ -407,7 +419,7 @@ fn extract_span_id(trace: &TraceEvent, key: &str) -> Vec<u8> {
             let mut bytes = Vec::with_capacity(arr.len().min(8));
             for v in arr.iter() {
                 if let Value::Integer(i) = v {
-                    bytes.push(*i as u8);
+                    bytes.push((*i).clamp(0, 255) as u8);
                 }
             }
             validate_span_id(&bytes)
@@ -551,7 +563,13 @@ fn extract_trace_span_events(trace: &TraceEvent) -> Vec<SpanEvent> {
             let dropped_attributes_count = match obj.get("dropped_attributes_count") {
                 Some(Value::Integer(i)) => {
                     let i = *i;
-                    if i < 0 { 0 } else { i as u32 }
+                    if i < 0 {
+                        0
+                    } else if i > u32::MAX as i64 {
+                        u32::MAX
+                    } else {
+                        i as u32
+                    }
                 }
                 _ => 0,
             };
@@ -612,7 +630,13 @@ fn extract_trace_span_links(trace: &TraceEvent) -> Vec<Link> {
             let dropped_attributes_count = match obj.get("dropped_attributes_count") {
                 Some(Value::Integer(i)) => {
                     let i = *i;
-                    if i < 0 { 0 } else { i as u32 }
+                    if i < 0 {
+                        0
+                    } else if i > u32::MAX as i64 {
+                        u32::MAX
+                    } else {
+                        i as u32
+                    }
                 }
                 _ => 0,
             };
@@ -640,7 +664,8 @@ fn extract_trace_status(trace: &TraceEvent) -> Option<SpanStatus> {
                 .unwrap_or_default();
 
             let code = match obj.get("code") {
-                Some(Value::Integer(i)) => *i as i32,
+                // OTLP StatusCode: 0=Unset, 1=Ok, 2=Error
+                Some(Value::Integer(i)) => (*i).clamp(0, 2) as i32,
                 _ => 0,
             };
 

@@ -577,7 +577,7 @@ fn extract_trace_id_safe(log: &LogEvent) -> Vec<u8> {
             let mut bytes = Vec::with_capacity(arr.len().min(16));
             for v in arr.iter() {
                 if let Value::Integer(i) = v {
-                    bytes.push(*i as u8);
+                    bytes.push((*i).clamp(0, 255) as u8);
                 }
             }
             validate_trace_id(&bytes)
@@ -609,7 +609,7 @@ fn extract_span_id_safe(log: &LogEvent) -> Vec<u8> {
             let mut bytes = Vec::with_capacity(arr.len().min(8));
             for v in arr.iter() {
                 if let Value::Integer(i) = v {
-                    bytes.push(*i as u8);
+                    bytes.push((*i).clamp(0, 255) as u8);
                 }
             }
             validate_span_id(&bytes)
