@@ -22,7 +22,12 @@ cue-%:
 config-examples:
 	yarn config-examples
 
-structured-data: cue-build config-examples
+VDEV = cargo vdev
+
+generate-vrl-docs:
+	$(VDEV) build vrl-docs --output-dir cue/reference/remap/functions
+
+structured-data: generate-vrl-docs cue-build config-examples
 
 serve: clean setup cargo-data structured-data
 	hugo server \

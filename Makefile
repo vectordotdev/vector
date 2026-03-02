@@ -705,8 +705,12 @@ generate-vector-vrl-docs: ## Generate VRL function documentation from Rust sourc
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build vector-vrl-docs --output docs/generated/ \
 		$(if $(findstring true,$(CI)),>/dev/null,)
 
+.PHONY: generate-vrl-docs
+generate-vrl-docs: ## Generate combined VRL function documentation for the website.
+	$(MAKE) -C website generate-vrl-docs
+
 .PHONY: generate-docs
-generate-docs: generate-component-docs generate-vector-vrl-docs
+generate-docs: generate-component-docs generate-vector-vrl-docs generate-vrl-docs
 
 .PHONY: signoff
 signoff: ## Signsoff all previous commits since branch creation
