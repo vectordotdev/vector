@@ -100,7 +100,6 @@ pub struct OtlpSerializer {
     logs_descriptor: ProtobufSerializer,
     metrics_descriptor: ProtobufSerializer,
     traces_descriptor: ProtobufSerializer,
-    options: Options,
 }
 
 impl OtlpSerializer {
@@ -132,7 +131,6 @@ impl OtlpSerializer {
             logs_descriptor,
             metrics_descriptor,
             traces_descriptor,
-            options,
         })
     }
 }
