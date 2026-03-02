@@ -28,28 +28,19 @@ applications:
             - tar xzf hugo_extended_${HUGO_VERSION}_Linux-64bit.tar.gz
             - mv hugo /usr/local/bin/
             - hugo version
-            - echo "Installing Rust..."
-            - curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y
-            - source ~/.cargo/env
-            - rustup install
-            - echo "Compiling VDEV..."
-            - cargo build -p vdev
-            - export VDEV=target/debug/vdev
-
         build:
           commands:
-            - make generate-vrl-docs
             - DEPLOY_PRIME_URL=$(echo "https://$(echo "${AWS_BRANCH}" | sed 's/[./]/-/g').d1a7j77663uxsc.amplifyapp.com" )
             - if [[ "${AWS_BRANCH}" == "website" ]]; then DEPLOY_COMMAND="ci-production-build"; fi
-            - cd website && make $DEPLOY_COMMAND | tee -a /var/log/amplify-build.log
+            - make $DEPLOY_COMMAND | tee -a /var/log/amplify-build.log
         postBuild:
           commands:
             - datadog-agent stop
       artifacts:
-        baseDirectory: website/public
+        baseDirectory: public
         files:
           - '**/*'
       cache:
         paths:
-          - website/node_modules/**/*
-    appRoot: .
+          - node_modules/**/*
+    appRoot: website
