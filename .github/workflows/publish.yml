@@ -22,7 +22,6 @@ env:
   DISABLE_MOLD: true
   DEBIAN_FRONTEND: noninteractive
   CONTAINER_TOOL: docker
-  CARGO_PROFILE_RELEASE_LTO: fat
   CHANNEL: ${{ inputs.channel }}
 
 jobs:

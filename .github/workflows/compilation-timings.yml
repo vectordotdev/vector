@@ -26,11 +26,9 @@ jobs:
     name: "Release Build (normal)"
     runs-on: ubuntu-24.04-8core
     env:
-      # We're not actually doing a debug build, we're just turning off the logic
-      # in release-flags.sh so that we don't override the Cargo "release" profile
-      # with full LTO. We also override codegen-units back to the default since
-      # Cargo.toml now sets codegen-units=1 for release builds.
-      PROFILE: debug
+      # Override the optimized release profile settings from Cargo.toml
+      # (lto=fat, codegen-units=1) back to defaults for this timing comparison.
+      CARGO_PROFILE_RELEASE_LTO: false
       CARGO_PROFILE_RELEASE_CODEGEN_UNITS: 256
     steps:
       - uses: colpal/actions-clean@36e6ca1abd35efe61cb60f912bd7837f67887c8a # v1.1.1
