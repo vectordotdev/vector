@@ -11,13 +11,19 @@ api = ["dep:async-graphql"]
 
 [dependencies]
 async-graphql = { version = "7.0.17", default-features = false, features = ["playground"], optional = true }
+bytes.workspace = true
+clap.workspace = true
+codecs = { path = "../codecs" }
 colored.workspace = true
 futures.workspace = true
 glob.workspace = true
+prost.workspace = true
+serde_json.workspace = true
 serde_yaml.workspace = true
 tokio = { workspace = true, features = ["time"] }
 tokio-stream = { workspace = true, features = ["sync"] }
 tokio-tungstenite.workspace = true
+tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tracing.workspace = true
 url = { version = "2.5.4", default-features = false }
 uuid.workspace = true
