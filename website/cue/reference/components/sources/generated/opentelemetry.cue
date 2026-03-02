@@ -327,13 +327,44 @@ generated: components: sources: opentelemetry: configuration: {
 	}
 	use_otlp_decoding: {
 		description: """
-			Setting this field will override the legacy mapping of OTEL protos to Vector events and use the proto directly.
+			Configuration for how OTLP data is decoded for each signal type.
 
-			One major caveat here is that the incoming metrics will be parsed as logs but they will preserve the OTLP format.
-			This means that components that work on metrics, will not be compatible with this output.
-			However, these events can be forwarded directly to a downstream OTEL collector.
+			This field supports both a simple boolean form (for backward compatibility) and a
+			per-signal configuration. See [`OtlpDecodingConfig`] for detailed documentation
+			and configuration examples.
 			"""
 		required: false
-		type: bool: default: false
+		type: object: options: {
+			logs: {
+				description: """
+					Whether to use OTLP decoding for logs.
+
+					When `true`, logs preserve their OTLP format.
+					When `false` (default), logs are converted to Vector's native format.
+					"""
+				required: false
+				type: bool: default: false
+			}
+			metrics: {
+				description: """
+					Whether to use OTLP decoding for metrics.
+
+					When `true`, metrics preserve their OTLP format but are processed as logs.
+					When `false` (default), metrics are converted to Vector's native metric format.
+					"""
+				required: false
+				type: bool: default: false
+			}
+			traces: {
+				description: """
+					Whether to use OTLP decoding for traces.
+
+					When `true`, traces preserve their OTLP format.
+					When `false` (default), traces are converted to Vector's native format.
+					"""
+				required: false
+				type: bool: default: false
+			}
+		}
 	}
 }

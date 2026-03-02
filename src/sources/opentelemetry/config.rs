@@ -62,7 +62,7 @@ pub const TRACES: &str = "traces";
 /// When OTLP decoding is enabled for metrics:
 /// - Metrics are parsed as logs while preserving the OTLP format
 /// - Vector's metric transforms will NOT be compatible with this output
-/// - The events can be forwarded directly to a downstream OTLP collector
+/// - The events can be forwarded directly (passthrough) to a downstream OTLP collector
 #[configurable_component]
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 #[serde(deny_unknown_fields)]
