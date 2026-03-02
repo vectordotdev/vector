@@ -45,6 +45,19 @@ reduction and improved data quality for observability infrastructure.
 - `/docs/` - Developer documentation
 - `/tests/` - Integration and E2E tests
 
+## Development Workflow
+
+### Iterative Development Process
+
+When working on Vector's Rust codebase, follow this iterative development cycle:
+
+1. Make code changes
+2. Run `make check-clippy` to check for linting issues
+3. Fix any issues found (use `make clippy-fix` for auto-fixes)
+4. Continue to next task or mark current task complete
+
+Run this cycle after any code modification.
+
 ## Two Different Workflows
 
 ### Rust Development (Most Common)
