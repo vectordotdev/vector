@@ -70,9 +70,11 @@ make generate-component-docs
 When introducing a new source, sink, or transform, you need to create documentation in two steps:
 
 1. **Generate the base documentation** from your Rust configuration schema:
+
    ```bash
    make generate-component-docs
    ```
+
    This creates an auto-generated CUE file in `website/cue/reference/components/{sources,sinks,transforms}/generated/<component_name>.cue` containing all the configuration options from your Rust code.
 
 2. **Create a manual CUE file** with additional metadata that cannot be auto-generated:
@@ -81,15 +83,17 @@ When introducing a new source, sink, or transform, you need to create documentat
    - Look at existing components for examples, such as `website/cue/reference/components/transforms/remap.cue`
 
 3. **Format the CUE files**:
+
    ```bash
    ./scripts/cue.sh fmt
    ```
 
 4. **Create a markdown documentation file** for the website:
    - Create a new file at `website/content/en/docs/reference/configuration/{sources,sinks,transforms}/<component_name>.md`
-   - Look at existing examples e.g. `website/content/en/docs/reference/configuration/transforms/remap.md` 
+   - Look at existing examples e.g. `website/content/en/docs/reference/configuration/transforms/remap.md`
 
 5. **Verify your documentation** is correct:
+
    ```bash
    make check-component-docs
    ```
