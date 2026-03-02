@@ -278,15 +278,6 @@ make check-component-docs
 
 Then: `chmod +x .git/hooks/pre-push`
 
-### Container Development
-
-Vector supports development in Docker/Podman containers:
-
-```bash
-ENVIRONMENT=true make <target>
-# Example: ENVIRONMENT=true make test
-```
-
 ## Architecture Notes
 
 ### Component Development
