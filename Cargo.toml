@@ -215,7 +215,7 @@ vector-common-macros = { path = "lib/vector-common-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions" }
-vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "compiler","value", "diagnostic", "path", "parser", "stdlib", "datadog", "core"] }
 mock_instant = { version = "0.6" }
 serial_test = { version = "3.2" }
 
@@ -510,7 +510,7 @@ docs = ["enable-unix"]
 default-cmake = ["enable-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets"]
+base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl-functions-env", "vrl-functions-system", "vrl-functions-network"]
 enable-api-client = ["base", "api-client"]
 enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
 
@@ -519,6 +519,11 @@ default-musl = ["enable-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build
 default-no-api-client = ["base", "sources-dnstap", "unix", "rdkafka?/gssapi-vendored"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
+
+# VRL functions control features
+vrl-functions-env = ["vrl/enable_env_functions"]
+vrl-functions-system = ["vrl/enable_system_functions"]
+vrl-functions-network = ["vrl/enable_network_functions"]
 
 # Enables the binary secret-backend-example
 secret-backend-example = ["transforms"]
