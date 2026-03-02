@@ -58,6 +58,8 @@ When working on Vector's Rust codebase, follow this iterative development cycle:
 
 Run this cycle after any code modification.
 
+When editing markdown files (*.md), run `make check-markdown` after changes.
+
 ## Two Different Workflows
 
 ### Rust Development (Most Common)
@@ -112,6 +114,7 @@ See [Integration Tests](#integration-tests) section below for more details.
 make fmt                      # Format code
 make check-fmt                # Verify formatting
 make check-clippy             # Run Clippy linter
+make check-markdown           # Check markdown files
 make check-component-docs     # Check component documentation
 ./scripts/check_changelog_fragments.sh  # Verify changelog
 ```
