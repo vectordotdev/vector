@@ -85,7 +85,11 @@ When introducing a new source, sink, or transform, you need to create documentat
    ./scripts/cue.sh fmt
    ```
 
-4. **Verify your documentation** is correct:
+4. **Create a markdown documentation file** for the website:
+   - Create a new file at `website/content/en/docs/reference/configuration/{sources,sinks,transforms}/<component_name>.md`
+   - Look at existing examples e.g. `website/content/en/docs/reference/configuration/transforms/remap.md` 
+
+5. **Verify your documentation** is correct:
    ```bash
    make check-component-docs
    ```
