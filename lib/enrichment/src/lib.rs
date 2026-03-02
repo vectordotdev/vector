@@ -10,6 +10,7 @@ mod vrl_util;
 
 use dyn_clone::DynClone;
 use indoc::indoc;
+use snafu::Snafu;
 pub use tables::{TableRegistry, TableSearch};
 use vrl::{
     compiler::Function,
@@ -47,6 +48,58 @@ pub enum Case {
     Insensitive,
 }
 
+#[derive(Clone, Debug, PartialEq, Eq, Snafu)]
+#[snafu(visibility(pub(crate)))]
+pub enum Error {
+    #[snafu(display("No rows found"))]
+    NoRowsFound,
+    #[snafu(display("More than one row found"))]
+    MoreThanOneRowFound,
+    #[snafu(display("Field(s) '{}' missing from dataset", fields.join(", ")))]
+    MissingDatasetFields { fields: Vec<String> },
+    #[snafu(display("Column contains invalid UTF-8: {source}"))]
+    InvalidUtfInColumn { source: std::str::Utf8Error },
+    #[snafu(display("Failed to encode value: {details}"))]
+    FailedToEncodeValue { details: String },
+    #[snafu(display("Only one condition is allowed"))]
+    OnlyOneConditionAllowed,
+    #[snafu(display("Only equality condition is allowed"))]
+    OnlyEqualityConditionAllowed,
+    #[snafu(display("{kind} condition must be specified"))]
+    MissingCondition { kind: &'static str },
+    #[snafu(display("{field} field is required"))]
+    MissingRequiredField { field: &'static str },
+    #[snafu(display("Only one field is allowed"))]
+    OnlyOneFieldAllowed,
+    #[snafu(display("Invalid address: {source}"))]
+    InvalidAddress { source: std::net::AddrParseError },
+    #[snafu(transparent)]
+    Internal { source: InternalError },
+    #[snafu(display("Table {table} not loaded"))]
+    TableNotLoaded { table: String },
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Snafu)]
+pub enum InternalError {
+    #[snafu(display("finish_load called prematurely"))]
+    FinishLoadCalled,
+    #[snafu(display("finish_load not called"))]
+    FinishLoadNotCalled,
+    // Unreachable in normal operation: we only decode values that were serialized by us.
+    #[snafu(display("Failed to decode value from memory table: {details}"))]
+    FailedToDecode { details: String },
+}
+
+impl From<Error> for vrl::prelude::ExpressionError {
+    fn from(error: Error) -> Self {
+        vrl::prelude::ExpressionError::Error {
+            message: error.to_string(),
+            labels: vec![],
+            notes: vec![],
+        }
+    }
+}
+
 /// Enrichment tables represent additional data sources that can be used to enrich the event data
 /// passing through Vector.
 pub trait Table: DynClone {
@@ -62,7 +115,7 @@ pub trait Table: DynClone {
         select: Option<&[String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<ObjectMap, String>;
+    ) -> Result<ObjectMap, Error>;
 
     /// Search the enrichment table data with the given condition.
     /// All conditions must match (AND).
@@ -74,14 +127,14 @@ pub trait Table: DynClone {
         select: Option<&[String]>,
         wildcard: Option<&Value>,
         index: Option<IndexHandle>,
-    ) -> Result<Vec<ObjectMap>, String>;
+    ) -> Result<Vec<ObjectMap>, Error>;
 
     /// Hints to the enrichment table what data is going to be searched to allow it to index the
     /// data in advance.
     ///
     /// # Errors
     /// Errors if the fields are not in the table.
-    fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, String>;
+    fn add_index(&mut self, case: Case, fields: &[&str]) -> Result<IndexHandle, Error>;
 
     /// Returns a list of the field names that are in each index
     fn index_fields(&self) -> Vec<(Case, Vec<String>)>;
