@@ -100,51 +100,62 @@ impl IncrementalRequestBuilder<Vec<Event>> for BigqueryRequestBuilder {
         input: Vec<Event>,
     ) -> Vec<Result<(Self::Metadata, Self::Payload), Self::Error>> {
         let max_serialized_rows_len = MAX_BATCH_PAYLOAD_SIZE - self.schema_overhead;
-        let metadata = RequestMetadataBuilder::from_events(&input);
-        let mut errors: Vec<Self::Error> = vec![];
-        let mut bodies: Vec<(EventFinalizers, (NonZeroUsize, Self::Payload))> = vec![];
+        let mut results = vec![];
         let mut event_finalizers = EventFinalizers::DEFAULT;
+        let mut chunk_metadata = RequestMetadataBuilder::default();
+
         let mut serialized_rows: Vec<Vec<u8>> = vec![];
-        let mut serialized_rows_len: usize = 0;
-        for mut event in input.into_iter() {
-            let current_event_finalizers = event.take_finalizers();
+        let mut serialized_rows_len = 0;
+        for mut event in input {
             let mut bytes = BytesMut::new();
-            if let Err(e) = self.protobuf_serializer.encode(event, &mut bytes) {
-                errors.push(BigqueryRequestBuilderError::ProtobufEncoding {
+            if let Err(e) = self.protobuf_serializer.encode(event.clone(), &mut bytes) {
+                results.push(Err(BigqueryRequestBuilderError::ProtobufEncoding {
                     message: format!("{e}"),
-                });
+                }));
+            } else if bytes.len() > max_serialized_rows_len {
+                // A single event that exceeds the limit cannot be sent in any request, reject it immediately.
+                results.push(Err(BigqueryRequestBuilderError::ProtobufEncoding {
+                    message: format!(
+                        "Encoded event ({} bytes) exceeds the maximum allowed serialized rows size ({} bytes).",
+                        bytes.len(),
+                        max_serialized_rows_len
+                    ),
+                }));
             } else {
                 if bytes.len() + serialized_rows_len > max_serialized_rows_len {
-                    // there's going to be too many events to send in one body;
-                    // flush the current events and start a new body
-                    bodies.push((event_finalizers, self.build_proto_data(serialized_rows)));
+                    // Adding this event would overflow the current chunk so flush it first.
+                    let (size, proto_data) = self.build_proto_data(serialized_rows);
+                    results.push(Ok((
+                        BigqueryRequestMetadata {
+                            finalizers: event_finalizers,
+                            request_metadata: chunk_metadata.with_request_size(size),
+                        },
+                        proto_data,
+                    )));
                     event_finalizers = EventFinalizers::DEFAULT;
-                    serialized_rows = vec![];
+                    chunk_metadata = RequestMetadataBuilder::default();
                     serialized_rows_len = 0;
+                    serialized_rows = vec![];
                 }
+                let current_event_finalizers = event.take_finalizers();
+                chunk_metadata.track_event(event);
                 event_finalizers.merge(current_event_finalizers);
                 serialized_rows_len += bytes.len();
                 serialized_rows.push(bytes.into());
             }
         }
-        // flush the final body (if there are any events left)
+        // flush the final chunk (if there are any events left)
         if !serialized_rows.is_empty() {
-            bodies.push((event_finalizers, self.build_proto_data(serialized_rows)));
+            let (size, proto_data) = self.build_proto_data(serialized_rows);
+            results.push(Ok((
+                BigqueryRequestMetadata {
+                    finalizers: event_finalizers,
+                    request_metadata: chunk_metadata.with_request_size(size),
+                },
+                proto_data,
+            )));
         }
-        // throw everything together into the expected IncrementalRequestBuilder return type
-        bodies
-            .into_iter()
-            .map(|(event_finalizers, (size, proto_data))| {
-                Ok((
-                    BigqueryRequestMetadata {
-                        finalizers: event_finalizers,
-                        request_metadata: metadata.with_request_size(size),
-                    },
-                    proto_data,
-                ))
-            })
-            .chain(errors.into_iter().map(Err))
-            .collect()
+        results
     }
 
     fn build_request(&mut self, metadata: Self::Metadata, payload: Self::Payload) -> Self::Request {

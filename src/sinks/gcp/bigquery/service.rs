@@ -13,6 +13,8 @@ use vector_lib::{
     stream::DriverResponse,
 };
 
+use crate::sinks::util::retries::RetryLogic;
+
 use super::proto::google::cloud::bigquery::storage::v1 as proto;
 use crate::event::{EventFinalizers, Finalizable};
 use crate::gcp::GcpAuthenticator;
@@ -34,6 +36,7 @@ impl Interceptor for AuthInterceptor {
     }
 }
 
+#[derive(Clone)]
 pub struct BigqueryRequest {
     pub request: proto::AppendRowsRequest,
     pub metadata: RequestMetadata,
@@ -105,6 +108,8 @@ pub enum BigqueryServiceError {
     Transport { error: tonic::transport::Error },
     #[snafu(display("BigQuery request failure: {}", status))]
     Request { status: tonic::Status },
+    #[snafu(display("BigQuery response stream closed"))]
+    ResponseStreamClosed,
 }
 
 impl From<tonic::transport::Error> for BigqueryServiceError {
@@ -123,8 +128,32 @@ type BigQueryWriteClient = proto::big_query_write_client::BigQueryWriteClient<
     InterceptedService<tonic::transport::Channel, AuthInterceptor>,
 >;
 
+#[derive(Clone)]
 pub struct BigqueryService {
     service: BigQueryWriteClient,
+}
+
+#[derive(Clone, Debug)]
+pub struct BigqueryRetryLogic;
+
+impl RetryLogic for BigqueryRetryLogic {
+    type Error = BigqueryServiceError;
+    type Request = BigqueryRequest;
+    type Response = BigqueryResponse;
+
+    fn is_retriable_error(&self, error: &Self::Error) -> bool {
+        match error {
+            BigqueryServiceError::Transport { .. } => true,
+            BigqueryServiceError::ResponseStreamClosed => true,
+            // Allow transient gRPC status codes to be retried.
+            BigqueryServiceError::Request { status } => matches!(
+                status.code(),
+                tonic::Code::Unavailable
+                    | tonic::Code::ResourceExhausted
+                    | tonic::Code::DeadlineExceeded
+            ),
+        }
+    }
 }
 
 impl BigqueryService {
@@ -171,7 +200,7 @@ impl Service<BigqueryRequest> for BigqueryService {
                         request_uncompressed_size,
                     })
                 }
-                None => Err(tonic::Status::unknown("response stream closed").into()),
+                None => Err(BigqueryServiceError::ResponseStreamClosed),
             }
         })
     }
