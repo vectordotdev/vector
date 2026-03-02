@@ -1,6 +1,10 @@
-# OTLP Native Log Conversion
+# OTLP Native Conversion
 
 This document explains the automatic native-to-OTLP conversion feature.
+
+> **Scope:** Auto-conversion currently supports **logs** and **traces**. Metrics continue to
+> work via the existing passthrough path (`use_otlp_decoding: true` on the source).
+> Native metric conversion is planned for a future release.
 
 ## Architecture overview
 

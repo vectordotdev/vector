@@ -74,9 +74,8 @@ impl From<Value> for PBValue {
             // Mirrors: PBValue::StringValue(v) => Value::Bytes(Bytes::from(v))
             // Optimization: Try valid UTF-8 first to avoid allocation
             Value::Bytes(b) => PBValue::StringValue(
-                String::from_utf8(b.to_vec()).unwrap_or_else(|e| {
-                    String::from_utf8_lossy(e.as_bytes()).into_owned()
-                }),
+                String::from_utf8(b.to_vec())
+                    .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned()),
             ),
 
             // Mirrors: PBValue::BoolValue(v) => Value::Boolean(v)

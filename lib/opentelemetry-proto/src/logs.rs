@@ -345,7 +345,14 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
                 .map(|dt| dt.timestamp_nanos_opt().unwrap_or(0) as u64)
                 .or_else(|_| {
                     s.parse::<i64>().map(|ts| {
-                        if ts < 1_000_000_000_000 {
+                        if ts < 0 {
+                            warn!(
+                                message = "Negative timestamp string, using 0.",
+                                field = key,
+                                value = ts
+                            );
+                            0
+                        } else if ts < 1_000_000_000_000 {
                             (ts as u64) * 1_000_000_000
                         } else {
                             ts as u64
@@ -374,9 +381,8 @@ fn extract_string_safe(log: &LogEvent, key: &str) -> String {
     match log.get(key) {
         Some(Value::Bytes(b)) => {
             // Optimization: try valid UTF-8 first to avoid extra allocation
-            String::from_utf8(b.to_vec()).unwrap_or_else(|e| {
-                String::from_utf8_lossy(e.as_bytes()).into_owned()
-            })
+            String::from_utf8(b.to_vec())
+                .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
         }
         Some(Value::Integer(i)) => i.to_string(),
         Some(Value::Float(f)) => f.to_string(),
@@ -417,10 +423,12 @@ fn extract_severity_number_safe(log: &LogEvent) -> i32 {
         Value::Bytes(b) => {
             // String number
             let s = String::from_utf8_lossy(b);
-            s.parse::<i32>().unwrap_or_else(|_| {
-                warn!(message = "Could not parse severity_number", value = %s);
-                0
-            })
+            s.parse::<i32>()
+                .map(|n| n.clamp(0, 24))
+                .unwrap_or_else(|_| {
+                    warn!(message = "Could not parse severity_number.", value = %s);
+                    0
+                })
         }
         _ => {
             warn!(
@@ -528,15 +536,15 @@ fn extract_kv_attributes_safe(log: &LogEvent, key: &str) -> Vec<KeyValue> {
             // User might have stored pre-formatted KeyValue array
             let mut result = Vec::with_capacity(arr.len());
             for v in arr.iter() {
-                if let Value::Object(obj) = v {
-                    if let Some(key) = obj.get("key").and_then(|v| v.as_str()) {
-                        result.push(KeyValue {
-                            key: key.to_string(),
-                            value: obj.get("value").map(|v| AnyValue {
-                                value: Some(v.clone().into()),
-                            }),
-                        });
-                    }
+                if let Value::Object(obj) = v
+                    && let Some(key) = obj.get("key").and_then(|v| v.as_str())
+                {
+                    result.push(KeyValue {
+                        key: key.to_string(),
+                        value: obj.get("value").map(|v| AnyValue {
+                            value: Some(v.clone().into()),
+                        }),
+                    });
                 }
             }
             result
@@ -562,7 +570,7 @@ fn extract_trace_id_safe(log: &LogEvent) -> Vec<u8> {
             } else {
                 return Vec::new(); // Invalid hex
             };
-            from_hex(s)
+            validate_trace_id(&from_hex(s))
         }
         Some(Value::Array(arr)) => {
             // Might be raw bytes as array - pre-allocate
@@ -595,7 +603,7 @@ fn extract_span_id_safe(log: &LogEvent) -> Vec<u8> {
             } else {
                 return Vec::new(); // Invalid hex
             };
-            from_hex(s)
+            validate_span_id(&from_hex(s))
         }
         Some(Value::Array(arr)) => {
             let mut bytes = Vec::with_capacity(arr.len().min(8));
@@ -670,15 +678,15 @@ fn extract_resource_safe(log: &LogEvent) -> Option<Resource> {
                     // Pre-formatted KeyValue array
                     let mut result = Vec::with_capacity(arr.len());
                     for item in arr.iter() {
-                        if let Value::Object(obj) = item {
-                            if let Some(key) = obj.get("key").and_then(|v| v.as_str()) {
-                                result.push(KeyValue {
-                                    key: key.to_string(),
-                                    value: obj.get("value").map(|v| AnyValue {
-                                        value: Some(v.clone().into()),
-                                    }),
-                                });
-                            }
+                        if let Value::Object(obj) = item
+                            && let Some(key) = obj.get("key").and_then(|v| v.as_str())
+                        {
+                            result.push(KeyValue {
+                                key: key.to_string(),
+                                value: obj.get("value").map(|v| AnyValue {
+                                    value: Some(v.clone().into()),
+                                }),
+                            });
                         }
                     }
                     result
@@ -904,5 +912,68 @@ mod native_conversion_tests {
         // Invalid fields should have safe defaults
         assert_eq!(lr.time_unix_nano, 0);
         assert!(lr.trace_id.is_empty());
+    }
+
+    #[test]
+    fn test_negative_timestamp_string_handled() {
+        let mut log = LogEvent::default();
+        log.insert("timestamp", "-1");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.time_unix_nano, 0);
+    }
+
+    #[test]
+    fn test_trace_id_wrong_hex_length_rejected() {
+        let mut log = LogEvent::default();
+        // 6 hex chars = 3 bytes, not valid 16-byte trace_id
+        log.insert("trace_id", "abcdef");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert!(
+            lr.trace_id.is_empty(),
+            "Wrong-length hex should produce empty trace_id"
+        );
+    }
+
+    #[test]
+    fn test_span_id_wrong_hex_length_rejected() {
+        let mut log = LogEvent::default();
+        // 4 hex chars = 2 bytes, not valid 8-byte span_id
+        log.insert("span_id", "abcd");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert!(
+            lr.span_id.is_empty(),
+            "Wrong-length hex should produce empty span_id"
+        );
+    }
+
+    #[test]
+    fn test_severity_number_string_out_of_range() {
+        let mut log = LogEvent::default();
+        log.insert("severity_number", "100");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.severity_number, 24);
+    }
+
+    #[test]
+    fn test_severity_number_negative_string() {
+        let mut log = LogEvent::default();
+        log.insert("severity_number", "-5");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.severity_number, 0);
     }
 }
