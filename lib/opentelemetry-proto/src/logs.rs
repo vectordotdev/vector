@@ -309,7 +309,11 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
 
     match value {
         // Native timestamp - use existing chrono methods
-        Value::Timestamp(ts) => ts.timestamp_nanos_opt().unwrap_or(0) as u64,
+        Value::Timestamp(ts) => ts
+            .timestamp_nanos_opt()
+            .filter(|&n| n >= 0)
+            .map(|n| n as u64)
+            .unwrap_or(0),
         // Integer - could be seconds or nanos (heuristic detection)
         Value::Integer(i) => {
             let i = *i;
@@ -324,7 +328,7 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
             // Heuristic: year 2001 in nanos = 1e18, in seconds = 1e9
             // If value < 1 trillion, assume seconds; otherwise assume nanos
             if i < 1_000_000_000_000 {
-                (i as u64) * 1_000_000_000 // seconds → nanos
+                (i as u64).saturating_mul(1_000_000_000)
             } else {
                 i as u64 // already nanos
             }
@@ -332,17 +336,28 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
         // Float - could be fractional seconds
         Value::Float(f) => {
             let f = f.into_inner();
-            if f < 0.0 || f.is_nan() {
+            if f < 0.0 || f.is_nan() || f.is_infinite() {
                 warn!(message = "Invalid float timestamp, using 0", field = key);
                 return 0;
             }
-            if f < 1e12 { (f * 1e9) as u64 } else { f as u64 }
+            let nanos = if f < 1e12 { f * 1e9 } else { f };
+            if nanos > u64::MAX as f64 {
+                warn!(message = "Float timestamp overflow, using 0.", field = key);
+                0
+            } else {
+                nanos as u64
+            }
         }
         // String - try RFC3339 or numeric
         Value::Bytes(b) => {
             let s = String::from_utf8_lossy(b);
             DateTime::parse_from_rfc3339(&s)
-                .map(|dt| dt.timestamp_nanos_opt().unwrap_or(0) as u64)
+                .map(|dt| {
+                    dt.timestamp_nanos_opt()
+                        .filter(|&n| n >= 0)
+                        .map(|n| n as u64)
+                        .unwrap_or(0)
+                })
                 .or_else(|_| {
                     s.parse::<i64>().map(|ts| {
                         if ts < 0 {
@@ -353,7 +368,7 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
                             );
                             0
                         } else if ts < 1_000_000_000_000 {
-                            (ts as u64) * 1_000_000_000
+                            (ts as u64).saturating_mul(1_000_000_000)
                         } else {
                             ts as u64
                         }

@@ -309,7 +309,11 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
     };
 
     match value {
-        Value::Timestamp(ts) => ts.timestamp_nanos_opt().unwrap_or(0) as u64,
+        Value::Timestamp(ts) => ts
+            .timestamp_nanos_opt()
+            .filter(|&n| n >= 0)
+            .map(|n| n as u64)
+            .unwrap_or(0),
         Value::Integer(i) => {
             let i = *i;
             if i < 0 {
@@ -321,23 +325,34 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
                 return 0;
             }
             if i < 1_000_000_000_000 {
-                (i as u64) * 1_000_000_000
+                (i as u64).saturating_mul(1_000_000_000)
             } else {
                 i as u64
             }
         }
         Value::Float(f) => {
             let f = f.into_inner();
-            if f < 0.0 || f.is_nan() {
+            if f < 0.0 || f.is_nan() || f.is_infinite() {
                 warn!(message = "Invalid float timestamp, using 0.", field = key);
                 return 0;
             }
-            if f < 1e12 { (f * 1e9) as u64 } else { f as u64 }
+            let nanos = if f < 1e12 { f * 1e9 } else { f };
+            if nanos > u64::MAX as f64 {
+                warn!(message = "Float timestamp overflow, using 0.", field = key);
+                0
+            } else {
+                nanos as u64
+            }
         }
         Value::Bytes(b) => {
             let s = String::from_utf8_lossy(b);
             DateTime::parse_from_rfc3339(&s)
-                .map(|dt| dt.timestamp_nanos_opt().unwrap_or(0) as u64)
+                .map(|dt| {
+                    dt.timestamp_nanos_opt()
+                        .filter(|&n| n >= 0)
+                        .map(|n| n as u64)
+                        .unwrap_or(0)
+                })
                 .or_else(|_| {
                     s.parse::<i64>().map(|ts| {
                         if ts < 0 {
@@ -348,7 +363,7 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
                             );
                             0
                         } else if ts < 1_000_000_000_000 {
-                            (ts as u64) * 1_000_000_000
+                            (ts as u64).saturating_mul(1_000_000_000)
                         } else {
                             ts as u64
                         }
@@ -541,13 +556,17 @@ fn extract_trace_span_events(trace: &TraceEvent) -> Vec<SpanEvent> {
                 .unwrap_or_default();
 
             let time_unix_nano = match obj.get("time_unix_nano") {
-                Some(Value::Timestamp(ts)) => ts.timestamp_nanos_opt().unwrap_or(0) as u64,
+                Some(Value::Timestamp(ts)) => ts
+                    .timestamp_nanos_opt()
+                    .filter(|&n| n >= 0)
+                    .map(|n| n as u64)
+                    .unwrap_or(0),
                 Some(Value::Integer(i)) => {
                     let i = *i;
                     if i < 0 {
                         0
                     } else if i < 1_000_000_000_000 {
-                        (i as u64) * 1_000_000_000
+                        (i as u64).saturating_mul(1_000_000_000)
                     } else {
                         i as u64
                     }
