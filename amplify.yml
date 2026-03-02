@@ -34,8 +34,7 @@ applications:
             - echo "Installing protoc..."
             - apt-get install -y protobuf-compiler
             - echo "Building vdev..."
-            - cd .. && cargo build -p vdev --release
-            - cp ../target/release/vdev /usr/local/bin/
+            - cd .. && cargo build -p vdev --release && cp target/release/vdev /usr/local/bin/ && cd -
             - vdev version
             - export VDEV=vdev
         build:
