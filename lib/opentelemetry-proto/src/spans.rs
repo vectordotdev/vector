@@ -15,7 +15,7 @@ use super::{
     },
     proto::{
         collector::trace::v1::ExportTraceServiceRequest,
-        common::v1::{AnyValue, KeyValue},
+        common::v1::{AnyValue, InstrumentationScope, KeyValue},
         resource::v1::Resource,
         trace::v1::{
             ResourceSpans, ScopeSpans, Span, Status as SpanStatus,
@@ -180,9 +180,9 @@ impl From<SpanStatus> for Value {
 pub fn native_trace_to_otlp_request(trace: &TraceEvent) -> ExportTraceServiceRequest {
     let span = build_span_from_native(trace);
     let scope_spans = ScopeSpans {
-        scope: None,
+        scope: extract_trace_scope(trace),
         spans: vec![span],
-        schema_url: String::new(),
+        schema_url: extract_trace_string(trace, "schema_url"),
     };
     let resource_spans = ResourceSpans {
         resource: extract_trace_resource(trace),
@@ -223,8 +223,9 @@ fn build_span_from_native(trace: &TraceEvent) -> Span {
 #[inline]
 fn extract_trace_string(trace: &TraceEvent, key: &str) -> String {
     match trace.get(event_path!(key)) {
-        Some(Value::Bytes(b)) => String::from_utf8(b.to_vec())
-            .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned()),
+        Some(Value::Bytes(b)) => std::str::from_utf8(b)
+            .map(|s| s.to_owned())
+            .unwrap_or_else(|_| String::from_utf8_lossy(b).into_owned()),
         Some(Value::Integer(i)) => i.to_string(),
         Some(Value::Float(f)) => f.to_string(),
         Some(Value::Boolean(b)) => if *b { "true" } else { "false" }.to_string(),
@@ -232,7 +233,8 @@ fn extract_trace_string(trace: &TraceEvent, key: &str) -> String {
             warn!(
                 message = "Converting non-string to string.",
                 field = key,
-                value_type = ?other
+                value_type = ?other,
+                internal_log_rate_secs = 10
             );
             format!("{other:?}")
         }
@@ -250,7 +252,8 @@ fn extract_trace_i32(trace: &TraceEvent, key: &str) -> i32 {
                 warn!(
                     message = "Value out of i32 range, clamping.",
                     field = key,
-                    value = i
+                    value = i,
+                    internal_log_rate_secs = 10
                 );
                 i.clamp(i32::MIN as i64, i32::MAX as i64) as i32
             } else {
@@ -260,7 +263,7 @@ fn extract_trace_i32(trace: &TraceEvent, key: &str) -> i32 {
         Some(Value::Bytes(b)) => {
             let s = String::from_utf8_lossy(b);
             s.parse::<i32>().unwrap_or_else(|_| {
-                warn!(message = "Could not parse i32 field.", field = key, value = %s);
+                warn!(message = "Could not parse i32 field.", field = key, value = %s, internal_log_rate_secs = 10);
                 0
             })
         }
@@ -278,14 +281,16 @@ fn extract_trace_u32(trace: &TraceEvent, key: &str) -> u32 {
                 warn!(
                     message = "Negative value for u32 field, using 0.",
                     field = key,
-                    value = i
+                    value = i,
+                    internal_log_rate_secs = 10
                 );
                 0
             } else if i > u32::MAX as i64 {
                 warn!(
                     message = "Value overflow for u32 field.",
                     field = key,
-                    value = i
+                    value = i,
+                    internal_log_rate_secs = 10
                 );
                 u32::MAX
             } else {
@@ -320,12 +325,17 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
                 warn!(
                     message = "Negative timestamp, using 0.",
                     field = key,
-                    value = i
+                    value = i,
+                    internal_log_rate_secs = 10
                 );
                 return 0;
             }
             if i < 1_000_000_000_000 {
                 (i as u64).saturating_mul(1_000_000_000)
+            } else if i < 1_000_000_000_000_000 {
+                (i as u64).saturating_mul(1_000_000)
+            } else if i < 1_000_000_000_000_000_000 {
+                (i as u64).saturating_mul(1_000)
             } else {
                 i as u64
             }
@@ -333,12 +343,20 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
         Value::Float(f) => {
             let f = f.into_inner();
             if f < 0.0 || f.is_nan() || f.is_infinite() {
-                warn!(message = "Invalid float timestamp, using 0.", field = key);
+                warn!(message = "Invalid float timestamp, using 0.", field = key, internal_log_rate_secs = 10);
                 return 0;
             }
-            let nanos = if f < 1e12 { f * 1e9 } else { f };
+            let nanos = if f < 1e12 {
+                f * 1e9
+            } else if f < 1e15 {
+                f * 1e6
+            } else if f < 1e18 {
+                f * 1e3
+            } else {
+                f
+            };
             if nanos > u64::MAX as f64 {
-                warn!(message = "Float timestamp overflow, using 0.", field = key);
+                warn!(message = "Float timestamp overflow, using 0.", field = key, internal_log_rate_secs = 10);
                 0
             } else {
                 nanos as u64
@@ -359,11 +377,16 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
                             warn!(
                                 message = "Negative timestamp string, using 0.",
                                 field = key,
-                                value = ts
+                                value = ts,
+                                internal_log_rate_secs = 10
                             );
                             0
                         } else if ts < 1_000_000_000_000 {
                             (ts as u64).saturating_mul(1_000_000_000)
+                        } else if ts < 1_000_000_000_000_000 {
+                            (ts as u64).saturating_mul(1_000_000)
+                        } else if ts < 1_000_000_000_000_000_000 {
+                            (ts as u64).saturating_mul(1_000)
                         } else {
                             ts as u64
                         }
@@ -373,13 +396,14 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
                     warn!(
                         message = "Could not parse timestamp string.",
                         field = key,
-                        value = %s
+                        value = %s,
+                        internal_log_rate_secs = 10
                     );
                     0
                 })
         }
         _ => {
-            warn!(message = "Unexpected timestamp type.", field = key);
+            warn!(message = "Unexpected timestamp type.", field = key, internal_log_rate_secs = 10);
             0
         }
     }
@@ -394,10 +418,9 @@ fn extract_trace_id(trace: &TraceEvent) -> Vec<u8> {
             if b.len() == 16 {
                 return b.to_vec();
             }
-            let s = if b.is_ascii() {
-                unsafe { std::str::from_utf8_unchecked(b) }
-            } else {
-                return Vec::new();
+            let s = match std::str::from_utf8(b) {
+                Ok(s) => s,
+                Err(_) => return Vec::new(),
             };
             validate_trace_id(&from_hex(s))
         }
@@ -423,10 +446,9 @@ fn extract_span_id(trace: &TraceEvent, key: &str) -> Vec<u8> {
             if b.len() == 8 {
                 return b.to_vec();
             }
-            let s = if b.is_ascii() {
-                unsafe { std::str::from_utf8_unchecked(b) }
-            } else {
-                return Vec::new();
+            let s = match std::str::from_utf8(b) {
+                Ok(s) => s,
+                Err(_) => return Vec::new(),
             };
             validate_span_id(&from_hex(s))
         }
@@ -479,6 +501,33 @@ fn extract_trace_kv_attributes(trace: &TraceEvent, key: &str) -> Vec<KeyValue> {
             result
         }
         _ => Vec::new(),
+    }
+}
+
+/// Extract instrumentation scope from a TraceEvent.
+fn extract_trace_scope(trace: &TraceEvent) -> Option<InstrumentationScope> {
+    let scope_name = trace
+        .get(event_path!("scope", "name"))
+        .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+    let scope_version = trace
+        .get(event_path!("scope", "version"))
+        .and_then(|v| v.as_str().map(|s| s.to_string()));
+
+    let scope_attrs = match trace.get(event_path!("scope", "attributes")) {
+        Some(Value::Object(obj)) => value_object_to_kv_list(obj),
+        _ => Vec::new(),
+    };
+
+    if scope_name.is_some() || scope_version.is_some() || !scope_attrs.is_empty() {
+        Some(InstrumentationScope {
+            name: scope_name.unwrap_or_default(),
+            version: scope_version.unwrap_or_default(),
+            attributes: scope_attrs,
+            dropped_attributes_count: 0,
+        })
+    } else {
+        None
     }
 }
 
@@ -567,6 +616,10 @@ fn extract_trace_span_events(trace: &TraceEvent) -> Vec<SpanEvent> {
                         0
                     } else if i < 1_000_000_000_000 {
                         (i as u64).saturating_mul(1_000_000_000)
+                    } else if i < 1_000_000_000_000_000 {
+                        (i as u64).saturating_mul(1_000_000)
+                    } else if i < 1_000_000_000_000_000_000 {
+                        (i as u64).saturating_mul(1_000)
                     } else {
                         i as u64
                     }
@@ -575,7 +628,7 @@ fn extract_trace_span_events(trace: &TraceEvent) -> Vec<SpanEvent> {
             };
 
             let attributes = match obj.get("attributes") {
-                Some(Value::Object(attrs)) => value_object_to_kv_list(attrs.clone()),
+                Some(Value::Object(attrs)) => value_object_to_kv_list(attrs),
                 _ => Vec::new(),
             };
 
@@ -642,7 +695,7 @@ fn extract_trace_span_links(trace: &TraceEvent) -> Vec<Link> {
                 .unwrap_or_default();
 
             let attributes = match obj.get("attributes") {
-                Some(Value::Object(attrs)) => value_object_to_kv_list(attrs.clone()),
+                Some(Value::Object(attrs)) => value_object_to_kv_list(attrs),
                 _ => Vec::new(),
             };
 
@@ -974,5 +1027,76 @@ mod native_trace_conversion_tests {
         // Invalid fields should have safe defaults
         assert!(span.trace_id.is_empty());
         assert!(span.span_id.is_empty());
+    }
+
+    #[test]
+    fn test_trace_scope_extraction() {
+        let mut scope = ObjectMap::new();
+        scope.insert("name".into(), Value::from("my-tracer"));
+        scope.insert("version".into(), Value::from("1.2.3"));
+
+        let trace = make_trace(btreemap! {
+            "name" => "test-span",
+            "scope" => Value::Object(scope),
+        });
+
+        let request = native_trace_to_otlp_request(&trace);
+        let scope = request.resource_spans[0].scope_spans[0]
+            .scope
+            .as_ref()
+            .unwrap();
+
+        assert_eq!(scope.name, "my-tracer");
+        assert_eq!(scope.version, "1.2.3");
+    }
+
+    #[test]
+    fn test_trace_scope_empty_produces_none() {
+        let trace = make_trace(btreemap! {
+            "name" => "test-span",
+        });
+
+        let request = native_trace_to_otlp_request(&trace);
+        assert!(request.resource_spans[0].scope_spans[0].scope.is_none());
+    }
+
+    #[test]
+    fn test_trace_schema_url() {
+        let trace = make_trace(btreemap! {
+            "name" => "test-span",
+            "schema_url" => "https://opentelemetry.io/schemas/1.21.0",
+        });
+
+        let request = native_trace_to_otlp_request(&trace);
+        assert_eq!(
+            request.resource_spans[0].scope_spans[0].schema_url,
+            "https://opentelemetry.io/schemas/1.21.0"
+        );
+    }
+
+    #[test]
+    fn test_trace_timestamp_as_milliseconds() {
+        let trace = make_trace(btreemap! {
+            "start_time_unix_nano" => 1704067200000i64,
+            "end_time_unix_nano" => 1704067201000i64,
+        });
+
+        let request = native_trace_to_otlp_request(&trace);
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        assert_eq!(span.start_time_unix_nano, 1704067200_000_000_000u64);
+        assert_eq!(span.end_time_unix_nano, 1704067201_000_000_000u64);
+    }
+
+    #[test]
+    fn test_trace_timestamp_as_microseconds() {
+        let trace = make_trace(btreemap! {
+            "start_time_unix_nano" => 1704067200_000_000i64,
+        });
+
+        let request = native_trace_to_otlp_request(&trace);
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        assert_eq!(span.start_time_unix_nano, 1704067200_000_000_000u64);
     }
 }

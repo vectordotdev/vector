@@ -72,10 +72,10 @@ impl From<Value> for PBValue {
     fn from(v: Value) -> Self {
         match v {
             // Mirrors: PBValue::StringValue(v) => Value::Bytes(Bytes::from(v))
-            // Optimization: Try valid UTF-8 first to avoid allocation
             Value::Bytes(b) => PBValue::StringValue(
-                String::from_utf8(b.to_vec())
-                    .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned()),
+                std::str::from_utf8(&b)
+                    .map(|s| s.to_owned())
+                    .unwrap_or_else(|_| String::from_utf8_lossy(&b).into_owned()),
             ),
 
             // Mirrors: PBValue::BoolValue(v) => Value::Boolean(v)
@@ -99,7 +99,7 @@ impl From<Value> for PBValue {
             }
 
             // Mirrors: PBValue::KvlistValue(arr) => kv_list_into_value(arr.values)
-            Value::Object(obj) => PBValue::KvlistValue(KeyValueList {
+            Value::Object(ref obj) => PBValue::KvlistValue(KeyValueList {
                 values: value_object_to_kv_list(obj),
             }),
 
@@ -114,18 +114,16 @@ impl From<Value> for PBValue {
 /// Convert a Vector ObjectMap to a Vec<KeyValue> for OTLP.
 /// This is the inverse of `kv_list_into_value`.
 #[inline]
-pub fn value_object_to_kv_list(obj: ObjectMap) -> Vec<KeyValue> {
-    // Pre-allocate based on input size (some may be filtered)
+pub fn value_object_to_kv_list(obj: &ObjectMap) -> Vec<KeyValue> {
     let mut result = Vec::with_capacity(obj.len());
-    for (k, v) in obj {
-        // Skip null values (OTLP doesn't represent them well)
+    for (k, v) in obj.iter() {
         if matches!(v, Value::Null) {
             continue;
         }
         result.push(KeyValue {
-            key: k.into(),
+            key: k.to_string(),
             value: Some(AnyValue {
-                value: Some(v.into()),
+                value: Some(v.clone().into()),
             }),
         });
     }
@@ -148,7 +146,7 @@ pub fn from_hex(s: &str) -> Vec<u8> {
 
     // hex::decode already pre-allocates correctly
     hex::decode(s).unwrap_or_else(|e| {
-        warn!(message = "Invalid hex string, using empty bytes", input = %s, error = %e);
+        warn!(message = "Invalid hex string, using empty bytes.", input = %s, error = %e, internal_log_rate_secs = 10);
         Vec::new()
     })
 }
@@ -163,20 +161,18 @@ pub fn validate_trace_id(bytes: &[u8]) -> Vec<u8> {
         16 => bytes.to_vec(),
         32 => {
             // Auto-fix: hex string passed as bytes (common mistake)
-            // Try direct hex decode from bytes to avoid UTF-8 conversion
-            if bytes.iter().all(|b| b.is_ascii_hexdigit()) {
-                // Safe: all bytes are ASCII hex digits
-                let s = unsafe { std::str::from_utf8_unchecked(bytes) };
+            if let Ok(s) = std::str::from_utf8(bytes) {
                 from_hex(s)
             } else {
-                warn!(message = "trace_id appears to be hex string but contains invalid chars");
+                warn!(message = "trace_id appears to be hex string but contains invalid chars.", internal_log_rate_secs = 10);
                 Vec::new()
             }
         }
         _ => {
             warn!(
-                message = "Invalid trace_id length, clearing",
-                length = bytes.len()
+                message = "Invalid trace_id length, clearing.",
+                length = bytes.len(),
+                internal_log_rate_secs = 10
             );
             Vec::new()
         }
@@ -192,20 +188,18 @@ pub fn validate_span_id(bytes: &[u8]) -> Vec<u8> {
         8 => bytes.to_vec(),
         16 => {
             // Auto-fix: hex string passed as bytes (common mistake)
-            // Try direct hex decode from bytes to avoid UTF-8 conversion
-            if bytes.iter().all(|b| b.is_ascii_hexdigit()) {
-                // Safe: all bytes are ASCII hex digits
-                let s = unsafe { std::str::from_utf8_unchecked(bytes) };
+            if let Ok(s) = std::str::from_utf8(bytes) {
                 from_hex(s)
             } else {
-                warn!(message = "span_id appears to be hex string but contains invalid chars");
+                warn!(message = "span_id appears to be hex string but contains invalid chars.", internal_log_rate_secs = 10);
                 Vec::new()
             }
         }
         _ => {
             warn!(
-                message = "Invalid span_id length, clearing",
-                length = bytes.len()
+                message = "Invalid span_id length, clearing.",
+                length = bytes.len(),
+                internal_log_rate_secs = 10
             );
             Vec::new()
         }
@@ -311,7 +305,7 @@ mod tests {
         let mut obj = ObjectMap::new();
         obj.insert("key".into(), Value::Null);
         obj.insert("valid".into(), Value::Integer(1));
-        let kv = value_object_to_kv_list(obj);
+        let kv = value_object_to_kv_list(&obj);
         // Null should be filtered out
         assert_eq!(kv.len(), 1);
         assert_eq!(kv[0].key, "valid");

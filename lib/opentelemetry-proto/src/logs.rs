@@ -284,7 +284,7 @@ fn build_scope_logs_from_native(log: &LogEvent, log_record: LogRecord) -> ScopeL
     ScopeLogs {
         scope: extract_instrumentation_scope_safe(log),
         log_records: vec![log_record],
-        schema_url: String::new(),
+        schema_url: extract_string_safe(log, "schema_url"),
     }
 }
 
@@ -314,35 +314,51 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
             .filter(|&n| n >= 0)
             .map(|n| n as u64)
             .unwrap_or(0),
-        // Integer - could be seconds or nanos (heuristic detection)
+        // Integer - could be seconds, ms, us, or nanos (heuristic detection)
         Value::Integer(i) => {
             let i = *i;
             if i < 0 {
                 warn!(
-                    message = "Negative timestamp, using 0",
+                    message = "Negative timestamp, using 0.",
                     field = key,
-                    value = i
+                    value = i,
+                    internal_log_rate_secs = 10
                 );
                 return 0;
             }
-            // Heuristic: year 2001 in nanos = 1e18, in seconds = 1e9
-            // If value < 1 trillion, assume seconds; otherwise assume nanos
+            // Heuristic by magnitude:
+            //   < 1e12 → seconds (10-digit epoch)
+            //   < 1e15 → milliseconds (13-digit epoch)
+            //   < 1e18 → microseconds (16-digit epoch)
+            //   >= 1e18 → nanoseconds (19-digit epoch)
             if i < 1_000_000_000_000 {
                 (i as u64).saturating_mul(1_000_000_000)
+            } else if i < 1_000_000_000_000_000 {
+                (i as u64).saturating_mul(1_000_000)
+            } else if i < 1_000_000_000_000_000_000 {
+                (i as u64).saturating_mul(1_000)
             } else {
-                i as u64 // already nanos
+                i as u64
             }
         }
-        // Float - could be fractional seconds
+        // Float - could be fractional seconds, ms, us, or nanos
         Value::Float(f) => {
             let f = f.into_inner();
             if f < 0.0 || f.is_nan() || f.is_infinite() {
-                warn!(message = "Invalid float timestamp, using 0", field = key);
+                warn!(message = "Invalid float timestamp, using 0.", field = key, internal_log_rate_secs = 10);
                 return 0;
             }
-            let nanos = if f < 1e12 { f * 1e9 } else { f };
+            let nanos = if f < 1e12 {
+                f * 1e9
+            } else if f < 1e15 {
+                f * 1e6
+            } else if f < 1e18 {
+                f * 1e3
+            } else {
+                f
+            };
             if nanos > u64::MAX as f64 {
-                warn!(message = "Float timestamp overflow, using 0.", field = key);
+                warn!(message = "Float timestamp overflow, using 0.", field = key, internal_log_rate_secs = 10);
                 0
             } else {
                 nanos as u64
@@ -364,11 +380,16 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
                             warn!(
                                 message = "Negative timestamp string, using 0.",
                                 field = key,
-                                value = ts
+                                value = ts,
+                                internal_log_rate_secs = 10
                             );
                             0
                         } else if ts < 1_000_000_000_000 {
                             (ts as u64).saturating_mul(1_000_000_000)
+                        } else if ts < 1_000_000_000_000_000 {
+                            (ts as u64).saturating_mul(1_000_000)
+                        } else if ts < 1_000_000_000_000_000_000 {
+                            (ts as u64).saturating_mul(1_000)
                         } else {
                             ts as u64
                         }
@@ -376,15 +397,16 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
                 })
                 .unwrap_or_else(|_| {
                     warn!(
-                        message = "Could not parse timestamp string",
+                        message = "Could not parse timestamp string.",
                         field = key,
-                        value = %s
+                        value = %s,
+                        internal_log_rate_secs = 10
                     );
                     0
                 })
         }
         _ => {
-            warn!(message = "Unexpected timestamp type", field = key);
+            warn!(message = "Unexpected timestamp type.", field = key, internal_log_rate_secs = 10);
             0
         }
     }
@@ -395,18 +417,19 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
 fn extract_string_safe(log: &LogEvent, key: &str) -> String {
     match log.get(key) {
         Some(Value::Bytes(b)) => {
-            // Optimization: try valid UTF-8 first to avoid extra allocation
-            String::from_utf8(b.to_vec())
-                .unwrap_or_else(|e| String::from_utf8_lossy(e.as_bytes()).into_owned())
+            std::str::from_utf8(b)
+                .map(|s| s.to_owned())
+                .unwrap_or_else(|_| String::from_utf8_lossy(b).into_owned())
         }
         Some(Value::Integer(i)) => i.to_string(),
         Some(Value::Float(f)) => f.to_string(),
         Some(Value::Boolean(b)) => if *b { "true" } else { "false" }.to_string(),
         Some(other) => {
             warn!(
-                message = "Converting non-string to string",
+                message = "Converting non-string to string.",
                 field = key,
-                value_type = ?other
+                value_type = ?other,
+                internal_log_rate_secs = 10
             );
             format!("{other:?}")
         }
@@ -429,7 +452,7 @@ fn extract_severity_number_safe(log: &LogEvent) -> i32 {
             let i = *i;
             // OTLP severity numbers are 0-24
             if !(0..=24).contains(&i) {
-                warn!(message = "Severity number out of range (0-24)", value = i);
+                warn!(message = "Severity number out of range (0-24).", value = i, internal_log_rate_secs = 10);
                 i.clamp(0, 24) as i32
             } else {
                 i as i32
@@ -441,14 +464,15 @@ fn extract_severity_number_safe(log: &LogEvent) -> i32 {
             s.parse::<i32>()
                 .map(|n| n.clamp(0, 24))
                 .unwrap_or_else(|_| {
-                    warn!(message = "Could not parse severity_number.", value = %s);
+                    warn!(message = "Could not parse severity_number.", value = %s, internal_log_rate_secs = 10);
                     0
                 })
         }
         _ => {
             warn!(
-                message = "Unexpected severity_number type",
-                value_type = ?value
+                message = "Unexpected severity_number type.",
+                value_type = ?value,
+                internal_log_rate_secs = 10
             );
             0
         }
@@ -503,16 +527,18 @@ fn extract_u32_safe(log: &LogEvent, key: &str) -> u32 {
             let i = *i;
             if i < 0 {
                 warn!(
-                    message = "Negative value for u32 field, using 0",
+                    message = "Negative value for u32 field, using 0.",
                     field = key,
-                    value = i
+                    value = i,
+                    internal_log_rate_secs = 10
                 );
                 0
             } else if i > u32::MAX as i64 {
                 warn!(
-                    message = "Value overflow for u32 field",
+                    message = "Value overflow for u32 field.",
                     field = key,
-                    value = i
+                    value = i,
+                    internal_log_rate_secs = 10
                 );
                 u32::MAX
             } else {
@@ -578,12 +604,9 @@ fn extract_trace_id_safe(log: &LogEvent) -> Vec<u8> {
                 return b.to_vec();
             }
             // Otherwise treat as hex string
-            // Try direct str conversion if ASCII (common case)
-            let s = if b.is_ascii() {
-                // Safety: we just checked it's ASCII
-                unsafe { std::str::from_utf8_unchecked(b) }
-            } else {
-                return Vec::new(); // Invalid hex
+            let s = match std::str::from_utf8(b) {
+                Ok(s) => s,
+                Err(_) => return Vec::new(),
             };
             validate_trace_id(&from_hex(s))
         }
@@ -611,12 +634,9 @@ fn extract_span_id_safe(log: &LogEvent) -> Vec<u8> {
                 return b.to_vec();
             }
             // Otherwise treat as hex string
-            // Try direct str conversion if ASCII (common case)
-            let s = if b.is_ascii() {
-                // Safety: we just checked it's ASCII
-                unsafe { std::str::from_utf8_unchecked(b) }
-            } else {
-                return Vec::new(); // Invalid hex
+            let s = match std::str::from_utf8(b) {
+                Ok(s) => s,
+                Err(_) => return Vec::new(),
             };
             validate_span_id(&from_hex(s))
         }
@@ -648,7 +668,7 @@ fn extract_instrumentation_scope_safe(log: &LogEvent) -> Option<InstrumentationS
 
     let scope_attrs = log
         .get("scope.attributes")
-        .and_then(|v| v.as_object().cloned())
+        .and_then(|v| v.as_object())
         .map(value_object_to_kv_list)
         .unwrap_or_default();
 
@@ -990,5 +1010,40 @@ mod native_conversion_tests {
         let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
 
         assert_eq!(lr.severity_number, 0);
+    }
+
+    #[test]
+    fn test_timestamp_as_milliseconds() {
+        let mut log = LogEvent::default();
+        log.insert("timestamp", 1704067200000i64); // 2024-01-01 in milliseconds
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.time_unix_nano, 1704067200_000_000_000u64);
+    }
+
+    #[test]
+    fn test_timestamp_as_microseconds() {
+        let mut log = LogEvent::default();
+        log.insert("timestamp", 1704067200_000_000i64); // 2024-01-01 in microseconds
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.time_unix_nano, 1704067200_000_000_000u64);
+    }
+
+    #[test]
+    fn test_schema_url_extracted() {
+        let mut log = LogEvent::default();
+        log.insert("schema_url", "https://opentelemetry.io/schemas/1.21.0");
+        log.insert("message", "test");
+
+        let request = native_log_to_otlp_request(&log);
+        assert_eq!(
+            request.resource_logs[0].scope_logs[0].schema_url,
+            "https://opentelemetry.io/schemas/1.21.0"
+        );
     }
 }

@@ -96,7 +96,6 @@ impl OtlpSerializerConfig {
 /// - `.links` → `links[]` (span links with trace_id, span_id, attributes)
 /// - `.status` → `status` (message, code)
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields will be used once encoding is implemented
 pub struct OtlpSerializer {
     logs_descriptor: ProtobufSerializer,
     metrics_descriptor: ProtobufSerializer,
