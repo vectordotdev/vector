@@ -18,6 +18,7 @@ on:
         type: string
 
 permissions:
+  contents: read
   packages: write
 
 jobs:
