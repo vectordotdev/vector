@@ -55,7 +55,14 @@ where
             Ok(ok) => ok.is_ok(),
             // InsufficientCapacity: n > burst size. Allow through rather than
             // permanently blocking events that exceed the burst capacity.
-            Err(_) => true,
+            Err(_) => {
+                warn!(
+                    message = "Event cost exceeds burst capacity, allowing through. Consider increasing threshold.",
+                    cost = n.get(),
+                    internal_log_rate_secs = 10,
+                );
+                true
+            }
         }
     }
 }

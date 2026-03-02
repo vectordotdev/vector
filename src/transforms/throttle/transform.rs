@@ -40,6 +40,14 @@ impl ThresholdType {
     }
 }
 
+/// Maximum number of unique keys to track utilization for.
+/// Prevents unbounded memory growth from high-cardinality key fields.
+const MAX_UTILIZATION_KEYS: usize = 10_000;
+
+/// Utilization gauges are only emitted every N events to reduce metric overhead.
+/// Since gauges overwrite, less frequent emission is equivalent for monitoring.
+const UTILIZATION_EMIT_INTERVAL: u64 = 100;
+
 /// Utilization tracking for a single key across all threshold types.
 struct KeyUtilization {
     events_consumed: u64,
@@ -209,6 +217,7 @@ pub struct ThrottleState<C: clock::Clock> {
     tokens_program: Option<Program>,
     vrl_runtime: Runtime,
     utilization: std::collections::HashMap<Option<String>, KeyUtilization>,
+    events_processed: u64,
     events_threshold: u64,
     bytes_threshold: u64,
     tokens_threshold: u64,
@@ -272,36 +281,6 @@ where
         }
     }
 
-    fn check_thresholds(
-        &self,
-        key: &Option<String>,
-        json_bytes: usize,
-        token_cost: Option<NonZeroU32>,
-    ) -> Option<ThresholdType> {
-        if let Some(ref limiter) = self.events_limiter
-            && !limiter.check_key(key)
-        {
-            return Some(ThresholdType::Events);
-        }
-
-        if let Some(ref limiter) = self.json_bytes_limiter
-            && json_bytes > 0
-            && let Some(n) = NonZeroU32::new(json_bytes.min(u32::MAX as usize) as u32)
-            && !limiter.check_key_n(key, n)
-        {
-            return Some(ThresholdType::JsonBytes);
-        }
-
-        if let Some(ref limiter) = self.tokens_limiter
-            && let Some(cost) = token_cost
-            && !limiter.check_key_n(key, cost)
-        {
-            return Some(ThresholdType::Tokens);
-        }
-
-        None
-    }
-
     fn update_utilization(
         &mut self,
         key: &Option<String>,
@@ -309,16 +288,26 @@ where
         token_cost: Option<NonZeroU32>,
         exceeded: &Option<ThresholdType>,
     ) {
-        let util = self.utilization.entry(key.clone()).or_insert_with(|| {
-            KeyUtilization::new(
-                self.events_threshold,
-                self.bytes_threshold,
-                self.tokens_threshold,
-            )
-        });
+        self.events_processed += 1;
+
+        // Bound utilization map to prevent unbounded memory growth from
+        // high-cardinality key fields. Skip tracking new keys once at capacity.
+        let util = if let Some(util) = self.utilization.get_mut(key) {
+            util
+        } else if self.utilization.len() < MAX_UTILIZATION_KEYS {
+            self.utilization.entry(key.clone()).or_insert_with(|| {
+                KeyUtilization::new(
+                    self.events_threshold,
+                    self.bytes_threshold,
+                    self.tokens_threshold,
+                )
+            })
+        } else {
+            return;
+        };
 
         // Only track consumption for limiters that were actually checked by the governor.
-        // check_thresholds short-circuits: if events fails, bytes/tokens governors never
+        // Threshold checking short-circuits: if events fails, bytes/tokens governors never
         // consumed tokens, so we must not count them in utilization.
         util.events_consumed += 1;
         match exceeded {
@@ -343,6 +332,12 @@ where
                     util.tokens_consumed += cost.get() as u64;
                 }
             }
+        }
+
+        // Gauges overwrite previous values, so emitting every N events is equivalent
+        // to per-event emission for monitoring while reducing metric overhead.
+        if self.events_processed % UTILIZATION_EMIT_INTERVAL != 0 {
+            return;
         }
 
         let key_str = key.as_deref().unwrap_or("").to_owned();
@@ -402,14 +397,44 @@ where
                 .ok()
         });
 
+        // Compute json_bytes cheaply (size estimate, no clone).
         let json_bytes = if self.json_bytes_limiter.is_some() {
             ThrottleState::<C>::compute_json_bytes(&event)
         } else {
             0
         };
 
-        let token_cost = if self.tokens_program.is_some() {
-            self.evaluate_tokens(&event)
+        // Check events limiter first (cheapest).
+        let mut exceeded: Option<ThresholdType> = None;
+        if let Some(ref limiter) = self.events_limiter
+            && !limiter.check_key(&key)
+        {
+            exceeded = Some(ThresholdType::Events);
+        }
+
+        // Only check json_bytes and tokens if events limiter passed.
+        // evaluate_tokens clones the event for VRL — defer until we know
+        // the event wasn't already rejected by cheaper limiters.
+        let token_cost = if exceeded.is_none() {
+            if let Some(ref limiter) = self.json_bytes_limiter
+                && json_bytes > 0
+                && let Some(n) = NonZeroU32::new(json_bytes.min(u32::MAX as usize) as u32)
+                && !limiter.check_key_n(&key, n)
+            {
+                exceeded = Some(ThresholdType::JsonBytes);
+                None
+            } else if self.tokens_program.is_some() {
+                let cost = self.evaluate_tokens(&event);
+                if let Some(ref limiter) = self.tokens_limiter
+                    && let Some(c) = cost
+                    && !limiter.check_key_n(&key, c)
+                {
+                    exceeded = Some(ThresholdType::Tokens);
+                }
+                cost
+            } else {
+                None
+            }
         } else {
             None
         };
@@ -417,16 +442,21 @@ where
         let needs_key_str = self.internal_metrics.emit_detailed_metrics
             || self.internal_metrics.emit_events_discarded_per_key;
 
+        // Allocate key_str once for all metric emissions that need it.
+        let key_str = if needs_key_str || exceeded.is_some() {
+            key.as_deref().unwrap_or("None").to_owned()
+        } else {
+            String::new()
+        };
+
         if self.internal_metrics.emit_detailed_metrics {
             emit!(ThrottleEventProcessed {
-                key: key.as_deref().unwrap_or("None").to_owned(),
+                key: key_str.clone(),
                 json_bytes: json_bytes as u64,
                 token_cost: token_cost.map_or(0, |n| n.get() as u64),
                 emit_detailed_metrics: true,
             });
         }
-
-        let exceeded = self.check_thresholds(&key, json_bytes, token_cost);
 
         if self.internal_metrics.emit_detailed_metrics {
             self.update_utilization(&key, json_bytes, token_cost, &exceeded);
@@ -435,11 +465,7 @@ where
         match exceeded {
             Some(threshold_type) => {
                 emit!(ThrottleEventDiscarded {
-                    key: if needs_key_str {
-                        key.as_deref().unwrap_or("None").to_owned()
-                    } else {
-                        String::new()
-                    },
+                    key: if needs_key_str { key_str } else { String::new() },
                     threshold_type: threshold_type.as_str(),
                     emit_events_discarded_per_key: self
                         .internal_metrics
@@ -491,6 +517,7 @@ where
             tokens_program: self.tokens_program,
             vrl_runtime: Runtime::default(),
             utilization: std::collections::HashMap::new(),
+            events_processed: 0,
             events_threshold: self.events_threshold,
             bytes_threshold: self.bytes_threshold,
             tokens_threshold: self.tokens_threshold,
