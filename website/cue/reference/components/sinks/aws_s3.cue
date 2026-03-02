@@ -246,15 +246,15 @@ components: sinks: aws_s3: components._aws & {
 
 				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
 				name = "message"
-				data_type = "utf8"
+				type = "utf8"
 
 				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
 				name = "timestamp"
-				data_type = "timestamp_millis"
+				type = "timestamp_millisecond"
 
 				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
 				name = "host"
-				data_type = "utf8"
+				type = "utf8"
 				```
 
 				#### YAML Example
@@ -274,7 +274,7 @@ components: sinks: aws_s3: components._aws & {
 				          - name: message
 				            type: utf8
 				          - name: timestamp
-				            type: timestamp_millis
+				            type: timestamp_millisecond
 				          - name: host
 				            type: utf8
 				```
