@@ -87,7 +87,7 @@ To merge a new source, sink, or transform, the pull request is required to:
 - [ ] Add tests, especially integration tests if your contribution connects to an external service.
 - [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can
 see some [example of instrumentation in existing integrations](https://github.com/vectordotdev/vector/tree/master/src/internal_events).
-- [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/vectordotdev/vector/blob/master/docs).
+- [ ] Add documentation. You need to generate and create documentation files for your component. See the [component documentation guide](docs/DOCUMENTING.md#adding-documentation-for-new-components) for detailed instructions.
 
 When adding new integration tests, the following changes are needed in the GitHub Workflows:
 
