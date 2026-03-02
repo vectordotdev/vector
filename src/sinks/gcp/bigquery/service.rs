@@ -13,7 +13,7 @@ use vector_lib::{
     stream::DriverResponse,
 };
 
-use crate::sinks::util::retries::RetryLogic;
+use crate::sinks::util::retries::{RetryAction, RetryLogic};
 
 use super::proto::google::cloud::bigquery::storage::v1 as proto;
 use crate::event::{EventFinalizers, Finalizable};
@@ -152,6 +152,18 @@ impl RetryLogic for BigqueryRetryLogic {
                     | tonic::Code::ResourceExhausted
                     | tonic::Code::DeadlineExceeded
             ),
+        }
+    }
+
+    fn should_retry_response(&self, response: &Self::Response) -> RetryAction<Self::Request> {
+        match response.event_status() {
+            EventStatus::Delivered | EventStatus::Recorded | EventStatus::Dropped => RetryAction::Successful,
+            EventStatus::Errored => {
+                RetryAction::Retry("transient error in BigQuery response".into())
+            }
+            EventStatus::Rejected => {
+                RetryAction::DontRetry("permanent error in BigQuery response".into())
+            }
         }
     }
 }

@@ -185,12 +185,22 @@ mod test {
     use std::collections::BTreeMap;
     use std::path::PathBuf;
 
-    use super::BigqueryRequestBuilder;
+    use super::{BigqueryRequestBuilder, MAX_BATCH_PAYLOAD_SIZE};
     use crate::sinks::util::IncrementalRequestBuilder;
 
-    #[test]
-    fn encode_events_incremental() {
-        // build the request builder
+    const OVERSIZED_PAYLOAD: &[u8] = &[0u8; MAX_BATCH_PAYLOAD_SIZE];
+
+    fn make_oversized_event() -> Event {
+        Event::Log(LogEvent::from_parts(
+            Value::Object(BTreeMap::from([(
+                "binary".into(),
+                Value::Bytes(Bytes::from_static(OVERSIZED_PAYLOAD)),
+            )])),
+            EventMetadata::default(),
+        ))
+    }
+
+    fn make_request_builder() -> BigqueryRequestBuilder {
         let desc_file = PathBuf::from(std::env::var_os("CARGO_MANIFEST_DIR").unwrap())
             .join("lib/codecs/tests/data/protobuf/test.desc");
         let protobuf_serializer = ProtobufSerializerConfig {
@@ -202,32 +212,64 @@ mod test {
         }
         .build()
         .unwrap();
-        let mut request_builder = BigqueryRequestBuilder::new(
+        BigqueryRequestBuilder::new(
             protobuf_serializer,
             "/projects/123/datasets/456/tables/789/streams/_default".to_string(),
         )
-        .unwrap();
-        // check that we break up large batches to avoid api limits
-        let mut events = vec![];
+        .unwrap()
+    }
+
+    #[test]
+    fn no_events() {
+        let mut request_builder = make_request_builder();
+        let results = request_builder.encode_events_incremental(vec![]);
+        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn batch_is_split_into_chunks() {
+        let mut request_builder = make_request_builder();
         let mut data = BytesMut::with_capacity(63336);
         for i in 1..data.capacity() {
             data.put_u64(i as u64);
         }
-        for _ in 0..128 {
-            let event = Event::Log(LogEvent::from_parts(
-                Value::Object(BTreeMap::from([
-                    ("text".into(), Value::Bytes(Bytes::from("hello world"))),
-                    ("binary".into(), Value::Bytes(data.clone().into())),
-                ])),
-                EventMetadata::default(),
-            ));
-            events.push(event);
-        }
+        let events = (0..128)
+            .map(|_| {
+                Event::Log(LogEvent::from_parts(
+                    Value::Object(BTreeMap::from([
+                        ("text".into(), Value::Bytes(Bytes::from("hello world"))),
+                        ("binary".into(), Value::Bytes(data.clone().into())),
+                    ])),
+                    EventMetadata::default(),
+                ))
+            })
+            .collect();
         let results = request_builder.encode_events_incremental(events);
         assert!(results.iter().all(|r| r.is_ok()));
         assert!(results.len() > 1);
-        // check that we don't generate bodies with no events in them
-        let results = request_builder.encode_events_incremental(vec![]);
-        assert!(results.is_empty());
+    }
+
+    #[test]
+    fn oversized_event_is_rejected() {
+        let mut request_builder = make_request_builder();
+        let results = request_builder.encode_events_incremental(vec![make_oversized_event()]);
+        assert_eq!(results.len(), 1);
+        assert!(results[0].is_err());
+    }
+
+    #[test]
+    fn oversized_event_mixed_with_normal_event() {
+        let mut request_builder = make_request_builder();
+        let normal_event = Event::Log(LogEvent::from_parts(
+            Value::Object(BTreeMap::from([(
+                "text".into(),
+                Value::Bytes(Bytes::from("hello")),
+            )])),
+            EventMetadata::default(),
+        ));
+        let results =
+            request_builder.encode_events_incremental(vec![normal_event, make_oversized_event()]);
+        assert_eq!(results.iter().filter(|r| r.is_ok()).count(), 1);
+        assert_eq!(results.iter().filter(|r| r.is_err()).count(), 1);
     }
 }
