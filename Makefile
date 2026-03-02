@@ -373,7 +373,7 @@ test-behavior-config: ## Runs configuration related behavioral tests
 
 .PHONY: test-behavior-%
 test-behavior-%: ## Runs behavioral test for a given category
-	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms -- test tests/behavior/$*/*
+	${MAYBE_ENVIRONMENT_EXEC} cargo run --no-default-features --features transforms,vrl-functions-env,vrl-functions-system,vrl-functions-network -- test tests/behavior/$*/*
 
 .PHONY: test-behavior
 test-behavior: ## Runs all behavioral tests
