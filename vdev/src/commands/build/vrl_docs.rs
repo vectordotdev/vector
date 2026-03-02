@@ -120,7 +120,12 @@ fn get_vrl_commit_sha(repo_root: &Path) -> Result<String> {
     let pkg = lock
         .package
         .iter()
-        .find(|p| p.name == VRL_PACKAGE_NAME && p.source.as_deref().is_some_and(|s| s.contains("github.com/vectordotdev/vrl")))
+        .find(|p| {
+            p.name == VRL_PACKAGE_NAME
+                && p.source
+                    .as_deref()
+                    .is_some_and(|s| s.contains("github.com/vectordotdev/vrl"))
+        })
         .context("Could not find VRL package with git source in Cargo.lock")?;
 
     // Source format: "git+https://github.com/vectordotdev/vrl.git?branch=doc-generation#5316c01b..."
@@ -148,10 +153,7 @@ fn sparse_checkout_docs(sha: &str, repo_url: &str, clone_dir: &Path) -> Result<(
     git(&["remote", "add", "origin", repo_url])?;
     git(&["config", "core.sparseCheckout", "true"])?;
 
-    let sparse_file = clone_dir
-        .join(".git")
-        .join("info")
-        .join("sparse-checkout");
+    let sparse_file = clone_dir.join(".git").join("info").join("sparse-checkout");
     fs::create_dir_all(sparse_file.parent().unwrap())?;
     fs::write(&sparse_file, "docs/generated\n")
         .context("Failed to write sparse-checkout config")?;
