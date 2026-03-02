@@ -210,6 +210,16 @@ impl GenerateConfig for S3SinkConfig {
 #[typetag::serde(name = "aws_s3")]
 impl SinkConfig for S3SinkConfig {
     async fn build(&self, cx: SinkContext) -> crate::Result<(VectorSink, Healthcheck)> {
+        // Parquet handles compression internally; reject conflicting sink-level compression.
+        #[cfg(feature = "codecs-parquet")]
+        if self.batch_encoding.is_some() && self.compression.is_compressed() {
+            return Err(
+                "When `batch_encoding` is set (e.g. Parquet), `compression` must be \"none\" \
+                 because the batch format handles compression internally."
+                    .into(),
+            );
+        }
+
         let service = self.create_service(&cx.proxy).await?;
         let healthcheck = self.build_healthcheck(service.client())?;
         let sink = self.build_processor(service, cx)?;

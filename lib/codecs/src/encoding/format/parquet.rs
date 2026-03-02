@@ -12,6 +12,7 @@ use bytes::{BufMut, BytesMut};
 use parquet::arrow::ArrowWriter;
 use parquet::basic::Compression as ParquetCodecCompression;
 use parquet::file::properties::WriterProperties;
+use tracing::warn;
 use vector_config::configurable_component;
 use vector_core::event::Event;
 
@@ -240,6 +241,17 @@ impl tokio_util::codec::Encoder<Vec<Event>> for ParquetSerializer {
     fn encode(&mut self, events: Vec<Event>, buffer: &mut BytesMut) -> Result<(), Self::Error> {
         if events.is_empty() {
             return Ok(());
+        }
+
+        // Warn about non-log events that will be silently dropped by the Arrow layer.
+        // Parquet encoding only supports Log events (declared via input_type).
+        let non_log_count = events.iter().filter(|e| e.maybe_as_log().is_none()).count();
+        if non_log_count > 0 {
+            warn!(
+                message = "Non-log events dropped by Parquet encoder.",
+                count = non_log_count,
+                internal_log_rate_secs = 10,
+            );
         }
 
         // In strict mode, check for extra top-level fields not in the schema
