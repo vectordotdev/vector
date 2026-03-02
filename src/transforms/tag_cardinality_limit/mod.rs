@@ -2,23 +2,20 @@ use std::{future::ready, pin::Pin};
 
 use futures::{Stream, StreamExt};
 use hashbrown::HashMap;
+use vector_lib::{event::Event, transform::TaskTransform};
 
-use crate::{
-    event::Event,
-    internal_events::{
-        TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
-        TagCardinalityValueLimitReached,
-    },
-    transforms::{TaskTransform, tag_cardinality_limit::config::LimitExceededAction},
+use crate::internal_events::{
+    TagCardinalityLimitRejectingEvent, TagCardinalityLimitRejectingTag,
+    TagCardinalityValueLimitReached,
 };
 
-mod config;
+pub mod config;
 mod tag_value_set;
 
 #[cfg(test)]
 mod tests;
 
-pub use config::{TagCardinalityLimitConfig, TagCardinalityLimitInnerConfig};
+pub use config::{BloomFilterConfig, Config, Inner, LimitExceededAction, Mode, PerMetricConfig};
 use tag_value_set::AcceptedTagValueSet;
 
 use crate::event::metric::TagValueSet;
@@ -27,22 +24,19 @@ type MetricId = (Option<String>, String);
 
 #[derive(Debug)]
 pub struct TagCardinalityLimit {
-    config: TagCardinalityLimitConfig,
+    config: Config,
     accepted_tags: HashMap<Option<MetricId>, HashMap<String, AcceptedTagValueSet>>,
 }
 
 impl TagCardinalityLimit {
-    fn new(config: TagCardinalityLimitConfig) -> Self {
+    fn new(config: Config) -> Self {
         Self {
             config,
             accepted_tags: HashMap::new(),
         }
     }
 
-    fn get_config_for_metric(
-        &self,
-        metric_key: Option<&MetricId>,
-    ) -> &TagCardinalityLimitInnerConfig {
+    fn get_config_for_metric(&self, metric_key: Option<&MetricId>) -> &Inner {
         match metric_key {
             Some(id) => self
                 .config
@@ -71,7 +65,7 @@ impl TagCardinalityLimit {
         key: &str,
         value: &TagValueSet,
     ) -> bool {
-        let config = self.get_config_for_metric(metric_key).clone();
+        let config = *self.get_config_for_metric(metric_key);
         let metric_accepted_tags = self.accepted_tags.entry(metric_key.cloned()).or_default();
         let tag_value_set = metric_accepted_tags
             .entry_ref(key)
@@ -119,7 +113,7 @@ impl TagCardinalityLimit {
 
     /// Record a key and value corresponding to a tag on an incoming Metric.
     fn record_tag_value(&mut self, metric_key: Option<&MetricId>, key: &str, value: &TagValueSet) {
-        let config = self.get_config_for_metric(metric_key).clone();
+        let config = *self.get_config_for_metric(metric_key);
         let metric_accepted_tags = self.accepted_tags.entry(metric_key.cloned()).or_default();
         metric_accepted_tags
             .entry_ref(key)

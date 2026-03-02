@@ -13,9 +13,9 @@ use crate::{
 
 /// Configuration of internal metrics for the TagCardinalityLimit transform.
 #[configurable_component]
-#[derive(Clone, Debug, PartialEq, Eq, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
-pub struct TagCardinalityLimitInternalMetricsConfig {
+pub struct InternalMetricsConfig {
     /// Whether to include extended tags (metric_name, tag_key) in the `tag_value_limit_exceeded_total` metric.
     ///
     /// This helps identify which metrics and tag keys are hitting cardinality limits, but can significantly
@@ -30,10 +30,10 @@ pub struct TagCardinalityLimitInternalMetricsConfig {
     "tag_cardinality_limit",
     "Limit the cardinality of tags on metrics events as a safeguard against cardinality explosion."
 ))]
-#[derive(Clone, Debug)]
-pub struct TagCardinalityLimitConfig {
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct Config {
     #[serde(flatten)]
-    pub global: TagCardinalityLimitInnerConfig,
+    pub global: Inner,
 
     /// Tag cardinality limits configuration per metric name.
     #[configurable(
@@ -46,8 +46,8 @@ pub struct TagCardinalityLimitConfig {
 
 /// Configuration for the `tag_cardinality_limit` transform for a specific group of metrics.
 #[configurable_component]
-#[derive(Clone, Debug)]
-pub struct TagCardinalityLimitInnerConfig {
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+pub struct Inner {
     /// How many distinct values to accept for any given key.
     #[serde(default = "default_value_limit")]
     pub value_limit: usize,
@@ -61,12 +61,12 @@ pub struct TagCardinalityLimitInnerConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub internal_metrics: TagCardinalityLimitInternalMetricsConfig,
+    pub internal_metrics: InternalMetricsConfig,
 }
 
 /// Controls the approach taken for tracking tag cardinality.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(tag = "mode", rename_all = "snake_case", deny_unknown_fields)]
 #[configurable(metadata(
     docs::enum_tag_description = "Controls the approach taken for tracking tag cardinality."
@@ -89,7 +89,7 @@ pub enum Mode {
 
 /// Bloom filter configuration in probabilistic mode.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub struct BloomFilterConfig {
     /// The size of the cache for detecting duplicate tags, in bytes.
     ///
@@ -103,7 +103,7 @@ pub struct BloomFilterConfig {
 /// Possible actions to take when an event arrives that would exceed the cardinality limit for one
 /// or more of its tags.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(rename_all = "snake_case")]
 pub enum LimitExceededAction {
     /// Drop the tag(s) that would exceed the configured limit.
@@ -115,14 +115,14 @@ pub enum LimitExceededAction {
 
 /// Tag cardinality limit configuration per metric name.
 #[configurable_component]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 pub struct PerMetricConfig {
     /// Namespace of the metric this configuration refers to.
     #[serde(default)]
     pub namespace: Option<String>,
 
     #[serde(flatten)]
-    pub config: TagCardinalityLimitInnerConfig,
+    pub config: Inner,
 }
 
 const fn default_limit_exceeded_action() -> LimitExceededAction {
@@ -141,14 +141,14 @@ pub(crate) const fn default_cache_size() -> usize {
     5 * 1024 // 5KB
 }
 
-impl GenerateConfig for TagCardinalityLimitConfig {
+impl GenerateConfig for Config {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(Self {
-            global: TagCardinalityLimitInnerConfig {
+            global: Inner {
                 mode: Mode::Exact,
                 value_limit: default_value_limit(),
                 limit_exceeded_action: default_limit_exceeded_action(),
-                internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
+                internal_metrics: InternalMetricsConfig::default(),
             },
             per_metric_limits: HashMap::default(),
         })
@@ -158,7 +158,7 @@ impl GenerateConfig for TagCardinalityLimitConfig {
 
 #[async_trait::async_trait]
 #[typetag::serde(name = "tag_cardinality_limit")]
-impl TransformConfig for TagCardinalityLimitConfig {
+impl TransformConfig for Config {
     async fn build(&self, _context: &TransformContext) -> crate::Result<Transform> {
         Ok(Transform::event_task(TagCardinalityLimit::new(
             self.clone(),

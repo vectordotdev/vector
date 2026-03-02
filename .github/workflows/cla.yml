@@ -9,13 +9,14 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
-  id-token: write # Needed to federate tokens.
-  actions: write
 
 jobs:
   CLAAssistant:
     runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+      id-token: write # Needed to federate tokens.
+      actions: write
     steps:
       - name: CLA already verified on PR
         if: github.event_name == 'merge_group'
