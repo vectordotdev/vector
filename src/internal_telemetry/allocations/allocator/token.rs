@@ -8,6 +8,12 @@ use tracing::Span;
 
 use super::{stack::GroupStack, tracing::WithAllocationGroup};
 
+#[cfg(all(target_os = "linux", feature = "component-probes"))]
+fn thread_id() -> usize {
+    thread_local! { static TID: usize = unsafe { libc::gettid() } as usize; }
+    TID.with(|t| *t)
+}
+
 thread_local! {
     /// The currently executing allocation token.
     ///
@@ -80,10 +86,18 @@ pub struct AllocationGroupToken {
 impl AllocationGroupToken {
     pub fn enter(&self) {
         _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().push(self.id));
+        #[cfg(all(target_os = "linux", feature = "component-probes"))]
+        crate::internal_telemetry::component_probes::VECTOR_COMPONENT_LABELS
+            [thread_id() % crate::internal_telemetry::component_probes::LABELS_LEN]
+            .store(self.id.as_raw(), std::sync::atomic::Ordering::Relaxed);
     }
 
     pub fn exit(&self) {
         _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().pop());
+        #[cfg(all(target_os = "linux", feature = "component-probes"))]
+        crate::internal_telemetry::component_probes::VECTOR_COMPONENT_LABELS
+            [thread_id() % crate::internal_telemetry::component_probes::LABELS_LEN]
+            .store(0, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
