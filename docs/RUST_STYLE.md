@@ -1,5 +1,8 @@
 # Rust Style Guide for Vector
 
+> **Note:
+** This is a draft document primarily intended for AI agents (like Claude) to understand Vector's Rust coding conventions. These guidelines help ensure consistent code generation and modifications.
+
 This document outlines Rust coding conventions and patterns for Vector development.
 
 ## Import Statements (`use`)
