@@ -137,6 +137,7 @@ dsmith
 DVB
 ede
 emoji
+emojis
 emqx
 enableable
 Enot
@@ -276,6 +277,7 @@ KDL
 keepappkey
 keephq
 kenton
+keybinds
 Kingcom
 Kolkata
 konqueror
@@ -556,3 +558,5 @@ zstandard
 ZTE
 Zync
 sighup
+CLAUDE
+linting

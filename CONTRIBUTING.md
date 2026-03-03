@@ -87,7 +87,7 @@ To merge a new source, sink, or transform, the pull request is required to:
 - [ ] Add tests, especially integration tests if your contribution connects to an external service.
 - [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can
 see some [example of instrumentation in existing integrations](https://github.com/vectordotdev/vector/tree/master/src/internal_events).
-- [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/vectordotdev/vector/blob/master/docs).
+- [ ] Add documentation. You need to generate and create documentation files for your component. See the [component documentation guide](docs/DOCUMENTING.md#adding-documentation-for-new-components) for detailed instructions.
 
 When adding new integration tests, the following changes are needed in the GitHub Workflows:
 
@@ -338,7 +338,7 @@ Vector requires all contributors to sign the Contributor License Agreement
 (CLA). This gives Vector the right to use your contribution as well as ensuring
 that you own your contributions and can use them for other purposes.
 
-The full text of the CLA can be found at [https://cla.datadoghq.com/vectordotdev/vector](https://cla.datadoghq.com/vectordotdev/vector).
+The full text of the CLA can be found [here](https://gist.github.com/bits-bot/55bdc97a4fdad52d97feb4d6c3d1d618).
 
 ### Granted rights and copyright assignment
 

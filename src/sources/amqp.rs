@@ -9,10 +9,12 @@ use futures::{FutureExt, StreamExt};
 use futures_util::Stream;
 use lapin::{Channel, acker::Acker, message::Delivery, options::BasicQosOptions};
 use snafu::Snafu;
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
-    codecs::decoding::{DeserializerConfig, FramingConfig},
+    codecs::{
+        DecoderFramedRead,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig, log_schema},
     configurable::configurable_component,
     event::{Event, LogEvent},
@@ -293,8 +295,6 @@ fn populate_log_event(
     // This handles the transition from the original timestamp logic. Originally the
     // `timestamp_key` was populated by the `properties.timestamp()` time on the message, falling
     // back to calling `now()`.
-    let now = Utc::now();
-    log.metadata_mut().set_ingest_timestamp(now);
     match log_namespace {
         LogNamespace::Vector => {
             if let Some(timestamp) = timestamp {
@@ -304,11 +304,11 @@ fn populate_log_event(
                 );
             };
 
-            log.insert(metadata_path!("vector", "ingest_timestamp"), now);
+            log.insert(metadata_path!("vector", "ingest_timestamp"), Utc::now());
         }
         LogNamespace::Legacy => {
             if let Some(timestamp_key) = log_schema().timestamp_key_target_path() {
-                log.try_insert(timestamp_key, timestamp.unwrap_or(now));
+                log.try_insert(timestamp_key, timestamp.unwrap_or_else(Utc::now));
             }
         }
     };
@@ -324,7 +324,7 @@ async fn receive_event(
 ) -> Result<(), ()> {
     let payload = Cursor::new(Bytes::copy_from_slice(&msg.data));
     let decoder = config.decoder(log_namespace).map_err(|_e| ())?;
-    let mut stream = FramedRead::new(payload, decoder);
+    let mut stream = DecoderFramedRead::new(payload, decoder);
 
     // Extract timestamp from AMQP message
     let timestamp = msg

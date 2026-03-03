@@ -263,8 +263,8 @@ parent = "community"
 weight = 1
 
 [[languages.en.menus.footer]]
-name = "Twitter"
-url = "https://twitter.com/vectordotdev"
+name = "X"
+url = "https://x.com/vectordotdev"
 parent = "community"
 weight = 2
 
@@ -318,9 +318,9 @@ weight = 2
 
 # Mini icons in navbar and footer
 [[languages.en.menus.comms]]
-name = "Twitter"
-params = { color = "twitter-blue", icon = "twitter" }
-url = "https://twitter.com/vectordotdev"
+name = "X"
+params = { color = "black", dark = "white", icon = "x" }
+url = "https://x.com/vectordotdev"
 weight = 1
 
 [[languages.en.menus.comms]]

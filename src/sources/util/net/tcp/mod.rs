@@ -14,7 +14,7 @@ use tokio::{
     net::{TcpListener, TcpStream},
     time::sleep,
 };
-use tokio_util::codec::{Decoder, FramedRead};
+use tokio_util::codec::Decoder;
 use tracing::Instrument;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
@@ -39,7 +39,7 @@ use crate::{
         SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
         TcpSocketTlsConnectionError,
     },
-    sources::util::AfterReadExt,
+    sources::util::{AfterReadExt, LenientFramedRead},
 };
 
 pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
@@ -290,7 +290,8 @@ async fn handle_stream<T>(
         .and_then(|stream| stream.ssl().peer_certificate())
         .map(CertificateMetadata::from);
 
-    let reader = FramedRead::new(socket, source.decoder());
+    let reader = LenientFramedRead::new(socket, source.decoder());
+
     let mut reader = ReadyFrames::new(reader);
 
     let connection_close_timeout = OptionFuture::from(

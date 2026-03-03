@@ -1,9 +1,29 @@
+use std::sync::LazyLock;
+
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
 use vector_core::event::LogEvent;
 use vrl::prelude::*;
 
 use crate::{parser::DnstapParser, schema::DnstapEventSchema};
+
+static DEFAULT_LOWERCASE_HOSTNAMES: LazyLock<Value> = LazyLock::new(|| Value::Boolean(false));
+
+static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
+    vec![
+        Parameter::required(
+            "value",
+            kind::BYTES,
+            "The base64 encoded representation of the DNSTAP data to parse.",
+        ),
+        Parameter::optional(
+            "lowercase_hostnames",
+            kind::BOOLEAN,
+            "Whether to turn all hostnames found in resulting data lowercase, for consistency.",
+        )
+        .default(&DEFAULT_LOWERCASE_HOSTNAMES),
+    ]
+});
 
 #[derive(Clone, Copy, Debug)]
 pub struct ParseDnstap;
@@ -17,19 +37,23 @@ impl Function for ParseDnstap {
         "Parses the `value` as base64 encoded DNSTAP data."
     }
 
-    fn parameters(&self) -> &'static [Parameter] {
+    fn internal_failure_reasons(&self) -> &'static [&'static str] {
         &[
-            Parameter {
-                keyword: "value",
-                kind: kind::BYTES,
-                required: true,
-            },
-            Parameter {
-                keyword: "lowercase_hostnames",
-                kind: kind::BOOLEAN,
-                required: false,
-            },
+            "`value` is not a valid base64 encoded string.",
+            "dnstap parsing failed for `value`",
         ]
+    }
+
+    fn category(&self) -> &'static str {
+        Category::Parse.as_ref()
+    }
+
+    fn return_kind(&self) -> u16 {
+        kind::OBJECT
+    }
+
+    fn parameters(&self) -> &'static [Parameter] {
+        &PARAMETERS
     }
 
     fn examples(&self) -> &'static [Example] {
@@ -149,9 +173,7 @@ impl Function for ParseDnstap {
         arguments: ArgumentList,
     ) -> Compiled {
         let value = arguments.required("value");
-        let lowercase_hostnames = arguments
-            .optional("lowercase_hostnames")
-            .unwrap_or_else(|| expr!(false));
+        let lowercase_hostnames = arguments.optional("lowercase_hostnames");
         Ok(ParseDnstapFn {
             value,
             lowercase_hostnames,
@@ -163,7 +185,7 @@ impl Function for ParseDnstap {
 #[derive(Debug, Clone)]
 struct ParseDnstapFn {
     value: Box<dyn Expression>,
-    lowercase_hostnames: Box<dyn Expression>,
+    lowercase_hostnames: Option<Box<dyn Expression>>,
 }
 
 impl FunctionExpression for ParseDnstapFn {
@@ -180,7 +202,10 @@ impl FunctionExpression for ParseDnstapFn {
                 .map_err(|_| format!("{input} is not a valid base64 encoded string"))?
                 .into(),
             DnsParserOptions {
-                lowercase_hostnames: self.lowercase_hostnames.resolve(ctx)?.try_boolean()?,
+                lowercase_hostnames: self
+                    .lowercase_hostnames
+                    .map_resolve_with_default(ctx, || DEFAULT_LOWERCASE_HOSTNAMES.clone())?
+                    .try_boolean()?,
             },
         )
         .map_err(|e| format!("dnstap parsing failed for {input}: {e}"))?;

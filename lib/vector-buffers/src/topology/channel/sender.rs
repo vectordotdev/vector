@@ -205,9 +205,13 @@ impl<T: Bufferable> BufferSender<T> {
     }
 
     #[async_recursion]
-    pub async fn send(&mut self, item: T, send_reference: Option<Instant>) -> crate::Result<()> {
+    pub async fn send(
+        &mut self,
+        mut item: T,
+        send_reference: Option<Instant>,
+    ) -> crate::Result<()> {
         if let Some(instrumentation) = self.custom_instrumentation.as_ref() {
-            instrumentation.on_send(&item);
+            instrumentation.on_send(&mut item);
         }
         let item_sizing = self
             .usage_instrumentation
