@@ -332,14 +332,28 @@ generated: components: sources: opentelemetry: configuration: {
 			This configuration controls how OpenTelemetry Protocol (OTLP) data is decoded for each
 			signal type (logs, metrics, traces).
 
-			When a signal is configured to use OTLP decoding (`true`), the raw OTLP format is preserved,
+			When a signal is configured to use OTLP decoding, the raw OTLP format is preserved,
 			allowing the data to be forwarded to downstream OTLP collectors without transformation.
-			When set to `false`, the signal is converted to Vector's native event format, enabling
-			compatibility with Vector's transforms and sinks.
+			Otherwise, the signal is converted to Vector's native event format.
 
-			# Important Considerations
+			Simple boolean form:
 
-			When OTLP decoding is enabled for metrics:
+			```yaml
+			use_otlp_decoding: true  # All signals preserve OTLP format
+			# or
+			use_otlp_decoding: false # All signals use Vector native format (default)
+			```
+
+			Per-signal configuration:
+
+			```yaml
+			use_otlp_decoding:
+			  logs: false     # Convert to Vector native format
+			  metrics: false  # Convert to Vector native format
+			  traces: true    # Preserve OTLP format
+			```
+
+			**Note:** When OTLP decoding is enabled for metrics:
 			- Metrics are parsed as logs while preserving the OTLP format
 			- Vector's metric transforms will NOT be compatible with this output
 			- The events can be forwarded directly (passthrough) to a downstream OTLP collector
