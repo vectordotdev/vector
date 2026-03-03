@@ -1,0 +1,49 @@
+{
+  "name": "simple_table",
+  "catalog_name": "test_catalog",
+  "schema_name": "test_schema",
+  "table_type": "MANAGED",
+  "data_source_format": "DELTA",
+  "columns": [
+    {
+      "name": "id",
+      "type_text": "bigint",
+      "type_name": "BIGINT",
+      "position": 1,
+      "type_precision": 0,
+      "type_scale": 0,
+      "nullable": false,
+      "type_json": "{\"name\":\"id\",\"type\":\"long\",\"nullable\":false,\"metadata\":{}}"
+    },
+    {
+      "name": "name",
+      "type_text": "string",
+      "type_name": "STRING",
+      "position": 2,
+      "type_precision": 0,
+      "type_scale": 0,
+      "nullable": true,
+      "type_json": "{\"name\":\"name\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "created_at",
+      "type_text": "timestamp",
+      "type_name": "TIMESTAMP",
+      "position": 3,
+      "type_precision": 0,
+      "type_scale": 0,
+      "nullable": true,
+      "type_json": "{\"name\":\"created_at\",\"type\":\"timestamp\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "is_active",
+      "type_text": "boolean",
+      "type_name": "BOOLEAN",
+      "position": 4,
+      "type_precision": 0,
+      "type_scale": 0,
+      "nullable": true,
+      "type_json": "{\"name\":\"is_active\",\"type\":\"boolean\",\"nullable\":true,\"metadata\":{}}"
+    }
+  ]
+}
