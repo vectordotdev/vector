@@ -147,6 +147,45 @@ make cue-build
 
 **Note:** Website changes use Hugo, CUE, Tailwind CSS, and TypeScript. See [website/README.md](website/README.md) for details.
 
+## Common Patterns
+
+### Development Tools
+
+Vector uses `cargo vdev` for most development tasks. This is a custom CLI tool that wraps common operations:
+
+```bash
+cargo vdev check rust         # Clippy
+cargo vdev check fmt          # Formatting check
+cargo vdev check events       # Event instrumentation check
+cargo vdev check licenses     # License compliance
+cargo vdev test               # Unit tests
+cargo vdev int test <name>    # Integration tests
+cargo vdev fmt                # Format code
+```
+
+### Pre-Push Hook (Optional but Recommended)
+
+Create `.git/hooks/pre-push` with:
+
+```bash
+#!/bin/sh
+set -e
+
+echo "Format code"
+make fmt
+
+echo "Running pre-push checks..."
+make check-licenses
+make check-fmt
+make check-clippy
+make check-markdown
+make check-component-docs
+
+./scripts/check_changelog_fragments.sh
+```
+
+Then: `chmod +x .git/hooks/pre-push`
+
 ## Detailed Documentation
 
 | Topic | Document |
