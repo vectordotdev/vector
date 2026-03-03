@@ -289,10 +289,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.int_tests }}
-    # Job-level permissions for artifact upload
     permissions:
-      contents: read  # Required to checkout code
-      actions: write  # Required to upload artifacts
+      contents: read
     outputs:
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
@@ -417,10 +415,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.e2e_tests }}
-    # Job-level permissions for artifact upload
     permissions:
-      contents: read  # Required to checkout code
-      actions: write  # Required to upload artifacts
+      contents: read
     outputs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
