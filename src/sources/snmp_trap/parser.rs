@@ -4,7 +4,7 @@ use serde_json::json;
 use smallvec::{SmallVec, smallvec};
 use snmp_parser::{
     parse_snmp_v1, parse_snmp_v2c,
-    snmp::{SnmpMessage, SnmpPdu},
+    snmp::{PduType, SnmpMessage, SnmpPdu},
 };
 use std::net::SocketAddr;
 use vector_lib::{
@@ -155,7 +155,7 @@ fn parse_v2c_trap(
     source_addr: SocketAddr,
 ) -> Result<SmallVec<[Event; 1]>, ParseError> {
     match message.pdu {
-        SnmpPdu::Generic(pdu) => {
+        SnmpPdu::Generic(ref pdu) if pdu.pdu_type == PduType::TrapV2 => {
             let mut log = LogEvent::default();
 
             // Add timestamp
@@ -194,7 +194,12 @@ fn parse_v2c_trap(
 
                 // sysUpTime is typically the first varbind (OID 1.3.6.1.2.1.1.3.0)
                 if oid.starts_with("1.3.6.1.2.1.1.3") {
-                    uptime = Some(value.clone());
+                    if let snmp_parser::snmp::VarBindValue::Value(
+                        snmp_parser::snmp::ObjectSyntax::TimeTicks(t),
+                    ) = &var.val
+                    {
+                        uptime = Some(*t as i64);
+                    }
                 }
 
                 // snmpTrapOID is typically the second varbind (OID 1.3.6.1.6.3.1.1.4.1.0)
