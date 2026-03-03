@@ -261,11 +261,10 @@ impl SourceConfig for OpentelemetryConfig {
         // Log info message when using mixed OTLP decoding formats
         if self.use_otlp_decoding.is_mixed() {
             info!(
-                message = "Using mixed OTLP decoding configuration.",
+                message = "Signals with OTLP decoding enabled will preserve raw format; others will use Vector native format.",
                 logs_otlp = self.use_otlp_decoding.logs,
                 metrics_otlp = self.use_otlp_decoding.metrics,
                 traces_otlp = self.use_otlp_decoding.traces,
-                note = "Signals with OTLP decoding enabled will preserve raw format; others will use Vector native format."
             );
         }
 

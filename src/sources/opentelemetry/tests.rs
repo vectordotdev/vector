@@ -1419,71 +1419,56 @@ mod otlp_decoding_config_tests {
     use vector_lib::codecs::decoding::OtlpSignalType;
 
     #[test]
-    fn test_otlp_decoding_from_bool_true() {
-        let config = OtlpDecodingConfig::from(true);
-        assert!(config.logs);
-        assert!(config.metrics);
-        assert!(config.traces);
-        assert!(config.all_enabled());
-        assert!(!config.is_mixed());
-    }
-
-    #[test]
-    fn test_otlp_decoding_from_bool_false() {
-        let config = OtlpDecodingConfig::from(false);
-        assert!(!config.logs);
-        assert!(!config.metrics);
-        assert!(!config.traces);
-        assert!(!config.any_enabled());
-        assert!(!config.is_mixed());
-    }
-
-    #[test]
-    fn test_otlp_decoding_helper_methods() {
-        // Test all enabled
+    fn test_otlp_decoding_mixed_configurations() {
+        // Test single signal enabled
         let config = OtlpDecodingConfig {
-            logs: true,
-            metrics: true,
+            logs: false,
+            metrics: false,
             traces: true,
         };
         assert!(config.any_enabled());
-        assert!(config.all_enabled());
-        assert!(!config.is_mixed());
+        assert!(!config.all_enabled());
+        assert!(config.is_mixed());
 
-        // Test none enabled
+        // Test two signals enabled
         let config = OtlpDecodingConfig {
-            logs: false,
+            logs: true,
+            metrics: false,
+            traces: true,
+        };
+        assert!(config.any_enabled());
+        assert!(!config.all_enabled());
+        assert!(config.is_mixed());
+
+        // Test different single signal
+        let config = OtlpDecodingConfig {
+            logs: true,
             metrics: false,
             traces: false,
         };
-        assert!(!config.any_enabled());
-        assert!(!config.all_enabled());
-        assert!(!config.is_mixed());
-
-        // Test mixed configuration
-        let config = OtlpDecodingConfig {
-            logs: false,
-            metrics: false,
-            traces: true,
-        };
-        assert!(config.any_enabled());
-        assert!(!config.all_enabled());
-        assert!(config.is_mixed());
-
-        // Test another mixed configuration
-        let config = OtlpDecodingConfig {
-            logs: true,
-            metrics: false,
-            traces: true,
-        };
         assert!(config.any_enabled());
         assert!(!config.all_enabled());
         assert!(config.is_mixed());
     }
 
     #[test]
-    fn test_otlp_decoding_deserialization_from_bool() {
-        // Test deserializing from a boolean true
+    fn test_otlp_decoding_from_bool() {
+        // Test direct From<bool> trait implementation
+        let config_true = OtlpDecodingConfig::from(true);
+        assert!(config_true.logs);
+        assert!(config_true.metrics);
+        assert!(config_true.traces);
+        assert!(config_true.all_enabled());
+        assert!(!config_true.is_mixed());
+
+        let config_false = OtlpDecodingConfig::from(false);
+        assert!(!config_false.logs);
+        assert!(!config_false.metrics);
+        assert!(!config_false.traces);
+        assert!(!config_false.any_enabled());
+        assert!(!config_false.is_mixed());
+
+        // Test TOML deserialization (which uses From<bool> under the hood)
         let config: OpentelemetryConfig = toml::from_str(
             r#"
             use_otlp_decoding = true
@@ -1500,7 +1485,6 @@ mod otlp_decoding_config_tests {
         assert!(config.use_otlp_decoding.metrics);
         assert!(config.use_otlp_decoding.traces);
 
-        // Test deserializing from a boolean false
         let config: OpentelemetryConfig = toml::from_str(
             r#"
             use_otlp_decoding = false
