@@ -10,41 +10,32 @@ use crate::{
 
 static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
     vec![
-        Parameter {
-            keyword: "table",
-            kind: kind::BYTES,
-            required: true,
-            description: "The [enrichment table](/docs/reference/glossary/#enrichment-tables) to search.",
-            default: None,
-        },
-        Parameter {
-            keyword: "condition",
-            kind: kind::OBJECT,
-            required: true,
-            description: "The condition to search on. Since the condition is used at boot time to create indices into the data, these conditions must be statically defined.",
-            default: None,
-        },
-        Parameter {
-            keyword: "select",
-            kind: kind::ARRAY,
-            required: false,
-            description: "A subset of fields from the enrichment table to return. If not specified, all fields are returned.",
-            default: None,
-        },
-        Parameter {
-            keyword: "case_sensitive",
-            kind: kind::BOOLEAN,
-            required: false,
-            description: "Whether text fields need to match cases exactly.",
-            default: Some(&DEFAULT_CASE_SENSITIVE),
-        },
-        Parameter {
-            keyword: "wildcard",
-            kind: kind::BYTES,
-            required: false,
-            description: "Value to use for wildcard matching in the search.",
-            default: None,
-        },
+        Parameter::required(
+            "table",
+            kind::BYTES,
+            "The [enrichment table](/docs/reference/glossary/#enrichment-tables) to search.",
+        ),
+        Parameter::required(
+            "condition",
+            kind::OBJECT,
+            "The condition to search on. Since the condition is used at boot time to create indices into the data, these conditions must be statically defined.",
+        ),
+        Parameter::optional(
+            "select",
+            kind::ARRAY,
+            "A subset of fields from the enrichment table to return. If not specified, all fields are returned.",
+        ),
+        Parameter::optional(
+            "case_sensitive",
+            kind::BOOLEAN,
+            "Whether text fields need to match cases exactly.",
+        )
+        .default(&DEFAULT_CASE_SENSITIVE),
+        Parameter::optional(
+            "wildcard",
+            kind::BYTES,
+            "Value to use for wildcard matching in the search.",
+        ),
     ]
 });
 
@@ -112,15 +103,64 @@ impl Function for FindEnrichmentTableRecords {
     }
 
     fn examples(&self) -> &'static [Example] {
-        &[example!(
-            title: "find records",
-            source: r#"find_enrichment_table_records!("test", {"surname": "Smith"})"#,
-            result: Ok(
-                indoc! { r#"[{"id": 1, "firstname": "Bob", "surname": "Smith"},
-                             {"id": 2, "firstname": "Fred", "surname": "Smith"}]"#,
-                },
-            ),
-        )]
+        const RESULT: Result<&'static str, &'static str> = Ok(indoc! {r#"
+            [{"id": 1, "firstname": "Bob", "surname": "Smith"},
+             {"id": 2, "firstname": "Fred", "surname": "Smith"}]
+        "#});
+
+        const EXAMPLES: &[Example] = &[
+            example! {
+                title: "Exact match",
+                source: indoc! {r#"
+                    find_enrichment_table_records!(
+                        "test",
+                        {"surname": "Smith"}
+                    )
+                "#},
+                result: RESULT,
+            },
+            example! {
+                title: "Case insensitive match",
+                source: indoc! {r#"
+                    find_enrichment_table_records!(
+                        "test",
+                        {"surname": "smith"},
+                        case_sensitive: false
+                    )
+                "#},
+                result: RESULT,
+            },
+            example! {
+                title: "Wildcard match",
+                source: indoc! {r#"
+                    find_enrichment_table_records!(
+                        "test",
+                        {"firstname": "Bob"},
+                        wildcard: "fred",
+                        case_sensitive: false
+                    )
+                "#},
+                result: RESULT,
+            },
+            example! {
+                title: "Date range search",
+                source: indoc! {r#"
+                    find_enrichment_table_records!(
+                        "test",
+                        {
+                            "surname": "Smith",
+                            "date_of_birth": {
+                                "from": t'1985-01-01T00:00:00Z',
+                                "to": t'1985-12-31T00:00:00Z'
+                            }
+                        }
+                    )
+                "#},
+                result: RESULT,
+            },
+        ];
+
+        EXAMPLES
     }
 
     fn compile(

@@ -2,11 +2,10 @@ use bytes::Bytes;
 use chrono::Utc;
 use futures::StreamExt;
 use snafu::{ResultExt, Snafu};
-use tokio_util::codec::FramedRead;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::{
-        Decoder, DecodingConfig, StreamDecodingError,
+        Decoder, DecoderFramedRead, DecodingConfig, StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
     config::{LegacyKey, LogNamespace},
@@ -242,7 +241,7 @@ impl InputHandler {
 
         self.bytes_received.emit(ByteSize(line.len()));
 
-        let mut stream = FramedRead::new(line.as_ref(), self.decoder.clone());
+        let mut stream = DecoderFramedRead::new(line.as_ref(), self.decoder.clone());
         while let Some(next) = stream.next().await {
             match next {
                 Ok((events, _byte_size)) => {
