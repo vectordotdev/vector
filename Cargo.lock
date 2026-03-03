@@ -8391,6 +8391,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "proptest-derive"
+version = "0.8.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c57924a81864dddafba92e1bf92f9bf82f97096c44489548a60e888e1547549b"
+dependencies = [
+ "proc-macro2 1.0.106",
+ "quote 1.0.44",
+ "syn 2.0.117",
+]
+
+[[package]]
 name = "prost"
 version = "0.11.9"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -12601,7 +12612,7 @@ dependencies = [
  "pin-project",
  "postgres-openssl",
  "proptest",
- "proptest-derive",
+ "proptest-derive 0.8.0",
  "prost 0.12.6",
  "prost-build 0.12.6",
  "prost-reflect",
@@ -12939,7 +12950,7 @@ name = "vector-lookup"
 version = "0.1.0"
 dependencies = [
  "proptest",
- "proptest-derive",
+ "proptest-derive 0.8.0",
  "serde",
  "vector-config",
  "vector-config-macros",
@@ -13166,7 +13177,7 @@ dependencies = [
  "prettydiff",
  "prettytable-rs",
  "proptest",
- "proptest-derive",
+ "proptest-derive 0.6.0",
  "prost 0.13.5",
  "prost-reflect",
  "psl",
