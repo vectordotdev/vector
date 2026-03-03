@@ -27,6 +27,7 @@ vrl = { workspace = true, optional = true }
 allocation-tracing = ["vector-top?/allocation-tracing"]
 api-client = ["dep:vector-api-client"]
 arrow = ["codecs/arrow"]
+parquet = ["codecs/parquet"]
 api = ["vector-tap/api"]
 file-source = ["dep:file-source", "dep:file-source-common"]
 lua = ["vector-core/lua"]
