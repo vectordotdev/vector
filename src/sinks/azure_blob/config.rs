@@ -165,10 +165,11 @@ impl GenerateConfig for AzureBlobSinkConfig {
 #[async_trait::async_trait]
 #[typetag::serde(name = "azure_blob")]
 impl SinkConfig for AzureBlobSinkConfig {
-    async fn build(&self, _cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
+    async fn build(&self, cx: SinkContext) -> Result<(VectorSink, Healthcheck)> {
         let client = azure_common::config::build_client(
             self.connection_string.clone().into(),
             self.container_name.clone(),
+            cx.proxy(),
         )?;
 
         let healthcheck = azure_common::config::build_healthcheck(

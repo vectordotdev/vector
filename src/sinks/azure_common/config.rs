@@ -129,6 +129,7 @@ pub fn build_healthcheck(
 pub fn build_client(
     connection_string: String,
     container_name: String,
+    proxy: &crate::config::ProxyConfig,
 ) -> crate::Result<Arc<BlobContainerClient>> {
     // Parse connection string without legacy SDK
     let parsed = ParsedConnectionString::parse(&connection_string)
@@ -163,9 +164,35 @@ pub fn build_client(
         }
     }
 
-    // Use reqwest v0.12 since Azure SDK only implements HttpClient for reqwest::Client v0.12.
+    // Use reqwest v0.12 since Azure SDK only implements HttpClient for reqwest::Client v0.12
+    let mut reqwest_builder = reqwest_12::ClientBuilder::new();
+    let bypass_proxy = {
+        let host = url.host_str().unwrap_or("");
+        let port = url.port();
+        proxy.no_proxy.matches(host)
+            || port
+                .map(|p| proxy.no_proxy.matches(&format!("{}:{}", host, p)))
+                .unwrap_or(false)
+    };
+    if bypass_proxy || !proxy.enabled {
+        // Ensure no proxy (and disable any potential system proxy auto-detection)
+        reqwest_builder = reqwest_builder.no_proxy();
+    } else {
+        if let Some(http) = &proxy.http {
+            let p = reqwest_12::Proxy::http(http)
+                .map_err(|e| format!("Invalid HTTP proxy URL: {e}"))?;
+            // If credentials are embedded in the proxy URL, reqwest will handle them.
+            reqwest_builder = reqwest_builder.proxy(p);
+        }
+        if let Some(https) = &proxy.https {
+            let p = reqwest_12::Proxy::https(https)
+                .map_err(|e| format!("Invalid HTTPS proxy URL: {e}"))?;
+            // If credentials are embedded in the proxy URL, reqwest will handle them.
+            reqwest_builder = reqwest_builder.proxy(p);
+        }
+    }
     options.client_options.transport = Some(azure_core::http::Transport::new(std::sync::Arc::new(
-        reqwest_12::ClientBuilder::new()
+        reqwest_builder
             .build()
             .map_err(|e| format!("Failed to build reqwest client: {e}"))?,
     )));

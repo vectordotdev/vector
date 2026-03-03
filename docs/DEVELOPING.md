@@ -445,14 +445,7 @@ tests related only to this component, the following approach can reduce waiting
 times:
 
 1. Install [cargo-watch](https://github.com/passcod/cargo-watch).
-2. (Only for GNU/Linux) Install LLVM 9 (for example, package `llvm-9` on Debian)
-   and set `RUSTFLAGS` environment variable to use `lld` as the linker:
-
-   ```sh
-   export RUSTFLAGS='-Clinker=clang-9 -Clink-arg=-fuse-ld=lld'
-   ```
-
-3. Run in the root directory of Vector's source
+2. Run in the root directory of Vector's source
 
    ```sh
    cargo watch -s clear -s \
