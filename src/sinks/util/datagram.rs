@@ -1,4 +1,6 @@
-use bytes::BytesMut;
+use std::pin::Pin;
+
+use bytes::Bytes;
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::stream::Peekable;
 #[cfg(unix)]
@@ -6,7 +8,6 @@ use std::path::PathBuf;
 use tokio::net::UdpSocket;
 #[cfg(unix)]
 use tokio::net::UnixDatagram;
-use tokio_util::codec::Encoder;
 use vector_lib::{
     codecs::encoding::{Chunker, Chunking},
     internal_event::{ByteSize, BytesSent, InternalEventHandle, RegisterInternalEvent},
@@ -15,8 +16,7 @@ use vector_lib::{
 #[cfg(unix)]
 use crate::internal_events::{UnixSendIncompleteError, UnixSocketSendError};
 use crate::{
-    codecs::Transformer,
-    event::{Event, EventStatus, Finalizable},
+    event::{EventFinalizers, EventStatus},
     internal_events::{
         SocketEventsSent, SocketMode, SocketSendError, UdpChunkingError, UdpSendIncompleteError,
     },
@@ -28,33 +28,45 @@ pub enum DatagramSocket {
     Unix(UnixDatagram, PathBuf),
 }
 
-pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encoding::Error>>(
-    input: &mut Peekable<BoxStream<'_, Event>>,
+/// A pre-encoded datagram ready to be sent over the socket.
+pub struct EncodedDatagram {
+    /// The encoded bytes to send (`None` if encoding failed).
+    pub bytes: Option<Bytes>,
+    pub finalizers: EventFinalizers,
+}
+
+pub async fn send_datagrams(
+    input: &mut Peekable<BoxStream<'_, EncodedDatagram>>,
     mut socket: DatagramSocket,
-    transformer: &Transformer,
-    encoder: &mut E,
     chunker: &Option<Chunker>,
     bytes_sent: &<BytesSent as RegisterInternalEvent>::Handle,
 ) {
-    while let Some(mut event) = input.next().await {
-        transformer.transform(&mut event);
-        let finalizers = event.take_finalizers();
-        let mut bytes = BytesMut::new();
+    loop {
+        // Peek without consuming so the event can be retried after reconnection.
+        // Clone the bytes (ref-counted, cheap) to release the borrow on `input`.
+        let Some(datagram) = Pin::new(&mut *input).peek().await else {
+            break;
+        };
+        let bytes = datagram.bytes.clone();
 
-        // Errors are handled by `Encoder`.
-        if encoder.encode(event, &mut bytes).is_err() {
-            finalizers.update_status(EventStatus::Errored);
+        let Some(bytes) = bytes else {
+            // Encoding failed earlier — consume and mark errored.
+            if let Some(datagram) = input.next().await {
+                datagram.finalizers.update_status(EventStatus::Errored);
+            }
             continue;
-        }
+        };
 
+        let mut socket_error = false;
         let delivered = if let Some(chunker) = chunker {
             let data_size = bytes.len();
-            match chunker.chunk(bytes.freeze()) {
+            match chunker.chunk(bytes) {
                 Ok(chunks) => {
                     let mut chunks_delivered = true;
-                    for bytes in chunks {
-                        if !send_and_emit(&mut socket, &bytes, bytes_sent).await {
+                    for chunk in chunks {
+                        if !send_and_emit(&mut socket, &chunk, bytes_sent).await {
                             chunks_delivered = false;
+                            socket_error = true;
                             break;
                         }
                     }
@@ -68,14 +80,25 @@ pub async fn send_datagrams<E: Encoder<Event, Error = vector_lib::codecs::encodi
                     false
                 }
             }
+        } else if send_and_emit(&mut socket, &bytes, bytes_sent).await {
+            true
         } else {
-            send_and_emit(&mut socket, &bytes.freeze(), bytes_sent).await
+            socket_error = true;
+            false
         };
 
         if delivered {
-            finalizers.update_status(EventStatus::Delivered);
+            if let Some(datagram) = input.next().await {
+                datagram.finalizers.update_status(EventStatus::Delivered);
+            }
+        } else if socket_error {
+            // Socket error — leave item in stream for retry after reconnection.
+            break;
         } else {
-            finalizers.update_status(EventStatus::Errored);
+            // Chunking error — consume and mark errored, continue with next event.
+            if let Some(datagram) = input.next().await {
+                datagram.finalizers.update_status(EventStatus::Errored);
+            }
         }
     }
 }
