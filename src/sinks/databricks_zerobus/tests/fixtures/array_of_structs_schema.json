@@ -1,0 +1,19 @@
+{
+  "name": "array_of_structs_table",
+  "catalog_name": "test_catalog",
+  "schema_name": "test_schema",
+  "table_type": "MANAGED",
+  "data_source_format": "DELTA",
+  "columns": [
+    {
+      "name": "transactions",
+      "type_text": "array<struct<id:bigint,amount:double,currency:string>>",
+      "type_name": "ARRAY",
+      "position": 1,
+      "type_precision": 0,
+      "type_scale": 0,
+      "nullable": true,
+      "type_json": "{\"name\":\"transactions\",\"type\":{\"type\":\"array\",\"elementType\":{\"type\":\"struct\",\"fields\":[{\"name\":\"id\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}},{\"name\":\"amount\",\"type\":\"double\",\"nullable\":true,\"metadata\":{}},{\"name\":\"currency\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]},\"containsNull\":true},\"nullable\":true,\"metadata\":{}}"
+    }
+  ]
+}
