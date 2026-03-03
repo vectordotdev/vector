@@ -18,11 +18,9 @@ use windows::Win32::System::EventLog::{
     EvtSubscribeStartAfterBookmark, EvtSubscribeStartAtOldestRecord, EvtSubscribeStrict,
     EvtSubscribeToFutureEvents,
 };
-use windows::Win32::System::Threading::{
-    CreateEventW, ResetEvent, WaitForMultipleObjects,
-};
 #[cfg(test)]
 use windows::Win32::System::Threading::SetEvent;
+use windows::Win32::System::Threading::{CreateEventW, ResetEvent, WaitForMultipleObjects};
 use windows::core::HSTRING;
 
 use super::{
@@ -177,32 +175,33 @@ impl EventLogSubscription {
 
         for channel in &config.channels {
             // Initialize bookmark from checkpoint or create fresh
-            let (bookmark, has_valid_checkpoint) =
-                if let Some(checkpoint) = checkpointer.get(channel).await {
-                    match BookmarkManager::from_xml(&checkpoint.bookmark_xml) {
-                        Ok(bm) => {
-                            info!(
-                                message = "Resuming from checkpoint bookmark.",
-                                channel = %channel
-                            );
-                            (bm, true)
-                        }
-                        Err(e) => {
-                            warn!(
-                                message = "Corrupted bookmark XML in checkpoint, creating fresh bookmark. Potential re-delivery of events.",
-                                channel = %channel,
-                                error = %e
-                            );
-                            (BookmarkManager::new()?, false)
-                        }
+            let (bookmark, has_valid_checkpoint) = if let Some(checkpoint) =
+                checkpointer.get(channel).await
+            {
+                match BookmarkManager::from_xml(&checkpoint.bookmark_xml) {
+                    Ok(bm) => {
+                        info!(
+                            message = "Resuming from checkpoint bookmark.",
+                            channel = %channel
+                        );
+                        (bm, true)
                     }
-                } else {
-                    info!(
-                        message = "No checkpoint found, creating fresh bookmark.",
-                        channel = %channel
-                    );
-                    (BookmarkManager::new()?, false)
-                };
+                    Err(e) => {
+                        warn!(
+                            message = "Corrupted bookmark XML in checkpoint, creating fresh bookmark. Potential re-delivery of events.",
+                            channel = %channel,
+                            error = %e
+                        );
+                        (BookmarkManager::new()?, false)
+                    }
+                }
+            } else {
+                info!(
+                    message = "No checkpoint found, creating fresh bookmark.",
+                    channel = %channel
+                );
+                (BookmarkManager::new()?, false)
+            };
 
             // Create manual-reset signal event, initially signaled.
             // Initially signaled ensures the first iteration drains any buffered events.
@@ -964,8 +963,7 @@ pub(super) fn build_xpath_query(
         let query = if ids.len() == 1 {
             format!("*[System[EventID={}]]", ids[0])
         } else {
-            let predicates: Vec<String> =
-                ids.iter().map(|id| format!("EventID={id}")).collect();
+            let predicates: Vec<String> = ids.iter().map(|id| format!("EventID={id}")).collect();
             format!("*[System[{}]]", predicates.join(" or "))
         };
 

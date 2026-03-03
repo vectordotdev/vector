@@ -14,7 +14,7 @@ permissions:
 
 jobs:
   test-integration-windows:
-    runs-on: windows-2025
+    runs-on: windows-2025-8core
     timeout-minutes: 60
     steps:
       - name: Checkout branch

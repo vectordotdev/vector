@@ -516,8 +516,7 @@ impl SourceConfig for WindowsEventLogConfig {
                     ("qualifiers".into(), Kind::integer().or_undefined()),
                     (
                         "string_inserts".into(),
-                        Kind::array(Collection::empty().with_unknown(Kind::bytes()))
-                        .or_undefined(),
+                        Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     ),
                     (
                         "event_data".into(),
@@ -531,8 +530,7 @@ impl SourceConfig for WindowsEventLogConfig {
                     ("opcode_name".into(), Kind::bytes().or_undefined()),
                     (
                         "keyword_names".into(),
-                        Kind::array(Collection::empty().with_unknown(Kind::bytes()))
-                        .or_undefined(),
+                        Kind::array(Collection::empty().with_unknown(Kind::bytes())).or_undefined(),
                     ),
                 ])),
                 [LogNamespace::Vector],

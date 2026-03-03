@@ -1,5 +1,5 @@
 use metrics::counter;
-use tracing::warn;
+use tracing::error;
 use vector_lib::{
     NamedInternalEvent,
     internal_event::{InternalEvent, error_stage, error_type},
@@ -14,7 +14,7 @@ pub struct WindowsEventLogParseError {
 
 impl InternalEvent for WindowsEventLogParseError {
     fn emit(self) {
-        warn!(
+        error!(
             message = "Failed to parse Windows Event Log event.",
             error = %self.error,
             channel = %self.channel,
@@ -43,7 +43,7 @@ pub struct WindowsEventLogQueryError {
 
 impl InternalEvent for WindowsEventLogQueryError {
     fn emit(self) {
-        warn!(
+        error!(
             message = "Failed to query Windows Event Log.",
             channel = %self.channel,
             query = ?self.query,
@@ -71,7 +71,7 @@ pub struct WindowsEventLogBookmarkError {
 
 impl InternalEvent for WindowsEventLogBookmarkError {
     fn emit(self) {
-        warn!(
+        error!(
             message = "Failed to save bookmark for Windows Event Log channel.",
             channel = %self.channel,
             error = %self.error,

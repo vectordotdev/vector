@@ -516,8 +516,8 @@ mod error_tests {
 
 #[cfg(test)]
 mod subscription_tests {
-    use super::*;
     use super::super::subscription::build_xpath_query;
+    use super::*;
 
     // Note: test_not_supported_error is in subscription.rs to avoid duplication
 
@@ -525,7 +525,10 @@ mod subscription_tests {
     fn test_build_xpath_query_default_wildcard() {
         let config = create_test_config();
         let query = build_xpath_query(&config).unwrap();
-        assert_eq!(query, "*", "Default config with no event_query and no only_event_ids should return wildcard");
+        assert_eq!(
+            query, "*",
+            "Default config with no event_query and no only_event_ids should return wildcard"
+        );
     }
 
     #[test]
@@ -556,7 +559,10 @@ mod subscription_tests {
         config.only_event_ids = Some(vec![4624, 4625, 4634]);
 
         let query = build_xpath_query(&config).unwrap();
-        assert_eq!(query, "*[System[EventID=4624 or EventID=4625 or EventID=4634]]");
+        assert_eq!(
+            query,
+            "*[System[EventID=4624 or EventID=4625 or EventID=4634]]"
+        );
     }
 
     #[test]
@@ -565,7 +571,10 @@ mod subscription_tests {
         config.only_event_ids = Some(vec![]);
 
         let query = build_xpath_query(&config).unwrap();
-        assert_eq!(query, "*", "Empty only_event_ids list should return wildcard");
+        assert_eq!(
+            query, "*",
+            "Empty only_event_ids list should return wildcard"
+        );
     }
 
     #[test]
@@ -577,7 +586,10 @@ mod subscription_tests {
         config.only_event_ids = Some((10000..10300).collect());
 
         let query = build_xpath_query(&config).unwrap();
-        assert_eq!(query, "*", "Large ID list exceeding 4096 chars should fall back to wildcard");
+        assert_eq!(
+            query, "*",
+            "Large ID list exceeding 4096 chars should fall back to wildcard"
+        );
     }
 
     #[test]
@@ -587,9 +599,18 @@ mod subscription_tests {
         config.only_event_ids = Some(vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10]);
 
         let query = build_xpath_query(&config).unwrap();
-        assert!(query.starts_with("*[System["), "Query should be XPath, got: {query}");
-        assert!(query.contains("EventID=1"), "Query should contain EventID=1");
-        assert!(query.contains("EventID=10"), "Query should contain EventID=10");
+        assert!(
+            query.starts_with("*[System["),
+            "Query should be XPath, got: {query}"
+        );
+        assert!(
+            query.contains("EventID=1"),
+            "Query should contain EventID=1"
+        );
+        assert!(
+            query.contains("EventID=10"),
+            "Query should contain EventID=10"
+        );
         assert!(query.len() <= 4096, "Query should fit within XPath limit");
     }
 
@@ -655,7 +676,10 @@ mod subscription_tests {
         config.ignore_event_ids = vec![4624, 4625];
 
         let query = build_xpath_query(&config).unwrap();
-        assert_eq!(query, "*", "ignore_event_ids alone should not generate XPath filter");
+        assert_eq!(
+            query, "*",
+            "ignore_event_ids alone should not generate XPath filter"
+        );
     }
 
     #[test]
@@ -954,11 +978,11 @@ mod security_tests {
         // at config validation time — the Windows API handles those at subscription.
         let excessive_length = "A".repeat(300);
         let dangerous_channels = vec![
-            "",                                    // Empty channel
-            "   ",                                 // Whitespace only
-            "System\0",                            // Null byte injection
-            "System\r\nmalicious",                 // CRLF injection
-            &excessive_length,                     // Excessive length
+            "",                    // Empty channel
+            "   ",                 // Whitespace only
+            "System\0",            // Null byte injection
+            "System\r\nmalicious", // CRLF injection
+            &excessive_length,     // Excessive length
         ];
 
         for dangerous_channel in &dangerous_channels {

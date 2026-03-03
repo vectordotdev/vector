@@ -18,8 +18,11 @@ This Windows-specific source uses pull-mode subscriptions (EvtSubscribe + EvtNex
 - Support for large events (up to 10MB render buffer)
 - Security hardening against XPath injection, resource exhaustion, and memory leaks
 - FluentBit-compatible string_inserts field for parameter arrays
+- Auto-generated XPath queries from `only_event_ids` for efficient server-side filtering
+- Early pre-filter in the event drain loop to discard non-matching event IDs before expensive rendering
 
 Configuration options:
+
 - `channels`: List of Windows Event Log channels to subscribe to
 - `event_query`: XPath query for filtering events
 - `read_existing_events`: Whether to read historical events on first run

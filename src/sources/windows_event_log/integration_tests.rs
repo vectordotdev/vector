@@ -775,15 +775,16 @@ async fn test_max_event_age_filtering() {
     // by the time we read it.
     emit_event("INFORMATION", 1000, "age-filter-test");
 
-    // Sleep briefly so the event has some age
-    tokio::time::sleep(Duration::from_secs(2)).await;
+    // Sleep so the event ages past the max_event_age_secs threshold.
+    // Use a generous buffer to avoid flakes from clock jitter on slow CI.
+    tokio::time::sleep(Duration::from_secs(5)).await;
 
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
         channels: vec!["Application".to_string()],
         event_query: Some(vectortest_query()),
         read_existing_events: true,
-        max_event_age_secs: Some(1), // 1 second — our event is already older
+        max_event_age_secs: Some(3), // 3 seconds — our event is already ~5s old
         event_timeout_ms: 2000,
         ..Default::default()
     };
@@ -797,7 +798,7 @@ async fn test_max_event_age_filtering() {
         if let Some(msg) = event.as_log().get("message") {
             assert!(
                 !msg.to_string_lossy().contains("age-filter-test"),
-                "max_event_age_secs=1 but old event was not filtered out. \
+                "max_event_age_secs=3 but old event was not filtered out. \
                  Check age filtering in build_event."
             );
         }
@@ -1502,11 +1503,7 @@ async fn test_checkpoint_resume_no_duplicate_record_ids() {
 
     // Phase 1: emit events and collect record IDs
     for i in 0..5 {
-        emit_event(
-            "INFORMATION",
-            1000,
-            &format!("ckpt-dup-test-phase1-{i}"),
-        );
+        emit_event("INFORMATION", 1000, &format!("ckpt-dup-test-phase1-{i}"));
     }
 
     let config = vectortest_config(data_dir.path());
@@ -1534,11 +1531,7 @@ async fn test_checkpoint_resume_no_duplicate_record_ids() {
 
     // Phase 2: emit new events, reuse same data_dir
     for i in 0..5 {
-        emit_event(
-            "INFORMATION",
-            1000,
-            &format!("ckpt-dup-test-phase2-{i}"),
-        );
+        emit_event("INFORMATION", 1000, &format!("ckpt-dup-test-phase2-{i}"));
     }
 
     let config = vectortest_config(data_dir.path());
