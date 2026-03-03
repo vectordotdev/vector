@@ -461,11 +461,7 @@ impl SourceConfig for OpentelemetryConfig {
             SourceOutput::new_metrics().with_port(METRICS)
         };
 
-        let traces_output = if self.use_otlp_decoding.traces {
-            SourceOutput::new_maybe_logs(DataType::Log, Definition::any()).with_port(TRACES)
-        } else {
-            SourceOutput::new_traces().with_port(TRACES)
-        };
+        let traces_output = SourceOutput::new_traces().with_port(TRACES);
 
         vec![logs_output, metrics_output, traces_output]
     }
