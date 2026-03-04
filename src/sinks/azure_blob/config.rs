@@ -160,8 +160,8 @@ pub struct AzureBlobSinkConfig {
     )]
     pub(super) acknowledgements: AcknowledgementsConfig,
 
-    #[serde(default)]
     #[configurable(derived)]
+    #[serde(default)]
     pub tls: Option<TlsConfig>,
 }
 

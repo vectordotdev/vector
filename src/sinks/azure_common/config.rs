@@ -497,8 +497,8 @@ pub async fn build_client(
         }
     }
 
-    if let Some(tls_config) = tls
-        && let Some(ca_file) = tls_config.ca_file
+    if let Some(tls_config) = &tls
+        && let Some(ca_file) = &tls_config.ca_file
     {
         let mut buf = Vec::new();
         File::open(&ca_file)?.read_to_end(&mut buf)?;

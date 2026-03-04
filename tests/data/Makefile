@@ -68,6 +68,9 @@ ca/intermediate_server/csr/azurite.csr.pem: ca/intermediate_server/private/azuri
 	openssl req -config ca/intermediate_server/openssl.cnf \
 		-key ca/intermediate_server/private/azurite.key.pem \
 		-subj '/CN=azurite/OU=Vector/O=Datadog/ST=New York/L=New York/C=US' \
+		-addext 'subjectAltName=DNS:azurite' \
+		-addext 'basicConstraints=critical,CA:FALSE' \
+		-addext 'extendedKeyUsage=serverAuth' \
 		-new -sha256 -out ca/intermediate_server/csr/azurite.csr.pem
 
 ca/intermediate_server/certs/azurite.cert.pem: ca/intermediate_server/csr/azurite.csr.pem

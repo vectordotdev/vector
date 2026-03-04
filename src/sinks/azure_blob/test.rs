@@ -407,3 +407,25 @@ async fn azure_blob_build_config_with_conflicting_connection_string_and_client_i
         }
     }
 }
+#[tokio::test]
+async fn azure_blob_build_config_with_custom_ca_certificate() {
+    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
+        r#"
+            account_name = "mylogstorage"
+            container_name = "my-logs"
+
+            [encoding]
+            codec = "json"
+
+            [tls]
+            ca_file = "tests/data/ca/certs/ca.cert.pem"
+        "#,
+    )
+    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+
+    let cx = SinkContext::default();
+    let _ = config
+        .build(cx)
+        .await
+        .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
+}
