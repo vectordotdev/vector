@@ -1678,9 +1678,9 @@ mod otlp_decoding_config_tests {
         assert_eq!(metrics_output.port.as_deref(), Some("metrics"));
         assert_eq!(metrics_output.ty, DataType::Log); // Should be Log when OTLP decoding is enabled
 
-        // Verify traces output (OTLP format, logs data type)
+        // Verify traces output (OTLP format, traces data type)
         let traces_output = &outputs[2];
         assert_eq!(traces_output.port.as_deref(), Some("traces"));
-        assert_eq!(traces_output.ty, DataType::Log); // Should be Log when OTLP decoding is enabled
+        assert_eq!(traces_output.ty, DataType::Trace); // Should always be Trace regardless of OTLP decoding
     }
 }
