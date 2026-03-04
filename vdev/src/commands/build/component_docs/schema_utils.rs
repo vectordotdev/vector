@@ -218,22 +218,105 @@ impl SchemaContext {
     }
 
     pub fn apply_schema_metadata(&self, source_schema: &Value, resolved_schema: &mut Value) {
-        if let Some(cat) = get_schema_metadata(source_schema, "docs::category") {
-            resolved_schema
-                .as_object_mut()
-                .unwrap()
-                .insert("category".to_string(), cat.clone());
-        }
+        let is_templateable = get_schema_metadata(source_schema, "docs::templateable")
+            .and_then(Value::as_bool)
+            .unwrap_or(false);
 
-        if let Some(examples) = get_schema_metadata(source_schema, "docs::examples")
-            && let Some(Value::Object(type_obj)) = resolved_schema.get_mut("type")
-        {
-            for (_, def) in type_obj.iter_mut() {
-                if let Value::Object(def_map) = def {
-                    def_map.insert("examples".to_string(), Value::clone(examples));
+        if let Some(Value::Object(types)) = resolved_schema.get_mut("type") {
+            if let Some(Value::Object(string_def)) = types.get_mut("string") {
+                if is_templateable {
+                    string_def.insert("syntax".to_string(), Value::String("template".to_string()));
                 }
             }
         }
+
+        if let Some(examples) = get_schema_metadata(source_schema, "docs::examples") {
+            let mut flattened_examples = match examples {
+                Value::Array(arr) => arr.clone(),
+                v => vec![v.clone()],
+            };
+
+            for ex in &mut flattened_examples {
+                if let Value::Object(obj) = ex {
+                    let sorted_obj = Self::sort_hash_nested(obj);
+                    *ex = Value::Object(sorted_obj);
+                }
+            }
+
+            if let Some(Value::Object(type_obj)) = resolved_schema.get_mut("type") {
+                for (type_name, def) in type_obj.iter_mut() {
+                    if let Value::Object(def_map) = def {
+                        if type_name == "array" {
+                            if let Some(Value::Object(items_obj)) = def_map.get_mut("items") {
+                                if let Some(Value::Object(subtypes)) = items_obj.get_mut("type") {
+                                    for (subtype_name, subtype_def) in subtypes.iter_mut() {
+                                        if subtype_name != "array" {
+                                            if let Value::Object(s_def) = subtype_def {
+                                                s_def.insert(
+                                                    "examples".to_string(),
+                                                    Value::Array(flattened_examples.clone()),
+                                                );
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        } else {
+                            def_map.insert(
+                                "examples".to_string(),
+                                Value::Array(flattened_examples.clone()),
+                            );
+                        }
+                    }
+                }
+            }
+        }
+
+        if let Some(type_unit) = get_schema_metadata(source_schema, "docs::type_unit") {
+            let unit_str = match type_unit {
+                Value::String(s) => s.clone(),
+                v => v.to_string(),
+            };
+            if let Some(schema_type) = self.numeric_schema_type(resolved_schema) {
+                if let Some(Value::Object(types)) = resolved_schema.get_mut("type") {
+                    if let Some(Value::Object(def)) = types.get_mut(schema_type) {
+                        def.insert("unit".to_string(), Value::String(unit_str));
+                    }
+                }
+            }
+        }
+
+        if let Some(syntax_override) = get_schema_metadata(source_schema, "docs::syntax_override") {
+            let syntax_str = match syntax_override {
+                Value::String(s) => s.clone(),
+                v => v.to_string(),
+            };
+            if self.resolved_schema_type(resolved_schema) == Some("string") {
+                if let Some(Value::Object(types)) = resolved_schema.get_mut("type") {
+                    if let Some(Value::Object(string_def)) = types.get_mut("string") {
+                        string_def.insert("syntax".to_string(), Value::String(syntax_str));
+                    }
+                }
+            }
+        }
+    }
+
+    pub fn sort_hash_nested(
+        input: &serde_json::Map<String, Value>,
+    ) -> serde_json::Map<String, Value> {
+        let mut sorted = serde_json::Map::new();
+        let mut keys: Vec<&String> = input.keys().collect();
+        keys.sort();
+        for key in keys {
+            let val = input.get(key).unwrap();
+            let new_val = if let Value::Object(obj) = val {
+                Value::Object(Self::sort_hash_nested(obj))
+            } else {
+                val.clone()
+            };
+            sorted.insert(key.clone(), new_val);
+        }
+        sorted
     }
 
     pub fn apply_object_property_fields(
@@ -253,7 +336,11 @@ impl SchemaContext {
         let has_default_value = has_self_default_value || has_parent_default_value;
 
         let is_required = required_properties
-            .is_some_and(|reqs| reqs.contains(&Value::String(property_name.to_string())));
+            .is_some_and(|reqs| reqs.contains(&Value::String(property_name.to_string())))
+            || property_schema
+                .get("required")
+                .and_then(Value::as_bool)
+                .unwrap_or(false);
 
         property.as_object_mut().unwrap().insert(
             "required".to_string(),
@@ -267,6 +354,15 @@ impl SchemaContext {
             && type_obj.len() > 1
         {
             // Remove map from mixed modes, simplifying
+        }
+    }
+
+    pub fn numeric_schema_type(&self, resolved_schema: &Value) -> Option<&'static str> {
+        let schema_type = self.resolved_schema_type(resolved_schema)?;
+        if matches!(schema_type, "uint" | "int" | "float") {
+            Some(schema_type)
+        } else {
+            None
         }
     }
 

@@ -39,8 +39,8 @@ pub fn run(schema_path: &Path) -> Result<()> {
     }
 
     // 2. Process All Components
-    let mut all_components: std::collections::HashMap<String, serde_json::Map<String, Value>> =
-        std::collections::HashMap::new();
+    let mut all_components: indexmap::IndexMap<String, serde_json::Map<String, Value>> =
+        indexmap::IndexMap::new();
     if let Some(definitions) = root_schema.get("definitions").and_then(|d| d.as_object()) {
         for (key, definition) in definitions {
             let comp_type = super::schema::get_schema_metadata(definition, "docs::component_type")
