@@ -159,7 +159,10 @@ fn test_command_no_escape_codes_in_output() {
     );
 
     let mut cmd = Command::cargo_bin("vector").unwrap();
-    cmd.arg("test").arg(config);
+    // Force colors on so VRL diagnostics contain ANSI codes. Without this,
+    // the subprocess detects a non-TTY and disables colors, which would make
+    // the test pass even if error! was used instead of eprintln!.
+    cmd.arg("--color").arg("always").arg("test").arg(config);
 
     let output = cmd.output().expect("Failed to execute process");
     let stdout = String::from_utf8(output.stdout).expect("stdout isn't valid utf8");
@@ -168,7 +171,9 @@ fn test_command_no_escape_codes_in_output() {
     // The command should fail
     assert_ne!(output.status.code(), Some(0));
 
-    // Neither stdout nor stderr should contain literal escape code text
+    // Neither stdout nor stderr should contain literal escape code text.
+    // The error! macro escapes ANSI escape bytes into literal "\x1b" text,
+    // while eprintln! passes them through as raw bytes.
     assert!(
         !stdout.contains(r"\x1b"),
         "stdout contains literal \\x1b escape codes: {stdout}"
