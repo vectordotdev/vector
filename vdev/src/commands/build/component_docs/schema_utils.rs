@@ -1,10 +1,13 @@
-use super::{docs_type_str, get_schema_metadata, SchemaContext};
+use super::{SchemaContext, docs_type_str, get_schema_metadata};
 use anyhow::Result;
 use serde_json::{Map, Value};
 
 impl SchemaContext {
     pub fn get_rendered_description_from_schema(&self, schema: &Value) -> String {
-        let raw_description = schema.get("description").and_then(|v| v.as_str()).unwrap_or("");
+        let raw_description = schema
+            .get("description")
+            .and_then(|v| v.as_str())
+            .unwrap_or("");
         let raw_title = schema.get("title").and_then(|v| v.as_str()).unwrap_or("");
 
         let description = if raw_title.is_empty() {
@@ -15,7 +18,11 @@ impl SchemaContext {
         description.trim().to_string()
     }
 
-    pub fn unwrap_resolved_schema(&mut self, schema_name: &str, friendly_name: &str) -> Result<Map<String, Value>> {
+    pub fn unwrap_resolved_schema(
+        &mut self,
+        schema_name: &str,
+        friendly_name: &str,
+    ) -> Result<Map<String, Value>> {
         info!("[*] Resolving schema definition for {}...", friendly_name);
 
         let mut resolved_schema = self.resolve_schema_by_name(schema_name)?;
@@ -40,7 +47,10 @@ impl SchemaContext {
         Ok(sorted_map)
     }
 
-    pub fn fix_grouped_enums_if_numeric(&self, grouped: &mut indexmap::IndexMap<String, Vec<Value>>) {
+    pub fn fix_grouped_enums_if_numeric(
+        &self,
+        grouped: &mut indexmap::IndexMap<String, Vec<Value>>,
+    ) {
         let mut numeric_vals = Vec::new();
         if let Some(ints) = grouped.shift_remove("integer") {
             numeric_vals.extend(ints);
@@ -52,7 +62,9 @@ impl SchemaContext {
         if !numeric_vals.is_empty() {
             let is_integer = numeric_vals.iter().all(|v| v.is_i64() || v.is_u64());
             let within_uint = numeric_vals.iter().all(serde_json::Value::is_u64);
-            let contains_signed = numeric_vals.iter().all(|v| v.is_i64() || v.as_i64().is_some());
+            let contains_signed = numeric_vals
+                .iter()
+                .all(|v| v.is_i64() || v.as_i64().is_some());
 
             let numeric_type = if !is_integer || (!contains_signed && !within_uint) {
                 "float"
@@ -72,7 +84,16 @@ impl SchemaContext {
     pub fn get_reduced_schema(&self, schema: &Value) -> Value {
         let mut reduced = schema.clone();
         if let Value::Object(ref mut map) = reduced {
-            let allowed_properties = ["type", "const", "enum", "allOf", "oneOf", "$ref", "items", "properties"];
+            let allowed_properties = [
+                "type",
+                "const",
+                "enum",
+                "allOf",
+                "oneOf",
+                "$ref",
+                "items",
+                "properties",
+            ];
             map.retain(|k, _| allowed_properties.contains(&k.as_str()));
 
             if let Some(items) = map.get_mut("items") {
@@ -99,7 +120,18 @@ impl SchemaContext {
     #[allow(clippy::self_only_used_in_recursion)]
     pub fn get_reduced_resolved_schema(&self, schema: &Value) -> Value {
         let mut reduced = schema.clone();
-        let allowed_types = ["condition", "object", "array", "enum", "const", "string", "bool", "float", "int", "uint"];
+        let allowed_types = [
+            "condition",
+            "object",
+            "array",
+            "enum",
+            "const",
+            "string",
+            "bool",
+            "float",
+            "int",
+            "uint",
+        ];
 
         if let Value::Object(ref mut map) = reduced {
             map.retain(|k, _| k == "type");
@@ -133,7 +165,11 @@ impl SchemaContext {
         reduced
     }
 
-    pub fn apply_schema_default_value(&self, source_schema: &Value, resolved_schema: &mut Value) -> Result<()> {
+    pub fn apply_schema_default_value(
+        &self,
+        source_schema: &Value,
+        resolved_schema: &mut Value,
+    ) -> Result<()> {
         debug!("Applying schema default values.");
 
         if let Some(default_value) = source_schema.get("default") {
@@ -141,28 +177,35 @@ impl SchemaContext {
             // Skipping type checking for now, simply merging default value into resolved
 
             if default_value_type == "object" {
-                if let Some(resolved_properties) = resolved_schema.pointer_mut("/type/object/options")
+                if let Some(resolved_properties) =
+                    resolved_schema.pointer_mut("/type/object/options")
                     && let Value::Object(props) = resolved_properties
-                        && let Value::Object(def_obj) = default_value {
-                            for (prop_name, prop_default_value) in def_obj {
-                                if let Some(resolved_prop) = props.get_mut(prop_name) {
-
-                                    // Let's add the default down to the types recursively
-                                    let mut should_set_required_false = false;
-                                    if let Some(Value::Object(type_obj)) = resolved_prop.get_mut("type") {
-                                        for (_, nested_type_def) in type_obj.iter_mut() {
-                                            if let Value::Object(t_def) = nested_type_def {
-                                                t_def.insert("default".to_string(), prop_default_value.clone());
-                                                should_set_required_false = true;
-                                            }
-                                        }
-                                    }
-                                    if should_set_required_false {
-                                        resolved_prop.as_object_mut().unwrap().insert("required".to_string(), Value::Bool(false));
+                    && let Value::Object(def_obj) = default_value
+                {
+                    for (prop_name, prop_default_value) in def_obj {
+                        if let Some(resolved_prop) = props.get_mut(prop_name) {
+                            // Let's add the default down to the types recursively
+                            let mut should_set_required_false = false;
+                            if let Some(Value::Object(type_obj)) = resolved_prop.get_mut("type") {
+                                for (_, nested_type_def) in type_obj.iter_mut() {
+                                    if let Value::Object(t_def) = nested_type_def {
+                                        t_def.insert(
+                                            "default".to_string(),
+                                            prop_default_value.clone(),
+                                        );
+                                        should_set_required_false = true;
                                     }
                                 }
                             }
+                            if should_set_required_false {
+                                resolved_prop
+                                    .as_object_mut()
+                                    .unwrap()
+                                    .insert("required".to_string(), Value::Bool(false));
+                            }
                         }
+                    }
+                }
             } else if let Some(Value::Object(type_obj)) = resolved_schema.get_mut("type") {
                 for (_, def) in type_obj.iter_mut() {
                     if let Value::Object(def_map) = def {
@@ -176,44 +219,66 @@ impl SchemaContext {
 
     pub fn apply_schema_metadata(&self, source_schema: &Value, resolved_schema: &mut Value) {
         if let Some(cat) = get_schema_metadata(source_schema, "docs::category") {
-            resolved_schema.as_object_mut().unwrap().insert("category".to_string(), cat.clone());
+            resolved_schema
+                .as_object_mut()
+                .unwrap()
+                .insert("category".to_string(), cat.clone());
         }
 
         if let Some(examples) = get_schema_metadata(source_schema, "docs::examples")
-            && let Some(Value::Object(type_obj)) = resolved_schema.get_mut("type") {
-                for (_, def) in type_obj.iter_mut() {
-                    if let Value::Object(def_map) = def {
-                        def_map.insert("examples".to_string(), Value::clone(examples));
-                    }
+            && let Some(Value::Object(type_obj)) = resolved_schema.get_mut("type")
+        {
+            for (_, def) in type_obj.iter_mut() {
+                if let Value::Object(def_map) = def {
+                    def_map.insert("examples".to_string(), Value::clone(examples));
                 }
             }
+        }
     }
 
-    pub fn apply_object_property_fields(&self, parent_schema: &Value, property_schema: &Value, property_name: &str, property: &mut Value) {
+    pub fn apply_object_property_fields(
+        &self,
+        parent_schema: &Value,
+        property_schema: &Value,
+        property_name: &str,
+        property: &mut Value,
+    ) {
         let required_properties = parent_schema.get("required").and_then(|r| r.as_array());
 
         let has_self_default_value = property_schema.get("default").is_some();
-        let has_parent_default_value = parent_schema.get("default").and_then(|d| d.get(property_name)).is_some();
+        let has_parent_default_value = parent_schema
+            .get("default")
+            .and_then(|d| d.get(property_name))
+            .is_some();
         let has_default_value = has_self_default_value || has_parent_default_value;
 
-        let is_required = required_properties.is_some_and(|reqs| reqs.contains(&Value::String(property_name.to_string())));
+        let is_required = required_properties
+            .is_some_and(|reqs| reqs.contains(&Value::String(property_name.to_string())));
 
-        property.as_object_mut().unwrap().insert("required".to_string(), Value::Bool(is_required && !has_default_value));
+        property.as_object_mut().unwrap().insert(
+            "required".to_string(),
+            Value::Bool(is_required && !has_default_value),
+        );
     }
 
     pub fn reconcile_resolved_schema(&self, resolved: &mut Value) {
         if let Some(Value::Object(type_obj)) = resolved.get_mut("type")
-            && type_obj.contains_key("object") && type_obj.len() > 1 {
-                // Remove map from mixed modes, simplifying
-            }
+            && type_obj.contains_key("object")
+            && type_obj.len() > 1
+        {
+            // Remove map from mixed modes, simplifying
+        }
     }
 
     pub fn resolved_schema_type(&self, resolved_schema: &Value) -> Option<&'static str> {
         if let Some(Value::Object(types)) = resolved_schema.get("type")
-            && types.len() == 1 {
-                // Should return string statically initialized
-                return Some(Box::leak(types.keys().next().unwrap().clone().into_boxed_str()));
-            }
+            && types.len() == 1
+        {
+            // Should return string statically initialized
+            return Some(Box::leak(
+                types.keys().next().unwrap().clone().into_boxed_str(),
+            ));
+        }
         None
     }
 

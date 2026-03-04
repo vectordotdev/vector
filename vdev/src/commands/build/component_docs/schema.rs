@@ -7,11 +7,9 @@ pub mod resolve;
 #[path = "schema_utils.rs"]
 pub mod utils;
 
-use anyhow::{anyhow, Result};
+use anyhow::{Result, anyhow};
 use serde_json::Value;
 use std::{collections::HashMap, env};
-
-
 
 pub struct SchemaContext {
     pub root_schema: Value,
@@ -130,7 +128,10 @@ pub fn schema_aware_nested_merge(base: &mut Value, override_val: &Value) {
         let over_obj = override_val.as_object().unwrap();
 
         for (k, v) in over_obj {
-            if k == "const" && base_obj.contains_key("value") && v.as_object().is_some_and(|o| o.contains_key("value")) {
+            if k == "const"
+                && base_obj.contains_key("value")
+                && v.as_object().is_some_and(|o| o.contains_key("value"))
+            {
                 let base_vals = std::mem::take(base_obj.get_mut("const").unwrap());
                 let mut result = Vec::new();
 
@@ -142,7 +143,9 @@ pub fn schema_aware_nested_merge(base: &mut Value, override_val: &Value) {
 
                 if let Value::Array(arr) = v {
                     for i in arr {
-                        if !result.contains(i) { result.push(i.clone()) }
+                        if !result.contains(i) {
+                            result.push(i.clone())
+                        }
                     }
                 } else if !result.contains(v) {
                     result.push(v.clone());

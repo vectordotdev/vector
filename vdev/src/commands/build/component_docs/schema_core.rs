@@ -1,5 +1,5 @@
-use super::{get_schema_ref, nested_merge, SchemaContext};
-use anyhow::{anyhow, Result};
+use super::{SchemaContext, get_schema_ref, nested_merge};
+use anyhow::{Result, anyhow};
 use serde_json::Value;
 
 impl SchemaContext {
@@ -42,7 +42,8 @@ impl SchemaContext {
 
     pub fn get_schema_by_name(&self, schema_name: &str) -> Result<Value> {
         let name = schema_name.replace("#/definitions/", "");
-        let def = self.root_schema
+        let def = self
+            .root_schema
             .get("definitions")
             .and_then(|defs| defs.get(&name))
             .cloned();
@@ -50,7 +51,9 @@ impl SchemaContext {
         if let Some(d) = def {
             Ok(d)
         } else {
-            Err(anyhow!("Could not find schema definition '{name}' in given schema."))
+            Err(anyhow!(
+                "Could not find schema definition '{name}' in given schema."
+            ))
         }
     }
 
@@ -68,7 +71,8 @@ impl SchemaContext {
                 debug!("Expanding top-level schema ref of '{}'...", r);
                 let unexpanded = self.get_schema_by_name(&r)?;
                 let expanded = self.expand_schema_references(&unexpanded)?;
-                self.expanded_schema_cache.insert(r.clone(), expanded.clone());
+                self.expanded_schema_cache
+                    .insert(r.clone(), expanded.clone());
                 expanded
             };
 
@@ -81,15 +85,16 @@ impl SchemaContext {
         }
 
         if let Some(items) = schema.get("items").cloned()
-            && items.get("$ref").is_some() {
-                let expanded_items = self.expand_schema_references(&items)?;
-                let items_mut = schema.get_mut("items").unwrap().as_object_mut().unwrap();
-                items_mut.remove("$ref");
+            && items.get("$ref").is_some()
+        {
+            let expanded_items = self.expand_schema_references(&items)?;
+            let items_mut = schema.get_mut("items").unwrap().as_object_mut().unwrap();
+            items_mut.remove("$ref");
 
-                let mut new_items = expanded_items;
-                nested_merge(&mut new_items, &Value::Object(items_mut.clone()));
-                *schema.get_mut("items").unwrap() = new_items;
-            }
+            let mut new_items = expanded_items;
+            nested_merge(&mut new_items, &Value::Object(items_mut.clone()));
+            *schema.get_mut("items").unwrap() = new_items;
+        }
 
         if let Some(Value::Object(properties)) = schema.get_mut("properties") {
             for (_, prop_schema) in properties.iter_mut() {

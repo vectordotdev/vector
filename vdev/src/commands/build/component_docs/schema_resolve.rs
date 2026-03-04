@@ -1,6 +1,6 @@
-use super::{docs_type_str, get_schema_metadata, nested_merge, SchemaContext};
+use super::{SchemaContext, docs_type_str, get_schema_metadata, nested_merge};
 use anyhow::Result;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 
 impl SchemaContext {
     pub fn resolve_schema_by_name(&mut self, schema_name: &str) -> Result<Value> {
@@ -11,7 +11,8 @@ impl SchemaContext {
         let schema = self.get_schema_by_name(schema_name)?;
         let resolved = self.resolve_schema(&schema)?;
 
-        self.resolved_schema_cache.insert(schema_name.to_string(), resolved.clone());
+        self.resolved_schema_cache
+            .insert(schema_name.to_string(), resolved.clone());
         Ok(resolved)
     }
 
@@ -23,7 +24,9 @@ impl SchemaContext {
             return Ok(Value::Null); // Returning null to indicate skipped
         }
 
-        if let Some(type_override) = get_schema_metadata(&expanded, "docs::type_override").and_then(|t| t.as_str()) {
+        if let Some(type_override) =
+            get_schema_metadata(&expanded, "docs::type_override").and_then(|t| t.as_str())
+        {
             let mut resolved = if type_override == "ascii_char" {
                 if let Some(Value::Number(n)) = expanded.get("default") {
                     if let Some(c) = n.as_u64() {
@@ -42,7 +45,10 @@ impl SchemaContext {
 
             let desc = self.get_rendered_description_from_schema(&expanded);
             if !desc.is_empty() {
-                resolved.as_object_mut().unwrap().insert("description".to_string(), Value::String(desc));
+                resolved
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("description".to_string(), Value::String(desc));
             }
             return Ok(resolved);
         }
@@ -54,31 +60,51 @@ impl SchemaContext {
 
         // Remove description from array items
         if let Some(items_schema) = resolved.pointer_mut("/type/array/items")
-            && let Value::Object(obj) = items_schema {
-                obj.remove("description");
-            }
+            && let Value::Object(obj) = items_schema
+        {
+            obj.remove("description");
+        }
 
         self.apply_schema_default_value(&expanded, &mut resolved)?;
         self.apply_schema_metadata(&expanded, &mut resolved);
 
         let desc = self.get_rendered_description_from_schema(&expanded);
         if !desc.is_empty() {
-            resolved.as_object_mut().unwrap().insert("description".to_string(), Value::String(desc));
+            resolved
+                .as_object_mut()
+                .unwrap()
+                .insert("description".to_string(), Value::String(desc));
         }
 
-        if expanded.get("deprecated").and_then(serde_json::Value::as_bool).unwrap_or(false) {
-            resolved.as_object_mut().unwrap().insert("deprecated".to_string(), Value::Bool(true));
+        if expanded
+            .get("deprecated")
+            .and_then(serde_json::Value::as_bool)
+            .unwrap_or(false)
+        {
+            resolved
+                .as_object_mut()
+                .unwrap()
+                .insert("deprecated".to_string(), Value::Bool(true));
             if let Some(msg) = get_schema_metadata(&expanded, "deprecated_message") {
-                resolved.as_object_mut().unwrap().insert("deprecated_message".to_string(), msg.clone());
+                resolved
+                    .as_object_mut()
+                    .unwrap()
+                    .insert("deprecated_message".to_string(), msg.clone());
             }
         }
 
         if let Some(common) = get_schema_metadata(&expanded, "docs::common") {
-            resolved.as_object_mut().unwrap().insert("common".to_string(), common.clone());
+            resolved
+                .as_object_mut()
+                .unwrap()
+                .insert("common".to_string(), common.clone());
         }
 
         if let Some(req) = get_schema_metadata(&expanded, "docs::required") {
-            resolved.as_object_mut().unwrap().insert("required".to_string(), req.clone());
+            resolved
+                .as_object_mut()
+                .unwrap()
+                .insert("required".to_string(), req.clone());
         }
 
         self.reconcile_resolved_schema(&mut resolved);
@@ -112,7 +138,11 @@ impl SchemaContext {
             Some("one-of" | "any-of") => {
                 debug!("Resolving enum schema.");
                 let mut wrapped = self.resolve_enum_schema(schema)?;
-                wrapped.get_mut("_resolved").and_then(|r| r.get_mut("type")).cloned().unwrap_or(Value::Null)
+                wrapped
+                    .get_mut("_resolved")
+                    .and_then(|r| r.get_mut("type"))
+                    .cloned()
+                    .unwrap_or(Value::Null)
             }
             Some("array") => {
                 debug!("Resolving array schema.");
@@ -133,7 +163,12 @@ impl SchemaContext {
                         debug!("Resolving object property '{}'...", prop_name);
                         let mut resolved_property = self.resolve_schema(prop_schema)?;
                         if !resolved_property.is_null() {
-                            self.apply_object_property_fields(schema, prop_schema, prop_name, &mut resolved_property);
+                            self.apply_object_property_fields(
+                                schema,
+                                prop_schema,
+                                prop_name,
+                                &mut resolved_property,
+                            );
                             options.insert(prop_name.clone(), resolved_property);
                         }
                     }
@@ -141,9 +176,12 @@ impl SchemaContext {
 
                 if let Some(addl_props) = schema.get("additionalProperties") {
                     debug!("Handling additional properties.");
-                    let sing_desc = get_schema_metadata(schema, "docs::additional_props_description");
+                    let sing_desc =
+                        get_schema_metadata(schema, "docs::additional_props_description");
                     if sing_desc.is_none() {
-                        error!("Missing 'docs::additional_props_description' metadata for a wildcard field.");
+                        error!(
+                            "Missing 'docs::additional_props_description' metadata for a wildcard field."
+                        );
                         std::process::exit(1);
                     }
 
@@ -161,7 +199,9 @@ impl SchemaContext {
                 debug!("Resolving string schema.");
                 let mut def = json!({});
                 if let Some(d) = schema.get("default") {
-                    def.as_object_mut().unwrap().insert("default".to_string(), d.clone());
+                    def.as_object_mut()
+                        .unwrap()
+                        .insert("default".to_string(), d.clone());
                 }
                 json!({ "string": def })
             }
@@ -173,7 +213,9 @@ impl SchemaContext {
 
                 let mut def = json!({});
                 if let Some(d) = schema.get("default") {
-                    def.as_object_mut().unwrap().insert("default".to_string(), d.clone());
+                    def.as_object_mut()
+                        .unwrap()
+                        .insert("default".to_string(), d.clone());
                 }
                 json!({ num_type: def })
             }
@@ -181,7 +223,9 @@ impl SchemaContext {
                 debug!("Resolving boolean schema.");
                 let mut def = json!({});
                 if let Some(d) = schema.get("default") {
-                    def.as_object_mut().unwrap().insert("default".to_string(), d.clone());
+                    def.as_object_mut()
+                        .unwrap()
+                        .insert("default".to_string(), d.clone());
                 }
                 json!({ "bool": def })
             }
@@ -193,7 +237,9 @@ impl SchemaContext {
                 let mut def = json!({ "value": const_val.clone() });
                 let desc = self.get_rendered_description_from_schema(schema);
                 if !desc.is_empty() {
-                    def.as_object_mut().unwrap().insert("description".to_string(), Value::String(desc));
+                    def.as_object_mut()
+                        .unwrap()
+                        .insert("description".to_string(), Value::String(desc));
                 }
 
                 json!({ type_str: { "const": def } })
@@ -201,7 +247,8 @@ impl SchemaContext {
             Some("enum") => {
                 debug!("Resolving enum const schema.");
                 if let Some(Value::Array(enum_vals)) = schema.get("enum") {
-                    let mut grouped: indexmap::IndexMap<String, Vec<Value>> = indexmap::IndexMap::new();
+                    let mut grouped: indexmap::IndexMap<String, Vec<Value>> =
+                        indexmap::IndexMap::new();
                     for val in enum_vals {
                         let t = docs_type_str(val);
                         grouped.entry(t.to_string()).or_default().push(val.clone());
@@ -212,7 +259,9 @@ impl SchemaContext {
                     for (k, v) in grouped {
                         let mut enum_map = serde_json::Map::new();
                         for item in v {
-                            let key_str = item.as_str().map_or_else(|| item.to_string(), std::string::ToString::to_string);
+                            let key_str = item
+                                .as_str()
+                                .map_or_else(|| item.to_string(), std::string::ToString::to_string);
                             enum_map.insert(key_str, json!({}));
                         }
                         res.insert(k, json!({ "enum": enum_map }));

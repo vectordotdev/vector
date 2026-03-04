@@ -1,6 +1,6 @@
-use std::path::PathBuf;
 use anyhow::Result;
 use clap::Args;
+use std::path::PathBuf;
 
 mod runner;
 mod schema;
