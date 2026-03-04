@@ -237,14 +237,20 @@ impl tokio_util::codec::Decoder for Framer {
 #[configurable(metadata(docs::enum_tag_description = "The codec to use for decoding events."))]
 pub enum DeserializerConfig {
     /// Uses the raw bytes as-is.
+    ///
+    /// This decoder outputs logs.
     Bytes,
 
     /// Decodes the raw bytes as [JSON][json].
+    ///
+    /// This decoder outputs logs.
     ///
     /// [json]: https://www.json.org/
     Json(JsonDeserializerConfig),
 
     /// Decodes the raw bytes as [protobuf][protobuf].
+    ///
+    /// This decoder outputs logs.
     ///
     /// [protobuf]: https://protobuf.dev/
     Protobuf(ProtobufDeserializerConfig),
@@ -263,6 +269,8 @@ pub enum DeserializerConfig {
     ///
     /// Decodes either as the [RFC 3164][rfc3164]-style format ("old" style) or the
     /// [RFC 5424][rfc5424]-style format ("new" style, includes structured data).
+    ///
+    /// This decoder outputs logs.
     ///
     /// [rfc3164]: https://www.ietf.org/rfc/rfc3164.txt
     /// [rfc5424]: https://www.ietf.org/rfc/rfc5424.txt
@@ -302,16 +310,22 @@ pub enum DeserializerConfig {
     /// Going forward, Vector will use that [Go SDK][implementation] as the reference implementation, which means
     /// the codec may continue to relax the enforcement of specification.
     ///
+    /// This decoder outputs logs.
+    ///
     /// [gelf]: https://docs.graylog.org/docs/gelf
     /// [implementation]: https://github.com/Graylog2/go-gelf/blob/v2/gelf/reader.go
     Gelf(GelfDeserializerConfig),
 
     /// Decodes the raw bytes as an [Influxdb Line Protocol][influxdb] message.
     ///
+    /// This decoder outputs metrics.
+    ///
     /// [influxdb]: https://docs.influxdata.com/influxdb/cloud/reference/syntax/line-protocol
     Influxdb(InfluxdbDeserializerConfig),
 
     /// Decodes the raw bytes as as an [Apache Avro][apache_avro] message.
+    ///
+    /// This decoder outputs logs.
     ///
     /// [apache_avro]: https://avro.apache.org/
     Avro {
@@ -320,6 +334,8 @@ pub enum DeserializerConfig {
     },
 
     /// Decodes the raw bytes as a string and passes them as input to a [VRL][vrl] program.
+    ///
+    /// This decoder outputs logs.
     ///
     /// [vrl]: https://vector.dev/docs/reference/vrl
     Vrl(VrlDeserializerConfig),
