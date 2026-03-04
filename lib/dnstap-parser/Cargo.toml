@@ -7,7 +7,7 @@ publish = false
 license = "MIT"
 
 [dependencies]
-base64.workspace = true
+base64 = { workspace = true, features = ["alloc"] }
 bytes = { workspace = true, features = ["serde"] }
 chrono.workspace = true
 dnsmsg-parser = { path = "../dnsmsg-parser" }
