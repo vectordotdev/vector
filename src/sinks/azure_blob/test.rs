@@ -14,7 +14,7 @@ use super::{config::AzureBlobSinkConfig, request_builder::AzureBlobRequestOption
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming},
     event::{Event, LogEvent},
-    sinks::azure_common::config::AzureAuthentication,
+    sinks::azure_common::config::{AzureAuthentication, SpecificAzureCredential},
     sinks::prelude::*,
     sinks::util::{
         Compression,
@@ -273,6 +273,44 @@ async fn azure_blob_build_config_with_client_id_and_secret() {
             assert_eq!(secret, "mock-client-secret");
         }
         _ => panic!("Expected ClientSecretCredential variant"),
+    }
+
+    let cx = SinkContext::default();
+    let _sink = config
+        .build(cx)
+        .await
+        .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
+}
+
+#[tokio::test]
+async fn azure_blob_build_config_with_client_certificate() {
+    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
+        r#"
+            connection_string = "AccountName=mylogstorage"
+            container_name = "my-logs"
+
+            [encoding]
+            codec = "json"
+
+            [auth]
+            azure_credential_kind = "client_certificate_credential"
+            azure_tenant_id = "00000000-0000-0000-0000-000000000000"
+            azure_client_id = "mock-client-id"
+            certificate_file = "tests/data/ClientCertificateAuth.pfx"
+            certificate_password = "MockPassword123"
+        "#,
+    )
+    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+
+    assert!(&config.auth.is_some());
+
+    match &config.auth.clone().unwrap() {
+        AzureAuthentication::Specific(SpecificAzureCredential::ClientCertificateCredential {
+            ..
+        }) => {
+            // Expected variant
+        }
+        _ => panic!("Expected Specific(ClientCertificateCredential) variant"),
     }
 
     let cx = SinkContext::default();

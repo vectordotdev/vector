@@ -328,9 +328,12 @@ impl AzureBlobSinkConfig {
 
     async fn run_assert(&self, input: impl Stream<Item = EventArray> + Send) {
         // `to_sink` needs to be inside the assertion check
-        assert_sink_compliance(&SINK_TAGS, async move { self.to_sink().await.run(input).await })
-            .await
-            .expect("Running sink failed");
+        assert_sink_compliance(
+            &SINK_TAGS,
+            async move { self.to_sink().await.run(input).await },
+        )
+        .await
+        .expect("Running sink failed");
     }
 
     pub async fn list_blobs(&self, prefix: String) -> Vec<String> {

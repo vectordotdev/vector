@@ -1,6 +1,9 @@
 use std::fs::File;
 use std::io::Read;
+use std::path::PathBuf;
 use std::sync::Arc;
+
+use base64::prelude::*;
 
 use azure_core::error::Error as AzureCoreError;
 
@@ -12,9 +15,9 @@ use azure_core::credentials::{TokenCredential, TokenRequestOptions};
 use azure_core::{Error, error::ErrorKind};
 
 use azure_identity::{
-    AzureCliCredential, ClientAssertion, ClientAssertionCredential, ClientSecretCredential,
-    ManagedIdentityCredential, ManagedIdentityCredentialOptions, UserAssignedId,
-    WorkloadIdentityCredential,
+    AzureCliCredential, ClientAssertion, ClientAssertionCredential, ClientCertificateCredential,
+    ClientCertificateCredentialOptions, ClientSecretCredential, ManagedIdentityCredential,
+    ManagedIdentityCredentialOptions, UserAssignedId, WorkloadIdentityCredential,
 };
 
 use azure_storage_blob::{BlobContainerClient, BlobContainerClientOptions};
@@ -81,6 +84,26 @@ pub enum SpecificAzureCredential {
     /// Use Azure CLI credentials
     #[cfg(not(target_arch = "wasm32"))]
     AzureCli {},
+
+    /// Use certificate credentials
+    ClientCertificateCredential {
+        /// The [Azure Tenant ID][azure_tenant_id].
+        ///
+        /// [azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+        azure_tenant_id: String,
+
+        /// The [Azure Client ID][azure_client_id].
+        ///
+        /// [azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+        azure_client_id: String,
+
+        /// PKCS12 certificate with RSA private key.
+        #[configurable(metadata(docs::examples = "path/to/certificate.pfx"))]
+        certificate_file: PathBuf,
+
+        /// The password for the client certificate, if applicable.
+        certificate_password: Option<SensitiveString>,
+    },
 
     /// Use Managed Identity credentials
     ManagedIdentity {
@@ -180,6 +203,41 @@ impl SpecificAzureCredential {
         let credential: Arc<dyn TokenCredential> = match self {
             #[cfg(not(target_arch = "wasm32"))]
             Self::AzureCli {} => AzureCliCredential::new(None)?,
+
+            // requires azure_identity feature 'client_certificate'
+            Self::ClientCertificateCredential {
+                azure_tenant_id,
+                azure_client_id,
+                certificate_file,
+                certificate_password,
+            } => {
+                let certificate_bytes: Vec<u8> = std::fs::read(certificate_file).map_err(|e| {
+                    Error::with_message(
+                        ErrorKind::Credential,
+                        format!(
+                            "Failed to read certificate file {}: {e}",
+                            certificate_file.display()
+                        ),
+                    )
+                })?;
+
+                // Note: in azure_identity 0.33.0+, this changes to SecretBytes, and the base64 encoding is no longer needed
+                let certificate_base64: azure_core::credentials::Secret =
+                    BASE64_STANDARD.encode(&certificate_bytes).into();
+
+                let mut options: ClientCertificateCredentialOptions =
+                    ClientCertificateCredentialOptions::default();
+                if let Some(password) = certificate_password {
+                    options.password = Some(password.inner().to_string().into());
+                }
+
+                ClientCertificateCredential::new(
+                    azure_tenant_id.clone(),
+                    azure_client_id.clone(),
+                    certificate_base64,
+                    Some(options),
+                )?
+            }
 
             Self::ManagedIdentity {
                 user_assigned_managed_identity_id,
@@ -375,12 +433,14 @@ pub async fn build_client(
         }
         (Auth::None, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
             info!("Using Client Secret authentication");
-            let credential_result: Arc<dyn TokenCredential> = auth.unwrap().credential().await.unwrap();
+            let credential_result: Arc<dyn TokenCredential> =
+                auth.unwrap().credential().await.unwrap();
             credential = Some(credential_result);
         }
         (Auth::None, Some(AzureAuthentication::Specific(..))) => {
             info!("Using specific Azure Authentication method");
-            let credential_result: Arc<dyn TokenCredential> = auth.unwrap().credential().await.unwrap();
+            let credential_result: Arc<dyn TokenCredential> =
+                auth.unwrap().credential().await.unwrap();
             credential = Some(credential_result);
         }
         (Auth::Sas { .. }, Some(AzureAuthentication::ClientSecretCredential { .. })) => {

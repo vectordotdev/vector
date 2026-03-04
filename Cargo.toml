@@ -303,7 +303,7 @@ aws-smithy-types = { version = "1.2.11", default-features = false, features = ["
 
 # Azure
 azure_core = { version = "0.30", features = ["reqwest", "hmac_openssl"], optional = true }
-azure_identity = { version = "0.30", optional = true }
+azure_identity = { version = "0.30", features = ["client_certificate"], optional = true }
 
 # Azure Storage
 azure_storage_blob = { version = "0.7", optional = true }
