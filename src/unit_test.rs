@@ -188,7 +188,7 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
                 match junit_reporter.write_reports(test_suite_elapsed) {
                     Ok(()) => {}
                     Err(error) => {
-                        error!("Failed to execute tests:\n{}.", error);
+                        error!("Failed to write test output:\n{}.", error);
                         return exitcode::CONFIG;
                     }
                 }
