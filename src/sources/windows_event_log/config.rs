@@ -76,20 +76,27 @@ pub struct WindowsEventLogConfig {
     ///
     /// Maps event field names to custom formatting options.
     #[serde(default)]
+    #[configurable(metadata(
+        docs::additional_props_description = "An individual event data format override."
+    ))]
     pub event_data_format: HashMap<String, EventDataFormat>,
 
     /// Ignore specific event IDs.
     ///
     /// Events with these IDs will be filtered out and not sent downstream.
     #[serde(default)]
-    #[configurable(metadata(docs::examples = "[4624, 4625, 4634]"))]
+    #[configurable(metadata(docs::examples = 4624))]
+    #[configurable(metadata(docs::examples = 4625))]
+    #[configurable(metadata(docs::examples = 4634))]
     pub ignore_event_ids: Vec<u32>,
 
     /// Only include specific event IDs.
     ///
     /// If specified, only events with these IDs will be processed.
     /// Takes precedence over `ignore_event_ids`.
-    #[configurable(metadata(docs::examples = "[1000, 1001, 1002]"))]
+    #[configurable(metadata(docs::examples = 1000))]
+    #[configurable(metadata(docs::examples = 1001))]
+    #[configurable(metadata(docs::examples = 1002))]
     pub only_event_ids: Option<Vec<u32>>,
 
     /// Maximum age of events to process (in seconds).
@@ -146,7 +153,7 @@ pub struct WindowsEventLogConfig {
 
     /// Maximum length for event data field values.
     ///
-    /// Event data values longer than this will be truncated with "...[truncated]" appended.
+    /// Event data values longer than this will be truncated with "...\[truncated\]" appended.
     /// Set to 0 for no limit.
     #[serde(default = "default_max_event_data_length")]
     #[configurable(metadata(docs::examples = 1024))]
@@ -719,10 +726,10 @@ mod tests {
 
     #[test]
     fn test_config_validation_rejects_wildcards() {
-        let mut config = WindowsEventLogConfig::default();
-
-        // Asterisk wildcard should be rejected
-        config.channels = vec!["Microsoft-Windows-*".to_string()];
+        let mut config = WindowsEventLogConfig {
+            channels: vec!["Microsoft-Windows-*".to_string()],
+            ..Default::default()
+        };
         let err = config.validate().unwrap_err();
         assert!(err.to_string().contains("wildcard"));
 

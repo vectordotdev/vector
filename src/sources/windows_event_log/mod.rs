@@ -1,22 +1,67 @@
-use std::path::PathBuf;
-use std::sync::Arc;
-
 use async_trait::async_trait;
-use futures::StreamExt;
-use vector_lib::finalizer::OrderedFinalizer;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
-};
-use vector_lib::{EstimatedJsonEncodedSizeOf, config::LogNamespace};
+use vector_lib::config::LogNamespace;
 use vrl::value::{Kind, kind::Collection};
 
 use vector_config::component::SourceDescription;
+
+use crate::config::{DataType, SourceConfig, SourceContext, SourceOutput};
+
+// Cross-platform: config types (pure serde structs, no Windows dependencies)
+mod config;
+pub use self::config::*;
+
+// Windows-only: runtime submodules
+#[cfg(windows)]
+mod bookmark;
+#[cfg(windows)]
+mod checkpoint;
+#[cfg(windows)]
+pub mod error;
+#[cfg(windows)]
+mod metadata;
+#[cfg(windows)]
+mod parser;
+#[cfg(windows)]
+mod render;
+#[cfg(windows)]
+mod sid_resolver;
+#[cfg(windows)]
+mod subscription;
+#[cfg(windows)]
+mod xml_parser;
+
+#[cfg(all(test, windows))]
+mod tests;
+
+// Integration tests are feature-gated to avoid requiring Windows Event Log service.
+// To run integration tests on Windows: cargo test --features sources-windows_event_log-integration-tests
+#[cfg(all(test, windows, feature = "sources-windows_event_log-integration-tests"))]
+mod integration_tests;
+
+// Windows-only: runtime imports
+#[cfg(windows)]
+use std::path::PathBuf;
+#[cfg(windows)]
+use std::sync::Arc;
+
+#[cfg(windows)]
+use futures::StreamExt;
+#[cfg(windows)]
+use vector_lib::EstimatedJsonEncodedSizeOf;
+#[cfg(windows)]
+use vector_lib::finalizer::OrderedFinalizer;
+#[cfg(windows)]
+use vector_lib::internal_event::{
+    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+};
+#[cfg(windows)]
 use windows::Win32::Foundation::{DUPLICATE_SAME_ACCESS, DuplicateHandle, HANDLE};
+#[cfg(windows)]
 use windows::Win32::System::Threading::GetCurrentProcess;
 
+#[cfg(windows)]
 use crate::{
     SourceSender,
-    config::{DataType, SourceConfig, SourceContext, SourceOutput},
     event::{BatchNotifier, BatchStatus, BatchStatusReceiver},
     internal_events::{
         EventsReceived, StreamClosedError, WindowsEventLogParseError, WindowsEventLogQueryError,
@@ -24,26 +69,7 @@ use crate::{
     shutdown::ShutdownSignal,
 };
 
-mod bookmark;
-mod checkpoint;
-mod config;
-pub mod error;
-mod metadata;
-mod parser;
-mod render;
-mod sid_resolver;
-mod subscription;
-mod xml_parser;
-
-#[cfg(test)]
-mod tests;
-
-// Integration tests are feature-gated to avoid requiring Windows Event Log service.
-// To run integration tests on Windows: cargo test --features sources-windows_event_log-integration-tests
-#[cfg(all(test, feature = "sources-windows_event_log-integration-tests"))]
-mod integration_tests;
-
-pub use self::config::*;
+#[cfg(windows)]
 use self::{
     checkpoint::Checkpointer,
     error::WindowsEventLogError,
@@ -55,6 +81,7 @@ use self::{
 /// Each entry represents a batch of events that need to be acknowledged before
 /// the checkpoint can be safely updated. Contains all channel bookmarks from
 /// the batch since a single batch may span multiple channels.
+#[cfg(windows)]
 #[derive(Debug, Clone)]
 struct FinalizerEntry {
     /// Channel bookmarks: (channel_name, bookmark_xml) pairs
@@ -62,10 +89,12 @@ struct FinalizerEntry {
 }
 
 /// Shared checkpointer type for use with the finalizer
+#[cfg(windows)]
 type SharedCheckpointer = Arc<Checkpointer>;
 
 /// Finalizer for handling acknowledgments.
 /// Supports both synchronous (immediate checkpoint) and asynchronous (deferred checkpoint) modes.
+#[cfg(windows)]
 enum Finalizer {
     /// Synchronous mode: checkpoints are updated immediately after reading events.
     /// Used when acknowledgements are disabled.
@@ -75,6 +104,7 @@ enum Finalizer {
     Async(OrderedFinalizer<FinalizerEntry>),
 }
 
+#[cfg(windows)]
 impl Finalizer {
     /// Create a new finalizer based on acknowledgement configuration.
     fn new(
@@ -146,6 +176,7 @@ impl Finalizer {
 }
 
 /// Windows Event Log source implementation
+#[cfg(windows)]
 pub struct WindowsEventLogSource {
     config: WindowsEventLogConfig,
     data_dir: PathBuf,
@@ -153,6 +184,7 @@ pub struct WindowsEventLogSource {
     log_namespace: LogNamespace,
 }
 
+#[cfg(windows)]
 impl WindowsEventLogSource {
     pub fn new(
         config: WindowsEventLogConfig,
@@ -458,23 +490,35 @@ impl WindowsEventLogSource {
 #[async_trait]
 #[typetag::serde(name = "windows_event_log")]
 impl SourceConfig for WindowsEventLogConfig {
-    async fn build(&self, cx: SourceContext) -> crate::Result<super::Source> {
-        let data_dir = cx
-            .globals
-            .resolve_and_make_data_subdir(self.data_dir.as_ref(), cx.key.id())?;
+    async fn build(&self, _cx: SourceContext) -> crate::Result<super::Source> {
+        #[cfg(not(windows))]
+        {
+            Err("The windows_event_log source is only supported on Windows.".into())
+        }
 
-        let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
+        #[cfg(windows)]
+        {
+            let data_dir = _cx
+                .globals
+                .resolve_and_make_data_subdir(self.data_dir.as_ref(), _cx.key.id())?;
 
-        let log_namespace = cx.log_namespace(self.log_namespace);
-        let source =
-            WindowsEventLogSource::new(self.clone(), data_dir, acknowledgements, log_namespace)?;
-        Ok(Box::pin(async move {
-            let mut source = source;
-            if let Err(error) = source.run_internal(cx.out, cx.shutdown).await {
-                error!(message = "Windows Event Log source failed.", %error);
-            }
-            Ok(())
-        }))
+            let acknowledgements = _cx.do_acknowledgements(self.acknowledgements);
+
+            let log_namespace = _cx.log_namespace(self.log_namespace);
+            let source = WindowsEventLogSource::new(
+                self.clone(),
+                data_dir,
+                acknowledgements,
+                log_namespace,
+            )?;
+            Ok(Box::pin(async move {
+                let mut source = source;
+                if let Err(error) = source.run_internal(_cx.out, _cx.shutdown).await {
+                    error!(message = "Windows Event Log source failed.", %error);
+                }
+                Ok(())
+            }))
+        }
     }
 
     fn outputs(&self, global_log_namespace: LogNamespace) -> Vec<SourceOutput> {

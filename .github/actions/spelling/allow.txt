@@ -500,6 +500,7 @@ Telstra
 Tencent
 Texet
 Thl
+timediff
 timeframe
 timeseries
 timespan
