@@ -131,6 +131,54 @@ fn validate_ignore_healthcheck() {
     );
 }
 
+#[test]
+fn test_command_no_escape_codes_in_output() {
+    // A config with an unhandled fallible VRL function call (missing `!`).
+    // This triggers a VRL compilation error reported through the test runner.
+    let config = create_file(
+        r#"
+[transforms.broken]
+  inputs = []
+  type = "remap"
+  source = """
+    .foo = to_int(.bar)
+  """
+[[tests]]
+  name = "broken_test"
+  [tests.input]
+    insert_at = "broken"
+    type = "log"
+    [tests.input.log_fields]
+      bar = "not_an_int"
+  [[tests.outputs]]
+    extract_from = "broken"
+    [[tests.outputs.conditions]]
+      type = "vrl"
+      source = "true"
+"#,
+    );
+
+    let mut cmd = Command::cargo_bin("vector").unwrap();
+    cmd.arg("test").arg(config);
+
+    let output = cmd.output().expect("Failed to execute process");
+    let stdout = String::from_utf8(output.stdout).expect("stdout isn't valid utf8");
+    let stderr = String::from_utf8(output.stderr).expect("stderr isn't valid utf8");
+
+    // The command should fail
+    assert_ne!(output.status.code(), Some(0));
+
+    // Neither stdout nor stderr should contain literal escape code text
+    assert!(
+        !stdout.contains(r"\x1b"),
+        "stdout contains literal \\x1b escape codes: {stdout}"
+    );
+    assert!(
+        !stderr.contains(r"\x1b"),
+        "stderr contains literal \\x1b escape codes: {stderr}"
+    );
+}
+
 fn validate(config: &str) -> i32 {
     let dir = create_directory();
 
