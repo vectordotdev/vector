@@ -7,6 +7,9 @@ name: Compilation Timings
 on:
   workflow_dispatch:
 
+permissions:
+  contents: read  # Checkout the repository code
+
 env:
   CI: true
 

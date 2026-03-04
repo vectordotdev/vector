@@ -2,10 +2,18 @@ name: Call Build Preview
 on:
   pull_request:
     types: [opened, reopened, synchronize]
+
+# Restrictive default permissions
+permissions:
+  contents: read  # Required for repository context
+
 jobs:
   approval_check:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
+    permissions:
+      contents: read  # Required for repository context
+      actions: write  # Required to upload artifacts that trigger the preview build workflow
     # Only run for PRs with 'website' in the branch name
     if: ${{ contains(github.head_ref, 'website') }}
     steps:
