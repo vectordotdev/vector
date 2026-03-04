@@ -2,6 +2,7 @@
 use std::{collections::HashSet, fs::read_dir, process::Command};
 
 use assert_cmd::prelude::*;
+use indoc::indoc;
 
 use crate::{create_directory, create_file, overwrite_file};
 
@@ -135,28 +136,25 @@ fn validate_ignore_healthcheck() {
 fn test_command_no_escape_codes_in_output() {
     // A config with an unhandled fallible VRL function call (missing `!`).
     // This triggers a VRL compilation error reported through the test runner.
-    let config = create_file(
-        r#"
-[transforms.broken]
-  inputs = []
-  type = "remap"
-  source = """
-    .foo = to_int(.bar)
-  """
-[[tests]]
-  name = "broken_test"
-  [tests.input]
-    insert_at = "broken"
-    type = "log"
-    [tests.input.log_fields]
-      bar = "not_an_int"
-  [[tests.outputs]]
-    extract_from = "broken"
-    [[tests.outputs.conditions]]
-      type = "vrl"
-      source = "true"
-"#,
-    );
+    let config = create_file(indoc! {"
+        transforms:
+          broken:
+            inputs: []
+            type: remap
+            source: .foo = to_int(.bar)
+        tests:
+          - name: broken_test
+            input:
+              insert_at: broken
+              type: log
+              log_fields:
+                bar: not_an_int
+            outputs:
+              - extract_from: broken
+                conditions:
+                  - type: vrl
+                    source: 'true'
+    "});
 
     let mut cmd = Command::cargo_bin("vector").unwrap();
     // Force colors on so VRL diagnostics contain ANSI codes. Without this,
