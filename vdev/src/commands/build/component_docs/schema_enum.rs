@@ -138,7 +138,9 @@ impl SchemaContext {
 
                     let mut tag_value = None;
                     for allowed in ["string", "number", "integer", "boolean"] {
-                        if let Some(const_val) = tag_subschema.pointer(&format!("/type/{allowed}/const/value")) {
+                        if let Some(const_val) =
+                            tag_subschema.pointer(&format!("/type/{allowed}/const/value"))
+                        {
                             if let Some(s) = const_val.as_str() {
                                 tag_value = Some(s.to_string());
                                 break;
