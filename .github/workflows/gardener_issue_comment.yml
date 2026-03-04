@@ -10,6 +10,11 @@ on:
   issue_comment:
     types: [created]
 
+# Minimal permissions - read-only access for workflow context
+# Note: Elevated permissions for project board updates are provided via GitHub App token
+permissions:
+  contents: read  # Default read access for workflow context (github.event, etc.)
+
 jobs:
   move-to-backlog:
     name: Move issues back to Gardener project board Triage

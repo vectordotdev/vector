@@ -149,6 +149,11 @@ on:
         value: ${{ jobs.int_tests.outputs.any }}
       e2e-tests-any:
         value: ${{ jobs.e2e_tests.outputs.any }}
+
+# Workflow-level permissions - read access to repository contents
+permissions:
+  contents: read  # Required to checkout code
+
 env:
   BASE_SHA: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_sha) || github.event.pull_request.base.sha }}
   HEAD_SHA: ${{ inputs.head_ref || (github.event_name == 'merge_group' && github.event.merge_group.head_sha) || github.event.pull_request.head.sha }}
@@ -284,6 +289,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.int_tests }}
+    permissions:
+      contents: read
     outputs:
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
@@ -408,6 +415,8 @@ jobs:
     runs-on: ubuntu-24.04
     timeout-minutes: 5
     if: ${{ inputs.e2e_tests }}
+    permissions:
+      contents: read
     outputs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
