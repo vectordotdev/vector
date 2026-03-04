@@ -461,9 +461,11 @@ impl SourceConfig for OpentelemetryConfig {
             SourceOutput::new_metrics().with_port(METRICS)
         };
 
-        let traces_output = SourceOutput::new_traces().with_port(TRACES);
-
-        vec![logs_output, metrics_output, traces_output]
+        vec![
+            logs_output,
+            metrics_output,
+            SourceOutput::new_traces().with_port(TRACES),
+        ]
     }
 
     fn resources(&self) -> Vec<Resource> {

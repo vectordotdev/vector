@@ -15,6 +15,6 @@ vector-vrl-metrics = { path = "../../vector-vrl-metrics", optional = true }
 vector-vrl-category.workspace = true
 
 [features]
-default = []
+default = ["dnstap", "vrl-metrics"]
 dnstap = ["dep:dnstap-parser"]
 vrl-metrics = ["dep:vector-vrl-metrics"]

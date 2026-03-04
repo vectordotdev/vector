@@ -7,6 +7,10 @@ on:
       - opened
       - reopened
 
+permissions:
+  contents: read         # Checkout the repository code
+  pull-requests: read    # Read PR metadata for triage workflow
+
 jobs:
   add-contributor-to-project:
     name: Add contributor PR to Gardener project board
