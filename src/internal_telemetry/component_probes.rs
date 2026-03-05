@@ -1,17 +1,25 @@
 use std::sync::atomic::AtomicU8;
 
-/// Number of slots in the [`VECTOR_COMPONENT_LABELS`] array (4 KiB).
-pub const LABELS_LEN: usize = 4096;
+/// Number of slots in the [`VECTOR_COMPONENT_LABELS`] array.
+///
+/// Matches the default Linux `pid_max` (32768). TIDs are indexed via
+/// `tid % LABELS_LEN`, so collisions are only possible when two threads in
+/// the same process have TIDs that differ by an exact multiple of 32768 —
+/// this cannot happen unless `pid_max` has been raised above the default,
+/// which is uncommon. In that case the only consequence is mislabeled
+/// profiling samples.
+///
+/// 32768 entries = 32 KiB of static memory.
+pub const LABELS_LEN: usize = 32768;
 
-/// Shared-memory array indexed by `tid % LABELS_LEN`.
+/// Per-thread label array indexed by `tid % LABELS_LEN`.
 ///
-/// Rust writes the component's group ID on enter and 0 on exit (~1ns, no kernel
-/// involvement).  bpftrace reads this array on a fixed-rate profile timer
-/// (`profile:hz:997`) to attribute stack samples to components.
+/// On span enter, the component's allocation group ID is written; on span
+/// exit it is cleared to 0.
 ///
-/// 4096 entries = 4KB.  TID collision requires two Vector threads whose TIDs
-/// differ by exactly 4096 — effectively impossible for a process with ~8-32
-/// threads.
+/// bpftrace can read this array on a fixed-rate profile timer
+/// (`profile:hz:997`) using `bpf_probe_read_user` to attribute CPU samples
+/// to individual components.
 #[unsafe(no_mangle)]
 #[allow(clippy::declare_interior_mutable_const)]
 pub static VECTOR_COMPONENT_LABELS: [AtomicU8; LABELS_LEN] = {
@@ -19,24 +27,14 @@ pub static VECTOR_COMPONENT_LABELS: [AtomicU8; LABELS_LEN] = {
     [ZERO; LABELS_LEN]
 };
 
-/// Uprobe attachment point: called once per component at startup to register
-/// the mapping from allocation group ID to component name.
+/// bpftrace attaches `uprobe:BINARY:vector_register_component` to build a
+/// `@component_names[group_id] = name` lookup table. It also captures
+/// `labels_ptr` and `labels_len` on the first call so the profile handler can
+/// read the shared-memory array at runtime.
 ///
-/// bpftrace attaches `uprobe:BINARY:vector_register_component` here at probe
-/// startup to build a `group_id -> component_id` lookup table.  It also
-/// captures `labels_ptr` / `labels_len` on the first call so the profile
-/// handler can read the shared-memory array at runtime (ASLR makes the
-/// compile-time address unusable).
-///
-/// Arguments follow the C ABI so bpftrace can read them reliably:
-///   arg0 = group_id (u8)
-///   arg1/arg2 = component_id (ptr, len)
-///   arg3/arg4 = labels array (ptr, len)
-///
-/// `black_box` prevents LTO from eliding the call site.
 #[unsafe(no_mangle)]
 #[inline(never)]
-#[allow(clippy::missing_const_for_fn)] // Must not be const: used as a uprobe attachment point.
+#[allow(clippy::missing_const_for_fn)]
 pub extern "C" fn vector_register_component(
     id: u8,
     name_ptr: *const u8,
@@ -55,7 +53,6 @@ mod tests {
 
     #[test]
     fn labels_array_store_and_clear() {
-        // Use a unique slot to avoid interference from other tests sharing the static array.
         let slot = 99;
         let group_id: u8 = 7;
 
