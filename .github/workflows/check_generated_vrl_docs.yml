@@ -88,11 +88,13 @@ jobs:
           && github.event.pull_request.head.repo.full_name == github.repository
         id: push
         continue-on-error: true
+        env:
+          HEAD_REF: ${{ github.head_ref }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git commit -m "$COMMIT_MESSAGE"
-          git push origin HEAD:refs/heads/${{ github.head_ref }}
+          git push origin HEAD:refs/heads/$HEAD_REF
 
       - name: Save PR number for comment workflow
         if: >
