@@ -703,7 +703,7 @@ generate-component-docs: ## Generate per-component Cue docs from the configurati
 .PHONY: generate-vector-vrl-docs
 generate-vector-vrl-docs: ## Generate VRL function documentation from Rust source.
 	${MAYBE_ENVIRONMENT_EXEC} $(VDEV) build vector-vrl-docs --output docs/generated/ \
-		$(if $(findstring true,$(CI)),>/dev/null,)
+		$(if $(findstring true,$(CI)),--vector-sha $(GITHUB_SHA) >/dev/null,)
 
 .PHONY: generate-vrl-docs
 generate-vrl-docs: ## Generate combined VRL function documentation for the website.
