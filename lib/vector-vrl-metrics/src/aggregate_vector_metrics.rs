@@ -14,7 +14,7 @@ use crate::common::{Error, MetricsStorage};
 static DEFAULT_TAGS: LazyLock<Value> = LazyLock::new(|| Value::Object(BTreeMap::new()));
 static PARAMETERS: LazyLock<Vec<Parameter>> = LazyLock::new(|| {
     vec![
-        Parameter::required("function", kind::BYTES, "The metric name to search.")
+        Parameter::required("function", kind::BYTES, "The aggregation function to apply to the matched metrics.")
             .enum_variants(&[
                 EnumVariant {
                     value: "sum",
@@ -125,7 +125,7 @@ impl Function for AggregateVectorMetrics {
             },
             example! {
                 title: "Min of vector internal metrics matching the name",
-                source: r#"aggregate_vector_metrics("max", "utilization")"#,
+                source: r#"aggregate_vector_metrics("min", "utilization")"#,
                 result: Ok("0.5"),
             },
         ]

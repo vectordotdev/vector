@@ -562,3 +562,4 @@ ZTE
 Zync
 sighup
 CLAUDE
+linting
