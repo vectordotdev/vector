@@ -6,7 +6,7 @@
   "arguments": [
     {
       "name": "function",
-      "description": "The metric name to search.",
+      "description": "The aggregation function to apply to the matched metrics.",
       "required": true,
       "type": [
         "string"
@@ -65,7 +65,7 @@
     },
     {
       "title": "Min of vector internal metrics matching the name",
-      "source": "aggregate_vector_metrics(\"max\", \"utilization\")",
+      "source": "aggregate_vector_metrics(\"min\", \"utilization\")",
       "return": 0.5
     }
   ],
