@@ -85,7 +85,7 @@ impl Function for FindEnrichmentTableRecords {
 
     fn usage(&self) -> &'static str {
         const_str::concat!(
-            "Hello Searches an [enrichment table](/docs/reference/glossary/#enrichment-tables) for rows that match the provided condition.\n\n",
+            "Searches an [enrichment table](/docs/reference/glossary/#enrichment-tables) for rows that match the provided condition.\n\n",
             super::ENRICHMENT_TABLE_EXPLAINER
         )
     }
