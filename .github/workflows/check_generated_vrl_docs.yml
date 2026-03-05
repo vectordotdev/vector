@@ -132,7 +132,7 @@ jobs:
     needs: run-check-generated-vrl-docs
     steps:
       - run: |
-          result="${{ needs.run-check-generated-vrl-docs.result }}"
-          if [ "$result" != "success" ] && [ "$result" != "skipped" ]; then
+          if [[ "${{ contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "One or more jobs failed or were cancelled"
             exit 1
           fi
