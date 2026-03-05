@@ -158,7 +158,7 @@ pub(crate) const ENRICHMENT_TABLE_EXPLAINER: &str = indoc! {r#"
     This function returns the rows that match the provided condition(s). _All_ fields need to
     match for rows to be returned; if any fields do not match, then no rows are returned.
 
-    There are currently three forms of search criteria:
+    There are three forms of search criteria:
 
     1. **Exact match search**. The given field must match the value exactly. Case sensitivity
        can be specified using the `case_sensitive` argument. An exact match search can use an
