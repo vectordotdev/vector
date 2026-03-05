@@ -37,10 +37,11 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 
 					[azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
 					"""
-				required: false
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\""
+				required:      false
 				type: string: {
 					default: ""
-					examples: ["00000000-0000-0000-0000-000000000000"]
+					examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_CLIENT_ID:?err}"]
 				}
 			}
 			azure_client_secret: {
@@ -52,7 +53,7 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 				required: false
 				type: string: {
 					default: ""
-					examples: ["00-00~000000-0000000~0000000000000000000"]
+					examples: ["00-00~000000-0000000~0000000000000000000", "${AZURE_CLIENT_SECRET:?err}"]
 				}
 			}
 			azure_credential_kind: {
@@ -60,6 +61,7 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 				required:    true
 				type: string: enum: {
 					azure_cli:                         "Use Azure CLI credentials"
+					client_certificate_credential:     "Use certificate credentials"
 					managed_identity:                  "Use Managed Identity credentials"
 					managed_identity_client_assertion: "Use Managed Identity with Client Assertion credentials"
 					workload_identity:                 "Use Workload Identity credentials"
@@ -71,11 +73,24 @@ generated: components: sinks: azure_logs_ingestion: configuration: {
 
 					[azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
 					"""
-				required: false
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\""
+				required:      false
 				type: string: {
 					default: ""
-					examples: ["00000000-0000-0000-0000-000000000000"]
+					examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_TENANT_ID:?err}"]
 				}
+			}
+			certificate_password: {
+				description:   "The password for the client certificate, if applicable."
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\""
+				required:      false
+				type: string: examples: ["${AZURE_CLIENT_CERTIFICATE_PASSWORD}"]
+			}
+			certificate_path: {
+				description:   "PKCS12 certificate with RSA private key."
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\""
+				required:      true
+				type: string: examples: ["path/to/certificate.pfx", "${AZURE_CLIENT_CERTIFICATE_PATH:?err}"]
 			}
 			client_assertion_client_id: {
 				description:   "The target Client ID to use."

@@ -52,18 +52,21 @@ pub enum AzureAuthentication {
         ///
         /// [azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
         #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        #[configurable(metadata(docs::examples = "${AZURE_TENANT_ID:?err}"))]
         azure_tenant_id: String,
 
         /// The [Azure Client ID][azure_client_id].
         ///
         /// [azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
         #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        #[configurable(metadata(docs::examples = "${AZURE_CLIENT_ID:?err}"))]
         azure_client_id: String,
 
         /// The [Azure Client Secret][azure_client_secret].
         ///
         /// [azure_client_secret]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
         #[configurable(metadata(docs::examples = "00-00~000000-0000000~0000000000000000000"))]
+        #[configurable(metadata(docs::examples = "${AZURE_CLIENT_SECRET:?err}"))]
         azure_client_secret: SensitiveString,
     },
 
@@ -95,18 +98,24 @@ pub enum SpecificAzureCredential {
         /// The [Azure Tenant ID][azure_tenant_id].
         ///
         /// [azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        #[configurable(metadata(docs::examples = "${AZURE_TENANT_ID:?err}"))]
         azure_tenant_id: String,
 
         /// The [Azure Client ID][azure_client_id].
         ///
         /// [azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        #[configurable(metadata(docs::examples = "${AZURE_CLIENT_ID:?err}"))]
         azure_client_id: String,
 
         /// PKCS12 certificate with RSA private key.
         #[configurable(metadata(docs::examples = "path/to/certificate.pfx"))]
-        certificate_file: PathBuf,
+        #[configurable(metadata(docs::examples = "${AZURE_CLIENT_CERTIFICATE_PATH:?err}"))]
+        certificate_path: PathBuf,
 
         /// The password for the client certificate, if applicable.
+        #[configurable(metadata(docs::examples = "${AZURE_CLIENT_CERTIFICATE_PASSWORD}"))]
         certificate_password: Option<SensitiveString>,
     },
 
@@ -216,15 +225,15 @@ impl SpecificAzureCredential {
             Self::ClientCertificateCredential {
                 azure_tenant_id,
                 azure_client_id,
-                certificate_file,
+                certificate_path,
                 certificate_password,
             } => {
-                let certificate_bytes: Vec<u8> = std::fs::read(certificate_file).map_err(|e| {
+                let certificate_bytes: Vec<u8> = std::fs::read(certificate_path).map_err(|e| {
                     Error::with_message(
                         ErrorKind::Credential,
                         format!(
                             "Failed to read certificate file {}: {e}",
-                            certificate_file.display()
+                            certificate_path.display()
                         ),
                     )
                 })?;
