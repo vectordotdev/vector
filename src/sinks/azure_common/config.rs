@@ -530,7 +530,7 @@ pub async fn build_client(
         && let Some(ca_file) = &tls_config.ca_file
     {
         let mut buf = Vec::new();
-        File::open(&ca_file)?.read_to_end(&mut buf)?;
+        File::open(ca_file)?.read_to_end(&mut buf)?;
         let cert = reqwest_12::Certificate::from_pem(&buf)?;
 
         warn!("Adding TLS root certificate from {}", ca_file.display());
