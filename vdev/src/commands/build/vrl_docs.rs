@@ -137,7 +137,6 @@ fn get_vrl_commit_sha(repo_root: &Path) -> Result<String> {
     Ok(sha.to_string())
 }
 
-
 /// Read all `*.json` files from a directory into a name->value map.
 fn read_function_docs(docs_dir: &Path) -> Result<BTreeMap<String, Value>> {
     let mut functions = BTreeMap::new();
