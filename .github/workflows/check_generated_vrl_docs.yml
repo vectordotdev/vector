@@ -33,13 +33,8 @@ jobs:
         with:
           filters: |
             docs:
-              - "lib/vector-vrl/functions/**"
-              - "lib/enrichment/**"
-              - "lib/dnstap-parser/**"
-              - "lib/vector-vrl-metrics/**"
-              - "lib/vector-vrl/category/**"
-              - "vdev/src/commands/build/vector_vrl_docs.rs"
-              - "vdev/Cargo.toml"
+              - "lib/vector-vrl/**"
+              - "vdev/**"
               - "Cargo.lock"
               - ".github/workflows/check_generated_vrl_docs.yml"
 
