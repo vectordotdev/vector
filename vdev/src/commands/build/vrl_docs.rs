@@ -2,14 +2,13 @@ use std::{
     collections::BTreeMap,
     fs,
     path::{Path, PathBuf},
-    process::Command,
 };
 
 use anyhow::{Context, Result};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
-use crate::app::CommandExt as _;
+use crate::utils::git::sparse_checkout_docs;
 use crate::utils::paths::find_repo_root;
 
 const VRL_REPO_URL: &str = "https://github.com/vectordotdev/vrl.git";
@@ -138,31 +137,6 @@ fn get_vrl_commit_sha(repo_root: &Path) -> Result<String> {
     Ok(sha.to_string())
 }
 
-/// Sparse-checkout only `docs/generated` from a repo at the given commit.
-fn sparse_checkout_docs(sha: &str, repo_url: &str, clone_dir: &Path) -> Result<()> {
-    fs::create_dir_all(clone_dir)?;
-
-    let git = |args: &[&str]| -> Result<String> {
-        Command::new("git")
-            .current_dir(clone_dir)
-            .args(args)
-            .check_output()
-    };
-
-    git(&["init"])?;
-    git(&["remote", "add", "origin", repo_url])?;
-    git(&["config", "core.sparseCheckout", "true"])?;
-
-    let sparse_file = clone_dir.join(".git").join("info").join("sparse-checkout");
-    fs::create_dir_all(sparse_file.parent().unwrap())?;
-    fs::write(&sparse_file, "docs/generated\n")
-        .context("Failed to write sparse-checkout config")?;
-
-    git(&["fetch", "--depth", "1", "origin", sha])?;
-    git(&["checkout", sha])?;
-
-    Ok(())
-}
 
 /// Read all `*.json` files from a directory into a name->value map.
 fn read_function_docs(docs_dir: &Path) -> Result<BTreeMap<String, Value>> {
