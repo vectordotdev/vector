@@ -1672,6 +1672,7 @@ mod otlp_decoding_config_tests {
         // Verify logs output (native format)
         let logs_output = &outputs[0];
         assert_eq!(logs_output.port.as_deref(), Some("logs"));
+        assert_eq!(logs_output.ty, DataType::Log);
 
         // Verify metrics output (OTLP format, logs data type)
         let metrics_output = &outputs[1];
