@@ -51,9 +51,9 @@ jobs:
 
       - uses: ./.github/actions/setup
         with:
-          rust: true
-          protoc: true
-          libsasl2: true
+          vdev: true
+          mold: false
+          cargo-cache: false
 
       - name: Regenerate VRL docs
         run: make generate-vector-vrl-docs
