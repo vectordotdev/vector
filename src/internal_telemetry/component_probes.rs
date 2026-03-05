@@ -1,37 +1,54 @@
-use std::sync::atomic::AtomicU8;
+use std::sync::atomic::{AtomicU8, Ordering};
 
-/// Number of slots in the [`VECTOR_COMPONENT_LABELS`] array.
+/// Returns a leaked `&'static AtomicU8` unique to the current thread.
 ///
-/// Matches the default Linux `pid_max` (32768). TIDs are indexed via
-/// `tid % LABELS_LEN`, so collisions are only possible when two threads in
-/// the same process have TIDs that differ by an exact multiple of 32768 —
-/// this cannot happen unless `pid_max` has been raised above the default,
-/// which is uncommon. In that case the only consequence is mislabeled
-/// profiling samples.
+/// On first access, allocates a single byte via `Box::leak`, then calls
+/// [`vector_register_thread`] so bpftrace can record the mapping from
+/// this thread's TID to the byte's address.
 ///
-/// 32768 entries = 32 KiB of static memory.
-pub const LABELS_LEN: usize = 32768;
+/// The leaked byte lives for the lifetime of the process — no use-after-free
+/// is possible even if the thread exits.
+pub fn thread_label() -> &'static AtomicU8 {
+    thread_local! {
+        static LABEL: &'static AtomicU8 = {
+            let label: &'static AtomicU8 = Box::leak(Box::new(AtomicU8::new(0)));
+            #[cfg(target_os = "linux")]
+            {
+                // SAFETY: gettid() is always safe on Linux.
+                let tid = unsafe { libc::gettid() } as u64;
+                vector_register_thread(tid, label as *const AtomicU8 as *const u8);
+            }
+            label
+        };
+    }
+    LABEL.with(|l| *l)
+}
 
-/// Per-thread label array indexed by `tid % LABELS_LEN`.
+/// Uprobe attachment point: called once per thread to register the mapping
+/// from Linux TID to the address of that thread's label byte.
 ///
-/// On span enter, the component's allocation group ID is written; on span
-/// exit it is cleared to 0.
+/// bpftrace attaches `uprobe:BINARY:vector_register_thread` to build a
+/// `@tid_to_addr[tid] = addr` map. On each `profile:hz:997` sample it reads
+/// `*((uint8 *)@tid_to_addr[tid])` to get the active component group ID.
 ///
-/// bpftrace can read this array on a fixed-rate profile timer
-/// (`profile:hz:997`) using `bpf_probe_read_user` to attribute CPU samples
-/// to individual components.
+/// Arguments follow the C ABI:
+///   arg0 = tid (u64)
+///   arg1 = label_ptr (*const u8)
 #[unsafe(no_mangle)]
-#[allow(clippy::declare_interior_mutable_const)]
-pub static VECTOR_COMPONENT_LABELS: [AtomicU8; LABELS_LEN] = {
-    const ZERO: AtomicU8 = AtomicU8::new(0);
-    [ZERO; LABELS_LEN]
-};
+#[inline(never)]
+pub extern "C" fn vector_register_thread(tid: u64, label_ptr: *const u8) {
+    std::hint::black_box((tid, label_ptr));
+}
 
-/// bpftrace attaches `uprobe:BINARY:vector_register_component` to build a
-/// `@component_names[group_id] = name` lookup table. It also captures
-/// `labels_ptr` and `labels_len` on the first call so the profile handler can
-/// read the shared-memory array at runtime.
+/// Uprobe attachment point: called once per component at startup to register
+/// the mapping from allocation group ID to component name.
 ///
+/// bpftrace attaches `uprobe:BINARY:vector_register_component` to build a
+/// `@component_names[group_id] = name` lookup table.
+///
+/// Arguments follow the C ABI:
+///   arg0 = group_id (u8)
+///   arg1/arg2 = component_id (ptr, len)
 #[unsafe(no_mangle)]
 #[inline(never)]
 #[allow(clippy::missing_const_for_fn)]
@@ -39,10 +56,8 @@ pub extern "C" fn vector_register_component(
     id: u8,
     name_ptr: *const u8,
     name_len: usize,
-    labels_ptr: *const u8,
-    labels_len: usize,
 ) {
-    std::hint::black_box((id, name_ptr, name_len, labels_ptr, labels_len));
+    std::hint::black_box((id, name_ptr, name_len));
 }
 
 #[cfg(test)]
@@ -52,29 +67,45 @@ mod tests {
     use super::*;
 
     #[test]
-    fn labels_array_store_and_clear() {
-        let slot = 99;
+    fn thread_label_store_and_clear() {
+        let label = thread_label();
         let group_id: u8 = 7;
 
-        VECTOR_COMPONENT_LABELS[slot].store(group_id, Ordering::Relaxed);
-        assert_eq!(
-            VECTOR_COMPONENT_LABELS[slot].load(Ordering::Relaxed),
-            group_id
-        );
+        label.store(group_id, Ordering::Relaxed);
+        assert_eq!(label.load(Ordering::Relaxed), group_id);
 
-        VECTOR_COMPONENT_LABELS[slot].store(0, Ordering::Relaxed);
-        assert_eq!(VECTOR_COMPONENT_LABELS[slot].load(Ordering::Relaxed), 0);
+        label.store(0, Ordering::Relaxed);
+        assert_eq!(label.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn thread_label_is_stable() {
+        let a = thread_label();
+        let b = thread_label();
+        assert!(std::ptr::eq(a, b), "must return the same address");
+    }
+
+    #[test]
+    fn thread_labels_are_unique() {
+        use std::sync::mpsc;
+        let (tx, rx) = mpsc::channel();
+        for _ in 0..4 {
+            let tx = tx.clone();
+            std::thread::spawn(move || {
+                tx.send(thread_label() as *const AtomicU8 as usize)
+                    .unwrap();
+            });
+        }
+        drop(tx);
+        let mut addrs: Vec<usize> = rx.iter().collect();
+        addrs.sort();
+        addrs.dedup();
+        assert_eq!(addrs.len(), 4, "each thread must get a distinct address");
     }
 
     #[test]
     fn register_component_does_not_panic() {
         let name = b"test_component";
-        vector_register_component(
-            1,
-            name.as_ptr(),
-            name.len(),
-            VECTOR_COMPONENT_LABELS.as_ptr() as *const u8,
-            LABELS_LEN,
-        );
+        vector_register_component(1, name.as_ptr(), name.len());
     }
 }

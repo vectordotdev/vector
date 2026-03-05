@@ -8,13 +8,6 @@ use tracing::Span;
 
 use super::{stack::GroupStack, tracing::WithAllocationGroup};
 
-#[cfg(all(target_os = "linux", feature = "component-probes"))]
-fn thread_id() -> usize {
-    // SAFETY: `gettid()` is always safe to call on Linux and has no preconditions.
-    thread_local! { static TID: usize = unsafe { libc::gettid() } as usize; }
-    TID.with(|t| *t)
-}
-
 thread_local! {
     /// The currently executing allocation token.
     ///
@@ -88,16 +81,14 @@ impl AllocationGroupToken {
     pub fn enter(&self) {
         _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().push(self.id));
         #[cfg(all(target_os = "linux", feature = "component-probes"))]
-        crate::internal_telemetry::component_probes::VECTOR_COMPONENT_LABELS
-            [thread_id() % crate::internal_telemetry::component_probes::LABELS_LEN]
+        crate::internal_telemetry::component_probes::thread_label()
             .store(self.id.as_raw(), Ordering::Relaxed);
     }
 
     pub fn exit(&self) {
         _ = LOCAL_ALLOCATION_GROUP_STACK.try_with(|stack| stack.borrow_mut().pop());
         #[cfg(all(target_os = "linux", feature = "component-probes"))]
-        crate::internal_telemetry::component_probes::VECTOR_COMPONENT_LABELS
-            [thread_id() % crate::internal_telemetry::component_probes::LABELS_LEN]
+        crate::internal_telemetry::component_probes::thread_label()
             .store(0, Ordering::Relaxed);
     }
 }

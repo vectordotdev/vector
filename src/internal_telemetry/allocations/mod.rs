@@ -206,9 +206,6 @@ pub fn acquire_allocation_group_id(
                 group_id.as_raw(),
                 id_bytes.as_ptr(),
                 id_bytes.len(),
-                crate::internal_telemetry::component_probes::VECTOR_COMPONENT_LABELS.as_ptr()
-                    as *const u8,
-                crate::internal_telemetry::component_probes::LABELS_LEN,
             );
         }
 
