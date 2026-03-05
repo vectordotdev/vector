@@ -296,7 +296,7 @@ async fn azure_blob_build_config_with_client_certificate() {
             azure_credential_kind = "client_certificate_credential"
             azure_tenant_id = "00000000-0000-0000-0000-000000000000"
             azure_client_id = "mock-client-id"
-            certificate_file = "tests/data/ClientCertificateAuth.pfx"
+            certificate_path = "tests/data/ClientCertificateAuth.pfx"
             certificate_password = "MockPassword123"
         "#,
     )

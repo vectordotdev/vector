@@ -566,12 +566,14 @@ impl TokenCredential for MockTokenCredential {
             ));
         };
 
+        // serde_json sometimes does and sometimes doesn't preserve order, be careful to sort
+        // the claims in alphabetical order to ensure a consistent base64 encoding for testing
         let jwt = serde_json::json!({
             "aud": scope.strip_suffix("/.default").unwrap_or(*scope),
-            "iat": 0,
             "exp": 2147483647,
+            "iat": 0,
             "iss": "https://sts.windows.net/",
-            "nbf": 0
+            "nbf": 0,
         });
 
         // JWTs do not include standard base64 padding.
@@ -607,6 +609,6 @@ async fn azure_mock_token_credential_test() {
         .expect("valid credential should return a token");
     assert_eq!(
         access_token.token.secret(),
-        "e30.eyJhdWQiOiJodHRwczovL2V4YW1wbGUuY29tIiwiaWF0IjowLCJleHAiOjIxNDc0ODM2NDcsImlzcyI6Imh0dHBzOi8vc3RzLndpbmRvd3MubmV0LyIsIm5iZiI6MH0."
+        "e30.eyJhdWQiOiJodHRwczovL2V4YW1wbGUuY29tIiwiZXhwIjoyMTQ3NDgzNjQ3LCJpYXQiOjAsImlzcyI6Imh0dHBzOi8vc3RzLndpbmRvd3MubmV0LyIsIm5iZiI6MH0."
     );
 }
