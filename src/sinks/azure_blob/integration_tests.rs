@@ -1,11 +1,12 @@
 use std::io::{BufRead, BufReader};
+use std::sync::Arc;
 
 use azure_core::http::StatusCode;
+use azure_storage_blob::BlobContainerClient;
 
 use bytes::{Buf, BytesMut};
 use flate2::read::GzDecoder;
 use futures::{Stream, StreamExt, stream};
-use vector_common::sensitive_string::SensitiveString;
 use vector_lib::{
     ByteSizeOf,
     codecs::{
@@ -31,20 +32,18 @@ use crate::{
 #[tokio::test]
 async fn azure_blob_healthcheck_passed() {
     let config = AzureBlobSinkConfig::new_emulator().await;
-    let client = azure_common::config::build_client(
-        None,
-        config
-            .connection_string
-            .clone()
-            .expect("failed to unwrap connection_string")
-            .inner()
-            .to_string(),
-        config.container_name.clone(),
-        &crate::config::ProxyConfig::default(),
-        None,
-    )
-    .await
-    .expect("Failed to create client");
+    let client = config.build_test_client().await;
+
+    azure_common::config::build_healthcheck(config.container_name, client)
+        .expect("Failed to build healthcheck")
+        .await
+        .expect("Failed to pass healthcheck");
+}
+
+#[tokio::test]
+async fn azure_blob_healthcheck_passed_with_oauth() {
+    let config = AzureBlobSinkConfig::new_emulator_with_oauth().await;
+    let client = config.build_test_client().await;
 
     azure_common::config::build_healthcheck(config.container_name, client)
         .expect("Failed to build healthcheck")
@@ -59,20 +58,7 @@ async fn azure_blob_healthcheck_unknown_container() {
         container_name: String::from("other-container-name"),
         ..config
     };
-    let client = azure_common::config::build_client(
-        None,
-        config
-            .connection_string
-            .clone()
-            .expect("failed to unwrap connection_string")
-            .inner()
-            .to_string(),
-        config.container_name.clone(),
-        &crate::config::ProxyConfig::default(),
-        None,
-    )
-    .await
-    .expect("Failed to create client");
+    let client = config.build_test_client().await;
 
     assert_eq!(
         azure_common::config::build_healthcheck(config.container_name, client)
@@ -84,10 +70,8 @@ async fn azure_blob_healthcheck_unknown_container() {
     );
 }
 
-#[tokio::test]
-async fn azure_blob_insert_lines_into_blob() {
+async fn assert_insert_lines_into_blob(config: AzureBlobSinkConfig) {
     let blob_prefix = format!("lines/into/blob/{}", random_string(10));
-    let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
         blob_prefix: blob_prefix.clone().try_into().unwrap(),
         ..config
@@ -106,9 +90,17 @@ async fn azure_blob_insert_lines_into_blob() {
 }
 
 #[tokio::test]
-async fn azure_blob_insert_json_into_blob() {
+async fn azure_blob_insert_lines_into_blob() {
+    assert_insert_lines_into_blob(AzureBlobSinkConfig::new_emulator().await).await;
+}
+
+#[tokio::test]
+async fn azure_blob_insert_lines_into_blob_with_oauth() {
+    assert_insert_lines_into_blob(AzureBlobSinkConfig::new_emulator_with_oauth().await).await;
+}
+
+async fn assert_insert_json_into_blob(config: AzureBlobSinkConfig) {
     let blob_prefix = format!("json/into/blob/{}", random_string(10));
-    let config = AzureBlobSinkConfig::new_emulator().await;
     let config = AzureBlobSinkConfig {
         blob_prefix: blob_prefix.clone().try_into().unwrap(),
         encoding: (
@@ -133,6 +125,16 @@ async fn azure_blob_insert_json_into_blob() {
         .map(|event| serde_json::to_string(&event.as_log().all_event_fields().unwrap()).unwrap())
         .collect::<Vec<_>>();
     assert_eq!(expected, blob_lines);
+}
+
+#[tokio::test]
+async fn azure_blob_insert_json_into_blob() {
+    assert_insert_json_into_blob(AzureBlobSinkConfig::new_emulator().await).await;
+}
+
+#[tokio::test]
+async fn azure_blob_insert_json_into_blob_with_oauth() {
+    assert_insert_json_into_blob(AzureBlobSinkConfig::new_emulator_with_oauth().await).await;
 }
 
 #[ignore]
@@ -195,14 +197,12 @@ async fn azure_blob_insert_json_into_blob_gzip() {
     assert_eq!(expected, blob_lines);
 }
 
-#[tokio::test]
-async fn azure_blob_rotate_files_after_the_buffer_size_is_reached() {
+async fn assert_rotate_files_after_the_buffer_size_is_reached(mut config: AzureBlobSinkConfig) {
     let groups = 3;
     let (lines, size, input) = random_lines_with_stream_with_group_key(100, 30, groups);
     let size_per_group = (size / groups) + 10;
 
     let blob_prefix = format!("lines-rotate/into/blob/{}", random_string(10));
-    let mut config = AzureBlobSinkConfig::new_emulator().await;
     config.batch.max_bytes = Some(size_per_group);
 
     let config = AzureBlobSinkConfig {
@@ -230,24 +230,17 @@ async fn azure_blob_rotate_files_after_the_buffer_size_is_reached() {
 }
 
 #[tokio::test]
-async fn azure_blob_insert_lines_into_blob_with_oauth() {
-    let blob_prefix = format!("lines/into/blob/{}", random_string(10));
-    let config = AzureBlobSinkConfig::new_emulator_with_oauth().await;
-    let config = AzureBlobSinkConfig {
-        blob_prefix: blob_prefix.clone().try_into().unwrap(),
-        ..config
-    };
-    let (lines, input) = random_lines_with_stream(100, 10, None);
+async fn azure_blob_rotate_files_after_the_buffer_size_is_reached() {
+    assert_rotate_files_after_the_buffer_size_is_reached(AzureBlobSinkConfig::new_emulator().await)
+        .await;
+}
 
-    config.run_assert(input).await;
-
-    let blobs = config.list_blobs(blob_prefix).await;
-    assert_eq!(blobs.len(), 1);
-    assert!(blobs[0].clone().ends_with(".log"));
-    let (content_type, content_encoding, blob_lines) = config.get_blob(blobs[0].clone()).await;
-    assert_eq!(content_type, Some(String::from("text/plain")));
-    assert_eq!(content_encoding, None);
-    assert_eq!(lines, blob_lines);
+#[tokio::test]
+async fn azure_blob_rotate_files_after_the_buffer_size_is_reached_with_oauth() {
+    assert_rotate_files_after_the_buffer_size_is_reached(
+        AzureBlobSinkConfig::new_emulator_with_oauth().await,
+    )
+    .await;
 }
 
 impl AzureBlobSinkConfig {
@@ -276,16 +269,10 @@ impl AzureBlobSinkConfig {
     }
 
     pub async fn new_emulator_with_oauth() -> AzureBlobSinkConfig {
-        let client_secret_credential =
-            azure_common::config::AzureAuthentication::ClientSecretCredential {
-                azure_tenant_id: "00000000-0000-0000-0000-000000000000".to_string(),
-                azure_client_id: "00000000-0000-0000-0000-000000000000".to_string(),
-                azure_client_secret: SensitiveString::from("mock-secret".to_string()),
-            };
         let address = std::env::var("AZURITE_OAUTH_ADDRESS").unwrap_or_else(|_| "localhost".into());
         let config = AzureBlobSinkConfig {
-            auth: Some(client_secret_credential),
-            connection_string: Some(format!("UseDevelopmentStorage=true;DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;BlobEndpoint=https://{address}:14430/devstoreaccount1;QueueEndpoint=https://{address}:14431/devstoreaccount1;TableEndpoint=https://{address}:14432/devstoreaccount1;").into()),
+            auth: Some(azure_common::config::AzureAuthentication::MockCredential),
+            connection_string: Some(format!("DefaultEndpointsProtocol=https;AccountName=devstoreaccount1;BlobEndpoint=https://{address}:14430/devstoreaccount1;QueueEndpoint=https://{address}:14431/devstoreaccount1;TableEndpoint=https://{address}:14432/devstoreaccount1;").into()),
             account_name: None,
             blob_endpoint: None,
             container_name: "logs".to_string(),
@@ -308,9 +295,9 @@ impl AzureBlobSinkConfig {
         config
     }
 
-    async fn to_sink(&self) -> VectorSink {
-        let client = azure_common::config::build_client(
-            None,
+    async fn build_test_client(&self) -> Arc<BlobContainerClient> {
+        azure_common::config::build_client(
+            self.auth.clone(),
             self.connection_string
                 .clone()
                 .expect("failed to unwrap connection_string")
@@ -318,11 +305,14 @@ impl AzureBlobSinkConfig {
                 .to_string(),
             self.container_name.clone(),
             &crate::config::ProxyConfig::default(),
-            None,
+            self.tls.clone(),
         )
         .await
-        .expect("Failed to create client");
+        .expect("Failed to create client")
+    }
 
+    async fn to_sink(&self) -> VectorSink {
+        let client = self.build_test_client().await;
         self.build_processor(client).expect("Failed to create sink")
     }
 
@@ -337,19 +327,7 @@ impl AzureBlobSinkConfig {
     }
 
     pub async fn list_blobs(&self, prefix: String) -> Vec<String> {
-        let client = azure_common::config::build_client(
-            None,
-            self.connection_string
-                .clone()
-                .expect("failed to unwrap connection_string")
-                .inner()
-                .to_string(),
-            self.container_name.clone(),
-            &crate::config::ProxyConfig::default(),
-            None,
-        )
-        .await
-        .unwrap();
+        let client = self.build_test_client().await;
 
         // Iterate pager results and collect blob names. Filter by prefix server-side.
         let mut pager = client
@@ -369,19 +347,7 @@ impl AzureBlobSinkConfig {
     }
 
     pub async fn get_blob(&self, blob: String) -> (Option<String>, Option<String>, Vec<String>) {
-        let client = azure_common::config::build_client(
-            None,
-            self.connection_string
-                .clone()
-                .expect("failed to unwrap connection_string")
-                .inner()
-                .to_string(),
-            self.container_name.clone(),
-            &crate::config::ProxyConfig::default(),
-            None,
-        )
-        .await
-        .unwrap();
+        let client = self.build_test_client().await;
 
         let blob_client = client.blob_client(&blob);
 
@@ -437,19 +403,7 @@ impl AzureBlobSinkConfig {
     }
 
     async fn ensure_container(&self) {
-        let client = azure_common::config::build_client(
-            None,
-            self.connection_string
-                .clone()
-                .expect("failed to unwrap connection_string")
-                .inner()
-                .to_string(),
-            self.container_name.clone(),
-            &crate::config::ProxyConfig::default(),
-            None,
-        )
-        .await
-        .unwrap();
+        let client = self.build_test_client().await;
         let result = client.create_container(None).await;
 
         let response = match result {

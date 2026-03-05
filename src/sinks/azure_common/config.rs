@@ -70,6 +70,11 @@ pub enum AzureAuthentication {
     /// Use credentials from environment variables
     #[configurable(metadata(docs::enum_tag_description = "The kind of Azure credential to use."))]
     Specific(SpecificAzureCredential),
+
+    /// Mock credential for testing — returns a static fake token
+    #[cfg(test)]
+    #[serde(skip)]
+    MockCredential,
 }
 
 /// Specific Azure credential types.
@@ -193,6 +198,9 @@ impl AzureAuthentication {
             }
 
             Self::Specific(specific) => specific.credential().await,
+
+            #[cfg(test)]
+            Self::MockCredential => Ok(Arc::new(MockTokenCredential) as Arc<dyn TokenCredential>),
         }
     }
 }
@@ -467,6 +475,18 @@ pub async fn build_client(
                 "Cannot use both Shared Key and another Azure Authentication method at the same time",
             )));
         }
+        #[cfg(test)]
+        (Auth::None, Some(AzureAuthentication::MockCredential)) => {
+            warn!("Using mock token credential authentication");
+            credential = Some(auth.unwrap().credential().await.unwrap());
+        }
+        #[cfg(test)]
+        (_, Some(AzureAuthentication::MockCredential)) => {
+            return Err(Box::new(Error::with_message(
+                ErrorKind::Credential,
+                "Cannot use both connection string auth and mock credential at the same time",
+            )));
+        }
     }
 
     // Use reqwest v0.12 since Azure SDK only implements HttpClient for reqwest::Client v0.12
@@ -516,4 +536,68 @@ pub async fn build_client(
     let client = BlobContainerClient::from_url(url, credential, Some(options))
         .map_err(|e| format!("{e}"))?;
     Ok(Arc::new(client))
+}
+
+#[cfg(test)]
+#[derive(Debug)]
+struct MockTokenCredential;
+
+#[cfg(test)]
+#[async_trait::async_trait]
+impl TokenCredential for MockTokenCredential {
+    async fn get_token(
+        &self,
+        scopes: &[&str],
+        _options: Option<azure_core::credentials::TokenRequestOptions<'_>>,
+    ) -> azure_core::Result<azure_core::credentials::AccessToken> {
+        let Some(scope) = scopes.first() else {
+            return Err(Error::with_message(
+                ErrorKind::Credential,
+                "no scopes were provided",
+            ));
+        };
+
+        let jwt = serde_json::json!({
+            "aud": scope.strip_suffix("/.default").unwrap_or(*scope),
+            "iat": 0,
+            "exp": 2147483647,
+            "iss": "https://sts.windows.net/",
+            "nbf": 0
+        });
+
+        // JWTs do not include standard base64 padding.
+        // this seemed cleaner than importing a new crates just for this function
+        let jwt_base64 = format!(
+            "e30.{}.",
+            BASE64_STANDARD
+                .encode(serde_json::to_string(&jwt).unwrap())
+                .trim_end_matches("=")
+        )
+        .to_string();
+
+        warn!(
+            "Using mock token credential, JWT: {}, base64: {}",
+            serde_json::to_string(&jwt).unwrap(),
+            jwt_base64
+        );
+
+        Ok(azure_core::credentials::AccessToken::new(
+            jwt_base64,
+            azure_core::time::OffsetDateTime::now_utc() + std::time::Duration::from_secs(3600),
+        ))
+    }
+}
+
+#[cfg(test)]
+#[tokio::test]
+async fn azure_mock_token_credential_test() {
+    let credential = MockTokenCredential;
+    let access_token = credential
+        .get_token(&["https://example.com/.default"], None)
+        .await
+        .expect("valid credential should return a token");
+    assert_eq!(
+        access_token.token.secret(),
+        "e30.eyJhdWQiOiJodHRwczovL2V4YW1wbGUuY29tIiwiaWF0IjowLCJleHAiOjIxNDc0ODM2NDcsImlzcyI6Imh0dHBzOi8vc3RzLndpbmRvd3MubmV0LyIsIm5iZiI6MH0."
+    );
 }
