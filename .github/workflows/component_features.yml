@@ -39,6 +39,10 @@ jobs:
         with:
           ref: ${{ inputs.ref }}
 
+      - name: Free disk space
+        shell: bash
+        run: sudo -E bash scripts/ci-free-disk-space.sh
+
       - uses: ./.github/actions/setup
         with:
           rust: true
