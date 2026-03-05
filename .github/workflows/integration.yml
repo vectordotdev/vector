@@ -89,7 +89,7 @@ jobs:
           submodules: "recursive"
 
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         if: github.event_name == 'merge_group'
         with:
           name: int_tests_changes
@@ -151,7 +151,7 @@ jobs:
           submodules: "recursive"
 
       - name: Download JSON artifact from changes.yml
-        uses: actions/download-artifact@37930b1c2abaa49bbe596cd826c3c89aef350131 # v7.0.0
+        uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         if: github.event_name == 'merge_group'
         with:
           name: e2e_tests_changes
