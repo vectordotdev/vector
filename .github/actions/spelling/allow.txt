@@ -69,6 +69,7 @@ bitwidth
 blackbox
 Blaupunkt
 Blusens
+bpftrace
 buildname
 buildroot
 bytestream
@@ -518,6 +519,7 @@ ubuntu
 Umeox
 UMTS
 unchunked
+uprobe
 upstreaminfo
 urlencoding
 useragents
