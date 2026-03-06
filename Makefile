@@ -389,6 +389,14 @@ test-integration: test-integration-nginx test-integration-opentelemetry test-int
 test-integration: test-integration-redis test-integration-splunk test-integration-dnstap test-integration-datadog-agent test-integration-datadog-logs test-integration-e2e-datadog-logs test-integration-e2e-opentelemetry-logs
 test-integration: test-integration-datadog-traces test-integration-shutdown
 
+.PHONY: test-integration-windows-event-log
+test-integration-windows-event-log: ## Runs Windows Event Log integration tests (Windows only)
+ifeq ($(OS),Windows_NT)
+	${MAYBE_ENVIRONMENT_EXEC} cargo test -p vector --no-default-features --features sources-windows_event_log-integration-tests windows_event_log::integration_tests
+else
+	@echo "Skipping windows-event-log integration tests (Windows only)"
+endif
+
 test-integration-%-cleanup:
 	$(VDEV) --verbose integration stop $*
 
