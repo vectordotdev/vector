@@ -28,9 +28,7 @@ fn thread_label() -> &'static AtomicU8 {
             let label: &'static AtomicU8 = Box::leak(Box::new(AtomicU8::new(0)));
             #[cfg(target_os = "linux")]
             {
-                // SAFETY: `gettid()` is always safe to call on Linux; it has
-                // no preconditions and cannot fail.
-                let tid = unsafe { libc::gettid() } as u64;
+                let tid = nix::unistd::gettid().as_raw() as u64;
                 vector_register_thread(tid, label as *const AtomicU8 as *const u8);
             }
             label
