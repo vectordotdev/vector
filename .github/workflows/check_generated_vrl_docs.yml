@@ -118,7 +118,7 @@ jobs:
           path: /tmp/docs-check/pr-number
 
       - name: Fail if docs are out of date
-        if: steps.check.outputs.changed == 'true' && steps.push.outcome != 'success'
+        if: steps.check.outputs.changed == 'true'
         run: |
           echo "docs/generated/ is out of date. Regenerate with: make generate-vector-vrl-docs"
           exit 1
