@@ -113,7 +113,7 @@ impl Function for FindEnrichmentTableRecords {
                 title: "Exact match",
                 source: indoc! {r#"
                     find_enrichment_table_records!(
-                        "test",
+                        "test-foo-bar",
                         {"surname": "Smith"}
                     )
                 "#},
