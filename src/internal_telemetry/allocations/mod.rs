@@ -199,16 +199,6 @@ pub fn acquire_allocation_group_id(
             component_type,
         };
 
-        #[cfg(feature = "component-probes")]
-        {
-            let id_bytes = writer.component_id.as_bytes();
-            crate::internal_telemetry::component_probes::vector_register_component(
-                group_id.as_raw(),
-                id_bytes.as_ptr(),
-                id_bytes.len(),
-            );
-        }
-
         return group_id;
     }
 

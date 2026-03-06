@@ -1,20 +1,28 @@
-use std::sync::atomic::{AtomicU8, Ordering};
+//! Lightweight bpftrace-based per-component CPU attribution.
+//!
+//! When the `component-probes` feature is enabled, this module provides a
+//! [`ComponentProbesLayer`] that tags each Tokio worker thread with the ID of
+//! the currently executing component. External bpftrace scripts read this tag
+//! on a profile timer to produce per-component flamegraphs.
+
+use std::sync::atomic::AtomicU8;
+
+use tracing::Subscriber;
+use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
 
 /// Returns a leaked `&'static AtomicU8` unique to the current thread.
 ///
-/// On first access, allocates a single byte via `Box::leak`, then calls
-/// [`vector_register_thread`] so bpftrace can record the mapping from
-/// this thread's TID to the byte's address.
-///
-/// The leaked byte lives for the lifetime of the process — no use-after-free
-/// is possible even if the thread exits.
-pub fn thread_label() -> &'static AtomicU8 {
+/// On first access, allocates a byte via `Box::leak` and calls
+/// [`vector_register_thread`] so bpftrace can map this thread's TID
+/// to the byte's address. The leaked byte is valid for the process lifetime.
+fn thread_label() -> &'static AtomicU8 {
     thread_local! {
         static LABEL: &'static AtomicU8 = {
             let label: &'static AtomicU8 = Box::leak(Box::new(AtomicU8::new(0)));
             #[cfg(target_os = "linux")]
             {
-                // SAFETY: gettid() is always safe on Linux.
+                // SAFETY: `gettid()` is always safe to call on Linux; it has
+                // no preconditions and cannot fail.
                 let tid = unsafe { libc::gettid() } as u64;
                 vector_register_thread(tid, label as *const AtomicU8 as *const u8);
             }
@@ -24,31 +32,16 @@ pub fn thread_label() -> &'static AtomicU8 {
     LABEL.with(|l| *l)
 }
 
-/// Uprobe attachment point: called once per thread to register the mapping
-/// from Linux TID to the address of that thread's label byte.
-///
-/// bpftrace attaches `uprobe:BINARY:vector_register_thread` to build a
-/// `@tid_to_addr[tid] = addr` map. On each `profile:hz:997` sample it reads
-/// `*((uint8 *)@tid_to_addr[tid])` to get the active component group ID.
-///
-/// Arguments follow the C ABI:
-///   arg0 = tid (u64)
-///   arg1 = label_ptr (*const u8)
+/// Uprobe attachment point called once per thread to register the
+/// `tid -> label_address` mapping with bpftrace.
 #[unsafe(no_mangle)]
 #[inline(never)]
 pub extern "C" fn vector_register_thread(tid: u64, label_ptr: *const u8) {
     std::hint::black_box((tid, label_ptr));
 }
 
-/// Uprobe attachment point: called once per component at startup to register
-/// the mapping from allocation group ID to component name.
-///
-/// bpftrace attaches `uprobe:BINARY:vector_register_component` to build a
-/// `@component_names[group_id] = name` lookup table.
-///
-/// Arguments follow the C ABI:
-///   arg0 = group_id (u8)
-///   arg1/arg2 = component_id (ptr, len)
+/// Uprobe attachment point called once per component to register the
+/// `group_id -> component_name` mapping with bpftrace.
 #[unsafe(no_mangle)]
 #[inline(never)]
 #[allow(clippy::missing_const_for_fn)]
@@ -58,6 +51,90 @@ pub extern "C" fn vector_register_component(
     name_len: usize,
 ) {
     std::hint::black_box((id, name_ptr, name_len));
+}
+
+/// Next probe group ID. 0 means idle (no component active).
+static NEXT_PROBE_ID: AtomicU8 = AtomicU8::new(1);
+
+/// Stored in span extensions to associate a span with a probe group ID.
+struct ProbeGroupId(u8);
+
+/// Extracts the `component_id` field value from span attributes.
+#[derive(Default)]
+struct ComponentIdVisitor {
+    component_id: Option<String>,
+}
+
+impl tracing::field::Visit for ComponentIdVisitor {
+    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+        if field.name() == "component_id" {
+            self.component_id = Some(format!("{value:?}"));
+        }
+    }
+}
+
+/// A tracing layer that writes the active component's group ID to a per-thread
+/// [`AtomicU8`] on span enter and clears it on exit.
+///
+/// Detects component spans via the `component_id` field in `on_new_span`,
+/// assigns a unique probe group ID, and registers the mapping with bpftrace
+/// via [`vector_register_component`]. Independent of `allocation-tracing`.
+pub struct ComponentProbesLayer<S> {
+    _subscriber: std::marker::PhantomData<S>,
+}
+
+impl<S> ComponentProbesLayer<S> {
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            _subscriber: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<S> Layer<S> for ComponentProbesLayer<S>
+where
+    S: Subscriber + for<'a> LookupSpan<'a>,
+{
+    fn on_new_span(
+        &self,
+        attrs: &tracing::span::Attributes<'_>,
+        id: &tracing::span::Id,
+        ctx: Context<'_, S>,
+    ) {
+        let mut visitor = ComponentIdVisitor::default();
+        attrs.record(&mut visitor);
+
+        if let Some(component_id) = visitor.component_id {
+            let probe_id = NEXT_PROBE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            if probe_id == 0 {
+                return;
+            }
+
+            let id_bytes = component_id.as_bytes();
+            vector_register_component(probe_id, id_bytes.as_ptr(), id_bytes.len());
+
+            if let Some(span) = ctx.span(id) {
+                span.extensions_mut().insert(ProbeGroupId(probe_id));
+            }
+        }
+    }
+
+    fn on_enter(&self, id: &tracing::span::Id, ctx: Context<'_, S>) {
+        if let Some(span) = ctx.span(id) {
+            if let Some(probe) = span.extensions().get::<ProbeGroupId>() {
+                thread_label().store(probe.0, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+    }
+
+    fn on_exit(&self, id: &tracing::span::Id, ctx: Context<'_, S>) {
+        if let Some(span) = ctx.span(id) {
+            if span.extensions().get::<ProbeGroupId>().is_some() {
+                thread_label().store(0, std::sync::atomic::Ordering::Relaxed);
+            }
+        }
+    }
 }
 
 #[cfg(test)]

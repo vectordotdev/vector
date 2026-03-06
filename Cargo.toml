@@ -548,7 +548,7 @@ target-x86_64-unknown-linux-musl =      ["target-unix"]
 # Enables features that work only on systems providing `cfg(unix)`
 unix = ["tikv-jemallocator", "allocation-tracing"]
 allocation-tracing = ["vector-lib/allocation-tracing"]
-component-probes = ["allocation-tracing"]
+component-probes = []
 
 # Enables kubernetes dependencies and shared code. Kubernetes-related sources,
 # transforms and sinks should depend on this feature.
