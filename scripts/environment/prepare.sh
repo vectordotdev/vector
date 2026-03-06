@@ -52,7 +52,6 @@ ALL_MODULES=(
   wasm-pack
   markdownlint
   datadog-ci
-  release-flags  # Not a tool - sources release-flags.sh to set CI env vars
   vdev
 )
 
@@ -184,9 +183,6 @@ fi
 
 install=(install)
 if contains_module rustup; then
-  # shellcheck source=scripts/environment/release-flags.sh
-  . "${SCRIPT_DIR}"/release-flags.sh
-
   ensure_active_toolchain_is_installed
 
   if [ "${require_binstall}" = "true" ]; then
