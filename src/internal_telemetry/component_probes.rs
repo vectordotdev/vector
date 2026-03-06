@@ -36,6 +36,7 @@ fn thread_label() -> &'static AtomicU8 {
 /// `tid -> label_address` mapping with bpftrace.
 #[unsafe(no_mangle)]
 #[inline(never)]
+#[allow(clippy::missing_const_for_fn)]
 pub extern "C" fn vector_register_thread(tid: u64, label_ptr: *const u8) {
     std::hint::black_box((tid, label_ptr));
 }
@@ -83,9 +84,15 @@ pub struct ComponentProbesLayer<S> {
     _subscriber: std::marker::PhantomData<S>,
 }
 
+impl<S> Default for ComponentProbesLayer<S> {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<S> ComponentProbesLayer<S> {
     #[must_use]
-    pub fn new() -> Self {
+    pub const fn new() -> Self {
         Self {
             _subscriber: std::marker::PhantomData,
         }
@@ -121,18 +128,18 @@ where
     }
 
     fn on_enter(&self, id: &tracing::span::Id, ctx: Context<'_, S>) {
-        if let Some(span) = ctx.span(id) {
-            if let Some(probe) = span.extensions().get::<ProbeGroupId>() {
-                thread_label().store(probe.0, std::sync::atomic::Ordering::Relaxed);
-            }
+        if let Some(span) = ctx.span(id)
+            && let Some(probe) = span.extensions().get::<ProbeGroupId>()
+        {
+            thread_label().store(probe.0, std::sync::atomic::Ordering::Relaxed);
         }
     }
 
     fn on_exit(&self, id: &tracing::span::Id, ctx: Context<'_, S>) {
-        if let Some(span) = ctx.span(id) {
-            if span.extensions().get::<ProbeGroupId>().is_some() {
-                thread_label().store(0, std::sync::atomic::Ordering::Relaxed);
-            }
+        if let Some(span) = ctx.span(id)
+            && span.extensions().get::<ProbeGroupId>().is_some()
+        {
+            thread_label().store(0, std::sync::atomic::Ordering::Relaxed);
         }
     }
 }
