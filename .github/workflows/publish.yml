@@ -71,7 +71,7 @@ jobs:
       - name: Bootstrap runner environment (Ubuntu-specific)
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
-        run: bash scripts/environment/prepare.sh --modules=rustup,cross
+        run: bash scripts/environment/prepare.sh --modules=rustup,cross,cargo-deb
       - name: Build Vector
         run: make package-${{ matrix.target }}-all
       - name: Stage package artifacts for publish

@@ -88,6 +88,10 @@ jobs:
           rust: true
           cross: true
           mold: false
+          cargo-deb: true
+
+      - name: Install packaging dependencies
+        run: sudo apt-get install -y cmark-gfm
 
       - run: VECTOR_VERSION="$(vdev version)" make package-deb-x86_64-unknown-linux-gnu
 
