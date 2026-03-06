@@ -5,10 +5,17 @@
 //! the currently executing component. External bpftrace scripts read this tag
 //! on a profile timer to produce per-component flamegraphs.
 
-use std::sync::atomic::AtomicU8;
+use std::{
+    marker::PhantomData,
+    sync::atomic::{AtomicU8, Ordering},
+};
 
-use tracing::Subscriber;
-use tracing_subscriber::{layer::Context, registry::LookupSpan, Layer};
+use tracing::{
+    Subscriber,
+    field::{Field, Visit},
+    span::{Attributes, Id},
+};
+use tracing_subscriber::{Layer, layer::Context, registry::LookupSpan};
 
 /// Returns a leaked `&'static AtomicU8` unique to the current thread.
 ///
@@ -66,8 +73,8 @@ struct ComponentIdVisitor {
     component_id: Option<String>,
 }
 
-impl tracing::field::Visit for ComponentIdVisitor {
-    fn record_debug(&mut self, field: &tracing::field::Field, value: &dyn std::fmt::Debug) {
+impl Visit for ComponentIdVisitor {
+    fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
         if field.name() == "component_id" {
             self.component_id = Some(format!("{value:?}"));
         }
@@ -81,7 +88,7 @@ impl tracing::field::Visit for ComponentIdVisitor {
 /// assigns a unique probe group ID, and registers the mapping with bpftrace
 /// via [`vector_register_component`]. Independent of `allocation-tracing`.
 pub struct ComponentProbesLayer<S> {
-    _subscriber: std::marker::PhantomData<S>,
+    _subscriber: PhantomData<S>,
 }
 
 impl<S> Default for ComponentProbesLayer<S> {
@@ -94,7 +101,7 @@ impl<S> ComponentProbesLayer<S> {
     #[must_use]
     pub const fn new() -> Self {
         Self {
-            _subscriber: std::marker::PhantomData,
+            _subscriber: PhantomData,
         }
     }
 }
@@ -103,17 +110,12 @@ impl<S> Layer<S> for ComponentProbesLayer<S>
 where
     S: Subscriber + for<'a> LookupSpan<'a>,
 {
-    fn on_new_span(
-        &self,
-        attrs: &tracing::span::Attributes<'_>,
-        id: &tracing::span::Id,
-        ctx: Context<'_, S>,
-    ) {
+    fn on_new_span(&self, attrs: &Attributes<'_>, id: &Id, ctx: Context<'_, S>) {
         let mut visitor = ComponentIdVisitor::default();
         attrs.record(&mut visitor);
 
         if let Some(component_id) = visitor.component_id {
-            let probe_id = NEXT_PROBE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+            let probe_id = NEXT_PROBE_ID.fetch_add(1, Ordering::Relaxed);
             if probe_id == 0 {
                 return;
             }
@@ -127,27 +129,25 @@ where
         }
     }
 
-    fn on_enter(&self, id: &tracing::span::Id, ctx: Context<'_, S>) {
+    fn on_enter(&self, id: &Id, ctx: Context<'_, S>) {
         if let Some(span) = ctx.span(id)
             && let Some(probe) = span.extensions().get::<ProbeGroupId>()
         {
-            thread_label().store(probe.0, std::sync::atomic::Ordering::Relaxed);
+            thread_label().store(probe.0, Ordering::Relaxed);
         }
     }
 
-    fn on_exit(&self, id: &tracing::span::Id, ctx: Context<'_, S>) {
+    fn on_exit(&self, id: &Id, ctx: Context<'_, S>) {
         if let Some(span) = ctx.span(id)
             && span.extensions().get::<ProbeGroupId>().is_some()
         {
-            thread_label().store(0, std::sync::atomic::Ordering::Relaxed);
+            thread_label().store(0, Ordering::Relaxed);
         }
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use std::sync::atomic::Ordering;
-
     use super::*;
 
     #[test]
