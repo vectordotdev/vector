@@ -74,6 +74,12 @@ struct ComponentIdVisitor {
 }
 
 impl Visit for ComponentIdVisitor {
+    fn record_str(&mut self, field: &Field, value: &str) {
+        if field.name() == "component_id" {
+            self.component_id = Some(value.to_owned());
+        }
+    }
+
     fn record_debug(&mut self, field: &Field, value: &dyn std::fmt::Debug) {
         if field.name() == "component_id" {
             self.component_id = Some(format!("{value:?}"));
