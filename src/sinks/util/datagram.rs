@@ -1,6 +1,6 @@
 use std::pin::Pin;
 
-use bytes::Bytes;
+use bytes::{Bytes, BytesMut};
 use futures::{StreamExt, stream::BoxStream};
 use futures_util::stream::Peekable;
 #[cfg(unix)]
@@ -8,6 +8,7 @@ use std::path::PathBuf;
 use tokio::net::UdpSocket;
 #[cfg(unix)]
 use tokio::net::UnixDatagram;
+use tokio_util::codec::Encoder;
 use vector_lib::{
     codecs::encoding::{Chunker, Chunking},
     internal_event::{ByteSize, BytesSent, InternalEventHandle, RegisterInternalEvent},
@@ -16,7 +17,8 @@ use vector_lib::{
 #[cfg(unix)]
 use crate::internal_events::{UnixSendIncompleteError, UnixSocketSendError};
 use crate::{
-    event::{EventFinalizers, EventStatus},
+    codecs::Transformer,
+    event::{Event, EventFinalizers, EventStatus, Finalizable},
     internal_events::{
         SocketEventsSent, SocketMode, SocketSendError, UdpChunkingError, UdpSendIncompleteError,
     },
@@ -63,6 +65,32 @@ fn is_recoverable_socket_error(error: &std::io::Error) -> bool {
             | ErrorKind::TimedOut
             | ErrorKind::Interrupted
     )
+}
+
+/// Transforms and encodes a raw event stream into a stream of [`EncodedDatagram`]s
+/// ready to be passed to [`send_datagrams`].
+pub fn encode_to_datagrams<'a, E>(
+    input: BoxStream<'a, Event>,
+    transformer: Transformer,
+    mut encoder: E,
+) -> Peekable<BoxStream<'a, EncodedDatagram>>
+where
+    E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Send + 'a,
+{
+    input
+        .map(move |mut event| {
+            transformer.transform(&mut event);
+            let finalizers = event.take_finalizers();
+            let mut bytes = BytesMut::new();
+            let bytes = if encoder.encode(event, &mut bytes).is_ok() {
+                Some(bytes.freeze())
+            } else {
+                None
+            };
+            EncodedDatagram { bytes, finalizers }
+        })
+        .boxed()
+        .peekable()
 }
 
 pub async fn send_datagrams(

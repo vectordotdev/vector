@@ -22,7 +22,7 @@ use vector_lib::{
     json_size::JsonSize,
 };
 
-use super::datagram::{DatagramSocket, EncodedDatagram, send_datagrams};
+use super::datagram::{DatagramSocket, encode_to_datagrams, send_datagrams};
 use crate::{
     codecs::Transformer,
     common::backoff::ExponentialBackoff,
@@ -259,22 +259,7 @@ where
 
     async fn run_datagram(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
         let bytes_sent = register!(BytesSent::from(Protocol::UNIX));
-        let mut encoder = self.encoder.clone();
-        let transformer = self.transformer.clone();
-        let mut input = input
-            .map(move |mut event| {
-                transformer.transform(&mut event);
-                let finalizers = event.take_finalizers();
-                let mut bytes = BytesMut::new();
-                let bytes = if encoder.encode(event, &mut bytes).is_ok() {
-                    Some(bytes.freeze())
-                } else {
-                    None
-                };
-                EncodedDatagram { bytes, finalizers }
-            })
-            .boxed()
-            .peekable();
+        let mut input = encode_to_datagrams(input, self.transformer.clone(), self.encoder.clone());
 
         while Pin::new(&mut input).peek().await.is_some() {
             let socket = match self.connector.connect_backoff().await {

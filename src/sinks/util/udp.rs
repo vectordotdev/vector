@@ -4,8 +4,7 @@ use std::{
 };
 
 use async_trait::async_trait;
-use bytes::BytesMut;
-use futures::{FutureExt, StreamExt, stream::BoxStream};
+use futures::{FutureExt, stream::BoxStream};
 use snafu::{ResultExt, Snafu};
 use tokio::{net::UdpSocket, time::sleep};
 use tokio_util::codec::Encoder;
@@ -17,13 +16,13 @@ use vector_lib::{
 
 use super::{
     SinkBuildError,
-    datagram::{DatagramSocket, EncodedDatagram, send_datagrams},
+    datagram::{DatagramSocket, encode_to_datagrams, send_datagrams},
 };
 use crate::{
     codecs::Transformer,
     common::backoff::ExponentialBackoff,
     dns,
-    event::{Event, Finalizable},
+    event::Event,
     internal_events::{UdpSocketConnectionEstablished, UdpSocketOutgoingConnectionError},
     net,
     sinks::{Healthcheck, VectorSink, util::StreamSink},
@@ -199,22 +198,7 @@ where
     E: Encoder<Event, Error = vector_lib::codecs::encoding::Error> + Clone + Send + Sync,
 {
     async fn run(self: Box<Self>, input: BoxStream<'_, Event>) -> Result<(), ()> {
-        let mut encoder = self.encoder.clone();
-        let transformer = self.transformer.clone();
-        let mut input = input
-            .map(move |mut event| {
-                transformer.transform(&mut event);
-                let finalizers = event.take_finalizers();
-                let mut bytes = BytesMut::new();
-                let bytes = if encoder.encode(event, &mut bytes).is_ok() {
-                    Some(bytes.freeze())
-                } else {
-                    None
-                };
-                EncodedDatagram { bytes, finalizers }
-            })
-            .boxed()
-            .peekable();
+        let mut input = encode_to_datagrams(input, self.transformer.clone(), self.encoder.clone());
 
         let chunker = self.chunker.clone();
         while Pin::new(&mut input).peek().await.is_some() {
