@@ -1722,19 +1722,40 @@ def render_and_import_component_schema(root_schema, schema_name, component_type,
   )
 end
 
-def render_and_import_generated_global_option_schema(root_schema, global_options)
+def render_and_import_generated_global_option_schema(root_schema)
   global_option_schema = {}
 
-  global_options.each do |component_name, schema_name|
-    friendly_name = "'#{component_name}' #{schema_name} configuration"
+  # Extract ALL properties from ConfigBuilder's allOf schemas
+  # ConfigBuilder uses #[serde(flatten)] for GlobalOptions, which creates multiple allOf schemas
+  # allOf[0] = ConfigBuilder's own fields (api, sources, sinks, etc.)
+  # allOf[1] = Flattened GlobalOptions fields (data_dir, timezone, etc.)
+  all_of_schemas = root_schema['allOf'] || []
 
-    if component_name == "global_option"
-      # Flattening global options
-      unwrap_resolved_schema(root_schema, schema_name, friendly_name)
-        .each { |name, schema| global_option_schema[name] = schema }
-    else
-      # Resolving and assigning other global options
-      global_option_schema[component_name] = resolve_schema_by_name(root_schema, schema_name)
+  if all_of_schemas.empty?
+    @logger.error "Could not find ConfigBuilder allOf schemas in root schema"
+    return
+  end
+
+  @logger.info "[*] Extracting ALL global options from ConfigBuilder (#{all_of_schemas.length} allOf schemas)..."
+
+  # Iterate through all allOf schemas to get all ConfigBuilder properties
+  all_of_schemas.each_with_index do |all_of_schema, index|
+    config_builder_properties = all_of_schema['properties'] || {}
+    @logger.info "[*] Processing allOf[#{index}] with #{config_builder_properties.keys.length} properties..."
+
+    # Iterate through ALL properties in this allOf schema
+    config_builder_properties.each do |field_name, field_schema|
+      # Skip fields marked with docs::hidden
+      metadata = field_schema['_metadata'] || {}
+      if metadata['docs::hidden']
+        @logger.info "[*] Skipping '#{field_name}' (marked as docs::hidden)"
+        next
+      end
+
+      # Extract and resolve the field
+      @logger.info "[*] Extracting '#{field_name}' field from ConfigBuilder..."
+      global_option_schema[field_name] = resolve_schema(root_schema, field_schema)
+      @logger.info "[✓] Resolved '#{field_name}'"
     end
   end
 
@@ -1793,11 +1814,6 @@ all_components.each do |component_type, components|
 end
 
 # At last, we generate the global options configuration.
-global_options = root_schema['definitions'].filter_map do |key, definition|
-  component_type = get_schema_metadata(definition, 'docs::component_type')
-  component_name = get_schema_metadata(definition, 'docs::component_name')
-  { component_name => key } if component_type == "global_option"
-end
-.reduce { |acc, item| nested_merge(acc, item) }
-
-render_and_import_generated_global_option_schema(root_schema, global_options)
+# We extract ALL global options directly from ConfigBuilder instead of using metadata.
+# ConfigBuilder is the single source of truth for what's actually allowed in the configuration.
+render_and_import_generated_global_option_schema(root_schema)
