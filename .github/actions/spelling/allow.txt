@@ -558,5 +558,9 @@ zstandard
 ZTE
 Zync
 sighup
+CPPFLAGS
+LDFLAGS
+libsasl
+pkgconfig
 CLAUDE
 linting
