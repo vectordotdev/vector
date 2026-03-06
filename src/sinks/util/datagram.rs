@@ -35,6 +35,36 @@ pub struct EncodedDatagram {
     pub finalizers: EventFinalizers,
 }
 
+enum SendOutcome {
+    /// Datagram was successfully sent.
+    Delivered,
+    /// Per-event error that reconnecting the socket cannot fix (e.g. EMSGSIZE,
+    /// EDESTADDRREQ). Drop the event and move on.
+    UnrecoverableError,
+    /// Socket-level error that may be resolved by reconnecting.
+    SocketError,
+}
+
+/// Returns `true` only for errors that are known to be transient socket-level
+/// failures where reconnecting may succeed. All other errors — including
+/// EDESTADDRREQ (os error 89), EMSGSIZE, and any unknown error — are treated as
+/// non-recoverable so the stream can drop the event and make progress.
+fn is_recoverable_socket_error(error: &std::io::Error) -> bool {
+    use std::io::ErrorKind;
+    matches!(
+        error.kind(),
+        ErrorKind::ConnectionRefused
+            | ErrorKind::ConnectionReset
+            | ErrorKind::ConnectionAborted
+            | ErrorKind::BrokenPipe
+            | ErrorKind::NetworkDown
+            | ErrorKind::HostUnreachable
+            | ErrorKind::NetworkUnreachable
+            | ErrorKind::TimedOut
+            | ErrorKind::Interrupted
+    )
+}
+
 pub async fn send_datagrams(
     input: &mut Peekable<BoxStream<'_, EncodedDatagram>>,
     mut socket: DatagramSocket,
@@ -57,47 +87,47 @@ pub async fn send_datagrams(
             continue;
         };
 
-        let mut socket_error = false;
-        let delivered = if let Some(chunker) = chunker {
+        let outcome = if let Some(chunker) = chunker {
             let data_size = bytes.len();
             match chunker.chunk(bytes) {
                 Ok(chunks) => {
-                    let mut chunks_delivered = true;
+                    let mut result = SendOutcome::Delivered;
                     for chunk in chunks {
-                        if !send_and_emit(&mut socket, &chunk, bytes_sent).await {
-                            chunks_delivered = false;
-                            socket_error = true;
+                        result = send_and_emit(&mut socket, &chunk, bytes_sent).await;
+                        if !matches!(result, SendOutcome::Delivered) {
                             break;
                         }
                     }
-                    chunks_delivered
+                    result
                 }
                 Err(err) => {
                     emit!(UdpChunkingError {
                         data_size,
                         error: err
                     });
-                    false
+                    SendOutcome::UnrecoverableError
                 }
             }
-        } else if send_and_emit(&mut socket, &bytes, bytes_sent).await {
-            true
         } else {
-            socket_error = true;
-            false
+            send_and_emit(&mut socket, &bytes, bytes_sent).await
         };
 
-        if delivered {
-            if let Some(datagram) = input.next().await {
-                datagram.finalizers.update_status(EventStatus::Delivered);
+        match outcome {
+            SendOutcome::Delivered => {
+                if let Some(datagram) = input.next().await {
+                    datagram.finalizers.update_status(EventStatus::Delivered);
+                }
             }
-        } else if socket_error {
-            // Socket error — leave item in stream for retry after reconnection.
-            break;
-        } else {
-            // Chunking error — consume and mark errored, continue with next event.
-            if let Some(datagram) = input.next().await {
-                datagram.finalizers.update_status(EventStatus::Errored);
+            SendOutcome::SocketError => {
+                // Leave item in stream for retry after reconnection.
+                break;
+            }
+            SendOutcome::UnrecoverableError => {
+                // Per-event or permanent error — consume and mark errored so the
+                // stream can make progress rather than retrying forever.
+                if let Some(datagram) = input.next().await {
+                    datagram.finalizers.update_status(EventStatus::Errored);
+                }
             }
         }
     }
@@ -107,7 +137,7 @@ async fn send_and_emit(
     socket: &mut DatagramSocket,
     bytes: &bytes::Bytes,
     bytes_sent: &<BytesSent as RegisterInternalEvent>::Handle,
-) -> bool {
+) -> SendOutcome {
     match send_datagram(socket, bytes).await {
         Ok(()) => {
             emit!(SocketEventsSent {
@@ -120,9 +150,10 @@ async fn send_and_emit(
                 byte_size: bytes.len().into(),
             });
             bytes_sent.emit(ByteSize(bytes.len()));
-            true
+            SendOutcome::Delivered
         }
         Err(error) => {
+            let recoverable = is_recoverable_socket_error(&error);
             match socket {
                 DatagramSocket::Udp(_) => emit!(SocketSendError {
                     mode: SocketMode::Udp,
@@ -136,7 +167,11 @@ async fn send_and_emit(
                     })
                 }
             };
-            false
+            if recoverable {
+                SendOutcome::SocketError
+            } else {
+                SendOutcome::UnrecoverableError
+            }
         }
     }
 }
