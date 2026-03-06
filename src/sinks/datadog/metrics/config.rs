@@ -27,6 +27,8 @@ pub struct DatadogMetricsDefaultBatchSettings;
 
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
+    // No default byte cap here; the appropriate limit (v1: 60 MiB, v2: 5 MiB) is applied at
+    // sink build time based on the active series API version.
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 2.0;
 }
@@ -254,7 +256,17 @@ impl DatadogMetricsConfig {
         dd_common: &DatadogCommonConfig,
         client: HttpClient,
     ) -> crate::Result<VectorSink> {
-        let batcher_settings = self.batch.into_batcher_settings()?;
+        let mut batcher_settings = self.batch.into_batcher_settings()?;
+        // Cap the batcher to the endpoint's uncompressed payload limit when the user has not set
+        // an explicit max_bytes. This ensures each batch fits in a single HTTP request without
+        // splitting, which avoids request amplification and the associated memory overhead.
+        // Different endpoints have very different limits (v2 series: 5 MiB, v1/sketches: 60 MiB),
+        // so the cap must be applied dynamically rather than hardcoded as a default.
+        if batcher_settings.size_limit == usize::MAX {
+            let series_version = SeriesApiVersion::get_api_version_backwards_compatible();
+            batcher_settings.size_limit =
+                DatadogMetricsEndpoint::Series(series_version).payload_limits().uncompressed;
+        }
 
         // TODO: revisit our concurrency and batching defaults
         let request_limits = self.request.into_settings();
@@ -302,5 +314,63 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogMetricsConfig>();
+    }
+
+    // When the user leaves max_bytes unset, the default batch config produces size_limit ==
+    // usize::MAX, which is the sentinel that build_sink replaces with the endpoint limit.
+    #[test]
+    fn batcher_default_produces_no_byte_limit() {
+        let config = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default();
+        let settings = config.into_batcher_settings().unwrap();
+        assert_eq!(settings.size_limit, usize::MAX);
+    }
+
+    // An explicit user-supplied max_bytes must not be clobbered by the endpoint-limit override.
+    #[test]
+    fn batcher_user_max_bytes_is_preserved() {
+        let config = BatchConfig::<DatadogMetricsDefaultBatchSettings> {
+            max_bytes: Some(1_000_000),
+            ..Default::default()
+        };
+        let settings = config.into_batcher_settings().unwrap();
+        assert_eq!(settings.size_limit, 1_000_000);
+    }
+
+    // Simulate the override in build_sink: when size_limit is usize::MAX the endpoint's
+    // uncompressed payload limit should be applied.
+    #[test]
+    fn batcher_size_limit_override_uses_v2_endpoint_limit() {
+        let mut settings = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default()
+            .into_batcher_settings()
+            .unwrap();
+        if settings.size_limit == usize::MAX {
+            settings.size_limit = DatadogMetricsEndpoint::Series(SeriesApiVersion::V2)
+                .payload_limits()
+                .uncompressed;
+        }
+        assert_eq!(
+            settings.size_limit,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2)
+                .payload_limits()
+                .uncompressed,
+        );
+    }
+
+    #[test]
+    fn batcher_size_limit_override_uses_v1_endpoint_limit() {
+        let mut settings = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default()
+            .into_batcher_settings()
+            .unwrap();
+        if settings.size_limit == usize::MAX {
+            settings.size_limit = DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
+                .payload_limits()
+                .uncompressed;
+        }
+        assert_eq!(
+            settings.size_limit,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
+                .payload_limits()
+                .uncompressed,
+        );
     }
 }
