@@ -90,7 +90,7 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
         subscriber.with(allocation_layer)
     };
 
-    #[cfg(feature = "component-probes")]
+    #[cfg(all(target_os = "linux", feature = "component-probes"))]
     let subscriber = {
         let probes_layer =
             crate::internal_telemetry::component_probes::ComponentProbesLayer::new()
