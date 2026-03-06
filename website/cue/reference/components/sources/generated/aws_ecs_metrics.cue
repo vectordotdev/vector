@@ -13,7 +13,7 @@ generated: components: sources: aws_ecs_metrics: configuration: {
 			- The version 2 endpoint base URI is `169.254.170.2/v2/`.
 			"""
 		required: false
-		type: string: default: "http://169.254.170.2/v2"
+		type: string: default: "http://169.254.170.2/v4/3a7c9b91-b966-4fee-a532-ffe77f6ff91f"
 	}
 	namespace: {
 		description: """
@@ -47,7 +47,7 @@ generated: components: sources: aws_ecs_metrics: configuration: {
 			"""
 		required: false
 		type: string: {
-			default: "v2"
+			default: "v3"
 			enum: {
 				v2: """
 					Version 2.
