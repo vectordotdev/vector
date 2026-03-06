@@ -16,7 +16,7 @@ list-docs-files() {
 }
 
 cmd_check() {
-  cargo vdev check docs
+  ${VDEV:-cargo vdev} check docs
 }
 
 cmd_list() {

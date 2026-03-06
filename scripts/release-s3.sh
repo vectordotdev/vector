@@ -7,8 +7,8 @@ set -euo pipefail
 #
 #   Uploads archives and packages to S3
 
-CHANNEL="${CHANNEL:-"$(cargo vdev release channel)"}"
-VERSION="${VECTOR_VERSION:-"$(cargo vdev version)"}"
+CHANNEL="${CHANNEL:-"$(${VDEV:-cargo vdev} release channel)"}"
+VERSION="${VECTOR_VERSION:-"$(${VDEV:-cargo vdev} version)"}"
 DATE="${DATE:-"$(date -u +%Y-%m-%d)"}"
 VERIFY_TIMEOUT="${VERIFY_TIMEOUT:-"30"}" # seconds
 VERIFY_RETRIES="${VERIFY_RETRIES:-"2"}"
