@@ -54,7 +54,7 @@
   "examples": [
     {
       "title": "Exact match",
-      "source": "find_enrichment_table_records!(\n    \"test-foo-bar\",\n    {\"surname\": \"Smith\"}\n)\n",
+      "source": "find_enrichment_table_records!(\n    \"test\",\n    {\"surname\": \"Smith\"}\n)\n",
       "return": [
         {
           "id": 1,
