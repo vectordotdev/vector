@@ -7,7 +7,7 @@
 
 use std::{
     marker::PhantomData,
-    sync::atomic::{AtomicU8, Ordering},
+    sync::atomic::{AtomicU16, Ordering},
 };
 
 use tracing::{
@@ -17,19 +17,19 @@ use tracing::{
 };
 use tracing_subscriber::{Layer, layer::Context, registry::LookupSpan};
 
-/// Returns a leaked `&'static AtomicU8` unique to the current thread.
+/// Returns a leaked `&'static AtomicU16` unique to the current thread.
 ///
 /// On first access, allocates a byte via `Box::leak` and calls
 /// [`vector_register_thread`] so bpftrace can map this thread's TID
 /// to the byte's address. The leaked byte is valid for the process lifetime.
-fn thread_label() -> &'static AtomicU8 {
+fn thread_label() -> &'static AtomicU16 {
     thread_local! {
-        static LABEL: &'static AtomicU8 = {
-            let label: &'static AtomicU8 = Box::leak(Box::new(AtomicU8::new(0)));
+        static LABEL: &'static AtomicU16 = {
+            let label: &'static AtomicU16 = Box::leak(Box::new(AtomicU16::new(0)));
             #[cfg(target_os = "linux")]
             {
                 let tid = nix::unistd::gettid().as_raw() as u64;
-                vector_register_thread(tid, label as *const AtomicU8 as *const u8);
+                vector_register_thread(tid, label as *const AtomicU16 as *const u8);
             }
             label
         };
@@ -52,7 +52,7 @@ pub extern "C" fn vector_register_thread(tid: u64, label_ptr: *const u8) {
 #[inline(never)]
 #[allow(clippy::missing_const_for_fn)]
 pub extern "C" fn vector_register_component(
-    id: u8,
+    id: u16,
     name_ptr: *const u8,
     name_len: usize,
 ) {
@@ -60,10 +60,10 @@ pub extern "C" fn vector_register_component(
 }
 
 /// Next probe group ID. 0 means idle (no component active).
-static NEXT_PROBE_ID: AtomicU8 = AtomicU8::new(1);
+static NEXT_PROBE_ID: AtomicU16 = AtomicU16::new(1);
 
 /// Stored in span extensions to associate a span with a probe group ID.
-struct ProbeGroupId(u8);
+struct ProbeGroupId(u16);
 
 /// Extracts the `component_id` field value from span attributes.
 #[derive(Default)]
@@ -86,7 +86,7 @@ impl Visit for ComponentIdVisitor {
 }
 
 /// A tracing layer that writes the active component's group ID to a per-thread
-/// [`AtomicU8`] on span enter and clears it on exit.
+/// [`AtomicU16`] on span enter and clears it on exit.
 ///
 /// Detects component spans via the `component_id` field in `on_new_span`,
 /// assigns a unique probe group ID, and registers the mapping with bpftrace
@@ -157,7 +157,7 @@ mod tests {
     #[test]
     fn thread_label_store_and_clear() {
         let label = thread_label();
-        let group_id: u8 = 7;
+        let group_id: u16 = 7;
 
         label.store(group_id, Ordering::Relaxed);
         assert_eq!(label.load(Ordering::Relaxed), group_id);
@@ -180,7 +180,7 @@ mod tests {
         for _ in 0..4 {
             let tx = tx.clone();
             std::thread::spawn(move || {
-                tx.send(thread_label() as *const AtomicU8 as usize)
+                tx.send(thread_label() as *const AtomicU16 as usize)
                     .unwrap();
             });
         }
