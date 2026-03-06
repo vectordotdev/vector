@@ -35,6 +35,7 @@ mod cgroups;
 mod cpu;
 mod disk;
 mod filesystem;
+mod host_info;
 mod memory;
 mod network;
 mod process;
@@ -69,6 +70,9 @@ pub enum Collector {
 
     /// Metrics related to the host.
     Host,
+
+    /// Static host system information (OS, CPU, network, etc.)
+    HostInfo,
 
     /// Metrics related to memory utilization.
     Memory,
@@ -186,7 +190,7 @@ pub fn default_namespace() -> Option<String> {
     Some(String::from("host"))
 }
 
-const fn example_collectors() -> [&'static str; 9] {
+const fn example_collectors() -> [&'static str; 10] {
     [
         "cgroups",
         "cpu",
@@ -194,6 +198,7 @@ const fn example_collectors() -> [&'static str; 9] {
         "filesystem",
         "load",
         "host",
+        "hostinfo",
         "memory",
         "network",
         "tcp",
@@ -207,6 +212,7 @@ fn default_collectors() -> Option<Vec<Collector>> {
         Collector::Filesystem,
         Collector::Load,
         Collector::Host,
+        Collector::HostInfo,
         Collector::Memory,
         Collector::Network,
         Collector::Process,
@@ -408,6 +414,9 @@ impl HostMetrics {
         }
         if self.config.has_collector(Collector::Host) {
             self.host_metrics(&mut buffer).await;
+        }
+        if self.config.has_collector(Collector::HostInfo) {
+            self.host_info_metrics(&mut buffer);
         }
         if self.config.has_collector(Collector::Memory) {
             self.memory_metrics(&mut buffer).await;
@@ -760,6 +769,7 @@ mod tests {
             Collector::Filesystem,
             Collector::Load,
             Collector::Host,
+            Collector::HostInfo,
             Collector::Memory,
             Collector::Network,
         ] {

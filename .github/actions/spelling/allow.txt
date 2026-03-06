@@ -224,6 +224,7 @@ hitag
 hitech
 HMACs
 hogwarts
+hostinfo
 htc
 htmltest
 HTTPDATE
@@ -525,6 +526,7 @@ usergroups
 userguide
 Verizon
 vhosts
+vmware
 Videocon
 Viewsonic
 WCDMA
@@ -535,6 +537,7 @@ Wiko
 winapi
 workarounds
 Woxter
+wsl
 wwang
 XCHACHA
 Xeon
