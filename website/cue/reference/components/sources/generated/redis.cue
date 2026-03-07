@@ -32,7 +32,6 @@ generated: components: sources: redis: configuration: {
 						description: """
 																The Avro schema definition.
 																**Note**: The following [`apache_avro::types::Value`] variants are *not* supported:
-																* `Date`
 																* `Decimal`
 																* `Duration`
 																* `Fixed`
