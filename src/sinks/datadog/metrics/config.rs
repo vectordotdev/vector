@@ -25,14 +25,10 @@ use crate::{
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
 
-// This default is centered around "series" data, which should be the lion's share of what we
-// process.  Given that a single series, when encoded, is in the 150-300 byte range, we can fit a
-// lot of these into a single request, something like 150-200K series.  Simply to be a little more
-// conservative, though, we use 100K here.  This will also get a little more tricky when it comes to
-// distributions and sketches, but we're going to have to implement incremental encoding to handle
-// "we've exceeded our maximum payload size, split this batch" scenarios anyways.
 impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
     const MAX_EVENTS: Option<usize> = Some(100_000);
+    // No default byte cap here; the appropriate limit (v1: 60 MiB, v2: 5 MiB) is applied at
+    // sink build time based on the active series API version.
     const MAX_BYTES: Option<usize> = None;
     const TIMEOUT_SECS: f64 = 2.0;
 }
@@ -40,6 +36,9 @@ impl SinkBatchSettings for DatadogMetricsDefaultBatchSettings {
 pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
 pub(super) const SERIES_V2_PATH: &str = "/api/v2/series";
 pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
+
+// TODO: the series V1 endpoint support is considered deprecated and should be removed in a future release.
+// At that time when the V1 support is removed, the SeriesApiVersion stops being useful and can be removed.
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum SeriesApiVersion {
@@ -54,12 +53,12 @@ impl SeriesApiVersion {
             Self::V2 => SERIES_V2_PATH,
         }
     }
-    fn get_api_version() -> Self {
+    fn get_api_version_backwards_compatible() -> Self {
         static API_VERSION: OnceLock<SeriesApiVersion> = OnceLock::new();
         *API_VERSION.get_or_init(|| {
-            match std::env::var("VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API") {
-                Ok(_) => Self::V2,
-                Err(_) => Self::V1,
+            match std::env::var("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API") {
+                Ok(_) => Self::V1,
+                Err(_) => Self::V2,
             }
         })
     }
@@ -96,12 +95,11 @@ impl DatadogMetricsEndpoint {
 
     // Creates an instance of the `Series` variant with the default API version.
     pub fn series() -> Self {
-        Self::Series(SeriesApiVersion::get_api_version())
+        Self::Series(SeriesApiVersion::get_api_version_backwards_compatible())
     }
 
     pub(super) const fn payload_limits(self) -> DatadogMetricsPayloadLimits {
         // from https://docs.datadoghq.com/api/latest/metrics/#submit-metrics
-
         let (uncompressed, compressed) = match self {
             // Sketches use the same payload size limits as v1 series
             DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
@@ -222,7 +220,12 @@ impl DatadogMetricsConfig {
     ) -> crate::Result<DatadogMetricsEndpointConfiguration> {
         let base_uri = self.get_base_agent_endpoint(dd_common);
 
-        let series_endpoint = build_uri(&base_uri, SeriesApiVersion::get_api_version().get_path())?;
+        // TODO: the V1 endpoint support is considered deprecated and should be removed in a future release.
+        // At that time, the get_api_version_backwards_compatible() should be replaced with statically using the v2.
+        let series_endpoint = build_uri(
+            &base_uri,
+            SeriesApiVersion::get_api_version_backwards_compatible().get_path(),
+        )?;
         let sketches_endpoint = build_uri(&base_uri, SKETCHES_PATH)?;
 
         Ok(DatadogMetricsEndpointConfiguration::new(
@@ -253,7 +256,17 @@ impl DatadogMetricsConfig {
         dd_common: &DatadogCommonConfig,
         client: HttpClient,
     ) -> crate::Result<VectorSink> {
-        let batcher_settings = self.batch.into_batcher_settings()?;
+        let mut batcher_settings = self.batch.into_batcher_settings()?;
+        // Cap the batcher to the endpoint's uncompressed payload limit when the user has not set
+        // an explicit max_bytes. This ensures each batch fits in a single HTTP request without
+        // splitting, which avoids request amplification and the associated memory overhead.
+        // Different endpoints have very different limits (v2 series: 5 MiB, v1/sketches: 60 MiB),
+        // so the cap must be applied dynamically rather than hardcoded as a default.
+        if batcher_settings.size_limit == usize::MAX {
+            let series_version = SeriesApiVersion::get_api_version_backwards_compatible();
+            batcher_settings.size_limit =
+                DatadogMetricsEndpoint::Series(series_version).payload_limits().uncompressed;
+        }
 
         // TODO: revisit our concurrency and batching defaults
         let request_limits = self.request.into_settings();
@@ -301,5 +314,63 @@ mod tests {
     #[test]
     fn generate_config() {
         crate::test_util::test_generate_config::<DatadogMetricsConfig>();
+    }
+
+    // When the user leaves max_bytes unset, the default batch config produces size_limit ==
+    // usize::MAX, which is the sentinel that build_sink replaces with the endpoint limit.
+    #[test]
+    fn batcher_default_produces_no_byte_limit() {
+        let config = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default();
+        let settings = config.into_batcher_settings().unwrap();
+        assert_eq!(settings.size_limit, usize::MAX);
+    }
+
+    // An explicit user-supplied max_bytes must not be clobbered by the endpoint-limit override.
+    #[test]
+    fn batcher_user_max_bytes_is_preserved() {
+        let config = BatchConfig::<DatadogMetricsDefaultBatchSettings> {
+            max_bytes: Some(1_000_000),
+            ..Default::default()
+        };
+        let settings = config.into_batcher_settings().unwrap();
+        assert_eq!(settings.size_limit, 1_000_000);
+    }
+
+    // Simulate the override in build_sink: when size_limit is usize::MAX the endpoint's
+    // uncompressed payload limit should be applied.
+    #[test]
+    fn batcher_size_limit_override_uses_v2_endpoint_limit() {
+        let mut settings = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default()
+            .into_batcher_settings()
+            .unwrap();
+        if settings.size_limit == usize::MAX {
+            settings.size_limit = DatadogMetricsEndpoint::Series(SeriesApiVersion::V2)
+                .payload_limits()
+                .uncompressed;
+        }
+        assert_eq!(
+            settings.size_limit,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2)
+                .payload_limits()
+                .uncompressed,
+        );
+    }
+
+    #[test]
+    fn batcher_size_limit_override_uses_v1_endpoint_limit() {
+        let mut settings = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default()
+            .into_batcher_settings()
+            .unwrap();
+        if settings.size_limit == usize::MAX {
+            settings.size_limit = DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
+                .payload_limits()
+                .uncompressed;
+        }
+        assert_eq!(
+            settings.size_limit,
+            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
+                .payload_limits()
+                .uncompressed,
+        );
     }
 }
