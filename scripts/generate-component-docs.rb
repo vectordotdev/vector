@@ -1722,11 +1722,11 @@ def render_and_import_component_schema(root_schema, schema_name, component_type,
   )
 end
 
-def render_and_import_generated_global_option_schema(root_schema)
-  global_option_schema = {}
+def render_and_import_generated_top_level_config_schema(root_schema)
+  top_level_config_schema = {}
 
   # Extract ALL properties from ConfigBuilder's allOf schemas
-  # ConfigBuilder uses #[serde(flatten)] for GlobalOptions, which creates multiple allOf schemas
+  # ConfigBuilder includes top-level config fields and uses #[serde(flatten)] for GlobalOptions
   # allOf[0] = ConfigBuilder's own fields (api, sources, sinks, etc.)
   # allOf[1] = Flattened GlobalOptions fields (data_dir, timezone, etc.)
   all_of_schemas = root_schema['allOf'] || []
@@ -1736,7 +1736,7 @@ def render_and_import_generated_global_option_schema(root_schema)
     return
   end
 
-  @logger.info "[*] Extracting ALL global options from ConfigBuilder (#{all_of_schemas.length} allOf schemas)..."
+  @logger.info "[*] Extracting ALL top-level config fields from ConfigBuilder (#{all_of_schemas.length} allOf schemas)..."
 
   # Iterate through all allOf schemas to get all ConfigBuilder properties
   all_of_schemas.each_with_index do |all_of_schema, index|
@@ -1754,13 +1754,13 @@ def render_and_import_generated_global_option_schema(root_schema)
 
       # Extract and resolve the field
       @logger.info "[*] Extracting '#{field_name}' field from ConfigBuilder..."
-      global_option_schema[field_name] = resolve_schema(root_schema, field_schema)
+      top_level_config_schema[field_name] = resolve_schema(root_schema, field_schema)
       @logger.info "[✓] Resolved '#{field_name}'"
     end
   end
 
   render_and_import_schema(
-    global_option_schema,
+    top_level_config_schema,
     "configuration",
     ["generated", "configuration"],
     "generated/configuration.cue"
@@ -1813,7 +1813,7 @@ all_components.each do |component_type, components|
   end
 end
 
-# At last, we generate the global options configuration.
-# We extract ALL global options directly from ConfigBuilder instead of using metadata.
+# At last, we generate the top-level Vector configuration schema.
+# We extract ALL top-level config fields directly from ConfigBuilder instead of using metadata.
 # ConfigBuilder is the single source of truth for what's actually allowed in the configuration.
-render_and_import_generated_global_option_schema(root_schema)
+render_and_import_generated_top_level_config_schema(root_schema)
