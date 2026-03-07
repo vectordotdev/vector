@@ -12821,7 +12821,7 @@ name = "vector-config-common"
 version = "0.1.0"
 dependencies = [
  "convert_case 0.8.0",
- "darling 0.20.11",
+ "darling 0.21.3",
  "proc-macro2 1.0.106",
  "quote 1.0.44",
  "serde",
@@ -12834,7 +12834,7 @@ dependencies = [
 name = "vector-config-macros"
 version = "0.1.0"
 dependencies = [
- "darling 0.20.11",
+ "darling 0.21.3",
  "proc-macro2 1.0.106",
  "quote 1.0.44",
  "serde",
