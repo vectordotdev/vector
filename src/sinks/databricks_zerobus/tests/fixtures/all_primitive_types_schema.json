@@ -1,0 +1,81 @@
+{
+  "name": "all_types_table",
+  "catalog_name": "test_catalog",
+  "schema_name": "test_schema",
+  "table_type": "MANAGED",
+  "data_source_format": "DELTA",
+  "columns": [
+    {
+      "name": "col_string",
+      "type_text": "string",
+      "type_name": "STRING",
+      "position": 1,
+      "nullable": true,
+      "type_json": "{\"name\":\"col_string\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "col_int",
+      "type_text": "int",
+      "type_name": "INT",
+      "position": 2,
+      "nullable": true,
+      "type_json": "{\"name\":\"col_int\",\"type\":\"integer\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "col_long",
+      "type_text": "bigint",
+      "type_name": "LONG",
+      "position": 3,
+      "nullable": true,
+      "type_json": "{\"name\":\"col_long\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "col_double",
+      "type_text": "double",
+      "type_name": "DOUBLE",
+      "position": 4,
+      "nullable": true,
+      "type_json": "{\"name\":\"col_double\",\"type\":\"double\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "col_float",
+      "type_text": "float",
+      "type_name": "FLOAT",
+      "position": 5,
+      "nullable": true,
+      "type_json": "{\"name\":\"col_float\",\"type\":\"float\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "col_boolean",
+      "type_text": "boolean",
+      "type_name": "BOOLEAN",
+      "position": 6,
+      "nullable": true,
+      "type_json": "{\"name\":\"col_boolean\",\"type\":\"boolean\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "col_binary",
+      "type_text": "binary",
+      "type_name": "BINARY",
+      "position": 7,
+      "nullable": true,
+      "type_json": "{\"name\":\"col_binary\",\"type\":\"binary\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "col_timestamp",
+      "type_text": "timestamp",
+      "type_name": "TIMESTAMP",
+      "position": 8,
+      "nullable": true,
+      "type_json": "{\"name\":\"col_timestamp\",\"type\":\"timestamp\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "col_date",
+      "type_text": "date",
+      "type_name": "DATE",
+      "position": 9,
+      "nullable": true,
+      "type_json": "{\"name\":\"col_date\",\"type\":\"date\",\"nullable\":true,\"metadata\":{}}"
+    }
+  ]
+}

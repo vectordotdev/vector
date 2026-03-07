@@ -1,0 +1,19 @@
+{
+  "name": "nested_struct_table",
+  "catalog_name": "test_catalog",
+  "schema_name": "test_schema",
+  "table_type": "MANAGED",
+  "data_source_format": "DELTA",
+  "columns": [
+    {
+      "name": "user_info",
+      "type_text": "struct<name:string,address:struct<street:string,city:string,zipcode:int>>",
+      "type_name": "STRUCT",
+      "position": 1,
+      "type_precision": 0,
+      "type_scale": 0,
+      "nullable": true,
+      "type_json": "{\"name\":\"user_info\",\"type\":{\"type\":\"struct\",\"fields\":[{\"name\":\"name\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"address\",\"type\":{\"type\":\"struct\",\"fields\":[{\"name\":\"street\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"city\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"zipcode\",\"type\":\"integer\",\"nullable\":true,\"metadata\":{}}]},\"nullable\":true,\"metadata\":{}}]},\"nullable\":true,\"metadata\":{}}"
+    }
+  ]
+}

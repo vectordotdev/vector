@@ -1,0 +1,47 @@
+{
+  "name": "mixed_types_table",
+  "catalog_name": "test_catalog",
+  "schema_name": "test_schema",
+  "columns": [
+    {
+      "name": "field_001",
+      "type_text": "timestamp",
+      "type_name": "TIMESTAMP",
+      "position": 0,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_001\",\"type\":\"timestamp\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_002",
+      "type_text": "bigint",
+      "type_name": "LONG",
+      "position": 12,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_002\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_003",
+      "type_text": "struct<field_004:struct<field_005:bigint,field_006:bigint>>",
+      "type_name": "STRUCT",
+      "position": 13,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_003\",\"type\":{\"type\":\"struct\",\"fields\":[{\"name\":\"field_004\",\"type\":{\"type\":\"struct\",\"fields\":[{\"name\":\"field_005\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}},{\"name\":\"field_006\",\"type\":\"long\",\"nullable\":true,\"metadata\":{}}]},\"nullable\":true,\"metadata\":{}}]},\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_007",
+      "type_text": "array<bigint>",
+      "type_name": "ARRAY",
+      "position": 16,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_007\",\"type\":{\"type\":\"array\",\"elementType\":\"long\",\"containsNull\":true},\"nullable\":true,\"metadata\":{}}"
+    },
+    {
+      "name": "field_008",
+      "type_text": "map<string,string>",
+      "type_name": "MAP",
+      "position": 20,
+      "nullable": true,
+      "type_json": "{\"name\":\"field_008\",\"type\":{\"type\":\"map\",\"keyType\":\"string\",\"valueType\":\"string\",\"valueContainsNull\":true},\"nullable\":true,\"metadata\":{}}"
+    }
+  ]
+}

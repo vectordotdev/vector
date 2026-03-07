@@ -280,7 +280,7 @@ impl ClickhouseConfig {
         };
 
         if let Some(batch_encoding) = &self.batch_encoding {
-            use vector_lib::codecs::{BatchEncoder, BatchSerializer};
+            use vector_lib::codecs::BatchEncoder;
 
             // Validate that batch_encoding is only compatible with ArrowStream format
             if self.format != Format::ArrowStream {
@@ -293,6 +293,11 @@ impl ClickhouseConfig {
 
             let mut arrow_config = match batch_encoding {
                 BatchSerializerConfig::ArrowStream(config) => config.clone(),
+                _ => {
+                    return Err(
+                        "'batch_encoding' for ClickHouse must use 'arrow_stream' codec.".into(),
+                    );
+                }
             };
 
             self.resolve_arrow_schema(
@@ -305,8 +310,7 @@ impl ClickhouseConfig {
             .await?;
 
             let resolved_batch_config = BatchSerializerConfig::ArrowStream(arrow_config);
-            let arrow_serializer = resolved_batch_config.build()?;
-            let batch_serializer = BatchSerializer::Arrow(arrow_serializer);
+            let batch_serializer = resolved_batch_config.build()?;
             let encoder = EncoderKind::Batch(BatchEncoder::new(batch_serializer));
 
             return Ok((Format::ArrowStream, encoder));
