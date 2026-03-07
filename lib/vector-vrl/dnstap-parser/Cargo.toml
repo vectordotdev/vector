@@ -10,15 +10,15 @@ license = "MIT"
 base64 = { workspace = true, features = ["alloc"] }
 bytes = { workspace = true, features = ["serde"] }
 chrono.workspace = true
-dnsmsg-parser = { path = "../dnsmsg-parser" }
+dnsmsg-parser = { path = "../../dnsmsg-parser" }
 hickory-proto.workspace = true
 prost.workspace = true
 snafu.workspace = true
 tracing.workspace = true
 vector-config.workspace = true
-vector-common = { path = "../vector-common" }
-vector-lookup = { path = "../vector-lookup", features = ["test"] }
-vector-core = { path = "../vector-core" }
+vector-common = { path = "../../vector-common" }
+vector-lookup = { path = "../../vector-lookup", features = ["test"] }
+vector-core = { path = "../../vector-core" }
 vrl.workspace = true
 paste.workspace = true
 
