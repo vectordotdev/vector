@@ -62,7 +62,7 @@ Much of Vector's reference documentation is automatically compiled from source c
 To regenerate this content, run:
 
 ```bash
-make generate-component-docs
+make generate-docs
 ```
 
 ### Adding Documentation for New Components
