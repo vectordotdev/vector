@@ -110,6 +110,12 @@ impl ProtobufSerializer {
     pub fn descriptor_proto(&self) -> &prost_reflect::prost_types::DescriptorProto {
         self.message_descriptor.descriptor_proto()
     }
+
+    /// Encode the descriptor proto to bytes.
+    pub fn encode_descriptor_proto(&self) -> Vec<u8> {
+        use prost_reflect::prost::Message as _;
+        self.message_descriptor.descriptor_proto().encode_to_vec()
+    }
 }
 
 impl Encoder<Event> for ProtobufSerializer {
