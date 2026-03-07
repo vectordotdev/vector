@@ -68,6 +68,7 @@ where
                     healthcheck: Default::default(),
                     buffer: Default::default(),
                     proxy: Default::default(),
+                    http_1_proxy: Default::default(),
                     inner: sink,
                 },
             )

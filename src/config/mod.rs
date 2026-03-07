@@ -76,6 +76,10 @@ pub use vector_lib::{
     id::Inputs,
 };
 
+pub mod http_1 {
+    pub use vector_lib::config::proxy_http_1::ProxyConfig;
+}
+
 #[derive(Debug, Clone, Ord, PartialOrd, Eq, PartialEq)]
 // // This is not a comprehensive set; variants are added as needed.
 pub enum ComponentType {
@@ -1006,6 +1010,8 @@ mod tests {
 
         assert!(config.global.proxy.http.is_some());
         assert!(config.global.proxy.https.is_none());
+        assert!(config.global.http_1_proxy.http.is_some());
+        assert!(config.global.http_1_proxy.https.is_none());
         assert_eq!(Some(PathBuf::from("/foobar")), config.global.data_dir);
         assert!(config.sources.contains_key(&ComponentKey::from("in")));
         assert!(config.sinks.contains_key(&ComponentKey::from("out")));
@@ -1082,7 +1088,16 @@ mod tests {
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
+        assert_eq!(
+            config.global.http_1_proxy.http,
+            Some("http://server:3128".into())
+        );
+        assert_eq!(
+            config.global.http_1_proxy.https,
+            Some("http://other:3128".into())
+        );
         assert!(config.global.proxy.no_proxy.matches("localhost"));
+        assert!(config.global.http_1_proxy.no_proxy.matches("localhost"));
         let source = config.sources.get(&ComponentKey::from("in")).unwrap();
         assert_eq!(source.proxy.http, Some("http://server:3128".into()));
         assert_eq!(source.proxy.https, Some("http://other:3128".into()));
@@ -1115,10 +1130,19 @@ mod tests {
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, None);
+        assert_eq!(
+            config.global.http_1_proxy.http,
+            Some("http://server:3128".into())
+        );
+        assert_eq!(config.global.http_1_proxy.https, None);
+
         let source = config.sources.get(&ComponentKey::from("in")).unwrap();
         assert_eq!(source.proxy.http, Some("http://server:3129".into()));
         assert_eq!(source.proxy.https, Some("http://other:3129".into()));
         assert!(source.proxy.no_proxy.matches("localhost"));
+        assert_eq!(source.http_1_proxy.http, Some("http://server:3129".into()));
+        assert_eq!(source.http_1_proxy.https, Some("http://other:3129".into()));
+        assert!(source.http_1_proxy.no_proxy.matches("localhost"));
     }
 
     #[test]
@@ -1147,10 +1171,21 @@ mod tests {
         .unwrap();
         assert_eq!(config.global.proxy.http, Some("http://server:3128".into()));
         assert_eq!(config.global.proxy.https, Some("http://other:3128".into()));
+        assert_eq!(
+            config.global.http_1_proxy.http,
+            Some("http://server:3128".into())
+        );
+        assert_eq!(
+            config.global.http_1_proxy.https,
+            Some("http://other:3128".into())
+        );
         let source = config.sources.get(&ComponentKey::from("in")).unwrap();
         assert_eq!(source.proxy.http, Some("http://server:3129".into()));
         assert_eq!(source.proxy.https, None);
         assert!(source.proxy.no_proxy.matches("localhost"));
+        assert_eq!(source.http_1_proxy.http, Some("http://server:3129".into()));
+        assert_eq!(source.http_1_proxy.https, None);
+        assert!(source.http_1_proxy.no_proxy.matches("localhost"));
     }
 }
 
