@@ -980,6 +980,23 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1505bd5d3d116872e7271a6d4e16d81d0c8570876c8de68093a09ac269d8aac0"
 
 [[package]]
+name = "attohttpc"
+version = "0.30.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "16e2cdb6d5ed835199484bb92bb8b3edd526effe995c61732580439c1a67e2e9"
+dependencies = [
+ "base64 0.22.1",
+ "flate2",
+ "http 1.3.1",
+ "log",
+ "native-tls",
+ "serde",
+ "serde_json",
+ "serde_urlencoded",
+ "url",
+]
+
+[[package]]
 name = "autocfg"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4480,21 +4497,19 @@ dependencies = [
 
 [[package]]
 name = "goauth"
-version = "0.16.0"
+version = "0.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b1f1228623a5a37d4834f984573a01086708b109bbf0f7c2ee8d70b0c90d7a5"
+checksum = "c6a66933ee399eb5dcb9fa142d0d0eaf3faca037a06add0e8de4fdec25f11d21"
 dependencies = [
  "arc-swap",
- "futures 0.3.31",
+ "attohttpc",
  "log",
- "reqwest 0.12.28",
  "serde",
  "serde_derive",
  "serde_json",
  "simpl",
- "smpl_jwt",
+ "smpl_jwt 0.9.0",
  "time",
- "tokio",
 ]
 
 [[package]]
@@ -9301,7 +9316,6 @@ dependencies = [
  "cookie",
  "cookie_store",
  "encoding_rs",
- "futures-channel",
  "futures-core",
  "futures-util",
  "h2 0.4.13",
@@ -10439,6 +10453,22 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "fff23fdd767425c13e6f354b7443b3cc0c23097ae077e2211ef8143fa68ad014"
 dependencies = [
  "base64 0.21.7",
+ "log",
+ "openssl",
+ "serde",
+ "serde_derive",
+ "serde_json",
+ "simpl",
+ "time",
+]
+
+[[package]]
+name = "smpl_jwt"
+version = "0.9.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "a45432dc6b645c982d4ef68966b4507fb57d98ca67289df780cd7ca4a4369f5e"
+dependencies = [
+ "base64 0.22.1",
  "log",
  "openssl",
  "serde",
@@ -12644,7 +12674,7 @@ dependencies = [
  "serial_test",
  "similar-asserts",
  "smallvec",
- "smpl_jwt",
+ "smpl_jwt 0.8.0",
  "snafu 0.8.9",
  "snap",
  "socket2 0.5.10",
