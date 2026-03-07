@@ -70,6 +70,7 @@ generated: configuration: configuration: {
 			}
 		}
 		description: "API options."
+		warnings: ["The API has no authentication and exposes all event data flowing through Vector. It must not be exposed to untrusted clients."]
 	}
 	enrichment_tables: {
 		type: object: options: {

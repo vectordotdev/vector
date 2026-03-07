@@ -781,6 +781,16 @@ def resolve_schema(root_schema, schema)
     resolved['required'] = is_required_field
   end
 
+  # Resolve any warnings attached to this option.
+  #
+  # Warnings can be specified in Rust via `#[configurable(metadata(docs::warnings = "..."))]`.
+  # Multiple warnings can be specified by repeating the attribute, and they will be emitted as an
+  # array in the CUE output.
+  warnings = get_schema_metadata(schema, 'docs::warnings')
+  if !warnings.nil?
+    resolved['warnings'] = warnings.is_a?(Array) ? warnings : [warnings]
+  end
+
   # Reconcile the resolve schema, which essentially gives us a chance to, once the schema is
   # entirely resolved, check it for logical inconsistencies, fix up anything that we reasonably can,
   # and so on.
