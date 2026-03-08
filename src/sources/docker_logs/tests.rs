@@ -114,7 +114,7 @@ mod integration_tests {
     ) {
         let source_id = ComponentKey::from("docker_logs_test");
         let deadline = tokio::time::Instant::now() + Duration::from_secs(5);
-        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline.into());
+        let shutdown_complete = shutdown.shutdown_source(&source_id, deadline);
         assert!(shutdown_complete.await, "source did not shut down in time");
         handle.await.unwrap().unwrap();
     }
