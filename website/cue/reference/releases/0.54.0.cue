@@ -41,7 +41,7 @@ releases: "0.54.0": {
 			type: "feat"
 			description: """
 				Add support for the Azure Monitor Logs Ingestion API through a new `azure_logs_ingestion` sink.
-				
+
 				The `azure_monitor_logs` sink is now deprecated, and current users will need to migrate to `azure_logs_ingestion` before Microsoft end support for the old Data Collector API (currently scheduled for September 2026).
 				"""
 			contributors: ["jlaundry"]
@@ -122,23 +122,23 @@ releases: "0.54.0": {
 			type: "enhancement"
 			description: """
 				Upgrades the syslog encoding transform with three major improvements:
-				
+
 				Structured Data Enhancements (RFC 5424):
-				
+
 				- Supports scalars
 				- Handles nested objects (flattened with dot notation)
 				- Serializes arrays as JSON strings, e.g., `tags="[\"tag1\",\"tag2\",\"tag3\"]"` (RFC 5424 spec doesn't define how to handle arrays in structured data)
 				- Validates SD-ID and PARAM-NAME fields per RFC 5424
 				- Sanitizes invalid characters to underscores
-				
+
 				UTF-8 Safety Fix:
-				
+
 				- Fixes panics from byte-based truncation on multibyte characters
 				- Implements character-based truncation for all fields
 				- Prevents crashes with emojis, Cyrillic text, etc.
-				
+
 				RFC 3164 Compliance Improvements:
-				
+
 				- Bug fix: Structured data is now properly ignored (previously incorrectly prepended)
 				- TAG field sanitized to ASCII printable characters (33-126)
 				- Adds debug logging when structured data is ignored
@@ -220,7 +220,7 @@ releases: "0.54.0": {
 			type: "enhancement"
 			description: """
 				# Added `internal_metrics.include_extended_tags` configuration option
-				
+
 				Added `internal_metrics` configuration section to the `tag_cardinality_limit` transform to better organize internal metrics configuration. The `internal_metrics.include_extended_tags` option controls whether to include extended tags (`metric_name`, `tag_key`) in the `tag_value_limit_exceeded_total` metric to help identify which specific metrics and tag keys are hitting the configured value limit. This option defaults to `false` because these tags have potentially unbounded cardinality.
 				"""
 			contributors: ["kaarolch"]
@@ -231,7 +231,7 @@ releases: "0.54.0": {
 				The `*buffer_utilization_mean` metrics have been enhanced to use time-weighted
 				averaging which make them more representative of the actual buffer utilization
 				over time.
-				
+
 				This change is breaking due to the replacement of the existing
 				`buffer_utilization_ewma_alpha` config option with
 				`buffer_utilization_ewma_half_life_seconds`.
@@ -242,27 +242,27 @@ releases: "0.54.0": {
 
 	vrl_changelog: """
 		### [0.31.0 (2026-03-05)]
-		
+
 		#### New Features
-		
+
 		- Added a new `parse_yaml` function. This function parses yaml according to the [YAML 1.1 spec](https://yaml.org/spec/1.1/).
-		
+
 		authors: juchem (https://github.com/vectordotdev/vrl/pull/1602)
 		- Added `--quiet` / `-q` flag to the CLI to suppress the banner text when starting the REPL.
-		
+
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1617)
-		
+
 		#### Fixes
-		
+
 		- Fixed a bug where lexer parse errors would emit a generic span with 202 error code instead of the
 		proper error. Also fixed error positions from nested lexers (e.g., string literals inside function
 		arguments) to correctly point to the actual location in the source.
-		
+
 		Before (generic E202 syntax error):
-		
+
 		```
 		$ string("\a")
-		
+
 		error[E202]: syntax error
 		┌─ :1:1
 		│
@@ -272,12 +272,12 @@ releases: "0.54.0": {
 		= see language documentation at https://vrl.dev
 		= try your code in the VRL REPL, learn more at https://vrl.dev/examples
 		```
-		
+
 		After (correct E209 invalid escape character):
-		
+
 		```
 		$ string("\a")
-		
+
 		error[E209]: invalid escape character: \a
 		┌─ :1:10
 		│
@@ -287,25 +287,25 @@ releases: "0.54.0": {
 		= see language documentation at https://vrl.dev
 		= try your code in the VRL REPL, learn more at https://vrl.dev/examples
 		```
-		
+
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1579)
 		- Fixed a bug where `parse_duration` panicked when large values overflowed during multiplication.
 		The function now returns an error instead.
-		
+
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1618)
 		- Corrected the type definition of the `basename` function to indicate that it can also return `null`.
 		Previously the type definition indicated that the function could only return bytes (or strings).
-		
+
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1635)
 		- Fixed incorrect parameter types in several stdlib functions:
-		
+
 		- `md5`: `value` parameter was typed as `any`, now correctly typed as `bytes`.
 		- `seahash`: `value` parameter was typed as `any`, now correctly typed as `bytes`.
 		- `floor`: `value` parameter was typed as `any`, now correctly typed as `float | integer`; `precision` parameter was typed as `any`, now correctly typed as `integer`.
 		- `parse_key_value`: `key_value_delimiter` and `field_delimiter` parameters were typed as `any`, now correctly typed as `bytes`.
-		
+
 		Note: the function documentation already reflected the correct types.
-		
+
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1650)
 
 		### [0.30.0 (2026-01-22)]
