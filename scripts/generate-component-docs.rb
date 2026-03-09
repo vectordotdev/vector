@@ -1737,6 +1737,7 @@ def render_and_import_generated_top_level_config_schema(root_schema)
     # Individual feature pages
     'api' => 'api',
     'schema' => 'schema',
+    'log_schema' => 'schema',
     'secret' => 'secrets',
 
     # Global options (everything else defaults to this)

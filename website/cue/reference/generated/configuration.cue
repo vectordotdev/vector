@@ -1347,7 +1347,7 @@ generated: configuration: {
 				"""
 			common:   false
 			required: false
-			group:    "global_options"
+			group:    "schema"
 		}
 		metrics_storage_refresh_period: {
 			type: float: {}
