@@ -4,7 +4,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-use anyhow::{Context, Result};
+use anyhow::{Context, Result, bail};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
@@ -134,8 +134,8 @@ fn get_vrl_commit_sha(repo_root: &Path) -> Result<String> {
             .context("Could not extract commit SHA from VRL git source string"),
         // Registry source (crates.io): use the version as a tag
         Some(source) if source.starts_with("registry+") => Ok(format!("v{}", pkg.version)),
-        Some(source) => anyhow::bail!("Unrecognized VRL package source in Cargo.lock: {source}"),
-        None => anyhow::bail!("VRL package in Cargo.lock has no source field"),
+        Some(source) => bail!("Unrecognized VRL package source in Cargo.lock: {source}"),
+        None => bail!("VRL package in Cargo.lock has no source field"),
     }
 }
 
