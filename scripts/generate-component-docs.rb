@@ -1770,10 +1770,9 @@ def render_and_import_generated_top_level_config_schema(root_schema)
     }
   }
 
-  # Extract ALL properties from ConfigBuilder's allOf schemas
-  # ConfigBuilder includes top-level config fields and uses #[serde(flatten)] for GlobalOptions
-  # allOf[0] = ConfigBuilder's own fields (api, sources, sinks, etc.)
-  # allOf[1] = Flattened GlobalOptions fields (data_dir, timezone, etc.)
+  # Usage of #[serde(flatten)] creates multiple schemas in the `allOf` array:
+  # - One or more schemas contain ConfigBuilder's direct fields
+  # - One or more schemas contain flattened GlobalOptions fields
   all_of_schemas = root_schema['allOf'] || []
 
   if all_of_schemas.empty?
@@ -1783,7 +1782,8 @@ def render_and_import_generated_top_level_config_schema(root_schema)
 
   @logger.info "[*] Extracting ALL top-level config fields from ConfigBuilder (#{all_of_schemas.length} allOf schemas)..."
 
-  # Iterate through all allOf schemas to get all ConfigBuilder properties
+  # Iterate through all allOf schemas to collect all top-level configuration properties.
+  # Each allOf schema may contribute different fields due to the flattened GlobalOptions.
   all_of_schemas.each_with_index do |all_of_schema, index|
     config_builder_properties = all_of_schema['properties'] || {}
     @logger.info "[*] Processing allOf[#{index}] with #{config_builder_properties.keys.length} properties..."
@@ -1898,7 +1898,7 @@ all_components.each do |component_type, components|
   end
 end
 
-# At last, we generate the top-level Vector configuration schema.
-# We extract ALL top-level config fields directly from ConfigBuilder instead of using metadata.
-# ConfigBuilder is the single source of truth for what's actually allowed in the configuration.
+# Finally, generate the top-level Vector configuration schema. We extract ALL top-level config fields directly from the
+# ConfigBuilder struct (defined in src/config/builder.rs) by processing its allOf schemas. ConfigBuilder is the single
+# source of truth for what's actually allowed at the top level of Vector's configuration file.
 render_and_import_generated_top_level_config_schema(root_schema)
