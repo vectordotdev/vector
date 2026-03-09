@@ -99,6 +99,7 @@ impl Cli {
 #[derive(Deserialize)]
 struct LockPackage {
     name: String,
+    version: String,
     source: Option<String>,
 }
 
@@ -107,7 +108,10 @@ struct CargoLock {
     package: Vec<LockPackage>,
 }
 
-/// Parse `Cargo.lock` to find the git commit SHA for the `vrl` package.
+/// Parse `Cargo.lock` to find a git ref for the `vrl` package.
+///
+/// Returns the commit SHA for git-sourced dependencies, or a version tag (e.g. `v0.31.0`) for
+/// registry-sourced dependencies.
 fn get_vrl_commit_sha(repo_root: &Path) -> Result<String> {
     let lock_path = repo_root.join("Cargo.lock");
     let lock_text = fs::read_to_string(&lock_path)
@@ -119,22 +123,24 @@ fn get_vrl_commit_sha(repo_root: &Path) -> Result<String> {
     let pkg = lock
         .package
         .iter()
-        .find(|p| {
-            p.name == VRL_PACKAGE_NAME
-                && p.source
-                    .as_deref()
-                    .is_some_and(|s| s.contains("github.com/vectordotdev/vrl"))
-        })
-        .context("Could not find VRL package with git source in Cargo.lock")?;
+        .find(|p| p.name == VRL_PACKAGE_NAME)
+        .context("Could not find VRL package in Cargo.lock")?;
 
-    // Source format: "git+https://github.com/vectordotdev/vrl.git?branch=doc-generation#5316c01b..."
-    let source = pkg.source.as_deref().unwrap();
-    let sha = source
-        .rsplit_once('#')
-        .map(|(_, sha)| sha)
-        .context("Could not extract commit SHA from VRL source string")?;
-
-    Ok(sha.to_string())
+    match pkg.source.as_deref() {
+        // Git source: "git+https://github.com/vectordotdev/vrl.git?branch=main#5316c01b..."
+        Some(source) if source.starts_with("git+") => {
+            source
+                .rsplit_once('#')
+                .map(|(_, sha)| sha.to_string())
+                .context("Could not extract commit SHA from VRL git source string")
+        }
+        // Registry source (crates.io): use the version as a tag
+        Some(source) if source.starts_with("registry+") => {
+            Ok(format!("v{}", pkg.version))
+        }
+        Some(source) => anyhow::bail!("Unrecognized VRL package source in Cargo.lock: {source}"),
+        None => anyhow::bail!("VRL package in Cargo.lock has no source field"),
+    }
 }
 
 /// Read all `*.json` files from a directory into a name->value map.
