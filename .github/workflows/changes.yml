@@ -227,7 +227,11 @@ jobs:
           component_docs:
             - 'scripts/generate-component-docs.rb'
             - "vdev/**"
-            - 'website/cue/**/base/**.cue'
+            - 'website/cue/**/*.cue'
+            - 'docs/generated/**'
+            # If changes to the VRL sha is made the combined generated cue file will change which
+            # may cause issues
+            - 'Cargo.lock'
             - ".github/workflows/changes.yml"
           markdown:
             - '**/**.md'
@@ -405,7 +409,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: int_tests_changes
           path: int_tests_changes.json
@@ -467,7 +471,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: e2e_tests_changes
           path: e2e_tests_changes.json

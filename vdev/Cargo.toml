@@ -35,7 +35,7 @@ paste.workspace = true
 regex.workspace = true
 reqwest = { workspace = true, features = ["blocking"] }
 serde.workspace = true
-serde_json.workspace = true
+serde_json = { workspace = true, features = ["preserve_order"] }
 serde_yaml.workspace = true
 sha2 = "0.10.9"
 tempfile.workspace = true
@@ -45,6 +45,8 @@ semver.workspace = true
 indoc.workspace = true
 git2 = { version = "0.20.4" }
 cfg-if.workspace = true
+vector-vrl-functions = { path = "../lib/vector-vrl/functions", features = ["dnstap", "vrl-metrics"] }
+vrl = { workspace = true, features = ["docs"] }
 
 [package.metadata.binstall]
 pkg-url = "{ repo }/releases/download/vdev-v{ version }/{ name }-{ target }-v{ version }.tgz"
