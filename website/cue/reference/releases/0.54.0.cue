@@ -107,7 +107,7 @@ releases: "0.54.0": {
 		{
 			type: "fix"
 			description: """
-				Fixed `vector test` printing literal `\x1b` escape codes instead of rendering ANSI colors when reporting VRL compilation errors.
+				Fixed `vector test` printing literal `\\x1b` escape codes instead of rendering ANSI colors when reporting VRL compilation errors.
 				"""
 			contributors: ["thomasqueirozb"]
 		},
