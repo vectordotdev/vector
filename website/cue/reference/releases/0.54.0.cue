@@ -6,6 +6,28 @@ releases: "0.54.0": {
 
 	whats_next: []
 
+	description: """
+		The Vector team is excited to announce version `0.54.0`!
+
+		## Release highlights
+		- Enhanced `vector top` with new keybinds for scrolling, sorting, and filtering. Press `?` to
+		  see all available keybinds.
+		- The `datadog_logs` sink now defaults to `zstd` compression instead of no compression, resulting
+		  in better network efficiency and higher throughput.
+		- Added `component_latency_seconds` histogram and `component_latency_mean_seconds` gauge internal
+		  metrics, exposing the time an event spends in a component.
+		- Syslog encoding transform received major upgrades with improved RFC compliance, support for
+		  scalars/nested objects/arrays in structured data, and better UTF-8 safety.
+		- Added a new `azure_logs_ingestion` sink that supports the Azure Monitor Logs Ingestion API.
+		  The existing `azure_monitor_logs` sink is now deprecated, and users should migrate before
+		  Microsoft ends support for the old Data Collector API (currently scheduled for September 2026).
+
+		## Breaking Changes
+
+		- The `datadog_logs` sink now defaults to `zstd` compression. You can explicitly set `compression` to preserve
+		  previous behavior.
+		"""
+
 	changelog: [
 		{
 			type: "fix"
