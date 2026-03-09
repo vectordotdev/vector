@@ -261,3 +261,10 @@ The fix is to cap the batcher's byte limit to the endpoint's uncompressed payloa
 ensures batches never accumulate more data than fits in a single HTTP request, eliminating
 the encoder splitting step and its associated backpressure and memory overhead — without
 requiring any user configuration.
+
+**Tradeoff — counter deduplication.** Smaller batches give `sort_and_collapse` fewer
+events to work with, so counters with the same series arriving within the same 2s window
+are slightly less likely to be collapsed before sending. This only matters for
+single-source high-throughput counters; fan-in workloads and high-cardinality tags see
+no dedup benefit regardless of batch size. The Datadog backend aggregates counters
+server-side, so extra points are correct behavior, not data loss.
