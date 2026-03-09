@@ -35,88 +35,89 @@ generated: components: sinks: databend: configuration: {
 				description:   "The AWS authentication configuration."
 				relevant_when: "strategy = \"aws\""
 				required:      true
-				type: object: options: {
-					access_key_id: {
-						description: "The AWS access key ID."
-						required:    true
-						type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
-					}
-					assume_role: {
-						description: """
+				type: {
+					object: options: {
+						access_key_id: {
+							description: "The AWS access key ID."
+							required:    true
+							type: string: examples: ["AKIAIOSFODNN7EXAMPLE"]
+						}
+						assume_role: {
+							description: """
 																The ARN of an [IAM role][iam_role] to assume.
 
 																[iam_role]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles.html
 																"""
-						required: true
-						type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
-					}
-					credentials_file: {
-						description: "Path to the credentials file."
-						required:    true
-						type: string: examples: ["/my/aws/credentials"]
-					}
-					external_id: {
-						description: """
+							required: true
+							type: string: examples: ["arn:aws:iam::123456789098:role/my_role"]
+						}
+						credentials_file: {
+							description: "Path to the credentials file."
+							required:    true
+							type: string: examples: ["/my/aws/credentials"]
+						}
+						external_id: {
+							description: """
 																The optional unique external ID in conjunction with role to assume.
 
 																[external_id]: https://docs.aws.amazon.com/IAM/latest/UserGuide/id_roles_create_for-user_externalid.html
 																"""
-						required: false
-						type: string: examples: ["randomEXAMPLEidString"]
-					}
-					imds: {
-						description: "Configuration for authenticating with AWS through IMDS."
-						required:    false
-						type: object: options: {
-							connect_timeout_seconds: {
-								description: "Connect timeout for IMDS."
-								required:    false
-								type: uint: {
-									default: 1
-									unit:    "seconds"
+							required: false
+							type: string: examples: ["randomEXAMPLEidString"]
+						}
+						imds: {
+							description: "Configuration for authenticating with AWS through IMDS."
+							required:    false
+							type: object: options: {
+								connect_timeout_seconds: {
+									description: "Connect timeout for IMDS."
+									required:    false
+									type: uint: {
+										default: 1
+										unit:    "seconds"
+									}
 								}
-							}
-							max_attempts: {
-								description: "Number of IMDS retries for fetching tokens and metadata."
-								required:    false
-								type: uint: default: 4
-							}
-							read_timeout_seconds: {
-								description: "Read timeout for IMDS."
-								required:    false
-								type: uint: {
-									default: 1
-									unit:    "seconds"
+								max_attempts: {
+									description: "Number of IMDS retries for fetching tokens and metadata."
+									required:    false
+									type: uint: default: 4
+								}
+								read_timeout_seconds: {
+									description: "Read timeout for IMDS."
+									required:    false
+									type: uint: {
+										default: 1
+										unit:    "seconds"
+									}
 								}
 							}
 						}
-					}
-					load_timeout_secs: {
-						description: """
+						load_timeout_secs: {
+							description: """
 																Timeout for successfully loading any credentials, in seconds.
 
 																Relevant when the default credentials chain or `assume_role` is used.
 																"""
-						required: false
-						type: uint: {
-							examples: [30]
-							unit: "seconds"
+							required: false
+							type: uint: {
+								examples: [30]
+								unit: "seconds"
+							}
 						}
-					}
-					profile: {
-						description: """
+						profile: {
+							description: """
 																The credentials profile to use.
 
 																Used to select AWS credentials from a provided credentials file.
 																"""
-						required: false
-						type: string: {
-							default: "default"
-							examples: ["develop"]
+							required: false
+							type: string: {
+								default: "default"
+								examples: ["develop"]
+							}
 						}
-					}
-					region: {
-						description: """
+						region: {
+							description: """
 																The [AWS region][aws_region] to send STS requests to.
 
 																If not set, this defaults to the configured region
@@ -124,16 +125,16 @@ generated: components: sinks: databend: configuration: {
 
 																[aws_region]: https://docs.aws.amazon.com/general/latest/gr/rande.html#regional-endpoints
 																"""
-						required: false
-						type: string: examples: ["us-west-2"]
-					}
-					secret_access_key: {
-						description: "The AWS secret access key."
-						required:    true
-						type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
-					}
-					session_name: {
-						description: """
+							required: false
+							type: string: examples: ["us-west-2"]
+						}
+						secret_access_key: {
+							description: "The AWS secret access key."
+							required:    true
+							type: string: examples: ["wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"]
+						}
+						session_name: {
+							description: """
 																The optional [RoleSessionName][role_session_name] is a unique session identifier for your assumed role.
 
 																Should be unique per principal or reason.
@@ -141,17 +142,19 @@ generated: components: sinks: databend: configuration: {
 
 																[role_session_name]: https://docs.aws.amazon.com/STS/latest/APIReference/API_AssumeRole.html
 																"""
-						required: false
-						type: string: examples: ["vector-indexer-role"]
-					}
-					session_token: {
-						description: """
+							required: false
+							type: string: examples: ["vector-indexer-role"]
+						}
+						session_token: {
+							description: """
 																The AWS session token.
 																See [AWS temporary credentials](https://docs.aws.amazon.com/IAM/latest/UserGuide/id_credentials_temp_use-resources.html)
 																"""
-						required: false
-						type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+							required: false
+							type: string: examples: ["AQoDYXdz...AQoDYXdz..."]
+						}
 					}
+					string: {}
 				}
 			}
 			password: {
