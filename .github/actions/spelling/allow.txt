@@ -69,6 +69,7 @@ bitwidth
 blackbox
 Blaupunkt
 Blusens
+bpf
 bpftrace
 buildname
 buildroot
@@ -525,6 +526,7 @@ urlencoding
 useragents
 usergroups
 userguide
+ustack
 Verizon
 vhosts
 Videocon
