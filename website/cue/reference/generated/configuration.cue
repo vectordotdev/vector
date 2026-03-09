@@ -406,22 +406,52 @@ generated: configuration: {
 			type: object: options: {
 				enabled: {
 					type: bool: default: false
-					description: "Whether or not schema is enabled."
-					required:    false
+					description: """
+						When enabled, Vector tracks the schema (field types and structure) of events as they flow
+						from sources through transforms to sinks. This allows Vector to understand what data each
+						component receives and produces.
+						"""
+					required: false
 				}
 				log_namespace: {
 					type: bool: {}
-					description: "Whether or not to enable log namespacing."
-					required:    false
+					description: """
+						Controls how metadata is stored in log events.
+
+						When set to `false` (legacy mode), metadata fields like `host`, `timestamp`, and `source_type`
+						are stored as top-level fields alongside your log data.
+
+						When set to `true` (Vector namespace mode), metadata is stored in a separate metadata namespace,
+						keeping it distinct from your actual log data.
+
+						See the [Log Namespacing guide](/guides/level-up/log_namespace/) for detailed information
+						about when to use Vector namespace mode and how to migrate from legacy mode.
+						"""
+					required: false
 				}
 				validation: {
 					type: bool: default: false
-					description: "Whether or not schema validation is enabled."
-					required:    false
+					description: """
+						When enabled, Vector validates that events flowing into each sink match the schema
+						requirements of that sink. If a sink requires certain fields or types that are missing
+						from the incoming events, Vector will report an error during configuration validation.
+
+						This helps catch pipeline configuration errors early, before runtime.
+						"""
+					required: false
 				}
 			}
-			description: "Schema options."
-			group:       "schema"
+			description: """
+				Schema options.
+
+				**Note:** The `enabled` and `validation` options are experimental and should only be enabled if you
+				understand the limitations. While the infrastructure exists for schema tracking and validation, the
+				full vision of automatic semantic field mapping and comprehensive schema enforcement was never fully
+				realized.
+
+				If you encounter issues with these features, please [report them here](https://github.com/vectordotdev/vector/issues/new?template=bug.yml).
+				"""
+			group: "schema"
 		}
 		secret: {
 			type: object: options: "*": {
