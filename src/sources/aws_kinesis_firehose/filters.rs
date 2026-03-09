@@ -8,16 +8,18 @@ use vector_lib::{
     config::LogNamespace,
     internal_event::{BytesReceived, Protocol},
 };
+use vrl::value::ObjectMap;
 use warp::{Filter, http::StatusCode};
 
 use super::{
     Compression,
     errors::{ParseSnafu, RequestError},
     handlers,
-    models::{FirehoseRequest, FirehoseResponse},
+    models::{FirehoseCommonAttributesHeader, FirehoseRequest, FirehoseResponse},
 };
 use crate::{
     SourceSender, codecs,
+    event::Value,
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
 };
 
@@ -58,6 +60,7 @@ pub fn firehose(
                 })
                 .untuple_one(),
         )
+        .and(parse_common_attributes_header())
         .and(parse_body())
         .and(warp::any().map(move || context.clone()))
         .and_then(handlers::firehose)
@@ -102,6 +105,43 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
                         })
                         .map_err(warp::reject::custom)
                 })
+            },
+        )
+}
+
+/// Parse AWS Kinesis Firehose X-Amz-Firehose-Common-Attributes header
+fn parse_common_attributes_header()
+-> impl Filter<Extract = (ObjectMap,), Error = warp::reject::Rejection> + Clone {
+    warp::any()
+        .and(warp::header("X-Amz-Firehose-Request-Id"))
+        .and(warp::header::optional("X-Amz-Firehose-Common-Attributes"))
+        .and_then(
+            |request_id: String, maybe_common_attributes: Option<String>| async move {
+                match maybe_common_attributes {
+                    Some(common_attributes) => {
+                        serde_json::from_str(&common_attributes)
+                            .context(ParseSnafu {
+                                request_id: request_id.clone(),
+                            })
+                            .map(|common_attributes_header: FirehoseCommonAttributesHeader| {
+                                let mut object_map = ObjectMap::new();
+
+                                for (attribute_name, attribute_value) in
+                                    common_attributes_header.common_attributes.iter()
+                                {
+                                    object_map.insert(
+                                        attribute_name.to_owned().into(),
+                                        Value::from(attribute_value.to_owned()),
+                                    );
+                                }
+
+                                return object_map;
+                            })
+                            .map_err(warp::reject::custom)
+
+                    }
+                    None => Ok(ObjectMap::new())
+                }
             },
         )
 }

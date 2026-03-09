@@ -19,7 +19,7 @@ use vector_lib::{
     lookup::{PathPrefix, metadata_path, path},
     source_sender::SendError,
 };
-use vrl::compiler::SecretTarget;
+use vrl::{compiler::SecretTarget, value::ObjectMap};
 use warp::reject;
 
 use super::{
@@ -53,6 +53,7 @@ pub(super) struct Context {
 pub(super) async fn firehose(
     request_id: String,
     source_arn: String,
+    common_attributes: ObjectMap,
     request: FirehoseRequest,
     mut context: Context,
 ) -> Result<impl warp::Reply, reject::Rejection> {
@@ -130,6 +131,14 @@ pub(super) async fn firehose(
                                 Some(LegacyKey::InsertIfEmpty(path!("source_arn"))),
                                 path!("source_arn"),
                                 source_arn.to_owned(),
+                            );
+
+                            log_namespace.insert_source_metadata(
+                                AwsKinesisFirehoseConfig::NAME,
+                                log,
+                                Some(LegacyKey::InsertIfEmpty(path!("common_attributes"))),
+                                path!("common_attributes"),
+                                common_attributes.clone(),
                             );
 
                             if context.store_access_key
