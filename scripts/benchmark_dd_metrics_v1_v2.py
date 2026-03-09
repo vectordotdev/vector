@@ -428,10 +428,10 @@ def run_single_benchmark(
     env["DD_SITE"] = dd_site
     env["VECTOR_LOG"] = args.vector_log
 
-    if mode == "v1":
-        env["VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API"] = "1"
+    if mode == "v2":
+        env["VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API"] = "1"
     else:
-        env.pop("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API", None)
+        env.pop("VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API", None)
 
     vector_cmd = [args.vector_bin, "--config", str(config_path)]
     vector_log_fp = None
