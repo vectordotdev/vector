@@ -264,8 +264,9 @@ impl DatadogMetricsConfig {
         // so the cap must be applied dynamically rather than hardcoded as a default.
         if batcher_settings.size_limit == usize::MAX {
             let series_version = SeriesApiVersion::get_api_version_backwards_compatible();
-            batcher_settings.size_limit =
-                DatadogMetricsEndpoint::Series(series_version).payload_limits().uncompressed;
+            batcher_settings.size_limit = DatadogMetricsEndpoint::Series(series_version)
+                .payload_limits()
+                .uncompressed;
         }
 
         // TODO: revisit our concurrency and batching defaults
@@ -328,10 +329,8 @@ mod tests {
     // An explicit user-supplied max_bytes must not be clobbered by the endpoint-limit override.
     #[test]
     fn batcher_user_max_bytes_is_preserved() {
-        let config = BatchConfig::<DatadogMetricsDefaultBatchSettings> {
-            max_bytes: Some(1_000_000),
-            ..Default::default()
-        };
+        let mut config = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default();
+        config.max_bytes = Some(1_000_000);
         let settings = config.into_batcher_settings().unwrap();
         assert_eq!(settings.size_limit, 1_000_000);
     }

@@ -1009,13 +1009,11 @@ mod tests {
     };
 
     use super::{
-        DatadogMetricsCompression, DatadogMetricsEncoder, EncoderError, ddmetric_proto,
-        encode_proto_key_and_message, encode_tags, encode_timestamp, generate_series_metrics,
-        get_compressor,
+        DatadogMetricsEncoder, EncoderError, ddmetric_proto, encode_proto_key_and_message,
+        encode_tags, encode_timestamp, generate_series_metrics, get_compressor,
         get_sketch_payload_sketches_field_number, max_compression_overhead_len,
-        max_uncompressed_header_len, request_compression, series_to_proto_message,
-        sketch_to_proto_message, validate_payload_size_limits, write_payload_footer,
-        write_payload_header,
+        max_uncompressed_header_len, series_to_proto_message, sketch_to_proto_message,
+        validate_payload_size_limits, write_payload_footer, write_payload_header,
     };
     use crate::{
         common::datadog::DatadogMetricType,
@@ -1072,20 +1070,10 @@ mod tests {
     }
 
     fn decompress_payload(payload: Bytes) -> io::Result<Bytes> {
+        let mut decompressor = ZlibDecoder::new(&payload[..]);
         let mut decompressed = BytesMut::new().writer();
-
-        match request_compression() {
-            DatadogMetricsCompression::Deflate => {
-                let mut decompressor = ZlibDecoder::new(&payload[..]);
-                copy(&mut decompressor, &mut decompressed)?;
-            }
-            DatadogMetricsCompression::Zstd => {
-                let mut decompressor = zstd::stream::read::Decoder::new(&payload[..])?;
-                copy(&mut decompressor, &mut decompressed)?;
-            }
-        }
-
-        Ok(decompressed.into_inner().freeze())
+        let result = copy(&mut decompressor, &mut decompressed);
+        result.map(|_| decompressed.into_inner().freeze())
     }
 
     fn ts() -> DateTime<Utc> {
