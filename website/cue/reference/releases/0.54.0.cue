@@ -272,7 +272,7 @@ releases: "0.54.0": {
 		
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1618)
 		- Corrected the type definition of the `basename` function to indicate that it can also return `null`.
-		Previously the type definitition indicated that the function could only return bytes (or strings).
+		Previously the type definition indicated that the function could only return bytes (or strings).
 		
 		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1635)
 		- Fixed incorrect parameter types in several stdlib functions:
@@ -284,11 +284,8 @@ releases: "0.54.0": {
 		
 		Note: the function documentation already reflected the correct types.
 		
-		authors: thomasqueirozb
-		
-		(https://github.com/vectordotdev/vrl/pull/1650)
-		
-		
+		authors: thomasqueirozb (https://github.com/vectordotdev/vrl/pull/1650)
+
 		### [0.30.0 (2026-01-22)]
 		"""
 
