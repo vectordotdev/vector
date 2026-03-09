@@ -4,7 +4,7 @@ use url::Url;
 use vector_lib::configurable::configurable_component;
 
 /// API options.
-#[configurable_component(api("api"))]
+#[configurable_component(global_option("api"))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
