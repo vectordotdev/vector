@@ -10197,6 +10197,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_yaml_ng"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b4db627b98b36d4203a7b458cf3573730f2bb591b28871d916dfa9efabfd41f"
+dependencies = [
+ "indexmap 2.12.0",
+ "itoa",
+ "ryu",
+ "serde",
+ "unsafe-libyaml",
+]
+
+[[package]]
 name = "serial_test"
 version = "3.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -13111,8 +13124,9 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vrl"
-version = "0.30.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#b4424e16d24234bb691808b0c3a2689af5a1b206"
+version = "0.31.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "398a6efaf0e120eae12249f7cc89a82ffd3fa8d98165e341bee6dd9a973bba6a"
 dependencies = [
  "aes",
  "aes-siv",
@@ -13198,6 +13212,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "serde_yaml_ng",
  "sha-1",
  "sha2",
  "sha3",
