@@ -39,6 +39,10 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.git_ref }}
+
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
       - name: Generate publish metadata
         id: generate-publish-metadata
         run: make ci-generate-publish-metadata
@@ -111,10 +115,12 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.git_ref }}
-      - name: Bootstrap runner environment (macOS-specific)
-        run: |
-          bash scripts/environment/bootstrap-macos.sh
-          bash scripts/environment/prepare.sh --modules=rustup
+
+      - uses: ./.github/actions/setup
+        with:
+          rust: true
+          rustup: true
+          protoc: true
       - name: Build Vector
         env:
           TARGET: "${{ matrix.architecture }}-apple-darwin"
@@ -351,6 +357,9 @@ jobs:
           pattern: vector-${{ env.VECTOR_VERSION }}-*-linux-*
           path: target/artifacts
           merge-multiple: true
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
       - name: Build and publish Docker images
         env:
           PLATFORM: "linux/amd64,linux/arm64,linux/arm/v7,linux/arm/v6"
@@ -382,6 +391,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.git_ref }}
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
       - name: Download all package artifacts
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
@@ -419,6 +431,9 @@ jobs:
         uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         with:
           ref: ${{ inputs.git_ref }}
+      - uses: ./.github/actions/setup
+        with:
+          vdev: true
       - name: Download all package artifacts
         uses: actions/download-artifact@70fc10c6e5e1ce46ad2ea6f2b72d43f7d47b13c3 # v8.0.0
         with:
