@@ -115,7 +115,7 @@ make fmt                      # Format code
 make check-fmt                # Verify formatting
 make check-clippy             # Run Clippy linter
 make check-markdown           # Check markdown files
-make check-component-docs     # Check component documentation
+make check-generated-docs     # Check generated documentation
 ./scripts/check_changelog_fragments.sh  # Verify changelog
 ```
 
@@ -179,7 +179,7 @@ make check-licenses
 make check-fmt
 make check-clippy
 make check-markdown
-make check-component-docs
+make check-generated-docs
 
 ./scripts/check_changelog_fragments.sh
 ```
@@ -200,7 +200,7 @@ Then: `chmod +x .git/hooks/pre-push`
 - **Transforms**: Modify, filter, or enrich event data
 - **Sinks**: Send data to external systems
 
-Component docs are auto-generated from code annotations. Run `make check-component-docs` after changes.
+Component docs are auto-generated from code annotations. Run `make check-generated-docs` after changes.
 
 ### Integration Tests
 
@@ -237,12 +237,12 @@ Run `make fmt` before committing. Formatting must be exact.
 
 Run `make clippy-fix` to auto-fix many issues. Manual fixes may be required.
 
-### Component Docs Out of Sync
+### Generated Docs Out of Sync
 
-Component documentation is generated from code. Run:
+Documentation is generated from code. Run:
 
 ```bash
-make check-component-docs
+make check-generated-docs
 ```
 
 ### License Check Fails
