@@ -72,6 +72,8 @@ jobs:
         run: sudo -E bash scripts/environment/bootstrap-ubuntu-24.04.sh
       - name: Bootstrap runner environment (generic)
         run: bash scripts/environment/prepare.sh --modules=rustup,cross,cargo-deb
+      - name: Install cross-compilation tools
+        run: sudo apt-get install -y binutils-arm-linux-gnueabihf binutils-aarch64-linux-gnu
       - name: Build Vector
         run: make package-${{ matrix.target }}-all
       - name: Stage package artifacts for publish

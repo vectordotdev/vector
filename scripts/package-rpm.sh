@@ -63,11 +63,19 @@ cp -av distribution/systemd/. "$RPMBUILD_DIR/SOURCES/systemd"
 # Copy the archive into the sources dir
 cp -av "$ARCHIVE_PATH" "$RPMBUILD_DIR/SOURCES/vector-$ARCH.tar.gz"
 
+# Determine the correct strip tool for cross-compilation.
+case "$TARGET" in
+  aarch64-*) STRIP_TOOL="aarch64-linux-gnu-strip" ;;
+  armv7-*-gnueabihf) STRIP_TOOL="arm-linux-gnueabihf-strip" ;;
+  *) STRIP_TOOL="strip" ;;
+esac
+
 # Perform the build.
 rpmbuild \
   --define "_topdir $RPMBUILD_DIR" \
   --target "$ARCH-redhat-linux" \
   --define "_arch $ARCH" \
+  --define "__strip $STRIP_TOOL" \
   --nodebuginfo \
   -ba distribution/rpm/vector.spec
 
