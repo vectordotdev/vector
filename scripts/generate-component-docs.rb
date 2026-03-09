@@ -1780,41 +1780,40 @@ def render_and_import_generated_top_level_config_schema(root_schema)
     return
   end
 
-  @logger.info "[*] Extracting ALL top-level config fields from ConfigBuilder (#{all_of_schemas.length} allOf schemas)..."
+  # Collect all properties from all allOf schemas into a single hash.
+  # Since ConfigBuilder uses #[serde(flatten)], field names are unique across all schemas.
+  all_properties = all_of_schemas.reduce({}) do |acc, schema|
+    acc.merge(schema['properties'] || {})
+  end
 
-  # Iterate through all allOf schemas to collect all top-level configuration properties.
-  # Each allOf schema may contribute different fields due to the flattened GlobalOptions.
-  all_of_schemas.each_with_index do |all_of_schema, index|
-    config_builder_properties = all_of_schema['properties'] || {}
-    @logger.info "[*] Processing allOf[#{index}] with #{config_builder_properties.keys.length} properties..."
+  @logger.info "[*] Found #{all_properties.keys.length} total properties across #{all_of_schemas.length} allOf schemas"
 
-    # Iterate through ALL properties in this allOf schema
-    config_builder_properties.each do |field_name, field_schema|
-      # Skip fields marked with docs::hidden
-      metadata = field_schema['_metadata'] || {}
-      if metadata['docs::hidden']
-        @logger.info "[*] Skipping '#{field_name}' (marked as docs::hidden)"
-        next
-      end
-
-      # Extract and resolve the field
-      @logger.info "[*] Extracting '#{field_name}' field from ConfigBuilder..."
-      resolved_field = resolve_schema(root_schema, field_schema)
-
-      # Assign group metadata to organize the documentation
-      if field_groups.key?(field_name)
-        group_name = field_groups[field_name]
-        resolved_field['group'] = group_name
-        @logger.debug "Assigned '#{field_name}' to group '#{group_name}'"
-      else
-        # Default to global_options for any fields not explicitly grouped
-        resolved_field['group'] = 'global_options'
-        @logger.debug "Assigned '#{field_name}' to default group 'global_options'"
-      end
-
-      top_level_config_schema[field_name] = resolved_field
-      @logger.info "[✓] Resolved '#{field_name}'"
+  # Process each property once
+  all_properties.each do |field_name, field_schema|
+    # Skip fields marked with docs::hidden
+    metadata = field_schema['_metadata'] || {}
+    if metadata['docs::hidden']
+      @logger.info "[*] Skipping '#{field_name}' (marked as docs::hidden)"
+      next
     end
+
+    # Extract and resolve the field
+    @logger.info "[*] Extracting '#{field_name}' field from ConfigBuilder..."
+    resolved_field = resolve_schema(root_schema, field_schema)
+
+    # Assign group metadata to organize the documentation
+    if field_groups.key?(field_name)
+      group_name = field_groups[field_name]
+      resolved_field['group'] = group_name
+      @logger.debug "Assigned '#{field_name}' to group '#{group_name}'"
+    else
+      # Default to global_options for any fields not explicitly grouped
+      resolved_field['group'] = 'global_options'
+      @logger.debug "Assigned '#{field_name}' to default group 'global_options'"
+    end
+
+    top_level_config_schema[field_name] = resolved_field
+    @logger.info "[✓] Resolved '#{field_name}'"
   end
 
   # Build the final data structure with both configuration and group metadata
