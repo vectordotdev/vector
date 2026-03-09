@@ -10,25 +10,47 @@ use crate::config::{DataType, SourceConfig, SourceContext, SourceOutput};
 mod config;
 pub use self::config::*;
 
-// Windows-only: runtime submodules
-#[cfg(windows)]
-mod bookmark;
-#[cfg(windows)]
-mod checkpoint;
-#[cfg(windows)]
-pub mod error;
-#[cfg(windows)]
-mod metadata;
-#[cfg(windows)]
-mod parser;
-#[cfg(windows)]
-mod render;
-#[cfg(windows)]
-mod sid_resolver;
-#[cfg(windows)]
-mod subscription;
-#[cfg(windows)]
-mod xml_parser;
+cfg_if::cfg_if! {
+    if #[cfg(windows)] {
+        mod bookmark;
+        mod checkpoint;
+        pub mod error;
+        mod metadata;
+        mod parser;
+        mod render;
+        mod sid_resolver;
+        mod subscription;
+        mod xml_parser;
+
+        use std::path::PathBuf;
+        use std::sync::Arc;
+
+        use futures::StreamExt;
+        use vector_lib::EstimatedJsonEncodedSizeOf;
+        use vector_lib::finalizer::OrderedFinalizer;
+        use vector_lib::internal_event::{
+            ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
+        };
+        use windows::Win32::Foundation::{DUPLICATE_SAME_ACCESS, DuplicateHandle, HANDLE};
+        use windows::Win32::System::Threading::GetCurrentProcess;
+
+        use crate::{
+            SourceSender,
+            event::{BatchNotifier, BatchStatus, BatchStatusReceiver},
+            internal_events::{
+                EventsReceived, StreamClosedError, WindowsEventLogParseError, WindowsEventLogQueryError,
+            },
+            shutdown::ShutdownSignal,
+        };
+
+        use self::{
+            checkpoint::Checkpointer,
+            error::WindowsEventLogError,
+            parser::EventLogParser,
+            subscription::{EventLogSubscription, WaitResult},
+        };
+    }
+}
 
 #[cfg(all(test, windows))]
 mod tests;
@@ -38,50 +60,13 @@ mod tests;
 #[cfg(all(test, windows, feature = "sources-windows_event_log-integration-tests"))]
 mod integration_tests;
 
-// Windows-only: runtime imports
-#[cfg(windows)]
-use std::path::PathBuf;
-#[cfg(windows)]
-use std::sync::Arc;
-
-#[cfg(windows)]
-use futures::StreamExt;
-#[cfg(windows)]
-use vector_lib::EstimatedJsonEncodedSizeOf;
-#[cfg(windows)]
-use vector_lib::finalizer::OrderedFinalizer;
-#[cfg(windows)]
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
-};
-#[cfg(windows)]
-use windows::Win32::Foundation::{DUPLICATE_SAME_ACCESS, DuplicateHandle, HANDLE};
-#[cfg(windows)]
-use windows::Win32::System::Threading::GetCurrentProcess;
-
-#[cfg(windows)]
-use crate::{
-    SourceSender,
-    event::{BatchNotifier, BatchStatus, BatchStatusReceiver},
-    internal_events::{
-        EventsReceived, StreamClosedError, WindowsEventLogParseError, WindowsEventLogQueryError,
-    },
-    shutdown::ShutdownSignal,
-};
-
-#[cfg(windows)]
-use self::{
-    checkpoint::Checkpointer,
-    error::WindowsEventLogError,
-    parser::EventLogParser,
-    subscription::{EventLogSubscription, WaitResult},
-};
+cfg_if::cfg_if! {
+if #[cfg(windows)] {
 
 /// Entry for the acknowledgment finalizer containing checkpoint information.
 /// Each entry represents a batch of events that need to be acknowledged before
 /// the checkpoint can be safely updated. Contains all channel bookmarks from
 /// the batch since a single batch may span multiple channels.
-#[cfg(windows)]
 #[derive(Debug, Clone)]
 struct FinalizerEntry {
     /// Channel bookmarks: (channel_name, bookmark_xml) pairs
@@ -89,12 +74,10 @@ struct FinalizerEntry {
 }
 
 /// Shared checkpointer type for use with the finalizer
-#[cfg(windows)]
 type SharedCheckpointer = Arc<Checkpointer>;
 
 /// Finalizer for handling acknowledgments.
 /// Supports both synchronous (immediate checkpoint) and asynchronous (deferred checkpoint) modes.
-#[cfg(windows)]
 enum Finalizer {
     /// Synchronous mode: checkpoints are updated immediately after reading events.
     /// Used when acknowledgements are disabled.
@@ -104,7 +87,6 @@ enum Finalizer {
     Async(OrderedFinalizer<FinalizerEntry>),
 }
 
-#[cfg(windows)]
 impl Finalizer {
     /// Create a new finalizer based on acknowledgement configuration.
     fn new(
@@ -176,7 +158,6 @@ impl Finalizer {
 }
 
 /// Windows Event Log source implementation
-#[cfg(windows)]
 pub struct WindowsEventLogSource {
     config: WindowsEventLogConfig,
     data_dir: PathBuf,
@@ -184,7 +165,6 @@ pub struct WindowsEventLogSource {
     log_namespace: LogNamespace,
 }
 
-#[cfg(windows)]
 impl WindowsEventLogSource {
     pub fn new(
         config: WindowsEventLogConfig,
@@ -486,6 +466,9 @@ impl WindowsEventLogSource {
         Ok(())
     }
 }
+
+} // if #[cfg(windows)]
+} // cfg_if!
 
 #[async_trait]
 #[typetag::serde(name = "windows_event_log")]
