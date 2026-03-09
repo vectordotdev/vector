@@ -207,6 +207,26 @@ Without the fix, a customer with 100 tags per metric can push Vector to **~10 GB
 under normal operating conditions at 50k events/s. With the fix, the same workload stays
 under ~150 MB regardless of tag count.
 
+### Validation — 100-tag profile at 50k/s (2-run average)
+
+Benchmark profile: 82 static tags (k8s pod/node UIDs, cloud resource IDs, kube labels/annotations)
++ 15 high-cardinality tags (8-byte values) + host (1000-cardinality) + run + seq = **100 tags total**,
+~3.1 KB statsd wire size per event (~35 chars avg for static tags).
+
+| | v2 — no limits | v2 — 5 MiB limit (fix) | v1 — no limits | v1 — 60 MiB limit |
+|---|---:|---:|---:|---:|
+| avg RSS | **14,588 MB** | **2,516 MB** | 13,544 MB | 6,523 MB |
+| peak RSS | **20,237 MB** | **2,662 MB** | 19,243 MB | 8,970 MB |
+| avg CPU % | 140 % | 132 % | 139 % | 155 % |
+| HTTP req/s | 33.6 | 124.4 | 3.2 | 10.2 |
+
+The prediction is confirmed: without the fix v2 reaches **~14–20 GB RSS**; with the 5 MiB limit it
+stays at **~2.5 GB** — an 83% reduction. Both runs showed zero loss and zero errors.
+
+The measured value (2.5 GB) is higher than the theoretical floor (~135 MB) because the pipeline is
+saturated at 50k/s with these heavy events (delivery ratio ~1.3×), keeping most FuturesOrdered slots
+occupied. The ~135 MB estimate applies to unsaturated load where batches drain before new ones arrive.
+
 ---
 
 ## Analysis
