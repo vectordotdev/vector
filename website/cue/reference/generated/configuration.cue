@@ -47,7 +47,6 @@ generated: configuration: {
 			}
 			description: "API options."
 			group:       "api"
-			group_order: 1
 		}
 		enrichment_tables: {
 			type: object: options: "*": {
@@ -376,7 +375,6 @@ generated: configuration: {
 			}
 			description: "All configured enrichment tables."
 			group:       "pipeline_components"
-			group_order: 4
 		}
 		healthchecks: {
 			type: object: options: {
@@ -424,7 +422,6 @@ generated: configuration: {
 			}
 			description: "Schema options."
 			group:       "schema"
-			group_order: 1
 		}
 		secret: {
 			type: object: options: "*": {
@@ -748,7 +745,6 @@ generated: configuration: {
 			}
 			description: "All configured secrets backends."
 			group:       "secrets"
-			group_order: 1
 		}
 		sinks: {
 			type: object: options: "*": {
@@ -964,7 +960,6 @@ generated: configuration: {
 			}
 			description: "All configured sinks."
 			group:       "pipeline_components"
-			group_order: 3
 		}
 		sources: {
 			type: object: options: "*": {
@@ -1062,7 +1057,6 @@ generated: configuration: {
 			}
 			description: "All configured sources."
 			group:       "pipeline_components"
-			group_order: 1
 		}
 		transforms: {
 			type: object: options: "*": {
@@ -1116,7 +1110,6 @@ generated: configuration: {
 			}
 			description: "All configured transforms."
 			group:       "pipeline_components"
-			group_order: 2
 		}
 		acknowledgements: {
 			type: object: options: enabled: {

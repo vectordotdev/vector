@@ -1729,18 +1729,17 @@ def render_and_import_generated_top_level_config_schema(root_schema)
   # These groups will be used to organize separate documentation pages
   field_groups = {
     # Pipeline component containers
-    'sources' => { 'group' => 'pipeline_components', 'order' => 1 },
-    'transforms' => { 'group' => 'pipeline_components', 'order' => 2 },
-    'sinks' => { 'group' => 'pipeline_components', 'order' => 3 },
-    'enrichment_tables' => { 'group' => 'pipeline_components', 'order' => 4 },
+    'sources' => 'pipeline_components',
+    'transforms' => 'pipeline_components',
+    'sinks' => 'pipeline_components',
+    'enrichment_tables' => 'pipeline_components',
 
     # Individual feature pages
-    'api' => { 'group' => 'api', 'order' => 1 },
-    'schema' => { 'group' => 'schema', 'order' => 1 },
-    'secret' => { 'group' => 'secrets', 'order' => 1 },
+    'api' => 'api',
+    'schema' => 'schema',
+    'secret' => 'secrets',
 
     # Global options (everything else defaults to this)
-    # Common fields should be ordered first via their existing common flag
   }
 
   group_metadata = {
@@ -1804,10 +1803,9 @@ def render_and_import_generated_top_level_config_schema(root_schema)
 
       # Assign group metadata to organize the documentation
       if field_groups.key?(field_name)
-        group_info = field_groups[field_name]
-        resolved_field['group'] = group_info['group']
-        resolved_field['group_order'] = group_info['order']
-        @logger.debug "Assigned '#{field_name}' to group '#{group_info['group']}' with order #{group_info['order']}"
+        group_name = field_groups[field_name]
+        resolved_field['group'] = group_name
+        @logger.debug "Assigned '#{field_name}' to group '#{group_name}'"
       else
         # Default to global_options for any fields not explicitly grouped
         resolved_field['group'] = 'global_options'
