@@ -23,16 +23,16 @@ If you encounter any issues please [report them here](https://github.com/vectord
 
 {{< /requirement >}}
 
-### Background
+## Background
 
 Vector traditionally stored metadata (like `host`, `timestamp`, and `source_type`) as top-level
 fields alongside your log data. This "legacy" approach has a few drawbacks:
 
-- **Field name collisions**: If your logs contain a field named `host`, it could conflict with
+* **Field name collisions**: If your logs contain a field named `host`, it could conflict with
   Vector's metadata field
-- **Unclear ownership**: It's not immediately obvious which fields are from your data and which
+* **Unclear ownership**: It's not immediately obvious which fields are from your data and which
   are Vector metadata
-- **Difficult transformations**: When you want to transform only your data (not metadata), you
+* **Difficult transformations**: When you want to transform only your data (not metadata), you
   need to be careful to exclude metadata fields
 
 The Vector namespace mode solves these issues by storing metadata in a separate namespace,
@@ -219,12 +219,14 @@ If you're considering migrating from legacy mode (`log_namespace = false`) to Ve
 VRL scripts that reference metadata fields will need to be updated to use the metadata accessor syntax:
 
 **Legacy mode:**
+
 ```coffee
 .host = "new-host"
 .timestamp = now()
 ```
 
 **Vector namespace mode:**
+
 ```coffee
 %vector.host = "new-host"
 %vector.ingest_timestamp = now()
@@ -232,7 +234,7 @@ VRL scripts that reference metadata fields will need to be updated to use the me
 
 ### Sink Behavior Differences
 
-Many sinks will behave differently depending on the namespace setting. Always test your sinks after switching modes to verify expected 
+Many sinks will behave differently depending on the namespace setting. Always test your sinks after switching modes to verify expected
 behavior before deploying.
 
 ### Gradual Migration Strategy
@@ -257,6 +259,7 @@ sources:
 ```
 
 This allows you to:
+
 1. Keep existing pipelines working with legacy mode
 2. Adopt Vector namespace mode for selected sources only
 3. Migrate sources incrementally over time
