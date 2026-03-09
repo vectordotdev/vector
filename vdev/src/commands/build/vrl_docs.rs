@@ -128,16 +128,12 @@ fn get_vrl_commit_sha(repo_root: &Path) -> Result<String> {
 
     match pkg.source.as_deref() {
         // Git source: "git+https://github.com/vectordotdev/vrl.git?branch=main#5316c01b..."
-        Some(source) if source.starts_with("git+") => {
-            source
-                .rsplit_once('#')
-                .map(|(_, sha)| sha.to_string())
-                .context("Could not extract commit SHA from VRL git source string")
-        }
+        Some(source) if source.starts_with("git+") => source
+            .rsplit_once('#')
+            .map(|(_, sha)| sha.to_string())
+            .context("Could not extract commit SHA from VRL git source string"),
         // Registry source (crates.io): use the version as a tag
-        Some(source) if source.starts_with("registry+") => {
-            Ok(format!("v{}", pkg.version))
-        }
+        Some(source) if source.starts_with("registry+") => Ok(format!("v{}", pkg.version)),
         Some(source) => anyhow::bail!("Unrecognized VRL package source in Cargo.lock: {source}"),
         None => anyhow::bail!("VRL package in Cargo.lock has no source field"),
     }
