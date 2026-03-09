@@ -227,7 +227,11 @@ jobs:
           component_docs:
             - 'scripts/generate-component-docs.rb'
             - "vdev/**"
-            - 'website/cue/**/base/**.cue'
+            - 'website/cue/**/*.cue'
+            - 'docs/generated/**'
+            # If changes to the VRL sha is made the combined generated cue file will change which
+            # may cause issues
+            - 'Cargo.lock'
             - ".github/workflows/changes.yml"
           markdown:
             - '**/**.md'
