@@ -4,10 +4,10 @@ use url::Url;
 use vector_lib::configurable::configurable_component;
 
 /// API options.
+#[configurable_component]
 #[configurable(metadata(
     docs::warnings = "The API has no authentication and exposes all event data flowing through Vector. It must not be exposed to untrusted clients."
 ))]
-#[configurable_component]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
 pub struct Options {
