@@ -262,9 +262,15 @@ ensures batches never accumulate more data than fits in a single HTTP request, e
 the encoder splitting step and its associated backpressure and memory overhead — without
 requiring any user configuration.
 
-**Tradeoff — counter deduplication.** Smaller batches give `sort_and_collapse` fewer
-events to work with, so counters with the same series arriving within the same 2s window
-are slightly less likely to be collapsed before sending. This only matters for
-single-source high-throughput counters; fan-in workloads and high-cardinality tags see
-no dedup benefit regardless of batch size. The Datadog backend aggregates counters
-server-side, so extra points are correct behavior, not data loss.
+**Trade-off: counter dedup efficiency.** Smaller batches give `sort_and_collapse` fewer
+events to work with, so dedup (counter collapsing) has fewer opportunities to merge
+duplicates within a batch. This trade-off is real but acceptable:
+
+- Dedup only matters for counters where the same series is emitted **multiple times within
+  the same 2-second window**. If a counter is sent once per flush interval, dedup is a
+  no-op regardless of batch size.
+- Many common sources — Datadog Agent, StatsD, Prometheus — already pre-aggregate counters
+  before sending, so Vector's dedup is redundant for those pipelines.
+- At normal load, the 2-second timeout drives batch boundaries, not the byte limit. The
+  byte cap only kicks in under high load with large tag sets, at which point keeping memory
+  bounded is the higher priority.
