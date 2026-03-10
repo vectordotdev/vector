@@ -256,4 +256,4 @@ vector --config vector.yaml 2>&1 | grep -i secret
 
 - [AWS Secrets Manager Documentation](https://docs.aws.amazon.com/secretsmanager/)
 - [Vector Secrets Management Overview](/docs/reference/configuration/secrets/#secret)
-- [AWS Authentication in Vector](/docs/reference/configuration/components/aws/)
+- [AWS Authentication in Vector](/docs/reference/configuration/sinks/aws_s3/#auth)
