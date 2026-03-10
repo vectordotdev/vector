@@ -59,7 +59,6 @@ pub struct AzureLogsIngestionConfig {
     pub stream_name: String,
 
     #[configurable(derived)]
-    #[serde(default)]
     pub auth: AzureAuthentication,
 
     /// [Token scope][token_scope] for dedicated Azure regions.

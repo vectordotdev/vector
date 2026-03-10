@@ -38,7 +38,7 @@ generated: components: sinks: azure_blob: configuration: {
 		}
 	}
 	auth: {
-		description: "Configuration of the authentication strategy for interacting with Azure services."
+		description: "Azure service principal authentication."
 		required:    false
 		type: object: options: {
 			azure_client_id: {
@@ -47,7 +47,7 @@ generated: components: sinks: azure_blob: configuration: {
 
 					[azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
 					"""
-				relevant_when: "azure_credential_kind = \"client_certificate_credential\""
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\" or azure_credential_kind = \"client_secret_credential\""
 				required:      true
 				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_CLIENT_ID:?err}"]
 			}
@@ -57,7 +57,8 @@ generated: components: sinks: azure_blob: configuration: {
 
 					[azure_client_secret]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
 					"""
-				required: true
+				relevant_when: "azure_credential_kind = \"client_secret_credential\""
+				required:      true
 				type: string: examples: ["00-00~000000-0000000~0000000000000000000", "${AZURE_CLIENT_SECRET:?err}"]
 			}
 			azure_credential_kind: {
@@ -66,6 +67,7 @@ generated: components: sinks: azure_blob: configuration: {
 				type: string: enum: {
 					azure_cli:                         "Use Azure CLI credentials"
 					client_certificate_credential:     "Use certificate credentials"
+					client_secret_credential:          "Use client ID/secret credentials"
 					managed_identity:                  "Use Managed Identity credentials"
 					managed_identity_client_assertion: "Use Managed Identity with Client Assertion credentials"
 					workload_identity:                 "Use Workload Identity credentials"
@@ -77,7 +79,7 @@ generated: components: sinks: azure_blob: configuration: {
 
 					[azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
 					"""
-				relevant_when: "azure_credential_kind = \"client_certificate_credential\""
+				relevant_when: "azure_credential_kind = \"client_certificate_credential\" or azure_credential_kind = \"client_secret_credential\""
 				required:      true
 				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_TENANT_ID:?err}"]
 			}

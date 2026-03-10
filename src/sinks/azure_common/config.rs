@@ -39,38 +39,11 @@ use crate::{
     tls::TlsConfig,
 };
 
-/// Configuration of the authentication strategy for interacting with Azure services.
+/// Azure service principal authentication.
 #[configurable_component]
-#[derive(Clone, Debug, Derivative, Eq, PartialEq)]
-#[derivative(Default)]
+#[derive(Clone, Debug, Eq, PartialEq)]
 #[serde(deny_unknown_fields, untagged)]
 pub enum AzureAuthentication {
-    /// Use client credentials
-    #[derivative(Default)]
-    ClientSecretCredential {
-        /// The [Azure Tenant ID][azure_tenant_id].
-        ///
-        /// [azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
-        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
-        #[configurable(metadata(docs::examples = "${AZURE_TENANT_ID:?err}"))]
-        azure_tenant_id: String,
-
-        /// The [Azure Client ID][azure_client_id].
-        ///
-        /// [azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
-        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
-        #[configurable(metadata(docs::examples = "${AZURE_CLIENT_ID:?err}"))]
-        azure_client_id: String,
-
-        /// The [Azure Client Secret][azure_client_secret].
-        ///
-        /// [azure_client_secret]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
-        #[configurable(metadata(docs::examples = "00-00~000000-0000000~0000000000000000000"))]
-        #[configurable(metadata(docs::examples = "${AZURE_CLIENT_SECRET:?err}"))]
-        azure_client_secret: SensitiveString,
-    },
-
-    /// Use credentials from environment variables
     #[configurable(metadata(docs::enum_tag_description = "The kind of Azure credential to use."))]
     Specific(SpecificAzureCredential),
 
@@ -78,6 +51,17 @@ pub enum AzureAuthentication {
     #[cfg(test)]
     #[serde(skip)]
     MockCredential,
+}
+
+impl Default for AzureAuthentication {
+    // This should never be actually used.
+    // This is only needed when using Default::default() (such as unit tests),
+    // as serde requires `azure_credential_kind` to be specified.
+    fn default() -> Self {
+        Self::Specific(SpecificAzureCredential::ManagedIdentity {
+            user_assigned_managed_identity_id: None,
+        })
+    }
 }
 
 /// Specific Azure credential types.
@@ -117,6 +101,30 @@ pub enum SpecificAzureCredential {
         /// The password for the client certificate, if applicable.
         #[configurable(metadata(docs::examples = "${AZURE_CLIENT_CERTIFICATE_PASSWORD}"))]
         certificate_password: Option<SensitiveString>,
+    },
+
+    /// Use client ID/secret credentials
+    ClientSecretCredential {
+        /// The [Azure Tenant ID][azure_tenant_id].
+        ///
+        /// [azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        #[configurable(metadata(docs::examples = "${AZURE_TENANT_ID:?err}"))]
+        azure_tenant_id: String,
+
+        /// The [Azure Client ID][azure_client_id].
+        ///
+        /// [azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        #[configurable(metadata(docs::examples = "${AZURE_CLIENT_ID:?err}"))]
+        azure_client_id: String,
+
+        /// The [Azure Client Secret][azure_client_secret].
+        ///
+        /// [azure_client_secret]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+        #[configurable(metadata(docs::examples = "00-00~000000-0000000~0000000000000000000"))]
+        #[configurable(metadata(docs::examples = "${AZURE_CLIENT_SECRET:?err}"))]
+        azure_client_secret: SensitiveString,
     },
 
     /// Use Managed Identity credentials
@@ -176,36 +184,6 @@ impl AzureAuthentication {
     /// Returns the provider for the credentials based on the authentication mechanism chosen.
     pub async fn credential(&self) -> azure_core::Result<Arc<dyn TokenCredential>> {
         match self {
-            Self::ClientSecretCredential {
-                azure_tenant_id,
-                azure_client_id,
-                azure_client_secret,
-            } => {
-                if azure_tenant_id.is_empty() {
-                    return Err(Error::with_message(ErrorKind::Credential,
-                        "`auth.azure_tenant_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
-                    ));
-                }
-                if azure_client_id.is_empty() {
-                    return Err(Error::with_message(ErrorKind::Credential,
-                        "`auth.azure_client_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
-                    ));
-                }
-                if azure_client_secret.inner().is_empty() {
-                    return Err(Error::with_message(ErrorKind::Credential,
-                        "`auth.azure_client_secret` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
-                    ));
-                }
-                let secret: String = azure_client_secret.inner().into();
-                let credential: Arc<dyn TokenCredential> = ClientSecretCredential::new(
-                    &azure_tenant_id.clone(),
-                    azure_client_id.clone(),
-                    secret.into(),
-                    None,
-                )?;
-                Ok(credential)
-            }
-
             Self::Specific(specific) => specific.credential().await,
 
             #[cfg(test)]
@@ -253,6 +231,36 @@ impl SpecificAzureCredential {
                     azure_client_id.clone(),
                     certificate_base64,
                     Some(options),
+                )?
+            }
+
+            Self::ClientSecretCredential {
+                azure_tenant_id,
+                azure_client_id,
+                azure_client_secret,
+            } => {
+                if azure_tenant_id.is_empty() {
+                    return Err(Error::with_message(ErrorKind::Credential,
+                        "`auth.azure_tenant_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
+                    ));
+                }
+                if azure_client_id.is_empty() {
+                    return Err(Error::with_message(ErrorKind::Credential,
+                        "`auth.azure_client_id` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
+                    ));
+                }
+                if azure_client_secret.inner().is_empty() {
+                    return Err(Error::with_message(ErrorKind::Credential,
+                        "`auth.azure_client_secret` is blank; either use `auth.azure_credential_kind`, or provide tenant ID, client ID, and secret.".to_string()
+                    ));
+                }
+
+                let secret: String = azure_client_secret.inner().into();
+                ClientSecretCredential::new(
+                    &azure_tenant_id.clone(),
+                    azure_client_id.clone(),
+                    secret.into(),
+                    None,
                 )?
             }
 
@@ -448,29 +456,11 @@ pub async fn build_client(
                 .per_call_policies
                 .push(Arc::new(policy));
         }
-        (Auth::None, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
-            info!("Using Client Secret authentication");
-            let credential_result: Arc<dyn TokenCredential> =
-                auth.unwrap().credential().await.unwrap();
-            credential = Some(credential_result);
-        }
         (Auth::None, Some(AzureAuthentication::Specific(..))) => {
-            info!("Using specific Azure Authentication method");
+            info!("Using Azure Authentication method");
             let credential_result: Arc<dyn TokenCredential> =
                 auth.unwrap().credential().await.unwrap();
             credential = Some(credential_result);
-        }
-        (Auth::Sas { .. }, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
-            return Err(Box::new(Error::with_message(
-                ErrorKind::Credential,
-                "Cannot use both SAS token and Client ID/Secret at the same time",
-            )));
-        }
-        (Auth::SharedKey { .. }, Some(AzureAuthentication::ClientSecretCredential { .. })) => {
-            return Err(Box::new(Error::with_message(
-                ErrorKind::Credential,
-                "Cannot use both Shared Key and Client ID/Secret at the same time",
-            )));
         }
         (Auth::Sas { .. }, Some(AzureAuthentication::Specific(..))) => {
             return Err(Box::new(Error::with_message(

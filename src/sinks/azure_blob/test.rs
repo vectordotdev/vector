@@ -242,6 +242,33 @@ fn azure_blob_build_request_with_uuid() {
 }
 
 #[tokio::test]
+async fn azure_blob_build_config_with_null_auth() {
+    let config: Result<AzureBlobSinkConfig, toml::de::Error> = toml::from_str::<AzureBlobSinkConfig>(
+        r#"
+            connection_string = "AccountName=mylogstorage"
+            container_name = "my-logs"
+
+            [encoding]
+            codec = "json"
+
+            [auth]
+        "#,
+    );
+
+    match config {
+        Ok(_) => panic!("Config parsing should have failed due to invalid auth config"),
+        Err(e) => {
+            let err_str = e.to_string();
+            assert!(
+                err_str.contains("data did not match any variant of untagged enum"),
+                "Config parsing did not complain about invalid auth config: {}",
+                err_str
+            );
+        }
+    }
+}
+
+#[tokio::test]
 async fn azure_blob_build_config_with_client_id_and_secret() {
     let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
         r#"
@@ -252,6 +279,7 @@ async fn azure_blob_build_config_with_client_id_and_secret() {
             codec = "json"
 
             [auth]
+            azure_credential_kind = "client_secret_credential"
             azure_tenant_id = "00000000-0000-0000-0000-000000000000"
             azure_client_id = "mock-client-id"
             azure_client_secret = "mock-client-secret"
@@ -262,17 +290,17 @@ async fn azure_blob_build_config_with_client_id_and_secret() {
     assert!(&config.auth.is_some());
 
     match &config.auth.clone().unwrap() {
-        AzureAuthentication::ClientSecretCredential {
+        AzureAuthentication::Specific(SpecificAzureCredential::ClientSecretCredential {
             azure_tenant_id,
             azure_client_id,
             azure_client_secret,
-        } => {
+        }) => {
             assert_eq!(azure_tenant_id, "00000000-0000-0000-0000-000000000000");
             assert_eq!(azure_client_id, "mock-client-id");
             let secret: String = azure_client_secret.inner().into();
             assert_eq!(secret, "mock-client-secret");
         }
-        _ => panic!("Expected ClientSecretCredential variant"),
+        _ => panic!("Expected Specific(ClientSecretCredential) variant"),
     }
 
     let cx = SinkContext::default();
@@ -382,6 +410,7 @@ async fn azure_blob_build_config_with_conflicting_connection_string_and_client_i
             codec = "json"
 
             [auth]
+            azure_credential_kind = "client_secret_credential"
             azure_tenant_id = "00000000-0000-0000-0000-000000000000"
             azure_client_id = "mock-client-id"
             azure_client_secret = "mock-client-secret"
@@ -400,7 +429,8 @@ async fn azure_blob_build_config_with_conflicting_connection_string_and_client_i
         Err(e) => {
             let err_str = e.to_string();
             assert!(
-                err_str.contains("Cannot use both Shared Key and Client ID"),
+                err_str
+                    .contains("Cannot use both Shared Key and another Azure Authentication method"),
                 "Config build did not complain about conflicting Shared Key and Client ID: {}",
                 err_str
             );
