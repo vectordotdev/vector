@@ -56,6 +56,12 @@ impl SeriesApiVersion {
     fn get_api_version_backwards_compatible() -> Self {
         static API_VERSION: OnceLock<SeriesApiVersion> = OnceLock::new();
         *API_VERSION.get_or_init(|| {
+            if std::env::var("VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API").is_ok() {
+                warn!(
+                    "VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API is deprecated and has no effect. \
+                     The v2 series endpoint is now the default — you can safely remove this variable."
+                );
+            }
             match std::env::var("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API") {
                 Ok(_) => Self::V1,
                 Err(_) => Self::V2,
