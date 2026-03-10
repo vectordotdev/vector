@@ -118,17 +118,11 @@ class RunResult:
     generated_total: float
     sent_eps: float
     sent_total: float
-    received_eps: float
-    received_total: float
-    errors_total_delta: float
-    discarded_total_delta: float
     avg_cpu_percent: float
     avg_rss_mb: float
     peak_rss_mb: float
     http_requests_sent_eps: float
     delivery_ratio: float
-    pipeline_accept_ratio: float
-    loss_rate: float
 
 
 def parse_args() -> argparse.Namespace:
@@ -271,66 +265,23 @@ def extract_component_sum(
     rows: Iterable[Tuple[str, Dict[str, str], float]],
     metric_base_name: str,
     component_id: str,
-) -> Tuple[float, str]:
-    exact = 0.0
-    fuzzy = 0.0
-    dd_sink = 0.0
+) -> float:
     plain = metric_base_name
     prefixed = f"vector_{metric_base_name}"
-    target = component_id.lower()
+    total = 0.0
     for name, labels, value in rows:
-        if name != plain and name != prefixed:
-            continue
-        label_component_id = labels.get("component_id", "")
-        # Primary match: exact component_id.
-        if label_component_id == component_id:
-            exact += value
-            continue
-        # Fuzzy match: component_id includes sink id (e.g. namespaced IDs).
-        if target and target in label_component_id.lower():
-            fuzzy += value
-            continue
-        # Fallback match: datadog_metrics sink counters by component metadata.
-        if (
-            labels.get("component_kind") == "sink"
-            and labels.get("component_type") == "datadog_metrics"
-        ):
-            dd_sink += value
-            continue
-    if exact > 0:
-        return exact, "component_id_exact"
-    if fuzzy > 0:
-        return fuzzy, "component_id_fuzzy"
-    if dd_sink > 0:
-        return dd_sink, "datadog_sink_tags"
-    return 0.0, "no_match"
+        if (name == plain or name == prefixed) and labels.get("component_id") == component_id:
+            total += value
+    return total
 
 
 def fetch_metrics_snapshot(metrics_url: str, sink_id: str) -> Dict[str, float]:
     with urllib.request.urlopen(metrics_url, timeout=5) as resp:
         text = resp.read().decode("utf-8", errors="replace")
     rows = parse_prometheus_metrics(text)
-    sent, sent_match = extract_component_sum(rows, "component_sent_events_total", sink_id)
-    received, received_match = extract_component_sum(
-        rows, "component_received_events_total", sink_id
-    )
-    errors, errors_match = extract_component_sum(rows, "component_errors_total", sink_id)
-    discarded, discarded_match = extract_component_sum(
-        rows, "component_discarded_events_total", sink_id
-    )
-    http_requests, _ = extract_component_sum(
-        rows, "http_client_requests_sent_total", sink_id
-    )
     return {
-        "sent": sent,
-        "received": received,
-        "errors": errors,
-        "discarded": discarded,
-        "http_requests": http_requests,
-        "sent_match": sent_match,
-        "received_match": received_match,
-        "errors_match": errors_match,
-        "discarded_match": discarded_match,
+        "sent": extract_component_sum(rows, "component_sent_events_total", sink_id),
+        "http_requests": extract_component_sum(rows, "http_client_requests_sent_total", sink_id),
     }
 
 
@@ -533,24 +484,9 @@ def run_single_benchmark(
             gen_rate = parse_actual_rate((stdout + "\n" + stderr).strip())
 
             after = fetch_metrics_snapshot(metrics_url, DEFAULT_SINK_ID)
-            if (
-                after.get("sent_match") != "component_id_exact"
-                or after.get("received_match") != "component_id_exact"
-            ):
-                print(
-                    f"[{run_id}] metric match strategy: "
-                    f"sent={after.get('sent_match')} "
-                    f"received={after.get('received_match')} "
-                    f"errors={after.get('errors_match')} "
-                    f"discarded={after.get('discarded_match')}",
-                    flush=True,
-                )
 
             duration = float(args.measure_seconds)
-            sent_delta = max(0.0, after["sent"] - before["sent"])
-            received_delta = max(0.0, after["received"] - before["received"])
-            errors_delta = max(0.0, after["errors"] - before["errors"])
-            discarded_delta = max(0.0, after["discarded"] - before["discarded"])
+            sent_delta = after["sent"] - before["sent"]
 
             return RunResult(
                 mode=mode,
@@ -559,21 +495,11 @@ def run_single_benchmark(
                 generated_total=gen_rate * duration,
                 sent_eps=sent_delta / duration,
                 sent_total=sent_delta,
-                received_eps=received_delta / duration,
-                received_total=received_delta,
-                errors_total_delta=errors_delta,
-                discarded_total_delta=discarded_delta,
                 avg_cpu_percent=statistics.mean(cpu_samples) if cpu_samples else 0.0,
                 avg_rss_mb=statistics.mean(rss_samples) if rss_samples else 0.0,
                 peak_rss_mb=max(rss_samples) if rss_samples else 0.0,
                 http_requests_sent_eps=(after["http_requests"] - before["http_requests"]) / duration,
-                delivery_ratio=(sent_delta / duration) / gen_rate if gen_rate > 0 else 0.0,
-                pipeline_accept_ratio=(
-                    (received_delta / duration) / gen_rate if gen_rate > 0 else 0.0
-                ),
-                loss_rate=(discarded_delta / (gen_rate * duration))
-                if gen_rate > 0 and duration > 0
-                else 0.0,
+                delivery_ratio=sent_delta / (gen_rate * duration) if gen_rate > 0 else 0.0,
             )
         finally:
             stop_process_gracefully(vector_proc)
@@ -592,32 +518,24 @@ def summarize_mode(results: List[RunResult]) -> Dict[str, float]:
         "generated_total": median([r.generated_total for r in results]),
         "sent_eps": median([r.sent_eps for r in results]),
         "sent_total": median([r.sent_total for r in results]),
-        "received_eps": median([r.received_eps for r in results]),
-        "received_total": median([r.received_total for r in results]),
-        "errors_total_delta": median([r.errors_total_delta for r in results]),
-        "discarded_total_delta": median([r.discarded_total_delta for r in results]),
         "avg_cpu_percent": median([r.avg_cpu_percent for r in results]),
         "avg_rss_mb": median([r.avg_rss_mb for r in results]),
         "peak_rss_mb": median([r.peak_rss_mb for r in results]),
         "http_requests_sent_eps": median([r.http_requests_sent_eps for r in results]),
         "delivery_ratio": median([r.delivery_ratio for r in results]),
-        "pipeline_accept_ratio": median([r.pipeline_accept_ratio for r in results]),
-        "loss_rate": median([r.loss_rate for r in results]),
     }
 
 
 def print_results_table(results: List[RunResult]) -> None:
     print("\nPer-run results")
     print(
-        "mode repeat gen_rate generated sent_eps sent_total recv_eps recv_total delivery accept loss errors discarded avg_cpu avg_rss_mb peak_rss_mb"
+        "mode repeat gen_rate generated sent_eps sent_total delivery avg_cpu avg_rss_mb peak_rss_mb"
     )
     for r in results:
         print(
             f"{r.mode:>3} {r.repeat:>6} {r.generator_actual_rate:>8.1f} "
             f"{r.generated_total:>9.0f} {r.sent_eps:>8.1f} {r.sent_total:>10.0f} "
-            f"{r.received_eps:>8.1f} {r.received_total:>10.0f} "
-            f"{r.delivery_ratio:>8.3f} {r.pipeline_accept_ratio:>7.3f} {r.loss_rate:>6.4f} "
-            f"{r.errors_total_delta:>6.1f} {r.discarded_total_delta:>9.1f} "
+            f"{r.delivery_ratio:>8.3f} "
             f"{r.avg_cpu_percent:>7.1f} {r.avg_rss_mb:>10.1f} {r.peak_rss_mb:>11.1f}"
         )
 
@@ -630,17 +548,11 @@ def print_median_comparison(v1: Dict[str, float], v2: Dict[str, float]) -> None:
         "generated_total",
         "sent_eps",
         "sent_total",
-        "received_eps",
-        "received_total",
-        "errors_total_delta",
-        "discarded_total_delta",
         "avg_cpu_percent",
         "avg_rss_mb",
         "peak_rss_mb",
         "http_requests_sent_eps",
         "delivery_ratio",
-        "pipeline_accept_ratio",
-        "loss_rate",
     ]
     for key in keys:
         v1v = v1.get(key, 0.0)
