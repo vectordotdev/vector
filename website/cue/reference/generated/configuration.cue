@@ -46,25 +46,11 @@ generated: configuration: {
 				}
 			}
 			description: "API options."
-			group:       "api"
+			warnings: ["The API has no authentication and exposes all event data flowing through Vector. It must not be exposed to untrusted clients."]
+			group: "api"
 		}
-<<<<<<< HEAD
-		description: "API options."
-		warnings: ["The API has no authentication and exposes all event data flowing through Vector. It must not be exposed to untrusted clients."]
-	}
-	enrichment_tables: {
-		type: object: options: {
-			file: {
-||||||| 40e82911e3
-		description: "API options."
-	}
-	enrichment_tables: {
-		type: object: options: {
-			file: {
-=======
 		enrichment_tables: {
 			type: object: options: "*": {
->>>>>>> origin/master
 				type: object: options: {
 					graph: {
 						type: object: options: node_attributes: {
