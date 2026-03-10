@@ -26,7 +26,7 @@ use crate::{
         components::{SINK_TAGS, assert_sink_compliance},
         random_events_with_stream, random_lines, random_lines_with_stream, random_string,
     },
-    tls::{self, TlsConfig},
+    tls,
 };
 
 #[tokio::test]
@@ -284,9 +284,8 @@ impl AzureBlobSinkConfig {
             batch: Default::default(),
             request: TowerRequestConfig::default(),
             acknowledgements: Default::default(),
-            tls: Some(TlsConfig {
+            tls: Some(azure_common::config::AzureBlobTlsConfig {
                 ca_file: Some(tls::TEST_PEM_CA_PATH.into()),
-                ..Default::default()
             }),
         };
 

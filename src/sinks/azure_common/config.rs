@@ -36,8 +36,22 @@ use vector_lib::{
 use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     sinks::{Healthcheck, util::retries::RetryLogic},
-    tls::TlsConfig,
 };
+
+/// TLS configuration.
+#[configurable_component]
+#[configurable(metadata(docs::advanced))]
+#[derive(Clone, Debug, Default)]
+#[serde(deny_unknown_fields)]
+pub struct AzureBlobTlsConfig {
+    /// Absolute path to an additional CA certificate file.
+    ///
+    /// The certificate must be in the DER or PEM (X.509) format. Additionally, the certificate can be provided as an inline string in PEM format.
+    #[serde(alias = "ca_path")]
+    #[configurable(metadata(docs::examples = "/path/to/certificate_authority.crt"))]
+    #[configurable(metadata(docs::human_name = "CA File Path"))]
+    pub ca_file: Option<PathBuf>,
+}
 
 /// Azure service principal authentication.
 #[configurable_component]
@@ -413,7 +427,7 @@ pub async fn build_client(
     connection_string: String,
     container_name: String,
     proxy: &crate::config::ProxyConfig,
-    tls: Option<TlsConfig>,
+    tls: Option<AzureBlobTlsConfig>,
 ) -> crate::Result<Arc<BlobContainerClient>> {
     // Parse connection string without legacy SDK
     let parsed = ParsedConnectionString::parse(&connection_string)
@@ -516,32 +530,7 @@ pub async fn build_client(
         }
     }
 
-    if let Some(TlsConfig {
-        verify_certificate,
-        verify_hostname,
-        alpn_protocols,
-        ca_file,
-        crt_file,
-        key_file,
-        key_pass,
-        server_name,
-    }) = &tls
-    {
-        if verify_certificate.is_some() {
-            return Err(
-                "TLS option `verify_certificate` is not supported for the azure_blob sink".into(),
-            );
-        }
-        if verify_hostname.is_some() {
-            return Err(
-                "TLS option `verify_hostname` is not supported for the azure_blob sink".into(),
-            );
-        }
-        if alpn_protocols.is_some() {
-            return Err(
-                "TLS option `alpn_protocols` is not supported for the azure_blob sink".into(),
-            );
-        }
+    if let Some(AzureBlobTlsConfig { ca_file }) = &tls {
         if let Some(ca_file) = ca_file {
             let mut buf = Vec::new();
             File::open(ca_file)?.read_to_end(&mut buf)?;
@@ -549,18 +538,6 @@ pub async fn build_client(
 
             warn!("Adding TLS root certificate from {}", ca_file.display());
             reqwest_builder = reqwest_builder.add_root_certificate(cert);
-        }
-        if crt_file.is_some() {
-            return Err("TLS option `crt_file` is not supported for the azure_blob sink".into());
-        }
-        if key_file.is_some() {
-            return Err("TLS option `key_file` is not supported for the azure_blob sink".into());
-        }
-        if key_pass.is_some() {
-            return Err("TLS option `key_pass` is not supported for the azure_blob sink".into());
-        }
-        if server_name.is_some() {
-            return Err("TLS option `server_name` is not supported for the azure_blob sink".into());
         }
     }
 

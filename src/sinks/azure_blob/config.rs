@@ -17,7 +17,7 @@ use crate::{
         Healthcheck, VectorSink,
         azure_common::{
             self, config::AzureAuthentication, config::AzureBlobRetryLogic,
-            service::AzureBlobService, sink::AzureBlobSink,
+            config::AzureBlobTlsConfig, service::AzureBlobService, sink::AzureBlobSink,
         },
         util::{
             BatchConfig, BulkSizeBasedDefaultBatchSettings, Compression, ServiceBuilderExt,
@@ -25,7 +25,6 @@ use crate::{
         },
     },
     template::Template,
-    tls::TlsConfig,
 };
 
 #[derive(Clone, Copy, Debug)]
@@ -53,7 +52,7 @@ pub struct AzureBlobSinkConfig {
     /// are supported authentication methods. If using a non-account SAS,
     /// healthchecks will fail and will need to be disabled by setting
     /// `healthcheck.enabled` to `false` for this sink
-    /// 
+    ///
     /// SECURITY WARNING: Access keys and SAS tokens can be used to gain unauthorized access to
     /// Azure Blob Storage resources. Numerous security breaches have occurred due to leaked
     /// connection strings. It is important to keep connection strings secure and not expose them
@@ -167,7 +166,7 @@ pub struct AzureBlobSinkConfig {
 
     #[configurable(derived)]
     #[serde(default)]
-    pub tls: Option<TlsConfig>,
+    pub tls: Option<AzureBlobTlsConfig>,
 }
 
 pub fn default_blob_prefix() -> Template {
