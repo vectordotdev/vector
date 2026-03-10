@@ -46,7 +46,7 @@ generated: configuration: {
 				}
 			}
 			description: "API options."
-			warnings: ["The API has no authentication and exposes all event data flowing through Vector. It must not be exposed to untrusted clients."]
+			warnings: ["The API currently does not support authentication. Only enable it in isolated environments or for debugging. It must not be exposed to untrusted clients."]
 			group: "api"
 		}
 		enrichment_tables: {
