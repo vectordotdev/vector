@@ -560,3 +560,5 @@ ZTE
 Zync
 sighup
 CLAUDE
+linting
+lexers
