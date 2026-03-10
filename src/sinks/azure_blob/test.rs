@@ -437,6 +437,7 @@ async fn azure_blob_build_config_with_conflicting_connection_string_and_client_i
         }
     }
 }
+
 #[tokio::test]
 async fn azure_blob_build_config_with_custom_ca_certificate() {
     let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
@@ -458,4 +459,38 @@ async fn azure_blob_build_config_with_custom_ca_certificate() {
         .build(cx)
         .await
         .unwrap_or_else(|error| panic!("Failed to build sink: {error:?}"));
+}
+
+#[tokio::test]
+async fn azure_blob_build_config_with_crt_file() {
+    let config: AzureBlobSinkConfig = toml::from_str::<AzureBlobSinkConfig>(
+        r#"
+            account_name = "mylogstorage"
+            container_name = "my-logs"
+
+            [encoding]
+            codec = "json"
+
+            [tls]
+            crt_file = "tests/data/ca/intermediate_client/certs/localhost.cert.pem"
+        "#,
+    )
+    .unwrap_or_else(|error| panic!("Config parsing failed: {error:?}"));
+
+    let cx = SinkContext::default();
+    let sink = config.build(cx).await;
+    match sink {
+        Ok(_) => {
+            panic!("Config build should have errored due to `crt_file` being unsupported")
+        }
+        Err(e) => {
+            let err_str = e.to_string();
+            assert!(
+                err_str
+                    .contains("TLS option `crt_file` is not supported"),
+                "Config build did not error about `crt_file` being unsupported: {}",
+                err_str
+            );
+        }
+    }
 }
