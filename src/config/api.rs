@@ -6,7 +6,7 @@ use vector_lib::configurable::configurable_component;
 /// API options.
 #[configurable_component]
 #[configurable(metadata(
-    docs::warnings = "The API has no authentication and exposes all event data flowing through Vector. It must not be exposed to untrusted clients."
+    docs::warnings = "The API currently does not support authentication. Only enable it in isolated environments or for debugging. It must not be exposed to untrusted clients."
 ))]
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 #[serde(default, deny_unknown_fields)]
