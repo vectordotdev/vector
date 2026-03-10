@@ -17,7 +17,7 @@ use crate::{
     test_util::components::assert_transform_compliance,
     transforms::{
         tag_cardinality_limit::config::{
-            BloomFilterConfig, Mode, TagCardinalityLimitInternalMetricsConfig, default_cache_size,
+            BloomFilterConfig, InternalMetricsConfig, Mode, default_cache_size,
         },
         test::create_topology,
     },
@@ -25,7 +25,7 @@ use crate::{
 
 #[test]
 fn generate_config() {
-    crate::test_util::test_generate_config::<TagCardinalityLimitConfig>();
+    crate::test_util::test_generate_config::<Config>();
 }
 
 fn make_metric_with_name(tags: MetricTags, name: &str) -> Event {
@@ -49,30 +49,27 @@ fn make_metric(tags: MetricTags) -> Event {
 fn make_transform_hashset(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
-) -> TagCardinalityLimitConfig {
-    TagCardinalityLimitConfig {
-        global: TagCardinalityLimitInnerConfig {
+) -> Config {
+    Config {
+        global: Inner {
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
-            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
+            internal_metrics: InternalMetricsConfig::default(),
         },
         per_metric_limits: HashMap::new(),
     }
 }
 
-fn make_transform_bloom(
-    value_limit: usize,
-    limit_exceeded_action: LimitExceededAction,
-) -> TagCardinalityLimitConfig {
-    TagCardinalityLimitConfig {
-        global: TagCardinalityLimitInnerConfig {
+fn make_transform_bloom(value_limit: usize, limit_exceeded_action: LimitExceededAction) -> Config {
+    Config {
+        global: Inner {
             value_limit,
             limit_exceeded_action,
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
-            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
+            internal_metrics: InternalMetricsConfig::default(),
         },
         per_metric_limits: HashMap::new(),
     }
@@ -82,13 +79,13 @@ fn make_transform_hashset_with_per_metric_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
     per_metric_limits: HashMap<String, PerMetricConfig>,
-) -> TagCardinalityLimitConfig {
-    TagCardinalityLimitConfig {
-        global: TagCardinalityLimitInnerConfig {
+) -> Config {
+    Config {
+        global: Inner {
             value_limit,
             limit_exceeded_action,
             mode: Mode::Exact,
-            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
+            internal_metrics: InternalMetricsConfig::default(),
         },
         per_metric_limits,
     }
@@ -98,15 +95,15 @@ fn make_transform_bloom_with_per_metric_limits(
     value_limit: usize,
     limit_exceeded_action: LimitExceededAction,
     per_metric_limits: HashMap<String, PerMetricConfig>,
-) -> TagCardinalityLimitConfig {
-    TagCardinalityLimitConfig {
-        global: TagCardinalityLimitInnerConfig {
+) -> Config {
+    Config {
+        global: Inner {
             value_limit,
             limit_exceeded_action,
             mode: Mode::Probabilistic(BloomFilterConfig {
                 cache_size_per_key: default_cache_size(),
             }),
-            internal_metrics: TagCardinalityLimitInternalMetricsConfig::default(),
+            internal_metrics: InternalMetricsConfig::default(),
         },
         per_metric_limits,
     }
@@ -122,7 +119,7 @@ async fn tag_cardinality_limit_drop_event_bloom() {
     drop_event(make_transform_bloom(2, LimitExceededAction::DropEvent)).await;
 }
 
-async fn drop_event(config: TagCardinalityLimitConfig) {
+async fn drop_event(config: Config) {
     assert_transform_compliance(async move {
         let mut event1 = make_metric(metric_tags!("tag1" => "val1"));
         let mut event2 = make_metric(metric_tags!("tag1" => "val2"));
@@ -174,7 +171,7 @@ async fn tag_cardinality_limit_drop_tag_bloom() {
     drop_tag(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
 }
 
-async fn drop_tag(config: TagCardinalityLimitConfig) {
+async fn drop_tag(config: Config) {
     assert_transform_compliance(async move {
         let tags1 = metric_tags!("tag1" => "val1", "tag2" => "val1");
         let mut event1 = make_metric(tags1);
@@ -242,7 +239,7 @@ async fn tag_cardinality_limit_drop_tag_bloom_multi_value() {
     drop_tag_multi_value(make_transform_bloom(2, LimitExceededAction::DropTag)).await;
 }
 
-async fn drop_tag_multi_value(config: TagCardinalityLimitConfig) {
+async fn drop_tag_multi_value(config: Config) {
     assert_transform_compliance(async move {
         let mut tags1 = MetricTags::default();
         tags1.set_multi_value(
@@ -327,7 +324,7 @@ async fn tag_cardinality_limit_separate_value_limit_per_tag_bloom() {
 
 /// Test that hitting the value limit on one tag does not affect the ability to take new
 /// values for other tags.
-async fn separate_value_limit_per_tag(config: TagCardinalityLimitConfig) {
+async fn separate_value_limit_per_tag(config: Config) {
     assert_transform_compliance(async move {
         let mut event1 = make_metric(metric_tags!("tag1" => "val1", "tag2" => "val1"));
 
@@ -462,7 +459,7 @@ async fn tag_cardinality_limit_separate_value_limit_per_metric_name_bloom() {
 
 /// Test that hitting the value limit on one tag does not affect the ability to take new
 /// values for other tags.
-async fn separate_value_limit_per_metric_name(config: TagCardinalityLimitConfig) {
+async fn separate_value_limit_per_metric_name(config: Config) {
     assert_transform_compliance(async move {
         let mut event_a1 =
             make_metric_with_name(metric_tags!("tag1" => "val1", "tag2" => "val1"), "metricA");

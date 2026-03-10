@@ -137,6 +137,7 @@ dsmith
 DVB
 ede
 emoji
+emojis
 emqx
 enableable
 Enot
@@ -558,3 +559,4 @@ ZTE
 Zync
 sighup
 CLAUDE
+linting
