@@ -434,9 +434,8 @@ impl PipelineTest {
             generator.send().await;
         }
 
-        // 5. Wait for pipeline to drain
-        //    Give sinks time to batch and flush
-        tokio::time::sleep(Duration::from_secs(2)).await;
+        // 5. Stop topology — flushes all buffered events through sinks before returning.
+        //    No grace period needed; topology.stop() is the correct synchronization point.
         topology.stop().await;
 
         // 6. Collect from listeners
@@ -486,96 +485,58 @@ pub trait TestGenerator: Send + Sync {
 #[async_trait]
 pub trait TestListener: Send + Sync {
     /// Start listening (bind to port)
-    async fn start(&self) -> Result<(), String>;
+    async fn start(&mut self) -> Result<(), String>;
 
     /// Collect all received data as events
-    async fn collect(&self) -> Vec<Event>;
+    async fn collect(&mut self) -> Vec<Event>;
 }
 ```
 
 #### HTTP listener implementation
 
+`HttpListener` wraps `build_test_server_generic()` from `src/sinks/util/test.rs:69`, which
+already handles hyper server setup, async body capture, and `Trigger`/`Tripwire`-based graceful
+shutdown. `HttpListener` only adds decompression and decoding on top of the captured bytes.
+
 ```rust
 pub struct HttpListener {
-    port: u16,
-    status_code: u16,
-    decompression: Option<String>,
-    codec: String,
-    captured: Arc<Mutex<Vec<Bytes>>>,
-    handle: Option<JoinHandle<()>>,
+    addr: SocketAddr,
+    status_code: StatusCode,
+    decompression: Option<Decompression>,
+    decoding: DecodingConfig,
+    // populated after start()
+    rx: Option<mpsc::Receiver<(Parts, Bytes)>>,
+    trigger: Option<Trigger>,
 }
 
 #[async_trait]
 impl TestListener for HttpListener {
-    async fn start(&self) -> Result<(), String> {
-        let addr: SocketAddr = ([0, 0, 0, 0], self.port).into();
-        let captured = Arc::clone(&self.captured);
+    async fn start(&mut self) -> Result<(), String> {
         let status = self.status_code;
-
-        let make_service = make_service_fn(move |_| {
-            let captured = Arc::clone(&captured);
-            async move {
-                Ok::<_, Infallible>(service_fn(move |req: Request<Body>| {
-                    let captured = Arc::clone(&captured);
-                    async move {
-                        let body = hyper::body::to_bytes(
-                            req.into_body()
-                        ).await.unwrap();
-                        captured.lock().await.push(body);
-                        Ok::<_, Infallible>(Response::builder()
-                            .status(status)
-                            .body(Body::empty())
-                            .unwrap())
-                    }
-                }))
-            }
+        let (rx, trigger, server) = build_test_server_generic(self.addr, move || {
+            Response::builder().status(status).body(Body::empty()).unwrap()
         });
-
-        let server = Server::bind(&addr).serve(make_service);
-        self.handle = Some(tokio::spawn(async { server.await.unwrap() }));
-        wait_for_tcp(addr).await;
+        tokio::spawn(server);
+        self.rx = Some(rx);
+        self.trigger = Some(trigger);
+        wait_for_tcp(self.addr).await;
         Ok(())
     }
 
-    async fn collect(&self) -> Vec<Event> {
-        let raw_bodies = self.captured.lock().await;
-        let mut events = Vec::new();
-
-        for body in raw_bodies.iter() {
-            // Decompress if needed
-            let decompressed = match self.decompression.as_deref() {
-                Some("gzip") => decompress_gzip(body),
-                Some("zstd") => decompress_zstd(body),
-                _ => body.to_vec(),
-            };
-
-            // Decode based on codec
-            match self.codec.as_str() {
-                "json" => {
-                    // Handle both single JSON and newline-delimited JSON
-                    for line in decompressed.split(|&b| b == b'\n') {
-                        if line.is_empty() { continue; }
-                        if let Ok(value) = serde_json::from_slice(line) {
-                            events.push(log_event_from_json(value));
-                        }
-                    }
-                }
-                "text" => {
-                    for line in decompressed.split(|&b| b == b'\n') {
-                        if line.is_empty() { continue; }
-                        let msg = String::from_utf8_lossy(line).to_string();
-                        events.push(Event::Log(LogEvent::from_str_legacy(msg)));
-                    }
-                }
-                _ => {}
-            }
-        }
-        events
+    async fn collect(&mut self) -> Vec<Event> {
+        drop(self.trigger.take()); // signal shutdown; drains the channel
+        let bodies: Vec<Bytes> = self.rx.take().unwrap()
+            .collect::<Vec<_>>().await
+            .into_iter().map(|(_, b)| b).collect();
+        decode_bodies(bodies, &self.decompression, &self.decoding)
     }
 }
 ```
 
 #### Socket generator implementation
+
+`SocketGenerator` wraps `send_lines()` from `src/test_util/mod.rs:137`, which already handles
+TCP connect, `LinesCodec` framing, and clean shutdown.
 
 ```rust
 pub struct SocketGenerator {
@@ -590,21 +551,41 @@ impl TestGenerator for SocketGenerator {
     }
 
     async fn send(&self) -> Result<(), String> {
-        let mut stream = TcpStream::connect(self.address).await
-            .map_err(|e| format!("failed to connect to {}: {}", self.address, e))?;
+        let lines = self.events.iter()
+            .map(|e| serde_json::to_string(e.as_log()).unwrap())
+            .collect::<Vec<_>>();
+        send_lines(self.address, lines).await
+            .map(|_| ())
+            .map_err(|e| e.to_string())
+    }
+}
+```
 
-        for event in &self.events {
-            let json = serde_json::to_string(event.as_log())
-                .map_err(|e| format!("failed to serialize event: {}", e))?;
-            stream.write_all(json.as_bytes()).await
-                .map_err(|e| format!("failed to send: {}", e))?;
-            stream.write_all(b"\n").await
-                .map_err(|e| format!("failed to send newline: {}", e))?;
-        }
+#### TCP listener implementation
 
-        stream.shutdown().await
-            .map_err(|e| format!("failed to shutdown: {}", e))?;
+`TcpListener` wraps `CountReceiver::receive_lines()` from `src/test_util/mod.rs:641`, which
+already binds a TCP port, frames input with `LinesCodec`, and collects newline-delimited strings.
+
+```rust
+pub struct TcpListener {
+    addr: SocketAddr,
+    receiver: Option<CountReceiver<String>>,
+}
+
+#[async_trait]
+impl TestListener for TcpListener {
+    async fn start(&mut self) -> Result<(), String> {
+        // receive_lines binds the port immediately
+        self.receiver = Some(CountReceiver::receive_lines(self.addr));
+        wait_for_tcp(self.addr).await;
         Ok(())
+    }
+
+    async fn collect(&mut self) -> Vec<Event> {
+        self.receiver.take().unwrap().await
+            .into_iter()
+            .map(|line| Event::Log(LogEvent::from_str_legacy(line)))
+            .collect()
     }
 }
 ```
@@ -709,8 +690,8 @@ testing is too high.
 ## Drawbacks
 
 - **Loopback networking**: Tests use real TCP connections on loopback. Port conflicts are
-  possible if tests run in parallel with hardcoded ports. Mitigated by using unique ports per
-  test file.
+  possible if tests run in parallel with hardcoded ports. Mitigated initially by using unique
+  ports per test file; eliminated in Part 2 via automatic port allocation.
 - **Sink flush timing**: After generators finish sending, sinks may still be batching
   internally. The framework must wait for sinks to flush before collecting from listeners.
   This introduces a timing dependency.
@@ -730,6 +711,12 @@ testing is too high.
   output. This is the closest existing prior art — this RFC makes the same pattern declarative.
 - **Vector's `spawn_blackhole_http_server`** (`src/test_util/http.rs`): Existing in-process
   mock HTTP server. The HTTP listener builds on the same `hyper` pattern with structured capture.
+- **Vector's `build_test_server_generic()`** (`src/sinks/util/test.rs:69`): Full hyper server
+  with `Trigger`/`Tripwire` shutdown and MPSC request capture. `HttpListener` wraps this directly.
+- **Vector's `CountReceiver::receive_lines()`** (`src/test_util/mod.rs:641`): TCP listener with
+  `LinesCodec` framing and async collection. `TcpListener` wraps this directly.
+- **Vector's `send_lines()`** (`src/test_util/mod.rs:137`): TCP client with `LinesCodec` framing
+  and clean shutdown. `SocketGenerator` wraps this directly.
 - **Vector's `build_input_event()`** (`src/config/unit_test/mod.rs:606`): Builds events from
   VRL/raw/log/metric definitions. Reused by generators.
 - **HTTP sink tests** (`src/sinks/http/tests.rs`): Existing Rust tests that build an HTTP
@@ -745,9 +732,9 @@ compression, or protocol behavior — which is the whole point.
 
 ### Use `{{ template }}` addresses instead of hardcoded ports
 
-The framework could auto-allocate ports and inject them via templates. This was deferred as a
-future improvement. Initially, test configs use hardcoded ports for simplicity and
-transparency. Auto-allocation can be added later for parallel test execution.
+The framework could auto-allocate ports and inject them via templates. Deferred to Part 2 —
+the initial implementation uses hardcoded ports for simplicity. Auto-allocation is the intended
+end state and is designed to be a non-breaking addition.
 
 ### Require Rust code for pipeline tests
 
@@ -767,7 +754,7 @@ Sink-level bugs continue to reach production. The barrier to testing stays high.
 - Should listeners support response sequences (`[200, 200, 500, 200]`) for testing retry
   behavior, or is a single `status_code` sufficient initially?
 - Should port allocation be automatic (random ports with template injection) or manual
-  (hardcoded ports as in the examples)?
+  (hardcoded ports as in the examples)? See Part 2 for the proposed template approach.
 - How should non-JSON payloads be handled by listeners? Options: raw byte comparison,
   codec-specific decoders, or pluggable parsers.
 
@@ -791,8 +778,6 @@ Sink-level bugs continue to reach production. The barrier to testing stays high.
 
 ## Future Improvements
 
-- **Automatic port allocation**: Random ports with template injection for parallel test
-  execution
 - **Response sequences**: `status_codes: [200, 200, 500, 200]` for testing retry logic
 - **Request-level assertions**: Assert on HTTP method, path, headers, content-encoding
 - **gRPC listener**: For testing OpenTelemetry sinks
@@ -802,3 +787,68 @@ Sink-level bugs continue to reach production. The barrier to testing stays high.
 - **Codec registry**: Pluggable decoders for Avro, Protobuf, MsgPack
 - **Metrics assertions**: Assert on Vector's internal metrics alongside event output
 - **Generator from file**: Load events from a JSON/CSV fixture file
+
+---
+
+## Part 2: Automatic Port Allocation
+
+The initial implementation uses hardcoded ports (e.g. `0.0.0.0:9000`, `0.0.0.0:9001`).
+This works for sequential test runs but breaks parallel execution. Part 2 replaces hardcoded
+ports with auto-allocated addresses injected via config template placeholders.
+
+### Proposed config syntax
+
+```yaml
+sources:
+  socket:
+    type: socket
+    address: "{{test.gen.gen}}"            # resolved to 127.0.0.1:<auto-port>
+
+sinks:
+  http_out:
+    inputs: ["parse"]
+    type: http
+    encoding:
+      codec: json
+    uri: "http://{{test.listener.out}}/"   # resolved to 127.0.0.1:<auto-port>
+
+tests:
+  - name: "transforms and sends two events"
+    generators:
+      gen:                                 # name matches {{test.gen.gen}}
+        type: socket
+        events:
+          - source: '{ "message": "hello world", "level": "info" }'
+
+    listeners:
+      out:                                 # name matches {{test.listener.out}}
+        type: http
+        decoding:
+          codec: json
+```
+
+Generators no longer carry an `address` field — the address is derived from the placeholder
+bound to their name. Listeners no longer carry a `port` field for the same reason.
+
+### How it works
+
+1. After loading raw config text and before parsing the topology, the framework scans for
+   `{{test.gen.<name>}}` and `{{test.listener.<name>}}` placeholders.
+2. For each unique name, it calls `next_addr()` from `src/test_util/addr.rs` to allocate a
+   random loopback port. The returned `PortGuard` is held alive for the duration of the test,
+   preventing races with concurrent tests.
+3. All occurrences of each placeholder are string-substituted with the allocated
+   `127.0.0.1:<port>` before the config is handed to the topology builder.
+4. The resolved addresses are passed to the corresponding generators and listeners so they
+   connect and bind to the same ports.
+
+### Plan of Attack (Part 2)
+
+- [ ] Implement `resolve_test_addresses(raw_config: &str) -> (String, AddressMap)` that scans
+  for placeholders, allocates ports via `next_addr()`, and returns the substituted config text
+  alongside a map of name → `SocketAddr`
+- [ ] Thread `AddressMap` through `build_pipeline_tests()` so generators and listeners receive
+  their allocated addresses
+- [ ] Remove `address` field from generator config; remove `port` field from listener config
+- [ ] Update `tests/behavior/pipelines/` examples to use template syntax
+- [ ] Verify parallel `vector test` invocations do not conflict
