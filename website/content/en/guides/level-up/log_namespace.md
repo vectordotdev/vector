@@ -16,7 +16,7 @@ Before you begin, this guide assumes the following:
 * When log namespacing is enabled, the [global schema settings] are ignored.
 * This feature is still in `beta` so behavior might change.
 
-[global schema settings]: /docs/reference/configuration/global-options/#log_schema
+[global schema settings]: /docs/reference/configuration/schema/#log_schema
 [docs.setup.quickstart]: /docs/setup/quickstart/
 
 If you encounter any issues please [report them here](https://github.com/vectordotdev/vector/issues/new?template=bug.yml).
