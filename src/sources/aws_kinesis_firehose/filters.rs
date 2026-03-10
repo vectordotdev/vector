@@ -123,18 +123,18 @@ fn parse_common_attributes_header()
                             request_id: request_id.clone(),
                         })
                         .map(|common_attributes_header: FirehoseCommonAttributesHeader| {
-                            let mut object_map = ObjectMap::new();
+                            let mut common_attributes_map = ObjectMap::new();
 
                             for (attribute_name, attribute_value) in
                                 common_attributes_header.common_attributes.iter()
                             {
-                                object_map.insert(
+                                common_attributes_map.insert(
                                     attribute_name.to_owned().into(),
                                     Value::from(attribute_value.to_owned()),
                                 );
                             }
 
-                            return object_map;
+                            return common_attributes_map;
                         })
                         .map_err(warp::reject::custom),
                     None => Ok(ObjectMap::new()),
