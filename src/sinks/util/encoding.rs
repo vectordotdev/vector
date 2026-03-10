@@ -11,8 +11,6 @@ use vector_lib::{
 };
 
 use crate::event::Event;
-#[cfg(feature = "codecs-arrow")]
-use vector_lib::codecs::internal_events::EncoderNullConstraintError;
 
 pub trait Encoder<T> {
     /// Encodes the input into the provided writer.
@@ -124,18 +122,7 @@ impl Encoder<Vec<Event>> for (Transformer, vector_lib::codecs::BatchEncoder) {
         let mut bytes = BytesMut::new();
         encoder
             .encode(transformed_events, &mut bytes)
-            .map_err(|error| {
-                #[cfg(feature = "codecs-arrow")]
-                if let vector_lib::codecs::encoding::Error::SchemaConstraintViolation(
-                    ref constraint_error,
-                ) = error
-                {
-                    emit!(EncoderNullConstraintError {
-                        error: constraint_error
-                    });
-                }
-                io::Error::new(io::ErrorKind::InvalidData, error)
-            })?;
+            .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
 
         write_all(writer, n_events, &bytes)?;
         Ok((bytes.len(), byte_size))
