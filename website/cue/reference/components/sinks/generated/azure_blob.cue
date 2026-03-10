@@ -107,6 +107,32 @@ generated: components: sinks: azure_blob: configuration: {
 				required:      true
 				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
 			}
+			client_id: {
+				description: """
+					The [Azure Client ID][azure_client_id]. Defaults to the value of the environment variable `AZURE_CLIENT_ID`.
+
+					[azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"workload_identity\""
+				required:      false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_CLIENT_ID}"]
+			}
+			tenant_id: {
+				description: """
+					The [Azure Tenant ID][azure_tenant_id]. Defaults to the value of the environment variable `AZURE_TENANT_ID`.
+
+					[azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+					"""
+				relevant_when: "azure_credential_kind = \"workload_identity\""
+				required:      false
+				type: string: examples: ["00000000-0000-0000-0000-000000000000", "${AZURE_TENANT_ID}"]
+			}
+			token_file_path: {
+				description:   "Path of a file containing a Kubernetes service account token. Defaults to the value of the environment variable `AZURE_FEDERATED_TOKEN_FILE`."
+				relevant_when: "azure_credential_kind = \"workload_identity\""
+				required:      false
+				type: string: examples: ["/var/run/secrets/azure/tokens/azure-identity-token", "${AZURE_FEDERATED_TOKEN_FILE}"]
+			}
 			user_assigned_managed_identity_id: {
 				description:   "The User Assigned Managed Identity (Client ID) to use."
 				relevant_when: "azure_credential_kind = \"managed_identity\" or azure_credential_kind = \"managed_identity_client_assertion\""

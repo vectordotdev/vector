@@ -18,6 +18,7 @@ use azure_identity::{
     AzureCliCredential, ClientAssertion, ClientAssertionCredential, ClientCertificateCredential,
     ClientCertificateCredentialOptions, ClientSecretCredential, ManagedIdentityCredential,
     ManagedIdentityCredentialOptions, UserAssignedId, WorkloadIdentityCredential,
+    WorkloadIdentityCredentialOptions,
 };
 
 use azure_storage_blob::{BlobContainerClient, BlobContainerClientOptions};
@@ -166,7 +167,28 @@ pub enum SpecificAzureCredential {
     },
 
     /// Use Workload Identity credentials
-    WorkloadIdentity {},
+    WorkloadIdentity {
+        /// The [Azure Tenant ID][azure_tenant_id]. Defaults to the value of the environment variable `AZURE_TENANT_ID`.
+        ///
+        /// [azure_tenant_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        #[configurable(metadata(docs::examples = "${AZURE_TENANT_ID}"))]
+        tenant_id: Option<String>,
+
+        /// The [Azure Client ID][azure_client_id]. Defaults to the value of the environment variable `AZURE_CLIENT_ID`.
+        ///
+        /// [azure_client_id]: https://learn.microsoft.com/entra/identity-platform/howto-create-service-principal-portal
+        #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        #[configurable(metadata(docs::examples = "${AZURE_CLIENT_ID}"))]
+        client_id: Option<String>,
+
+        /// Path of a file containing a Kubernetes service account token. Defaults to the value of the environment variable `AZURE_FEDERATED_TOKEN_FILE`.
+        #[configurable(metadata(
+            docs::examples = "/var/run/secrets/azure/tokens/azure-identity-token"
+        ))]
+        #[configurable(metadata(docs::examples = "${AZURE_FEDERATED_TOKEN_FILE}"))]
+        token_file_path: Option<PathBuf>,
+    },
 }
 
 #[derive(Debug)]
@@ -312,7 +334,19 @@ impl SpecificAzureCredential {
                 )?
             }
 
-            Self::WorkloadIdentity {} => WorkloadIdentityCredential::new(None)?,
+            Self::WorkloadIdentity {
+                tenant_id,
+                client_id,
+                token_file_path,
+            } => {
+                let mut options = WorkloadIdentityCredentialOptions::default();
+
+                options.tenant_id = tenant_id.clone();
+                options.client_id = client_id.clone();
+                options.token_file_path = token_file_path.clone();
+
+                WorkloadIdentityCredential::new(Some(options))?
+            }
         };
         Ok(credential)
     }
