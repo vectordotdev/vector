@@ -29,7 +29,7 @@ jobs:
   generate-publish-metadata:
     name: Generate Publish-related Metadata
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     outputs:
       vector_version: ${{ steps.generate-publish-metadata.outputs.vector_version }}
       vector_build_desc: ${{ steps.generate-publish-metadata.outputs.vector_build_desc }}
@@ -232,7 +232,7 @@ jobs:
   rpm-verify:
     name: Verify RPM Packages
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 10
     needs:
       - generate-publish-metadata
       - build-linux-packages

@@ -291,7 +291,7 @@ jobs:
   # Detects changes that are specific to integration tests
   int_tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     if: ${{ inputs.int_tests }}
     permissions:
       contents: read
@@ -417,7 +417,7 @@ jobs:
   # Detects changes that are specific to e2e tests
   e2e_tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     if: ${{ inputs.e2e_tests }}
     permissions:
       contents: read
