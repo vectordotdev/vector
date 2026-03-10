@@ -2,7 +2,7 @@ name: opentelemetry-vector-e2e
 services:
   otel-collector-source:
     container_name: otel-collector-source
-    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}
+    image: otel/opentelemetry-collector-contrib:${CONFIG_COLLECTOR_VERSION}@${CONFIG_COLLECTOR_DIGEST}
     init: true
     volumes:
       - type: bind
@@ -84,6 +84,7 @@ services:
       dockerfile: ./tests/e2e/opentelemetry-common/collector.Dockerfile
       args:
         CONFIG_COLLECTOR_VERSION: ${CONFIG_COLLECTOR_VERSION}
+        CONFIG_COLLECTOR_DIGEST: ${CONFIG_COLLECTOR_DIGEST}
     init: true
     user: "0:0" # test only, override special user with root
     command: [ "--config", "/etc/otelcol-contrib/config.yaml" ]

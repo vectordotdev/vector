@@ -12,15 +12,29 @@ cfg_if! {
 pub type Environment = BTreeMap<String, Option<String>>;
 
 pub(crate) fn rename_environment_keys(environment: &Environment) -> Environment {
-    environment
-        .iter()
-        .map(|(var, value)| {
-            (
-                format!("CONFIG_{}", var.replace('-', "_").to_uppercase()),
-                value.clone(),
-            )
-        })
-        .collect()
+    let mut result = Environment::new();
+    for (var, value) in environment {
+        let normalized = var.replace('-', "_");
+        let config_key = format!("CONFIG_{}", normalized.to_uppercase());
+
+        // If the key contains "version" and the value contains `@`, split into version and digest.
+        if normalized.contains("version") {
+            if let Some(val) = value {
+                if let Some((version_part, digest_part)) = val.split_once('@') {
+                    let digest_key = format!(
+                        "CONFIG_{}",
+                        normalized.replace("version", "digest").to_uppercase()
+                    );
+                    result.insert(config_key, Some(version_part.to_string()));
+                    result.insert(digest_key, Some(digest_part.to_string()));
+                    continue;
+                }
+            }
+        }
+
+        result.insert(config_key, value.clone());
+    }
+    result
 }
 
 pub(crate) fn extract_present(environment: &Environment) -> BTreeMap<String, String> {
