@@ -254,7 +254,7 @@ sinks:
       codec: json
     uri: http://0.0.0.0:9001/
     request:
-      retry_max_duration_secs: 1
+      retry_max_duration_secs: 10
 
 tests:
   - name: "retries on server error"
@@ -387,6 +387,13 @@ This differs from existing `[[tests]]` where conditions run once per event. The 
 is more powerful for pipeline tests because you need to verify event count, ordering, and
 cross-event relationships.
 
+**Ordering and batching semantics:** When a sink batches multiple events into a single HTTP
+request body (e.g., JSON array or ndjson), the listener splits the body into individual events
+before appending to the collection. Events from a single batch are appended in the order they
+appear in the body. Events across multiple requests are appended in the order the requests are
+received. Index-based assertions (`.[0]`, `.[1]`) are therefore reliable when a single generator
+sends events sequentially through a single sink — which is the primary use case.
+
 #### Lifecycle
 
 For each test:
@@ -409,38 +416,73 @@ pub struct PipelineTest {
     generators: Vec<Box<dyn TestGenerator>>,
     listeners: HashMap<String, Box<dyn TestListener>>,
     outputs: Vec<TestOutput>,
+    // Kept alive to hold port reservations for the duration of the test (Part 2)
+    _port_guards: Vec<PortGuard>,
 }
+
+const TEST_TIMEOUT: Duration = Duration::from_secs(30);
 
 impl PipelineTest {
     pub async fn run(self) -> UnitTestResult {
+        match tokio::time::timeout(TEST_TIMEOUT, self.run_inner()).await {
+            Ok(result) => result,
+            Err(_) => UnitTestResult {
+                errors: vec![format!(
+                    "test '{}' timed out after {}s",
+                    self.name,
+                    TEST_TIMEOUT.as_secs()
+                )],
+            },
+        }
+    }
+
+    async fn run_inner(mut self) -> UnitTestResult {
         // 1. Start listeners
-        for listener in self.listeners.values() {
-            listener.start().await;
+        for (name, listener) in self.listeners.iter_mut() {
+            if let Err(e) = listener.start().await {
+                return UnitTestResult {
+                    errors: vec![format!("failed to start listener '{}': {}", name, e)],
+                };
+            }
         }
 
         // 2. Start topology
         let diff = config::ConfigDiff::initial(&self.config);
-        let (topology, _) = RunningTopology::start_validated(
+        let (topology, _) = match RunningTopology::start_validated(
             self.config, diff, self.pieces
-        ).await.unwrap();
+        ).await {
+            Some(result) => result,
+            None => return UnitTestResult {
+                errors: vec!["topology failed to start (config validation error)".to_string()],
+            },
+        };
 
-        // 3. Wait for sources
+        // 3. Wait for sources — wrapped to return an error instead of panicking
         for generator in &self.generators {
-            wait_for_tcp(generator.target_address()).await;
+            if let Err(e) = wait_for_tcp_timeout(generator.target_address(), TEST_TIMEOUT).await {
+                return UnitTestResult { errors: vec![e] };
+            }
         }
 
         // 4. Run generators
         for generator in &self.generators {
-            generator.send().await;
+            if let Err(e) = generator.send().await {
+                return UnitTestResult {
+                    errors: vec![format!("generator error: {}", e)],
+                };
+            }
         }
 
-        // 5. Stop topology — flushes all buffered events through sinks before returning.
-        //    No grace period needed; topology.stop() is the correct synchronization point.
+        // 5. Stop topology — topology.stop() flushes all buffered events through sinks
+        //    before returning. The outer timeout in run() guards against a stuck sink
+        //    (e.g., retrying against a 500 listener with no retry limit) causing an
+        //    indefinite hang, since graceful_shutdown_duration defaults to None
+        //    (Box::pin(future::pending())) when Config is constructed by build_pipeline_tests.
         topology.stop().await;
 
         // 6. Collect from listeners
         let mut collected: HashMap<String, Vec<Event>> = HashMap::new();
-        for (name, listener) in &self.listeners {
+        for (name, listener) in &mut self.listeners {
             collected.insert(name.clone(), listener.collect().await);
         }
 
@@ -494,9 +536,15 @@ pub trait TestListener: Send + Sync {
 
 #### HTTP listener implementation
 
-`HttpListener` wraps `build_test_server_generic()` from `src/sinks/util/test.rs:69`, which
-already handles hyper server setup, async body capture, and `Trigger`/`Tripwire`-based graceful
-shutdown. `HttpListener` only adds decompression and decoding on top of the captured bytes.
+`build_test_server_generic()` at `src/sinks/util/test.rs:69` only sends request bodies to its
+channel when the response status is 2xx. `HttpListener` cannot wrap it directly for
+non-200 status tests (Example 3) because no bodies would be captured despite the sink
+retrying. Instead, `HttpListener` builds its own hyper server that always captures the request
+body regardless of the configured response status, then responds with the configured status code.
+Decompression and decoding run on top of the captured bytes.
+
+`HttpListener` still borrows the `Trigger`/`Tripwire` shutdown pattern and the `(Parts, Bytes)`
+channel type from `build_test_server_generic()` as a reference implementation.
 
 ```rust
 pub struct HttpListener {
@@ -513,19 +561,28 @@ pub struct HttpListener {
 impl TestListener for HttpListener {
     async fn start(&mut self) -> Result<(), String> {
         let status = self.status_code;
-        let (rx, trigger, server) = build_test_server_generic(self.addr, move || {
-            Response::builder().status(status).body(Body::empty()).unwrap()
-        });
+        let (tx, rx) = mpsc::channel(128);
+        let (trigger, tripwire) = Tripwire::new();
+
+        // Build our own hyper server so we capture bodies on ALL responses,
+        // not just 2xx — build_test_server_generic() only sends to the channel
+        // on success responses, which would silently drop retries in error tests.
+        let server = build_capturing_http_server(self.addr, status, tx, tripwire);
         tokio::spawn(server);
         self.rx = Some(rx);
         self.trigger = Some(trigger);
-        wait_for_tcp(self.addr).await;
-        Ok(())
+
+        wait_for_tcp_timeout(self.addr, Duration::from_secs(5)).await
+            .map_err(|e| format!("listener '{}' failed to bind: {}", self.addr, e))
     }
 
     async fn collect(&mut self) -> Vec<Event> {
         drop(self.trigger.take()); // signal shutdown; drains the channel
-        let bodies: Vec<Bytes> = self.rx.take().unwrap()
+        let rx = match self.rx.take() {
+            Some(rx) => rx,
+            None => return Vec::new(), // start() was never called or failed
+        };
+        let bodies: Vec<Bytes> = rx
             .collect::<Vec<_>>().await
             .into_iter().map(|(_, b)| b).collect();
         decode_bodies(bodies, &self.decompression, &self.decoding)
@@ -552,8 +609,12 @@ impl TestGenerator for SocketGenerator {
 
     async fn send(&self) -> Result<(), String> {
         let lines = self.events.iter()
-            .map(|e| serde_json::to_string(e.as_log()).unwrap())
-            .collect::<Vec<_>>();
+            .map(|e| match e {
+                Event::Log(log) => serde_json::to_string(log)
+                    .map_err(|err| format!("failed to serialize event: {}", err)),
+                _ => Err("socket generator only supports log events".to_string()),
+            })
+            .collect::<Result<Vec<_>, _>>()?;
         send_lines(self.address, lines).await
             .map(|_| ())
             .map_err(|e| e.to_string())
@@ -582,19 +643,119 @@ impl TestListener for TcpListener {
     }
 
     async fn collect(&mut self) -> Vec<Event> {
-        self.receiver.take().unwrap().await
-            .into_iter()
-            .map(|line| Event::Log(LogEvent::from_str_legacy(line)))
-            .collect()
+        match self.receiver.take() {
+            Some(receiver) => receiver.await
+                .into_iter()
+                .map(|line| Event::Log(LogEvent::from_str_legacy(line)))
+                .collect(),
+            None => Vec::new(), // start() was never called or failed
+        }
     }
+}
+```
+
+#### Config schema
+
+`TestGeneratorConfig` and `TestListenerConfig` are discriminated unions on `type`, parsed from
+the `tests[].generators` and `tests[].listeners` maps. They integrate into the existing
+`TestDefinition` struct alongside the existing `inputs`, `outputs`, and `no_outputs_from` fields.
+
+```rust
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum TestGeneratorConfig {
+    Socket {
+        address: SocketAddr,
+        events: Vec<InputDefinition>,
+    },
+    Http {
+        address: SocketAddr,
+        events: Vec<InputDefinition>,
+    },
+}
+
+#[derive(Debug, Clone, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
+pub enum TestListenerConfig {
+    Http {
+        port: u16,
+        #[serde(default = "default_status_200")]
+        status_code: u16,
+        #[serde(default)]
+        decompression: Option<DecompressionConfig>,
+        decoding: DecodingConfig,
+    },
+    Tcp {
+        port: u16,
+    },
+}
+
+/// Extended TestDefinition — fields added alongside existing ones
+#[derive(Debug, Clone, Deserialize, Default)]
+pub struct TestDefinition<T = OutputCheck> {
+    pub name: String,
+    // existing fields
+    pub inputs: Vec<TestInput>,
+    pub outputs: Vec<T>,
+    pub no_outputs_from: Vec<String>,
+    // new fields
+    #[serde(default)]
+    pub generators: IndexMap<String, TestGeneratorConfig>,
+    #[serde(default)]
+    pub listeners: IndexMap<String, TestListenerConfig>,
+}
+```
+
+`InputDefinition` is the existing per-event type used by `build_input_event()` in
+`src/config/unit_test/mod.rs:606`. The `source:` field in generator event definitions maps
+directly to `InputDefinition::vrl { source }` — it is VRL source code whose return value
+becomes the event. This matches the existing `type: vrl` / `source:` convention in
+`[[tests]]` inputs. No new field names are introduced.
+
+#### Feature gate
+
+`src/test_util/pipeline_test/` is gated behind the `test-utils` feature (the same feature that
+gates most of `src/test_util/`). `build_pipeline_tests()` must be callable from `vector test`,
+which is a production binary command, so the feature is also enabled in the default feature set
+for development builds. The `#[cfg(test)]` attribute is not used for this module — test-utils
+is the correct gate.
+
+#### RunnableTest trait
+
+`build_unit_tests_main()` currently returns `Vec<UnitTest>`. The signature changes to
+`Vec<Box<dyn RunnableTest>>` so both `UnitTest` and `PipelineTest` can be returned from the same
+function and driven by the same runner loop in `src/unit_test.rs`.
+
+```rust
+#[async_trait]
+pub trait RunnableTest: Send {
+    fn name(&self) -> &str;
+    async fn run(self: Box<Self>) -> UnitTestResult;
+}
+
+impl RunnableTest for UnitTest {
+    fn name(&self) -> &str { &self.name }
+    async fn run(self: Box<Self>) -> UnitTestResult { (*self).run().await }
+}
+
+impl RunnableTest for PipelineTest {
+    fn name(&self) -> &str { &self.name }
+    async fn run(self: Box<Self>) -> UnitTestResult { (*self).run().await }
 }
 ```
 
 #### Extending the test framework
 
 The existing `vector test` CLI (`src/unit_test.rs:139`) calls
-`config::build_unit_tests_main()`. This function dispatches to the pipeline test path when
-it detects `tests[].generators` or `tests[].listeners`:
+`config::build_unit_tests_main()`. This function dispatches based on whether the config
+contains pipeline test components.
+
+A config is **pipeline-test mode** if any test in `tests[]` has a non-empty `generators` or
+`listeners` map. A config is **unit-test mode** if no test has `generators` or `listeners`.
+**Mixed configs — where some tests use generators/listeners and others use the existing
+`[[tests]]` format — are a configuration error.** `build_unit_tests_main()` returns
+`Err(vec!["mixed pipeline and unit test definitions are not supported in the same file"])` in
+that case. The two test types must be in separate files.
 
 ```rust
 pub async fn build_unit_tests_main(
@@ -603,10 +764,13 @@ pub async fn build_unit_tests_main(
 ) -> Result<Vec<Box<dyn RunnableTest>>, Vec<String>> {
     let config_builder = /* load config */;
 
-    if has_pipeline_test_components(&config_builder) {
-        build_pipeline_tests(config_builder).await
-    } else {
-        build_unit_tests(config_builder).await  // existing path
+    match classify_test_config(&config_builder) {
+        TestConfigKind::Pipeline => build_pipeline_tests(config_builder).await,
+        TestConfigKind::Unit => build_unit_tests(config_builder).await,
+        TestConfigKind::Mixed => Err(vec![
+            "mixed pipeline and unit test definitions are not supported in the same file \
+             — split into separate files".to_string()
+        ]),
     }
 }
 ```
@@ -617,7 +781,7 @@ pub async fn build_unit_tests_main(
 |--------|----------------------|----------------------------|
 | Scope | Transforms only | Full pipeline including sinks |
 | Sources | Stripped and replaced | Real — generators send data into them |
-| Transforms | Kept (relevant subset) | Kept (all) |
+| Transforms | Kept (declared path only) | Kept (all) |
 | Sinks | Stripped and replaced | Real — full execution against listeners |
 | What is tested | Transform logic | Transform logic + sink encoding, batching, compression |
 | Test infra | Synthetic components replace pipeline | Generators and listeners wrap the real pipeline |
@@ -690,11 +854,11 @@ testing is too high.
 ## Drawbacks
 
 - **Loopback networking**: Tests use real TCP connections on loopback. Port conflicts are
-  possible if tests run in parallel with hardcoded ports. Mitigated initially by using unique
-  ports per test file; eliminated in Part 2 via automatic port allocation.
+  possible if tests run in parallel with hardcoded ports. Part 1 is not safe for parallel
+  execution; Part 2 (automatic port allocation) is the fix.
 - **Sink flush timing**: After generators finish sending, sinks may still be batching
-  internally. The framework must wait for sinks to flush before collecting from listeners.
-  This introduces a timing dependency.
+  internally. `topology.stop()` is the synchronization point — it waits for all sinks to
+  flush before returning. A per-test timeout (30s default) guards against stuck sinks.
 - **Payload parsing in listeners**: Listeners must decompress and decode payloads to produce
   events for assertion. Initially only JSON/ndjson is supported; other codecs are added as
   needed.
@@ -747,8 +911,6 @@ Sink-level bugs continue to reach production. The barrier to testing stays high.
 
 ## Outstanding Questions
 
-- How should the framework handle sink flush timing? Options: fixed grace period, wait for
-  all sinks to report idle, or configurable timeout per test.
 - Should listeners support request-level assertions (HTTP headers, method, path) in addition
   to body content?
 - Should listeners support response sequences (`[200, 200, 500, 200]`) for testing retry
@@ -760,21 +922,29 @@ Sink-level bugs continue to reach production. The barrier to testing stays high.
 
 ## Plan Of Attack
 
-- [ ] Extract `build_input_event()` from `src/config/unit_test/mod.rs` into a shared
+Steps 1–7 are prerequisites and must be completed in order before Steps 8–14 can begin.
+
+**Phase 1 — Foundation (sequential, each step depends on the previous):**
+- [ ] 1. Extract `build_input_event()` from `src/config/unit_test/mod.rs` into a shared
   `src/test_util/event_builder.rs`
-- [ ] Implement `TestGenerator` trait and `SocketGenerator`
-- [ ] Implement `TestListener` trait and `HttpListener` with decompression and JSON decoding
-- [ ] Implement `tests[].generators` and `tests[].listeners` config parsing
-- [ ] Implement VRL array assertion runner (pass `.` as array of events)
-- [ ] Implement `build_pipeline_tests()` alongside `build_unit_tests()`
-- [ ] Extend `build_unit_tests_main()` to detect and dispatch pipeline tests
-- [ ] Write first pipeline test: socket source -> remap -> HTTP sink -> HTTP listener
-- [ ] Write pipeline test for route transform with two HTTP sinks
-- [ ] Write pipeline test for gzip compression + ndjson encoding
-- [ ] Implement `HttpGenerator` for testing HTTP sources
-- [ ] Implement `TcpListener` for testing socket sinks
-- [ ] Add pipeline test examples to `tests/behavior/pipelines/`
-- [ ] Add documentation in `docs/DEVELOPING.md`
+- [ ] 2. Implement `RunnableTest` trait; update `build_unit_tests_main()` return type
+- [ ] 3. Implement `TestGenerator` trait and `SocketGenerator`
+- [ ] 4. Implement `TestListener` trait and `HttpListener` (custom capturing server, not
+  `build_test_server_generic()`) with decompression and JSON decoding
+- [ ] 5. Implement `tests[].generators` and `tests[].listeners` config parsing
+  (`TestGeneratorConfig`, `TestListenerConfig`, extended `TestDefinition`)
+- [ ] 6. Implement VRL array assertion runner (pass `.` as array of events)
+- [ ] 7. Implement `build_pipeline_tests()` and extend `build_unit_tests_main()` to detect
+  and dispatch (pipeline, unit, mixed-error) using `classify_test_config()`
+
+**Phase 2 — Test coverage (can proceed in parallel after Phase 1):**
+- [ ] 8. Write first pipeline test: socket source -> remap -> HTTP sink -> HTTP listener
+- [ ] 9. Write pipeline test for route transform with two HTTP sinks
+- [ ] 10. Write pipeline test for gzip compression + ndjson encoding
+- [ ] 11. Implement `HttpGenerator` for testing HTTP sources
+- [ ] 12. Implement `TcpListener` for testing socket sinks
+- [ ] 13. Add pipeline test examples to `tests/behavior/pipelines/`
+- [ ] 14. Add documentation in `docs/DEVELOPING.md`
 
 ## Future Improvements
 
