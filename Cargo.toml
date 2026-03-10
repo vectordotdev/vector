@@ -215,7 +215,7 @@ vector-common-macros = { path = "lib/vector-common-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-vrl-category = { path = "lib/vector-vrl/category" }
 vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
-vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
+vrl = { default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] , version = "0.31.0" }
 mock_instant = { version = "0.6" }
 serial_test = { version = "3.2" }
 
