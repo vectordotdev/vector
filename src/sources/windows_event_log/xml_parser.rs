@@ -405,7 +405,11 @@ pub fn build_event(
         time_created,
         provider_name: system_fields.provider_name,
         provider_guid: system_fields.provider_guid,
-        channel: system_fields.channel,
+        channel: if system_fields.channel.is_empty() {
+            channel.to_string()
+        } else {
+            system_fields.channel
+        },
         computer: system_fields.computer,
         user_id: system_fields.user_id,
         process_id: system_fields.process_id,
@@ -497,7 +501,7 @@ fn parse_section(
 
     loop {
         if iterations >= MAX_ITERATIONS
-            || (named_data.len() >= MAX_FIELDS && inserts.len() >= MAX_FIELDS)
+            || (named_data.len() >= MAX_FIELDS || inserts.len() >= MAX_FIELDS)
         {
             break;
         }

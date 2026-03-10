@@ -296,10 +296,17 @@ impl EventLogParser {
     }
 
     fn extract_message_from_event_data(&self, event: &WindowsEvent) -> String {
-        // Try to find a message in event data
+        // Try to find a message in named event data fields
         for (key, value) in &event.event_data {
             if key.to_lowercase().contains("message") {
                 return value.clone();
+            }
+        }
+
+        // Try string inserts (unnamed <Data> elements, e.g. from eventcreate)
+        if let Some(first) = event.string_inserts.first() {
+            if !first.is_empty() {
+                return first.clone();
             }
         }
 
