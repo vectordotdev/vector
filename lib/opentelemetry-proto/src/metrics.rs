@@ -467,7 +467,7 @@ impl ToF64 for Option<NumberDataPointValue> {
 /// - AggregatedSummary → Summary
 /// - Distribution → Histogram (samples converted to buckets)
 /// - Set → Gauge (count of unique values)
-/// - Sketch → unsupported (warning emitted, empty gauge produced)
+/// - Sketch → unsupported (warning emitted, metric dropped)
 pub fn native_metric_to_otlp_request(metric: &MetricEvent) -> ExportMetricsServiceRequest {
     let (resource, scope, attributes) = decompose_metric_tags(metric.tags());
     let timestamp_nanos = extract_metric_timestamp_nanos(metric);
@@ -768,21 +768,11 @@ fn build_otlp_metric(
 
         MetricValue::Sketch { .. } => {
             warn!(
-                message =
-                    "Sketch metrics cannot be directly converted to OTLP. Emitting empty gauge.",
+                message = "Sketch metrics cannot be directly converted to OTLP format. Metric will be dropped.",
                 metric_name = metric.name(),
-                internal_log_rate_secs = 10
+                internal_log_rate_limit = true,
             );
-            Some(Data::Gauge(Gauge {
-                data_points: vec![NumberDataPoint {
-                    attributes: attributes.to_vec(),
-                    start_time_unix_nano: 0,
-                    time_unix_nano: timestamp_nanos,
-                    value: Some(NumberDataPointValue::AsDouble(0.0)),
-                    exemplars: Vec::new(),
-                    flags: 0,
-                }],
-            }))
+            None
         }
     };
 
