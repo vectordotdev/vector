@@ -1,10 +1,14 @@
 use crate::encoding::ProtobufSerializer;
 use bytes::BytesMut;
-use opentelemetry_proto::proto::{
-    DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE,
-    RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, RESOURCE_SPANS_JSON_FIELD,
-    TRACES_REQUEST_MESSAGE_TYPE,
+use opentelemetry_proto::{
+    metrics::native_metric_to_otlp_request,
+    proto::{
+        DESCRIPTOR_BYTES, LOGS_REQUEST_MESSAGE_TYPE, METRICS_REQUEST_MESSAGE_TYPE,
+        RESOURCE_LOGS_JSON_FIELD, RESOURCE_METRICS_JSON_FIELD, RESOURCE_SPANS_JSON_FIELD,
+        TRACES_REQUEST_MESSAGE_TYPE,
+    },
 };
+use prost::Message;
 use tokio_util::codec::Encoder;
 use vector_config_macros::configurable_component;
 use vector_core::{config::DataType, event::Event, schema};
@@ -25,7 +29,7 @@ impl OtlpSerializerConfig {
 
     /// The data type of events that are accepted by `OtlpSerializer`.
     pub fn input_type(&self) -> DataType {
-        DataType::Log | DataType::Trace
+        DataType::Log | DataType::Trace | DataType::Metric
     }
 
     /// The schema required by the serializer.
@@ -42,21 +46,35 @@ impl OtlpSerializerConfig {
 ///
 /// # Implementation approach
 ///
-/// This serializer converts Vector's internal event representation to the appropriate OTLP message type
-/// based on the top-level field in the event:
-/// - `resourceLogs` → `ExportLogsServiceRequest`
-/// - `resourceMetrics` → `ExportMetricsServiceRequest`
-/// - `resourceSpans` → `ExportTraceServiceRequest`
+/// This serializer converts Vector's internal event representation to the appropriate OTLP message type:
+/// - `resourceLogs` → `ExportLogsServiceRequest` (pre-formatted OTLP passthrough)
+/// - `resourceMetrics` → `ExportMetricsServiceRequest` (pre-formatted OTLP passthrough)
+/// - `resourceSpans` → `ExportTraceServiceRequest` (pre-formatted OTLP passthrough)
+/// - Native metrics → Automatic conversion to `ExportMetricsServiceRequest`
 ///
 /// The implementation is the inverse of what the `opentelemetry` source does when decoding,
 /// ensuring round-trip compatibility.
+///
+/// # Native Metric Conversion
+///
+/// Native Vector metrics are automatically converted to OTLP format:
+/// - Counter → Sum (monotonic, Delta/Cumulative based on MetricKind)
+/// - Gauge → Gauge
+/// - AggregatedHistogram → Histogram
+/// - AggregatedSummary → Summary
+/// - Distribution → Histogram (samples converted to buckets)
+/// - Set → Gauge (cardinality count)
+///
+/// Tag decomposition (reverse of decode-path flattening):
+/// - `resource.*` tags → `resource.attributes[]`
+/// - `scope.name` / `scope.version` → `scopeMetrics[].scope`
+/// - `scope.*` tags → scope attributes
+/// - All other tags → data point `attributes[]`
 #[derive(Debug, Clone)]
-#[allow(dead_code)] // Fields will be used once encoding is implemented
 pub struct OtlpSerializer {
     logs_descriptor: ProtobufSerializer,
     metrics_descriptor: ProtobufSerializer,
     traces_descriptor: ProtobufSerializer,
-    options: Options,
 }
 
 impl OtlpSerializer {
@@ -88,7 +106,6 @@ impl OtlpSerializer {
             logs_descriptor,
             metrics_descriptor,
             traces_descriptor,
-            options,
         })
     }
 }
@@ -124,8 +141,13 @@ impl Encoder<Event> for OtlpSerializer {
                         .into())
                 }
             }
-            Event::Metric(_) => {
-                Err("OTLP serializer does not support native Vector metrics yet.".into())
+            Event::Metric(metric) => {
+                // Native Vector metric → OTLP conversion
+                // Tags are decomposed back into resource/scope/data-point attributes
+                let otlp_request = native_metric_to_otlp_request(metric);
+                otlp_request
+                    .encode(buffer)
+                    .map_err(|e| format!("Failed to encode OTLP metric request: {e}").into())
             }
         }
     }
