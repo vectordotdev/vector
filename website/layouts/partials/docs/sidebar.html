@@ -47,7 +47,7 @@
 {{ define "subsection-group" }}
 {{ $here := .here }}
 {{ $section := .section }}
-{{ $open := .ctx.IsAncestor $section }}
+{{ $open := or (.ctx.IsAncestor $section) (eq .ctx.RelPermalink $here) }}
 <div x-data="{ open: {{ $open }} }">
   <span class="flex justify-between items-center">
     {{ template "link" (dict "here" $here "url" .ctx.RelPermalink "title" (.ctx.Params.short | default .ctx.Title)) }}

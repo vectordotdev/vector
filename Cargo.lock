@@ -1871,7 +1871,7 @@ dependencies = [
  "bitflags 2.10.0",
  "cexpr",
  "clang-sys",
- "itertools 0.13.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.106",
  "quote 1.0.44",
  "regex",
@@ -5165,7 +5165,7 @@ dependencies = [
  "httpdate",
  "itoa",
  "pin-project-lite",
- "socket2 0.5.10",
+ "socket2 0.4.10",
  "tokio",
  "tower-service",
  "tracing 0.1.44",
@@ -8470,7 +8470,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "be769465445e8c1474e9c5dac2018218498557af32d9ed057325ec9a41ae81bf"
 dependencies = [
  "heck 0.5.0",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "log",
  "multimap",
  "once_cell",
@@ -8516,7 +8516,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8a56d757972c98b346a9b766e3f02746cde6dd1cd1d1d563472929fdd74bec4d"
 dependencies = [
  "anyhow",
- "itertools 0.14.0",
+ "itertools 0.10.5",
  "proc-macro2 1.0.106",
  "quote 1.0.44",
  "syn 2.0.117",
@@ -9229,6 +9229,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ba39f3699c378cd8970968dcbff9c43159ea4cfbd88d43c00b22f2ef10a435d2"
 
 [[package]]
+name = "relative-path"
+version = "2.0.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "bca40a312222d8ba74837cb474edef44b37f561da5f773981007a10bbaa992b0"
+dependencies = [
+ "serde",
+]
+
+[[package]]
 name = "rend"
 version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -9537,7 +9546,7 @@ dependencies = [
  "proc-macro2 1.0.106",
  "quote 1.0.44",
  "regex",
- "relative-path",
+ "relative-path 1.9.3",
  "rustc_version",
  "syn 2.0.117",
  "unicode-ident",
@@ -10179,6 +10188,19 @@ name = "serde_yaml"
 version = "0.9.34+deprecated"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "6a8b1a1a2ebf674015cc02edccce75287f1a0130d394307b36743c2f5d504b47"
+dependencies = [
+ "indexmap 2.12.0",
+ "itoa",
+ "ryu",
+ "serde",
+ "unsafe-libyaml",
+]
+
+[[package]]
+name = "serde_yaml_ng"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "7b4db627b98b36d4203a7b458cf3573730f2bb591b28871d916dfa9efabfd41f"
 dependencies = [
  "indexmap 2.12.0",
  "itoa",
@@ -12440,7 +12462,7 @@ checksum = "accd4ea62f7bb7a82fe23066fb0957d48ef677f6eeb8215f372f52e48bb32426"
 
 [[package]]
 name = "vdev"
-version = "0.2.0"
+version = "0.3.0"
 dependencies = [
  "anyhow",
  "cfg-if",
@@ -12469,11 +12491,13 @@ dependencies = [
  "tempfile",
  "toml 0.9.8",
  "toml_edit 0.23.9",
+ "vector-vrl-functions",
+ "vrl",
 ]
 
 [[package]]
 name = "vector"
-version = "0.54.0"
+version = "0.55.0"
 dependencies = [
  "apache-avro 0.16.0",
  "approx",
@@ -13100,8 +13124,8 @@ checksum = "6a02e4885ed3bc0f2de90ea6dd45ebcbb66dacffe03547fadbb0eeae2770887d"
 
 [[package]]
 name = "vrl"
-version = "0.30.0"
-source = "git+https://github.com/vectordotdev/vrl.git?branch=main#43a08e226c32bdc1b51f9471c47839c068854b85"
+version = "0.31.0"
+source = "git+https://github.com/vectordotdev/vrl.git?branch=main#0bb7a9b62cfc8572e60e9293e771d47066297edc"
 dependencies = [
  "aes",
  "aes-siv",
@@ -13176,6 +13200,7 @@ dependencies = [
  "quoted_printable",
  "rand 0.8.5",
  "regex",
+ "relative-path 2.0.1",
  "reqwest 0.12.28",
  "reqwest-middleware",
  "reqwest-retry",
@@ -13186,6 +13211,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_yaml",
+ "serde_yaml_ng",
  "sha-1",
  "sha2",
  "sha3",
