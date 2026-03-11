@@ -1089,8 +1089,7 @@ mod native_metric_conversion_tests {
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
             Some(Data::Gauge(gauge)) => {
-                let expected_nanos =
-                    u64::try_from(ts.timestamp_nanos_opt().unwrap()).unwrap();
+                let expected_nanos = u64::try_from(ts.timestamp_nanos_opt().unwrap()).unwrap();
                 assert_eq!(gauge.data_points[0].time_unix_nano, expected_nanos);
             }
             other => panic!("Expected Gauge, got {other:?}"),
@@ -1836,12 +1835,10 @@ mod native_metric_conversion_tests {
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
-            Some(Data::Gauge(gauge)) => {
-                match &gauge.data_points[0].value {
-                    Some(NumberDataPointValue::AsDouble(v)) => assert!(v.is_nan()),
-                    other => panic!("Expected AsDouble(NaN), got {other:?}"),
-                }
-            }
+            Some(Data::Gauge(gauge)) => match &gauge.data_points[0].value {
+                Some(NumberDataPointValue::AsDouble(v)) => assert!(v.is_nan()),
+                other => panic!("Expected AsDouble(NaN), got {other:?}"),
+            },
             other => panic!("Expected Gauge, got {other:?}"),
         }
     }
@@ -1951,10 +1948,7 @@ mod native_metric_conversion_tests {
         let mut tags = MetricTags::default();
         tags.replace("scope.name".to_string(), "meter".to_string());
         tags.replace("scope.custom.key".to_string(), "custom_val".to_string());
-        tags.replace(
-            "scope.another.attr".to_string(),
-            "another_val".to_string(),
-        );
+        tags.replace("scope.another.attr".to_string(), "another_val".to_string());
         let metric = metric.with_tags(Some(tags));
 
         let request = native_metric_to_otlp_request(&metric);
