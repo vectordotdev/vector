@@ -9,7 +9,10 @@ use vector_lib::prometheus::parser::{
 
 use crate::event::{
     Event,
-    metric::{Bucket, Metric, MetricKind, MetricTags, MetricValue, Quantile},
+    metric::{
+        Bucket, Metric, MetricKind, MetricTags, MetricValue, NativeHistogramBuckets,
+        NativeHistogramCount, NativeHistogramResetHint, NativeHistogramSpan, Quantile,
+    },
 };
 
 fn utc_timestamp(timestamp: Option<i64>, default: DateTime<Utc>) -> DateTime<Utc> {
@@ -197,10 +200,100 @@ fn reparse_groups(
                     );
                 }
             }
+            GroupKind::NativeHistogram(metrics) => {
+                for (key, metric) in metrics {
+                    if skip_nan_values && metric.histogram.sum.is_nan() {
+                        continue;
+                    }
+
+                    let tags = combine_tags(key.labels, tag_overrides.clone());
+                    let value = proto_histogram_to_native(metric.histogram);
+
+                    result.push(
+                        Metric::new(group.name.clone(), metric_kind, value)
+                            .with_timestamp(Some(utc_timestamp(key.timestamp, start)))
+                            .with_tags(tags.as_option())
+                            .into(),
+                    );
+                }
+            }
         }
     }
 
     result
+}
+
+/// Convert a Prometheus proto `Histogram` into Vector's internal `NativeHistogram` representation.
+fn proto_histogram_to_native(h: vector_lib::prometheus::parser::proto::Histogram) -> MetricValue {
+    use vector_lib::prometheus::parser::proto::histogram::{Count, ResetHint, ZeroCount};
+
+    let count = match h.count {
+        Some(Count::CountInt(v)) => NativeHistogramCount::Integer(v),
+        Some(Count::CountFloat(v)) => NativeHistogramCount::Float(v),
+        None => NativeHistogramCount::Integer(0),
+    };
+
+    let zero_count = match h.zero_count {
+        Some(ZeroCount::ZeroCountInt(v)) => NativeHistogramCount::Integer(v),
+        Some(ZeroCount::ZeroCountFloat(v)) => NativeHistogramCount::Float(v),
+        None => NativeHistogramCount::Integer(0),
+    };
+
+    // Float histograms use absolute counts; integer histograms use delta encoding.
+    // Prefer integer deltas when present, else fall back to float counts.
+    let positive_buckets = if !h.positive_deltas.is_empty() {
+        NativeHistogramBuckets::IntegerDeltas(h.positive_deltas)
+    } else if !h.positive_counts.is_empty() {
+        NativeHistogramBuckets::FloatCounts(h.positive_counts)
+    } else if count.is_float() {
+        NativeHistogramBuckets::FloatCounts(Vec::new())
+    } else {
+        NativeHistogramBuckets::IntegerDeltas(Vec::new())
+    };
+
+    let negative_buckets = if !h.negative_deltas.is_empty() {
+        NativeHistogramBuckets::IntegerDeltas(h.negative_deltas)
+    } else if !h.negative_counts.is_empty() {
+        NativeHistogramBuckets::FloatCounts(h.negative_counts)
+    } else if count.is_float() {
+        NativeHistogramBuckets::FloatCounts(Vec::new())
+    } else {
+        NativeHistogramBuckets::IntegerDeltas(Vec::new())
+    };
+
+    let reset_hint = match ResetHint::try_from(h.reset_hint).unwrap_or(ResetHint::Unknown) {
+        ResetHint::Unknown => NativeHistogramResetHint::Unknown,
+        ResetHint::Yes => NativeHistogramResetHint::Yes,
+        ResetHint::No => NativeHistogramResetHint::No,
+        ResetHint::Gauge => NativeHistogramResetHint::Gauge,
+    };
+
+    MetricValue::NativeHistogram {
+        count,
+        sum: h.sum,
+        schema: h.schema,
+        zero_threshold: h.zero_threshold,
+        zero_count,
+        positive_spans: h
+            .positive_spans
+            .into_iter()
+            .map(|s| NativeHistogramSpan {
+                offset: s.offset,
+                length: s.length,
+            })
+            .collect(),
+        positive_buckets,
+        negative_spans: h
+            .negative_spans
+            .into_iter()
+            .map(|s| NativeHistogramSpan {
+                offset: s.offset,
+                length: s.length,
+            })
+            .collect(),
+        negative_buckets,
+        reset_hint,
+    }
 }
 
 #[cfg(feature = "sources-prometheus-remote-write")]

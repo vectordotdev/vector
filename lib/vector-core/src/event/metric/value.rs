@@ -84,6 +84,59 @@ pub enum MetricValue {
         #[configurable(derived)]
         sketch: MetricSketch,
     },
+
+    /// A Prometheus-style native (exponential) histogram.
+    ///
+    /// Native histograms use exponential bucket boundaries determined by a `schema` parameter, allowing for high
+    /// resolution at low cost. Unlike `AggregatedHistogram` which uses fixed bucket boundaries, native histograms use
+    /// sparse buckets indexed by integer keys, where adjacent buckets grow by a factor of `2^(2^-schema)`.
+    ///
+    /// See <https://prometheus.io/docs/specs/native_histograms/> for details.
+    NativeHistogram {
+        /// The total number of observations.
+        ///
+        /// May be a float to support gauge histograms where resets can cause fractional counts.
+        count: NativeHistogramCount,
+
+        /// The sum of all observations.
+        sum: f64,
+
+        /// The resolution parameter.
+        ///
+        /// Valid values are from -4 to 8 for standard exponential schemas. Higher values give finer resolution.
+        /// Bucket boundaries are at `(2^(2^-schema))^n` for positive buckets.
+        schema: i32,
+
+        /// The width of the "zero bucket".
+        ///
+        /// Observations in `[-zero_threshold, zero_threshold]` are counted in the zero bucket rather than in positive
+        /// or negative exponential buckets.
+        zero_threshold: f64,
+
+        /// Count of observations in the zero bucket.
+        zero_count: NativeHistogramCount,
+
+        /// Spans of populated positive buckets.
+        positive_spans: Vec<NativeHistogramSpan>,
+
+        /// Bucket values for positive buckets.
+        ///
+        /// For integer counts, these are deltas from the previous bucket (first is absolute). For float counts, these
+        /// are absolute values. The interpretation depends on the `count` type.
+        positive_buckets: NativeHistogramBuckets,
+
+        /// Spans of populated negative buckets.
+        negative_spans: Vec<NativeHistogramSpan>,
+
+        /// Bucket values for negative buckets.
+        ///
+        /// For integer counts, these are deltas from the previous bucket (first is absolute). For float counts, these
+        /// are absolute values. The interpretation depends on the `count` type.
+        negative_buckets: NativeHistogramBuckets,
+
+        /// Hint about whether this represents a counter reset.
+        reset_hint: NativeHistogramResetHint,
+    },
 }
 
 impl MetricValue {
@@ -99,6 +152,7 @@ impl MetricValue {
             MetricValue::AggregatedSummary { count, .. }
             | MetricValue::AggregatedHistogram { count, .. } => *count == 0,
             MetricValue::Sketch { sketch } => sketch.is_empty(),
+            MetricValue::NativeHistogram { count, .. } => count.as_f64() == 0.0,
         }
     }
 
@@ -114,6 +168,89 @@ impl MetricValue {
             Self::AggregatedHistogram { .. } => "aggregated histogram",
             Self::AggregatedSummary { .. } => "aggregated summary",
             Self::Sketch { sketch } => sketch.as_name(),
+            Self::NativeHistogram { .. } => "native histogram",
+        }
+    }
+
+    /// Converts a native histogram to an aggregated histogram.
+    ///
+    /// This is a **lossy** conversion: native histograms use exponential bucket boundaries determined by the schema,
+    /// while aggregated histograms use fixed explicit boundaries. The resulting aggregated histogram will have one
+    /// bucket per populated native histogram bucket, with upper limits computed from the schema.
+    ///
+    /// Negative buckets are merged together as observations below zero, and the zero bucket is placed at
+    /// `zero_threshold`.
+    ///
+    /// If this value is not a native histogram, returns `None`.
+    #[must_use]
+    pub fn native_histogram_to_agg_histogram(&self) -> Option<MetricValue> {
+        match self {
+            MetricValue::NativeHistogram {
+                count,
+                sum,
+                schema,
+                zero_threshold,
+                zero_count,
+                positive_spans,
+                positive_buckets,
+                negative_spans,
+                negative_buckets,
+                ..
+            } => {
+                let mut buckets = Vec::new();
+
+                // All negative observations collapse into one bucket at upper_limit = -zero_threshold (or 0 if
+                // zero_threshold is 0). This is lossy but aggregated histograms don't naturally represent negative
+                // exponential buckets.
+                let neg_total: f64 = iter_span_counts(negative_spans, negative_buckets)
+                    .map(|(_, c)| c)
+                    .sum();
+                if neg_total > 0.0 {
+                    let limit = if *zero_threshold > 0.0 {
+                        -*zero_threshold
+                    } else {
+                        0.0
+                    };
+                    buckets.push(Bucket {
+                        upper_limit: limit,
+                        // Truncation: fractional counts from float histograms are floored.
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                        count: neg_total.max(0.0) as u64,
+                    });
+                }
+
+                // Zero bucket.
+                let zc = zero_count.as_f64();
+                if zc > 0.0 {
+                    buckets.push(Bucket {
+                        upper_limit: *zero_threshold,
+                        #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                        count: zc.max(0.0) as u64,
+                    });
+                }
+
+                // Positive buckets: compute upper bound for each populated bucket.
+                for (index, c) in iter_span_counts(positive_spans, positive_buckets) {
+                    if c > 0.0 {
+                        buckets.push(Bucket {
+                            upper_limit: native_histogram_bucket_upper_bound(*schema, index),
+                            #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                            count: c.max(0.0) as u64,
+                        });
+                    }
+                }
+
+                // Truncation: fractional counts from float histograms are floored.
+                #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                let count_u64 = count.as_f64().max(0.0) as u64;
+
+                Some(MetricValue::AggregatedHistogram {
+                    buckets,
+                    count: count_u64,
+                    sum: *sum,
+                })
+            }
+            _ => None,
         }
     }
 
@@ -199,6 +336,24 @@ impl MetricValue {
                     ddsketch.clear();
                 }
             },
+            Self::NativeHistogram {
+                count,
+                sum,
+                zero_count,
+                positive_spans,
+                positive_buckets,
+                negative_spans,
+                negative_buckets,
+                ..
+            } => {
+                *count = NativeHistogramCount::default();
+                *sum = 0.0;
+                *zero_count = NativeHistogramCount::default();
+                positive_spans.clear();
+                *positive_buckets = NativeHistogramBuckets::default();
+                negative_spans.clear();
+                *negative_buckets = NativeHistogramBuckets::default();
+            }
         }
     }
 
@@ -371,6 +526,18 @@ impl ByteSizeOf for MetricValue {
             Self::AggregatedHistogram { buckets, .. } => buckets.allocated_bytes(),
             Self::AggregatedSummary { quantiles, .. } => quantiles.allocated_bytes(),
             Self::Sketch { sketch } => sketch.allocated_bytes(),
+            Self::NativeHistogram {
+                positive_spans,
+                positive_buckets,
+                negative_spans,
+                negative_buckets,
+                ..
+            } => {
+                positive_spans.allocated_bytes()
+                    + positive_buckets.allocated_bytes()
+                    + negative_spans.allocated_bytes()
+                    + negative_buckets.allocated_bytes()
+            }
         }
     }
 }
@@ -421,6 +588,43 @@ impl PartialEq for MetricValue {
             ) => l_quantiles == r_quantiles && l_count == r_count && float_eq(*l_sum, *r_sum),
             (Self::Sketch { sketch: l_sketch }, Self::Sketch { sketch: r_sketch }) => {
                 l_sketch == r_sketch
+            }
+            (
+                Self::NativeHistogram {
+                    count: left_count,
+                    sum: left_sum,
+                    schema: left_schema,
+                    zero_threshold: left_zero_threshold,
+                    zero_count: left_zero_count,
+                    positive_spans: left_positive_spans,
+                    positive_buckets: left_positive_buckets,
+                    negative_spans: left_negative_spans,
+                    negative_buckets: left_negative_buckets,
+                    reset_hint: left_reset_hint,
+                },
+                Self::NativeHistogram {
+                    count: right_count,
+                    sum: right_sum,
+                    schema: right_schema,
+                    zero_threshold: right_zero_threshold,
+                    zero_count: right_zero_count,
+                    positive_spans: right_positive_spans,
+                    positive_buckets: right_positive_buckets,
+                    negative_spans: right_negative_spans,
+                    negative_buckets: right_negative_buckets,
+                    reset_hint: right_reset_hint,
+                },
+            ) => {
+                left_count == right_count
+                    && float_eq(*left_sum, *right_sum)
+                    && left_schema == right_schema
+                    && float_eq(*left_zero_threshold, *right_zero_threshold)
+                    && left_zero_count == right_zero_count
+                    && left_positive_spans == right_positive_spans
+                    && left_positive_buckets == right_positive_buckets
+                    && left_negative_spans == right_negative_spans
+                    && left_negative_buckets == right_negative_buckets
+                    && left_reset_hint == right_reset_hint
             }
             _ => false,
         }
@@ -499,6 +703,28 @@ impl fmt::Display for MetricValue {
                         })
                     }
                 }
+            }
+            MetricValue::NativeHistogram {
+                count,
+                sum,
+                schema,
+                zero_threshold,
+                zero_count,
+                positive_buckets,
+                negative_buckets,
+                ..
+            } => {
+                write!(
+                    fmt,
+                    "count={} sum={} schema={} zero_threshold={} zero_count={} pos_buckets={} neg_buckets={}",
+                    count.as_f64(),
+                    sum,
+                    schema,
+                    zero_threshold,
+                    zero_count.as_f64(),
+                    positive_buckets.len(),
+                    negative_buckets.len(),
+                )
             }
         }
     }
@@ -745,5 +971,402 @@ impl Quantile {
 impl ByteSizeOf for Quantile {
     fn allocated_bytes(&self) -> usize {
         0
+    }
+}
+
+/// Count type for native histograms.
+///
+/// Integer counts are used for traditional counter-style histograms. Float counts are used for gauge histograms where
+/// values may decrease, or when the source uses float counts.
+#[configurable_component]
+#[derive(Clone, Copy, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeHistogramCount {
+    /// Integer count value.
+    Integer(u64),
+
+    /// Floating-point count value.
+    Float(f64),
+}
+
+impl NativeHistogramCount {
+    /// Returns this count as a floating point value.
+    pub fn as_f64(&self) -> f64 {
+        match self {
+            // The loss of precision here is acceptable for display/summary purposes.
+            #[allow(clippy::cast_precision_loss)]
+            Self::Integer(v) => *v as f64,
+            Self::Float(v) => *v,
+        }
+    }
+
+    /// Returns `true` if the count represents a float-type histogram (gauge histogram).
+    pub const fn is_float(&self) -> bool {
+        matches!(self, Self::Float(_))
+    }
+}
+
+impl PartialEq for NativeHistogramCount {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Integer(a), Self::Integer(b)) => a == b,
+            (Self::Float(a), Self::Float(b)) => float_eq(*a, *b),
+            _ => false,
+        }
+    }
+}
+
+impl Default for NativeHistogramCount {
+    fn default() -> Self {
+        Self::Integer(0)
+    }
+}
+
+impl ByteSizeOf for NativeHistogramCount {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
+}
+
+/// A span of consecutive populated buckets in a native histogram.
+///
+/// Native histograms use a sparse representation: rather than storing every bucket, only non-empty ranges ("spans") are
+/// stored. A span indicates where a run of consecutive buckets begins and how long it is.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct NativeHistogramSpan {
+    /// Gap in bucket indices from the previous span (or from zero for the first span).
+    pub offset: i32,
+
+    /// Number of consecutive buckets in this span.
+    pub length: u32,
+}
+
+impl ByteSizeOf for NativeHistogramSpan {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
+}
+
+/// Bucket counts for native histograms.
+///
+/// Integer histograms store bucket counts as deltas from the previous bucket (first value is absolute), enabling
+/// efficient encoding. Float histograms (gauge histograms) store absolute bucket counts directly.
+#[configurable_component]
+#[derive(Clone, Debug)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeHistogramBuckets {
+    /// Delta-encoded integer bucket counts.
+    ///
+    /// The first value is the absolute count of the first bucket; subsequent values are the delta from the previous
+    /// bucket's count.
+    IntegerDeltas(Vec<i64>),
+
+    /// Absolute floating-point bucket counts.
+    FloatCounts(Vec<f64>),
+}
+
+impl NativeHistogramBuckets {
+    /// Returns the number of buckets represented.
+    pub fn len(&self) -> usize {
+        match self {
+            Self::IntegerDeltas(v) => v.len(),
+            Self::FloatCounts(v) => v.len(),
+        }
+    }
+
+    /// Returns `true` if there are no buckets.
+    pub fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
+    /// Iterates over absolute bucket counts as floating-point values.
+    ///
+    /// For integer-delta buckets, this decodes the deltas into absolute counts.
+    pub fn iter_absolute(&self) -> impl Iterator<Item = f64> + '_ {
+        let mut running: i64 = 0;
+        let mut idx: usize = 0;
+        std::iter::from_fn(move || match self {
+            Self::IntegerDeltas(deltas) => {
+                let d = *deltas.get(idx)?;
+                running = running.wrapping_add(d);
+                idx += 1;
+                // Allow precision loss for display/summary purposes.
+                #[allow(clippy::cast_precision_loss)]
+                Some(running as f64)
+            }
+            Self::FloatCounts(counts) => {
+                let v = *counts.get(idx)?;
+                idx += 1;
+                Some(v)
+            }
+        })
+    }
+}
+
+impl PartialEq for NativeHistogramBuckets {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::IntegerDeltas(a), Self::IntegerDeltas(b)) => a == b,
+            (Self::FloatCounts(a), Self::FloatCounts(b)) => {
+                a.len() == b.len() && a.iter().zip(b).all(|(x, y)| float_eq(*x, *y))
+            }
+            _ => false,
+        }
+    }
+}
+
+impl Default for NativeHistogramBuckets {
+    fn default() -> Self {
+        Self::IntegerDeltas(Vec::new())
+    }
+}
+
+impl ByteSizeOf for NativeHistogramBuckets {
+    fn allocated_bytes(&self) -> usize {
+        match self {
+            Self::IntegerDeltas(v) => v.allocated_bytes(),
+            Self::FloatCounts(v) => v.allocated_bytes(),
+        }
+    }
+}
+
+/// Reset hint for native histograms, indicating whether the histogram was reset.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum NativeHistogramResetHint {
+    /// No hint; receiver should detect resets from the data.
+    #[default]
+    Unknown,
+
+    /// This histogram is the first after a reset (or the very first observation).
+    Yes,
+
+    /// This histogram is known not to be the first after a reset.
+    No,
+
+    /// This histogram is a gauge histogram (no reset semantics).
+    Gauge,
+}
+
+impl ByteSizeOf for NativeHistogramResetHint {
+    fn allocated_bytes(&self) -> usize {
+        0
+    }
+}
+
+/// Compute the upper bound of a native histogram bucket given its index and schema.
+///
+/// For positive indices, the upper bound is `(2^(2^-schema))^index`. For index 0, the upper bound is 1.0.
+/// The lower bound of a bucket is the upper bound of the previous bucket (or `zero_threshold` for the first positive
+/// bucket).
+#[must_use]
+pub fn native_histogram_bucket_upper_bound(schema: i32, index: i32) -> f64 {
+    // Special case: schema -4 through 8, index can be negative or positive.
+    // upper_bound = 2^(index * 2^(-schema))
+    let exp = f64::from(index) * (-f64::from(schema)).exp2();
+    exp.exp2()
+}
+
+/// Iterate over `(bucket_index, absolute_count)` pairs for the given spans and bucket data.
+///
+/// Spans describe which bucket indices are populated; this function zips them with the absolute (decoded) counts from
+/// the bucket storage.
+fn iter_span_counts<'a>(
+    spans: &'a [NativeHistogramSpan],
+    buckets: &'a NativeHistogramBuckets,
+) -> impl Iterator<Item = (i32, f64)> + 'a {
+    // First, expand spans into a flat sequence of bucket indices.
+    let indices = spans.iter().scan(0i32, |index, span| {
+        *index += span.offset;
+        let start = *index;
+        #[allow(clippy::cast_possible_wrap)]
+        {
+            *index += span.length as i32;
+        }
+        Some((start, span.length))
+    });
+
+    indices
+        .flat_map(|(start, length)| {
+            #[allow(clippy::cast_possible_wrap)]
+            (0..length).map(move |i| start + i as i32)
+        })
+        .zip(buckets.iter_absolute())
+}
+
+#[cfg(test)]
+mod native_histogram_tests {
+    use super::*;
+
+    #[test]
+    fn bucket_upper_bound_schema_0() {
+        // Schema 0: bucket boundaries are powers of 2.
+        assert_eq!(native_histogram_bucket_upper_bound(0, 0), 1.0);
+        assert_eq!(native_histogram_bucket_upper_bound(0, 1), 2.0);
+        assert_eq!(native_histogram_bucket_upper_bound(0, 2), 4.0);
+        assert_eq!(native_histogram_bucket_upper_bound(0, 3), 8.0);
+        assert_eq!(native_histogram_bucket_upper_bound(0, -1), 0.5);
+    }
+
+    #[test]
+    fn bucket_upper_bound_schema_1() {
+        // Schema 1: bucket boundaries at 2^(n/2), so sqrt(2)^n.
+        assert_eq!(native_histogram_bucket_upper_bound(1, 0), 1.0);
+        assert!((native_histogram_bucket_upper_bound(1, 1) - 2.0_f64.sqrt()).abs() < 1e-10);
+        assert!((native_histogram_bucket_upper_bound(1, 2) - 2.0).abs() < 1e-10);
+    }
+
+    #[test]
+    fn iter_absolute_decodes_integer_deltas() {
+        let buckets = NativeHistogramBuckets::IntegerDeltas(vec![2, 1, -2, 3]);
+        let absolute: Vec<f64> = buckets.iter_absolute().collect();
+        assert_eq!(absolute, vec![2.0, 3.0, 1.0, 4.0]);
+    }
+
+    #[test]
+    fn iter_absolute_passes_float_counts() {
+        let buckets = NativeHistogramBuckets::FloatCounts(vec![1.5, 2.5, 0.5]);
+        let absolute: Vec<f64> = buckets.iter_absolute().collect();
+        assert_eq!(absolute, vec![1.5, 2.5, 0.5]);
+    }
+
+    #[test]
+    fn iter_span_counts_single_span() {
+        let spans = vec![NativeHistogramSpan {
+            offset: 1,
+            length: 3,
+        }];
+        let buckets = NativeHistogramBuckets::IntegerDeltas(vec![2, 1, -2]);
+        let result: Vec<(i32, f64)> = iter_span_counts(&spans, &buckets).collect();
+        assert_eq!(result, vec![(1, 2.0), (2, 3.0), (3, 1.0)]);
+    }
+
+    #[test]
+    fn iter_span_counts_multiple_spans_with_gap() {
+        // Span 1: indices 0..2, Span 2: gap of 3, then indices 5..7
+        let spans = vec![
+            NativeHistogramSpan {
+                offset: 0,
+                length: 2,
+            },
+            NativeHistogramSpan {
+                offset: 3,
+                length: 2,
+            },
+        ];
+        let buckets = NativeHistogramBuckets::IntegerDeltas(vec![1, 1, 1, 1]);
+        let result: Vec<(i32, f64)> = iter_span_counts(&spans, &buckets).collect();
+        assert_eq!(result, vec![(0, 1.0), (1, 2.0), (5, 3.0), (6, 4.0)]);
+    }
+
+    #[test]
+    fn native_histogram_to_agg_histogram_basic() {
+        let native = MetricValue::NativeHistogram {
+            count: NativeHistogramCount::Integer(6),
+            sum: 18.5,
+            schema: 0,
+            zero_threshold: 0.0,
+            zero_count: NativeHistogramCount::Integer(0),
+            positive_spans: vec![NativeHistogramSpan {
+                offset: 1,
+                length: 3,
+            }],
+            positive_buckets: NativeHistogramBuckets::IntegerDeltas(vec![2, 1, -2]),
+            negative_spans: vec![],
+            negative_buckets: NativeHistogramBuckets::IntegerDeltas(vec![]),
+            reset_hint: NativeHistogramResetHint::No,
+        };
+
+        let agg = native.native_histogram_to_agg_histogram().unwrap();
+        match agg {
+            MetricValue::AggregatedHistogram {
+                buckets,
+                count,
+                sum,
+            } => {
+                assert_eq!(count, 6);
+                assert_eq!(sum, 18.5);
+                // Buckets at indices 1, 2, 3 with schema 0 -> upper bounds 2.0, 4.0, 8.0
+                // Counts: 2, 3, 1
+                assert_eq!(buckets.len(), 3);
+                assert_eq!(buckets[0].upper_limit, 2.0);
+                assert_eq!(buckets[0].count, 2);
+                assert_eq!(buckets[1].upper_limit, 4.0);
+                assert_eq!(buckets[1].count, 3);
+                assert_eq!(buckets[2].upper_limit, 8.0);
+                assert_eq!(buckets[2].count, 1);
+            }
+            _ => panic!("expected AggregatedHistogram"),
+        }
+    }
+
+    #[test]
+    fn native_histogram_to_agg_histogram_with_zero_bucket() {
+        let native = MetricValue::NativeHistogram {
+            count: NativeHistogramCount::Integer(5),
+            sum: 3.0,
+            schema: 0,
+            zero_threshold: 0.001,
+            zero_count: NativeHistogramCount::Integer(2),
+            positive_spans: vec![NativeHistogramSpan {
+                offset: 1,
+                length: 1,
+            }],
+            positive_buckets: NativeHistogramBuckets::IntegerDeltas(vec![3]),
+            negative_spans: vec![],
+            negative_buckets: NativeHistogramBuckets::IntegerDeltas(vec![]),
+            reset_hint: NativeHistogramResetHint::Unknown,
+        };
+
+        let agg = native.native_histogram_to_agg_histogram().unwrap();
+        match agg {
+            MetricValue::AggregatedHistogram { buckets, count, .. } => {
+                assert_eq!(count, 5);
+                assert_eq!(buckets.len(), 2);
+                // Zero bucket at threshold 0.001
+                assert_eq!(buckets[0].upper_limit, 0.001);
+                assert_eq!(buckets[0].count, 2);
+                // Positive bucket at index 1, schema 0 -> 2.0
+                assert_eq!(buckets[1].upper_limit, 2.0);
+                assert_eq!(buckets[1].count, 3);
+            }
+            _ => panic!("expected AggregatedHistogram"),
+        }
+    }
+
+    #[test]
+    fn native_histogram_is_empty() {
+        let empty = MetricValue::NativeHistogram {
+            count: NativeHistogramCount::Integer(0),
+            sum: 0.0,
+            schema: 0,
+            zero_threshold: 0.0,
+            zero_count: NativeHistogramCount::Integer(0),
+            positive_spans: vec![],
+            positive_buckets: NativeHistogramBuckets::IntegerDeltas(vec![]),
+            negative_spans: vec![],
+            negative_buckets: NativeHistogramBuckets::IntegerDeltas(vec![]),
+            reset_hint: NativeHistogramResetHint::Unknown,
+        };
+        assert!(empty.is_empty());
+
+        let non_empty = MetricValue::NativeHistogram {
+            count: NativeHistogramCount::Integer(1),
+            sum: 1.0,
+            schema: 0,
+            zero_threshold: 0.0,
+            zero_count: NativeHistogramCount::Integer(0),
+            positive_spans: vec![NativeHistogramSpan {
+                offset: 0,
+                length: 1,
+            }],
+            positive_buckets: NativeHistogramBuckets::IntegerDeltas(vec![1]),
+            negative_spans: vec![],
+            negative_buckets: NativeHistogramBuckets::IntegerDeltas(vec![]),
+            reset_hint: NativeHistogramResetHint::Unknown,
+        };
+        assert!(!non_empty.is_empty());
     }
 }

@@ -38,6 +38,10 @@ impl GreptimeDBBatchSizer {
                 MetricValue::AggregatedHistogram { buckets, .. }  => F64_BYTE_SIZE * (buckets.len() + SUMMARY_STAT_FIELD_COUNT),
                 MetricValue::AggregatedSummary { quantiles, .. } => F64_BYTE_SIZE * (quantiles.len() + SUMMARY_STAT_FIELD_COUNT),
                 MetricValue::Sketch { .. } => F64_BYTE_SIZE * (DISTRIBUTION_QUANTILES.len() + DISTRIBUTION_STAT_FIELD_COUNT),
+                // Native histograms are converted to classic histograms before encoding, so estimate based on
+                // total populated bucket count.
+                MetricValue::NativeHistogram { positive_buckets, negative_buckets, .. } =>
+                    F64_BYTE_SIZE * (positive_buckets.len() + negative_buckets.len() + SUMMARY_STAT_FIELD_COUNT),
             }
     }
 }

@@ -386,6 +386,10 @@ impl Arbitrary for MetricValue {
             MetricValue::Sketch { sketch } => Box::new(iter::once(MetricValue::Sketch {
                 sketch: sketch.clone(),
             })),
+            // Similar to sketches, native histograms have tightly coupled internal invariants
+            // (spans must match bucket counts, deltas encode running totals) that don't lend
+            // themselves to naive shrinking.
+            native @ MetricValue::NativeHistogram { .. } => Box::new(iter::once(native.clone())),
         }
     }
 }

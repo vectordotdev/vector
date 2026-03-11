@@ -54,6 +54,8 @@ impl Partitioner for DatadogMetricsTypePartitioner {
             // NOTE: AggregatedSummary will be split into counters and gauges during normalization
             MetricValue::AggregatedSummary { .. } => series,
             MetricValue::Sketch { .. } => DatadogMetricsEndpoint::Sketches,
+            // Native histograms are most similar to sketches (sparse, exponential bucketing).
+            MetricValue::NativeHistogram { .. } => DatadogMetricsEndpoint::Sketches,
         };
         (item.metadata().datadog_api_key(), endpoint)
     }

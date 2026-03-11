@@ -47,6 +47,7 @@ pub enum VrlTarget {
     Trace(Value, EventMetadata),
 }
 
+#[allow(clippy::large_enum_variant)]
 pub enum TargetEvents {
     One(Event),
     Logs(TargetIter<LogEvent>),

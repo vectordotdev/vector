@@ -398,6 +398,33 @@ fn get_type_and_fields(
                 ("sketch", Some(fields))
             }
         },
+        native @ MetricValue::NativeHistogram { .. } => {
+            // InfluxDB doesn't support native histograms; convert to classic histogram buckets.
+            let fields = native.native_histogram_to_agg_histogram().and_then(|agg| {
+                if let MetricValue::AggregatedHistogram {
+                    buckets,
+                    count,
+                    sum,
+                } = agg
+                {
+                    let mut fields: HashMap<KeyString, Field> = buckets
+                        .iter()
+                        .map(|sample| {
+                            (
+                                format!("bucket_{}", sample.upper_limit).into(),
+                                Field::UnsignedInt(sample.count),
+                            )
+                        })
+                        .collect();
+                    fields.insert("count".into(), Field::UnsignedInt(count));
+                    fields.insert("sum".into(), Field::Float(sum));
+                    Some(fields)
+                } else {
+                    None
+                }
+            });
+            ("histogram", fields)
+        }
     }
 }
 

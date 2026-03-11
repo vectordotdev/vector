@@ -3,7 +3,10 @@ use std::{collections::BTreeMap, fmt::Write as _};
 use chrono::Utc;
 use indexmap::map::IndexMap;
 use vector_lib::{
-    event::metric::{MetricSketch, MetricTags, Quantile, samples_to_buckets},
+    event::metric::{
+        MetricSketch, MetricTags, NativeHistogramBuckets, NativeHistogramCount,
+        NativeHistogramResetHint, NativeHistogramSpan, Quantile, samples_to_buckets,
+    },
     prometheus::parser::{METRIC_NAME_LABEL, proto},
 };
 
@@ -28,6 +31,79 @@ pub(super) trait MetricCollector {
         tags: Option<&MetricTags>,
         extra: Option<(&str, String)>,
     );
+
+    /// Emit a native histogram.
+    ///
+    /// The default implementation converts the native histogram to a classic aggregated histogram
+    /// and emits it as multiple samples. Collectors that support native histograms (e.g.,
+    /// Prometheus remote write) should override this to emit a proper native histogram.
+    #[allow(clippy::too_many_arguments)]
+    fn emit_native_histogram(
+        &mut self,
+        timestamp_millis: Option<i64>,
+        name: &str,
+        tags: Option<&MetricTags>,
+        count: &NativeHistogramCount,
+        sum: f64,
+        schema: i32,
+        zero_threshold: f64,
+        zero_count: &NativeHistogramCount,
+        positive_spans: &[NativeHistogramSpan],
+        positive_buckets: &NativeHistogramBuckets,
+        negative_spans: &[NativeHistogramSpan],
+        negative_buckets: &NativeHistogramBuckets,
+        reset_hint: NativeHistogramResetHint,
+    ) {
+        // Suppress "unused" warnings for parameters only needed by overriding implementations.
+        let _ = (schema, reset_hint);
+
+        // Fallback: build a classic histogram representation and emit it as float samples.
+        // This is lossy but allows the text exposition format to represent native histograms.
+        let native_value = MetricValue::NativeHistogram {
+            count: *count,
+            sum,
+            schema,
+            zero_threshold,
+            zero_count: *zero_count,
+            positive_spans: positive_spans.to_vec(),
+            positive_buckets: positive_buckets.clone(),
+            negative_spans: negative_spans.to_vec(),
+            negative_buckets: negative_buckets.clone(),
+            reset_hint,
+        };
+        if let Some(MetricValue::AggregatedHistogram {
+            buckets,
+            count,
+            sum,
+        }) = native_value.native_histogram_to_agg_histogram()
+        {
+            let mut bucket_count = 0.0;
+            for bucket in &buckets {
+                if bucket.upper_limit.is_infinite() {
+                    continue;
+                }
+                bucket_count += bucket.count as f64;
+                self.emit_value(
+                    timestamp_millis,
+                    name,
+                    "_bucket",
+                    bucket_count,
+                    tags,
+                    Some(("le", bucket.upper_limit.to_string())),
+                );
+            }
+            self.emit_value(
+                timestamp_millis,
+                name,
+                "_bucket",
+                count as f64,
+                tags,
+                Some(("le", "+Inf".to_string())),
+            );
+            self.emit_value(timestamp_millis, name, "_sum", sum, tags, None);
+            self.emit_value(timestamp_millis, name, "_count", count as f64, tags, None);
+        }
+    }
 
     fn finish(self) -> Self::Output;
 
@@ -215,6 +291,34 @@ pub(super) trait MetricCollector {
                         );
                     }
                 },
+                MetricValue::NativeHistogram {
+                    count,
+                    sum,
+                    schema,
+                    zero_threshold,
+                    zero_count,
+                    positive_spans,
+                    positive_buckets,
+                    negative_spans,
+                    negative_buckets,
+                    reset_hint,
+                } => {
+                    self.emit_native_histogram(
+                        timestamp,
+                        name,
+                        tags,
+                        count,
+                        *sum,
+                        *schema,
+                        *zero_threshold,
+                        zero_count,
+                        positive_spans,
+                        positive_buckets,
+                        negative_spans,
+                        negative_buckets,
+                        *reset_hint,
+                    );
+                }
             }
         }
     }
@@ -315,8 +419,14 @@ impl StringCollector {
 
 type Labels = Vec<proto::Label>;
 
+#[derive(Default)]
+struct SeriesEntry {
+    samples: Vec<proto::Sample>,
+    histograms: Vec<proto::Histogram>,
+}
+
 pub(super) struct TimeSeries {
-    buffer: IndexMap<Labels, Vec<proto::Sample>>,
+    buffer: IndexMap<Labels, SeriesEntry>,
     metadata: IndexMap<String, proto::MetricMetadata>,
     timestamp: Option<i64>,
 }
@@ -392,14 +502,102 @@ impl MetricCollector for TimeSeries {
         self.buffer
             .entry(Self::make_labels(tags, name, suffix, extra))
             .or_default()
+            .samples
             .push(proto::Sample { value, timestamp });
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn emit_native_histogram(
+        &mut self,
+        timestamp_millis: Option<i64>,
+        name: &str,
+        tags: Option<&MetricTags>,
+        count: &NativeHistogramCount,
+        sum: f64,
+        schema: i32,
+        zero_threshold: f64,
+        zero_count: &NativeHistogramCount,
+        positive_spans: &[NativeHistogramSpan],
+        positive_buckets: &NativeHistogramBuckets,
+        negative_spans: &[NativeHistogramSpan],
+        negative_buckets: &NativeHistogramBuckets,
+        reset_hint: NativeHistogramResetHint,
+    ) {
+        use proto::histogram::{Count, ResetHint, ZeroCount};
+
+        let timestamp = timestamp_millis.unwrap_or_else(|| self.default_timestamp());
+
+        let proto_count = match count {
+            NativeHistogramCount::Integer(v) => Count::CountInt(*v),
+            NativeHistogramCount::Float(v) => Count::CountFloat(*v),
+        };
+
+        let proto_zero_count = match zero_count {
+            NativeHistogramCount::Integer(v) => ZeroCount::ZeroCountInt(*v),
+            NativeHistogramCount::Float(v) => ZeroCount::ZeroCountFloat(*v),
+        };
+
+        let proto_reset_hint = match reset_hint {
+            NativeHistogramResetHint::Unknown => ResetHint::Unknown,
+            NativeHistogramResetHint::Yes => ResetHint::Yes,
+            NativeHistogramResetHint::No => ResetHint::No,
+            NativeHistogramResetHint::Gauge => ResetHint::Gauge,
+        };
+
+        let (positive_deltas, positive_counts) = match positive_buckets {
+            NativeHistogramBuckets::IntegerDeltas(d) => (d.clone(), Vec::new()),
+            NativeHistogramBuckets::FloatCounts(c) => (Vec::new(), c.clone()),
+        };
+
+        let (negative_deltas, negative_counts) = match negative_buckets {
+            NativeHistogramBuckets::IntegerDeltas(d) => (d.clone(), Vec::new()),
+            NativeHistogramBuckets::FloatCounts(c) => (Vec::new(), c.clone()),
+        };
+
+        let histogram = proto::Histogram {
+            count: Some(proto_count),
+            sum,
+            schema,
+            zero_threshold,
+            zero_count: Some(proto_zero_count),
+            negative_spans: negative_spans
+                .iter()
+                .map(|s| proto::BucketSpan {
+                    offset: s.offset,
+                    length: s.length,
+                })
+                .collect(),
+            negative_deltas,
+            negative_counts,
+            positive_spans: positive_spans
+                .iter()
+                .map(|s| proto::BucketSpan {
+                    offset: s.offset,
+                    length: s.length,
+                })
+                .collect(),
+            positive_deltas,
+            positive_counts,
+            reset_hint: proto_reset_hint as i32,
+            timestamp,
+        };
+
+        self.buffer
+            .entry(Self::make_labels(tags, name, "", None))
+            .or_default()
+            .histograms
+            .push(histogram);
     }
 
     fn finish(self) -> proto::WriteRequest {
         let timeseries = self
             .buffer
             .into_iter()
-            .map(|(labels, samples)| proto::TimeSeries { labels, samples })
+            .map(|(labels, entry)| proto::TimeSeries {
+                labels,
+                samples: entry.samples,
+                histograms: entry.histograms,
+            })
             .collect::<Vec<_>>();
         let metadata = self
             .metadata
@@ -429,6 +627,7 @@ const fn prometheus_metric_type(metric_value: &MetricValue) -> proto::MetricType
         MetricValue::AggregatedHistogram { .. } => MetricType::Histogram,
         MetricValue::AggregatedSummary { .. } => MetricType::Summary,
         MetricValue::Sketch { .. } => MetricType::Summary,
+        MetricValue::NativeHistogram { .. } => MetricType::Histogram,
     }
 }
 
@@ -489,6 +688,7 @@ mod tests {
                                 value: $svalue,
                                 timestamp: $timestamp,
                             }],
+                            histograms: vec![],
                         },
                     )*
                 ],
@@ -967,6 +1167,90 @@ mod tests {
                 # TYPE something counter
                 something{code="success"} 1
             "#}
+        );
+    }
+
+    fn native_histogram_metric() -> Metric {
+        use crate::event::metric::{
+            NativeHistogramBuckets, NativeHistogramCount, NativeHistogramResetHint,
+            NativeHistogramSpan,
+        };
+
+        // A simple native histogram with schema=0 (powers of 2), 3 populated positive buckets
+        // starting at index 1: buckets at indices 1, 2, 3 with counts 2, 3, 1.
+        // Delta encoding: [2, 1, -2] -> absolute counts [2, 3, 1]
+        // Upper bounds at schema=0: index 1 -> 2.0, index 2 -> 4.0, index 3 -> 8.0
+        Metric::new(
+            "request_latency".to_owned(),
+            MetricKind::Absolute,
+            MetricValue::NativeHistogram {
+                count: NativeHistogramCount::Integer(6),
+                sum: 18.5,
+                schema: 0,
+                zero_threshold: 0.0,
+                zero_count: NativeHistogramCount::Integer(0),
+                positive_spans: vec![NativeHistogramSpan {
+                    offset: 1,
+                    length: 3,
+                }],
+                positive_buckets: NativeHistogramBuckets::IntegerDeltas(vec![2, 1, -2]),
+                negative_spans: vec![],
+                negative_buckets: NativeHistogramBuckets::IntegerDeltas(vec![]),
+                reset_hint: NativeHistogramResetHint::No,
+            },
+        )
+        .with_tags(Some(tags()))
+        .with_timestamp(Some(timestamp()))
+    }
+
+    #[test]
+    fn encodes_native_histogram_as_text_fallback() {
+        // Text exposition format doesn't support native histograms, so we expect a lossy
+        // conversion to classic bucketed histogram.
+        let encoded = encode_one::<StringCollector>(None, &[], &[], &native_histogram_metric());
+        assert_eq!(
+            encoded,
+            indoc! {r#"
+                # HELP request_latency request_latency
+                # TYPE request_latency histogram
+                request_latency_bucket{code="200",le="2"} 2 1612325106789
+                request_latency_bucket{code="200",le="4"} 5 1612325106789
+                request_latency_bucket{code="200",le="8"} 6 1612325106789
+                request_latency_bucket{code="200",le="+Inf"} 6 1612325106789
+                request_latency_sum{code="200"} 18.5 1612325106789
+                request_latency_count{code="200"} 6 1612325106789
+            "#}
+        );
+    }
+
+    #[test]
+    fn encodes_native_histogram_as_remote_write() {
+        // Remote write supports native histograms directly - verify we emit a proper
+        // proto::Histogram rather than expanding to multiple samples.
+        let encoded = encode_one::<TimeSeries>(None, &[], &[], &native_histogram_metric());
+
+        assert_eq!(encoded.timeseries.len(), 1);
+        let ts = &encoded.timeseries[0];
+        assert!(ts.samples.is_empty(), "expected no float samples");
+        assert_eq!(ts.histograms.len(), 1);
+
+        let h = &ts.histograms[0];
+        assert_eq!(h.schema, 0);
+        assert_eq!(h.sum, 18.5);
+        assert_eq!(h.count, Some(proto::histogram::Count::CountInt(6)));
+        assert_eq!(h.positive_spans.len(), 1);
+        assert_eq!(h.positive_spans[0].offset, 1);
+        assert_eq!(h.positive_spans[0].length, 3);
+        assert_eq!(h.positive_deltas, vec![2, 1, -2]);
+        assert!(h.positive_counts.is_empty());
+        assert_eq!(h.reset_hint, proto::histogram::ResetHint::No as i32);
+        assert_eq!(h.timestamp, 1612325106789);
+
+        // Verify labels include __name__ without suffix.
+        assert!(
+            ts.labels
+                .iter()
+                .any(|l| { l.name == "__name__" && l.value == "request_latency" })
         );
     }
 }
