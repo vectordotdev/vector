@@ -231,7 +231,7 @@ pub fn sparse_checkout_docs(sha: &str, repo_url: &str, clone_dir: &Path) -> Resu
         .context("Failed to write sparse-checkout config")?;
 
     git(&["fetch", "--depth", "1", "origin", sha])?;
-    git(&["checkout", sha])?;
+    git(&["checkout", "FETCH_HEAD"])?;
 
     Ok(())
 }

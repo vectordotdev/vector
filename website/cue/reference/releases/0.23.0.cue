@@ -151,7 +151,7 @@ releases: "0.23.0": {
 			description: """
 				The `azure_blob` sink now supports loading credentials from environment variables and via the managed
 				identity service. To use this, set the new [`storage_account`
-				parameter](/docs/reference/configuration/sinks/azure_blob/#storage_account).
+				parameter](/docs/reference/configuration/sinks/azure_blob/).
 				"""
 			pr_numbers: [12821, 12959]
 			contributors: ["yvespp"]
