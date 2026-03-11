@@ -352,13 +352,20 @@ impl SourceConfig for OpentelemetryConfig {
             }
         };
 
+        let logs_output = if self.use_otlp_decoding {
+            SourceOutput::new_maybe_logs(DataType::Log, Definition::any()).with_port(LOGS)
+        } else {
+            SourceOutput::new_maybe_logs(DataType::Log, schema_definition).with_port(LOGS)
+        };
+
         let metrics_output = if self.use_otlp_decoding {
             SourceOutput::new_maybe_logs(DataType::Log, Definition::any()).with_port(METRICS)
         } else {
             SourceOutput::new_metrics().with_port(METRICS)
         };
+
         vec![
-            SourceOutput::new_maybe_logs(DataType::Log, schema_definition).with_port(LOGS),
+            logs_output,
             metrics_output,
             SourceOutput::new_traces().with_port(TRACES),
         ]

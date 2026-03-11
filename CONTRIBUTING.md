@@ -87,7 +87,7 @@ To merge a new source, sink, or transform, the pull request is required to:
 - [ ] Add tests, especially integration tests if your contribution connects to an external service.
 - [ ] Add instrumentation so folks using your integration can get insight into how it's working and performing. You can
 see some [example of instrumentation in existing integrations](https://github.com/vectordotdev/vector/tree/master/src/internal_events).
-- [ ] Add documentation. You can see [examples in the `docs` directory](https://github.com/vectordotdev/vector/blob/master/docs).
+- [ ] Add documentation. You need to generate and create documentation files for your component. See the [component documentation guide](docs/DOCUMENTING.md#adding-documentation-for-new-components) for detailed instructions.
 
 When adding new integration tests, the following changes are needed in the GitHub Workflows:
 
@@ -141,7 +141,7 @@ echo "Running pre-push checks..."
 make check-licenses
 make check-fmt
 make check-clippy
-make check-component-docs
+make check-generated-docs
 
 # Some other checks that in our experience rarely fail on PRs.
 make check-deny
@@ -292,7 +292,7 @@ cargo vdev check events
 cargo vdev check licenses
 # Vector's documentation for each component is generated from the comments attached to the Component structs and members.
 # Running this ensures that the generated docs are up to date.
-make check-component-docs
+make check-generated-docs
 # Generate the code documentation for the Vector project.
 # Run this to ensure the docs can be generated without errors (warnings are acceptable at the minute).
 cd rust-doc && make docs
