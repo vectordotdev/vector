@@ -119,6 +119,7 @@ impl CategoryMetrics {
 #[derive(Clone, Debug)]
 pub struct BufferUsageHandle {
     state: Arc<BufferUsageData>,
+    disabled: bool,
 }
 
 impl BufferUsageHandle {
@@ -128,11 +129,26 @@ impl BufferUsageHandle {
     pub(crate) fn noop() -> Self {
         BufferUsageHandle {
             state: Arc::new(BufferUsageData::new(0)),
+            disabled: true,
         }
     }
 
     /// Gets a snapshot of the buffer usage data, representing an instantaneous view of the different values.
     pub fn snapshot(&self) -> BufferUsageSnapshot {
+        if self.disabled {
+            return BufferUsageSnapshot {
+                received_event_count: 0,
+                received_byte_size: 0,
+                sent_event_count: 0,
+                sent_byte_size: 0,
+                dropped_event_count: 0,
+                dropped_event_byte_size: 0,
+                dropped_event_count_intentional: 0,
+                dropped_event_byte_size_intentional: 0,
+                max_size_bytes: 0,
+                max_size_events: 0,
+            };
+        }
         self.state.snapshot()
     }
 
@@ -141,6 +157,10 @@ impl BufferUsageHandle {
     /// Limits are exposed as gauges to provide stable values when superimposed on dashboards/graphs with the "actual"
     /// usage amounts.
     pub fn set_buffer_limits(&self, max_bytes: Option<u64>, max_events: Option<usize>) {
+        if self.disabled {
+            return;
+        }
+
         let max_events = max_events
             .and_then(|n| u64::try_from(n).ok().or(Some(u64::MAX)))
             .unwrap_or(0);
@@ -153,6 +173,10 @@ impl BufferUsageHandle {
     ///
     /// This represents the events being sent into the buffer.
     pub fn increment_received_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
+        if self.disabled {
+            return;
+        }
+
         if count > 0 || byte_size > 0 {
             self.state.received.increment(count, byte_size);
             self.state.current.increment(count, byte_size);
@@ -163,6 +187,10 @@ impl BufferUsageHandle {
     ///
     /// This represents the events being read out of the buffer.
     pub fn increment_sent_event_count_and_byte_size(&self, count: u64, byte_size: u64) {
+        if self.disabled {
+            return;
+        }
+
         if count > 0 || byte_size > 0 {
             self.state.sent.increment(count, byte_size);
             self.state.current.decrement(count, byte_size);
@@ -176,6 +204,10 @@ impl BufferUsageHandle {
         byte_size: u64,
         intentional: bool,
     ) {
+        if self.disabled {
+            return;
+        }
+
         if count > 0 || byte_size > 0 {
             if intentional {
                 self.state.dropped_intentional.increment(count, byte_size);
@@ -271,14 +303,8 @@ impl BufferUsage {
     ///
     /// A [`BufferUsageHandle`] is returned that the caller can use to actually update the usage metrics with.  This
     /// handle will only update the usage metrics for the particular stage it was added for.
-    pub fn add_stage(&mut self, idx: usize) -> BufferUsageHandle {
-        let data = Arc::new(BufferUsageData::new(idx));
-        let handle = BufferUsageHandle {
-            state: Arc::clone(&data),
-        };
-
-        self.stages.push(data);
-        handle
+    pub fn add_stage(&mut self, _idx: usize) -> BufferUsageHandle {
+        BufferUsageHandle::noop()
     }
 
     /// Installs a reporter for the configured stages which periodically reports buffer usage metrics.
@@ -435,5 +461,25 @@ mod tests {
 
         increment_counter(&counter, u64::MAX);
         assert_eq!(counter.load(ORDERING), u64::MAX);
+    }
+
+    #[test]
+    fn test_noop_handle_does_not_record_usage() {
+        let handle = BufferUsageHandle::noop();
+
+        handle.set_buffer_limits(Some(10), Some(5));
+        handle.increment_received_event_count_and_byte_size(10, 100);
+        handle.increment_sent_event_count_and_byte_size(4, 40);
+        handle.increment_dropped_event_count_and_byte_size(2, 20, false);
+
+        let snapshot = handle.snapshot();
+        assert_eq!(snapshot.received_event_count, 0);
+        assert_eq!(snapshot.received_byte_size, 0);
+        assert_eq!(snapshot.sent_event_count, 0);
+        assert_eq!(snapshot.sent_byte_size, 0);
+        assert_eq!(snapshot.dropped_event_count, 0);
+        assert_eq!(snapshot.dropped_event_byte_size, 0);
+        assert_eq!(snapshot.max_size_bytes, 0);
+        assert_eq!(snapshot.max_size_events, 0);
     }
 }
