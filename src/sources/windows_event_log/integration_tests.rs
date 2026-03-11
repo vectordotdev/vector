@@ -201,8 +201,6 @@ async fn test_checkpoint_resume_no_redelivery() {
         !first_run.is_empty(),
         "Phase 1 produced 0 events. Cannot test checkpoint resume."
     );
-    let first_count = first_run.len();
-
     // Let checkpoint flush to disk
     tokio::time::sleep(Duration::from_secs(1)).await;
 
@@ -211,17 +209,21 @@ async fn test_checkpoint_resume_no_redelivery() {
     let config = test_config("VT_ckptres", data_dir.path());
     let second_run = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
 
+    // Phase 1 event should NOT be redelivered (checkpoint should have advanced past it)
+    let has_phase1 = second_run.iter().any(|e| {
+        e.as_log()
+            .get("message")
+            .map(|m| m.to_string_lossy().contains("checkpoint-test-phase1"))
+            .unwrap_or(false)
+    });
     assert!(
-        second_run.len() < first_count,
-        "Second run returned {} events (first run had {}). \
-         Expected fewer events because checkpoint should skip already-read events. \
+        !has_phase1,
+        "Phase 1 event was redelivered in phase 2 — checkpoint did not advance. \
          Check checkpoint persistence in data_dir: {:?}",
-        second_run.len(),
-        first_count,
         data_dir.path()
     );
 
-    // The new event should be present
+    // The new phase 2 event should be present
     let has_phase2 = second_run.iter().any(|e| {
         e.as_log()
             .get("message")
@@ -229,9 +231,10 @@ async fn test_checkpoint_resume_no_redelivery() {
             .unwrap_or(false)
     });
     assert!(
-        has_phase2 || second_run.is_empty(),
-        "Second run has events but none match the phase2 marker. \
-         Checkpoint may have advanced past the new event."
+        has_phase2,
+        "Phase 2 event not found in second run — checkpoint may have advanced past it. \
+         Got {} events.",
+        second_run.len()
     );
 }
 
