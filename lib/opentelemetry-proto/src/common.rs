@@ -43,13 +43,13 @@ impl From<PBValue> for TagValue {
 pub fn kv_list_into_value(arr: Vec<KeyValue>) -> Value {
     Value::Object(
         arr.into_iter()
-            .filter_map(|kv| {
-                kv.value.map(|av| {
-                    (
-                        kv.key.into(),
-                        av.value.map(Into::into).unwrap_or(Value::Null),
-                    )
-                })
+            .map(|kv| {
+                let v = kv
+                    .value
+                    .and_then(|av| av.value)
+                    .map(Into::into)
+                    .unwrap_or(Value::Null);
+                (kv.key.into(), v)
             })
             .collect::<ObjectMap>(),
     )
@@ -146,7 +146,7 @@ pub fn from_hex(s: &str) -> Vec<u8> {
 
     // hex::decode already pre-allocates correctly
     hex::decode(s).unwrap_or_else(|e| {
-        warn!(message = "Invalid hex string, using empty bytes.", input = %s, error = %e, internal_log_rate_secs = 10);
+        warn!(message = "Invalid hex string, using empty bytes.", input = %s, error = %e, internal_log_rate_limit = true);
         Vec::new()
     })
 }
@@ -164,7 +164,7 @@ pub fn validate_trace_id(bytes: &[u8]) -> Vec<u8> {
             if let Ok(s) = std::str::from_utf8(bytes) {
                 from_hex(s)
             } else {
-                warn!(message = "trace_id appears to be hex string but contains invalid chars.", internal_log_rate_secs = 10);
+                warn!(message = "trace_id appears to be hex string but contains invalid chars.", internal_log_rate_limit = true);
                 Vec::new()
             }
         }
@@ -172,7 +172,7 @@ pub fn validate_trace_id(bytes: &[u8]) -> Vec<u8> {
             warn!(
                 message = "Invalid trace_id length, clearing.",
                 length = bytes.len(),
-                internal_log_rate_secs = 10
+                internal_log_rate_limit = true
             );
             Vec::new()
         }
@@ -191,7 +191,7 @@ pub fn validate_span_id(bytes: &[u8]) -> Vec<u8> {
             if let Ok(s) = std::str::from_utf8(bytes) {
                 from_hex(s)
             } else {
-                warn!(message = "span_id appears to be hex string but contains invalid chars.", internal_log_rate_secs = 10);
+                warn!(message = "span_id appears to be hex string but contains invalid chars.", internal_log_rate_limit = true);
                 Vec::new()
             }
         }
@@ -199,7 +199,7 @@ pub fn validate_span_id(bytes: &[u8]) -> Vec<u8> {
             warn!(
                 message = "Invalid span_id length, clearing.",
                 length = bytes.len(),
-                internal_log_rate_secs = 10
+                internal_log_rate_limit = true
             );
             Vec::new()
         }
