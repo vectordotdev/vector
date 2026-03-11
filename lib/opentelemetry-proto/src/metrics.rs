@@ -706,17 +706,25 @@ fn build_otlp_metric(
             let mut total_sum = 0.0f64;
 
             for sample in samples {
+                // Skip non-finite samples (NaN, +Inf, -Inf) — they are not in
+                // boundaries and would corrupt total_sum / bucket assignment.
+                if !sample.value.is_finite() {
+                    continue;
+                }
+
                 let rate = u64::from(sample.rate);
                 total_count += rate;
                 total_sum += sample.value * f64::from(sample.rate);
 
-                // Find which bucket this sample belongs to
+                // Find which bucket this sample belongs to.
+                // Because boundaries is built from finite sample values (deduped),
+                // every finite sample has an exact match → Ok(idx).
                 let bucket_idx = match boundaries.binary_search_by(|b| {
                     b.partial_cmp(&sample.value)
                         .unwrap_or(std::cmp::Ordering::Equal)
                 }) {
-                    Ok(idx) => idx,  // Exact match — belongs in bucket [idx]
-                    Err(idx) => idx, // Between boundaries — belongs in bucket [idx]
+                    Ok(idx) => idx,
+                    Err(idx) => idx,
                 };
                 // bucket_counts has len boundaries+1, so bucket_idx is always in range.
                 // Guard defensively: if out of range, place in the overflow (+inf) bucket.
