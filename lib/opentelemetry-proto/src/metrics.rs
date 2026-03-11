@@ -759,6 +759,7 @@ fn build_otlp_metric(
                     attributes: attributes.to_vec(),
                     start_time_unix_nano: 0,
                     time_unix_nano: timestamp_nanos,
+                    #[allow(clippy::cast_precision_loss)]
                     value: Some(NumberDataPointValue::AsDouble(values.len() as f64)),
                     exemplars: Vec::new(),
                     flags: 0,
@@ -1088,7 +1089,8 @@ mod native_metric_conversion_tests {
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
             Some(Data::Gauge(gauge)) => {
-                let expected_nanos = ts.timestamp_nanos_opt().unwrap() as u64;
+                let expected_nanos =
+                    u64::try_from(ts.timestamp_nanos_opt().unwrap()).unwrap();
                 assert_eq!(gauge.data_points[0].time_unix_nano, expected_nanos);
             }
             other => panic!("Expected Gauge, got {other:?}"),
