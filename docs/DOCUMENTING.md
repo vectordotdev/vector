@@ -96,7 +96,7 @@ When introducing a new source, sink, or transform, you need to create documentat
 5. **Verify your documentation** is correct:
 
    ```bash
-   make check-component-docs
+   make check-generated-docs
    ```
 
 6. It is recommended to `cd website && make serve` to view how the documentation renders on the Vector website.
