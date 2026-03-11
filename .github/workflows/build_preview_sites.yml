@@ -13,6 +13,7 @@ jobs:
   deploy_vector_preview_site:
     if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
     permissions:
+      contents: read          # Required by the reusable workflow
       actions: read           # Required to download artifacts
       issues: write           # Required to post preview link comments
       pull-requests: write    # Required to post preview link comments
@@ -29,6 +30,7 @@ jobs:
   deploy_rust_doc_preview_site:
     if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
     permissions:
+      contents: read          # Required by the reusable workflow
       actions: read           # Required to download artifacts
       issues: write           # Required to post preview link comments
       pull-requests: write    # Required to post preview link comments
@@ -45,6 +47,7 @@ jobs:
   deploy_vrl_playground_preview_site:
     if: ${{ github.event.workflow_run.conclusion == 'success' && contains(github.event.workflow_run.head_branch, 'website') }}
     permissions:
+      contents: read          # Required by the reusable workflow
       actions: read           # Required to download artifacts
       issues: write           # Required to post preview link comments
       pull-requests: write    # Required to post preview link comments
