@@ -3,7 +3,7 @@ use std::sync::OnceLock;
 use http::Uri;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
-use vector_lib::{config::proxy::ProxyConfig, configurable::configurable_component};
+use vector_lib::{config::proxy::ProxyConfig, configurable::configurable_component, stream::BatcherSettings};
 
 use super::{
     request_builder::DatadogMetricsRequestBuilder,
@@ -21,7 +21,6 @@ use crate::{
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
-
 #[derive(Clone, Copy, Debug, Default)]
 pub struct DatadogMetricsDefaultBatchSettings;
 
@@ -262,18 +261,8 @@ impl DatadogMetricsConfig {
         dd_common: &DatadogCommonConfig,
         client: HttpClient,
     ) -> crate::Result<VectorSink> {
-        let mut batcher_settings = self.batch.into_batcher_settings()?;
-        // Cap the batcher to the endpoint's uncompressed payload limit when the user has not set
-        // an explicit max_bytes. This ensures each batch fits in a single HTTP request without
-        // splitting, which avoids request amplification and the associated memory overhead.
-        // Different endpoints have very different limits (v2 series: 5 MiB, v1/sketches: 60 MiB),
-        // so the cap must be applied dynamically rather than hardcoded as a default.
-        if batcher_settings.size_limit == usize::MAX {
-            let series_version = SeriesApiVersion::get_api_version_backwards_compatible();
-            batcher_settings.size_limit = DatadogMetricsEndpoint::Series(series_version)
-                .payload_limits()
-                .uncompressed;
-        }
+        let (batcher_settings, sketches_batcher_settings) =
+            resolve_endpoint_batch_settings(self.batch)?;
 
         // TODO: revisit our concurrency and batching defaults
         let request_limits = self.request.into_settings();
@@ -292,7 +281,13 @@ impl DatadogMetricsConfig {
         )?;
 
         let protocol = self.get_protocol(dd_common);
-        let sink = DatadogMetricsSink::new(service, request_builder, batcher_settings, protocol);
+        let sink = DatadogMetricsSink::new(
+            service,
+            request_builder,
+            batcher_settings,
+            sketches_batcher_settings,
+            protocol,
+        );
 
         Ok(VectorSink::from_event_streamsink(sink))
     }
@@ -305,6 +300,26 @@ impl DatadogMetricsConfig {
             .unwrap_or("http")
             .to_string()
     }
+}
+
+/// Returns `(series_settings, sketches_settings)`.
+///
+/// When the user has not set an explicit `max_bytes`, each endpoint is capped to its own
+/// uncompressed payload limit (5 MiB for Series v2, 60 MiB for Sketches). When an explicit
+/// limit is configured, both endpoints share it.
+fn resolve_endpoint_batch_settings(
+    batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
+) -> crate::Result<(BatcherSettings, BatcherSettings)> {
+    let mut series = batch.into_batcher_settings()?;
+    let mut sketches = series;
+    if series.size_limit == usize::MAX {
+        let series_version = SeriesApiVersion::get_api_version_backwards_compatible();
+        series.size_limit = DatadogMetricsEndpoint::Series(series_version)
+            .payload_limits()
+            .uncompressed;
+        sketches.size_limit = DatadogMetricsEndpoint::Sketches.payload_limits().uncompressed;
+    }
+    Ok((series, sketches))
 }
 
 fn build_uri(host: &str, endpoint: &str) -> crate::Result<Uri> {
@@ -323,59 +338,25 @@ mod tests {
         crate::test_util::test_generate_config::<DatadogMetricsConfig>();
     }
 
-    // When the user leaves max_bytes unset, the default batch config produces size_limit ==
-    // usize::MAX, which is the sentinel that build_sink replaces with the endpoint limit.
+    // When max_bytes is unset, each endpoint gets its own API payload limit.
     #[test]
-    fn batcher_default_produces_no_byte_limit() {
-        let config = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default();
-        let settings = config.into_batcher_settings().unwrap();
-        assert_eq!(settings.size_limit, usize::MAX);
+    fn default_batch_config_uses_endpoint_specific_size_limits() {
+        let (series, sketches) =
+            resolve_endpoint_batch_settings(BatchConfig::default()).unwrap();
+
+        assert_eq!(series.size_limit, 5_242_880); // 5 MiB — Series v2 limit
+        assert_eq!(sketches.size_limit, 62_914_560); // 60 MiB — Sketches limit
     }
 
-    // An explicit user-supplied max_bytes must not be clobbered by the endpoint-limit override.
+    // When the user sets max_bytes, both endpoints share that limit unchanged.
     #[test]
-    fn batcher_user_max_bytes_is_preserved() {
+    fn explicit_max_bytes_applies_to_both_endpoints() {
         let mut config = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default();
         config.max_bytes = Some(1_000_000);
-        let settings = config.into_batcher_settings().unwrap();
-        assert_eq!(settings.size_limit, 1_000_000);
-    }
 
-    // Simulate the override in build_sink: when size_limit is usize::MAX the endpoint's
-    // uncompressed payload limit should be applied.
-    #[test]
-    fn batcher_size_limit_override_uses_v2_endpoint_limit() {
-        let mut settings = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default()
-            .into_batcher_settings()
-            .unwrap();
-        if settings.size_limit == usize::MAX {
-            settings.size_limit = DatadogMetricsEndpoint::Series(SeriesApiVersion::V2)
-                .payload_limits()
-                .uncompressed;
-        }
-        assert_eq!(
-            settings.size_limit,
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V2)
-                .payload_limits()
-                .uncompressed,
-        );
-    }
+        let (series, sketches) = resolve_endpoint_batch_settings(config).unwrap();
 
-    #[test]
-    fn batcher_size_limit_override_uses_v1_endpoint_limit() {
-        let mut settings = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default()
-            .into_batcher_settings()
-            .unwrap();
-        if settings.size_limit == usize::MAX {
-            settings.size_limit = DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
-                .payload_limits()
-                .uncompressed;
-        }
-        assert_eq!(
-            settings.size_limit,
-            DatadogMetricsEndpoint::Series(SeriesApiVersion::V1)
-                .payload_limits()
-                .uncompressed,
-        );
+        assert_eq!(series.size_limit, 1_000_000);
+        assert_eq!(sketches.size_limit, 1_000_000);
     }
 }

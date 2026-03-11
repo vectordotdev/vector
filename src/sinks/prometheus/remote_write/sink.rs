@@ -182,7 +182,7 @@ where
             .filter_map(move |event| {
                 future::ready(make_remote_write_event(tenant_id.as_ref(), event))
             })
-            .batched_partitioned(PrometheusTenantIdPartitioner, || {
+            .batched_partitioned(PrometheusTenantIdPartitioner, batch_settings.timeout, |_| {
                 batch_settings
                     .as_reducer_config(ByteSizeOfItemSize, EventCollection::new(self.aggregate))
             })
