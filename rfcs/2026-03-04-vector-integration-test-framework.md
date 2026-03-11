@@ -331,6 +331,9 @@ tests:
 
 ### Implementation
 
+See [implementation sketch](./2026-03-04-vector-integration-test-framework/impl-sketch.md)
+for Rust type signatures, config struct definitions, and detailed design decisions.
+
 #### Generator and listener types
 
 Generators are declared per-test under `tests[].generators`. Each generator sends data into a
@@ -400,395 +403,21 @@ For each test:
 
 1. **Start listeners** — bind to their configured ports, ready to receive
 2. **Start topology** — sources, transforms, and sinks start normally
-3. **Wait for sources to be ready** — `wait_for_tcp()` on source addresses
+3. **Wait for sources to be ready** — poll source addresses until they accept connections
 4. **Run generators** — connect to sources and send events
-5. **Wait for pipeline to drain** — generators signal completion, framework waits for sinks
-   to flush (topology shutdown + grace period)
+5. **Wait for pipeline to drain** — `topology.stop()` flushes all buffered events through
+   sinks before returning; a 30-second per-test timeout guards against stuck sinks
 6. **Collect from listeners** — each listener returns its captured events as an array
 7. **Run assertions** — VRL conditions execute against collected arrays
 8. **Teardown** — stop topology and listeners
 
-```rust
-pub struct PipelineTest {
-    pub name: String,
-    config: Config,
-    pieces: TopologyPieces,
-    generators: Vec<Box<dyn TestGenerator>>,
-    listeners: HashMap<String, Box<dyn TestListener>>,
-    outputs: Vec<TestOutput>,
-    // Kept alive to hold port reservations for the duration of the test (Part 2)
-    _port_guards: Vec<PortGuard>,
-}
+#### Dispatch
 
-const TEST_TIMEOUT: Duration = Duration::from_secs(30);
-
-impl PipelineTest {
-    pub async fn run(self) -> UnitTestResult {
-        match tokio::time::timeout(TEST_TIMEOUT, self.run_inner()).await {
-            Ok(result) => result,
-            Err(_) => UnitTestResult {
-                errors: vec![format!(
-                    "test '{}' timed out after {}s",
-                    self.name,
-                    TEST_TIMEOUT.as_secs()
-                )],
-            },
-        }
-    }
-
-    async fn run_inner(mut self) -> UnitTestResult {
-        // 1. Start listeners
-        for (name, listener) in self.listeners.iter_mut() {
-            if let Err(e) = listener.start().await {
-                return UnitTestResult {
-                    errors: vec![format!("failed to start listener '{}': {}", name, e)],
-                };
-            }
-        }
-
-        // 2. Start topology
-        let diff = config::ConfigDiff::initial(&self.config);
-        let (topology, _) = match RunningTopology::start_validated(
-            self.config, diff, self.pieces
-        ).await {
-            Some(result) => result,
-            None => return UnitTestResult {
-                errors: vec!["topology failed to start (config validation error)".to_string()],
-            },
-        };
-
-        // 3. Wait for sources — wrapped to return an error instead of panicking
-        for generator in &self.generators {
-            if let Err(e) = wait_for_tcp_timeout(generator.target_address(), TEST_TIMEOUT).await {
-                return UnitTestResult { errors: vec![e] };
-            }
-        }
-
-        // 4. Run generators
-        for generator in &self.generators {
-            if let Err(e) = generator.send().await {
-                return UnitTestResult {
-                    errors: vec![format!("generator error: {}", e)],
-                };
-            }
-        }
-
-        // 5. Stop topology — topology.stop() flushes all buffered events through sinks
-        //    before returning. The outer timeout in run() guards against a stuck sink
-        //    (e.g., retrying against a 500 listener with no retry limit) causing an
-        //    indefinite hang, since graceful_shutdown_duration defaults to None
-        //    (Box::pin(future::pending())) when Config is constructed by build_pipeline_tests.
-        topology.stop().await;
-
-        // 6. Collect from listeners
-        let mut collected: HashMap<String, Vec<Event>> = HashMap::new();
-        for (name, listener) in &mut self.listeners {
-            collected.insert(name.clone(), listener.collect().await);
-        }
-
-        // 7. Run assertions
-        let mut errors = Vec::new();
-        for output in &self.outputs {
-            let events = collected.get(&output.extract_from)
-                .unwrap_or(&Vec::new());
-
-            // Build a VRL Value::Array from collected events
-            let array_value = events_to_vrl_array(events);
-
-            if let Some(conditions) = &output.conditions {
-                for (i, condition) in conditions.iter().enumerate() {
-                    if let Err(e) = run_vrl_assertion(condition, &array_value) {
-                        errors.push(format!(
-                            "'{}', condition[{}]: {}",
-                            output.extract_from, i, e
-                        ));
-                    }
-                }
-            }
-        }
-
-        UnitTestResult { errors }
-    }
-}
-```
-
-#### Generator and listener traits
-
-```rust
-#[async_trait]
-pub trait TestGenerator: Send + Sync {
-    /// The address this generator sends to
-    fn target_address(&self) -> SocketAddr;
-
-    /// Send all configured events to the target
-    async fn send(&self) -> Result<(), String>;
-}
-
-#[async_trait]
-pub trait TestListener: Send + Sync {
-    /// Start listening (bind to port)
-    async fn start(&mut self) -> Result<(), String>;
-
-    /// Collect all received data as events
-    async fn collect(&mut self) -> Vec<Event>;
-}
-```
-
-#### HTTP listener implementation
-
-`build_test_server_generic()` at `src/sinks/util/test.rs:69` only sends request bodies to its
-channel when the response status is 2xx. `HttpListener` cannot wrap it directly for
-non-200 status tests (Example 3) because no bodies would be captured despite the sink
-retrying. Instead, `HttpListener` builds its own hyper server that always captures the request
-body regardless of the configured response status, then responds with the configured status code.
-Decompression and decoding run on top of the captured bytes.
-
-`HttpListener` still borrows the `Trigger`/`Tripwire` shutdown pattern and the `(Parts, Bytes)`
-channel type from `build_test_server_generic()` as a reference implementation.
-
-```rust
-pub struct HttpListener {
-    addr: SocketAddr,
-    status_code: StatusCode,
-    decompression: Option<Decompression>,
-    decoding: DecodingConfig,
-    // populated after start()
-    rx: Option<mpsc::Receiver<(Parts, Bytes)>>,
-    trigger: Option<Trigger>,
-}
-
-#[async_trait]
-impl TestListener for HttpListener {
-    async fn start(&mut self) -> Result<(), String> {
-        let status = self.status_code;
-        let (tx, rx) = mpsc::channel(128);
-        let (trigger, tripwire) = Tripwire::new();
-
-        // Build our own hyper server so we capture bodies on ALL responses,
-        // not just 2xx — build_test_server_generic() only sends to the channel
-        // on success responses, which would silently drop retries in error tests.
-        let server = build_capturing_http_server(self.addr, status, tx, tripwire);
-        tokio::spawn(server);
-        self.rx = Some(rx);
-        self.trigger = Some(trigger);
-
-        wait_for_tcp_timeout(self.addr, Duration::from_secs(5)).await
-            .map_err(|e| format!("listener '{}' failed to bind: {}", self.addr, e))
-    }
-
-    async fn collect(&mut self) -> Vec<Event> {
-        drop(self.trigger.take()); // signal shutdown; drains the channel
-        let rx = match self.rx.take() {
-            Some(rx) => rx,
-            None => return Vec::new(), // start() was never called or failed
-        };
-        let bodies: Vec<Bytes> = rx
-            .collect::<Vec<_>>().await
-            .into_iter().map(|(_, b)| b).collect();
-        decode_bodies(bodies, &self.decompression, &self.decoding)
-    }
-}
-```
-
-#### Socket generator implementation
-
-`SocketGenerator` wraps `send_lines()` from `src/test_util/mod.rs:137`, which already handles
-TCP connect, `LinesCodec` framing, and clean shutdown.
-
-```rust
-pub struct SocketGenerator {
-    address: SocketAddr,
-    events: Vec<Event>,
-}
-
-#[async_trait]
-impl TestGenerator for SocketGenerator {
-    fn target_address(&self) -> SocketAddr {
-        self.address
-    }
-
-    async fn send(&self) -> Result<(), String> {
-        let lines = self.events.iter()
-            .map(|e| match e {
-                Event::Log(log) => serde_json::to_string(log)
-                    .map_err(|err| format!("failed to serialize event: {}", err)),
-                _ => Err("socket generator only supports log events".to_string()),
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-        send_lines(self.address, lines).await
-            .map(|_| ())
-            .map_err(|e| e.to_string())
-    }
-}
-```
-
-#### TCP listener implementation
-
-`TcpListener` wraps `CountReceiver::receive_lines()` from `src/test_util/mod.rs:641`, which
-already binds a TCP port, frames input with `LinesCodec`, and collects newline-delimited strings.
-
-```rust
-pub struct TcpListener {
-    addr: SocketAddr,
-    receiver: Option<CountReceiver<String>>,
-}
-
-#[async_trait]
-impl TestListener for TcpListener {
-    async fn start(&mut self) -> Result<(), String> {
-        // receive_lines binds the port immediately
-        self.receiver = Some(CountReceiver::receive_lines(self.addr));
-        wait_for_tcp(self.addr).await;
-        Ok(())
-    }
-
-    async fn collect(&mut self) -> Vec<Event> {
-        match self.receiver.take() {
-            Some(receiver) => receiver.await
-                .into_iter()
-                .map(|line| Event::Log(LogEvent::from_str_legacy(line)))
-                .collect(),
-            None => Vec::new(), // start() was never called or failed
-        }
-    }
-}
-```
-
-#### Config schema
-
-`TestGeneratorConfig` and `TestListenerConfig` are discriminated unions on `type`, parsed from
-the `tests[].generators` and `tests[].listeners` maps. They integrate into the existing
-`TestDefinition` struct alongside the existing `inputs`, `outputs`, and `no_outputs_from` fields.
-
-```rust
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum TestGeneratorConfig {
-    Socket {
-        address: SocketAddr,
-        events: Vec<InputDefinition>,
-    },
-    Http {
-        address: SocketAddr,
-        events: Vec<InputDefinition>,
-    },
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(tag = "type", rename_all = "snake_case")]
-pub enum TestListenerConfig {
-    Http {
-        port: u16,
-        #[serde(default = "default_status_200")]
-        status_code: u16,
-        #[serde(default)]
-        decompression: Option<DecompressionConfig>,
-        decoding: DecodingConfig,
-    },
-    Tcp {
-        port: u16,
-    },
-}
-
-/// Extended TestDefinition — fields added alongside existing ones
-#[derive(Debug, Clone, Deserialize, Default)]
-pub struct TestDefinition<T = OutputCheck> {
-    pub name: String,
-    // existing fields
-    pub inputs: Vec<TestInput>,
-    pub outputs: Vec<T>,
-    pub no_outputs_from: Vec<String>,
-    // new fields
-    #[serde(default)]
-    pub generators: IndexMap<String, TestGeneratorConfig>,
-    #[serde(default)]
-    pub listeners: IndexMap<String, TestListenerConfig>,
-}
-```
-
-`InputDefinition` is the existing per-event type used by `build_input_event()` in
-`src/config/unit_test/mod.rs:606`. The `source:` field in generator event definitions maps
-directly to `InputDefinition::vrl { source }` — it is VRL source code whose return value
-becomes the event. This matches the existing `type: vrl` / `source:` convention in
-`[[tests]]` inputs. No new field names are introduced.
-
-#### Feature gate
-
-`src/test_util/pipeline_test/` is gated behind the `test-utils` feature (the same feature that
-gates most of `src/test_util/`). `build_pipeline_tests()` must be callable from `vector test`,
-which is a production binary command, so the feature is also enabled in the default feature set
-for development builds. The `#[cfg(test)]` attribute is not used for this module — test-utils
-is the correct gate.
-
-#### RunnableTest trait
-
-`build_unit_tests_main()` currently returns `Vec<UnitTest>`. The signature changes to
-`Vec<Box<dyn RunnableTest>>` so both `UnitTest` and `PipelineTest` can be returned from the same
-function and driven by the same runner loop in `src/unit_test.rs`.
-
-```rust
-#[async_trait]
-pub trait RunnableTest: Send {
-    fn name(&self) -> &str;
-    async fn run(self: Box<Self>) -> UnitTestResult;
-}
-
-impl RunnableTest for UnitTest {
-    fn name(&self) -> &str { &self.name }
-    async fn run(self: Box<Self>) -> UnitTestResult { (*self).run().await }
-}
-
-impl RunnableTest for PipelineTest {
-    fn name(&self) -> &str { &self.name }
-    async fn run(self: Box<Self>) -> UnitTestResult { (*self).run().await }
-}
-```
-
-#### Extending the test framework
-
-The existing `vector test` CLI (`src/unit_test.rs:139`) calls
-`config::build_unit_tests_main()`. This function dispatches based on whether the config
-contains pipeline test components.
-
-A config is **pipeline-test mode** if any test in `tests[]` has a non-empty `generators` or
-`listeners` map. A config is **unit-test mode** if no test has `generators` or `listeners`.
-**Mixed configs — where some tests use generators/listeners and others use the existing
-`[[tests]]` format — are a configuration error.** `build_unit_tests_main()` returns
-`Err(vec!["mixed pipeline and unit test definitions are not supported in the same file"])` in
-that case. The two test types must be in separate files.
-
-```rust
-pub async fn build_unit_tests_main(
-    paths: &[ConfigPath],
-    signal_handler: &mut signal::SignalHandler,
-) -> Result<Vec<Box<dyn RunnableTest>>, Vec<String>> {
-    let config_builder = /* load config */;
-
-    match classify_test_config(&config_builder) {
-        TestConfigKind::Pipeline => build_pipeline_tests(config_builder).await,
-        TestConfigKind::Unit => build_unit_tests(config_builder).await,
-        TestConfigKind::Mixed => Err(vec![
-            "mixed pipeline and unit test definitions are not supported in the same file \
-             — split into separate files".to_string()
-        ]),
-    }
-}
-```
-
-#### How it differs from existing `[[tests]]`
-
-| Aspect | `[[tests]]` unit tests | Pipeline integration tests |
-|--------|----------------------|----------------------------|
-| Scope | Transforms only | Full pipeline including sinks |
-| Sources | Stripped and replaced | Real — generators send data into them |
-| Transforms | Kept (declared path only) | Kept (all) |
-| Sinks | Stripped and replaced | Real — full execution against listeners |
-| What is tested | Transform logic | Transform logic + sink encoding, batching, compression |
-| Test infra | Synthetic components replace pipeline | Generators and listeners wrap the real pipeline |
-| Assertion input | Single event per condition | Array of all captured events |
-| Network I/O | None | Loopback (generators -> sources, sinks -> listeners) |
-| Execution | `vector test` | `vector test` (same) |
-| Rust code needed | No | No |
+A config file is either all pipeline tests or all unit tests — mixing both in the same file
+is a configuration error. `build_unit_tests_main()` inspects `tests[].generators` and
+`tests[].listeners` to classify the file and dispatch to the appropriate builder.
+`build_unit_tests_main()` returns `Vec<Box<dyn RunnableTest>>` so both `UnitTest` and
+`PipelineTest` can be driven by the same runner loop in `src/unit_test.rs`.
 
 #### File organization
 
@@ -810,6 +439,9 @@ src/test_util/
 └── ...
 ```
 
+The `pipeline_test` module is gated behind the `test-utils` feature, which is also enabled
+in development builds so `vector test` can use it.
+
 Test config files:
 
 ```
@@ -822,6 +454,21 @@ tests/
 │       ├── ndjson_encoding.yml
 │       └── compression.yml
 ```
+
+#### How it differs from existing `[[tests]]`
+
+| Aspect | `[[tests]]` unit tests | Pipeline integration tests |
+|--------|----------------------|----------------------------|
+| Scope | Transforms only | Full pipeline including sinks |
+| Sources | Stripped and replaced | Real — generators send data into them |
+| Transforms | Kept (declared path only) | Kept (all) |
+| Sinks | Stripped and replaced | Real — full execution against listeners |
+| What is tested | Transform logic | Transform logic + sink encoding, batching, compression |
+| Test infra | Synthetic components replace pipeline | Generators and listeners wrap the real pipeline |
+| Assertion input | Single event per condition | Array of all captured events |
+| Network I/O | None | Loopback (generators -> sources, sinks -> listeners) |
+| Execution | `vector test` | `vector test` (same) |
+| Rust code needed | No | No |
 
 ## Rationale
 
@@ -876,7 +523,8 @@ testing is too high.
 - **Vector's `spawn_blackhole_http_server`** (`src/test_util/http.rs`): Existing in-process
   mock HTTP server. The HTTP listener builds on the same `hyper` pattern with structured capture.
 - **Vector's `build_test_server_generic()`** (`src/sinks/util/test.rs:69`): Full hyper server
-  with `Trigger`/`Tripwire` shutdown and MPSC request capture. `HttpListener` wraps this directly.
+  with `Trigger`/`Tripwire` shutdown and MPSC request capture. Referenced as a design model
+  for `HttpListener`, but not used directly (see implementation sketch).
 - **Vector's `CountReceiver::receive_lines()`** (`src/test_util/mod.rs:641`): TCP listener with
   `LinesCodec` framing and async collection. `TcpListener` wraps this directly.
 - **Vector's `send_lines()`** (`src/test_util/mod.rs:137`): TCP client with `LinesCodec` framing
