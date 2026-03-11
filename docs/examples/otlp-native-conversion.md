@@ -756,6 +756,6 @@ Invalid fields are handled gracefully:
 | Severity number out of range | Clamped to 0-24 |
 | Negative timestamp | Use 0 |
 | Invalid UTF-8 | Lossy conversion |
-| Unsupported metric type (Sketch) | Gauge with warning logged |
+| Unsupported metric type (Sketch) | Metric dropped with warning logged |
 
 The pipeline does not break due to malformed data.
