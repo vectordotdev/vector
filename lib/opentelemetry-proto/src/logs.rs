@@ -57,6 +57,12 @@ struct ResourceLog {
     log_record: LogRecord,
 }
 
+/// Safely convert nanosecond timestamp (u64) to DateTime<Utc>.
+/// Returns None if the value overflows i64 (past year 2262).
+fn nanos_to_timestamp(ns: u64) -> Option<DateTime<Utc>> {
+    i64::try_from(ns).ok().map(|n| Utc.timestamp_nanos(n))
+}
+
 // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.15.0/specification/logs/data-model.md
 impl ResourceLog {
     fn into_event(self, log_namespace: LogNamespace, now: DateTime<Utc>) -> Event {
@@ -187,19 +193,22 @@ impl ResourceLog {
             );
         }
 
-        log_namespace.insert_source_metadata(
-            SOURCE_NAME,
-            &mut log,
-            Some(LegacyKey::Overwrite(path!(DROPPED_ATTRIBUTES_COUNT_KEY))),
-            path!(DROPPED_ATTRIBUTES_COUNT_KEY),
-            self.log_record.dropped_attributes_count,
-        );
+        if self.log_record.dropped_attributes_count > 0 {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(DROPPED_ATTRIBUTES_COUNT_KEY))),
+                path!(DROPPED_ATTRIBUTES_COUNT_KEY),
+                self.log_record.dropped_attributes_count,
+            );
+        }
 
         // According to log data model spec, if observed_time_unix_nano is missing, the collector
         // should set it to the current time.
         let observed_timestamp = if self.log_record.observed_time_unix_nano > 0 {
-            Utc.timestamp_nanos(self.log_record.observed_time_unix_nano as i64)
-                .into()
+            nanos_to_timestamp(self.log_record.observed_time_unix_nano)
+                .map(Value::Timestamp)
+                .unwrap_or(Value::Timestamp(now))
         } else {
             Value::Timestamp(now)
         };
@@ -213,8 +222,9 @@ impl ResourceLog {
 
         // If time_unix_nano is not present (0 represents missing or unknown timestamp) use observed time
         let timestamp = if self.log_record.time_unix_nano > 0 {
-            Utc.timestamp_nanos(self.log_record.time_unix_nano as i64)
-                .into()
+            nanos_to_timestamp(self.log_record.time_unix_nano)
+                .map(Value::Timestamp)
+                .unwrap_or_else(|| observed_timestamp.clone())
         } else {
             observed_timestamp
         };
@@ -322,7 +332,7 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
                     message = "Negative timestamp, using 0.",
                     field = key,
                     value = i,
-                    internal_log_rate_secs = 10
+                    internal_log_rate_limit = true
                 );
                 return 0;
             }
@@ -345,7 +355,7 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
         Value::Float(f) => {
             let f = f.into_inner();
             if f < 0.0 || f.is_nan() || f.is_infinite() {
-                warn!(message = "Invalid float timestamp, using 0.", field = key, internal_log_rate_secs = 10);
+                warn!(message = "Invalid float timestamp, using 0.", field = key, internal_log_rate_limit = true);
                 return 0;
             }
             let nanos = if f < 1e12 {
@@ -358,7 +368,7 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
                 f
             };
             if nanos > u64::MAX as f64 {
-                warn!(message = "Float timestamp overflow, using 0.", field = key, internal_log_rate_secs = 10);
+                warn!(message = "Float timestamp overflow, using 0.", field = key, internal_log_rate_limit = true);
                 0
             } else {
                 nanos as u64
@@ -381,7 +391,7 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
                                 message = "Negative timestamp string, using 0.",
                                 field = key,
                                 value = ts,
-                                internal_log_rate_secs = 10
+                                internal_log_rate_limit = true
                             );
                             0
                         } else if ts < 1_000_000_000_000 {
@@ -400,13 +410,13 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
                         message = "Could not parse timestamp string.",
                         field = key,
                         value = %s,
-                        internal_log_rate_secs = 10
+                        internal_log_rate_limit = true
                     );
                     0
                 })
         }
         _ => {
-            warn!(message = "Unexpected timestamp type.", field = key, internal_log_rate_secs = 10);
+            warn!(message = "Unexpected timestamp type.", field = key, internal_log_rate_limit = true);
             0
         }
     }
@@ -429,7 +439,7 @@ fn extract_string_safe(log: &LogEvent, key: &str) -> String {
                 message = "Converting non-string to string.",
                 field = key,
                 value_type = ?other,
-                internal_log_rate_secs = 10
+                internal_log_rate_limit = true
             );
             format!("{other:?}")
         }
@@ -452,7 +462,7 @@ fn extract_severity_number_safe(log: &LogEvent) -> i32 {
             let i = *i;
             // OTLP severity numbers are 0-24
             if !(0..=24).contains(&i) {
-                warn!(message = "Severity number out of range (0-24).", value = i, internal_log_rate_secs = 10);
+                warn!(message = "Severity number out of range (0-24).", value = i, internal_log_rate_limit = true);
                 i.clamp(0, 24) as i32
             } else {
                 i as i32
@@ -464,7 +474,7 @@ fn extract_severity_number_safe(log: &LogEvent) -> i32 {
             s.parse::<i32>()
                 .map(|n| n.clamp(0, 24))
                 .unwrap_or_else(|_| {
-                    warn!(message = "Could not parse severity_number.", value = %s, internal_log_rate_secs = 10);
+                    warn!(message = "Could not parse severity_number.", value = %s, internal_log_rate_limit = true);
                     0
                 })
         }
@@ -472,7 +482,7 @@ fn extract_severity_number_safe(log: &LogEvent) -> i32 {
             warn!(
                 message = "Unexpected severity_number type.",
                 value_type = ?value,
-                internal_log_rate_secs = 10
+                internal_log_rate_limit = true
             );
             0
         }
@@ -530,7 +540,7 @@ fn extract_u32_safe(log: &LogEvent, key: &str) -> u32 {
                     message = "Negative value for u32 field, using 0.",
                     field = key,
                     value = i,
-                    internal_log_rate_secs = 10
+                    internal_log_rate_limit = true
                 );
                 0
             } else if i > u32::MAX as i64 {
@@ -538,7 +548,7 @@ fn extract_u32_safe(log: &LogEvent, key: &str) -> u32 {
                     message = "Value overflow for u32 field.",
                     field = key,
                     value = i,
-                    internal_log_rate_secs = 10
+                    internal_log_rate_limit = true
                 );
                 u32::MAX
             } else {

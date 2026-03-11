@@ -30,6 +30,15 @@ pub const DROPPED_ATTRIBUTES_COUNT_KEY: &str = "dropped_attributes_count";
 pub const RESOURCE_KEY: &str = "resources";
 pub const ATTRIBUTES_KEY: &str = "attributes";
 
+/// Safely convert nanosecond timestamp (u64) to Value::Timestamp.
+/// Returns Value::Null if the value overflows i64 (past year 2262).
+fn nanos_to_value(ns: u64) -> Value {
+    i64::try_from(ns)
+        .ok()
+        .map(|n| Value::from(Utc.timestamp_nanos(n)))
+        .unwrap_or(Value::Null)
+}
+
 impl ResourceSpans {
     pub fn into_event_iter(self) -> impl Iterator<Item = Event> {
         let resource = self.resource;
@@ -73,11 +82,11 @@ impl ResourceSpan {
         trace.insert(event_path!("kind"), span.kind);
         trace.insert(
             event_path!("start_time_unix_nano"),
-            Value::from(Utc.timestamp_nanos(span.start_time_unix_nano as i64)),
+            nanos_to_value(span.start_time_unix_nano),
         );
         trace.insert(
             event_path!("end_time_unix_nano"),
-            Value::from(Utc.timestamp_nanos(span.end_time_unix_nano as i64)),
+            nanos_to_value(span.end_time_unix_nano),
         );
         if !span.attributes.is_empty() {
             trace.insert(
@@ -129,12 +138,12 @@ impl From<SpanEvent> for Value {
         obj.insert("name".into(), ev.name.into());
         obj.insert(
             "time_unix_nano".into(),
-            Value::Timestamp(Utc.timestamp_nanos(ev.time_unix_nano as i64)),
+            nanos_to_value(ev.time_unix_nano),
         );
         obj.insert("attributes".into(), kv_list_into_value(ev.attributes));
         obj.insert(
             "dropped_attributes_count".into(),
-            Value::Integer(ev.dropped_attributes_count as i64),
+            Value::Integer(i64::from(ev.dropped_attributes_count)),
         );
         Value::Object(obj)
     }
@@ -234,7 +243,7 @@ fn extract_trace_string(trace: &TraceEvent, key: &str) -> String {
                 message = "Converting non-string to string.",
                 field = key,
                 value_type = ?other,
-                internal_log_rate_secs = 10
+                internal_log_rate_limit = true
             );
             format!("{other:?}")
         }
@@ -253,7 +262,7 @@ fn extract_trace_i32(trace: &TraceEvent, key: &str) -> i32 {
                     message = "Value out of i32 range, clamping.",
                     field = key,
                     value = i,
-                    internal_log_rate_secs = 10
+                    internal_log_rate_limit = true
                 );
                 i.clamp(i32::MIN as i64, i32::MAX as i64) as i32
             } else {
@@ -263,7 +272,7 @@ fn extract_trace_i32(trace: &TraceEvent, key: &str) -> i32 {
         Some(Value::Bytes(b)) => {
             let s = String::from_utf8_lossy(b);
             s.parse::<i32>().unwrap_or_else(|_| {
-                warn!(message = "Could not parse i32 field.", field = key, value = %s, internal_log_rate_secs = 10);
+                warn!(message = "Could not parse i32 field.", field = key, value = %s, internal_log_rate_limit = true);
                 0
             })
         }
@@ -282,7 +291,7 @@ fn extract_trace_u32(trace: &TraceEvent, key: &str) -> u32 {
                     message = "Negative value for u32 field, using 0.",
                     field = key,
                     value = i,
-                    internal_log_rate_secs = 10
+                    internal_log_rate_limit = true
                 );
                 0
             } else if i > u32::MAX as i64 {
@@ -290,7 +299,7 @@ fn extract_trace_u32(trace: &TraceEvent, key: &str) -> u32 {
                     message = "Value overflow for u32 field.",
                     field = key,
                     value = i,
-                    internal_log_rate_secs = 10
+                    internal_log_rate_limit = true
                 );
                 u32::MAX
             } else {
@@ -326,7 +335,7 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
                     message = "Negative timestamp, using 0.",
                     field = key,
                     value = i,
-                    internal_log_rate_secs = 10
+                    internal_log_rate_limit = true
                 );
                 return 0;
             }
@@ -343,7 +352,7 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
         Value::Float(f) => {
             let f = f.into_inner();
             if f < 0.0 || f.is_nan() || f.is_infinite() {
-                warn!(message = "Invalid float timestamp, using 0.", field = key, internal_log_rate_secs = 10);
+                warn!(message = "Invalid float timestamp, using 0.", field = key, internal_log_rate_limit = true);
                 return 0;
             }
             let nanos = if f < 1e12 {
@@ -356,7 +365,7 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
                 f
             };
             if nanos > u64::MAX as f64 {
-                warn!(message = "Float timestamp overflow, using 0.", field = key, internal_log_rate_secs = 10);
+                warn!(message = "Float timestamp overflow, using 0.", field = key, internal_log_rate_limit = true);
                 0
             } else {
                 nanos as u64
@@ -378,7 +387,7 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
                                 message = "Negative timestamp string, using 0.",
                                 field = key,
                                 value = ts,
-                                internal_log_rate_secs = 10
+                                internal_log_rate_limit = true
                             );
                             0
                         } else if ts < 1_000_000_000_000 {
@@ -397,13 +406,13 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
                         message = "Could not parse timestamp string.",
                         field = key,
                         value = %s,
-                        internal_log_rate_secs = 10
+                        internal_log_rate_limit = true
                     );
                     0
                 })
         }
         _ => {
-            warn!(message = "Unexpected timestamp type.", field = key, internal_log_rate_secs = 10);
+            warn!(message = "Unexpected timestamp type.", field = key, internal_log_rate_limit = true);
             0
         }
     }
