@@ -1709,4 +1709,322 @@ mod native_metric_conversion_tests {
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         assert_eq!(otlp_metric.name, "my-service.cpu_usage.percent");
     }
+
+    // ====================================================================
+    // NaN / Infinity edge case tests
+    // ====================================================================
+
+    #[test]
+    fn test_distribution_nan_samples_are_skipped() {
+        let metric = MetricEvent::new(
+            "dist.nan".to_string(),
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vec![
+                    Sample {
+                        value: 10.0,
+                        rate: 2,
+                    },
+                    Sample {
+                        value: f64::NAN,
+                        rate: 1,
+                    },
+                    Sample {
+                        value: 20.0,
+                        rate: 3,
+                    },
+                ],
+                statistic: vector_core::event::metric::StatisticKind::Histogram,
+            },
+        );
+
+        let request = native_metric_to_otlp_request(&metric);
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+
+        match &otlp_metric.data {
+            Some(Data::Histogram(hist)) => {
+                let dp = &hist.data_points[0];
+                // NaN sample skipped: count = 2 + 3 = 5, sum = 10*2 + 20*3 = 80
+                assert_eq!(dp.count, 5);
+                assert_eq!(dp.sum, Some(80.0));
+                // Boundaries from finite samples only: [10.0, 20.0]
+                assert_eq!(dp.explicit_bounds, vec![10.0, 20.0]);
+            }
+            other => panic!("Expected Histogram, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_distribution_infinity_samples_are_skipped() {
+        let metric = MetricEvent::new(
+            "dist.inf".to_string(),
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vec![
+                    Sample {
+                        value: 5.0,
+                        rate: 1,
+                    },
+                    Sample {
+                        value: f64::INFINITY,
+                        rate: 1,
+                    },
+                    Sample {
+                        value: f64::NEG_INFINITY,
+                        rate: 1,
+                    },
+                ],
+                statistic: vector_core::event::metric::StatisticKind::Histogram,
+            },
+        );
+
+        let request = native_metric_to_otlp_request(&metric);
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+
+        match &otlp_metric.data {
+            Some(Data::Histogram(hist)) => {
+                let dp = &hist.data_points[0];
+                // Only the finite sample counted
+                assert_eq!(dp.count, 1);
+                assert_eq!(dp.sum, Some(5.0));
+                assert_eq!(dp.explicit_bounds, vec![5.0]);
+            }
+            other => panic!("Expected Histogram, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_distribution_all_nan_produces_empty_histogram() {
+        let metric = MetricEvent::new(
+            "dist.all_nan".to_string(),
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vec![
+                    Sample {
+                        value: f64::NAN,
+                        rate: 1,
+                    },
+                    Sample {
+                        value: f64::NAN,
+                        rate: 2,
+                    },
+                ],
+                statistic: vector_core::event::metric::StatisticKind::Histogram,
+            },
+        );
+
+        let request = native_metric_to_otlp_request(&metric);
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+
+        match &otlp_metric.data {
+            Some(Data::Histogram(hist)) => {
+                let dp = &hist.data_points[0];
+                assert_eq!(dp.count, 0);
+                assert_eq!(dp.sum, Some(0.0));
+                assert!(dp.explicit_bounds.is_empty());
+                // Only the overflow bucket exists
+                assert_eq!(dp.bucket_counts, vec![0]);
+            }
+            other => panic!("Expected Histogram, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_gauge_nan_value_passes_through() {
+        let metric = make_gauge("nan.gauge", f64::NAN);
+        let request = native_metric_to_otlp_request(&metric);
+
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Gauge(gauge)) => {
+                match &gauge.data_points[0].value {
+                    Some(NumberDataPointValue::AsDouble(v)) => assert!(v.is_nan()),
+                    other => panic!("Expected AsDouble(NaN), got {other:?}"),
+                }
+            }
+            other => panic!("Expected Gauge, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_counter_infinity_value_passes_through() {
+        let metric = make_counter("inf.counter", f64::INFINITY, MetricKind::Incremental);
+        let request = native_metric_to_otlp_request(&metric);
+
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+        match &otlp_metric.data {
+            Some(Data::Sum(sum)) => {
+                assert_eq!(
+                    sum.data_points[0].value,
+                    Some(NumberDataPointValue::AsDouble(f64::INFINITY))
+                );
+            }
+            other => panic!("Expected Sum, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_distribution_with_zero_rate_samples() {
+        let metric = MetricEvent::new(
+            "dist.zero_rate".to_string(),
+            MetricKind::Incremental,
+            MetricValue::Distribution {
+                samples: vec![
+                    Sample {
+                        value: 10.0,
+                        rate: 0,
+                    },
+                    Sample {
+                        value: 20.0,
+                        rate: 2,
+                    },
+                ],
+                statistic: vector_core::event::metric::StatisticKind::Histogram,
+            },
+        );
+
+        let request = native_metric_to_otlp_request(&metric);
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+
+        match &otlp_metric.data {
+            Some(Data::Histogram(hist)) => {
+                let dp = &hist.data_points[0];
+                // rate=0 contributes 0 to count and sum
+                assert_eq!(dp.count, 2);
+                assert_eq!(dp.sum, Some(40.0));
+            }
+            other => panic!("Expected Histogram, got {other:?}"),
+        }
+    }
+
+    // ====================================================================
+    // Sketch handling tests
+    // ====================================================================
+
+    #[test]
+    fn test_sketch_produces_no_data() {
+        use vector_core::event::metric::MetricSketch;
+        use vector_core::metrics::AgentDDSketch;
+
+        let sketch = AgentDDSketch::with_agent_defaults();
+        let metric = MetricEvent::new(
+            "sketch.metric".to_string(),
+            MetricKind::Absolute,
+            MetricValue::Sketch {
+                sketch: MetricSketch::AgentDDSketch(sketch),
+            },
+        );
+
+        let request = native_metric_to_otlp_request(&metric);
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+
+        // Sketch metrics should produce a metric with no data (dropped)
+        assert_eq!(otlp_metric.name, "sketch.metric");
+        assert!(otlp_metric.data.is_none());
+    }
+
+    // ====================================================================
+    // Tag prefix collision tests
+    // ====================================================================
+
+    #[test]
+    fn test_tag_with_resource_prefix_routed_to_resource() {
+        // A data-point attribute originally named "resource.host" gets stored
+        // as tag "resource.host" during decode. On re-encode, it becomes a
+        // resource attribute with key "host". This is a known limitation of
+        // the prefix-based decomposition approach.
+        let metric = make_gauge("test", 1.0);
+        let mut tags = MetricTags::default();
+        tags.replace("resource.host".to_string(), "localhost".to_string());
+        let metric = metric.with_tags(Some(tags));
+
+        let request = native_metric_to_otlp_request(&metric);
+        let resource = request.resource_metrics[0].resource.as_ref().unwrap();
+
+        assert_eq!(resource.attributes.len(), 1);
+        assert_eq!(resource.attributes[0].key, "host");
+    }
+
+    #[test]
+    fn test_scope_custom_attributes_preserved() {
+        let metric = make_gauge("test", 1.0);
+        let mut tags = MetricTags::default();
+        tags.replace("scope.name".to_string(), "meter".to_string());
+        tags.replace("scope.custom.key".to_string(), "custom_val".to_string());
+        tags.replace(
+            "scope.another.attr".to_string(),
+            "another_val".to_string(),
+        );
+        let metric = metric.with_tags(Some(tags));
+
+        let request = native_metric_to_otlp_request(&metric);
+        let scope = request.resource_metrics[0].scope_metrics[0]
+            .scope
+            .as_ref()
+            .unwrap();
+
+        assert_eq!(scope.name, "meter");
+        assert_eq!(scope.attributes.len(), 2);
+        let keys: Vec<&str> = scope.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(keys.contains(&"custom.key"));
+        assert!(keys.contains(&"another.attr"));
+    }
+
+    // ====================================================================
+    // Histogram non-finite sum passthrough tests
+    // ====================================================================
+
+    #[test]
+    fn test_aggregated_histogram_nan_sum_passes_through() {
+        let metric = MetricEvent::new(
+            "hist.nan_sum".to_string(),
+            MetricKind::Absolute,
+            MetricValue::AggregatedHistogram {
+                buckets: vec![Bucket {
+                    upper_limit: 10.0,
+                    count: 1,
+                }],
+                count: 1,
+                sum: f64::NAN,
+            },
+        );
+
+        let request = native_metric_to_otlp_request(&metric);
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+
+        match &otlp_metric.data {
+            Some(Data::Histogram(hist)) => {
+                let dp = &hist.data_points[0];
+                assert!(dp.sum.unwrap().is_nan());
+            }
+            other => panic!("Expected Histogram, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_aggregated_summary_nan_sum_passes_through() {
+        let metric = MetricEvent::new(
+            "summary.nan_sum".to_string(),
+            MetricKind::Absolute,
+            MetricValue::AggregatedSummary {
+                quantiles: vec![Quantile {
+                    quantile: 0.5,
+                    value: 100.0,
+                }],
+                count: 10,
+                sum: f64::NAN,
+            },
+        );
+
+        let request = native_metric_to_otlp_request(&metric);
+        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
+
+        match &otlp_metric.data {
+            Some(Data::Summary(summary)) => {
+                let dp = &summary.data_points[0];
+                assert!(dp.sum.is_nan());
+            }
+            other => panic!("Expected Summary, got {other:?}"),
+        }
+    }
 }
