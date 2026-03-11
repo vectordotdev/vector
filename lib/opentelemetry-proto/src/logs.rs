@@ -1517,4 +1517,584 @@ mod native_conversion_tests {
         assert_eq!(scope.name, "my-logger");
         assert_eq!(scope.version, "1.0.0");
     }
+
+    // ========================================================================
+    // Advanced field mapping tests
+    // ========================================================================
+
+    #[test]
+    fn test_full_otlp_field_mapping_all_fields() {
+        use vrl::value::ObjectMap;
+
+        // Set EVERY possible OTLP field and verify the complete output
+        let mut log = LogEvent::default();
+        log.insert("message", "Complete OTLP log");
+        log.insert("timestamp", 1704067200_000_000_000i64);
+        log.insert("observed_timestamp", 1704067201_000_000_000i64);
+        log.insert("severity_text", "WARN");
+        log.insert("severity_number", 13i64);
+        log.insert("trace_id", "0123456789abcdef0123456789abcdef");
+        log.insert("span_id", "fedcba9876543210");
+        log.insert("flags", 1i64);
+        log.insert("dropped_attributes_count", 3i64);
+        log.insert("schema_url", "https://opentelemetry.io/schemas/1.21.0");
+
+        let mut attrs = ObjectMap::new();
+        attrs.insert("http.method".into(), Value::from("GET"));
+        attrs.insert("http.status_code".into(), Value::Integer(200));
+        log.insert("attributes", Value::Object(attrs));
+
+        let mut resources = ObjectMap::new();
+        resources.insert("service.name".into(), Value::from("api-gateway"));
+        resources.insert("host.name".into(), Value::from("prod-1"));
+        log.insert("resources", Value::Object(resources));
+
+        log.insert("scope.name", "http-handler");
+        log.insert("scope.version", "3.2.1");
+
+        let request = native_log_to_otlp_request(&log);
+        let rl = &request.resource_logs[0];
+        let sl = &rl.scope_logs[0];
+        let lr = &sl.log_records[0];
+
+        // LogRecord fields
+        assert_eq!(lr.time_unix_nano, 1704067200_000_000_000u64);
+        assert_eq!(lr.observed_time_unix_nano, 1704067201_000_000_000u64);
+        assert_eq!(lr.severity_text, "WARN");
+        assert_eq!(lr.severity_number, 13);
+        assert_eq!(lr.flags, 1);
+        assert_eq!(lr.dropped_attributes_count, 3);
+        assert_eq!(lr.trace_id.len(), 16);
+        assert_eq!(lr.span_id.len(), 8);
+
+        // Body
+        let body = lr.body.as_ref().unwrap();
+        match body.value.as_ref().unwrap() {
+            PBValue::StringValue(s) => assert_eq!(s, "Complete OTLP log"),
+            other => panic!("Expected StringValue body, got {other:?}"),
+        }
+
+        // Attributes - explicit ones only, known fields should NOT be duplicated
+        let attr_keys: Vec<&str> = lr.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(attr_keys.contains(&"http.method"));
+        assert!(attr_keys.contains(&"http.status_code"));
+        assert!(
+            !attr_keys.contains(&"message"),
+            "known field 'message' must not appear in attributes"
+        );
+        assert!(
+            !attr_keys.contains(&"timestamp"),
+            "known field 'timestamp' must not appear in attributes"
+        );
+
+        // Verify attribute value types preserved
+        let status_kv = lr
+            .attributes
+            .iter()
+            .find(|kv| kv.key == "http.status_code")
+            .unwrap();
+        match status_kv.value.as_ref().unwrap().value.as_ref().unwrap() {
+            PBValue::IntValue(200) => {}
+            other => panic!("Expected IntValue(200), got {other:?}"),
+        }
+
+        // Resource
+        let resource = rl.resource.as_ref().unwrap();
+        let res_keys: Vec<&str> = resource
+            .attributes
+            .iter()
+            .map(|kv| kv.key.as_str())
+            .collect();
+        assert!(res_keys.contains(&"service.name"));
+        assert!(res_keys.contains(&"host.name"));
+
+        // Scope
+        let scope = sl.scope.as_ref().unwrap();
+        assert_eq!(scope.name, "http-handler");
+        assert_eq!(scope.version, "3.2.1");
+
+        // Schema URL
+        assert_eq!(sl.schema_url, "https://opentelemetry.io/schemas/1.21.0");
+    }
+
+    #[test]
+    fn test_attribute_value_types_preserved() {
+        use ordered_float::NotNan;
+        use vrl::value::ObjectMap;
+
+        // Verify all attribute value types map correctly to OTLP
+        let mut log = LogEvent::default();
+        log.insert("message", "type test");
+
+        let mut attrs = ObjectMap::new();
+        attrs.insert("str_val".into(), Value::from("hello"));
+        attrs.insert("int_val".into(), Value::Integer(42));
+        attrs.insert(
+            "float_val".into(),
+            Value::Float(NotNan::new(3.14).unwrap()),
+        );
+        attrs.insert("bool_val".into(), Value::Boolean(true));
+        attrs.insert(
+            "array_val".into(),
+            Value::Array(vec![Value::from("a"), Value::from("b")]),
+        );
+
+        let mut nested = ObjectMap::new();
+        nested.insert("inner".into(), Value::from("nested_value"));
+        attrs.insert("object_val".into(), Value::Object(nested));
+
+        log.insert("attributes", Value::Object(attrs));
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        let find_attr = |key: &str| -> &PBValue {
+            lr.attributes
+                .iter()
+                .find(|kv| kv.key == key)
+                .unwrap()
+                .value
+                .as_ref()
+                .unwrap()
+                .value
+                .as_ref()
+                .unwrap()
+        };
+
+        assert!(matches!(find_attr("str_val"), PBValue::StringValue(s) if s == "hello"));
+        assert!(matches!(find_attr("int_val"), PBValue::IntValue(42)));
+        assert!(matches!(find_attr("float_val"), PBValue::DoubleValue(f) if (*f - 3.14).abs() < 0.001));
+        assert!(matches!(find_attr("bool_val"), PBValue::BoolValue(true)));
+        assert!(matches!(find_attr("array_val"), PBValue::ArrayValue(arr) if arr.values.len() == 2));
+        assert!(matches!(
+            find_attr("object_val"),
+            PBValue::KvlistValue(kv) if kv.values.len() == 1
+        ));
+    }
+
+    #[test]
+    fn test_body_field_priority_message_wins() {
+        // When both "message" and "body" are present, "message" has priority
+        let mut log = LogEvent::default();
+        log.insert("message", "from message");
+        log.insert("body", "from body");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+            PBValue::StringValue(s) => assert_eq!(s, "from message"),
+            other => panic!("Expected message to win, got {other:?}"),
+        }
+
+        // "body" field should end up in attributes since it's a known field but
+        // message took priority for the OTLP body
+        let attr_keys: Vec<&str> = lr.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            !attr_keys.contains(&"body"),
+            "'body' is a known OTLP field and should not be in attributes"
+        );
+    }
+
+    #[test]
+    fn test_body_fallback_to_msg() {
+        let mut log = LogEvent::default();
+        log.insert("msg", "from msg field");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+            PBValue::StringValue(s) => assert_eq!(s, "from msg field"),
+            other => panic!("Expected StringValue from msg, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_body_fallback_to_log() {
+        let mut log = LogEvent::default();
+        log.insert("log", "from log field");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+            PBValue::StringValue(s) => assert_eq!(s, "from log field"),
+            other => panic!("Expected StringValue from log, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_structured_body_object() {
+        use vrl::value::ObjectMap;
+
+        // Body can be a structured object, not just a string
+        let mut log = LogEvent::default();
+        let mut body_obj = ObjectMap::new();
+        body_obj.insert("action".into(), Value::from("login"));
+        body_obj.insert("success".into(), Value::Boolean(true));
+        log.insert("message", Value::Object(body_obj));
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        // Object body should become KvlistValue
+        match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+            PBValue::KvlistValue(kv) => {
+                assert_eq!(kv.values.len(), 2);
+                let keys: Vec<&str> = kv.values.iter().map(|kv| kv.key.as_str()).collect();
+                assert!(keys.contains(&"action"));
+                assert!(keys.contains(&"success"));
+            }
+            other => panic!("Expected KvlistValue body, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_observed_timestamp_independent_of_timestamp() {
+        let mut log = LogEvent::default();
+        log.insert("timestamp", 1704067200_000_000_000i64);
+        log.insert("observed_timestamp", 1704067300_000_000_000i64);
+        log.insert("message", "test");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.time_unix_nano, 1704067200_000_000_000u64);
+        assert_eq!(lr.observed_time_unix_nano, 1704067300_000_000_000u64);
+        assert_ne!(lr.time_unix_nano, lr.observed_time_unix_nano);
+    }
+
+    #[test]
+    fn test_flags_and_dropped_attributes_count() {
+        let mut log = LogEvent::default();
+        log.insert("message", "test");
+        log.insert("flags", 255i64);
+        log.insert("dropped_attributes_count", 7i64);
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.flags, 255);
+        assert_eq!(lr.dropped_attributes_count, 7);
+    }
+
+    #[test]
+    fn test_scope_with_attributes() {
+        use vrl::value::ObjectMap;
+
+        let mut log = LogEvent::default();
+        log.insert("message", "test");
+        log.insert("scope.name", "my-lib");
+        log.insert("scope.version", "1.0");
+
+        let mut scope_attrs = ObjectMap::new();
+        scope_attrs.insert("lib.language".into(), Value::from("rust"));
+        scope_attrs.insert("lib.runtime".into(), Value::from("tokio"));
+        log.insert("scope.attributes", Value::Object(scope_attrs));
+
+        let request = native_log_to_otlp_request(&log);
+        let scope = request.resource_logs[0].scope_logs[0]
+            .scope
+            .as_ref()
+            .unwrap();
+
+        assert_eq!(scope.name, "my-lib");
+        assert_eq!(scope.version, "1.0");
+        assert_eq!(scope.attributes.len(), 2);
+        let scope_attr_keys: Vec<&str> =
+            scope.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(scope_attr_keys.contains(&"lib.language"));
+        assert!(scope_attr_keys.contains(&"lib.runtime"));
+    }
+
+    #[test]
+    fn test_remaining_field_same_key_as_explicit_attribute() {
+        use vrl::value::ObjectMap;
+
+        // If user has .attributes.env = "prod" AND a root .env = "staging",
+        // both should appear (explicit first, remaining appended)
+        let mut log = LogEvent::default();
+        log.insert("message", "test");
+        let mut attrs = ObjectMap::new();
+        attrs.insert("env".into(), Value::from("prod"));
+        log.insert("attributes", Value::Object(attrs));
+        log.insert("env", "staging");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        let env_attrs: Vec<&KeyValue> =
+            lr.attributes.iter().filter(|kv| kv.key == "env").collect();
+        // Both explicit and remaining field are present
+        assert_eq!(
+            env_attrs.len(),
+            2,
+            "Both explicit and remaining 'env' should be present"
+        );
+    }
+
+    #[test]
+    fn test_null_fields_not_in_attributes() {
+        let mut log = LogEvent::default();
+        log.insert("message", "test");
+        log.insert("should_be_dropped", Value::Null);
+        log.insert("valid_field", "keep me");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        let attr_keys: Vec<&str> = lr.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            !attr_keys.contains(&"should_be_dropped"),
+            "Null fields must not appear in attributes"
+        );
+        assert!(attr_keys.contains(&"valid_field"));
+    }
+
+    #[test]
+    fn test_severity_inference_all_levels() {
+        let cases = vec![
+            ("TRACE", SeverityNumber::Trace),
+            ("DEBUG", SeverityNumber::Debug),
+            ("INFO", SeverityNumber::Info),
+            ("NOTICE", SeverityNumber::Info),
+            ("WARN", SeverityNumber::Warn),
+            ("WARNING", SeverityNumber::Warn),
+            ("ERROR", SeverityNumber::Error),
+            ("ERR", SeverityNumber::Error),
+            ("FATAL", SeverityNumber::Fatal),
+            ("CRITICAL", SeverityNumber::Fatal),
+            ("CRIT", SeverityNumber::Fatal),
+            ("EMERG", SeverityNumber::Fatal),
+            ("EMERGENCY", SeverityNumber::Fatal),
+            ("ALERT", SeverityNumber::Fatal),
+        ];
+
+        for (text, expected) in cases {
+            let mut log = LogEvent::default();
+            log.insert("severity_text", text);
+            // No severity_number — should be inferred
+
+            let request = native_log_to_otlp_request(&log);
+            let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+            assert_eq!(
+                lr.severity_number,
+                expected as i32,
+                "severity_text '{text}' should infer severity_number {}",
+                expected as i32,
+            );
+        }
+    }
+
+    #[test]
+    fn test_severity_inference_case_insensitive() {
+        let mut log = LogEvent::default();
+        log.insert("severity_text", "error"); // lowercase
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.severity_number, SeverityNumber::Error as i32);
+    }
+
+    #[test]
+    fn test_severity_inference_unknown_text() {
+        let mut log = LogEvent::default();
+        log.insert("severity_text", "CUSTOM_LEVEL");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.severity_number, SeverityNumber::Unspecified as i32);
+        // severity_text is still preserved even if number can't be inferred
+        assert_eq!(lr.severity_text, "CUSTOM_LEVEL");
+    }
+
+    #[test]
+    fn test_timestamp_rfc3339_string() {
+        let mut log = LogEvent::default();
+        log.insert("timestamp", "2024-01-01T00:00:00Z");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.time_unix_nano, 1704067200_000_000_000u64);
+    }
+
+    #[test]
+    fn test_timestamp_float_seconds() {
+        use ordered_float::NotNan;
+
+        let mut log = LogEvent::default();
+        // 1704067200.5 seconds = 2024-01-01T00:00:00.5Z
+        log.insert(
+            "timestamp",
+            Value::Float(NotNan::new(1704067200.5).unwrap()),
+        );
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        // Float seconds → nanoseconds (with rounding tolerance)
+        let expected = 1704067200_500_000_000u64;
+        let diff = if lr.time_unix_nano > expected {
+            lr.time_unix_nano - expected
+        } else {
+            expected - lr.time_unix_nano
+        };
+        assert!(
+            diff < 1_000,
+            "Float timestamp should convert to ~{expected} nanos, got {}",
+            lr.time_unix_nano
+        );
+    }
+
+    #[test]
+    fn test_resource_via_alternative_field_names() {
+        use vrl::value::ObjectMap;
+
+        // "resource" (singular) should also work
+        let mut log = LogEvent::default();
+        log.insert("message", "test");
+        let mut res = ObjectMap::new();
+        res.insert("service.name".into(), Value::from("via-resource-singular"));
+        log.insert("resource", Value::Object(res));
+
+        let request = native_log_to_otlp_request(&log);
+        let resource = request.resource_logs[0].resource.as_ref().unwrap();
+        assert_eq!(resource.attributes[0].key, "service.name");
+        match resource.attributes[0]
+            .value
+            .as_ref()
+            .unwrap()
+            .value
+            .as_ref()
+            .unwrap()
+        {
+            PBValue::StringValue(s) => assert_eq!(s, "via-resource-singular"),
+            other => panic!("Expected StringValue, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_many_remaining_fields_all_collected() {
+        // Simulate a log with many custom fields from e.g. a JSON file source
+        let mut log = LogEvent::default();
+        log.insert("message", "application event");
+        log.insert("host", "prod-server-42");
+        log.insert("pid", 12345i64);
+        log.insert("thread_name", "main");
+        log.insert("logger", "com.example.App");
+        log.insert("environment", "production");
+        log.insert("version", "2.1.0");
+        log.insert("correlation_id", "corr-789");
+        log.insert("source_type", "file");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        let attr_keys: Vec<&str> = lr.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        for expected in [
+            "host",
+            "pid",
+            "thread_name",
+            "logger",
+            "environment",
+            "version",
+            "correlation_id",
+            "source_type",
+        ] {
+            assert!(
+                attr_keys.contains(&expected),
+                "'{expected}' should be in attributes, got {attr_keys:?}"
+            );
+        }
+
+        // Verify pid is IntValue
+        let pid_kv = lr.attributes.iter().find(|kv| kv.key == "pid").unwrap();
+        assert!(matches!(
+            pid_kv.value.as_ref().unwrap().value.as_ref().unwrap(),
+            PBValue::IntValue(12345)
+        ));
+    }
+
+    #[test]
+    fn test_vector_namespace_full_metadata_mapping() {
+        use vrl::value::ObjectMap;
+
+        // Vector namespace: body at root, everything else in metadata
+        let mut log = make_vector_namespace_log(Value::from("structured log body"));
+
+        // Set all metadata fields
+        log.metadata_mut().value_mut().insert(
+            path!("opentelemetry", "severity_text"),
+            Value::from("ERROR"),
+        );
+        log.metadata_mut().value_mut().insert(
+            path!("opentelemetry", "severity_number"),
+            Value::Integer(17),
+        );
+        log.metadata_mut().value_mut().insert(
+            path!("opentelemetry", "trace_id"),
+            Value::from("abcdef0123456789abcdef0123456789"),
+        );
+        log.metadata_mut().value_mut().insert(
+            path!("opentelemetry", "span_id"),
+            Value::from("abcdef0123456789"),
+        );
+
+        let mut scope_obj = ObjectMap::new();
+        scope_obj.insert("name".into(), Value::from("otel-sdk"));
+        scope_obj.insert("version".into(), Value::from("1.5.0"));
+        log.metadata_mut()
+            .value_mut()
+            .insert(path!("opentelemetry", "scope"), Value::Object(scope_obj));
+
+        let mut res_obj = ObjectMap::new();
+        res_obj.insert("service.name".into(), Value::from("my-svc"));
+        res_obj.insert("k8s.pod.name".into(), Value::from("pod-abc"));
+        log.metadata_mut()
+            .value_mut()
+            .insert(path!("opentelemetry", "resources"), Value::Object(res_obj));
+
+        let request = native_log_to_otlp_request(&log);
+        let rl = &request.resource_logs[0];
+        let sl = &rl.scope_logs[0];
+        let lr = &sl.log_records[0];
+
+        // Body from root
+        match lr.body.as_ref().unwrap().value.as_ref().unwrap() {
+            PBValue::StringValue(s) => assert_eq!(s, "structured log body"),
+            other => panic!("Expected body from root, got {other:?}"),
+        }
+
+        // Metadata fields
+        assert_eq!(lr.severity_text, "ERROR");
+        assert_eq!(lr.severity_number, 17);
+        assert_eq!(lr.trace_id.len(), 16);
+        assert_eq!(lr.span_id.len(), 8);
+
+        // Scope from metadata
+        let scope = sl.scope.as_ref().unwrap();
+        assert_eq!(scope.name, "otel-sdk");
+        assert_eq!(scope.version, "1.5.0");
+
+        // Resources from metadata
+        let resource = rl.resource.as_ref().unwrap();
+        let res_keys: Vec<&str> = resource
+            .attributes
+            .iter()
+            .map(|kv| kv.key.as_str())
+            .collect();
+        assert!(res_keys.contains(&"service.name"));
+        assert!(res_keys.contains(&"k8s.pod.name"));
+
+        // No spurious attributes (Vector namespace doesn't collect remaining fields)
+        assert!(
+            lr.attributes.is_empty(),
+            "Vector namespace should have no remaining-field attributes"
+        );
+    }
 }
