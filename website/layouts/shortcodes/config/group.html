@@ -1,0 +1,14 @@
+{{- $config := site.Data.docs.configuration -}}
+{{- $fields := $config.configuration -}}
+{{- $groupName := .Get "group" -}}
+
+{{- /* Filter fields to only those in the specified group */ -}}
+{{- $groupFields := dict -}}
+{{- range $fieldKey, $fieldValue := $fields -}}
+  {{- if eq $fieldValue.group $groupName -}}
+    {{- $groupFields = merge $groupFields (dict $fieldKey $fieldValue) -}}
+  {{- end -}}
+{{- end -}}
+
+{{- /* Render fields using the existing data.html partial */ -}}
+{{ partial "data.html" (dict "component_config" $groupFields) }}
