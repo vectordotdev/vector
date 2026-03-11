@@ -202,7 +202,10 @@ impl ComposeTestConfig {
             .values()
             .multi_cartesian_product()
             .map(|product| {
-                let key = product.iter().map(|v| v.replace("@", "-")).join("-");
+                let key = product
+                    .iter()
+                    .map(|v| v.replace("@", "-").replace(":", "-"))
+                    .join("-");
                 let config: Environment = self
                     .matrix
                     .keys()
