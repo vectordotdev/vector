@@ -19,9 +19,14 @@ use vector_lib::event::EventStatus;
 
 /// Emit a test event into the Application log via `eventcreate.exe`.
 ///
+/// Each test should use a unique `source` name (e.g. `"VT_stress"`) to
+/// prevent cross-test pollution when tests run in parallel. The source
+/// name is used as the Provider/@Name in the event, which tests then
+/// filter on via XPath.
+///
 /// Requires administrator privileges. Panics with a clear message if
 /// `eventcreate` is missing or the call fails.
-fn emit_event(event_type: &str, event_id: u32, description: &str) {
+fn emit_event(source: &str, event_type: &str, event_id: u32, description: &str) {
     // Retry a few times because eventcreate can transiently fail with exit
     // code 1 when multiple tests invoke it concurrently (registry contention).
     let max_retries = 3;
@@ -35,7 +40,7 @@ fn emit_event(event_type: &str, event_id: u32, description: &str) {
                 "/ID",
                 &event_id.to_string(),
                 "/SO",
-                "VectorTest",
+                source,
                 "/D",
                 description,
             ])
@@ -62,29 +67,21 @@ fn emit_event(event_type: &str, event_id: u32, description: &str) {
     }
 }
 
-fn emit_test_event() {
-    emit_event(
-        "INFORMATION",
-        1000,
-        "Vector Windows Event Log integration test",
-    );
-}
-
 fn temp_data_dir() -> tempfile::TempDir {
     tempfile::tempdir().expect("failed to create temp data_dir for test")
 }
 
-/// XPath query that matches only our VectorTest events.
-fn vectortest_query() -> String {
-    "*[System[Provider[@Name='VectorTest'] and EventID=1000]]".to_string()
+/// XPath query that matches events from a specific test source.
+fn test_query(source: &str) -> String {
+    format!("*[System[Provider[@Name='{source}'] and EventID=1000]]")
 }
 
-/// Build a config targeting Application + our VectorTest events.
-fn vectortest_config(data_dir: &std::path::Path) -> WindowsEventLogConfig {
+/// Build a config targeting Application + a specific test source.
+fn test_config(source: &str, data_dir: &std::path::Path) -> WindowsEventLogConfig {
     WindowsEventLogConfig {
         data_dir: Some(data_dir.to_path_buf()),
         channels: vec!["Application".to_string()],
-        event_query: Some(vectortest_query()),
+        event_query: Some(test_query(source)),
         read_existing_events: true,
         batch_size: 100,
         event_timeout_ms: 2000,
@@ -101,7 +98,7 @@ fn vectortest_config(data_dir: &std::path::Path) -> WindowsEventLogConfig {
 #[tokio::test]
 async fn test_basic_event_ingestion() {
     let data_dir = temp_data_dir();
-    emit_test_event();
+    emit_event("VT_basic", "INFORMATION", 1000, "basic ingestion test");
 
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
@@ -149,13 +146,14 @@ async fn test_backlog_drain_no_duplicates() {
 
     for i in 0..n {
         emit_event(
+            "VT_backlog",
             "INFORMATION",
             1000,
             &format!("backlog-drain-test-event-{i}"),
         );
     }
 
-    let config = vectortest_config(data_dir.path());
+    let config = test_config("VT_backlog", data_dir.path());
     let events = run_and_assert_source_compliance(config, Duration::from_secs(10), &[]).await;
 
     assert!(
@@ -196,8 +194,8 @@ async fn test_checkpoint_resume_no_redelivery() {
     let data_dir = temp_data_dir();
 
     // Phase 1: emit and consume
-    emit_event("INFORMATION", 1000, "checkpoint-test-phase1");
-    let config = vectortest_config(data_dir.path());
+    emit_event("VT_ckptres", "INFORMATION", 1000, "checkpoint-test-phase1");
+    let config = test_config("VT_ckptres", data_dir.path());
     let first_run = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
     assert!(
         !first_run.is_empty(),
@@ -209,8 +207,8 @@ async fn test_checkpoint_resume_no_redelivery() {
     tokio::time::sleep(Duration::from_secs(1)).await;
 
     // Phase 2: emit one more, reuse same data_dir
-    emit_event("INFORMATION", 1000, "checkpoint-test-phase2");
-    let config = vectortest_config(data_dir.path());
+    emit_event("VT_ckptres", "INFORMATION", 1000, "checkpoint-test-phase2");
+    let config = test_config("VT_ckptres", data_dir.path());
     let second_run = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
 
     assert!(
@@ -245,7 +243,7 @@ async fn test_checkpoint_resume_no_redelivery() {
 #[tokio::test]
 async fn test_channel_isolation() {
     let data_dir = temp_data_dir();
-    emit_test_event(); // goes to Application
+    emit_event("VT_chaniso", "INFORMATION", 1000, "channel isolation test"); // goes to Application
 
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
@@ -278,15 +276,15 @@ async fn test_channel_isolation() {
 #[tokio::test]
 async fn test_only_event_ids_filter() {
     let data_dir = temp_data_dir();
-    emit_event("INFORMATION", 999, "only-filter-exclude");
-    emit_event("INFORMATION", 1000, "only-filter-include");
+    emit_event("VT_onlyid", "INFORMATION", 999, "only-filter-exclude");
+    emit_event("VT_onlyid", "INFORMATION", 1000, "only-filter-include");
 
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
         channels: vec!["Application".to_string()],
         read_existing_events: true,
         only_event_ids: Some(vec![1000]),
-        event_query: Some("*[System[Provider[@Name='VectorTest']]]".to_string()),
+        event_query: Some("*[System[Provider[@Name='VT_onlyid']]]".to_string()),
         ..Default::default()
     };
 
@@ -311,14 +309,14 @@ async fn test_only_event_ids_filter() {
 #[tokio::test]
 async fn test_ignore_event_ids_filter() {
     let data_dir = temp_data_dir();
-    emit_event("INFORMATION", 1000, "ignore-filter-test");
+    emit_event("VT_ignid", "INFORMATION", 1000, "ignore-filter-test");
 
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
         channels: vec!["Application".to_string()],
         read_existing_events: true,
         ignore_event_ids: vec![1000],
-        event_query: Some("*[System[Provider[@Name='VectorTest']]]".to_string()),
+        event_query: Some("*[System[Provider[@Name='VT_ignid']]]".to_string()),
         ..Default::default()
     };
 
@@ -353,9 +351,9 @@ async fn test_only_event_ids_generates_xpath_filter() {
     let data_dir = temp_data_dir();
 
     // Emit events with different IDs. Only ID 1000 should be returned.
-    emit_event("INFORMATION", 999, "xpath-filter-exclude");
-    emit_event("INFORMATION", 1000, "xpath-filter-include");
-    emit_event("INFORMATION", 998, "xpath-filter-exclude-2");
+    emit_event("VT_xpathid", "INFORMATION", 999, "xpath-filter-exclude");
+    emit_event("VT_xpathid", "INFORMATION", 1000, "xpath-filter-include");
+    emit_event("VT_xpathid", "INFORMATION", 998, "xpath-filter-exclude-2");
 
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
@@ -400,11 +398,11 @@ async fn test_only_event_ids_generates_xpath_filter() {
 #[tokio::test]
 async fn test_multiple_event_levels() {
     let data_dir = temp_data_dir();
-    emit_event("INFORMATION", 1000, "level-test-info");
-    emit_event("WARNING", 1000, "level-test-warn");
-    emit_event("ERROR", 1000, "level-test-error");
+    emit_event("VT_levels", "INFORMATION", 1000, "level-test-info");
+    emit_event("VT_levels", "WARNING", 1000, "level-test-warn");
+    emit_event("VT_levels", "ERROR", 1000, "level-test-error");
 
-    let config = vectortest_config(data_dir.path());
+    let config = test_config("VT_levels", data_dir.path());
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
 
     let mut levels_seen: HashSet<String> = HashSet::new();
@@ -433,9 +431,9 @@ async fn test_multiple_event_levels() {
 async fn test_rendered_message_content() {
     let data_dir = temp_data_dir();
     let marker = "rendered-message-test-unique-string-12345";
-    emit_event("INFORMATION", 1000, marker);
+    emit_event("VT_render", "INFORMATION", 1000, marker);
 
-    let mut config = vectortest_config(data_dir.path());
+    let mut config = test_config("VT_render", data_dir.path());
     config.render_message = true;
 
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
@@ -465,9 +463,9 @@ async fn test_rendered_message_content() {
 #[tokio::test]
 async fn test_render_message_disabled_fallback() {
     let data_dir = temp_data_dir();
-    emit_test_event();
+    emit_event("VT_noren", "INFORMATION", 1000, "render disabled test");
 
-    let mut config = vectortest_config(data_dir.path());
+    let mut config = test_config("VT_noren", data_dir.path());
     config.render_message = false;
 
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
@@ -490,9 +488,9 @@ async fn test_render_message_disabled_fallback() {
 #[tokio::test]
 async fn test_include_xml_well_formed() {
     let data_dir = temp_data_dir();
-    emit_test_event();
+    emit_event("VT_xmlinc", "INFORMATION", 1000, "xml inclusion test");
 
-    let mut config = vectortest_config(data_dir.path());
+    let mut config = test_config("VT_xmlinc", data_dir.path());
     config.include_xml = true;
 
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
@@ -518,9 +516,9 @@ async fn test_include_xml_well_formed() {
 #[tokio::test]
 async fn test_exclude_xml_by_default() {
     let data_dir = temp_data_dir();
-    emit_test_event();
+    emit_event("VT_xmlexc", "INFORMATION", 1000, "xml exclusion test");
 
-    let mut config = vectortest_config(data_dir.path());
+    let mut config = test_config("VT_xmlexc", data_dir.path());
     config.include_xml = false;
 
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
@@ -619,9 +617,9 @@ async fn test_nonexistent_channel_graceful_handling() {
 #[tokio::test]
 async fn test_event_field_completeness() {
     let data_dir = temp_data_dir();
-    emit_test_event();
+    emit_event("VT_fields", "INFORMATION", 1000, "field completeness test");
 
-    let mut config = vectortest_config(data_dir.path());
+    let mut config = test_config("VT_fields", data_dir.path());
     config.include_xml = true;
 
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
@@ -709,13 +707,18 @@ async fn test_rate_limiting() {
 
     // Emit a burst of events
     for i in 0..20 {
-        emit_event("INFORMATION", 1000, &format!("rate-limit-test-{i}"));
+        emit_event(
+            "VT_rate",
+            "INFORMATION",
+            1000,
+            &format!("rate-limit-test-{i}"),
+        );
     }
 
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
         channels: vec!["Application".to_string()],
-        event_query: Some(vectortest_query()),
+        event_query: Some(test_query("VT_rate")),
         read_existing_events: true,
         events_per_second: 50,
         batch_size: 100,
@@ -747,9 +750,9 @@ async fn test_event_data_truncation() {
     // We verify truncation indirectly: the source should not crash and events
     // should still arrive with the field present.
     let long_desc = "A".repeat(500);
-    emit_event("INFORMATION", 1000, &long_desc);
+    emit_event("VT_trunc", "INFORMATION", 1000, &long_desc);
 
-    let mut config = vectortest_config(data_dir.path());
+    let mut config = test_config("VT_trunc", data_dir.path());
     config.max_event_data_length = 100;
     config.include_xml = false;
 
@@ -773,7 +776,7 @@ async fn test_max_event_age_filtering() {
 
     // Emit event, then configure a very short max age so it's already "old"
     // by the time we read it.
-    emit_event("INFORMATION", 1000, "age-filter-test");
+    emit_event("VT_maxage", "INFORMATION", 1000, "age-filter-test");
 
     // Sleep so the event ages past the max_event_age_secs threshold.
     // Use a generous buffer to avoid flakes from clock jitter on slow CI.
@@ -782,7 +785,7 @@ async fn test_max_event_age_filtering() {
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
         channels: vec!["Application".to_string()],
-        event_query: Some(vectortest_query()),
+        event_query: Some(test_query("VT_maxage")),
         read_existing_events: true,
         max_event_age_secs: Some(3), // 3 seconds — our event is already ~5s old
         event_timeout_ms: 2000,
@@ -814,9 +817,9 @@ async fn test_max_event_age_filtering() {
 #[tokio::test]
 async fn test_event_data_format_coercion() {
     let data_dir = temp_data_dir();
-    emit_test_event();
+    emit_event("VT_format", "INFORMATION", 1000, "format coercion test");
 
-    let mut config = vectortest_config(data_dir.path());
+    let mut config = test_config("VT_format", data_dir.path());
     config.field_filter.include_event_data = true;
     // event_id is a system field set as Integer by the parser, so test
     // that event_data_format can convert it to a string
@@ -853,7 +856,7 @@ async fn test_event_data_format_coercion() {
 #[tokio::test]
 async fn test_multi_channel_ingestion() {
     let data_dir = temp_data_dir();
-    emit_test_event(); // Goes to Application
+    emit_event("VT_multi", "INFORMATION", 1000, "multi channel test"); // Goes to Application
 
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
@@ -924,7 +927,7 @@ async fn test_all_channels_invalid_no_panic() {
 #[tokio::test]
 async fn test_source_compliance_metrics() {
     let data_dir = temp_data_dir();
-    emit_test_event();
+    emit_event("VT_comply", "INFORMATION", 1000, "compliance metrics test");
 
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
@@ -1065,14 +1068,14 @@ async fn test_acknowledgements_checkpoint_after_delivery() {
     let data_dir = temp_data_dir();
 
     // Phase 1: emit event, run with acks enabled + Delivered status
-    emit_event("INFORMATION", 1000, "ack-test-phase1");
+    emit_event("VT_ackdel", "INFORMATION", 1000, "ack-test-phase1");
 
     {
         let (tx, mut rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
         let config = WindowsEventLogConfig {
             data_dir: Some(data_dir.path().to_path_buf()),
             channels: vec!["Application".to_string()],
-            event_query: Some(vectortest_query()),
+            event_query: Some(test_query("VT_ackdel")),
             read_existing_events: true,
             batch_size: 100,
             event_timeout_ms: 2000,
@@ -1131,8 +1134,8 @@ async fn test_acknowledgements_checkpoint_after_delivery() {
     );
 
     // Phase 2: emit a NEW event, run with same data_dir
-    emit_event("INFORMATION", 1000, "ack-test-phase2");
-    let config = vectortest_config(data_dir.path());
+    emit_event("VT_ackdel", "INFORMATION", 1000, "ack-test-phase2");
+    let config = test_config("VT_ackdel", data_dir.path());
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
 
     // Should NOT see phase1 event again (checkpoint advanced)
@@ -1173,12 +1176,17 @@ async fn test_checkpoint_corruption_recovery() {
         .expect("should be able to write corrupted checkpoint");
 
     // Emit a test event
-    emit_test_event();
+    emit_event(
+        "VT_corrupt",
+        "INFORMATION",
+        1000,
+        "corruption recovery test",
+    );
 
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
         channels: vec!["Application".to_string()],
-        event_query: Some(vectortest_query()),
+        event_query: Some(test_query("VT_corrupt")),
         read_existing_events: true,
         batch_size: 100,
         event_timeout_ms: 2000,
@@ -1207,7 +1215,7 @@ async fn test_rejected_ack_does_not_advance_checkpoint() {
     let data_dir = temp_data_dir();
 
     // Emit a distinctive event
-    emit_event("INFORMATION", 1000, "rejected-ack-test-marker");
+    emit_event("VT_rejack", "INFORMATION", 1000, "rejected-ack-test-marker");
 
     // Phase 1: Run with acks enabled but Rejected status — checkpoint should NOT advance
     {
@@ -1215,7 +1223,7 @@ async fn test_rejected_ack_does_not_advance_checkpoint() {
         let config = WindowsEventLogConfig {
             data_dir: Some(data_dir.path().to_path_buf()),
             channels: vec!["Application".to_string()],
-            event_query: Some(vectortest_query()),
+            event_query: Some(test_query("VT_rejack")),
             read_existing_events: true,
             batch_size: 100,
             event_timeout_ms: 2000,
@@ -1258,7 +1266,7 @@ async fn test_rejected_ack_does_not_advance_checkpoint() {
 
     // Phase 2: Run again with same data_dir — should see the SAME events
     // because checkpoint should not have advanced after rejection
-    let config = vectortest_config(data_dir.path());
+    let config = test_config("VT_rejack", data_dir.path());
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
 
     let has_marker = events.iter().any(|e| {
@@ -1302,13 +1310,18 @@ async fn test_stress_burst_ingestion() {
     let n = 200;
 
     for i in 0..n {
-        emit_event("INFORMATION", 1000, &format!("stress-test-event-{i}"));
+        emit_event(
+            "VT_stress",
+            "INFORMATION",
+            1000,
+            &format!("stress-test-event-{i}"),
+        );
     }
 
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
         channels: vec!["Application".to_string()],
-        event_query: Some(vectortest_query()),
+        event_query: Some(test_query("VT_stress")),
         read_existing_events: true,
         batch_size: 50, // Multiple batches required
         event_timeout_ms: 2000,
@@ -1363,13 +1376,13 @@ async fn test_resubscribe_after_log_clear() {
     let data_dir = temp_data_dir();
 
     // Emit an initial event
-    emit_event("INFORMATION", 1000, "pre-clear-event");
+    emit_event("VT_resub", "INFORMATION", 1000, "pre-clear-event");
 
     let (tx, mut rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
         channels: vec!["Application".to_string()],
-        event_query: Some(vectortest_query()),
+        event_query: Some(test_query("VT_resub")),
         read_existing_events: true,
         batch_size: 100,
         event_timeout_ms: 1000,
@@ -1405,7 +1418,7 @@ async fn test_resubscribe_after_log_clear() {
         Ok(status) if status.success() => {
             // Log was cleared. Emit a new event and verify it arrives.
             tokio::time::sleep(Duration::from_secs(1)).await;
-            emit_event("INFORMATION", 1000, "post-clear-event");
+            emit_event("VT_resub", "INFORMATION", 1000, "post-clear-event");
 
             let mut found_post_clear = false;
             let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
@@ -1465,10 +1478,15 @@ async fn test_full_data_path_produces_checkpoint() {
     let data_dir = temp_data_dir();
 
     for i in 0..5 {
-        emit_event("INFORMATION", 1000, &format!("checkpoint-path-test-{i}"));
+        emit_event(
+            "VT_fullck",
+            "INFORMATION",
+            1000,
+            &format!("checkpoint-path-test-{i}"),
+        );
     }
 
-    let config = vectortest_config(data_dir.path());
+    let config = test_config("VT_fullck", data_dir.path());
     let events = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
 
     assert!(
@@ -1518,10 +1536,15 @@ async fn test_checkpoint_resume_no_duplicate_record_ids() {
 
     // Phase 1: emit events and collect record IDs
     for i in 0..5 {
-        emit_event("INFORMATION", 1000, &format!("ckpt-dup-test-phase1-{i}"));
+        emit_event(
+            "VT_ckptdup",
+            "INFORMATION",
+            1000,
+            &format!("ckpt-dup-test-phase1-{i}"),
+        );
     }
 
-    let config = vectortest_config(data_dir.path());
+    let config = test_config("VT_ckptdup", data_dir.path());
     let first_run = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
     assert!(
         !first_run.is_empty(),
@@ -1546,10 +1569,15 @@ async fn test_checkpoint_resume_no_duplicate_record_ids() {
 
     // Phase 2: emit new events, reuse same data_dir
     for i in 0..5 {
-        emit_event("INFORMATION", 1000, &format!("ckpt-dup-test-phase2-{i}"));
+        emit_event(
+            "VT_ckptdup",
+            "INFORMATION",
+            1000,
+            &format!("ckpt-dup-test-phase2-{i}"),
+        );
     }
 
-    let config = vectortest_config(data_dir.path());
+    let config = test_config("VT_ckptdup", data_dir.path());
     let second_run = run_and_assert_source_compliance(config, Duration::from_secs(5), &[]).await;
 
     let second_ids: HashSet<String> = second_run
@@ -1566,7 +1594,7 @@ async fn test_checkpoint_resume_no_duplicate_record_ids() {
     // written). On multi-core runners, the last in-flight batch may be sent but
     // not checkpointed, causing re-delivery of up to batch_size events.
     // The important invariant is that the checkpoint prevents FULL re-delivery.
-    let batch_size = 100; // matches vectortest_config
+    let batch_size = 100; // matches test_config
     let overlap: HashSet<_> = first_ids.intersection(&second_ids).collect();
     assert!(
         overlap.len() <= batch_size,
