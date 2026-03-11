@@ -276,13 +276,18 @@ pub fn native_log_to_otlp_request(log: &LogEvent) -> ExportLogsServiceRequest {
 }
 
 fn build_log_record_from_native(log: &LogEvent) -> LogRecord {
+    let mut attributes = extract_kv_attributes_safe(log, ATTRIBUTES_KEY);
+    // Collect non-OTLP fields (e.g., user_id, request_id) into attributes
+    // to prevent data loss during conversion
+    collect_remaining_fields(log, &mut attributes);
+
     LogRecord {
         time_unix_nano: extract_timestamp_nanos_safe(log, "timestamp"),
         observed_time_unix_nano: extract_timestamp_nanos_safe(log, OBSERVED_TIMESTAMP_KEY),
         severity_number: extract_severity_number_safe(log),
         severity_text: extract_string_safe(log, SEVERITY_TEXT_KEY),
         body: extract_body_safe(log),
-        attributes: extract_kv_attributes_safe(log, ATTRIBUTES_KEY),
+        attributes,
         dropped_attributes_count: extract_u32_safe(log, DROPPED_ATTRIBUTES_COUNT_KEY),
         flags: extract_u32_safe(log, FLAGS_KEY),
         trace_id: extract_trace_id_safe(log),
@@ -307,12 +312,101 @@ fn build_resource_logs_from_native(log: &LogEvent, scope_logs: ScopeLogs) -> Res
 }
 
 // ============================================================================
+// Namespace-aware field access helpers
+// ============================================================================
+
+/// Known OTLP log fields that are extracted into specific LogRecord/scope/resource fields.
+/// Fields not in this list are collected as additional attributes to prevent data loss.
+const KNOWN_OTLP_LOG_FIELDS: &[&str] = &[
+    "message",
+    "body",
+    "msg",
+    "log", // body candidates
+    "timestamp",
+    OBSERVED_TIMESTAMP_KEY,
+    SEVERITY_TEXT_KEY,
+    SEVERITY_NUMBER_KEY,
+    ATTRIBUTES_KEY,
+    TRACE_ID_KEY,
+    SPAN_ID_KEY,
+    FLAGS_KEY,
+    DROPPED_ATTRIBUTES_COUNT_KEY,
+    RESOURCE_KEY,
+    "resource",
+    "resource_attributes",
+    "scope",
+    "schema_url",
+];
+
+/// Get a field value, checking event root first, then Vector namespace metadata.
+///
+/// In Legacy namespace, fields are stored at the event root (e.g., `log.severity_text`).
+/// In Vector namespace, fields are stored at `%metadata.opentelemetry.{key}`.
+/// This helper checks both locations transparently.
+fn get_otel_field<'a>(log: &'a LogEvent, key: &str) -> Option<&'a Value> {
+    log.get(key).or_else(|| get_metadata_otel(log, &[key]))
+}
+
+/// Navigate Vector namespace metadata: %metadata.opentelemetry.{segments...}
+///
+/// Accesses nested metadata fields stored by the decode path via `insert_source_metadata`.
+/// For example, `get_metadata_otel(log, &["scope", "name"])` accesses
+/// `%metadata.opentelemetry.scope.name`.
+fn get_metadata_otel<'a>(log: &'a LogEvent, segments: &[&str]) -> Option<&'a Value> {
+    let mut current: &Value = log.metadata().value();
+
+    // Navigate to opentelemetry namespace
+    match current {
+        Value::Object(map) => current = map.get("opentelemetry")?,
+        _ => return None,
+    }
+
+    // Navigate through the specified path segments
+    for segment in segments {
+        match current {
+            Value::Object(map) => current = map.get(*segment)?,
+            _ => return None,
+        }
+    }
+
+    Some(current)
+}
+
+/// Collect event root fields that are not known OTLP fields and add them as attributes.
+/// This prevents data loss for user-added fields (e.g., user_id, request_id, hostname).
+fn collect_remaining_fields(log: &LogEvent, existing_attrs: &mut Vec<KeyValue>) {
+    // In Vector namespace, the root value IS the body — don't collect as attributes
+    if log.namespace() == LogNamespace::Vector {
+        return;
+    }
+
+    let map = match log.as_map() {
+        Some(map) => map,
+        None => return, // Root is not an Object (e.g., simple string body)
+    };
+
+    for (key, value) in map.iter() {
+        let key_str: &str = key;
+        // Skip known OTLP fields and null values
+        if KNOWN_OTLP_LOG_FIELDS.contains(&key_str) || matches!(value, Value::Null) {
+            continue;
+        }
+        existing_attrs.push(KeyValue {
+            key: key_str.to_string(),
+            value: Some(AnyValue {
+                value: Some(value.clone().into()),
+            }),
+        });
+    }
+}
+
+// ============================================================================
 // Safe extraction helpers - reuse existing patterns from Vector
 // ============================================================================
 
 /// Extract timestamp as nanoseconds, handling multiple input formats.
 fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
-    let value = match log.get(key) {
+    let value = match get_otel_field(log, key) {
         Some(v) => v,
         None => return 0, // Missing timestamp is valid (0 means unset in OTLP)
     };
@@ -437,7 +531,7 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
 /// Extract string field, handling multiple types.
 #[inline]
 fn extract_string_safe(log: &LogEvent, key: &str) -> String {
-    match log.get(key) {
+    match get_otel_field(log, key) {
         Some(Value::Bytes(b)) => std::str::from_utf8(b)
             .map(|s| s.to_owned())
             .unwrap_or_else(|_| String::from_utf8_lossy(b).into_owned()),
@@ -459,7 +553,7 @@ fn extract_string_safe(log: &LogEvent, key: &str) -> String {
 
 /// Extract severity number with validation.
 fn extract_severity_number_safe(log: &LogEvent) -> i32 {
-    let value = match log.get(SEVERITY_NUMBER_KEY) {
+    let value = match get_otel_field(log, SEVERITY_NUMBER_KEY) {
         Some(v) => v,
         None => {
             // Try to infer from severity_text if number not present
@@ -505,7 +599,7 @@ fn extract_severity_number_safe(log: &LogEvent) -> i32 {
 
 /// Infer severity number from severity text.
 fn infer_severity_number(log: &LogEvent) -> i32 {
-    let text = match log.get(SEVERITY_TEXT_KEY) {
+    let text = match get_otel_field(log, SEVERITY_TEXT_KEY) {
         Some(Value::Bytes(b)) => String::from_utf8_lossy(b).to_uppercase(),
         _ => return SeverityNumber::Unspecified as i32,
     };
@@ -523,7 +617,7 @@ fn infer_severity_number(log: &LogEvent) -> i32 {
     }
 }
 
-/// Extract body, supporting various message field locations.
+/// Extract body, supporting various message field locations and log namespaces.
 #[inline]
 fn extract_body_safe(log: &LogEvent) -> Option<AnyValue> {
     // Priority order for finding the log body:
@@ -535,18 +629,28 @@ fn extract_body_safe(log: &LogEvent) -> Option<AnyValue> {
     const BODY_FIELDS: [&str; 4] = ["message", "body", "msg", "log"];
 
     for field in BODY_FIELDS {
-        if let Some(v) = log.get(field) {
+        if let Some(v) = get_otel_field(log, field) {
             return Some(AnyValue {
                 value: Some(v.clone().into()),
             });
         }
     }
+
+    // In Vector namespace, the body is the event root value itself
+    // (OTLP decode puts body at root, metadata in %metadata.opentelemetry.*)
+    let root = log.value();
+    if log.namespace() == LogNamespace::Vector && !matches!(root, Value::Null) {
+        return Some(AnyValue {
+            value: Some(root.clone().into()),
+        });
+    }
+
     None
 }
 
 /// Extract u32 field safely.
 fn extract_u32_safe(log: &LogEvent, key: &str) -> u32 {
-    match log.get(key) {
+    match get_otel_field(log, key) {
         Some(Value::Integer(i)) => {
             let i = *i;
             if i < 0 {
@@ -580,7 +684,7 @@ fn extract_u32_safe(log: &LogEvent, key: &str) -> u32 {
 /// Extract attributes object, handling nested structures.
 #[inline]
 fn extract_kv_attributes_safe(log: &LogEvent, key: &str) -> Vec<KeyValue> {
-    match log.get(key) {
+    match get_otel_field(log, key) {
         Some(Value::Object(obj)) => {
             // Pre-allocate and convert without cloning when possible
             let mut result = Vec::with_capacity(obj.len());
@@ -621,7 +725,7 @@ fn extract_kv_attributes_safe(log: &LogEvent, key: &str) -> Vec<KeyValue> {
 /// Extract trace_id with validation.
 #[inline]
 fn extract_trace_id_safe(log: &LogEvent) -> Vec<u8> {
-    match log.get(TRACE_ID_KEY) {
+    match get_otel_field(log, TRACE_ID_KEY) {
         Some(Value::Bytes(b)) => {
             // Optimization: check if already valid 16-byte binary
             if b.len() == 16 {
@@ -651,7 +755,7 @@ fn extract_trace_id_safe(log: &LogEvent) -> Vec<u8> {
 /// Extract span_id with validation.
 #[inline]
 fn extract_span_id_safe(log: &LogEvent) -> Vec<u8> {
-    match log.get(SPAN_ID_KEY) {
+    match get_otel_field(log, SPAN_ID_KEY) {
         Some(Value::Bytes(b)) => {
             // Optimization: check if already valid 8-byte binary
             if b.len() == 8 {
@@ -678,20 +782,25 @@ fn extract_span_id_safe(log: &LogEvent) -> Vec<u8> {
 }
 
 /// Extract instrumentation scope.
+/// Checks both event root (Legacy namespace: `scope.name`) and metadata
+/// (Vector namespace: `%metadata.opentelemetry.scope.name`).
 fn extract_instrumentation_scope_safe(log: &LogEvent) -> Option<InstrumentationScope> {
-    // Extract scope fields using dot-notation string paths
+    // Extract scope fields: try event root first, then metadata
     let scope_name = log
         .get("scope.name")
+        .or_else(|| get_metadata_otel(log, &["scope", "name"]))
         .and_then(|v| v.as_bytes())
         .map(|b| String::from_utf8_lossy(b).into_owned());
 
     let scope_version = log
         .get("scope.version")
+        .or_else(|| get_metadata_otel(log, &["scope", "version"]))
         .and_then(|v| v.as_bytes())
         .map(|b| String::from_utf8_lossy(b).into_owned());
 
     let scope_attrs = log
         .get("scope.attributes")
+        .or_else(|| get_metadata_otel(log, &["scope", "attributes"]))
         .and_then(|v| v.as_object())
         .map(value_object_to_kv_list)
         .unwrap_or_default();
@@ -715,7 +824,7 @@ fn extract_resource_safe(log: &LogEvent) -> Option<Resource> {
     const RESOURCE_FIELDS: [&str; 3] = ["resources", "resource", "resource_attributes"];
 
     for field in RESOURCE_FIELDS {
-        if let Some(v) = log.get(field) {
+        if let Some(v) = get_otel_field(log, field) {
             let attrs = match v {
                 Value::Object(obj) => {
                     // Pre-allocate and avoid clone
@@ -1069,5 +1178,343 @@ mod native_conversion_tests {
             request.resource_logs[0].scope_logs[0].schema_url,
             "https://opentelemetry.io/schemas/1.21.0"
         );
+    }
+
+    // ========================================================================
+    // Vector namespace metadata extraction tests
+    // ========================================================================
+
+    /// Helper to create a LogEvent in Vector namespace with OTLP metadata fields.
+    fn make_vector_namespace_log(body: Value) -> LogEvent {
+        use vrl::value::ObjectMap;
+
+        let mut log = LogEvent::from(body);
+        // Insert "vector" marker to indicate Vector namespace
+        log.metadata_mut()
+            .value_mut()
+            .insert(path!("vector"), Value::Object(ObjectMap::new()));
+        log
+    }
+
+    #[test]
+    fn test_vector_namespace_severity_text_from_metadata() {
+        let mut log = make_vector_namespace_log(Value::from("hello"));
+        log.metadata_mut().value_mut().insert(
+            path!("opentelemetry", "severity_text"),
+            Value::from("ERROR"),
+        );
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.severity_text, "ERROR");
+    }
+
+    #[test]
+    fn test_vector_namespace_trace_id_from_metadata() {
+        let mut log = make_vector_namespace_log(Value::from("trace log"));
+        log.metadata_mut().value_mut().insert(
+            path!("opentelemetry", "trace_id"),
+            Value::from("0123456789abcdef0123456789abcdef"),
+        );
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.trace_id.len(), 16);
+    }
+
+    #[test]
+    fn test_vector_namespace_scope_from_metadata() {
+        use vrl::value::ObjectMap;
+
+        let mut log = make_vector_namespace_log(Value::from("scoped log"));
+        let mut scope_obj = ObjectMap::new();
+        scope_obj.insert("name".into(), Value::from("my-library"));
+        scope_obj.insert("version".into(), Value::from("2.0.0"));
+        log.metadata_mut()
+            .value_mut()
+            .insert(path!("opentelemetry", "scope"), Value::Object(scope_obj));
+
+        let request = native_log_to_otlp_request(&log);
+        let scope = request.resource_logs[0].scope_logs[0]
+            .scope
+            .as_ref()
+            .unwrap();
+
+        assert_eq!(scope.name, "my-library");
+        assert_eq!(scope.version, "2.0.0");
+    }
+
+    #[test]
+    fn test_vector_namespace_resources_from_metadata() {
+        use vrl::value::ObjectMap;
+
+        let mut log = make_vector_namespace_log(Value::from("resource log"));
+        let mut res_obj = ObjectMap::new();
+        res_obj.insert("service.name".into(), Value::from("my-service"));
+        log.metadata_mut()
+            .value_mut()
+            .insert(path!("opentelemetry", "resources"), Value::Object(res_obj));
+
+        let request = native_log_to_otlp_request(&log);
+        let resource = request.resource_logs[0].resource.as_ref().unwrap();
+
+        assert_eq!(resource.attributes.len(), 1);
+        assert_eq!(resource.attributes[0].key, "service.name");
+    }
+
+    #[test]
+    fn test_vector_namespace_body_from_root() {
+        // In Vector namespace, the body IS the event root value
+        let log = make_vector_namespace_log(Value::from("root body message"));
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert!(lr.body.is_some());
+        let body = lr.body.as_ref().unwrap();
+        match body.value.as_ref().unwrap() {
+            super::super::proto::common::v1::any_value::Value::StringValue(s) => {
+                assert_eq!(s, "root body message");
+            }
+            other => panic!("Expected StringValue body, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn test_vector_namespace_severity_number_from_metadata() {
+        let mut log = make_vector_namespace_log(Value::from("warning log"));
+        log.metadata_mut().value_mut().insert(
+            path!("opentelemetry", "severity_number"),
+            Value::Integer(13), // WARN
+        );
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        assert_eq!(lr.severity_number, 13);
+    }
+
+    // ========================================================================
+    // Remaining fields → attributes tests
+    // ========================================================================
+
+    #[test]
+    fn test_unknown_fields_collected_as_attributes() {
+        let mut log = LogEvent::default();
+        log.insert("message", "Test message");
+        log.insert("user_id", "user-123");
+        log.insert("request_id", "req-456");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        let attr_keys: Vec<&str> = lr.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            attr_keys.contains(&"user_id"),
+            "user_id should be in attributes, got {attr_keys:?}"
+        );
+        assert!(
+            attr_keys.contains(&"request_id"),
+            "request_id should be in attributes, got {attr_keys:?}"
+        );
+    }
+
+    #[test]
+    fn test_known_fields_not_duplicated_in_attributes() {
+        let mut log = LogEvent::default();
+        log.insert("message", "Test message");
+        log.insert("severity_text", "INFO");
+        log.insert("timestamp", 1704067200i64);
+        log.insert("trace_id", "0123456789abcdef0123456789abcdef");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        let attr_keys: Vec<&str> = lr.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            !attr_keys.contains(&"message"),
+            "message should not be in attributes"
+        );
+        assert!(
+            !attr_keys.contains(&"severity_text"),
+            "severity_text should not be in attributes"
+        );
+        assert!(
+            !attr_keys.contains(&"timestamp"),
+            "timestamp should not be in attributes"
+        );
+        assert!(
+            !attr_keys.contains(&"trace_id"),
+            "trace_id should not be in attributes"
+        );
+    }
+
+    #[test]
+    fn test_remaining_fields_merged_with_explicit_attributes() {
+        let mut log = LogEvent::default();
+        log.insert("message", "Test");
+        log.insert("attributes.explicit_attr", "from_attributes");
+        log.insert("hostname", "server-1");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        let attr_keys: Vec<&str> = lr.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            attr_keys.contains(&"explicit_attr"),
+            "explicit attributes should be present"
+        );
+        assert!(
+            attr_keys.contains(&"hostname"),
+            "remaining field 'hostname' should be in attributes"
+        );
+    }
+
+    #[test]
+    fn test_vector_namespace_no_remaining_fields() {
+        // In Vector namespace, root is body — no fields should be collected as attributes
+        let mut log = make_vector_namespace_log(Value::from("simple body"));
+        log.metadata_mut()
+            .value_mut()
+            .insert(path!("opentelemetry", "severity_text"), Value::from("INFO"));
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        // Body should be extracted from root
+        assert!(lr.body.is_some());
+        // Severity should come from metadata
+        assert_eq!(lr.severity_text, "INFO");
+        // No remaining fields should be in attributes
+        assert!(
+            lr.attributes.is_empty(),
+            "Vector namespace should not collect remaining fields"
+        );
+    }
+
+    // ========================================================================
+    // Review comment scenario tests
+    // ========================================================================
+
+    #[test]
+    fn test_user_fields_preserved_as_attributes() {
+        // Verifies that non-OTLP fields on a plain log are not silently dropped.
+        // {"message": "User logged in", "level": "info", "user_id": "12345", "request_id": "abc-123"}
+        // should produce attributes with level, user_id, request_id
+        let mut log = LogEvent::default();
+        log.insert("message", "User logged in");
+        log.insert("level", "info");
+        log.insert("user_id", "12345");
+        log.insert("request_id", "abc-123");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        // Body should be the message
+        assert!(lr.body.is_some());
+
+        // All non-OTLP fields should be in attributes
+        let attr_keys: Vec<&str> = lr.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            attr_keys.contains(&"level"),
+            "level should be in attributes, got {attr_keys:?}"
+        );
+        assert!(
+            attr_keys.contains(&"user_id"),
+            "user_id should be in attributes, got {attr_keys:?}"
+        );
+        assert!(
+            attr_keys.contains(&"request_id"),
+            "request_id should be in attributes, got {attr_keys:?}"
+        );
+    }
+
+    #[test]
+    fn test_enrichment_pipeline_round_trip() {
+        use vrl::value::ObjectMap;
+
+        // Simulates the enrichment pipeline described by szibis:
+        // OTLP source (use_otlp_decoding: false) → VRL transform → OTLP sink
+        //
+        // After OTLP decode (Legacy namespace), the event looks like:
+        //   message: "User login successful"
+        //   severity_text: "INFO"
+        //   resources: {"service.name": "auth-service"}  ← flat dotted keys from kv_list_into_value
+        //   attributes: {"user_id": "user-12345"}
+        //
+        // VRL enrichment adds:
+        //   .attributes.processed_by = "vector"
+        //   .resources."deployment.region" = "us-west-2"  ← quoted key = literal dot in key name
+        let mut log = LogEvent::default();
+        log.insert("message", "User login successful");
+        log.insert("severity_text", "INFO");
+        log.insert("severity_number", 9i64);
+        log.insert("trace_id", "0123456789abcdef0123456789abcdef");
+        log.insert("span_id", "0123456789abcdef");
+
+        // Simulate kv_list_into_value output: flat object with dotted keys
+        let mut resources = ObjectMap::new();
+        resources.insert("service.name".into(), Value::from("auth-service"));
+        resources.insert("deployment.region".into(), Value::from("us-west-2"));
+        log.insert("resources", Value::Object(resources));
+
+        let mut attrs = ObjectMap::new();
+        attrs.insert("user_id".into(), Value::from("user-12345"));
+        attrs.insert("processed_by".into(), Value::from("vector"));
+        log.insert("attributes", Value::Object(attrs));
+
+        log.insert("scope.name", "my-logger");
+        log.insert("scope.version", "1.0.0");
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+
+        // Verify body
+        assert!(lr.body.is_some());
+
+        // Verify severity
+        assert_eq!(lr.severity_text, "INFO");
+        assert_eq!(lr.severity_number, 9);
+
+        // Verify trace context
+        assert_eq!(lr.trace_id.len(), 16);
+        assert_eq!(lr.span_id.len(), 8);
+
+        // Verify attributes include both original and enriched
+        let attr_keys: Vec<&str> = lr.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            attr_keys.contains(&"user_id"),
+            "original attribute user_id should be present"
+        );
+        assert!(
+            attr_keys.contains(&"processed_by"),
+            "enriched attribute processed_by should be present"
+        );
+
+        // Verify resource attributes
+        let resource = request.resource_logs[0].resource.as_ref().unwrap();
+        let res_keys: Vec<&str> = resource
+            .attributes
+            .iter()
+            .map(|kv| kv.key.as_str())
+            .collect();
+        assert!(
+            res_keys.contains(&"service.name"),
+            "resource service.name should be present"
+        );
+        assert!(
+            res_keys.contains(&"deployment.region"),
+            "enriched resource deployment.region should be present"
+        );
+
+        // Verify scope
+        let scope = request.resource_logs[0].scope_logs[0]
+            .scope
+            .as_ref()
+            .unwrap();
+        assert_eq!(scope.name, "my-logger");
+        assert_eq!(scope.version, "1.0.0");
     }
 }
