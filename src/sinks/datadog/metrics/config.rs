@@ -3,7 +3,9 @@ use std::sync::OnceLock;
 use http::Uri;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
-use vector_lib::{config::proxy::ProxyConfig, configurable::configurable_component, stream::BatcherSettings};
+use vector_lib::{
+    config::proxy::ProxyConfig, configurable::configurable_component, stream::BatcherSettings,
+};
 
 use super::{
     request_builder::DatadogMetricsRequestBuilder,
@@ -317,7 +319,9 @@ fn resolve_endpoint_batch_settings(
         series.size_limit = DatadogMetricsEndpoint::Series(series_version)
             .payload_limits()
             .uncompressed;
-        sketches.size_limit = DatadogMetricsEndpoint::Sketches.payload_limits().uncompressed;
+        sketches.size_limit = DatadogMetricsEndpoint::Sketches
+            .payload_limits()
+            .uncompressed;
     }
     Ok((series, sketches))
 }
@@ -341,8 +345,7 @@ mod tests {
     // When max_bytes is unset, each endpoint gets its own API payload limit.
     #[test]
     fn default_batch_config_uses_endpoint_specific_size_limits() {
-        let (series, sketches) =
-            resolve_endpoint_batch_settings(BatchConfig::default()).unwrap();
+        let (series, sketches) = resolve_endpoint_batch_settings(BatchConfig::default()).unwrap();
 
         assert_eq!(series.size_limit, 5_242_880); // 5 MiB — Series v2 limit
         assert_eq!(sketches.size_limit, 62_914_560); // 60 MiB — Sketches limit
