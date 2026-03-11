@@ -31,7 +31,7 @@ components: sinks: opentelemetry: {
 	}
 
 	support: {
-		requirements: ["This sink accepts events conforming to the [OTEL proto format](\(urls.opentelemetry_proto)). You can use [Remap](\(urls.vector_remap_transform)) to prepare events for ingestion."]
+		requirements: ["With `codec: otlp`, native Vector logs, traces, and metrics are automatically converted to OTLP protobuf format. Pre-formatted OTLP events (from `use_otlp_decoding: true`) are passed through unchanged. Native metrics use tag prefix decomposition (`resource.*`, `scope.*`) to reconstruct the original OTLP resource/scope/data-point attribute hierarchy."]
 		warnings: []
 		notices: []
 	}
