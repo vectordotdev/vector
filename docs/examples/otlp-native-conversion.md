@@ -11,7 +11,7 @@ This document explains the automatic native-to-OTLP conversion feature.
 
 ### Previous approach
 
-For Vector version 0.54.0 and older, the approach is:
+For Vector version 0.55.0 and older, the approach is:
 
 ```mermaid
 flowchart LR
@@ -47,7 +47,7 @@ flowchart LR
 
 ### Current approach
 
-For Vector v0.54.0 and later, the approach is:
+For Vector v0.55.0 and later, the approach is:
 
 ```mermaid
 flowchart LR
@@ -295,10 +295,10 @@ classDiagram
 
 ### Previous: Complex VRL required
 
-For Vector version 0.54.0 and older, the following complex VRL transform is required:
+For Vector version 0.55.0 and older, the following complex VRL transform is required:
 
 ```yaml
-# vector.yaml - before v0.54.0
+# vector.yaml - before v0.55.0
 sources:
   app_logs:
     type: file
@@ -374,10 +374,10 @@ sinks:
 
 ### Current: VRL is not required
 
-For Vector version 0.54.0 and later, VRL is not required:
+For Vector version 0.55.0 and later, VRL is not required:
 
 ```yaml
-# vector.yaml - v0.54.0+
+# vector.yaml - v0.55.0+
 sources:
   app_logs:
     type: file
