@@ -136,10 +136,7 @@ impl From<SpanEvent> for Value {
     fn from(ev: SpanEvent) -> Self {
         let mut obj: BTreeMap<KeyString, Value> = BTreeMap::new();
         obj.insert("name".into(), ev.name.into());
-        obj.insert(
-            "time_unix_nano".into(),
-            nanos_to_value(ev.time_unix_nano),
-        );
+        obj.insert("time_unix_nano".into(), nanos_to_value(ev.time_unix_nano));
         obj.insert("attributes".into(), kv_list_into_value(ev.attributes));
         obj.insert(
             "dropped_attributes_count".into(),
@@ -352,7 +349,11 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
         Value::Float(f) => {
             let f = f.into_inner();
             if f < 0.0 || f.is_nan() || f.is_infinite() {
-                warn!(message = "Invalid float timestamp, using 0.", field = key, internal_log_rate_limit = true);
+                warn!(
+                    message = "Invalid float timestamp, using 0.",
+                    field = key,
+                    internal_log_rate_limit = true
+                );
                 return 0;
             }
             let nanos = if f < 1e12 {
@@ -365,7 +366,11 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
                 f
             };
             if nanos > u64::MAX as f64 {
-                warn!(message = "Float timestamp overflow, using 0.", field = key, internal_log_rate_limit = true);
+                warn!(
+                    message = "Float timestamp overflow, using 0.",
+                    field = key,
+                    internal_log_rate_limit = true
+                );
                 0
             } else {
                 nanos as u64
@@ -412,7 +417,11 @@ fn extract_trace_timestamp_nanos(trace: &TraceEvent, key: &str) -> u64 {
                 })
         }
         _ => {
-            warn!(message = "Unexpected timestamp type.", field = key, internal_log_rate_limit = true);
+            warn!(
+                message = "Unexpected timestamp type.",
+                field = key,
+                internal_log_rate_limit = true
+            );
             0
         }
     }

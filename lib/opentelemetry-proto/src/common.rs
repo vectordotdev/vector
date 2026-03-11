@@ -164,7 +164,10 @@ pub fn validate_trace_id(bytes: &[u8]) -> Vec<u8> {
             if let Ok(s) = std::str::from_utf8(bytes) {
                 from_hex(s)
             } else {
-                warn!(message = "trace_id appears to be hex string but contains invalid chars.", internal_log_rate_limit = true);
+                warn!(
+                    message = "trace_id appears to be hex string but contains invalid chars.",
+                    internal_log_rate_limit = true
+                );
                 Vec::new()
             }
         }
@@ -191,7 +194,10 @@ pub fn validate_span_id(bytes: &[u8]) -> Vec<u8> {
             if let Ok(s) = std::str::from_utf8(bytes) {
                 from_hex(s)
             } else {
-                warn!(message = "span_id appears to be hex string but contains invalid chars.", internal_log_rate_limit = true);
+                warn!(
+                    message = "span_id appears to be hex string but contains invalid chars.",
+                    internal_log_rate_limit = true
+                );
                 Vec::new()
             }
         }

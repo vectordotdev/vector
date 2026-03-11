@@ -355,7 +355,11 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
         Value::Float(f) => {
             let f = f.into_inner();
             if f < 0.0 || f.is_nan() || f.is_infinite() {
-                warn!(message = "Invalid float timestamp, using 0.", field = key, internal_log_rate_limit = true);
+                warn!(
+                    message = "Invalid float timestamp, using 0.",
+                    field = key,
+                    internal_log_rate_limit = true
+                );
                 return 0;
             }
             let nanos = if f < 1e12 {
@@ -368,7 +372,11 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
                 f
             };
             if nanos > u64::MAX as f64 {
-                warn!(message = "Float timestamp overflow, using 0.", field = key, internal_log_rate_limit = true);
+                warn!(
+                    message = "Float timestamp overflow, using 0.",
+                    field = key,
+                    internal_log_rate_limit = true
+                );
                 0
             } else {
                 nanos as u64
@@ -416,7 +424,11 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
                 })
         }
         _ => {
-            warn!(message = "Unexpected timestamp type.", field = key, internal_log_rate_limit = true);
+            warn!(
+                message = "Unexpected timestamp type.",
+                field = key,
+                internal_log_rate_limit = true
+            );
             0
         }
     }
@@ -426,11 +438,9 @@ fn extract_timestamp_nanos_safe(log: &LogEvent, key: &str) -> u64 {
 #[inline]
 fn extract_string_safe(log: &LogEvent, key: &str) -> String {
     match log.get(key) {
-        Some(Value::Bytes(b)) => {
-            std::str::from_utf8(b)
-                .map(|s| s.to_owned())
-                .unwrap_or_else(|_| String::from_utf8_lossy(b).into_owned())
-        }
+        Some(Value::Bytes(b)) => std::str::from_utf8(b)
+            .map(|s| s.to_owned())
+            .unwrap_or_else(|_| String::from_utf8_lossy(b).into_owned()),
         Some(Value::Integer(i)) => i.to_string(),
         Some(Value::Float(f)) => f.to_string(),
         Some(Value::Boolean(b)) => if *b { "true" } else { "false" }.to_string(),
@@ -462,7 +472,11 @@ fn extract_severity_number_safe(log: &LogEvent) -> i32 {
             let i = *i;
             // OTLP severity numbers are 0-24
             if !(0..=24).contains(&i) {
-                warn!(message = "Severity number out of range (0-24).", value = i, internal_log_rate_limit = true);
+                warn!(
+                    message = "Severity number out of range (0-24).",
+                    value = i,
+                    internal_log_rate_limit = true
+                );
                 i.clamp(0, 24) as i32
             } else {
                 i as i32
