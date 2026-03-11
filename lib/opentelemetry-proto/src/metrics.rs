@@ -572,8 +572,7 @@ fn extract_metric_timestamp_nanos(metric: &MetricEvent) -> u64 {
     metric
         .timestamp()
         .and_then(|ts| ts.timestamp_nanos_opt())
-        .filter(|&n| n >= 0)
-        .map(|n| n as u64)
+        .and_then(|n| u64::try_from(n).ok())
         .unwrap_or(0)
 }
 
@@ -707,9 +706,9 @@ fn build_otlp_metric(
             let mut total_sum = 0.0f64;
 
             for sample in samples {
-                let rate = sample.rate as u64;
+                let rate = u64::from(sample.rate);
                 total_count += rate;
-                total_sum += sample.value * sample.rate as f64;
+                total_sum += sample.value * f64::from(sample.rate);
 
                 // Find which bucket this sample belongs to
                 let bucket_idx = match boundaries.binary_search_by(|b| {
@@ -719,13 +718,10 @@ fn build_otlp_metric(
                     Ok(idx) => idx,  // Exact match — belongs in bucket [idx]
                     Err(idx) => idx, // Between boundaries — belongs in bucket [idx]
                 };
-                // bucket_counts has len boundaries+1, so bucket_idx is always valid
-                if bucket_idx < bucket_counts.len() {
-                    bucket_counts[bucket_idx] += rate;
-                } else {
-                    // Shouldn't happen, but guard against it
-                    *bucket_counts.last_mut().unwrap() += rate;
-                }
+                // bucket_counts has len boundaries+1, so bucket_idx is always in range.
+                // Guard defensively: if out of range, place in the overflow (+inf) bucket.
+                let target_idx = bucket_idx.min(bucket_counts.len().saturating_sub(1));
+                bucket_counts[target_idx] += rate;
             }
 
             let _ = statistic; // StatisticKind doesn't affect OTLP encoding
