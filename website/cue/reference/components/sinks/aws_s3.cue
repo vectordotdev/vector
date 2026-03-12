@@ -231,7 +231,14 @@ components: sinks: aws_s3: components._aws & {
 
 				This feature requires the `codecs-parquet` feature flag at compile time.
 
-				#### TOML Example
+				Six mutually exclusive schema input options are available. Exactly one must
+				be specified.
+
+				#### Option 1: Inline Field List
+
+				Simple flat schemas using Vector type names. Supported types: `utf8`,
+				`int32`, `int64`, `float32`, `float64`, `boolean`,
+				`timestamp_millisecond`, `timestamp_microsecond`.
 
 				```toml
 				[sinks.s3_parquet]
@@ -257,7 +264,61 @@ components: sinks: aws_s3: components._aws & {
 				type = "utf8"
 				```
 
-				#### YAML Example
+				#### Option 2: Native Parquet Schema (Inline)
+
+				Full Parquet schema string with support for nested types, repetition
+				levels, and logical annotations.
+
+				```toml
+				[sinks.s3_parquet.batch_encoding]
+				parquet.compression = "snappy"
+				parquet.parquet_schema = "message logs { required binary message (STRING); required binary host (STRING); optional int64 timestamp (TIMESTAMP_MILLIS); }"
+				```
+
+				#### Option 3: Native Parquet Schema (File)
+
+				Load the Parquet schema from a `.schema` file.
+
+				```toml
+				[sinks.s3_parquet.batch_encoding]
+				parquet.compression = "snappy"
+				parquet.schema_file = "/etc/vector/schemas/logs.schema"
+				```
+
+				#### Option 4: Avro Schema (Inline)
+
+				Avro JSON schema supporting nested records, arrays, maps, and nullable
+				unions. Automatically converted to Arrow/Parquet types.
+
+				```toml
+				[sinks.s3_parquet.batch_encoding]
+				parquet.compression = "snappy"
+				parquet.avro_schema = '{"type":"record","name":"logs","fields":[{"name":"message","type":"string"},{"name":"host","type":"string"},{"name":"level","type":"string"}]}'
+				```
+
+				#### Option 5: Avro Schema (File)
+
+				Load the Avro schema from a `.avsc` file.
+
+				```toml
+				[sinks.s3_parquet.batch_encoding]
+				parquet.compression = "snappy"
+				parquet.avro_schema_file = "/etc/vector/schemas/logs.avsc"
+				```
+
+				#### Option 6: Protobuf Descriptor (File)
+
+				Compiled `.desc` file with message type. Supports nested messages, maps,
+				and well-known types (Timestamp, Duration, wrappers).
+
+				```toml
+				[sinks.s3_parquet.batch_encoding]
+				parquet.compression = "snappy"
+				parquet.proto_desc_file = "/etc/vector/schemas/logs.desc"
+				parquet.proto_message_type = "mypackage.LogRecord"
+				```
+
+				#### YAML Example (Inline Field List)
 
 				```yaml
 				sinks:
@@ -278,6 +339,20 @@ components: sinks: aws_s3: components._aws & {
 				          - name: host
 				            type: utf8
 				```
+
+				#### Configuration Reference
+
+				| Field | Type | Description |
+				|---|---|---|
+				| `schema` | array of objects | Inline field list (name + type pairs) |
+				| `parquet_schema` | string | Native Parquet schema string |
+				| `schema_file` | path | Path to `.schema` file |
+				| `avro_schema` | string | Avro JSON schema string |
+				| `avro_schema_file` | path | Path to `.avsc` file |
+				| `proto_desc_file` | path | Path to `.desc` file |
+				| `proto_message_type` | string | Protobuf message type (required with `proto_desc_file`) |
+				| `compression` | string | `snappy` (default), `zstd`, `gzip`, `lz4`, `none` |
+				| `schema_mode` | string | `strict` (default) or `relaxed` |
 				"""
 		}
 	}
