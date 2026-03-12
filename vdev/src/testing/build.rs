@@ -67,7 +67,7 @@ pub fn build_integration_image() -> Result<()> {
     let mut cmd = prepare_build_command(
         &image,
         &dockerfile,
-        Some(&[ALL_INTEGRATIONS_FEATURE_FLAG.to_string()]),
+        Some(&[ALL_INTEGRATIONS_FEATURE_FLAG.to_string(), "vendored".to_string()]),
         &Environment::default(),
         false, // Integration tests don't pre-build Vector tests.
     );
