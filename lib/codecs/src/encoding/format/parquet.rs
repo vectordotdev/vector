@@ -64,8 +64,10 @@ pub enum SchemaMode {
 
 /// Arrow data type for Parquet schema field definitions.
 ///
-/// For nested/complex types (struct, list, map), use `parquet_schema`, `avro_schema`,
-/// or `proto_desc_file` instead of the inline field list.
+/// Scalar types map directly to Arrow data types. Compound types (`struct`,
+/// `list`, `map`) support one level of nesting via the `fields`, `items`,
+/// `key_type`, and `value_type` properties on the field definition.
+/// For deeper nesting, use `parquet_schema`, `avro_schema`, or `proto_desc_file`.
 #[configurable_component]
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -92,9 +94,20 @@ pub enum ParquetFieldType {
     TimestampNanosecond,
     /// Date (days since epoch).
     Date32,
+    /// Struct (nested record). Define sub-fields via the `fields` property.
+    Struct,
+    /// List (repeated values). Define element type via the `items` property.
+    List,
+    /// Map (key-value pairs). Define types via `key_type` and `value_type`.
+    Map,
 }
 
 impl ParquetFieldType {
+    /// Returns true if this is a scalar (non-compound) type.
+    fn is_scalar(&self) -> bool {
+        !matches!(self, Self::Struct | Self::List | Self::Map)
+    }
+
     fn to_arrow_data_type(&self) -> DataType {
         match self {
             Self::Boolean => DataType::Boolean,
@@ -114,8 +127,30 @@ impl ParquetFieldType {
                 DataType::Timestamp(TimeUnit::Nanosecond, Some("+00:00".into()))
             }
             Self::Date32 => DataType::Date32,
+            // Compound types are handled by resolve_inline_schema via
+            // the field's `fields`, `items`, `key_type`, `value_type` properties.
+            Self::Struct | Self::List | Self::Map => {
+                unreachable!("compound types resolved via inline_field_to_arrow")
+            }
         }
     }
+}
+
+/// A sub-field definition within a struct type (one level of nesting).
+///
+/// Sub-fields support only scalar types. For deeper nesting, use
+/// `parquet_schema`, `avro_schema`, or `proto_desc_file`.
+#[configurable_component]
+#[derive(Clone, Debug, PartialEq)]
+pub struct ParquetSchemaSubField {
+    /// The name of the sub-field.
+    #[configurable(metadata(docs::examples = "source", docs::examples = "region"))]
+    pub name: String,
+
+    /// The Arrow data type of the sub-field (scalar types only).
+    #[serde(rename = "type")]
+    #[configurable(metadata(docs::examples = "utf8", docs::examples = "int64"))]
+    pub data_type: ParquetFieldType,
 }
 
 /// A field definition for the Parquet schema.
@@ -128,8 +163,32 @@ pub struct ParquetSchemaField {
 
     /// The Arrow data type of the field.
     #[serde(rename = "type")]
-    #[configurable(metadata(docs::examples = "utf8", docs::examples = "int64"))]
+    #[configurable(metadata(
+        docs::examples = "utf8",
+        docs::examples = "int64",
+        docs::examples = "struct"
+    ))]
     pub data_type: ParquetFieldType,
+
+    /// Sub-fields for `struct` type (one level of nesting, scalar types only).
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    #[configurable(derived)]
+    pub fields: Vec<ParquetSchemaSubField>,
+
+    /// Element type for `list` type.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[configurable(derived)]
+    pub items: Option<ParquetFieldType>,
+
+    /// Key type for `map` type (must be a string-compatible type).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[configurable(derived)]
+    pub key_type: Option<ParquetFieldType>,
+
+    /// Value type for `map` type.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[configurable(derived)]
+    pub value_type: Option<ParquetFieldType>,
 }
 
 /// Configuration for the Parquet serializer.
@@ -274,8 +333,8 @@ impl ParquetSerializerConfig {
         let fields: Vec<Field> = self
             .schema
             .iter()
-            .map(|f| Field::new(&f.name, f.data_type.to_arrow_data_type(), true))
-            .collect();
+            .map(|f| inline_field_to_arrow(f))
+            .collect::<Result<Vec<_>, _>>()?;
         Ok(Schema::new(fields))
     }
 
@@ -336,6 +395,113 @@ impl ParquetSerializerConfig {
 }
 
 /// Read a schema file with size validation (max 10 MB).
+/// Convert an inline `ParquetSchemaField` to an Arrow `Field`, handling
+/// scalar types directly and compound types (struct, list, map) via their
+/// sub-field descriptors. Sub-fields are restricted to scalar types (one
+/// level of nesting).
+fn inline_field_to_arrow(
+    f: &ParquetSchemaField,
+) -> Result<Field, Box<dyn std::error::Error + Send + Sync>> {
+    match f.data_type {
+        ParquetFieldType::Struct => {
+            if f.fields.is_empty() {
+                return Err(format!(
+                    "Field '{}' has type 'struct' but no 'fields' defined",
+                    f.name
+                )
+                .into());
+            }
+            let sub_fields: Vec<Field> = f
+                .fields
+                .iter()
+                .map(|sf| {
+                    if !sf.data_type.is_scalar() {
+                        return Err(format!(
+                            "Sub-field '{}' in struct '{}' must be a scalar type, got '{:?}'",
+                            sf.name, f.name, sf.data_type
+                        )
+                        .into());
+                    }
+                    Ok(Field::new(
+                        &sf.name,
+                        sf.data_type.to_arrow_data_type(),
+                        true,
+                    ))
+                })
+                .collect::<Result<Vec<_>, Box<dyn std::error::Error + Send + Sync>>>()?;
+            Ok(Field::new(
+                &f.name,
+                DataType::Struct(Fields::from(sub_fields)),
+                true,
+            ))
+        }
+        ParquetFieldType::List => {
+            let items = f.items.as_ref().ok_or_else(|| {
+                format!(
+                    "Field '{}' has type 'list' but no 'items' type defined",
+                    f.name
+                )
+            })?;
+            if !items.is_scalar() {
+                return Err(format!(
+                    "Field '{}' list 'items' must be a scalar type, got '{items:?}'",
+                    f.name
+                )
+                .into());
+            }
+            let item_field = Field::new("item", items.to_arrow_data_type(), true);
+            Ok(Field::new(
+                &f.name,
+                DataType::List(Arc::new(item_field)),
+                true,
+            ))
+        }
+        ParquetFieldType::Map => {
+            let key_type = f.key_type.as_ref().ok_or_else(|| {
+                format!(
+                    "Field '{}' has type 'map' but no 'key_type' defined",
+                    f.name
+                )
+            })?;
+            let value_type = f.value_type.as_ref().ok_or_else(|| {
+                format!(
+                    "Field '{}' has type 'map' but no 'value_type' defined",
+                    f.name
+                )
+            })?;
+            if !key_type.is_scalar() {
+                return Err(format!(
+                    "Field '{}' map 'key_type' must be a scalar type, got '{key_type:?}'",
+                    f.name
+                )
+                .into());
+            }
+            if !value_type.is_scalar() {
+                return Err(format!(
+                    "Field '{}' map 'value_type' must be a scalar type, got '{value_type:?}'",
+                    f.name
+                )
+                .into());
+            }
+            let entries_field = Field::new(
+                "entries",
+                DataType::Struct(Fields::from(vec![
+                    Field::new("key", key_type.to_arrow_data_type(), false),
+                    Field::new("value", value_type.to_arrow_data_type(), true),
+                ])),
+                false,
+            );
+            Ok(Field::new(
+                &f.name,
+                DataType::Map(Arc::new(entries_field), false),
+                true,
+            ))
+        }
+        // Scalar types
+        _ => Ok(Field::new(&f.name, f.data_type.to_arrow_data_type(), true)),
+    }
+}
+
 fn read_schema_file(
     path: &std::path::Path,
     field_name: &str,
@@ -658,6 +824,10 @@ mod tests {
                 name: name.to_string(),
                 data_type: serde_json::from_value(serde_json::json!(typ))
                     .unwrap_or_else(|e| panic!("Invalid type '{}': {}", typ, e)),
+                fields: Vec::new(),
+                items: None,
+                key_type: None,
+                value_type: None,
             })
             .collect()
     }
@@ -1980,5 +2150,223 @@ mod tests {
             b"PAR1",
             "Parquet footer magic bytes missing"
         );
+    }
+
+    // ========================================================================
+    // Inline nested schema: struct, list, map
+    // ========================================================================
+
+    #[test]
+    fn test_inline_struct_type() {
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [
+                {"name": "name", "type": "utf8"},
+                {
+                    "name": "metadata",
+                    "type": "struct",
+                    "fields": [
+                        {"name": "source", "type": "utf8"},
+                        {"name": "region", "type": "utf8"}
+                    ]
+                }
+            ]
+        }))
+        .expect("Config should deserialize");
+
+        let serializer = ParquetSerializer::new(config).expect("Struct inline schema should parse");
+        assert_eq!(serializer.schema.fields().len(), 2);
+        assert!(
+            matches!(serializer.schema.field(1).data_type(), DataType::Struct(_)),
+            "Expected Struct, got {:?}",
+            serializer.schema.field(1).data_type()
+        );
+    }
+
+    #[test]
+    fn test_inline_list_type() {
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [
+                {"name": "name", "type": "utf8"},
+                {"name": "tags", "type": "list", "items": "utf8"}
+            ]
+        }))
+        .expect("Config should deserialize");
+
+        let serializer = ParquetSerializer::new(config).expect("List inline schema should parse");
+        assert_eq!(serializer.schema.fields().len(), 2);
+        assert!(
+            matches!(serializer.schema.field(1).data_type(), DataType::List(_)),
+            "Expected List, got {:?}",
+            serializer.schema.field(1).data_type()
+        );
+    }
+
+    #[test]
+    fn test_inline_map_type() {
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [
+                {"name": "name", "type": "utf8"},
+                {
+                    "name": "labels",
+                    "type": "map",
+                    "key_type": "utf8",
+                    "value_type": "utf8"
+                }
+            ]
+        }))
+        .expect("Config should deserialize");
+
+        let serializer = ParquetSerializer::new(config).expect("Map inline schema should parse");
+        assert_eq!(serializer.schema.fields().len(), 2);
+        assert!(
+            matches!(serializer.schema.field(1).data_type(), DataType::Map(_, _)),
+            "Expected Map, got {:?}",
+            serializer.schema.field(1).data_type()
+        );
+    }
+
+    #[test]
+    fn test_inline_struct_missing_fields_error() {
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [{"name": "metadata", "type": "struct"}]
+        }))
+        .expect("Config should deserialize");
+
+        let result = ParquetSerializer::new(config);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("no 'fields' defined"),
+            "Expected fields error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_inline_list_missing_items_error() {
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [{"name": "tags", "type": "list"}]
+        }))
+        .expect("Config should deserialize");
+
+        let result = ParquetSerializer::new(config);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("no 'items' type defined"),
+            "Expected items error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_inline_map_missing_key_type_error() {
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [{"name": "labels", "type": "map", "value_type": "utf8"}]
+        }))
+        .expect("Config should deserialize");
+
+        let result = ParquetSerializer::new(config);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("no 'key_type' defined"),
+            "Expected key_type error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_inline_map_missing_value_type_error() {
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [{"name": "labels", "type": "map", "key_type": "utf8"}]
+        }))
+        .expect("Config should deserialize");
+
+        let result = ParquetSerializer::new(config);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("no 'value_type' defined"),
+            "Expected value_type error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_inline_struct_rejects_nested_compound_subfield() {
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [{
+                "name": "metadata",
+                "type": "struct",
+                "fields": [
+                    {"name": "nested", "type": "struct"}
+                ]
+            }]
+        }))
+        .expect("Config should deserialize");
+
+        let result = ParquetSerializer::new(config);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("must be a scalar type"),
+            "Expected scalar error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_inline_list_rejects_compound_items() {
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [{"name": "nested_lists", "type": "list", "items": "list"}]
+        }))
+        .expect("Config should deserialize");
+
+        let result = ParquetSerializer::new(config);
+        assert!(result.is_err());
+        let err = result.unwrap_err().to_string();
+        assert!(
+            err.contains("must be a scalar type"),
+            "Expected scalar error, got: {err}"
+        );
+    }
+
+    #[test]
+    fn test_inline_mixed_flat_and_nested() {
+        let config: ParquetSerializerConfig = serde_json::from_value(serde_json::json!({
+            "schema": [
+                {"name": "message", "type": "utf8"},
+                {"name": "status_code", "type": "int64"},
+                {
+                    "name": "metadata",
+                    "type": "struct",
+                    "fields": [
+                        {"name": "source", "type": "utf8"},
+                        {"name": "region", "type": "utf8"}
+                    ]
+                },
+                {"name": "tags", "type": "list", "items": "utf8"},
+                {
+                    "name": "labels",
+                    "type": "map",
+                    "key_type": "utf8",
+                    "value_type": "utf8"
+                }
+            ]
+        }))
+        .expect("Config should deserialize");
+
+        let serializer = ParquetSerializer::new(config).expect("Mixed schema should parse");
+        assert_eq!(serializer.schema.fields().len(), 5);
+        assert_eq!(*serializer.schema.field(0).data_type(), DataType::Utf8);
+        assert_eq!(*serializer.schema.field(1).data_type(), DataType::Int64);
+        assert!(matches!(
+            serializer.schema.field(2).data_type(),
+            DataType::Struct(_)
+        ));
+        assert!(matches!(
+            serializer.schema.field(3).data_type(),
+            DataType::List(_)
+        ));
+        assert!(matches!(
+            serializer.schema.field(4).data_type(),
+            DataType::Map(_, _)
+        ));
     }
 }

@@ -44,18 +44,22 @@ fn make_parquet_serializer(
             ParquetSchemaField {
                 name: "message".into(),
                 data_type: ParquetFieldType::Utf8,
+                fields: Vec::new(), items: None, key_type: None, value_type: None,
             },
             ParquetSchemaField {
                 name: "host".into(),
                 data_type: ParquetFieldType::Utf8,
+                fields: Vec::new(), items: None, key_type: None, value_type: None,
             },
             ParquetSchemaField {
                 name: "level".into(),
                 data_type: ParquetFieldType::Utf8,
+                fields: Vec::new(), items: None, key_type: None, value_type: None,
             },
             ParquetSchemaField {
                 name: "status_code".into(),
                 data_type: ParquetFieldType::Int64,
+                fields: Vec::new(), items: None, key_type: None, value_type: None,
             },
         ],
         compression,

@@ -510,10 +510,12 @@ async fn s3_parquet_insert_message() {
             ParquetSchemaField {
                 name: "message".to_string(),
                 data_type: ParquetFieldType::Utf8,
+                fields: Vec::new(), items: None, key_type: None, value_type: None,
             },
             ParquetSchemaField {
                 name: "host".to_string(),
                 data_type: ParquetFieldType::Utf8,
+                fields: Vec::new(), items: None, key_type: None, value_type: None,
             },
         ],
         compression: ParquetCompression::Snappy,
