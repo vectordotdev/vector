@@ -10,6 +10,7 @@ allow = [
   "ISC",
   "MIT",
   "MIT-0",
+  "BlueOak-1.0.0"
   "OpenSSL",
   "Unicode-3.0",
   "Unicode-DFS-2016",
