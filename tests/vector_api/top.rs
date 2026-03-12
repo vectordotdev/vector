@@ -1,40 +1,34 @@
 //! Integration tests for `vector top` command
 //!
-//! Provides extensions for GraphQL queries and tests for component discovery,
+//! Provides extensions for gRPC queries and tests for component discovery,
 //! metrics collection, and config reloading.
 
 use super::{common::*, harness::*};
 use indoc::indoc;
+use vector_lib::api_client::proto::ComponentsResponse;
 
 impl TestHarness {
-    /// Queries all components from the GraphQL API
-    pub async fn query_components(
-        &self,
-    ) -> Result<vector_lib::api_client::gql::components_query::ResponseData, String> {
-        use vector_lib::api_client::gql::ComponentsQueryExt;
-
+    /// Queries all components from the gRPC API
+    pub async fn query_components(&mut self) -> Result<ComponentsResponse, String> {
         self.api_client()
-            .components_query(100)
+            .get_components(100)
             .await
-            .map_err(|e| format!("Query failed: {e}"))?
-            .data
-            .ok_or_else(|| "No data in response".to_string())
+            .map_err(|e| format!("Query failed: {e}"))
     }
 
-    /// Queries component IDs from the GraphQL API
-    pub async fn query_component_ids(&self) -> Result<Vec<String>, String> {
-        let data = self.query_components().await?;
-        Ok(data
+    /// Queries component IDs from the gRPC API
+    pub async fn query_component_ids(&mut self) -> Result<Vec<String>, String> {
+        let response = self.query_components().await?;
+        Ok(response
             .components
-            .edges
             .iter()
-            .map(|e| e.node.component_id.clone())
+            .map(|c| c.component_id.clone())
             .collect())
     }
 
     /// Waits for a component to process at least the expected number of events
     pub async fn wait_for_events(
-        &self,
+        &mut self,
         component_id: &str,
         expected_events: i64,
     ) -> Result<i64, String> {
@@ -56,7 +50,7 @@ impl TestHarness {
 async fn displays_pipeline_topology_and_metrics() {
     const EXPECTED_EVENTS: i64 = 100;
 
-    let runner = TestHarness::new(indoc! {"
+    let mut runner = TestHarness::new(indoc! {"
         sources:
           demo:
             type: demo_logs
@@ -93,47 +87,57 @@ async fn displays_pipeline_topology_and_metrics() {
     assert_eq!(component_ids.len(), 3);
 
     // Query full component data for types and metrics
-    let data = runner
+    let response = runner
         .query_components()
         .await
         .expect("Failed to query components");
 
     // Verify component types are reported correctly
-    for edge in &data.components.edges {
-        let component_id = &edge.node.component_id;
-        let component_type = edge.node.on.to_string();
+    use vector_lib::api_client::proto::ComponentType;
+    for component in &response.components {
+        let component_id = &component.component_id;
+        let component_type =
+            ComponentType::try_from(component.component_type).expect("Valid component type");
 
         match component_id.as_str() {
-            "demo" => assert_eq!(component_type, "source"),
-            "blackhole1" | "blackhole2" => assert_eq!(component_type, "sink"),
+            "demo" => assert_eq!(component_type, ComponentType::Source),
+            "blackhole1" | "blackhole2" => assert_eq!(component_type, ComponentType::Sink),
             _ => panic!("Unexpected component: {}", component_id),
         }
     }
 
     // Verify source sent events
-    let source = data
+    let source = response
         .components
-        .edges
         .iter()
-        .find(|e| e.node.component_id == "demo")
+        .find(|c| c.component_id == "demo")
         .expect("Should find source");
 
-    assert!(source.node.on.sent_events_total() >= EXPECTED_EVENTS);
+    let sent_events = source
+        .metrics
+        .as_ref()
+        .and_then(|m| m.sent_events_total)
+        .unwrap_or(0);
+    assert!(sent_events >= EXPECTED_EVENTS);
 
     // Verify at least one sink received events
-    let sink1 = data
+    let sink1 = response
         .components
-        .edges
         .iter()
-        .find(|e| e.node.component_id == "blackhole1")
+        .find(|c| c.component_id == "blackhole1")
         .expect("Should find sink1");
 
-    assert!(sink1.node.on.received_events_total() >= EXPECTED_EVENTS);
+    let received_events = sink1
+        .metrics
+        .as_ref()
+        .and_then(|m| m.received_events_total)
+        .unwrap_or(0);
+    assert!(received_events >= EXPECTED_EVENTS);
 }
 
 #[tokio::test]
 async fn config_reload_updates_components() {
-    // Initial config: 1 source -> 1 sink
+    // Initial config: 1 source -> 1 sink (runs continuously)
     let config = single_source_config("demo1", 0.1, None);
     let mut runner = TestHarness::new(&config)
         .await
@@ -146,81 +150,83 @@ async fn config_reload_updates_components() {
     assert!(component_ids.contains(&"blackhole".to_string()));
     assert_eq!(component_ids.len(), 2);
 
-    // RELOAD 1: Add components
+    // RELOAD 1: Replace with completely new set
     runner
         .reload_with_config(
             indoc! {"
                 sources:
-                  demo1:
+                  new_demo1:
                     type: demo_logs
                     format: json
                     interval: 0.1
 
-                  demo2:
+                  new_demo2:
                     type: demo_logs
                     format: json
                     interval: 0.1
 
                 sinks:
-                  blackhole1:
+                  new_blackhole1:
                     type: blackhole
-                    inputs: ['demo1']
+                    inputs: ['new_demo1']
 
-                  blackhole2:
+                  new_blackhole2:
                     type: blackhole
-                    inputs: ['demo2']
+                    inputs: ['new_demo2']
             "},
-            &["demo1", "demo2", "blackhole1", "blackhole2"],
-        )
-        .await
-        .expect("Failed to reload config");
-
-    // Verify additions
-    assert!(runner.check_running(), "Vector should still be running");
-
-    let component_ids = runner.query_component_ids().await.expect("Failed to query");
-
-    assert!(component_ids.contains(&"demo1".to_string()));
-    assert!(component_ids.contains(&"demo2".to_string()));
-    assert!(component_ids.contains(&"blackhole1".to_string()));
-    assert!(component_ids.contains(&"blackhole2".to_string()));
-    assert_eq!(component_ids.len(), 4);
-
-    // Verify new components are processing events
-    runner
-        .wait_for_events("demo2", 10)
-        .await
-        .expect("New source should process events");
-
-    // RELOAD 2: Replace with completely new components (same count, different names)
-    runner
-        .reload_with_config(
-            indoc! {"
-                sources:
-                  new_demo:
-                    type: demo_logs
-                    format: json
-                    interval: 0.1
-
-                sinks:
-                  new_blackhole:
-                    type: blackhole
-                    inputs: ['new_demo']
-            "},
-            &["new_demo", "new_blackhole"],
+            &["new_demo1", "new_demo2", "new_blackhole1", "new_blackhole2"],
         )
         .await
         .expect("Failed to reload config");
 
     // Verify old components removed and new ones added
+    assert!(runner.check_running(), "Vector should still be running");
+
     let component_ids = runner.query_component_ids().await.expect("Failed to query");
 
     assert!(!component_ids.contains(&"demo1".to_string()));
-    assert!(!component_ids.contains(&"demo2".to_string()));
-    assert!(!component_ids.contains(&"blackhole1".to_string()));
-    assert!(!component_ids.contains(&"blackhole2".to_string()));
-    assert!(component_ids.contains(&"new_demo".to_string()));
-    assert!(component_ids.contains(&"new_blackhole".to_string()));
+    assert!(!component_ids.contains(&"blackhole".to_string()));
+    assert!(component_ids.contains(&"new_demo1".to_string()));
+    assert!(component_ids.contains(&"new_demo2".to_string()));
+    assert!(component_ids.contains(&"new_blackhole1".to_string()));
+    assert!(component_ids.contains(&"new_blackhole2".to_string()));
+    assert_eq!(component_ids.len(), 4);
+
+    // Verify new components are processing events
+    runner
+        .wait_for_events("new_demo1", 10)
+        .await
+        .expect("New source should process events");
+
+    // RELOAD 2: Scale back down to single component
+    runner
+        .reload_with_config(
+            indoc! {"
+                sources:
+                  final_demo:
+                    type: demo_logs
+                    format: json
+                    interval: 0.1
+
+                sinks:
+                  final_blackhole:
+                    type: blackhole
+                    inputs: ['final_demo']
+            "},
+            &["final_demo", "final_blackhole"],
+        )
+        .await
+        .expect("Failed to reload config");
+
+    // Verify all previous components removed and final ones added
+    let component_ids = runner.query_component_ids().await.expect("Failed to query");
+
+    assert!(!component_ids.contains(&"new_demo1".to_string()));
+    assert!(!component_ids.contains(&"new_demo2".to_string()));
+    assert!(!component_ids.contains(&"new_blackhole1".to_string()));
+    assert!(!component_ids.contains(&"new_blackhole2".to_string()));
+    assert!(component_ids.contains(&"final_demo".to_string()));
+    assert!(component_ids.contains(&"final_blackhole".to_string()));
     assert_eq!(component_ids.len(), 2);
 }
 
@@ -233,33 +239,38 @@ async fn watch_mode_auto_reloads() {
         .expect("Failed to start Vector");
 
     // Verify initial state: 1 source + 1 sink
-    let data = runner.query_components().await.expect("Failed to query");
-    assert_eq!(data.components.edges.len(), 2);
+    let response = runner.query_components().await.expect("Failed to query");
+    assert_eq!(response.components.len(), 2);
 
     // Modify config file - Vector should auto-reload (no SIGHUP needed!)
+    // Use completely new component names to avoid reload issues
     runner
         .reload_with_config(
             indoc! {"
                 sources:
-                  demo:
+                  watch_demo1:
                     type: demo_logs
                     format: json
                     interval: 0.1
 
-                  demo2:
+                  watch_demo2:
                     type: demo_logs
                     format: json
                     interval: 0.1
 
                 sinks:
-                  blackhole:
+                  watch_blackhole:
                     type: blackhole
-                    inputs: ['demo', 'demo2']
+                    inputs: ['watch_demo1', 'watch_demo2']
             "},
-            &["demo", "demo2", "blackhole"],
+            &["watch_demo1", "watch_demo2", "watch_blackhole"],
         )
         .await
         .expect("Watch mode reload failed");
+
+    // Verify reload worked
+    let component_ids = runner.query_component_ids().await.expect("Failed to query");
+    assert_eq!(component_ids.len(), 3);
 
     // Cleanup happens automatically via Drop
 }

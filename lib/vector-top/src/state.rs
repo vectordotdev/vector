@@ -21,7 +21,7 @@ use crate::dashboard::columns;
 
 type IdentifiedMetric = (ComponentKey, i64);
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct SentEventsMetric {
     pub key: ComponentKey,
     pub total: i64,
@@ -437,11 +437,11 @@ pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
                         }
                     }
                 }
-                EventType::ReceivedBytesThroughputs(interval, rows) => {
+                EventType::ReceivedBytesThroughputs(_interval, rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.components.get_mut(&key) {
-                            r.received_bytes_throughput_sec =
-                                (v as f64 * (1000.0 / interval as f64)) as i64;
+                            // Server already returns throughput normalized to per-second
+                            r.received_bytes_throughput_sec = v;
                         }
                     }
                 }
@@ -452,11 +452,11 @@ pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
                         }
                     }
                 }
-                EventType::ReceivedEventsThroughputs(interval, rows) => {
+                EventType::ReceivedEventsThroughputs(_interval, rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.components.get_mut(&key) {
-                            r.received_events_throughput_sec =
-                                (v as f64 * (1000.0 / interval as f64)) as i64;
+                            // Server already returns throughput normalized to per-second
+                            r.received_events_throughput_sec = v;
                         }
                     }
                 }
@@ -467,11 +467,11 @@ pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
                         }
                     }
                 }
-                EventType::SentBytesThroughputs(interval, rows) => {
+                EventType::SentBytesThroughputs(_interval, rows) => {
                     for (key, v) in rows {
                         if let Some(r) = state.components.get_mut(&key) {
-                            r.sent_bytes_throughput_sec =
-                                (v as f64 * (1000.0 / interval as f64)) as i64;
+                            // Server already returns throughput normalized to per-second
+                            r.sent_bytes_throughput_sec = v;
                         }
                     }
                 }
@@ -488,13 +488,14 @@ pub async fn updater(mut event_rx: EventRx, mut state: State) -> StateRx {
                         }
                     }
                 }
-                EventType::SentEventsThroughputs(interval, rows) => {
+                EventType::SentEventsThroughputs(_interval, rows) => {
                     for m in rows {
                         if let Some(r) = state.components.get_mut(&m.key) {
-                            r.sent_events_throughput_sec =
-                                (m.total as f64 * (1000.0 / interval as f64)) as i64;
+                            // Server already returns throughput normalized to per-second
+                            r.sent_events_throughput_sec = m.total;
                             for (id, v) in m.outputs {
-                                let throughput = (v as f64 * (1000.0 / interval as f64)) as i64;
+                                // Server already returns throughput normalized to per-second
+                                let throughput = v;
                                 r.outputs
                                     .entry(id)
                                     .or_insert_with(OutputMetrics::default)

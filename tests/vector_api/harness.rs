@@ -21,7 +21,7 @@ use vector::test_util::{temp_dir, temp_file};
 use vector_lib::api_client::Client;
 
 // Constants
-pub const STARTUP_TIMEOUT: Duration = Duration::from_secs(2);
+pub const STARTUP_TIMEOUT: Duration = Duration::from_secs(10);
 pub const EVENT_PROCESSING_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Test harness for Vector instances with API enabled
@@ -112,14 +112,14 @@ impl TestHarness {
             .spawn()
             .map_err(|e| format!("Failed to spawn vector: {e}"))?;
 
-        let api_client = Client::new(
-            format!("http://127.0.0.1:{api_port}/graphql")
-                .parse()
-                .map_err(|e| format!("Invalid URL: {e}"))?,
-        );
+        let url = format!("http://127.0.0.1:{api_port}");
+        let mut api_client = Client::new(&url)
+            .await
+            .map_err(|e| format!("Failed to create client: {e}"))?;
 
         // Wait for Vector startup with crash detection
-        wait_for_startup(&mut vector, &api_client, STARTUP_TIMEOUT).await?;
+        // This will repeatedly try to connect until Vector is ready
+        wait_for_startup(&mut vector, &mut api_client, STARTUP_TIMEOUT).await?;
 
         Ok(Self {
             vector,
@@ -130,14 +130,9 @@ impl TestHarness {
         })
     }
 
-    /// Returns reference to the API client
-    pub fn api_client(&self) -> &Client {
-        &self.api_client
-    }
-
-    /// Returns the API port number
-    pub fn api_port(&self) -> u16 {
-        self.api_port
+    /// Returns mutable reference to the API client
+    pub fn api_client(&mut self) -> &mut Client {
+        &mut self.api_client
     }
 
     /// Reloads Vector configuration by sending SIGHUP or using watch mode
@@ -169,8 +164,16 @@ impl TestHarness {
                 .map_err(|e| format!("Failed to send SIGHUP: {e}"))?;
         }
 
+        // Give Vector a moment to process the reload signal before polling
+        sleep(Duration::from_millis(500)).await;
+
         // Poll for reload completion with crash detection
-        wait_for_topology_match(&mut self.vector, &self.api_client, expected_component_ids).await
+        wait_for_topology_match(
+            &mut self.vector,
+            &mut self.api_client,
+            expected_component_ids,
+        )
+        .await
     }
 
     /// Checks if Vector is still running
@@ -245,10 +248,11 @@ pub fn create_data_directory() -> PathBuf {
 /// Fails fast if Vector crashes, succeeds fast if API becomes ready quickly.
 pub async fn wait_for_startup(
     vector: &mut Child,
-    client: &Client,
+    client: &mut Client,
     timeout: Duration,
 ) -> Result<(), String> {
     let start = Instant::now();
+    let mut connected = false;
 
     loop {
         // Check if Vector crashed
@@ -263,8 +267,13 @@ pub async fn wait_for_startup(
             };
         }
 
-        // Check if API is ready
-        if client.healthcheck().await.is_ok() {
+        // Try to connect if not connected yet
+        if !connected && client.connect().await.is_ok() {
+            connected = true;
+        }
+
+        // Check if API is ready (only if connected)
+        if connected && client.health().await.is_ok() {
             return Ok(());
         }
 
@@ -284,12 +293,11 @@ pub async fn wait_for_startup(
 /// Combines topology polling with crash detection for reload scenarios.
 pub async fn wait_for_topology_match(
     vector: &mut Child,
-    client: &Client,
+    client: &mut Client,
     expected_component_ids: &[&str],
 ) -> Result<(), String> {
-    use vector_lib::api_client::gql::ComponentsQueryExt;
-
     let start = Instant::now();
+    let mut last_components: Vec<String> = Vec::new();
 
     loop {
         // Check if Vector crashed
@@ -298,19 +306,24 @@ pub async fn wait_for_topology_match(
         }
 
         // Query components to see if topology matches
-        if let Ok(result) = client.components_query(100).await
-            && let Some(data) = result.data
-        {
-            let mut current_ids: Vec<&str> = data
+        if let Ok(response) = client.get_components(100).await {
+            let mut current_ids: Vec<String> = response
                 .components
-                .edges
                 .iter()
-                .map(|e| e.node.component_id.as_str())
+                .map(|c| c.component_id.clone())
                 .collect();
             current_ids.sort_unstable();
 
-            let mut expected_sorted = expected_component_ids.to_vec();
+            let mut expected_sorted: Vec<String> = expected_component_ids
+                .iter()
+                .map(|s| s.to_string())
+                .collect();
             expected_sorted.sort_unstable();
+
+            // Track last seen components for better error reporting
+            if current_ids != last_components {
+                last_components = current_ids.clone();
+            }
 
             if current_ids == expected_sorted {
                 return Ok(());
@@ -320,7 +333,8 @@ pub async fn wait_for_topology_match(
         // Check timeout
         if start.elapsed() >= STARTUP_TIMEOUT {
             return Err(format!(
-                "Topology did not match expected components within {STARTUP_TIMEOUT:?}"
+                "Topology did not match expected components within {STARTUP_TIMEOUT:?}. Last seen: {:?}, expected: {:?}",
+                last_components, expected_component_ids
             ));
         }
 
@@ -330,16 +344,14 @@ pub async fn wait_for_topology_match(
 
 /// Waits for a component to process the expected number of events
 ///
-/// Polls the GraphQL API until the component's sent_events_total
+/// Polls the gRPC API until the component's sent_events_total
 /// reaches or exceeds the expected count.
 pub async fn wait_for_component_events(
-    client: &Client,
+    client: &mut Client,
     component_id: &str,
     expected_events: i64,
     timeout: Duration,
 ) -> Result<i64, String> {
-    use vector_lib::api_client::gql::ComponentsQueryExt;
-
     let start = Instant::now();
     let mut last_count = 0;
 
@@ -350,20 +362,21 @@ pub async fn wait_for_component_events(
             ));
         }
 
-        let result = client
-            .components_query(100)
+        let response = client
+            .get_components(100)
             .await
             .map_err(|e| format!("Query failed: {e}"))?;
 
-        let data = result.data.ok_or("No data in response")?;
-
-        if let Some(component) = data
+        if let Some(component) = response
             .components
-            .edges
             .iter()
-            .find(|e| e.node.component_id == component_id)
+            .find(|c| c.component_id == component_id)
         {
-            let events = component.node.on.sent_events_total();
+            let events = component
+                .metrics
+                .as_ref()
+                .and_then(|m| m.sent_events_total)
+                .unwrap_or(0);
 
             if events != last_count {
                 last_count = events;

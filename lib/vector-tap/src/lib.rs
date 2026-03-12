@@ -9,20 +9,31 @@ pub mod topology;
 
 use std::{borrow::Cow, collections::BTreeMap};
 
+use bytes::Bytes;
 use colored::{ColoredString, Colorize};
+use prost::Message;
 use tokio::{
     sync::mpsc as tokio_mpsc,
     time::{Duration, Instant, timeout},
 };
 use tokio_stream::StreamExt;
+use tokio_util::codec::Encoder;
 use url::Url;
 use vector_api_client::{
-    connect_subscription_client,
-    gql::{
-        TapEncodingFormat, TapSubscriptionExt,
-        output_events_by_component_id_patterns_subscription::OutputEventsByComponentIdPatternsSubscriptionOutputEventsByComponentIdPatterns as GraphQLTapOutputEvent,
-    },
+    Client,
+    proto::{OutputEvent, OutputEventsRequest},
 };
+use vector_core::event::Event;
+
+#[derive(Clone, Copy, Debug, clap::ValueEnum)]
+pub enum TapEncodingFormat {
+    Json,
+    Yaml,
+    Logfmt,
+}
+
+// Note: TapEncodingFormat is kept for CLI compatibility but not used in the gRPC API
+// The server now sends proto events directly, which clients serialize as needed
 
 #[derive(Clone, Debug)]
 pub struct EventFormatter {
@@ -103,14 +114,20 @@ impl EventFormatter {
 #[derive(Clone, Debug)]
 pub enum OutputChannel {
     Stdout(EventFormatter),
-    AsyncChannel(tokio_mpsc::Sender<Vec<GraphQLTapOutputEvent>>),
+    AsyncChannel(tokio_mpsc::Sender<Vec<OutputEvent>>),
 }
 
-/// Error type for DNS message parsing
+/// Error type for tap execution
 #[derive(Debug)]
 pub enum TapExecutorError {
-    ConnectionFailure(tokio_tungstenite::tungstenite::Error),
-    GraphQLError,
+    ConnectionFailure(String),
+    GrpcError(String),
+}
+
+impl From<vector_api_client::Error> for TapExecutorError {
+    fn from(err: vector_api_client::Error) -> Self {
+        TapExecutorError::GrpcError(format!("{}", err))
+    }
 }
 
 #[derive(Debug)]
@@ -119,7 +136,6 @@ pub struct TapRunner<'a> {
     input_patterns: Vec<String>,
     output_patterns: Vec<String>,
     output_channel: &'a OutputChannel,
-    format: TapEncodingFormat,
 }
 
 impl<'a> TapRunner<'a> {
@@ -128,14 +144,12 @@ impl<'a> TapRunner<'a> {
         input_patterns: Vec<String>,
         output_patterns: Vec<String>,
         output_channel: &'a OutputChannel,
-        format: TapEncodingFormat,
     ) -> Self {
         TapRunner {
             url,
             input_patterns,
             output_patterns,
             output_channel,
-            format,
         }
     }
 
@@ -146,26 +160,24 @@ impl<'a> TapRunner<'a> {
         duration_ms: Option<u64>,
         quiet: bool,
     ) -> Result<(), TapExecutorError> {
-        let subscription_client = connect_subscription_client((*self.url).clone())
-            .await
-            .map_err(TapExecutorError::ConnectionFailure)?;
+        let mut client = Client::new(self.url.as_str()).await?;
+        client.connect().await?;
 
-        tokio::pin! {
-            let stream = subscription_client.output_events_by_component_id_patterns_subscription(
-                self.output_patterns.clone(),
-                self.input_patterns.clone(),
-                self.format,
-                limit,
-                interval,
-            );
-        }
+        let request = OutputEventsRequest {
+            outputs_patterns: self.output_patterns.clone(),
+            inputs_patterns: self.input_patterns.clone(),
+            limit: limit as i32,
+            interval_ms: interval as i32,
+        };
+
+        let mut stream = client.stream_output_events(request).await?;
 
         let start_time = Instant::now();
         let stream_duration = duration_ms
             .map(Duration::from_millis)
             .unwrap_or(Duration::MAX);
 
-        // Loop over the returned results, printing out tap events.
+        // Loop over the returned results, processing tap events
         loop {
             let time_elapsed = start_time.elapsed();
             if time_elapsed >= stream_duration {
@@ -174,27 +186,26 @@ impl<'a> TapRunner<'a> {
 
             let message = timeout(stream_duration - time_elapsed, stream.next()).await;
             match message {
-                Ok(Some(Some(res))) => {
-                    if let Some(d) = res.data {
-                        let output_events: Vec<GraphQLTapOutputEvent> = d
-                            .output_events_by_component_id_patterns
-                            .into_iter()
-                            .filter(|event| {
-                                !matches!(
-                                    (quiet, event),
-                                    (true, GraphQLTapOutputEvent::EventNotification(_))
-                                )
-                            })
-                            .collect();
+                Ok(Some(Ok(output_event))) => {
+                    // Filter out notifications if quiet mode is enabled
+                    if quiet
+                        && matches!(
+                            output_event.event,
+                            Some(vector_api_client::proto::output_event::Event::Notification(
+                                _
+                            ))
+                        )
+                    {
+                        continue;
+                    }
 
-                        match &self.output_channel {
-                            OutputChannel::Stdout(formatter) => {
-                                self.output_event_stdout(&output_events, formatter);
-                            }
-                            OutputChannel::AsyncChannel(sender_tx) => {
-                                if let Err(error) = sender_tx.send(output_events).await {
-                                    error!("Could not send tap events: {error}");
-                                }
+                    match &self.output_channel {
+                        OutputChannel::Stdout(formatter) => {
+                            self.output_event_stdout(&output_event, formatter);
+                        }
+                        OutputChannel::AsyncChannel(sender_tx) => {
+                            if let Err(error) = sender_tx.send(vec![output_event]).await {
+                                error!("Could not send tap events: {error}");
                             }
                         }
                     }
@@ -205,56 +216,102 @@ impl<'a> TapRunner<'a> {
                 {
                     return Ok(());
                 }
-                Ok(_) => return Err(TapExecutorError::GraphQLError),
+                Ok(None) => {
+                    return Err(TapExecutorError::GrpcError(
+                        "Stream ended unexpectedly".to_string(),
+                    ));
+                }
+                Ok(Some(Err(err))) => return Err(TapExecutorError::from(err)),
+            }
+        }
+    }
+
+    /// Convert and serialize a protobuf EventWrapper to the requested format
+    fn serialize_event(
+        event_wrapper: &vector_api_client::proto::event::EventWrapper,
+        format: TapEncodingFormat,
+    ) -> Result<String, String> {
+        // Encode the vector-api-client EventWrapper to protobuf bytes
+        let bytes = event_wrapper.encode_to_vec();
+
+        // Decode as vector-core EventWrapper
+        let core_event_wrapper =
+            vector_core::event::proto::EventWrapper::decode(Bytes::from(bytes))
+                .map_err(|e| format!("Failed to decode event: {}", e))?;
+
+        // Convert to vector-core Event (which has Serialize)
+        let event: Event = core_event_wrapper.into();
+
+        // Serialize based on format
+        match format {
+            TapEncodingFormat::Json => serde_json::to_string(&event)
+                .map_err(|e| format!("JSON serialization failed: {}", e)),
+            TapEncodingFormat::Yaml => serde_yaml::to_string(&event)
+                .map_err(|e| format!("YAML serialization failed: {}", e)),
+            TapEncodingFormat::Logfmt => {
+                // For logfmt, we need to extract the log event and serialize it
+                match event {
+                    Event::Log(log_event) => {
+                        let mut serializer =
+                            codecs::encoding::format::LogfmtSerializerConfig.build();
+                        let mut bytes = bytes::BytesMut::new();
+                        // Wrap the LogEvent back into Event for the serializer
+                        serializer
+                            .encode(Event::Log(log_event), &mut bytes)
+                            .map_err(|e| format!("Logfmt serialization failed: {}", e))?;
+                        String::from_utf8(bytes.to_vec())
+                            .map_err(|e| format!("UTF-8 conversion failed: {}", e))
+                    }
+                    Event::Metric(_) => {
+                        // Metrics don't serialize well to logfmt, use JSON as fallback
+                        serde_json::to_string(&event)
+                            .map_err(|e| format!("JSON serialization failed: {}", e))
+                    }
+                    Event::Trace(_) => {
+                        // Traces don't serialize well to logfmt, use JSON as fallback
+                        serde_json::to_string(&event)
+                            .map_err(|e| format!("JSON serialization failed: {}", e))
+                    }
+                }
             }
         }
     }
 
     #[allow(clippy::print_stdout)]
-    fn output_event_stdout(
-        &self,
-        output_events: &[GraphQLTapOutputEvent],
-        formatter: &EventFormatter,
-    ) {
-        for tap_event in output_events.iter() {
-            match tap_event {
-                GraphQLTapOutputEvent::Log(ev) => {
-                    println!(
-                        "{}",
-                        formatter.format(
-                            ev.component_id.as_ref(),
-                            ev.component_kind.as_ref(),
-                            ev.component_type.as_ref(),
-                            ev.string.as_ref()
-                        )
-                    );
-                }
-                GraphQLTapOutputEvent::Metric(ev) => {
-                    println!(
-                        "{}",
-                        formatter.format(
-                            ev.component_id.as_ref(),
-                            ev.component_kind.as_ref(),
-                            ev.component_type.as_ref(),
-                            ev.string.as_ref()
-                        )
-                    );
-                }
-                GraphQLTapOutputEvent::Trace(ev) => {
-                    println!(
-                        "{}",
-                        formatter.format(
-                            ev.component_id.as_ref(),
-                            ev.component_kind.as_ref(),
-                            ev.component_type.as_ref(),
-                            ev.string.as_ref()
-                        )
-                    );
-                }
-                #[allow(clippy::print_stderr)]
-                GraphQLTapOutputEvent::EventNotification(ev) => {
-                    eprintln!("{}", ev.message);
-                }
+    fn output_event_stdout(&self, output_event: &OutputEvent, formatter: &EventFormatter) {
+        use vector_api_client::proto::output_event::Event as OutputEventType;
+
+        match &output_event.event {
+            Some(OutputEventType::TappedEvent(ev)) => {
+                // Format the proto event for display
+                let encoded_string = if let Some(ref event_wrapper) = ev.event {
+                    match Self::serialize_event(event_wrapper, formatter.format) {
+                        Ok(s) => s,
+                        Err(e) => {
+                            error!(message = "Failed to serialize event.", error = %e);
+                            format!("{:?}", event_wrapper)
+                        }
+                    }
+                } else {
+                    "No event data".to_string()
+                };
+
+                println!(
+                    "{}",
+                    formatter.format(
+                        &ev.component_id,
+                        &ev.component_kind,
+                        &ev.component_type,
+                        &encoded_string
+                    )
+                );
+            }
+            #[allow(clippy::print_stderr)]
+            Some(OutputEventType::Notification(ev)) => {
+                eprintln!("{}", ev.message);
+            }
+            None => {
+                error!("Received OutputEvent with no event data");
             }
         }
     }

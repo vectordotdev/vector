@@ -20,13 +20,6 @@ test = false
 bench = false
 
 [[bin]]
-name = "graphql-schema"
-path = "src/api/schema/gen.rs"
-test = false
-bench = false
-required-features = ["default-no-api-client"]
-
-[[bin]]
 name = "secret-backend-example"
 path = "src/config/loading/secret_backend_example.rs"
 test = false
@@ -204,6 +197,7 @@ tokio-tungstenite = { version = "0.20.1", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
+tonic-reflection = { version = "0.11", default-features = false, features = ["server"] }
 tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"]  }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
@@ -339,10 +333,6 @@ smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 lapin = { version = "2.5.3", default-features = false, features = ["native-tls"], optional = true }
 deadpool = { version = "0.12.2", default-features = false, features = ["managed", "rt_tokio_1"], optional = true }
 
-# API
-async-graphql = { version = "7.0.17", default-features = false, optional = true, features = ["chrono", "playground"] }
-async-graphql-warp = { version = "7.0.17", default-features = false, optional = true }
-
 # Opentelemetry
 
 hex = { version = "0.4.3", default-features = false, optional = true }
@@ -436,6 +426,7 @@ tokio-tungstenite = { workspace = true, features = ["connect"], optional = true 
 toml.workspace = true
 hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
+tonic-reflection = { workspace = true, optional = true }
 thread_local = { version = "1.1.9", default-features = false, optional = true }
 typetag = { version = "0.2.20", default-features = false }
 url.workspace = true
@@ -557,9 +548,12 @@ docker = ["dep:bollard", "dep:dirs-next"]
 
 # API
 api = [
-  "dep:async-graphql",
-  "dep:async-graphql-warp",
   "dep:base64",
+  "dep:tonic",
+  "dep:tonic-reflection",
+  "dep:prost",
+  "dep:prost-types",
+  "protobuf-build",
   "vector-lib/api",
 ]
 
