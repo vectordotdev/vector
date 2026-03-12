@@ -61,8 +61,8 @@ pub struct AzureBlobSinkConfig {
     /// | Allowed resource types | Container & Object |
     /// | Allowed permissions    | Read & Create      |
     #[configurable(metadata(
-        docs::warnings = "Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage\
-        resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep\
+        docs::warnings = "Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage \
+        resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep \
         connection strings secure and not expose them in logs, error messages, or version control systems."
     ))]
     #[configurable(metadata(
