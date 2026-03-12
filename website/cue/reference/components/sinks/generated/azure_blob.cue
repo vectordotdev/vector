@@ -296,6 +296,7 @@ generated: components: sinks: azure_blob: configuration: {
 			"""
 		required: false
 		type: string: examples: ["DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net", "BlobEndpoint=https://mylogstorage.blob.core.windows.net/;SharedAccessSignature=generatedsastoken", "AccountName=mylogstorage"]
+		warnings: ["Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storageresources. Numerous security breaches have occurred due to leaked connection strings. It is important to keepconnection strings secure and not expose them in logs, error messages, or version control systems."]
 	}
 	container_name: {
 		description: "The Azure Blob Storage Account container name."

@@ -53,11 +53,6 @@ pub struct AzureBlobSinkConfig {
     /// healthchecks will fail and will need to be disabled by setting
     /// `healthcheck.enabled` to `false` for this sink
     ///
-    /// SECURITY WARNING: Access keys and SAS tokens can be used to gain unauthorized access to
-    /// Azure Blob Storage resources. Numerous security breaches have occurred due to leaked
-    /// connection strings. It is important to keep connection strings secure and not expose them
-    /// in logs, error messages, or version control systems.
-    ///
     /// When generating an account SAS, the following are the minimum required option
     /// settings for Vector to access blob storage and pass a health check.
     /// | Option                 | Value              |
@@ -65,6 +60,11 @@ pub struct AzureBlobSinkConfig {
     /// | Allowed services       | Blob               |
     /// | Allowed resource types | Container & Object |
     /// | Allowed permissions    | Read & Create      |
+    #[configurable(metadata(
+        docs::warnings = "Access keys and SAS tokens can be used to gain unauthorized access to Azure Blob Storage\
+        resources. Numerous security breaches have occurred due to leaked connection strings. It is important to keep\
+        connection strings secure and not expose them in logs, error messages, or version control systems."
+    ))]
     #[configurable(metadata(
         docs::examples = "DefaultEndpointsProtocol=https;AccountName=mylogstorage;AccountKey=storageaccountkeybase64encoded;EndpointSuffix=core.windows.net"
     ))]
