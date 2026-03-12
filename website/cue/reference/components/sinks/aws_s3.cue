@@ -236,9 +236,11 @@ components: sinks: aws_s3: components._aws & {
 
 				#### Option 1: Inline Field List
 
-				Simple flat schemas using Vector type names. Supported types: `utf8`,
-				`int32`, `int64`, `float32`, `float64`, `boolean`,
-				`timestamp_millisecond`, `timestamp_microsecond`.
+				Schemas using Vector type names. Scalar types: `utf8`, `int32`, `int64`,
+				`float32`, `float64`, `boolean`, `binary`, `timestamp_millisecond`,
+				`timestamp_microsecond`, `timestamp_nanosecond`, `date32`.
+				Compound types (one level of nesting): `struct` (with `fields`),
+				`list` (with `items`), `map` (with `key_type` and `value_type`).
 
 				```toml
 				[sinks.s3_parquet]
@@ -260,8 +262,21 @@ components: sinks: aws_s3: components._aws & {
 				type = "timestamp_millisecond"
 
 				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
-				name = "host"
-				type = "utf8"
+				name = "metadata"
+				type = "struct"
+
+				  [[sinks.s3_parquet.batch_encoding.parquet.schema.fields]]
+				  name = "source"
+				  type = "utf8"
+
+				  [[sinks.s3_parquet.batch_encoding.parquet.schema.fields]]
+				  name = "region"
+				  type = "utf8"
+
+				[[sinks.s3_parquet.batch_encoding.parquet.schema]]
+				name = "tags"
+				type = "list"
+				items = "utf8"
 				```
 
 				#### Option 2: Native Parquet Schema (Inline)
@@ -318,7 +333,7 @@ components: sinks: aws_s3: components._aws & {
 				parquet.proto_message_type = "mypackage.LogRecord"
 				```
 
-				#### YAML Example (Inline Field List)
+				#### YAML Example (Inline with Nested Types)
 
 				```yaml
 				sinks:
@@ -336,15 +351,27 @@ components: sinks: aws_s3: components._aws & {
 				            type: utf8
 				          - name: timestamp
 				            type: timestamp_millisecond
-				          - name: host
-				            type: utf8
+				          - name: metadata
+				            type: struct
+				            fields:
+				              - name: source
+				                type: utf8
+				              - name: region
+				                type: utf8
+				          - name: tags
+				            type: list
+				            items: utf8
+				          - name: labels
+				            type: map
+				            key_type: utf8
+				            value_type: utf8
 				```
 
 				#### Configuration Reference
 
 				| Field | Type | Description |
 				|---|---|---|
-				| `schema` | array of objects | Inline field list (name + type pairs) |
+				| `schema` | array of objects | Inline field list with `name`, `type`, and optional `fields`/`items`/`key_type`/`value_type` for nesting |
 				| `parquet_schema` | string | Native Parquet schema string |
 				| `schema_file` | path | Path to `.schema` file |
 				| `avro_schema` | string | Avro JSON schema string |
