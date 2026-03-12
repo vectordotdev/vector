@@ -9,7 +9,7 @@ use std::sync::Arc;
 use vector_config::configurable_component;
 use vector_core::{
     config::DataType,
-    event::{Event, Value},
+    event::Event,
     schema,
 };
 use vrl::protobuf::encode::{Options, encode_message};
@@ -118,12 +118,7 @@ impl ProtoBatchSerializer {
                 Event::Log(log) => {
                     encode_message(&self.descriptor, log.value().clone(), &self.options)
                 }
-                Event::Trace(trace) => encode_message(
-                    &self.descriptor,
-                    Value::Object(trace.as_map().clone()),
-                    &self.options,
-                ),
-                Event::Metric(_) => {
+                Event::Trace(_) | Event::Metric(_) => {
                     return Err(ProtoBatchEncodingError::UnsupportedEventType);
                 }
             }
