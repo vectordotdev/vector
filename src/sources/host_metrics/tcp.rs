@@ -91,7 +91,7 @@ fn tcp_state_to_string(state: TcpState) -> &'static str {
 fn parse_tcp_entries(entries: Vec<TcpNetEntry>, tcp_stats: &mut TcpStats) {
     for entry in entries {
         let state_str = tcp_state_to_string(entry.state);
-        *tcp_stats.conn_states.entry(state_str).or_insert(0.0) += 1.0;
+        *tcp_stats.conn_states.entry(state_str.to_string()).or_insert(0.0) += 1.0;
         tcp_stats.tx_queued_bytes += f64::from(entry.tx_queue);
         tcp_stats.rx_queued_bytes += f64::from(entry.rx_queue);
     }
