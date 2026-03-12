@@ -29,7 +29,7 @@ impl OtlpSerializerConfig {
 
     /// The data type of events that are accepted by `OtlpSerializer`.
     pub fn input_type(&self) -> DataType {
-        DataType::Log | DataType::Trace | DataType::Metric
+        DataType::all_bits()
     }
 
     /// The schema required by the serializer.
