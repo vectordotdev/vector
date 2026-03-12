@@ -202,6 +202,11 @@ pub fn native_trace_to_otlp_request(trace: &TraceEvent) -> ExportTraceServiceReq
 }
 
 fn build_span_from_native(trace: &TraceEvent) -> Span {
+    let mut attributes = extract_trace_kv_attributes(trace, ATTRIBUTES_KEY);
+    // Collect non-OTLP fields (e.g., deployment_id, tenant) into attributes
+    // to prevent data loss during conversion
+    collect_trace_remaining_fields(trace, &mut attributes);
+
     Span {
         trace_id: extract_trace_id(trace),
         span_id: extract_span_id(trace, SPAN_ID_KEY),
@@ -211,13 +216,62 @@ fn build_span_from_native(trace: &TraceEvent) -> Span {
         kind: extract_trace_i32(trace, "kind"),
         start_time_unix_nano: extract_trace_timestamp_nanos(trace, "start_time_unix_nano"),
         end_time_unix_nano: extract_trace_timestamp_nanos(trace, "end_time_unix_nano"),
-        attributes: extract_trace_kv_attributes(trace, ATTRIBUTES_KEY),
+        attributes,
         dropped_attributes_count: extract_trace_u32(trace, DROPPED_ATTRIBUTES_COUNT_KEY),
         events: extract_trace_span_events(trace),
         dropped_events_count: extract_trace_u32(trace, "dropped_events_count"),
         links: extract_trace_span_links(trace),
         dropped_links_count: extract_trace_u32(trace, "dropped_links_count"),
         status: extract_trace_status(trace),
+    }
+}
+
+// ============================================================================
+// Remaining fields collection for TraceEvent
+// ============================================================================
+
+/// Known OTLP span fields that are extracted into specific Span/scope/resource fields.
+/// Fields not in this list are collected as additional attributes to prevent data loss.
+const KNOWN_OTLP_SPAN_FIELDS: &[&str] = &[
+    TRACE_ID_KEY,
+    SPAN_ID_KEY,
+    "parent_span_id",
+    "trace_state",
+    "name",
+    "kind",
+    "start_time_unix_nano",
+    "end_time_unix_nano",
+    ATTRIBUTES_KEY,
+    DROPPED_ATTRIBUTES_COUNT_KEY,
+    "events",
+    "dropped_events_count",
+    "links",
+    "dropped_links_count",
+    "status",
+    RESOURCE_KEY,
+    "resource",
+    "resource_attributes",
+    "scope",
+    "schema_url",
+    "ingest_timestamp", // Added by decode path (line 130)
+];
+
+/// Collect event root fields that are not known OTLP span fields and add them as attributes.
+/// This prevents data loss for user-added fields (e.g., deployment_id, tenant, environment).
+fn collect_trace_remaining_fields(trace: &TraceEvent, existing_attrs: &mut Vec<KeyValue>) {
+    let map = trace.as_map();
+
+    for (key, value) in map.iter() {
+        let key_str: &str = key;
+        if KNOWN_OTLP_SPAN_FIELDS.contains(&key_str) || matches!(value, Value::Null) {
+            continue;
+        }
+        existing_attrs.push(KeyValue {
+            key: key_str.to_string(),
+            value: Some(AnyValue {
+                value: Some(value.clone().into()),
+            }),
+        });
     }
 }
 
@@ -1116,5 +1170,182 @@ mod native_trace_conversion_tests {
         let span = &request.resource_spans[0].scope_spans[0].spans[0];
 
         assert_eq!(span.start_time_unix_nano, 1704067200_000_000_000u64);
+    }
+
+    // ========================================================================
+    // Remaining fields → attributes tests
+    // ========================================================================
+
+    #[test]
+    fn test_unknown_trace_fields_collected_as_attributes() {
+        let trace = make_trace(btreemap! {
+            "name" => "test-span",
+            "trace_id" => "0123456789abcdef0123456789abcdef",
+            "span_id" => "0123456789abcdef",
+            "deployment_id" => "deploy-42",
+            "tenant" => "acme-corp",
+            "environment" => "production",
+        });
+
+        let request = native_trace_to_otlp_request(&trace);
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        let attr_keys: Vec<&str> = span.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            attr_keys.contains(&"deployment_id"),
+            "deployment_id should be in attributes, got {attr_keys:?}"
+        );
+        assert!(
+            attr_keys.contains(&"tenant"),
+            "tenant should be in attributes, got {attr_keys:?}"
+        );
+        assert!(
+            attr_keys.contains(&"environment"),
+            "environment should be in attributes, got {attr_keys:?}"
+        );
+    }
+
+    #[test]
+    fn test_known_trace_fields_not_in_attributes() {
+        let trace = make_trace(btreemap! {
+            "name" => "test-span",
+            "trace_id" => "0123456789abcdef0123456789abcdef",
+            "span_id" => "0123456789abcdef",
+            "kind" => 2,
+            "trace_state" => "key=value",
+        });
+
+        let request = native_trace_to_otlp_request(&trace);
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        let attr_keys: Vec<&str> = span.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            !attr_keys.contains(&"name"),
+            "known field 'name' should not be in attributes"
+        );
+        assert!(
+            !attr_keys.contains(&"trace_id"),
+            "known field 'trace_id' should not be in attributes"
+        );
+        assert!(
+            !attr_keys.contains(&"span_id"),
+            "known field 'span_id' should not be in attributes"
+        );
+        assert!(
+            !attr_keys.contains(&"kind"),
+            "known field 'kind' should not be in attributes"
+        );
+        assert!(
+            !attr_keys.contains(&"trace_state"),
+            "known field 'trace_state' should not be in attributes"
+        );
+    }
+
+    #[test]
+    fn test_trace_remaining_fields_merged_with_explicit_attributes() {
+        let mut attrs = ObjectMap::new();
+        attrs.insert("http.method".into(), Value::from("GET"));
+
+        let trace = make_trace(btreemap! {
+            "name" => "http-request",
+            "attributes" => Value::Object(attrs),
+            "custom_tag" => "my-value",
+        });
+
+        let request = native_trace_to_otlp_request(&trace);
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        let attr_keys: Vec<&str> = span.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            attr_keys.contains(&"http.method"),
+            "explicit attribute should be present"
+        );
+        assert!(
+            attr_keys.contains(&"custom_tag"),
+            "remaining field should be in attributes"
+        );
+    }
+
+    #[test]
+    fn test_trace_null_fields_not_in_attributes() {
+        let trace = make_trace(btreemap! {
+            "name" => "test-span",
+            "should_be_dropped" => Value::Null,
+            "valid_field" => "keep me",
+        });
+
+        let request = native_trace_to_otlp_request(&trace);
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        let attr_keys: Vec<&str> = span.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            !attr_keys.contains(&"should_be_dropped"),
+            "Null fields must not appear in attributes"
+        );
+        assert!(attr_keys.contains(&"valid_field"));
+    }
+
+    #[test]
+    fn test_trace_many_custom_fields_preserved() {
+        use super::super::proto::common::v1::any_value::Value as PBValue;
+
+        let trace = make_trace(btreemap! {
+            "name" => "db-query",
+            "trace_id" => "0123456789abcdef0123456789abcdef",
+            "span_id" => "0123456789abcdef",
+            "host" => "db-primary-1",
+            "pod_name" => "api-7b9f4d-x2k9p",
+            "namespace" => "production",
+            "db_latency_ms" => 42i64,
+            "is_cached" => false,
+        });
+
+        let request = native_trace_to_otlp_request(&trace);
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        let attr_keys: Vec<&str> = span.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        for expected in ["host", "pod_name", "namespace", "db_latency_ms", "is_cached"] {
+            assert!(
+                attr_keys.contains(&expected),
+                "'{expected}' should be in attributes, got {attr_keys:?}"
+            );
+        }
+
+        // Verify types preserved
+        let find = |key: &str| -> &PBValue {
+            span.attributes
+                .iter()
+                .find(|kv| kv.key == key)
+                .unwrap()
+                .value
+                .as_ref()
+                .unwrap()
+                .value
+                .as_ref()
+                .unwrap()
+        };
+
+        assert!(matches!(find("db_latency_ms"), PBValue::IntValue(42)));
+        assert!(matches!(find("is_cached"), PBValue::BoolValue(false)));
+    }
+
+    #[test]
+    fn test_trace_ingest_timestamp_not_in_attributes() {
+        // ingest_timestamp is added by the decode path and should be treated as known
+        let trace = make_trace(btreemap! {
+            "name" => "test-span",
+            "ingest_timestamp" => Value::Timestamp(Utc::now()),
+            "custom_field" => "keep me",
+        });
+
+        let request = native_trace_to_otlp_request(&trace);
+        let span = &request.resource_spans[0].scope_spans[0].spans[0];
+
+        let attr_keys: Vec<&str> = span.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            !attr_keys.contains(&"ingest_timestamp"),
+            "ingest_timestamp is a known field, should not be in attributes"
+        );
+        assert!(attr_keys.contains(&"custom_field"));
     }
 }
