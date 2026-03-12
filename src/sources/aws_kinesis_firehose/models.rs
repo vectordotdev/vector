@@ -1,6 +1,6 @@
 use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use std::collections::HashMap;
 
 /// Represents AWS Kinesis Firehose X-Amz-Firehose-Common-Attributes header
 ///
@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct FirehoseCommonAttributesHeader {
-    pub common_attributes: BTreeMap<String, String>,
+    pub common_attributes: HashMap<String, String>,
 }
 
 /// Represents an AWS Kinesis Firehose request

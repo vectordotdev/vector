@@ -1,4 +1,4 @@
-use std::{convert::Infallible, io};
+use std::{collections::HashMap, convert::Infallible, io};
 
 use bytes::{Buf, Bytes};
 use chrono::Utc;
@@ -8,7 +8,6 @@ use vector_lib::{
     config::LogNamespace,
     internal_event::{BytesReceived, Protocol},
 };
-use vrl::value::ObjectMap;
 use warp::{Filter, http::StatusCode};
 
 use super::{
@@ -19,8 +18,8 @@ use super::{
 };
 use crate::{
     SourceSender, codecs,
-    event::Value,
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
+    sources::http_server::HttpConfigParamKind,
 };
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
@@ -32,6 +31,7 @@ pub fn firehose(
     acknowledgements: bool,
     out: SourceSender,
     log_namespace: LogNamespace,
+    common_attributes: Vec<HttpConfigParamKind>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = Infallible> + Clone {
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     let context = handlers::Context {
@@ -42,6 +42,7 @@ pub fn firehose(
         bytes_received,
         out,
         log_namespace,
+        common_attributes,
     };
     warp::post()
         .and(emit_received())
@@ -111,7 +112,7 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
 
 /// Parse AWS Kinesis Firehose X-Amz-Firehose-Common-Attributes header
 fn parse_common_attributes_header()
--> impl Filter<Extract = (ObjectMap,), Error = warp::reject::Rejection> + Clone {
+-> impl Filter<Extract = (HashMap<String, String>,), Error = warp::reject::Rejection> + Clone {
     warp::any()
         .and(warp::header("X-Amz-Firehose-Request-Id"))
         .and(warp::header::optional("X-Amz-Firehose-Common-Attributes"))
@@ -123,21 +124,10 @@ fn parse_common_attributes_header()
                             request_id: request_id.clone(),
                         })
                         .map(|common_attributes_header: FirehoseCommonAttributesHeader| {
-                            let mut common_attributes_map = ObjectMap::new();
-
-                            for (attribute_name, attribute_value) in
-                                common_attributes_header.common_attributes.iter()
-                            {
-                                common_attributes_map.insert(
-                                    attribute_name.to_owned().into(),
-                                    Value::from(attribute_value.to_owned()),
-                                );
-                            }
-
-                            return common_attributes_map;
+                            common_attributes_header.common_attributes
                         })
                         .map_err(warp::reject::custom),
-                    None => Ok(ObjectMap::new()),
+                    None => Ok(HashMap::new()),
                 }
             },
         )

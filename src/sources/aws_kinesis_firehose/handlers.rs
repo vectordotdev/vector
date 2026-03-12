@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::Read;
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
@@ -19,7 +20,10 @@ use vector_lib::{
     lookup::{PathPrefix, metadata_path, path},
     source_sender::SendError,
 };
-use vrl::{compiler::SecretTarget, value::ObjectMap};
+use vrl::{
+    compiler::SecretTarget,
+    value::{KeyString, ObjectMap, Value},
+};
 use warp::reject;
 
 use super::{
@@ -36,6 +40,7 @@ use crate::{
         AwsKinesisFirehoseAutomaticRecordDecodeError, EventsReceived, StreamClosedError,
     },
     sources::aws_kinesis_firehose::AwsKinesisFirehoseConfig,
+    sources::http_server::HttpConfigParamKind,
 };
 
 #[derive(Clone)]
@@ -47,18 +52,21 @@ pub(super) struct Context {
     pub(super) bytes_received: Registered<BytesReceived>,
     pub(super) out: SourceSender,
     pub(super) log_namespace: LogNamespace,
+    pub(super) common_attributes: Vec<HttpConfigParamKind>,
 }
 
 /// Publishes decoded events from the FirehoseRequest to the pipeline
 pub(super) async fn firehose(
     request_id: String,
     source_arn: String,
-    common_attributes: ObjectMap,
+    common_attributes: HashMap<String, String>,
     request: FirehoseRequest,
     mut context: Context,
 ) -> Result<impl warp::Reply, reject::Rejection> {
     let log_namespace = context.log_namespace;
     let events_received = register!(EventsReceived);
+    let common_attributes_map =
+        build_common_attributes_map(&context.common_attributes, &common_attributes);
 
     for record in request.records {
         let bytes = decode_record(&record, context.compression)
@@ -133,13 +141,15 @@ pub(super) async fn firehose(
                                 source_arn.to_owned(),
                             );
 
-                            log_namespace.insert_source_metadata(
-                                AwsKinesisFirehoseConfig::NAME,
-                                log,
-                                Some(LegacyKey::InsertIfEmpty(path!("common_attributes"))),
-                                path!("common_attributes"),
-                                common_attributes.clone(),
-                            );
+                            if common_attributes_map.len() > 0 {
+                                log_namespace.insert_source_metadata(
+                                    AwsKinesisFirehoseConfig::NAME,
+                                    log,
+                                    Some(LegacyKey::InsertIfEmpty(path!("common_attributes"))),
+                                    path!("common_attributes"),
+                                    common_attributes_map.clone(),
+                                );
+                            }
 
                             if context.store_access_key
                                 && let Some(access_key) = &request.access_key
@@ -263,6 +273,42 @@ fn decode_gzip(data: &[u8]) -> std::io::Result<Bytes> {
     gz.read_to_end(&mut decoded)?;
 
     Ok(Bytes::from(decoded))
+}
+
+fn build_common_attributes_map(
+    common_attributes_config: &[HttpConfigParamKind],
+    common_attributes: &HashMap<String, String>,
+) -> ObjectMap {
+    let mut common_attributes_map = ObjectMap::new();
+
+    for common_attribute_config in common_attributes_config {
+        match common_attribute_config {
+            HttpConfigParamKind::Exact(common_attribute_name) => {
+                let value = common_attributes
+                    .get(common_attribute_name)
+                    .map(String::as_bytes);
+                common_attributes_map.insert(
+                    KeyString::from(common_attribute_name.to_owned()),
+                    Value::from(value.map(Bytes::copy_from_slice)),
+                );
+            }
+            HttpConfigParamKind::Glob(common_attribute_pattern) => {
+                for common_attribute_name in common_attributes.keys() {
+                    if common_attribute_pattern.matches(common_attribute_name) {
+                        let value = common_attributes
+                            .get(common_attribute_name)
+                            .map(String::as_bytes);
+                        common_attributes_map.insert(
+                            KeyString::from(common_attribute_name.to_owned()),
+                            Value::from(value.map(Bytes::copy_from_slice)),
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    common_attributes_map
 }
 
 #[cfg(test)]
