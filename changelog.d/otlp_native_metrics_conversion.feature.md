@@ -1,4 +1,4 @@
-Added native Vector metric to OTLP conversion support in the OTLP serializer. Vector metrics (Counter, Gauge, Histogram, Summary, Distribution, Set) are now automatically converted to the OTLP protobuf format when sent through OTLP sinks. Tags with `resource.*` and `scope.*` prefixes are decomposed back into OTLP resource attributes, instrumentation scope, and data point attributes, preserving the original OTLP structure.
+Added native Vector metric to OTLP conversion support in the OTLP serializer. Vector metrics (Counter, Gauge, Histogram, Summary, Distribution, Set) are now automatically converted to the OTLP protobuf format when sent through OTLP sinks. Tags with `resource.*` and `scope.*` prefixes are reserved for OTLP structural mapping — they are decomposed back into OTLP resource attributes, instrumentation scope, and data point attributes. Native metrics from non-OTLP sources that coincidentally use these tag prefixes will have those tags routed into the OTLP resource/scope structures rather than remaining as flat data point attributes.
 
 Sample configuration:
 
