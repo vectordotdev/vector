@@ -177,7 +177,7 @@ metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
-paste = { version = "1.0.15" }
+pastey = { version = "0.2", default-features = false }
 pin-project = { version = "1.1.11", default-features = false }
 proptest = { version = "1.10" }
 proptest-derive = { version = "0.6.0" }
@@ -226,7 +226,7 @@ reqwest_12 = { package = "reqwest", version = "0.12", features = ["json"] }
 clap.workspace = true
 clap_complete.workspace = true
 indoc.workspace = true
-paste.workspace = true
+pastey.workspace = true
 pin-project.workspace = true
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
@@ -397,8 +397,8 @@ indexmap.workspace = true
 inventory = { version = "0.3.20", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
 itertools.workspace = true
-k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26"], optional = true }
-kube = { version = "0.93.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
+k8s-openapi = { version = "0.27.0", default-features = false, features = ["v1_31"], optional = true }
+kube = { version = "3.0.1", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
 lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
@@ -460,10 +460,7 @@ windows-service = "0.8.0"
 nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
 
 [target.'cfg(target_os = "linux")'.dependencies]
-netlink-packet-utils = "0.5.2"
-netlink-packet-sock-diag = "0.4.2"
-netlink-packet-core = "0.7.0"
-netlink-sys = { version = "0.8.7", features = ["tokio_socket"] }
+procfs = { version = "0.18.0", default-features = false }
 
 [build-dependencies]
 prost-build = { workspace = true, optional = true }
