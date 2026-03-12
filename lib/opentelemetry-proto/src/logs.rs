@@ -336,6 +336,8 @@ const KNOWN_OTLP_LOG_FIELDS: &[&str] = &[
     "resource_attributes",
     "scope",
     "schema_url",
+    "source_type",       // Vector operational metadata (not user data)
+    "ingest_timestamp",  // Vector operational metadata (not user data)
 ];
 
 /// Get a field value, checking event root first, then Vector namespace metadata.
@@ -805,12 +807,34 @@ fn extract_instrumentation_scope_safe(log: &LogEvent) -> Option<InstrumentationS
         .map(value_object_to_kv_list)
         .unwrap_or_default();
 
-    if scope_name.is_some() || scope_version.is_some() || !scope_attrs.is_empty() {
+    let scope_dropped = log
+        .get("scope.dropped_attributes_count")
+        .or_else(|| get_metadata_otel(log, &["scope", "dropped_attributes_count"]))
+        .and_then(|v| match v {
+            Value::Integer(i) => {
+                let i = *i;
+                if i < 0 {
+                    Some(0)
+                } else if i > u32::MAX as i64 {
+                    Some(u32::MAX)
+                } else {
+                    Some(i as u32)
+                }
+            }
+            _ => None,
+        })
+        .unwrap_or(0);
+
+    if scope_name.is_some()
+        || scope_version.is_some()
+        || !scope_attrs.is_empty()
+        || scope_dropped > 0
+    {
         Some(InstrumentationScope {
             name: scope_name.unwrap_or_default(),
             version: scope_version.unwrap_or_default(),
             attributes: scope_attrs,
-            dropped_attributes_count: 0,
+            dropped_attributes_count: scope_dropped,
         })
     } else {
         None
@@ -1990,7 +2014,7 @@ mod native_conversion_tests {
         log.insert("environment", "production");
         log.insert("version", "2.1.0");
         log.insert("correlation_id", "corr-789");
-        log.insert("source_type", "file");
+        log.insert("app_name", "my-app");
 
         let request = native_log_to_otlp_request(&log);
         let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
@@ -2004,7 +2028,7 @@ mod native_conversion_tests {
             "environment",
             "version",
             "correlation_id",
-            "source_type",
+            "app_name",
         ] {
             assert!(
                 attr_keys.contains(&expected),

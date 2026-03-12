@@ -70,15 +70,39 @@ impl OtlpSerializerConfig {
 /// - Any other Vector source (socket, kafka, etc.)
 ///
 /// Field mapping for native logs:
-/// - `.message` / `.body` / `.msg` → `logRecords[].body.stringValue`
+/// - `.message` / `.body` / `.msg` / `.log` → `logRecords[].body`
 /// - `.timestamp` → `logRecords[].timeUnixNano`
+/// - `.observed_timestamp` → `logRecords[].observedTimeUnixNano`
 /// - `.attributes.*` → `logRecords[].attributes[]`
 /// - `.resources.*` → `resource.attributes[]`
 /// - `.severity_text` → `logRecords[].severityText`
-/// - `.severity_number` → `logRecords[].severityNumber`
-/// - `.scope.name/version` → `scopeLogs[].scope`
+/// - `.severity_number` → `logRecords[].severityNumber` (inferred from text if absent)
+/// - `.scope.name/version/attributes` → `scopeLogs[].scope`
 /// - `.trace_id` → `logRecords[].traceId` (hex string → bytes)
 /// - `.span_id` → `logRecords[].spanId` (hex string → bytes)
+/// - `.flags` → `logRecords[].flags`
+/// - `.dropped_attributes_count` → `logRecords[].droppedAttributesCount`
+/// - **All other fields** → `logRecords[].attributes[]` (automatic collection)
+///
+/// # Remaining Fields as Attributes
+///
+/// Any event field that is not a recognized OTLP field is automatically collected
+/// into the `attributes[]` array to prevent data loss. For example, given a log event:
+///
+/// ```json
+/// {"message": "User logged in", "level": "info", "user_id": "12345", "request_id": "abc-123"}
+/// ```
+///
+/// The `message` maps to `body`, while `level`, `user_id`, and `request_id` are automatically
+/// added to `attributes[]` with their original types preserved (string, integer, float, boolean,
+/// array, and nested object values are all supported).
+///
+/// This behavior ensures that logs from any Vector source (file, syslog, socket, kafka, etc.)
+/// can be sent to OTLP endpoints without manual field mapping. Fields already in `.attributes`
+/// are combined with remaining fields in the output.
+///
+/// Vector operational metadata (`source_type`, `ingest_timestamp`) is excluded from this
+/// automatic collection.
 ///
 /// # Native Trace Conversion
 ///
@@ -95,6 +119,7 @@ impl OtlpSerializerConfig {
 /// - `.events` → `events[]` (span events with name, time, attributes)
 /// - `.links` → `links[]` (span links with trace_id, span_id, attributes)
 /// - `.status` → `status` (message, code)
+/// - **All other fields** → `attributes[]` (automatic collection, same as logs)
 #[derive(Debug, Clone)]
 pub struct OtlpSerializer {
     logs_descriptor: ProtobufSerializer,

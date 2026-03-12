@@ -38,6 +38,33 @@ components: sinks: opentelemetry: {
 
 	configuration: generated.components.sinks.opentelemetry.configuration
 	how_it_works: {
+		remaining_fields: {
+			title: "Automatic Field Collection as Attributes"
+			body: """
+				When using `codec: otlp` with native Vector events (not pre-formatted OTLP), any event field
+				that is not a recognized OTLP field is automatically collected into `attributes[]` to prevent
+				data loss.
+
+				For example, a log event with fields `message`, `level`, `user_id`, and `request_id` will have
+				`message` mapped to the OTLP body, while `level`, `user_id`, and `request_id` are added to
+				`attributes[]` with their original types preserved.
+
+				This applies to both logs and traces. The following fields are recognized and mapped to specific
+				OTLP fields (not collected as attributes):
+
+				**Logs:** `message`, `body`, `msg`, `log`, `timestamp`, `observed_timestamp`, `severity_text`,
+				`severity_number`, `attributes`, `trace_id`, `span_id`, `flags`, `dropped_attributes_count`,
+				`resources`, `resource`, `scope`, `schema_url`, `source_type`, `ingest_timestamp`
+
+				**Traces:** `trace_id`, `span_id`, `parent_span_id`, `trace_state`, `name`, `kind`,
+				`start_time_unix_nano`, `end_time_unix_nano`, `attributes`, `dropped_attributes_count`,
+				`events`, `dropped_events_count`, `links`, `dropped_links_count`, `status`, `resources`,
+				`resource`, `scope`, `schema_url`, `ingest_timestamp`
+
+				All other fields become `attributes[]` entries. This means logs from any Vector source
+				(file, syslog, socket, kafka, etc.) can be sent to OTLP endpoints without manual field mapping.
+				"""
+		}
 		quickstart: {
 			title: "Quickstart"
 			body: """
