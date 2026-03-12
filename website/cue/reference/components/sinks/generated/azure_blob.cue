@@ -134,10 +134,23 @@ generated: components: sinks: azure_blob: configuration: {
 				type: string: examples: ["/var/run/secrets/azure/tokens/azure-identity-token", "${AZURE_FEDERATED_TOKEN_FILE}"]
 			}
 			user_assigned_managed_identity_id: {
-				description:   "The User Assigned Managed Identity (Client ID) to use."
+				description:   "The User Assigned Managed Identity to use."
 				relevant_when: "azure_credential_kind = \"managed_identity\" or azure_credential_kind = \"managed_identity_client_assertion\""
 				required:      false
 				type: string: examples: ["00000000-0000-0000-0000-000000000000"]
+			}
+			user_assigned_managed_identity_id_type: {
+				description: """
+					The type of the User Assigned Managed Identity ID provided (Client ID, Object ID,
+					or Resource ID). Defaults to Client ID.
+					"""
+				relevant_when: "azure_credential_kind = \"managed_identity\" or azure_credential_kind = \"managed_identity_client_assertion\""
+				required:      false
+				type: string: enum: {
+					client_id:   "Client ID"
+					object_id:   "Object ID"
+					resource_id: "Resource ID"
+				}
 			}
 		}
 	}

@@ -75,8 +75,24 @@ impl Default for AzureAuthentication {
     fn default() -> Self {
         Self::Specific(SpecificAzureCredential::ManagedIdentity {
             user_assigned_managed_identity_id: None,
+            user_assigned_managed_identity_id_type: None,
         })
     }
+}
+
+#[configurable_component]
+#[derive(Clone, Debug, Eq, PartialEq)]
+#[serde(deny_unknown_fields, rename_all = "snake_case")]
+#[derive(Default)]
+/// User Assigned Managed Identity Types.
+pub enum UserAssignedManagedIdentityIdType {
+    #[default]
+    /// Client ID
+    ClientId,
+    /// Object ID
+    ObjectId,
+    /// Resource ID
+    ResourceId,
 }
 
 /// Specific Azure credential types.
@@ -144,18 +160,28 @@ pub enum SpecificAzureCredential {
 
     /// Use Managed Identity credentials
     ManagedIdentity {
-        /// The User Assigned Managed Identity (Client ID) to use.
+        /// The User Assigned Managed Identity to use.
         #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
         #[serde(default, skip_serializing_if = "Option::is_none")]
         user_assigned_managed_identity_id: Option<String>,
+
+        /// The type of the User Assigned Managed Identity ID provided (Client ID, Object ID,
+        /// or Resource ID). Defaults to Client ID.
+        user_assigned_managed_identity_id_type: Option<UserAssignedManagedIdentityIdType>,
     },
 
     /// Use Managed Identity with Client Assertion credentials
     ManagedIdentityClientAssertion {
-        /// The User Assigned Managed Identity (Client ID) to use for the managed identity.
+        /// The User Assigned Managed Identity to use for the managed identity.
         #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
+        #[configurable(metadata(
+            docs::examples = "/subscriptions/00000000-0000-0000-0000-000000000000/resourceGroups/rg-vector/providers/Microsoft.ManagedIdentity/userAssignedIdentities/id-vector-uami"
+        ))]
         #[serde(default, skip_serializing_if = "Option::is_none")]
         user_assigned_managed_identity_id: Option<String>,
+
+        /// The type of the User Assigned Managed Identity ID provided (Client ID, Object ID, or Resource ID). Defaults to Client ID.
+        user_assigned_managed_identity_id_type: Option<UserAssignedManagedIdentityIdType>,
 
         /// The target Tenant ID to use.
         #[configurable(metadata(docs::examples = "00000000-0000-0000-0000-000000000000"))]
@@ -302,22 +328,50 @@ impl SpecificAzureCredential {
 
             Self::ManagedIdentity {
                 user_assigned_managed_identity_id,
+                user_assigned_managed_identity_id_type,
             } => {
                 let mut options = ManagedIdentityCredentialOptions::default();
                 if let Some(id) = user_assigned_managed_identity_id {
-                    options.user_assigned_id = Some(UserAssignedId::ClientId(id.clone()));
+                    options.user_assigned_id = match user_assigned_managed_identity_id_type
+                        .as_ref()
+                        .unwrap_or(&Default::default())
+                    {
+                        UserAssignedManagedIdentityIdType::ClientId => {
+                            Some(UserAssignedId::ClientId(id.clone()))
+                        }
+                        UserAssignedManagedIdentityIdType::ObjectId => {
+                            Some(UserAssignedId::ObjectId(id.clone()))
+                        }
+                        UserAssignedManagedIdentityIdType::ResourceId => {
+                            Some(UserAssignedId::ResourceId(id.clone()))
+                        }
+                    };
                 }
                 ManagedIdentityCredential::new(Some(options))?
             }
 
             Self::ManagedIdentityClientAssertion {
                 user_assigned_managed_identity_id,
+                user_assigned_managed_identity_id_type,
                 client_assertion_tenant_id,
                 client_assertion_client_id,
             } => {
                 let mut options = ManagedIdentityCredentialOptions::default();
                 if let Some(id) = user_assigned_managed_identity_id {
-                    options.user_assigned_id = Some(UserAssignedId::ClientId(id.clone()));
+                    options.user_assigned_id = match user_assigned_managed_identity_id_type
+                        .as_ref()
+                        .unwrap_or(&Default::default())
+                    {
+                        UserAssignedManagedIdentityIdType::ClientId => {
+                            Some(UserAssignedId::ClientId(id.clone()))
+                        }
+                        UserAssignedManagedIdentityIdType::ObjectId => {
+                            Some(UserAssignedId::ObjectId(id.clone()))
+                        }
+                        UserAssignedManagedIdentityIdType::ResourceId => {
+                            Some(UserAssignedId::ResourceId(id.clone()))
+                        }
+                    };
                 }
                 let msi: Arc<dyn TokenCredential> = ManagedIdentityCredential::new(Some(options))?;
                 let assertion = ManagedIdentityClientAssertion {
