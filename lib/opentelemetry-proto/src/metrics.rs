@@ -468,10 +468,12 @@ impl ToF64 for Option<NumberDataPointValue> {
 /// - Distribution → Histogram (samples converted to buckets)
 /// - Set → Gauge (count of unique values)
 /// - Sketch → unsupported (warning emitted, metric dropped)
-pub fn native_metric_to_otlp_request(metric: &MetricEvent) -> ExportMetricsServiceRequest {
+pub fn native_metric_to_otlp_request(
+    metric: &MetricEvent,
+) -> Option<ExportMetricsServiceRequest> {
     let decomposed = decompose_metric_tags(metric.tags());
     let timestamp_nanos = extract_metric_timestamp_nanos(metric);
-    let otlp_metric = build_otlp_metric(metric, &decomposed.attributes, timestamp_nanos);
+    let otlp_metric = build_otlp_metric(metric, &decomposed.attributes, timestamp_nanos)?;
 
     let scope_metrics = ScopeMetrics {
         scope: decomposed.scope,
@@ -485,9 +487,9 @@ pub fn native_metric_to_otlp_request(metric: &MetricEvent) -> ExportMetricsServi
         schema_url: decomposed.resource_schema_url,
     };
 
-    ExportMetricsServiceRequest {
+    Some(ExportMetricsServiceRequest {
         resource_metrics: vec![resource_metrics],
-    }
+    })
 }
 
 /// Result of decomposing metric tags back into OTLP structures.
@@ -509,8 +511,13 @@ struct DecomposedMetricTags {
 /// - "scope.version" → InstrumentationScope.version
 /// - "scope.dropped_attributes_count" → InstrumentationScope.dropped_attributes_count (not an attribute)
 /// - "scope.schema_url" → ScopeMetrics.schema_url (not an attribute)
-/// - Tags with "scope." prefix (other than above) → scope attributes (prefix removed)
+/// - Tags with "scope." prefix (other than above) → scope attributes (prefix stripped)
 /// - All other tags → data point KeyValue attributes
+///
+/// **Important:** The `resource.*` and `scope.*` tag prefixes are reserved for OTLP
+/// structural mapping under OTLP encoding. Native metrics that happen to use these
+/// prefixes (e.g. `resource.host`) will have those tags routed into the corresponding
+/// OTLP proto fields rather than remaining as flat data point attributes.
 fn decompose_metric_tags(tags: Option<&MetricTags>) -> DecomposedMetricTags {
     let tags = match tags {
         Some(t) => t,
@@ -618,11 +625,15 @@ fn extract_metric_timestamp_nanos(metric: &MetricEvent) -> u64 {
 }
 
 /// Build the OTLP Metric protobuf message from a Vector MetricEvent.
+///
+/// Returns `None` for unsupported metric types (e.g. Sketch), which causes the
+/// metric to be truly dropped from the OTLP payload rather than included with
+/// empty data.
 fn build_otlp_metric(
     metric: &MetricEvent,
     attributes: &[KeyValue],
     timestamp_nanos: u64,
-) -> super::proto::metrics::v1::Metric {
+) -> Option<super::proto::metrics::v1::Metric> {
     let data = match metric.value() {
         MetricValue::Counter { value } => {
             let temporality = match metric.kind() {
@@ -814,16 +825,16 @@ fn build_otlp_metric(
                 metric_name = metric.name(),
                 internal_log_rate_limit = true,
             );
-            None
+            return None;
         }
     };
 
-    super::proto::metrics::v1::Metric {
+    Some(super::proto::metrics::v1::Metric {
         name: metric.name().to_string(),
         description: String::new(),
         unit: String::new(),
         data,
-    }
+    })
 }
 
 #[cfg(test)]
@@ -847,7 +858,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_empty_counter_produces_valid_otlp() {
         let metric = make_counter("test.counter", 42.0, MetricKind::Incremental);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         assert_eq!(request.resource_metrics.len(), 1);
         assert_eq!(request.resource_metrics[0].scope_metrics.len(), 1);
@@ -860,7 +871,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_counter_incremental_to_sum_delta() {
         let metric = make_counter("http.requests", 100.0, MetricKind::Incremental);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         assert_eq!(otlp_metric.name, "http.requests");
@@ -885,7 +896,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_counter_absolute_to_sum_cumulative() {
         let metric = make_counter("http.total", 500.0, MetricKind::Absolute);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
@@ -903,7 +914,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_gauge_conversion() {
         let metric = make_gauge("cpu.usage", 75.5);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         assert_eq!(otlp_metric.name, "cpu.usage");
@@ -949,7 +960,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -995,7 +1006,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1024,7 +1035,7 @@ mod native_metric_conversion_tests {
         tags.replace("resource.host.name".to_string(), "host1".to_string());
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let resource = request.resource_metrics[0].resource.as_ref().unwrap();
 
         assert_eq!(resource.attributes.len(), 2);
@@ -1045,7 +1056,7 @@ mod native_metric_conversion_tests {
         tags.replace("scope.version".to_string(), "2.0.0".to_string());
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let scope = request.resource_metrics[0].scope_metrics[0]
             .scope
             .as_ref()
@@ -1063,7 +1074,7 @@ mod native_metric_conversion_tests {
         tags.replace("http.status_code".to_string(), "200".to_string());
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1087,7 +1098,7 @@ mod native_metric_conversion_tests {
         tags.replace("http.method".to_string(), "POST".to_string());
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         // Resource should have service.name
         let resource = request.resource_metrics[0].resource.as_ref().unwrap();
@@ -1115,7 +1126,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_no_tags_produces_valid_otlp() {
         let metric = make_gauge("test", 1.0);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         assert!(request.resource_metrics[0].resource.is_none());
         assert!(request.resource_metrics[0].scope_metrics[0].scope.is_none());
@@ -1125,7 +1136,7 @@ mod native_metric_conversion_tests {
     fn test_timestamp_preserved() {
         let ts = Utc::now();
         let metric = make_gauge("test", 1.0).with_timestamp(Some(ts));
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
@@ -1140,7 +1151,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_no_timestamp_produces_zero() {
         let metric = make_gauge("test", 1.0);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
@@ -1164,7 +1175,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1202,7 +1213,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1242,7 +1253,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1259,7 +1270,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_metric_name_preserved() {
         let metric = make_counter("my.service.requests.total", 42.0, MetricKind::Incremental);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         assert_eq!(otlp_metric.name, "my.service.requests.total");
@@ -1273,7 +1284,7 @@ mod native_metric_conversion_tests {
         tags.replace("scope.custom_attr".to_string(), "custom_value".to_string());
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let scope = request.resource_metrics[0].scope_metrics[0]
             .scope
             .as_ref()
@@ -1298,7 +1309,7 @@ mod native_metric_conversion_tests {
         tags.replace("http.method".to_string(), "GET".to_string());
         original = original.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&original);
+        let request = native_metric_to_otlp_request(&original).unwrap();
 
         // Decode back
         let events: Vec<Event> = request
@@ -1325,7 +1336,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_roundtrip_gauge() {
         let metric = make_gauge("cpu.usage", 75.5).with_timestamp(Some(Utc::now()));
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let events: Vec<Event> = request
             .resource_metrics
@@ -1369,7 +1380,7 @@ mod native_metric_conversion_tests {
         )
         .with_timestamp(Some(Utc::now()));
 
-        let request = native_metric_to_otlp_request(&original);
+        let request = native_metric_to_otlp_request(&original).unwrap();
         let events: Vec<Event> = request
             .resource_metrics
             .into_iter()
@@ -1421,7 +1432,7 @@ mod native_metric_conversion_tests {
         )
         .with_timestamp(Some(Utc::now()));
 
-        let request = native_metric_to_otlp_request(&original);
+        let request = native_metric_to_otlp_request(&original).unwrap();
         let events: Vec<Event> = request
             .resource_metrics
             .into_iter()
@@ -1449,7 +1460,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_roundtrip_counter_absolute_cumulative() {
         let metric = make_counter("total.bytes", 999.0, MetricKind::Absolute);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let events: Vec<Event> = request
             .resource_metrics
@@ -1472,7 +1483,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_counter_zero_value() {
         let metric = make_counter("zero.counter", 0.0, MetricKind::Incremental);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
@@ -1489,7 +1500,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_gauge_negative_value() {
         let metric = make_gauge("temperature", -15.5);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
@@ -1506,7 +1517,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_gauge_very_large_value() {
         let metric = make_gauge("big.value", f64::MAX);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
@@ -1532,7 +1543,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1559,7 +1570,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1583,7 +1594,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1608,7 +1619,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1635,7 +1646,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1661,7 +1672,7 @@ mod native_metric_conversion_tests {
         tags.replace("resource.host.name".to_string(), "host-1".to_string());
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let resource = request.resource_metrics[0].resource.as_ref().unwrap();
 
         assert_eq!(resource.attributes.len(), 4);
@@ -1683,7 +1694,7 @@ mod native_metric_conversion_tests {
         tags.replace("scope.version".to_string(), "3.0.0".to_string());
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let scope = request.resource_metrics[0].scope_metrics[0]
             .scope
             .as_ref()
@@ -1708,7 +1719,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1726,7 +1737,7 @@ mod native_metric_conversion_tests {
     fn test_counter_large_value_roundtrip() {
         let metric = make_counter("big.counter", 1e18, MetricKind::Incremental)
             .with_timestamp(Some(Utc::now()));
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let events: Vec<Event> = request
             .resource_metrics
@@ -1744,7 +1755,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_metric_name_with_special_characters() {
         let metric = make_gauge("my-service.cpu_usage.percent", 50.0);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         assert_eq!(otlp_metric.name, "my-service.cpu_usage.percent");
@@ -1778,7 +1789,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1818,7 +1829,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1853,7 +1864,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1872,7 +1883,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_gauge_nan_value_passes_through() {
         let metric = make_gauge("nan.gauge", f64::NAN);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
@@ -1887,7 +1898,7 @@ mod native_metric_conversion_tests {
     #[test]
     fn test_counter_infinity_value_passes_through() {
         let metric = make_counter("inf.counter", f64::INFINITY, MetricKind::Incremental);
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
 
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
         match &otlp_metric.data {
@@ -1921,7 +1932,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -1940,7 +1951,7 @@ mod native_metric_conversion_tests {
     // ====================================================================
 
     #[test]
-    fn test_sketch_produces_no_data() {
+    fn test_sketch_produces_none() {
         use vector_core::event::metric::MetricSketch;
         use vector_core::metrics::AgentDDSketch;
 
@@ -1953,12 +1964,8 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
-        let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
-
-        // Sketch metrics should produce a metric with no data (dropped)
-        assert_eq!(otlp_metric.name, "sketch.metric");
-        assert!(otlp_metric.data.is_none());
+        // Sketch metrics are truly dropped — not included in the payload at all
+        assert!(native_metric_to_otlp_request(&metric).is_none());
     }
 
     // ====================================================================
@@ -1976,7 +1983,7 @@ mod native_metric_conversion_tests {
         tags.replace("resource.host".to_string(), "localhost".to_string());
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let resource = request.resource_metrics[0].resource.as_ref().unwrap();
 
         assert_eq!(resource.attributes.len(), 1);
@@ -1992,7 +1999,7 @@ mod native_metric_conversion_tests {
         tags.replace("scope.another.attr".to_string(), "another_val".to_string());
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let scope = request.resource_metrics[0].scope_metrics[0]
             .scope
             .as_ref()
@@ -2024,7 +2031,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -2051,7 +2058,7 @@ mod native_metric_conversion_tests {
             },
         );
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let otlp_metric = &request.resource_metrics[0].scope_metrics[0].metrics[0];
 
         match &otlp_metric.data {
@@ -2081,7 +2088,7 @@ mod native_metric_conversion_tests {
         );
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let rm = &request.resource_metrics[0];
         let resource = rm.resource.as_ref().unwrap();
 
@@ -2112,7 +2119,7 @@ mod native_metric_conversion_tests {
         );
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let rm = &request.resource_metrics[0];
 
         assert_eq!(rm.schema_url, "https://opentelemetry.io/schemas/1.21.0");
@@ -2135,7 +2142,7 @@ mod native_metric_conversion_tests {
         );
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let sm = &request.resource_metrics[0].scope_metrics[0];
         let scope = sm.scope.as_ref().unwrap();
 
@@ -2161,7 +2168,7 @@ mod native_metric_conversion_tests {
         );
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let sm = &request.resource_metrics[0].scope_metrics[0];
 
         assert_eq!(sm.schema_url, "https://opentelemetry.io/schemas/1.22.0");
@@ -2185,7 +2192,7 @@ mod native_metric_conversion_tests {
         );
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let rm = &request.resource_metrics[0];
         let resource = rm.resource.as_ref().unwrap();
 
@@ -2205,7 +2212,7 @@ mod native_metric_conversion_tests {
         );
         let metric = metric.with_tags(Some(tags));
 
-        let request = native_metric_to_otlp_request(&metric);
+        let request = native_metric_to_otlp_request(&metric).unwrap();
         let sm = &request.resource_metrics[0].scope_metrics[0];
         let scope = sm.scope.as_ref().unwrap();
 

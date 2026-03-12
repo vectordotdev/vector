@@ -40,22 +40,20 @@ impl OtlpSerializerConfig {
 
 /// Serializer that converts an `Event` to bytes using the OTLP (OpenTelemetry Protocol) protobuf format.
 ///
-/// This serializer encodes events using the OTLP protobuf specification, which is the recommended
-/// encoding format for OpenTelemetry data. The output is suitable for sending to OTLP-compatible
-/// endpoints with `content-type: application/x-protobuf`.
+/// The output is suitable for sending to OTLP-compatible endpoints with
+/// `content-type: application/x-protobuf`.
 ///
-/// # Implementation approach
+/// # Pre-formatted OTLP events
 ///
-/// This serializer converts Vector's internal event representation to the appropriate OTLP message type:
-/// - `resourceLogs` → `ExportLogsServiceRequest` (pre-formatted OTLP passthrough)
-/// - `resourceMetrics` → `ExportMetricsServiceRequest` (pre-formatted OTLP passthrough)
-/// - `resourceSpans` → `ExportTraceServiceRequest` (pre-formatted OTLP passthrough)
-/// - Native metrics → Automatic conversion to `ExportMetricsServiceRequest`
+/// These are passed through to the matching OTLP request type:
+/// - Log events with `resourceLogs` -> `ExportLogsServiceRequest`
+/// - Log events with `resourceMetrics` -> `ExportMetricsServiceRequest`
+/// - Trace events with `resourceSpans` -> `ExportTraceServiceRequest`
 ///
-/// The implementation is the inverse of what the `opentelemetry` source does when decoding,
-/// ensuring round-trip compatibility.
+/// Pre-formatted events are typically produced by the `opentelemetry` source with
+/// `use_otlp_decoding: true`.
 ///
-/// # Native Metric Conversion
+/// # Native Vector events
 ///
 /// Native Vector metrics are automatically converted to OTLP format:
 /// - Counter → Sum (monotonic, Delta/Cumulative based on MetricKind)
@@ -64,12 +62,22 @@ impl OtlpSerializerConfig {
 /// - AggregatedSummary → Summary
 /// - Distribution → Histogram (samples converted to buckets)
 /// - Set → Gauge (cardinality count)
+/// - Sketch → dropped with warning (not representable in OTLP)
 ///
-/// Tag decomposition (reverse of decode-path flattening):
-/// - `resource.*` tags → `resource.attributes[]`
-/// - `scope.name` / `scope.version` → `scopeMetrics[].scope`
-/// - `scope.*` tags → scope attributes
+/// Tag decomposition reverses the decode-path flattening:
+/// - `resource.*` tags → `Resource.attributes[]` (prefix stripped)
+/// - `resource.dropped_attributes_count` → `Resource.dropped_attributes_count`
+/// - `resource.schema_url` → `ResourceMetrics.schema_url`
+/// - `scope.name` / `scope.version` → `InstrumentationScope` fields
+/// - `scope.dropped_attributes_count` → `InstrumentationScope.dropped_attributes_count`
+/// - `scope.schema_url` → `ScopeMetrics.schema_url`
+/// - `scope.*` (other) → `InstrumentationScope.attributes[]` (prefix stripped)
 /// - All other tags → data point `attributes[]`
+///
+/// **Note:** The `resource.*` and `scope.*` tag prefixes are reserved for OTLP
+/// structural mapping. Native metrics using these prefixes will have those tags
+/// routed into the corresponding OTLP proto fields rather than kept as flat
+/// data point attributes.
 #[derive(Debug, Clone)]
 pub struct OtlpSerializer {
     logs_descriptor: ProtobufSerializer,
@@ -143,11 +151,14 @@ impl Encoder<Event> for OtlpSerializer {
             }
             Event::Metric(metric) => {
                 // Native Vector metric → OTLP conversion
-                // Tags are decomposed back into resource/scope/data-point attributes
-                let otlp_request = native_metric_to_otlp_request(metric);
-                otlp_request
-                    .encode(buffer)
-                    .map_err(|e| format!("Failed to encode OTLP metric request: {e}").into())
+                // Tags are decomposed back into resource/scope/data-point attributes.
+                // Returns None for unsupported types (e.g. Sketch) which are truly dropped.
+                match native_metric_to_otlp_request(metric) {
+                    Some(otlp_request) => otlp_request
+                        .encode(buffer)
+                        .map_err(|e| format!("Failed to encode OTLP metric request: {e}").into()),
+                    None => Ok(()),
+                }
             }
         }
     }
