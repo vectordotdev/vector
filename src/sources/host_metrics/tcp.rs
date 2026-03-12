@@ -71,7 +71,7 @@ struct TcpStats {
     tx_queued_bytes: f64,
 }
 
-fn tcp_state_to_string(state: TcpState) -> &'static str {
+const fn tcp_state_to_string(state: TcpState) -> &'static str {
     match state {
         TcpState::Established => "established",
         TcpState::SynSent => "syn_sent",
@@ -91,7 +91,10 @@ fn tcp_state_to_string(state: TcpState) -> &'static str {
 fn parse_tcp_entries(entries: Vec<TcpNetEntry>, tcp_stats: &mut TcpStats) {
     for entry in entries {
         let state_str = tcp_state_to_string(entry.state);
-        *tcp_stats.conn_states.entry(state_str.to_string()).or_insert(0.0) += 1.0;
+        *tcp_stats
+            .conn_states
+            .entry(state_str.to_string())
+            .or_insert(0.0) += 1.0;
         tcp_stats.tx_queued_bytes += f64::from(entry.tx_queue);
         tcp_stats.rx_queued_bytes += f64::from(entry.rx_queue);
     }
@@ -199,11 +202,9 @@ mod tests {
 
         let mut n_tx_queued_bytes_metric = 0;
         let mut n_rx_queued_bytes_metric = 0;
-        let mut n_conn_total_metrics = 0;
 
-        for metric in metrics {
+        for metric in &metrics {
             if metric.name() == TCP_CONNS_TOTAL {
-                n_conn_total_metrics += 1;
                 let tags = metric.tags();
                 assert!(
                     tags.is_some(),
@@ -236,7 +237,7 @@ mod tests {
         // Connection metrics depend on actual TCP connections on the host
         // In minimal test environments, there may be zero connections, which is valid
         // Each connection state present should have the correct tag structure
-        for metric in buffer.metrics {
+        for metric in metrics {
             if metric.name() == TCP_CONNS_TOTAL {
                 let tags = metric.tags();
                 assert!(
