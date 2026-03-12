@@ -114,12 +114,10 @@ fn parse_tcp_entries(entries: Vec<TcpNetEntry>, tcp_stats: &mut TcpStats) {
 ///
 /// # Error Handling
 ///
-/// - IPv4 read errors are **fatal** and return an error (no metrics emitted)
-/// - IPv6 read errors are **non-fatal** - a warning is emitted but IPv4 metrics are still returned
-///
-/// This asymmetry exists because:
-/// - IPv4 is ubiquitous and essential
-/// - IPv6 may be partially configured (enabled but `/proc/net/tcp6` unreadable)
+/// Both IPv4 and IPv6 read errors are **fatal**: if either fails, no metrics are emitted.
+/// When IPv6 is detected via `/proc/net/if_inet6`, a failure to read `/proc/net/tcp6` is
+/// treated as a hard error rather than a degraded fallback, because emitting IPv4-only
+/// totals on an IPv6-enabled host would silently undercount connections.
 fn build_tcp_stats() -> Result<TcpStats, TcpError> {
     let mut tcp_stats = TcpStats::default();
 
@@ -127,20 +125,12 @@ fn build_tcp_stats() -> Result<TcpStats, TcpError> {
     let tcp_entries = procfs::net::tcp().context(ReadTcpTableSnafu)?;
     parse_tcp_entries(tcp_entries, &mut tcp_stats);
 
-    // Read IPv6 TCP sockets if IPv6 is enabled
-    // Note: IPv6 errors are non-fatal - we still return IPv4 metrics
+    // Read IPv6 TCP sockets if IPv6 is enabled.
+    // Failure here is fatal: silently returning IPv4-only metrics on an IPv6-enabled host
+    // would undercount connections, matching the behavior of the prior implementation.
     if is_ipv6_enabled() {
-        match procfs::net::tcp6() {
-            Ok(tcp6_entries) => {
-                parse_tcp_entries(tcp6_entries, &mut tcp_stats);
-            }
-            Err(error) => {
-                emit!(HostMetricsScrapeDetailError {
-                    message: "Failed to read IPv6 TCP stats, continuing with IPv4 only.",
-                    error,
-                });
-            }
-        }
+        let tcp6_entries = procfs::net::tcp6().context(ReadTcpTableSnafu)?;
+        parse_tcp_entries(tcp6_entries, &mut tcp_stats);
     }
 
     Ok(tcp_stats)
