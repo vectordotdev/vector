@@ -296,18 +296,36 @@ fn build_log_record_from_native(log: &LogEvent) -> LogRecord {
 }
 
 fn build_scope_logs_from_native(log: &LogEvent, log_record: LogRecord) -> ScopeLogs {
+    // Scope-level schema_url: decode path stores at "scope.schema_url" (Legacy)
+    // or "%metadata.opentelemetry.scope.schema_url" (Vector).
+    let scope_schema_url = log
+        .get("scope.schema_url")
+        .or_else(|| get_metadata_otel(log, &["scope", "schema_url"]))
+        .and_then(|v| v.as_bytes())
+        .map(|b| String::from_utf8_lossy(b).into_owned())
+        .unwrap_or_default();
+
     ScopeLogs {
         scope: extract_instrumentation_scope_safe(log),
         log_records: vec![log_record],
-        schema_url: extract_string_safe(log, "schema_url"),
+        schema_url: scope_schema_url,
     }
 }
 
 fn build_resource_logs_from_native(log: &LogEvent, scope_logs: ScopeLogs) -> ResourceLogs {
+    // Resource-level schema_url: decode path stores at root "schema_url" (Legacy)
+    // or "%metadata.opentelemetry.resources.schema_url" (Vector).
+    let resource_schema_url = log
+        .get("schema_url")
+        .or_else(|| get_metadata_otel(log, &["resources", "schema_url"]))
+        .and_then(|v| v.as_bytes())
+        .map(|b| String::from_utf8_lossy(b).into_owned())
+        .unwrap_or_default();
+
     ResourceLogs {
         resource: extract_resource_safe(log),
         scope_logs: vec![scope_logs],
-        schema_url: String::new(),
+        schema_url: resource_schema_url,
     }
 }
 
@@ -336,6 +354,7 @@ const KNOWN_OTLP_LOG_FIELDS: &[&str] = &[
     "resource_attributes",
     "scope",
     "schema_url",
+    "resource_dropped_attributes_count",
     "source_type",       // Vector operational metadata (not user data)
     "ingest_timestamp",  // Vector operational metadata (not user data)
 ];
@@ -887,9 +906,32 @@ fn extract_resource_safe(log: &LogEvent) -> Option<Resource> {
             };
 
             if !attrs.is_empty() {
+                // Extract resource_dropped_attributes_count: decode path stores at
+                // root "resource_dropped_attributes_count" (Legacy) or
+                // "%metadata.opentelemetry.resources.dropped_attributes_count" (Vector).
+                let dropped = log
+                    .get("resource_dropped_attributes_count")
+                    .or_else(|| {
+                        get_metadata_otel(log, &["resources", "dropped_attributes_count"])
+                    })
+                    .and_then(|v| match v {
+                        Value::Integer(i) => {
+                            let i = *i;
+                            if i < 0 {
+                                Some(0)
+                            } else if i > u32::MAX as i64 {
+                                Some(u32::MAX)
+                            } else {
+                                Some(i as u32)
+                            }
+                        }
+                        _ => None,
+                    })
+                    .unwrap_or(0);
+
                 return Some(Resource {
                     attributes: attrs,
-                    dropped_attributes_count: 0,
+                    dropped_attributes_count: dropped,
                 });
             }
         }
@@ -1192,15 +1234,57 @@ mod native_conversion_tests {
     }
 
     #[test]
-    fn test_schema_url_extracted() {
+    fn test_resource_schema_url_extracted() {
         let mut log = LogEvent::default();
         log.insert("schema_url", "https://opentelemetry.io/schemas/1.21.0");
         log.insert("message", "test");
 
         let request = native_log_to_otlp_request(&log);
+        // Root "schema_url" maps to ResourceLogs.schema_url (resource level)
+        assert_eq!(
+            request.resource_logs[0].schema_url,
+            "https://opentelemetry.io/schemas/1.21.0"
+        );
+    }
+
+    #[test]
+    fn test_scope_schema_url_extracted() {
+        let mut log = LogEvent::default();
+        log.insert("scope.schema_url", "https://scope.schema/1.0");
+        log.insert("message", "test");
+
+        let request = native_log_to_otlp_request(&log);
+        // "scope.schema_url" maps to ScopeLogs.schema_url (scope level)
         assert_eq!(
             request.resource_logs[0].scope_logs[0].schema_url,
-            "https://opentelemetry.io/schemas/1.21.0"
+            "https://scope.schema/1.0"
+        );
+    }
+
+    #[test]
+    fn test_resource_dropped_attributes_count_extracted() {
+        let mut log = LogEvent::default();
+        log.insert("message", "test");
+        log.insert("resources.service.name", "my-svc");
+        log.insert("resource_dropped_attributes_count", 4i64);
+
+        let request = native_log_to_otlp_request(&log);
+        let resource = request.resource_logs[0].resource.as_ref().unwrap();
+        assert_eq!(resource.dropped_attributes_count, 4);
+    }
+
+    #[test]
+    fn test_resource_dropped_attributes_count_not_in_attributes() {
+        let mut log = LogEvent::default();
+        log.insert("message", "test");
+        log.insert("resource_dropped_attributes_count", 2i64);
+
+        let request = native_log_to_otlp_request(&log);
+        let lr = &request.resource_logs[0].scope_logs[0].log_records[0];
+        let attr_keys: Vec<&str> = lr.attributes.iter().map(|kv| kv.key.as_str()).collect();
+        assert!(
+            !attr_keys.contains(&"resource_dropped_attributes_count"),
+            "resource_dropped_attributes_count should not appear in attributes"
         );
     }
 
@@ -1562,6 +1646,8 @@ mod native_conversion_tests {
         log.insert("flags", 1i64);
         log.insert("dropped_attributes_count", 3i64);
         log.insert("schema_url", "https://opentelemetry.io/schemas/1.21.0");
+        log.insert("scope.schema_url", "https://scope.schema/1.0");
+        log.insert("resource_dropped_attributes_count", 5i64);
 
         let mut attrs = ObjectMap::new();
         attrs.insert("http.method".into(), Value::from("GET"));
@@ -1637,8 +1723,12 @@ mod native_conversion_tests {
         assert_eq!(scope.name, "http-handler");
         assert_eq!(scope.version, "3.2.1");
 
-        // Schema URL
-        assert_eq!(sl.schema_url, "https://opentelemetry.io/schemas/1.21.0");
+        // Schema URLs — scope vs resource level
+        assert_eq!(sl.schema_url, "https://scope.schema/1.0");
+        assert_eq!(rl.schema_url, "https://opentelemetry.io/schemas/1.21.0");
+
+        // Resource dropped attributes count
+        assert_eq!(resource.dropped_attributes_count, 5);
     }
 
     #[test]

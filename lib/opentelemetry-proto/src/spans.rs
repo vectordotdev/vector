@@ -185,15 +185,24 @@ impl From<SpanStatus> for Value {
 /// Invalid fields are handled gracefully with defaults/warnings, not errors.
 pub fn native_trace_to_otlp_request(trace: &TraceEvent) -> ExportTraceServiceRequest {
     let span = build_span_from_native(trace);
+
+    // Scope-level schema_url: decode path stores at "scope.schema_url".
+    let scope_schema_url = trace
+        .get(event_path!("scope", "schema_url"))
+        .and_then(|v| v.as_str().map(|s| s.to_string()))
+        .unwrap_or_default();
+
     let scope_spans = ScopeSpans {
         scope: extract_trace_scope(trace),
         spans: vec![span],
-        schema_url: extract_trace_string(trace, "schema_url"),
+        schema_url: scope_schema_url,
     };
+
+    // Resource-level schema_url: decode path stores at root "schema_url".
     let resource_spans = ResourceSpans {
         resource: extract_trace_resource(trace),
         scope_spans: vec![scope_spans],
-        schema_url: String::new(),
+        schema_url: extract_trace_string(trace, "schema_url"),
     };
 
     ExportTraceServiceRequest {
@@ -253,7 +262,8 @@ const KNOWN_OTLP_SPAN_FIELDS: &[&str] = &[
     "resource_attributes",
     "scope",
     "schema_url",
-    "ingest_timestamp", // Added by decode path (line 130)
+    "resource_dropped_attributes_count",
+    "ingest_timestamp", // Added by decode path
 ];
 
 /// Collect event root fields that are not known OTLP span fields and add them as attributes.
@@ -591,12 +601,32 @@ fn extract_trace_scope(trace: &TraceEvent) -> Option<InstrumentationScope> {
         _ => Vec::new(),
     };
 
-    if scope_name.is_some() || scope_version.is_some() || !scope_attrs.is_empty() {
+    // Extract scope.dropped_attributes_count (added by decode fix #24905).
+    let scope_dropped =
+        match trace.get(event_path!("scope", "dropped_attributes_count")) {
+            Some(Value::Integer(i)) => {
+                let i = *i;
+                if i < 0 {
+                    0
+                } else if i > u32::MAX as i64 {
+                    u32::MAX
+                } else {
+                    i as u32
+                }
+            }
+            _ => 0,
+        };
+
+    if scope_name.is_some()
+        || scope_version.is_some()
+        || !scope_attrs.is_empty()
+        || scope_dropped > 0
+    {
         Some(InstrumentationScope {
             name: scope_name.unwrap_or_default(),
             version: scope_version.unwrap_or_default(),
             attributes: scope_attrs,
-            dropped_attributes_count: 0,
+            dropped_attributes_count: scope_dropped,
         })
     } else {
         None
@@ -646,9 +676,26 @@ fn extract_trace_resource(trace: &TraceEvent) -> Option<Resource> {
             };
 
             if !attrs.is_empty() {
+                // Extract resource_dropped_attributes_count (added by decode fix #24905).
+                let dropped = match trace
+                    .get(event_path!("resource_dropped_attributes_count"))
+                {
+                    Some(Value::Integer(i)) => {
+                        let i = *i;
+                        if i < 0 {
+                            0
+                        } else if i > u32::MAX as i64 {
+                            u32::MAX
+                        } else {
+                            i as u32
+                        }
+                    }
+                    _ => 0,
+                };
+
                 return Some(Resource {
                     attributes: attrs,
-                    dropped_attributes_count: 0,
+                    dropped_attributes_count: dropped,
                 });
             }
         }
@@ -1133,7 +1180,8 @@ mod native_trace_conversion_tests {
     }
 
     #[test]
-    fn test_trace_schema_url() {
+    fn test_trace_resource_schema_url() {
+        // Root "schema_url" maps to ResourceSpans.schema_url (resource level)
         let trace = make_trace(btreemap! {
             "name" => "test-span",
             "schema_url" => "https://opentelemetry.io/schemas/1.21.0",
@@ -1141,9 +1189,71 @@ mod native_trace_conversion_tests {
 
         let request = native_trace_to_otlp_request(&trace);
         assert_eq!(
-            request.resource_spans[0].scope_spans[0].schema_url,
+            request.resource_spans[0].schema_url,
             "https://opentelemetry.io/schemas/1.21.0"
         );
+    }
+
+    #[test]
+    fn test_trace_scope_schema_url() {
+        // "scope.schema_url" maps to ScopeSpans.schema_url (scope level)
+        let mut trace = TraceEvent::default();
+        trace.insert(event_path!("name"), Value::from("test-span"));
+        trace.insert(
+            event_path!("scope", "schema_url"),
+            Value::from("https://scope.schema/1.0"),
+        );
+
+        let request = native_trace_to_otlp_request(&trace);
+        assert_eq!(
+            request.resource_spans[0].scope_spans[0].schema_url,
+            "https://scope.schema/1.0"
+        );
+    }
+
+    #[test]
+    fn test_trace_scope_dropped_attributes_count() {
+        let mut trace = TraceEvent::default();
+        trace.insert(event_path!("name"), Value::from("test-span"));
+        trace.insert(event_path!("scope", "name"), Value::from("tracer"));
+        trace.insert(
+            event_path!("scope", "dropped_attributes_count"),
+            Value::Integer(3),
+        );
+
+        let request = native_trace_to_otlp_request(&trace);
+        let scope = request.resource_spans[0].scope_spans[0]
+            .scope
+            .as_ref()
+            .unwrap();
+        assert_eq!(scope.dropped_attributes_count, 3);
+    }
+
+    #[test]
+    fn test_trace_resource_dropped_attributes_count() {
+        let mut trace = TraceEvent::default();
+        trace.insert(event_path!("name"), Value::from("test-span"));
+        trace.insert(
+            event_path!(RESOURCE_KEY),
+            kv_list_into_value(vec![KeyValue {
+                key: "host.name".to_string(),
+                value: Some(AnyValue {
+                    value: Some(
+                        super::super::proto::common::v1::any_value::Value::StringValue(
+                            "server".to_string(),
+                        ),
+                    ),
+                }),
+            }]),
+        );
+        trace.insert(
+            event_path!("resource_dropped_attributes_count"),
+            Value::Integer(7),
+        );
+
+        let request = native_trace_to_otlp_request(&trace);
+        let resource = request.resource_spans[0].resource.as_ref().unwrap();
+        assert_eq!(resource.dropped_attributes_count, 7);
     }
 
     #[test]
