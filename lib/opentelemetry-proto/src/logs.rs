@@ -135,19 +135,6 @@ impl ResourceLog {
             );
         }
 
-        // Resource-level schema_url (from ResourceLogs).
-        // Legacy namespace: stored at root as "schema_url" (flat, alongside other top-level fields).
-        // Vector namespace: stored under metadata at "resources.schema_url" (grouped with resource data).
-        if !self.resource_schema_url.is_empty() {
-            log_namespace.insert_source_metadata(
-                SOURCE_NAME,
-                &mut log,
-                Some(LegacyKey::Overwrite(path!(SCHEMA_URL_KEY))),
-                path!(RESOURCE_KEY, SCHEMA_URL_KEY),
-                self.resource_schema_url,
-            );
-        }
-
         // Optional fields
         if let Some(resource) = self.resource {
             if !resource.attributes.is_empty() {
@@ -173,6 +160,20 @@ impl ResourceLog {
                     resource.dropped_attributes_count,
                 );
             }
+        }
+        // Resource-level schema_url (from ResourceLogs).
+        // Legacy namespace: stored at root as "schema_url" (flat, alongside other top-level fields).
+        // Vector namespace: stored under metadata at "resources.schema_url" (grouped with resource data).
+        // Must come AFTER the resources insert above, which overwrites the entire "resources"
+        // key in Vector namespace — inserting schema_url before would be lost.
+        if !self.resource_schema_url.is_empty() {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(SCHEMA_URL_KEY))),
+                path!(RESOURCE_KEY, SCHEMA_URL_KEY),
+                self.resource_schema_url,
+            );
         }
         if !self.log_record.attributes.is_empty() {
             log_namespace.insert_source_metadata(
@@ -595,5 +596,50 @@ mod tests {
 
         // Resource attributes still work
         assert!(log.get("resources").is_some());
+    }
+
+    #[test]
+    fn test_all_new_fields_together_vector_namespace() {
+        let scope = InstrumentationScope {
+            name: "otel-sdk".to_string(),
+            version: "2.0.0".to_string(),
+            attributes: vec![make_kv("lib.lang", "rust")],
+            dropped_attributes_count: 1,
+        };
+        let rl = make_resource_logs(
+            vec![make_kv("host.name", "server-1")],
+            2,
+            Some(scope),
+            "https://scope.schema/1.0",
+            "https://resource.schema/1.0",
+            default_log_record(),
+        );
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Vector).collect();
+        let log = events[0].as_log();
+        let metadata = log.metadata().value();
+        let otel = metadata.get("opentelemetry").expect("opentelemetry metadata");
+
+        // Scope fields
+        let scope_meta = otel.get("scope").expect("scope metadata");
+        assert_eq!(scope_meta.get("name").unwrap().to_string_lossy(), "otel-sdk");
+        assert_eq!(
+            scope_meta.get("schema_url").unwrap().to_string_lossy(),
+            "https://scope.schema/1.0"
+        );
+
+        // Resource schema_url must survive even when resource attributes are present.
+        // This is the key assertion: the resources insert (which sets the attributes
+        // object) must not overwrite schema_url that was inserted earlier.
+        let res_meta = otel.get("resources").expect("resources metadata");
+        assert_eq!(
+            res_meta.get("schema_url").unwrap().to_string_lossy(),
+            "https://resource.schema/1.0"
+        );
+
+        // Resource dropped attributes count
+        assert_eq!(
+            *res_meta.get("dropped_attributes_count").unwrap(),
+            Value::Integer(2)
+        );
     }
 }
