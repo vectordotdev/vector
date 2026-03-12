@@ -1371,21 +1371,87 @@ async fn test_stress_burst_ingestion() {
 // Resubscribe after log clear
 // ---------------------------------------------------------------------------
 
-/// Clear the Application event log mid-run, verify the source recovers
+/// Helper: write an event to a custom log channel via PowerShell Write-EventLog.
+fn write_custom_log_event(log_name: &str, source: &str, event_id: u32, message: &str) {
+    let status = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            &format!(
+                "Write-EventLog -LogName '{}' -Source '{}' -EventId {} -EntryType Information -Message '{}'",
+                log_name, source, event_id, message
+            ),
+        ])
+        .status()
+        .expect("failed to run powershell Write-EventLog");
+    assert!(status.success(), "Write-EventLog failed with {status}");
+}
+
+/// Clear a dedicated custom event log mid-run, verify the source recovers
 /// via resubscription and continues ingesting new events.
-/// Requires Administrator privileges (wevtutil cl).
+///
+/// Uses a temporary custom log channel (created via PowerShell New-EventLog)
+/// instead of Application, so clearing it doesn't destroy events that other
+/// parallel tests depend on.
+///
+/// Requires Administrator privileges.
 #[tokio::test]
 async fn test_resubscribe_after_log_clear() {
+    let log_name = "VectorTestResub";
+    let source_name = "VT_resub";
+
+    // Create dedicated log channel for this test
+    let create_result = Command::new("powershell")
+        .args([
+            "-NoProfile",
+            "-Command",
+            &format!(
+                "if (-not [System.Diagnostics.EventLog]::SourceExists('{source_name}')) {{ \
+                     New-EventLog -LogName '{log_name}' -Source '{source_name}' \
+                 }}"
+            ),
+        ])
+        .status();
+
+    match create_result {
+        Ok(status) if status.success() => {}
+        _ => {
+            // Can't create custom log — skip gracefully
+            return;
+        }
+    }
+
+    // Ensure cleanup on all exit paths
+    struct CleanupGuard {
+        log_name: &'static str,
+    }
+    impl Drop for CleanupGuard {
+        fn drop(&mut self) {
+            let _ = Command::new("powershell")
+                .args([
+                    "-NoProfile",
+                    "-Command",
+                    &format!(
+                        "Remove-EventLog -LogName '{}' -ErrorAction SilentlyContinue",
+                        self.log_name
+                    ),
+                ])
+                .status();
+        }
+    }
+    let _cleanup = CleanupGuard {
+        log_name: "VectorTestResub",
+    };
+
     let data_dir = temp_data_dir();
 
-    // Emit an initial event
-    emit_event("VT_resub", "INFORMATION", 1000, "pre-clear-event");
+    // Emit an initial event into our dedicated channel
+    write_custom_log_event(log_name, source_name, 1000, "pre-clear-event");
 
     let (tx, mut rx) = SourceSender::new_test_finalize(EventStatus::Delivered);
     let config = WindowsEventLogConfig {
         data_dir: Some(data_dir.path().to_path_buf()),
-        channels: vec!["Application".to_string()],
-        event_query: Some(test_query("VT_resub")),
+        channels: vec![log_name.to_string()],
         read_existing_events: true,
         batch_size: 100,
         event_timeout_ms: 1000,
@@ -1412,16 +1478,14 @@ async fn test_resubscribe_after_log_clear() {
         }
     }
 
-    // Clear the Application log — this invalidates the subscription position
-    let clear_result = Command::new("wevtutil")
-        .args(["cl", "Application"])
-        .status();
+    // Clear our dedicated log — does NOT affect Application or other tests
+    let clear_result = Command::new("wevtutil").args(["cl", log_name]).status();
 
     match clear_result {
         Ok(status) if status.success() => {
             // Log was cleared. Emit a new event and verify it arrives.
             tokio::time::sleep(Duration::from_secs(1)).await;
-            emit_event("VT_resub", "INFORMATION", 1000, "post-clear-event");
+            write_custom_log_event(log_name, source_name, 1000, "post-clear-event");
 
             let mut found_post_clear = false;
             let deadline = tokio::time::Instant::now() + Duration::from_secs(8);
@@ -1455,11 +1519,9 @@ async fn test_resubscribe_after_log_clear() {
             );
         }
         _ => {
-            // wevtutil cl failed (not admin, or not available) — skip gracefully
+            // wevtutil cl failed — skip gracefully
             handle.abort();
             let _ = handle.await;
-            // Don't fail the test — this just means we can't test this scenario
-            // in this environment
         }
     }
 }
