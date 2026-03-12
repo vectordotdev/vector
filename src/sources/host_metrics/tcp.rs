@@ -1,7 +1,6 @@
 use std::{collections::HashMap, path::Path};
 
 use procfs::net::{TcpNetEntry, TcpState};
-use snafu::{ResultExt, Snafu};
 use vector_lib::event::MetricTags;
 
 use super::HostMetrics;
@@ -19,12 +18,10 @@ impl HostMetrics {
         let result = tokio::task::spawn_blocking(build_tcp_stats)
             .await
             .unwrap_or_else(|join_error| {
-                Err(TcpError::ReadTcpTable {
-                    source: procfs::ProcError::Other(format!(
-                        "Failed to join blocking task: {}",
-                        join_error
-                    )),
-                })
+                Err(procfs::ProcError::Other(format!(
+                    "Failed to join blocking task: {}",
+                    join_error
+                )))
             });
 
         match result {
@@ -56,12 +53,6 @@ impl HostMetrics {
             }
         }
     }
-}
-
-#[derive(Debug, Snafu)]
-enum TcpError {
-    #[snafu(display("Could not read TCP socket table: {}", source))]
-    ReadTcpTable { source: procfs::ProcError },
 }
 
 #[derive(Debug, Default)]
@@ -118,18 +109,18 @@ fn parse_tcp_entries(entries: Vec<TcpNetEntry>, tcp_stats: &mut TcpStats) {
 /// When IPv6 is detected via `/proc/net/if_inet6`, a failure to read `/proc/net/tcp6` is
 /// treated as a hard error rather than a degraded fallback, because emitting IPv4-only
 /// totals on an IPv6-enabled host would silently undercount connections.
-fn build_tcp_stats() -> Result<TcpStats, TcpError> {
+fn build_tcp_stats() -> Result<TcpStats, procfs::ProcError> {
     let mut tcp_stats = TcpStats::default();
 
     // Read IPv4 TCP sockets
-    let tcp_entries = procfs::net::tcp().context(ReadTcpTableSnafu)?;
+    let tcp_entries = procfs::net::tcp()?;
     parse_tcp_entries(tcp_entries, &mut tcp_stats);
 
     // Read IPv6 TCP sockets if IPv6 is enabled.
     // Failure here is fatal: silently returning IPv4-only metrics on an IPv6-enabled host
     // would undercount connections, matching the behavior of the prior implementation.
     if is_ipv6_enabled() {
-        let tcp6_entries = procfs::net::tcp6().context(ReadTcpTableSnafu)?;
+        let tcp6_entries = procfs::net::tcp6()?;
         parse_tcp_entries(tcp6_entries, &mut tcp_stats);
     }
 
