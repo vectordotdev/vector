@@ -1,6 +1,6 @@
 [package]
 name = "vector"
-version = "0.54.0"
+version = "0.55.0"
 authors = ["Vector Contributors <vector@datadoghq.com>"]
 edition = "2024"
 description = "A lightweight and ultra-fast tool for building observability pipelines"
@@ -101,9 +101,7 @@ members = [
   ".",
   "lib/codecs",
   "lib/dnsmsg-parser",
-  "lib/dnstap-parser",
   "lib/docs-renderer",
-  "lib/enrichment",
   "lib/fakedata",
   "lib/file-source",
   "lib/file-source-common",
@@ -128,10 +126,12 @@ members = [
   "lib/vector-top",
   "lib/vector-vrl/category",
   "lib/vector-vrl/cli",
+  "lib/vector-vrl/dnstap-parser",
+  "lib/vector-vrl/enrichment",
   "lib/vector-vrl/functions",
+  "lib/vector-vrl/metrics",
   "lib/vector-vrl/tests",
   "lib/vector-vrl/web-playground",
-  "lib/vector-vrl-metrics",
   "vdev",
 ]
 
@@ -170,8 +170,8 @@ metrics-tracing-context = { version = "0.17.0", default-features = false }
 metrics-util = { version = "0.18.0", default-features = false, features = ["registry"] }
 nom = { version = "8.0.0", default-features = false }
 ordered-float = { version = "4.6.0", default-features = false }
-paste = { version = "1.0.15" }
-pin-project = { version = "1.1.10", default-features = false }
+pastey = { version = "0.2", default-features = false }
+pin-project = { version = "1.1.11", default-features = false }
 proptest = { version = "1.10" }
 proptest-derive = { version = "0.6.0" }
 prost = { version = "0.12", default-features = false, features = ["std"] }
@@ -185,7 +185,7 @@ reqwest = { version = "0.11", features = ["json"] }
 rust_decimal = { version = "1.37.0", default-features = false, features = ["std"] }
 semver = { version = "1.0.27", default-features = false, features = ["serde", "std"] }
 serde = { version = "1.0.219", default-features = false, features = ["alloc", "derive", "rc"] }
-serde_json = { version = "1.0.143", default-features = false, features = ["raw_value", "std"] }
+serde_json = { version = "1.0.143", default-features = false, features = ["preserve_order", "raw_value", "std"] }
 serde_yaml = { version = "0.9.34", default-features = false }
 snafu = { version = "0.8.9", default-features = false, features = ["futures", "std"] }
 socket2 = { version = "0.5.10", default-features = false }
@@ -208,8 +208,8 @@ vector-config-macros = { path = "lib/vector-config-macros" }
 vector-common-macros = { path = "lib/vector-common-macros" }
 vector-lib = { path = "lib/vector-lib", default-features = false, features = ["vrl"] }
 vector-vrl-category = { path = "lib/vector-vrl/category" }
-vector-vrl-functions = { path = "lib/vector-vrl/functions" }
-vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", features = ["arbitrary", "cli", "test", "test_framework"] }
+vector-vrl-functions = { path = "lib/vector-vrl/functions", default-features = false }
+vrl = { git = "https://github.com/vectordotdev/vrl.git", branch = "main", default-features = false, features = ["arbitrary", "cli", "test", "test_framework", "stdlib-base"] }
 mock_instant = { version = "0.6" }
 serial_test = { version = "3.2" }
 
@@ -220,7 +220,7 @@ reqwest_12 = { package = "reqwest", version = "0.12", features = ["json"] }
 clap.workspace = true
 clap_complete.workspace = true
 indoc.workspace = true
-paste.workspace = true
+pastey.workspace = true
 pin-project.workspace = true
 proptest = { workspace = true, optional = true }
 proptest-derive = { workspace = true, optional = true }
@@ -231,7 +231,7 @@ vrl.workspace = true
 
 # Internal libs
 dnsmsg-parser = { path = "lib/dnsmsg-parser", optional = true }
-dnstap-parser = { path = "lib/dnstap-parser", optional = true }
+dnstap-parser = { path = "lib/vector-vrl/dnstap-parser", optional = true }
 fakedata = { path = "lib/fakedata", optional = true }
 tracing-limit = { path = "lib/tracing-limit" }
 vector-common = { path = "lib/vector-common", default-features = false }
@@ -240,7 +240,7 @@ vector-config.workspace = true
 vector-config-common.workspace = true
 vector-config-macros.workspace = true
 vector-vrl-functions = { workspace = true, features = ["vrl-metrics"] }
-vector-vrl-metrics = { path = "lib/vector-vrl-metrics" }
+vector-vrl-metrics = { path = "lib/vector-vrl/metrics" }
 loki-logproto = { path = "lib/loki-logproto", optional = true }
 
 # Tokio / Futures
@@ -386,8 +386,8 @@ indexmap.workspace = true
 inventory = { version = "0.3.20", default-features = false }
 ipnet = { version = "2", default-features = false, optional = true, features = ["serde", "std"] }
 itertools.workspace = true
-k8s-openapi = { version = "0.22.0", default-features = false, features = ["v1_26"], optional = true }
-kube = { version = "0.93.0", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
+k8s-openapi = { version = "0.27.0", default-features = false, features = ["v1_31"], optional = true }
+kube = { version = "3.0.1", default-features = false, features = ["client", "openssl-tls", "runtime"], optional = true }
 listenfd = { version = "1.0.2", default-features = false, optional = true }
 lru = { version = "0.16.3", default-features = false }
 maxminddb = { version = "0.27.0", default-features = false, optional = true, features = ["simdutf8"] }
@@ -501,7 +501,7 @@ docs = ["enable-unix"]
 default-cmake = ["enable-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build"]
 # Default features for *-pc-windows-msvc
 # TODO: Enable SASL https://github.com/vectordotdev/vector/pull/3081#issuecomment-659298042
-base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets"]
+base = ["api", "enrichment-tables", "sinks", "sources", "transforms", "secrets", "vrl/stdlib"]
 enable-api-client = ["base", "api-client"]
 enable-unix = ["enable-api-client", "sources-dnstap", "unix"]
 
@@ -510,6 +510,11 @@ default-musl = ["enable-unix", "rdkafka?/gssapi-vendored", "rdkafka?/cmake_build
 default-no-api-client = ["base", "sources-dnstap", "unix", "rdkafka?/gssapi-vendored"]
 
 tokio-console = ["dep:console-subscriber", "tokio/tracing"]
+
+# VRL functions control features
+vrl-functions-env = ["vrl/enable_env_functions"]
+vrl-functions-system = ["vrl/enable_system_functions"]
+vrl-functions-network = ["vrl/enable_network_functions"]
 
 # Enables the binary secret-backend-example
 secret-backend-example = ["transforms"]
@@ -1019,7 +1024,7 @@ dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
-cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file"]
+cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file", "transforms-remap"]
 test-utils = ["vector-lib/test"]
 
 # End-to-End testing-related features

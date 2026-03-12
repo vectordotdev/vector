@@ -149,6 +149,11 @@ on:
         value: ${{ jobs.int_tests.outputs.any }}
       e2e-tests-any:
         value: ${{ jobs.e2e_tests.outputs.any }}
+
+# Workflow-level permissions - read access to repository contents
+permissions:
+  contents: read  # Required to checkout code
+
 env:
   BASE_SHA: ${{ inputs.base_ref || (github.event_name == 'merge_group' && github.event.merge_group.base_sha) || github.event.pull_request.base.sha }}
   HEAD_SHA: ${{ inputs.head_ref || (github.event_name == 'merge_group' && github.event.merge_group.head_sha) || github.event.pull_request.head.sha }}
@@ -222,7 +227,11 @@ jobs:
           component_docs:
             - 'scripts/generate-component-docs.rb'
             - "vdev/**"
-            - 'website/cue/**/base/**.cue'
+            - 'website/cue/**/*.cue'
+            - 'docs/generated/**'
+            # If changes to the VRL sha is made the combined generated cue file will change which
+            # may cause issues
+            - 'Cargo.lock'
             - ".github/workflows/changes.yml"
           markdown:
             - '**/**.md'
@@ -282,8 +291,10 @@ jobs:
   # Detects changes that are specific to integration tests
   int_tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     if: ${{ inputs.int_tests }}
+    permissions:
+      contents: read
     outputs:
       amqp: ${{ steps.filter.outputs.amqp }}
       appsignal: ${{ steps.filter.outputs.appsignal}}
@@ -398,7 +409,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: int_tests_changes
           path: int_tests_changes.json
@@ -406,8 +417,10 @@ jobs:
   # Detects changes that are specific to e2e tests
   e2e_tests:
     runs-on: ubuntu-24.04
-    timeout-minutes: 5
+    timeout-minutes: 15
     if: ${{ inputs.e2e_tests }}
+    permissions:
+      contents: read
     outputs:
       datadog-logs: ${{ steps.filter.outputs.datadog-logs }}
       datadog-metrics: ${{ steps.filter.outputs.datadog-metrics }}
@@ -458,7 +471,7 @@ jobs:
           echo "any=$any_changed" >> $GITHUB_OUTPUT
 
       - name: Upload JSON artifact
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        uses: actions/upload-artifact@bbbca2ddaa5d8feaa63e36b76fdaad77386f024f # v7.0.0
         with:
           name: e2e_tests_changes
           path: e2e_tests_changes.json

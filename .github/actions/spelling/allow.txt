@@ -560,3 +560,5 @@ Zync
 sighup
 CLAUDE
 grpcurl
+linting
+lexers
