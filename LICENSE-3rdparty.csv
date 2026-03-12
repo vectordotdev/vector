@@ -15,7 +15,6 @@ amq-protocol-tcp,https://github.com/amqp-rs/amq-protocol,BSD-2-Clause,Marc-Antoi
 amq-protocol-types,https://github.com/amqp-rs/amq-protocol,BSD-2-Clause,Marc-Antoine Perennou <%arc-Antoine@Perennou.com>
 amq-protocol-uri,https://github.com/amqp-rs/amq-protocol,BSD-2-Clause,Marc-Antoine Perennou <%arc-Antoine@Perennou.com>
 android_system_properties,https://github.com/nical/android_system_properties,MIT OR Apache-2.0,Nicolas Silva <nical@fastmail.com>
-ansi_term,https://github.com/ogham/rust-ansi-term,MIT,"ogham@bsago.me, Ryan Scheel (Havvy) <ryan.havvy@gmail.com>, Josh Triplett <josh@joshtriplett.org>"
 anstream,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstream Authors
 anstyle,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstyle Authors
 anstyle-parse,https://github.com/rust-cli/anstyle,MIT OR Apache-2.0,The anstyle-parse Authors
@@ -539,13 +538,12 @@ p256,https://github.com/RustCrypto/elliptic-curves/tree/master/p256,Apache-2.0 O
 p384,https://github.com/RustCrypto/elliptic-curves/tree/master/p384,Apache-2.0 OR MIT,"RustCrypto Developers, Frank Denis <github@pureftpd.org>"
 pad,https://github.com/ogham/rust-pad,MIT,Ben S <ogham@bsago.me>
 parking,https://github.com/smol-rs/parking,Apache-2.0 OR MIT,"Stjepan Glavina <stjepang@gmail.com>, The Rust Project Developers"
-parking_lot,https://github.com/Amanieu/parking_lot,Apache-2.0 OR MIT,Amanieu d'Antras <amanieu@gmail.com>
 parking_lot,https://github.com/Amanieu/parking_lot,MIT OR Apache-2.0,Amanieu d'Antras <amanieu@gmail.com>
-parking_lot_core,https://github.com/Amanieu/parking_lot,Apache-2.0 OR MIT,Amanieu d'Antras <amanieu@gmail.com>
 parking_lot_core,https://github.com/Amanieu/parking_lot,MIT OR Apache-2.0,Amanieu d'Antras <amanieu@gmail.com>
 parse-size,https://github.com/kennytm/parse-size,MIT,kennytm <kennytm@gmail.com>
 passt,https://github.com/kevingimbel/passt,MIT OR Apache-2.0,Kevin Gimbel <hallo@kevingimbel.com>
 paste,https://github.com/dtolnay/paste,MIT OR Apache-2.0,David Tolnay <dtolnay@gmail.com>
+pastey,https://github.com/as1100k/pastey,MIT OR Apache-2.0,"Aditya Kumar <git@adityais.dev>, David Tolnay <dtolnay@gmail.com>"
 pbkdf2,https://github.com/RustCrypto/password-hashes/tree/master/pbkdf2,MIT OR Apache-2.0,RustCrypto Developers
 peeking_take_while,https://github.com/fitzgen/peeking_take_while,MIT OR Apache-2.0,Nick Fitzgerald <fitzgen@gmail.com>
 pem,https://github.com/jcreekmore/pem-rs,MIT,Jonathan Creekmore <jonathan@thecreekmores.org>
@@ -866,7 +864,7 @@ wasm-bindgen-macro,https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crat
 wasm-bindgen-macro-support,https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/macro-support,MIT OR Apache-2.0,The wasm-bindgen Developers
 wasm-bindgen-shared,https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/shared,MIT OR Apache-2.0,The wasm-bindgen Developers
 wasm-streams,https://github.com/MattiasBuelens/wasm-streams,MIT OR Apache-2.0,Mattias Buelens <mattias@buelens.com>
-wasm-timer,https://github.com/tomaka/wasm-timer,MIT,Pierre Krieger <pierre.krieger1708@gmail.com>
+wasmtimer,https://github.com/whizsid/wasmtimer-rs,MIT,"WhizSid <whizsid@aol.com>, Pierre Krieger <pierre.krieger1708@gmail.com>"
 web-sys,https://github.com/wasm-bindgen/wasm-bindgen/tree/master/crates/web-sys,MIT OR Apache-2.0,The wasm-bindgen Developers
 web-time,https://github.com/daxpedda/web-time,MIT OR Apache-2.0,The web-time Authors
 webbrowser,https://github.com/amodm/webbrowser-rs,MIT OR Apache-2.0,Amod Malviya @amodm
