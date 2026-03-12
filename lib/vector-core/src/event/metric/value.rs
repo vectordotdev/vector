@@ -1089,7 +1089,7 @@ impl NativeHistogramBuckets {
         std::iter::from_fn(move || match self {
             Self::IntegerDeltas(deltas) => {
                 let d = *deltas.get(idx)?;
-                running = running.wrapping_add(d);
+                running = running.saturating_add(d);
                 idx += 1;
                 // Allow precision loss for display/summary purposes.
                 #[allow(clippy::cast_precision_loss)]
