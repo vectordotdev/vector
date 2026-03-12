@@ -14,6 +14,17 @@ use super::proto::{
     resource::v1::Resource,
 };
 
+/// Shared context for converting OTLP metric data points into Vector events.
+/// Groups the fields that are identical across all data points within a single
+/// OTLP Metric message, avoiding repetitive argument passing.
+struct MetricContext {
+    resource: Option<Resource>,
+    scope: Option<InstrumentationScope>,
+    metric_name: String,
+    scope_schema_url: String,
+    resource_schema_url: String,
+}
+
 impl ResourceMetrics {
     pub fn into_event_iter(self) -> impl Iterator<Item = Event> {
         let resource = self.resource;
@@ -28,214 +39,120 @@ impl ResourceMetrics {
                 let resource_schema_url = resource_schema_url.clone();
 
                 scope_metrics.metrics.into_iter().flat_map(move |metric| {
-                    let metric_name = metric.name.clone();
-                    let scope_schema_url = scope_schema_url.clone();
-                    let resource_schema_url = resource_schema_url.clone();
+                    let ctx = MetricContext {
+                        resource: resource.clone(),
+                        scope: scope.clone(),
+                        metric_name: metric.name,
+                        scope_schema_url: scope_schema_url.clone(),
+                        resource_schema_url: resource_schema_url.clone(),
+                    };
                     match metric.data {
-                        Some(Data::Gauge(g)) => Self::convert_gauge(
-                            g,
-                            &resource,
-                            &scope,
-                            &metric_name,
-                            &scope_schema_url,
-                            &resource_schema_url,
-                        ),
-                        Some(Data::Sum(s)) => Self::convert_sum(
-                            s,
-                            &resource,
-                            &scope,
-                            &metric_name,
-                            &scope_schema_url,
-                            &resource_schema_url,
-                        ),
-                        Some(Data::Histogram(h)) => Self::convert_histogram(
-                            h,
-                            &resource,
-                            &scope,
-                            &metric_name,
-                            &scope_schema_url,
-                            &resource_schema_url,
-                        ),
-                        Some(Data::ExponentialHistogram(e)) => Self::convert_exp_histogram(
-                            e,
-                            &resource,
-                            &scope,
-                            &metric_name,
-                            &scope_schema_url,
-                            &resource_schema_url,
-                        ),
-                        Some(Data::Summary(su)) => Self::convert_summary(
-                            su,
-                            &resource,
-                            &scope,
-                            &metric_name,
-                            &scope_schema_url,
-                            &resource_schema_url,
-                        ),
+                        Some(Data::Gauge(g)) => Self::convert_gauge(g, ctx),
+                        Some(Data::Sum(s)) => Self::convert_sum(s, ctx),
+                        Some(Data::Histogram(h)) => Self::convert_histogram(h, ctx),
+                        Some(Data::ExponentialHistogram(e)) => {
+                            Self::convert_exp_histogram(e, ctx)
+                        }
+                        Some(Data::Summary(su)) => Self::convert_summary(su, ctx),
                         _ => Vec::new(),
                     }
                 })
             })
     }
 
-    fn convert_gauge(
-        gauge: Gauge,
-        resource: &Option<Resource>,
-        scope: &Option<InstrumentationScope>,
-        metric_name: &str,
-        scope_schema_url: &str,
-        resource_schema_url: &str,
-    ) -> Vec<Event> {
-        let resource = resource.clone();
-        let scope = scope.clone();
-        let metric_name = metric_name.to_string();
-        let scope_schema_url = scope_schema_url.to_string();
-        let resource_schema_url = resource_schema_url.to_string();
-
+    fn convert_gauge(gauge: Gauge, ctx: MetricContext) -> Vec<Event> {
         gauge
             .data_points
             .into_iter()
             .map(move |point| {
                 GaugeMetric {
-                    resource: resource.clone(),
-                    scope: scope.clone(),
+                    resource: ctx.resource.clone(),
+                    scope: ctx.scope.clone(),
                     point,
                 }
                 .into_metric(
-                    metric_name.clone(),
-                    &scope_schema_url,
-                    &resource_schema_url,
+                    ctx.metric_name.clone(),
+                    &ctx.scope_schema_url,
+                    &ctx.resource_schema_url,
                 )
             })
             .collect()
     }
 
-    fn convert_sum(
-        sum: Sum,
-        resource: &Option<Resource>,
-        scope: &Option<InstrumentationScope>,
-        metric_name: &str,
-        scope_schema_url: &str,
-        resource_schema_url: &str,
-    ) -> Vec<Event> {
-        let resource = resource.clone();
-        let scope = scope.clone();
-        let metric_name = metric_name.to_string();
-        let scope_schema_url = scope_schema_url.to_string();
-        let resource_schema_url = resource_schema_url.to_string();
-
+    fn convert_sum(sum: Sum, ctx: MetricContext) -> Vec<Event> {
         sum.data_points
             .into_iter()
             .map(move |point| {
                 SumMetric {
                     aggregation_temporality: sum.aggregation_temporality,
-                    resource: resource.clone(),
-                    scope: scope.clone(),
+                    resource: ctx.resource.clone(),
+                    scope: ctx.scope.clone(),
                     is_monotonic: sum.is_monotonic,
                     point,
                 }
                 .into_metric(
-                    metric_name.clone(),
-                    &scope_schema_url,
-                    &resource_schema_url,
+                    ctx.metric_name.clone(),
+                    &ctx.scope_schema_url,
+                    &ctx.resource_schema_url,
                 )
             })
             .collect()
     }
 
-    fn convert_histogram(
-        histogram: Histogram,
-        resource: &Option<Resource>,
-        scope: &Option<InstrumentationScope>,
-        metric_name: &str,
-        scope_schema_url: &str,
-        resource_schema_url: &str,
-    ) -> Vec<Event> {
-        let resource = resource.clone();
-        let scope = scope.clone();
-        let metric_name = metric_name.to_string();
-        let scope_schema_url = scope_schema_url.to_string();
-        let resource_schema_url = resource_schema_url.to_string();
-
+    fn convert_histogram(histogram: Histogram, ctx: MetricContext) -> Vec<Event> {
         histogram
             .data_points
             .into_iter()
             .map(move |point| {
                 HistogramMetric {
                     aggregation_temporality: histogram.aggregation_temporality,
-                    resource: resource.clone(),
-                    scope: scope.clone(),
+                    resource: ctx.resource.clone(),
+                    scope: ctx.scope.clone(),
                     point,
                 }
                 .into_metric(
-                    metric_name.clone(),
-                    &scope_schema_url,
-                    &resource_schema_url,
+                    ctx.metric_name.clone(),
+                    &ctx.scope_schema_url,
+                    &ctx.resource_schema_url,
                 )
             })
             .collect()
     }
 
-    fn convert_exp_histogram(
-        histogram: ExponentialHistogram,
-        resource: &Option<Resource>,
-        scope: &Option<InstrumentationScope>,
-        metric_name: &str,
-        scope_schema_url: &str,
-        resource_schema_url: &str,
-    ) -> Vec<Event> {
-        let resource = resource.clone();
-        let scope = scope.clone();
-        let metric_name = metric_name.to_string();
-        let scope_schema_url = scope_schema_url.to_string();
-        let resource_schema_url = resource_schema_url.to_string();
-
+    fn convert_exp_histogram(histogram: ExponentialHistogram, ctx: MetricContext) -> Vec<Event> {
         histogram
             .data_points
             .into_iter()
             .map(move |point| {
                 ExpHistogramMetric {
                     aggregation_temporality: histogram.aggregation_temporality,
-                    resource: resource.clone(),
-                    scope: scope.clone(),
+                    resource: ctx.resource.clone(),
+                    scope: ctx.scope.clone(),
                     point,
                 }
                 .into_metric(
-                    metric_name.clone(),
-                    &scope_schema_url,
-                    &resource_schema_url,
+                    ctx.metric_name.clone(),
+                    &ctx.scope_schema_url,
+                    &ctx.resource_schema_url,
                 )
             })
             .collect()
     }
 
-    fn convert_summary(
-        summary: Summary,
-        resource: &Option<Resource>,
-        scope: &Option<InstrumentationScope>,
-        metric_name: &str,
-        scope_schema_url: &str,
-        resource_schema_url: &str,
-    ) -> Vec<Event> {
-        let resource = resource.clone();
-        let scope = scope.clone();
-        let metric_name = metric_name.to_string();
-        let scope_schema_url = scope_schema_url.to_string();
-        let resource_schema_url = resource_schema_url.to_string();
-
+    fn convert_summary(summary: Summary, ctx: MetricContext) -> Vec<Event> {
         summary
             .data_points
             .into_iter()
             .map(move |point| {
                 SummaryMetric {
-                    resource: resource.clone(),
-                    scope: scope.clone(),
+                    resource: ctx.resource.clone(),
+                    scope: ctx.scope.clone(),
                     point,
                 }
                 .into_metric(
-                    metric_name.clone(),
-                    &scope_schema_url,
-                    &resource_schema_url,
+                    ctx.metric_name.clone(),
+                    &ctx.scope_schema_url,
+                    &ctx.resource_schema_url,
                 )
             })
             .collect()
