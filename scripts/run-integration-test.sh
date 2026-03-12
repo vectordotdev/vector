@@ -10,6 +10,8 @@ if [[ "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
   set -x
 fi
 
+vdev_cmd="${VDEV:-cargo vdev}"
+
 print_compose_logs_on_failure() {
   local LAST_RETURN_CODE=$1
   if [[ "$LAST_RETURN_CODE" -ne 0 || "${ACTIONS_RUNNER_DEBUG:-}" == "true" ]]; then
@@ -104,7 +106,7 @@ if [[ ${#TEST_ENV} -gt 0 ]]; then
   TEST_ENVIRONMENTS="${TEST_ENV}"
 else
   # Collect all available environments via auto-discovery
-  mapfile -t TEST_ENVIRONMENTS < <(cargo vdev "${VERBOSITY}" "${TEST_TYPE}" show -e "${TEST_NAME}")
+  mapfile -t TEST_ENVIRONMENTS < <($vdev_cmd "${VERBOSITY}" "${TEST_TYPE}" show -e "${TEST_NAME}")
   if [[ ${#TEST_ENVIRONMENTS[@]} -eq 0 ]]; then
     echo "ERROR: no environments found for ${TEST_TYPE} test '${TEST_NAME}'" >&2
     exit 1
@@ -127,12 +129,12 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   docker run --rm -v vector_target:/output/"${TEST_NAME}" alpine:3.20 \
     sh -c "rm -rf /output/${TEST_NAME}/*"
 
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" start "${TEST_NAME}" "${TEST_ENV}"
+  $vdev_cmd "${VERBOSITY}" "${TEST_TYPE}" start "${TEST_NAME}" "${TEST_ENV}"
   START_RET=$?
   print_compose_logs_on_failure "$START_RET"
 
   if [[ "$START_RET" -eq 0 ]]; then
-    cargo vdev "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" "${TEST_NAME}" "${TEST_ENV}"
+    $vdev_cmd "${VERBOSITY}" "${TEST_TYPE}" test --retries "$RETRIES" "${TEST_NAME}" "${TEST_ENV}"
     RET=$?
     print_compose_logs_on_failure "$RET"
 
@@ -144,7 +146,7 @@ for TEST_ENV in "${TEST_ENVIRONMENTS[@]}"; do
   fi
 
   # Always stop the environment (best effort cleanup)
-  cargo vdev "${VERBOSITY}" "${TEST_TYPE}" stop "${TEST_NAME}" || true
+  $vdev_cmd "${VERBOSITY}" "${TEST_TYPE}" stop "${TEST_NAME}" || true
 
   # Exit early on first failure
   if [[ "$RET" -ne 0 ]]; then
