@@ -135,7 +135,9 @@ impl ResourceLog {
             );
         }
 
-        // Resource-level schema_url (from ResourceLogs)
+        // Resource-level schema_url (from ResourceLogs).
+        // Legacy namespace: stored at root as "schema_url" (flat, alongside other top-level fields).
+        // Vector namespace: stored under metadata at "resources.schema_url" (grouped with resource data).
         if !self.resource_schema_url.is_empty() {
             log_namespace.insert_source_metadata(
                 SOURCE_NAME,
@@ -157,6 +159,9 @@ impl ResourceLog {
                     kv_list_into_value(resource.attributes),
                 );
             }
+            // Resource dropped_attributes_count: only written when > 0 (optional metadata).
+            // Legacy namespace: stored at root as "resource_dropped_attributes_count".
+            // Vector namespace: stored under metadata at "resources.dropped_attributes_count".
             if resource.dropped_attributes_count > 0 {
                 log_namespace.insert_source_metadata(
                     SOURCE_NAME,
@@ -224,6 +229,9 @@ impl ResourceLog {
             );
         }
 
+        // Log-record level dropped_attributes_count: always written (including zero) because it
+        // is a required field per the OTLP LogRecord spec and CUE schema (required: true).
+        // This differs from scope/resource dropped counts which are optional metadata.
         log_namespace.insert_source_metadata(
             SOURCE_NAME,
             &mut log,
@@ -233,34 +241,32 @@ impl ResourceLog {
         );
 
         // According to log data model spec, if observed_time_unix_nano is missing, the collector
-        // should set it to the current time.
-        let observed_timestamp = if self.log_record.observed_time_unix_nano > 0 {
+        // should set it to the current time. Using DateTime<Utc> (Copy) avoids a Value clone.
+        let observed_ts = if self.log_record.observed_time_unix_nano > 0 {
             Utc.timestamp_nanos(self.log_record.observed_time_unix_nano as i64)
-                .into()
         } else {
-            Value::Timestamp(now)
+            now
         };
         log_namespace.insert_source_metadata(
             SOURCE_NAME,
             &mut log,
             Some(LegacyKey::Overwrite(path!(OBSERVED_TIMESTAMP_KEY))),
             path!(OBSERVED_TIMESTAMP_KEY),
-            observed_timestamp.clone(),
+            Value::Timestamp(observed_ts),
         );
 
         // If time_unix_nano is not present (0 represents missing or unknown timestamp) use observed time
         let timestamp = if self.log_record.time_unix_nano > 0 {
             Utc.timestamp_nanos(self.log_record.time_unix_nano as i64)
-                .into()
         } else {
-            observed_timestamp
+            observed_ts
         };
         log_namespace.insert_source_metadata(
             SOURCE_NAME,
             &mut log,
             log_schema().timestamp_key().map(LegacyKey::Overwrite),
             path!("timestamp"),
-            timestamp,
+            Value::Timestamp(timestamp),
         );
 
         log_namespace.insert_vector_metadata(
