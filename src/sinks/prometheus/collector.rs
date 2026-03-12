@@ -54,9 +54,6 @@ pub(super) trait MetricCollector {
         negative_buckets: &NativeHistogramBuckets,
         reset_hint: NativeHistogramResetHint,
     ) {
-        // Suppress "unused" warnings for parameters only needed by overriding implementations.
-        let _ = (schema, reset_hint);
-
         // Fallback: build a classic histogram representation and emit it as float samples.
         // This is lossy but allows the text exposition format to represent native histograms.
         let native_value = MetricValue::NativeHistogram {
