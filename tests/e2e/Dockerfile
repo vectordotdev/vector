@@ -22,7 +22,6 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 
 COPY tests/data/ca/certs /certs
 
-COPY scripts/environment/install-protoc.sh /
 COPY scripts/environment/prepare.sh /
 COPY scripts/environment/binstall.sh /
 COPY scripts/environment/release-flags.sh /
@@ -30,8 +29,7 @@ COPY scripts/environment/release-flags.sh /
 WORKDIR /vector
 COPY rust-toolchain.toml .
 
-RUN bash /prepare.sh --modules=cargo-nextest
-RUN bash /install-protoc.sh
+RUN bash /prepare.sh --modules=cargo-nextest,protoc
 
 COPY . .
 ARG FEATURES
