@@ -141,7 +141,7 @@ pub(super) async fn firehose(
                                 source_arn.to_owned(),
                             );
 
-                            if common_attributes_map.len() > 0 {
+                            if !common_attributes_map.is_empty() {
                                 log_namespace.insert_source_metadata(
                                     AwsKinesisFirehoseConfig::NAME,
                                     log,

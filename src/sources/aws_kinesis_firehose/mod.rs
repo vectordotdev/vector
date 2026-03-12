@@ -360,7 +360,6 @@ mod tests {
                     Value::Bytes("tymur_test".into()),
                 ),
             ]
-            .into_iter(),
         )
     });
 
@@ -396,7 +395,7 @@ mod tests {
                 acknowledgements: true.into(),
                 log_namespace: Some(log_namespace),
                 keepalive: Default::default(),
-                common_attributes: common_attributes,
+                common_attributes,
             }
             .build(cx)
             .await
