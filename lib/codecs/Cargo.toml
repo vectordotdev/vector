@@ -42,7 +42,7 @@ serde_json.workspace = true
 serde-aux = { version = "4.5", optional = true }
 smallvec = { version = "1", default-features = false, features = ["union"] }
 snafu.workspace = true
-strum = { version = "0.26.3", features = ["derive"], optional = true }
+strum = { version = "0.27.2", features = ["derive"], optional = true }
 syslog_loose = { version = "0.23", default-features = false, optional = true }
 tokio-util = { version = "0.7", default-features = false, features = ["codec"] }
 tokio = { workspace = true, features = ["full"] }
