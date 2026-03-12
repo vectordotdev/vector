@@ -43,7 +43,6 @@ ignore = [
   # There is not fix available yet.
   # https://github.com/vectordotdev/vector/issues/19262
   "RUSTSEC-2023-0071",
-  { id = "RUSTSEC-2021-0139", reason = " ansi_term is unmaintained" },
   { id = "RUSTSEC-2024-0388", reason = "derivative is unmaintained" },
   { id = "RUSTSEC-2024-0384", reason = "instant is unmaintained" },
   { id = "RUSTSEC-2020-0168", reason = "mach is unmaintained" },
