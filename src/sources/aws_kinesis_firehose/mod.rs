@@ -349,18 +349,16 @@ mod tests {
     const COMMON_ATTRIBUTES: &str = r#"{ "commonAttributes": { "environment": "testing", "application_group": "tymur_test" } }"#;
 
     static COMMON_ATTRIBUTES_MAP: LazyLock<ObjectMap> = LazyLock::new(|| {
-        ObjectMap::from_iter(
-            [
-                (
-                    KeyString::from("environment"),
-                    Value::Bytes("testing".into()),
-                ),
-                (
-                    KeyString::from("application_group"),
-                    Value::Bytes("tymur_test".into()),
-                ),
-            ]
-        )
+        ObjectMap::from_iter([
+            (
+                KeyString::from("environment"),
+                Value::Bytes("testing".into()),
+            ),
+            (
+                KeyString::from("application_group"),
+                Value::Bytes("tymur_test".into()),
+            ),
+        ])
     });
 
     #[test]
@@ -750,6 +748,11 @@ mod tests {
                             .unwrap(),
                         &value!(timestamp.trunc_subsecs(3))
                     );
+                    assert!(
+                        meta.value()
+                            .get(path!("aws_kinesis_firehose", "common_attributes"))
+                            .is_none()
+                    );
                 }
 
                 let response: models::FirehoseResponse = res.json().await.unwrap();
@@ -933,7 +936,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn aws_kinesis_firehose_forwards_events_specific_common_attributes_legacy_namespace() {
+    async fn aws_kinesis_firehose_forwards_events_common_attributes_legacy_namespace() {
         assert_source_compliance(&SOURCE_TAGS, async move {
             let mut expected_common_attributes = ObjectMap::new();
             expected_common_attributes.insert(
@@ -989,7 +992,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn aws_kinesis_firehose_forwards_events_specific_common_attributes_vector_namespace() {
+    async fn aws_kinesis_firehose_forwards_events_common_attributes_vector_namespace() {
         assert_source_compliance(&SOURCE_TAGS, async move {
             let mut expected_common_attributes = ObjectMap::new();
             expected_common_attributes.insert(
@@ -1069,121 +1072,6 @@ mod tests {
                     .get(path!("aws_kinesis_firehose", "common_attributes"))
                     .unwrap(),
                 &value!(expected_common_attributes)
-            );
-
-            let response: models::FirehoseResponse = res.json().await.unwrap();
-            assert_eq!(response.request_id, REQUEST_ID);
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn aws_kinesis_firehose_forwards_events_no_configured_common_attributes_legacy_namespace()
-    {
-        assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr, _guard) =
-                source(None, None, false, Default::default(), true, false, vec![]).await;
-
-            let timestamp: DateTime<Utc> = Utc::now();
-
-            let res = spawn_send(
-                addr,
-                timestamp,
-                vec![RECORD.as_bytes()],
-                None,
-                true,
-                Compression::None,
-                Some(COMMON_ATTRIBUTES),
-            )
-            .await;
-
-            let events = collect_ready(rx).await;
-            let res = res.await.unwrap().unwrap();
-            assert_eq!(200, res.status().as_u16());
-
-            assert_event_data_eq!(
-                events,
-                vec![log_event! {
-                    "source_type" => Bytes::from("aws_kinesis_firehose"),
-                    "timestamp" => timestamp.trunc_subsecs(3), // AWS sends timestamps as ms
-                    "message"=> RECORD,
-                    "request_id" => REQUEST_ID,
-                    "source_arn" => SOURCE_ARN,
-                },]
-            );
-
-            let response: models::FirehoseResponse = res.json().await.unwrap();
-            assert_eq!(response.request_id, REQUEST_ID);
-        })
-        .await;
-    }
-
-    #[tokio::test]
-    async fn aws_kinesis_firehose_forwards_events_no_configured_common_attributes_vector_namespace()
-    {
-        assert_source_compliance(&SOURCE_TAGS, async move {
-            let (rx, addr, _guard) =
-                source(None, None, false, Default::default(), true, true, vec![]).await;
-
-            let timestamp: DateTime<Utc> = Utc::now();
-
-            let res = spawn_send(
-                addr,
-                timestamp,
-                vec![RECORD.as_bytes()],
-                None,
-                true,
-                Compression::None,
-                Some(COMMON_ATTRIBUTES),
-            )
-            .await;
-
-            let mut events = collect_ready(rx).await;
-            let res = res.await.unwrap().unwrap();
-            assert_eq!(200, res.status().as_u16());
-
-            let event = events.pop().unwrap();
-            let log = event.as_log();
-            let meta = log.metadata();
-
-            // event data, currently assumes default bytes deserializer
-            assert_eq!(log.value(), &value!(Bytes::from(RECORD.to_owned())));
-
-            // vector metadata
-            assert_eq!(
-                meta.value().get(path!("vector", "source_type")).unwrap(),
-                &value!("aws_kinesis_firehose")
-            );
-            assert!(
-                meta.value()
-                    .get(path!("vector", "ingest_timestamp"))
-                    .unwrap()
-                    .is_timestamp()
-            );
-
-            // source metadata
-            assert_eq!(
-                meta.value()
-                    .get(path!("aws_kinesis_firehose", "request_id"))
-                    .unwrap(),
-                &value!(REQUEST_ID)
-            );
-            assert_eq!(
-                meta.value()
-                    .get(path!("aws_kinesis_firehose", "source_arn"))
-                    .unwrap(),
-                &value!(SOURCE_ARN)
-            );
-            assert_eq!(
-                meta.value()
-                    .get(path!("aws_kinesis_firehose", "timestamp"))
-                    .unwrap(),
-                &value!(timestamp.trunc_subsecs(3))
-            );
-            assert!(
-                meta.value()
-                    .get(path!("aws_kinesis_firehose", "common_attributes"))
-                    .is_none()
             );
 
             let response: models::FirehoseResponse = res.json().await.unwrap();
