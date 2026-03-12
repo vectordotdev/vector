@@ -26,19 +26,26 @@ pub const SEVERITY_NUMBER_KEY: &str = "severity_number";
 pub const OBSERVED_TIMESTAMP_KEY: &str = "observed_timestamp";
 pub const DROPPED_ATTRIBUTES_COUNT_KEY: &str = "dropped_attributes_count";
 pub const FLAGS_KEY: &str = "flags";
+pub const SCHEMA_URL_KEY: &str = "schema_url";
+const RESOURCE_DROPPED_ATTRIBUTES_COUNT_KEY: &str = "resource_dropped_attributes_count";
 
 impl ResourceLogs {
     pub fn into_event_iter(self, log_namespace: LogNamespace) -> impl Iterator<Item = Event> {
         let now = Utc::now();
+        let resource_schema_url = self.schema_url;
 
         self.scope_logs.into_iter().flat_map(move |scope_log| {
             let scope = scope_log.scope;
+            let scope_schema_url = scope_log.schema_url;
             let resource = self.resource.clone();
+            let resource_schema_url = resource_schema_url.clone();
             scope_log.log_records.into_iter().map(move |log_record| {
                 ResourceLog {
                     resource: resource.clone(),
                     scope: scope.clone(),
                     log_record,
+                    scope_schema_url: scope_schema_url.clone(),
+                    resource_schema_url: resource_schema_url.clone(),
                 }
                 .into_event(log_namespace, now)
             })
@@ -50,6 +57,8 @@ struct ResourceLog {
     resource: Option<Resource>,
     scope: Option<InstrumentationScope>,
     log_record: LogRecord,
+    scope_schema_url: String,
+    resource_schema_url: String,
 }
 
 // https://github.com/open-telemetry/opentelemetry-specification/blob/v1.15.0/specification/logs/data-model.md
@@ -115,17 +124,50 @@ impl ResourceLog {
             }
         }
 
-        // Optional fields
-        if let Some(resource) = self.resource
-            && !resource.attributes.is_empty()
-        {
+        // Scope-level schema_url (from ScopeLogs)
+        if !self.scope_schema_url.is_empty() {
             log_namespace.insert_source_metadata(
                 SOURCE_NAME,
                 &mut log,
-                Some(LegacyKey::Overwrite(path!(RESOURCE_KEY))),
-                path!(RESOURCE_KEY),
-                kv_list_into_value(resource.attributes),
+                Some(LegacyKey::Overwrite(path!(SCOPE_KEY, SCHEMA_URL_KEY))),
+                path!(SCOPE_KEY, SCHEMA_URL_KEY),
+                self.scope_schema_url,
             );
+        }
+
+        // Resource-level schema_url (from ResourceLogs)
+        if !self.resource_schema_url.is_empty() {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(SCHEMA_URL_KEY))),
+                path!(RESOURCE_KEY, SCHEMA_URL_KEY),
+                self.resource_schema_url,
+            );
+        }
+
+        // Optional fields
+        if let Some(resource) = self.resource {
+            if !resource.attributes.is_empty() {
+                log_namespace.insert_source_metadata(
+                    SOURCE_NAME,
+                    &mut log,
+                    Some(LegacyKey::Overwrite(path!(RESOURCE_KEY))),
+                    path!(RESOURCE_KEY),
+                    kv_list_into_value(resource.attributes),
+                );
+            }
+            if resource.dropped_attributes_count > 0 {
+                log_namespace.insert_source_metadata(
+                    SOURCE_NAME,
+                    &mut log,
+                    Some(LegacyKey::Overwrite(path!(
+                        RESOURCE_DROPPED_ATTRIBUTES_COUNT_KEY
+                    ))),
+                    path!(RESOURCE_KEY, DROPPED_ATTRIBUTES_COUNT_KEY),
+                    resource.dropped_attributes_count,
+                );
+            }
         }
         if !self.log_record.attributes.is_empty() {
             log_namespace.insert_source_metadata(
@@ -234,5 +276,318 @@ impl ResourceLog {
         }
 
         log.into()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::proto::{
+        common::v1::{AnyValue, KeyValue, any_value::Value as PBValue},
+        logs::v1::ScopeLogs,
+    };
+
+    fn make_scope(name: &str, version: &str) -> InstrumentationScope {
+        InstrumentationScope {
+            name: name.to_string(),
+            version: version.to_string(),
+            attributes: vec![],
+            dropped_attributes_count: 0,
+        }
+    }
+
+    fn make_resource_logs(
+        resource_attrs: Vec<KeyValue>,
+        resource_dropped: u32,
+        scope: Option<InstrumentationScope>,
+        scope_schema_url: &str,
+        resource_schema_url: &str,
+        log_record: LogRecord,
+    ) -> ResourceLogs {
+        ResourceLogs {
+            resource: Some(Resource {
+                attributes: resource_attrs,
+                dropped_attributes_count: resource_dropped,
+            }),
+            scope_logs: vec![ScopeLogs {
+                scope,
+                log_records: vec![log_record],
+                schema_url: scope_schema_url.to_string(),
+            }],
+            schema_url: resource_schema_url.to_string(),
+        }
+    }
+
+    fn make_kv(key: &str, val: &str) -> KeyValue {
+        KeyValue {
+            key: key.to_string(),
+            value: Some(AnyValue {
+                value: Some(PBValue::StringValue(val.to_string())),
+            }),
+        }
+    }
+
+    fn default_log_record() -> LogRecord {
+        LogRecord {
+            time_unix_nano: 1_000_000_000,
+            observed_time_unix_nano: 1_000_000_000,
+            severity_number: SeverityNumber::Info as i32,
+            severity_text: "INFO".to_string(),
+            body: Some(AnyValue {
+                value: Some(PBValue::StringValue("test".to_string())),
+            }),
+            attributes: vec![],
+            dropped_attributes_count: 0,
+            flags: 0,
+            trace_id: vec![],
+            span_id: vec![],
+        }
+    }
+
+    // ========================================================================
+    // Tests for schema_url decode (Legacy namespace)
+    // ========================================================================
+
+    #[test]
+    fn test_scope_schema_url_decoded_legacy() {
+        let rl = make_resource_logs(
+            vec![],
+            0,
+            None,
+            "https://opentelemetry.io/schemas/1.21.0",
+            "",
+            default_log_record(),
+        );
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Legacy).collect();
+        assert_eq!(events.len(), 1);
+        let log = events[0].as_log();
+        assert_eq!(
+            log.get("scope.schema_url").unwrap().to_string_lossy(),
+            "https://opentelemetry.io/schemas/1.21.0"
+        );
+    }
+
+    #[test]
+    fn test_resource_schema_url_decoded_legacy() {
+        let rl = make_resource_logs(
+            vec![],
+            0,
+            None,
+            "",
+            "https://opentelemetry.io/schemas/1.20.0",
+            default_log_record(),
+        );
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Legacy).collect();
+        assert_eq!(events.len(), 1);
+        let log = events[0].as_log();
+        assert_eq!(
+            log.get("schema_url").unwrap().to_string_lossy(),
+            "https://opentelemetry.io/schemas/1.20.0"
+        );
+    }
+
+    #[test]
+    fn test_both_schema_urls_decoded_legacy() {
+        let rl = make_resource_logs(
+            vec![],
+            0,
+            None,
+            "https://scope.schema",
+            "https://resource.schema",
+            default_log_record(),
+        );
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Legacy).collect();
+        let log = events[0].as_log();
+        assert_eq!(
+            log.get("scope.schema_url").unwrap().to_string_lossy(),
+            "https://scope.schema"
+        );
+        assert_eq!(
+            log.get("schema_url").unwrap().to_string_lossy(),
+            "https://resource.schema"
+        );
+    }
+
+    #[test]
+    fn test_empty_schema_urls_not_inserted() {
+        let rl = make_resource_logs(vec![], 0, None, "", "", default_log_record());
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Legacy).collect();
+        let log = events[0].as_log();
+        assert!(log.get("scope.schema_url").is_none());
+        assert!(log.get("schema_url").is_none());
+    }
+
+    // ========================================================================
+    // Tests for schema_url decode (Vector namespace)
+    // ========================================================================
+
+    #[test]
+    fn test_scope_schema_url_decoded_vector() {
+        let rl = make_resource_logs(
+            vec![],
+            0,
+            None,
+            "https://scope.schema",
+            "",
+            default_log_record(),
+        );
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Vector).collect();
+        let log = events[0].as_log();
+        let metadata = log.metadata().value();
+        let scope_schema = metadata
+            .get("opentelemetry")
+            .and_then(|v| v.get("scope"))
+            .and_then(|v| v.get("schema_url"));
+        assert!(scope_schema.is_some());
+        assert_eq!(
+            scope_schema.unwrap().to_string_lossy(),
+            "https://scope.schema"
+        );
+    }
+
+    #[test]
+    fn test_resource_schema_url_decoded_vector() {
+        let rl = make_resource_logs(
+            vec![],
+            0,
+            None,
+            "",
+            "https://resource.schema",
+            default_log_record(),
+        );
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Vector).collect();
+        let log = events[0].as_log();
+        let metadata = log.metadata().value();
+        let res_schema = metadata
+            .get("opentelemetry")
+            .and_then(|v| v.get("resources"))
+            .and_then(|v| v.get("schema_url"));
+        assert!(res_schema.is_some());
+        assert_eq!(
+            res_schema.unwrap().to_string_lossy(),
+            "https://resource.schema"
+        );
+    }
+
+    // ========================================================================
+    // Tests for resource.dropped_attributes_count
+    // ========================================================================
+
+    #[test]
+    fn test_resource_dropped_attributes_count_legacy() {
+        let rl = make_resource_logs(
+            vec![make_kv("service.name", "test")],
+            5,
+            None,
+            "",
+            "",
+            default_log_record(),
+        );
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Legacy).collect();
+        let log = events[0].as_log();
+        assert_eq!(
+            *log.get("resource_dropped_attributes_count").unwrap(),
+            Value::Integer(5)
+        );
+    }
+
+    #[test]
+    fn test_resource_dropped_attributes_count_zero_not_inserted() {
+        let rl = make_resource_logs(
+            vec![make_kv("service.name", "test")],
+            0,
+            None,
+            "",
+            "",
+            default_log_record(),
+        );
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Legacy).collect();
+        let log = events[0].as_log();
+        assert!(log.get("resource_dropped_attributes_count").is_none());
+    }
+
+    #[test]
+    fn test_resource_dropped_attributes_count_vector() {
+        let rl = make_resource_logs(
+            vec![make_kv("service.name", "test")],
+            3,
+            None,
+            "",
+            "",
+            default_log_record(),
+        );
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Vector).collect();
+        let log = events[0].as_log();
+        let metadata = log.metadata().value();
+        let dropped = metadata
+            .get("opentelemetry")
+            .and_then(|v| v.get("resources"))
+            .and_then(|v| v.get("dropped_attributes_count"));
+        assert!(dropped.is_some());
+        assert_eq!(*dropped.unwrap(), Value::Integer(3));
+    }
+
+    // ========================================================================
+    // Tests for scope fields (verify existing behavior still works)
+    // ========================================================================
+
+    #[test]
+    fn test_scope_name_version_decoded() {
+        let scope = make_scope("my-library", "1.2.3");
+        let rl = make_resource_logs(vec![], 0, Some(scope), "", "", default_log_record());
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Legacy).collect();
+        let log = events[0].as_log();
+        assert_eq!(
+            log.get("scope.name").unwrap().to_string_lossy(),
+            "my-library"
+        );
+        assert_eq!(log.get("scope.version").unwrap().to_string_lossy(), "1.2.3");
+    }
+
+    // ========================================================================
+    // Combined: all new fields populated together
+    // ========================================================================
+
+    #[test]
+    fn test_all_new_fields_together() {
+        let scope = InstrumentationScope {
+            name: "otel-sdk".to_string(),
+            version: "2.0.0".to_string(),
+            attributes: vec![make_kv("lib.lang", "rust")],
+            dropped_attributes_count: 1,
+        };
+        let rl = make_resource_logs(
+            vec![make_kv("host.name", "server-1")],
+            2,
+            Some(scope),
+            "https://scope.schema/1.0",
+            "https://resource.schema/1.0",
+            default_log_record(),
+        );
+        let events: Vec<Event> = rl.into_event_iter(LogNamespace::Legacy).collect();
+        let log = events[0].as_log();
+
+        // Scope fields
+        assert_eq!(log.get("scope.name").unwrap().to_string_lossy(), "otel-sdk");
+        assert_eq!(log.get("scope.version").unwrap().to_string_lossy(), "2.0.0");
+
+        // Schema URLs
+        assert_eq!(
+            log.get("scope.schema_url").unwrap().to_string_lossy(),
+            "https://scope.schema/1.0"
+        );
+        assert_eq!(
+            log.get("schema_url").unwrap().to_string_lossy(),
+            "https://resource.schema/1.0"
+        );
+
+        // Resource dropped attributes count
+        assert_eq!(
+            *log.get("resource_dropped_attributes_count").unwrap(),
+            Value::Integer(2)
+        );
+
+        // Resource attributes still work
+        assert!(log.get("resources").is_some());
     }
 }
