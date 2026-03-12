@@ -339,11 +339,12 @@ impl SpecificAzureCredential {
                 client_id,
                 token_file_path,
             } => {
-                let mut options = WorkloadIdentityCredentialOptions::default();
-
-                options.tenant_id = tenant_id.clone();
-                options.client_id = client_id.clone();
-                options.token_file_path = token_file_path.clone();
+                let options = WorkloadIdentityCredentialOptions {
+                    tenant_id: tenant_id.clone(),
+                    client_id: client_id.clone(),
+                    token_file_path: token_file_path.clone(),
+                    ..Default::default()
+                };
 
                 WorkloadIdentityCredential::new(Some(options))?
             }
@@ -564,15 +565,15 @@ pub async fn build_client(
         }
     }
 
-    if let Some(AzureBlobTlsConfig { ca_file }) = &tls {
-        if let Some(ca_file) = ca_file {
-            let mut buf = Vec::new();
-            File::open(ca_file)?.read_to_end(&mut buf)?;
-            let cert = reqwest_12::Certificate::from_pem(&buf)?;
+    if let Some(AzureBlobTlsConfig { ca_file }) = &tls
+        && let Some(ca_file) = ca_file
+    {
+        let mut buf = Vec::new();
+        File::open(ca_file)?.read_to_end(&mut buf)?;
+        let cert = reqwest_12::Certificate::from_pem(&buf)?;
 
-            warn!("Adding TLS root certificate from {}", ca_file.display());
-            reqwest_builder = reqwest_builder.add_root_certificate(cert);
-        }
+        warn!("Adding TLS root certificate from {}", ca_file.display());
+        reqwest_builder = reqwest_builder.add_root_certificate(cert);
     }
 
     options.client_options.transport = Some(azure_core::http::Transport::new(std::sync::Arc::new(
