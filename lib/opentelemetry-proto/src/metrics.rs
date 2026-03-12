@@ -469,20 +469,20 @@ impl ToF64 for Option<NumberDataPointValue> {
 /// - Set → Gauge (count of unique values)
 /// - Sketch → unsupported (warning emitted, metric dropped)
 pub fn native_metric_to_otlp_request(metric: &MetricEvent) -> ExportMetricsServiceRequest {
-    let (resource, scope, attributes) = decompose_metric_tags(metric.tags());
+    let decomposed = decompose_metric_tags(metric.tags());
     let timestamp_nanos = extract_metric_timestamp_nanos(metric);
-    let otlp_metric = build_otlp_metric(metric, &attributes, timestamp_nanos);
+    let otlp_metric = build_otlp_metric(metric, &decomposed.attributes, timestamp_nanos);
 
     let scope_metrics = ScopeMetrics {
-        scope,
+        scope: decomposed.scope,
         metrics: vec![otlp_metric],
-        schema_url: String::new(),
+        schema_url: decomposed.scope_schema_url,
     };
 
     let resource_metrics = ResourceMetrics {
-        resource,
+        resource: decomposed.resource,
         scope_metrics: vec![scope_metrics],
-        schema_url: String::new(),
+        schema_url: decomposed.resource_schema_url,
     };
 
     ExportMetricsServiceRequest {
@@ -490,81 +490,122 @@ pub fn native_metric_to_otlp_request(metric: &MetricEvent) -> ExportMetricsServi
     }
 }
 
+/// Result of decomposing metric tags back into OTLP structures.
+struct DecomposedMetricTags {
+    resource: Option<Resource>,
+    scope: Option<InstrumentationScope>,
+    attributes: Vec<KeyValue>,
+    scope_schema_url: String,
+    resource_schema_url: String,
+}
+
 /// Decompose Vector MetricTags back into OTLP resource, scope, and data point attributes.
 ///
 /// This reverses the flattening done by `build_metric_tags` during decode:
 /// - Tags with "resource." prefix → Resource attributes (prefix removed)
+/// - "resource.dropped_attributes_count" → Resource.dropped_attributes_count (not an attribute)
+/// - "resource.schema_url" → ResourceMetrics.schema_url (not an attribute)
 /// - "scope.name" → InstrumentationScope.name
 /// - "scope.version" → InstrumentationScope.version
-/// - Tags with "scope." prefix (other than name/version) → scope attributes (prefix removed)
+/// - "scope.dropped_attributes_count" → InstrumentationScope.dropped_attributes_count (not an attribute)
+/// - "scope.schema_url" → ScopeMetrics.schema_url (not an attribute)
+/// - Tags with "scope." prefix (other than above) → scope attributes (prefix removed)
 /// - All other tags → data point KeyValue attributes
-fn decompose_metric_tags(
-    tags: Option<&MetricTags>,
-) -> (
-    Option<Resource>,
-    Option<InstrumentationScope>,
-    Vec<KeyValue>,
-) {
+fn decompose_metric_tags(tags: Option<&MetricTags>) -> DecomposedMetricTags {
     let tags = match tags {
         Some(t) => t,
-        None => return (None, None, Vec::new()),
+        None => {
+            return DecomposedMetricTags {
+                resource: None,
+                scope: None,
+                attributes: Vec::new(),
+                scope_schema_url: String::new(),
+                resource_schema_url: String::new(),
+            }
+        }
     };
 
     let mut resource_attrs = Vec::new();
+    let mut resource_dropped: u32 = 0;
+    let mut resource_schema_url = String::new();
     let mut scope_name: Option<String> = None;
     let mut scope_version: Option<String> = None;
+    let mut scope_dropped: u32 = 0;
+    let mut scope_schema_url = String::new();
     let mut scope_attrs = Vec::new();
     let mut data_point_attrs = Vec::new();
 
     for (key, value) in tags.iter_single() {
-        let pb_value = PBValue::StringValue(value.to_string());
-        let any_value = Some(AnyValue {
-            value: Some(pb_value),
-        });
-
-        if let Some(resource_key) = key.strip_prefix("resource.") {
+        if key == "resource.dropped_attributes_count" {
+            resource_dropped = value.parse::<u32>().unwrap_or(0);
+        } else if key == "resource.schema_url" {
+            resource_schema_url = value.to_string();
+        } else if let Some(resource_key) = key.strip_prefix("resource.") {
+            let pb_value = PBValue::StringValue(value.to_string());
             resource_attrs.push(KeyValue {
                 key: resource_key.to_string(),
-                value: any_value,
+                value: Some(AnyValue {
+                    value: Some(pb_value),
+                }),
             });
         } else if key == "scope.name" {
             scope_name = Some(value.to_string());
         } else if key == "scope.version" {
             scope_version = Some(value.to_string());
+        } else if key == "scope.dropped_attributes_count" {
+            scope_dropped = value.parse::<u32>().unwrap_or(0);
+        } else if key == "scope.schema_url" {
+            scope_schema_url = value.to_string();
         } else if let Some(scope_key) = key.strip_prefix("scope.") {
+            let pb_value = PBValue::StringValue(value.to_string());
             scope_attrs.push(KeyValue {
                 key: scope_key.to_string(),
-                value: any_value,
+                value: Some(AnyValue {
+                    value: Some(pb_value),
+                }),
             });
         } else {
+            let pb_value = PBValue::StringValue(value.to_string());
             data_point_attrs.push(KeyValue {
                 key: key.to_string(),
-                value: any_value,
+                value: Some(AnyValue {
+                    value: Some(pb_value),
+                }),
             });
         }
     }
 
-    let resource = if !resource_attrs.is_empty() {
+    let resource = if !resource_attrs.is_empty() || resource_dropped > 0 {
         Some(Resource {
             attributes: resource_attrs,
-            dropped_attributes_count: 0,
+            dropped_attributes_count: resource_dropped,
         })
     } else {
         None
     };
 
-    let scope = if scope_name.is_some() || scope_version.is_some() || !scope_attrs.is_empty() {
+    let scope = if scope_name.is_some()
+        || scope_version.is_some()
+        || !scope_attrs.is_empty()
+        || scope_dropped > 0
+    {
         Some(InstrumentationScope {
             name: scope_name.unwrap_or_default(),
             version: scope_version.unwrap_or_default(),
             attributes: scope_attrs,
-            dropped_attributes_count: 0,
+            dropped_attributes_count: scope_dropped,
         })
     } else {
         None
     };
 
-    (resource, scope, data_point_attrs)
+    DecomposedMetricTags {
+        resource,
+        scope,
+        attributes: data_point_attrs,
+        scope_schema_url,
+        resource_schema_url,
+    }
 }
 
 /// Extract timestamp as nanoseconds from a Metric event.
@@ -2020,5 +2061,156 @@ mod native_metric_conversion_tests {
             }
             other => panic!("Expected Summary, got {other:?}"),
         }
+    }
+
+    // ====================================================================
+    // Proto-level structural field extraction
+    // ====================================================================
+
+    #[test]
+    fn test_resource_dropped_attributes_count_extracted() {
+        let metric = make_gauge("test", 1.0);
+        let mut tags = MetricTags::default();
+        tags.replace(
+            "resource.service.name".to_string(),
+            "svc".to_string(),
+        );
+        tags.replace(
+            "resource.dropped_attributes_count".to_string(),
+            "5".to_string(),
+        );
+        let metric = metric.with_tags(Some(tags));
+
+        let request = native_metric_to_otlp_request(&metric);
+        let rm = &request.resource_metrics[0];
+        let resource = rm.resource.as_ref().unwrap();
+
+        assert_eq!(resource.dropped_attributes_count, 5);
+        // Must not appear as a regular attribute
+        assert!(
+            !resource
+                .attributes
+                .iter()
+                .any(|kv| kv.key == "dropped_attributes_count"),
+            "dropped_attributes_count should not be a resource attribute"
+        );
+        // Normal resource attribute still present
+        assert!(resource.attributes.iter().any(|kv| kv.key == "service.name"));
+    }
+
+    #[test]
+    fn test_resource_schema_url_extracted() {
+        let metric = make_gauge("test", 1.0);
+        let mut tags = MetricTags::default();
+        tags.replace(
+            "resource.service.name".to_string(),
+            "svc".to_string(),
+        );
+        tags.replace(
+            "resource.schema_url".to_string(),
+            "https://opentelemetry.io/schemas/1.21.0".to_string(),
+        );
+        let metric = metric.with_tags(Some(tags));
+
+        let request = native_metric_to_otlp_request(&metric);
+        let rm = &request.resource_metrics[0];
+
+        assert_eq!(rm.schema_url, "https://opentelemetry.io/schemas/1.21.0");
+        // Must not appear as a resource attribute
+        let resource = rm.resource.as_ref().unwrap();
+        assert!(
+            !resource.attributes.iter().any(|kv| kv.key == "schema_url"),
+            "schema_url should not be a resource attribute"
+        );
+    }
+
+    #[test]
+    fn test_scope_dropped_attributes_count_extracted() {
+        let metric = make_gauge("test", 1.0);
+        let mut tags = MetricTags::default();
+        tags.replace("scope.name".to_string(), "my-meter".to_string());
+        tags.replace(
+            "scope.dropped_attributes_count".to_string(),
+            "3".to_string(),
+        );
+        let metric = metric.with_tags(Some(tags));
+
+        let request = native_metric_to_otlp_request(&metric);
+        let sm = &request.resource_metrics[0].scope_metrics[0];
+        let scope = sm.scope.as_ref().unwrap();
+
+        assert_eq!(scope.dropped_attributes_count, 3);
+        // Must not appear as a scope attribute
+        assert!(
+            !scope
+                .attributes
+                .iter()
+                .any(|kv| kv.key == "dropped_attributes_count"),
+            "dropped_attributes_count should not be a scope attribute"
+        );
+    }
+
+    #[test]
+    fn test_scope_schema_url_extracted() {
+        let metric = make_gauge("test", 1.0);
+        let mut tags = MetricTags::default();
+        tags.replace("scope.name".to_string(), "my-meter".to_string());
+        tags.replace(
+            "scope.schema_url".to_string(),
+            "https://opentelemetry.io/schemas/1.22.0".to_string(),
+        );
+        let metric = metric.with_tags(Some(tags));
+
+        let request = native_metric_to_otlp_request(&metric);
+        let sm = &request.resource_metrics[0].scope_metrics[0];
+
+        assert_eq!(sm.schema_url, "https://opentelemetry.io/schemas/1.22.0");
+        // Must not appear as a scope attribute
+        let scope = sm.scope.as_ref().unwrap();
+        assert!(
+            !scope.attributes.iter().any(|kv| kv.key == "schema_url"),
+            "schema_url should not be a scope attribute"
+        );
+    }
+
+    #[test]
+    fn test_resource_dropped_count_only_creates_resource() {
+        // Even with no resource attributes, a dropped_attributes_count alone
+        // should create a Resource.
+        let metric = make_gauge("test", 1.0);
+        let mut tags = MetricTags::default();
+        tags.replace(
+            "resource.dropped_attributes_count".to_string(),
+            "2".to_string(),
+        );
+        let metric = metric.with_tags(Some(tags));
+
+        let request = native_metric_to_otlp_request(&metric);
+        let rm = &request.resource_metrics[0];
+        let resource = rm.resource.as_ref().unwrap();
+
+        assert_eq!(resource.dropped_attributes_count, 2);
+        assert!(resource.attributes.is_empty());
+    }
+
+    #[test]
+    fn test_scope_dropped_count_only_creates_scope() {
+        // Even with no scope name/version/attributes, a dropped_attributes_count
+        // alone should create an InstrumentationScope.
+        let metric = make_gauge("test", 1.0);
+        let mut tags = MetricTags::default();
+        tags.replace(
+            "scope.dropped_attributes_count".to_string(),
+            "1".to_string(),
+        );
+        let metric = metric.with_tags(Some(tags));
+
+        let request = native_metric_to_otlp_request(&metric);
+        let sm = &request.resource_metrics[0].scope_metrics[0];
+        let scope = sm.scope.as_ref().unwrap();
+
+        assert_eq!(scope.dropped_attributes_count, 1);
+        assert!(scope.name.is_empty());
+        assert!(scope.attributes.is_empty());
     }
 }
