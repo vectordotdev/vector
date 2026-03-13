@@ -10,12 +10,12 @@ pub mod topology;
 use std::{borrow::Cow, collections::BTreeMap};
 
 use colored::{ColoredString, Colorize};
-use tokio::sync::mpsc as tokio_mpsc;
-use tokio::time::timeout;
-use tokio::time::{Duration, Instant};
+use tokio::{
+    sync::mpsc as tokio_mpsc,
+    time::{Duration, Instant, timeout},
+};
 use tokio_stream::StreamExt;
 use url::Url;
-
 use vector_api_client::{
     connect_subscription_client,
     gql::{

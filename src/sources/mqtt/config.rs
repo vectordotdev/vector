@@ -7,12 +7,12 @@ use vector_lib::{
     codecs::decoding::{DeserializerConfig, FramingConfig},
     config::{LegacyKey, LogNamespace},
     configurable::configurable_component,
-    lookup::lookup_v2::OptionalValuePath,
-    lookup::owned_value_path,
+    lookup::{lookup_v2::OptionalValuePath, owned_value_path},
     tls::MaybeTlsSettings,
 };
 use vrl::value::Kind;
 
+use super::source::MqttSource;
 use crate::{
     codecs::DecodingConfig,
     common::mqtt::{
@@ -20,10 +20,8 @@ use crate::{
         TlsSnafu,
     },
     config::{SourceConfig, SourceContext, SourceOutput},
-    serde::{default_decoding, default_framing_message_based},
+    serde::{OneOrMany, default_decoding, default_framing_message_based},
 };
-
-use super::source::MqttSource;
 
 /// Configuration for the `mqtt` source.
 #[configurable_component(source("mqtt", "Collect logs from MQTT."))]
@@ -34,11 +32,11 @@ pub struct MqttSourceConfig {
     #[serde(flatten)]
     pub common: MqttCommonConfig,
 
-    /// MQTT topic from which messages are to be read.
+    /// MQTT topic or topics from which messages are to be read.
     #[configurable(derived)]
     #[serde(default = "default_topic")]
     #[derivative(Default(value = "default_topic()"))]
-    pub topic: String,
+    pub topic: OneOrMany<String>,
 
     #[configurable(derived)]
     #[serde(default = "default_framing_message_based")]
@@ -65,8 +63,8 @@ pub struct MqttSourceConfig {
     pub topic_key: OptionalValuePath,
 }
 
-fn default_topic() -> String {
-    "vector".to_owned()
+fn default_topic() -> OneOrMany<String> {
+    OneOrMany::One("vector".into())
 }
 
 fn default_topic_key() -> OptionalValuePath {

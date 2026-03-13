@@ -1,9 +1,9 @@
 use std::{path::PathBuf, process::Command};
 
-use anyhow::{bail, Result};
+use anyhow::{Result, bail};
 use clap::Args;
 
-use crate::{app::CommandExt as _, features};
+use crate::{app::CommandExt as _, utils::features};
 
 /// Run `vector` with the minimum set of features required by the config file
 #[derive(Args, Debug)]

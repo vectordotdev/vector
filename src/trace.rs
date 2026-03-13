@@ -64,9 +64,10 @@ pub fn init(color: bool, json: bool, levels: &str, internal_log_rate_limit: u64)
     let metrics_layer =
         metrics_layer_enabled().then(|| MetricsLayer::new().with_filter(LevelFilter::INFO));
 
-    let broadcast_layer = RateLimitedLayer::new(BroadcastLayer::new())
-        .with_default_limit(internal_log_rate_limit)
-        .with_filter(fmt_filter.clone());
+    // BroadcastLayer should NOT be rate limited because it feeds the internal_logs source,
+    // which users rely on to capture ALL internal Vector logs for debugging/monitoring.
+    // Console output (stdout/stderr) has its own separate rate limiting below.
+    let broadcast_layer = BroadcastLayer::new().with_filter(fmt_filter.clone());
 
     let subscriber = tracing_subscriber::registry()
         .with(metrics_layer)
@@ -138,11 +139,11 @@ fn should_process_tracing_event() -> bool {
 
 /// Attempts to buffer an event into the early buffer.
 fn try_buffer_event(log: &LogEvent) -> bool {
-    if SHOULD_BUFFER.load(Ordering::Acquire) {
-        if let Some(buffer) = get_early_buffer().as_mut() {
-            buffer.push(log.clone());
-            return true;
-        }
+    if SHOULD_BUFFER.load(Ordering::Acquire)
+        && let Some(buffer) = get_early_buffer().as_mut()
+    {
+        buffer.push(log.clone());
+        return true;
     }
 
     false

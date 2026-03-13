@@ -1,3 +1,8 @@
+use std::num::NonZeroUsize;
+
+use greptimedb_ingester::{Error as GreptimeError, api::v1::*};
+use vector_lib::event::Metric;
+
 use crate::sinks::{
     greptimedb::metrics::{
         batch::GreptimeDBBatchSizer,
@@ -5,9 +10,6 @@ use crate::sinks::{
     },
     prelude::*,
 };
-use greptimedb_ingester::{Error as GreptimeError, api::v1::*};
-use std::num::NonZeroUsize;
-use vector_lib::event::Metric;
 
 /// GreptimeDBGrpcRequest is a wrapper around the RowInsertRequests
 /// that is used to send metrics to GreptimeDB.

@@ -12,20 +12,20 @@ use crate::config::{BoxedSink, BoxedSource, BoxedTransform};
 
 /// For components implementing `ValidatableComponent`
 pub mod prelude {
-    pub use super::ComponentTestCaseConfig;
-    pub use super::ExternalResource;
-    pub use super::HttpResourceConfig;
-    pub use super::ResourceDirection;
-    pub use super::ValidatableComponent;
-    pub use super::ValidationConfiguration;
+    pub use super::{
+        ComponentTestCaseConfig, ExternalResource, HttpResourceConfig, ResourceDirection,
+        ValidatableComponent, ValidationConfiguration,
+    };
     pub use crate::register_validatable_component;
 }
 
-pub use self::resources::*;
 #[cfg(feature = "component-validation-runner")]
 pub use self::runner::*;
-pub use self::test_case::{TestCase, TestCaseExpectation};
-pub use self::validators::*;
+pub use self::{
+    resources::*,
+    test_case::{TestCase, TestCaseExpectation},
+    validators::*,
+};
 
 pub mod component_names {
     pub const TEST_SOURCE_NAME: &str = "test_source";

@@ -1,11 +1,12 @@
 #![cfg(test)]
-use similar_asserts::assert_eq;
-
 use chrono::{DateTime, Utc};
-use vector_lib::lookup::{event_path, metadata_path};
-use vector_lib::{config::LogNamespace, event};
-use vrl::value;
-use vrl::value::Value;
+use similar_asserts::assert_eq;
+use vector_lib::{
+    config::LogNamespace,
+    event,
+    lookup::{event_path, metadata_path},
+};
+use vrl::{value, value::Value};
 
 use crate::{
     event::{Event, LogEvent},

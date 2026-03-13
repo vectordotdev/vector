@@ -220,7 +220,7 @@ pub enum BufferType {
     /// forcefully or crashes.
     #[configurable(title = "Events are buffered in memory.")]
     Memory {
-        /// The terms around how to express buffering limits, can be in size or bytes_size.
+        /// The terms around how to express buffering limits, can be in size or `bytes_size`.
         #[serde(flatten)]
         size: MemoryBufferSize,
 

@@ -118,9 +118,22 @@ impl TraceEvent {
     }
 }
 
+impl From<Value> for TraceEvent {
+    fn from(value: Value) -> Self {
+        let log_event = LogEvent::from(value);
+        Self(log_event)
+    }
+}
+
 impl From<LogEvent> for TraceEvent {
     fn from(log: LogEvent) -> Self {
         Self(log)
+    }
+}
+
+impl From<TraceEvent> for LogEvent {
+    fn from(trace: TraceEvent) -> Self {
+        trace.0
     }
 }
 

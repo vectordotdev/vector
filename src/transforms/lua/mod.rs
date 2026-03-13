@@ -1,8 +1,7 @@
 pub mod v1;
 pub mod v2;
 
-use vector_lib::config::{ComponentKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
+use vector_lib::{config::ComponentKey, configurable::configurable_component};
 
 use crate::{
     config::{GenerateConfig, Input, OutputId, TransformConfig, TransformContext, TransformOutput},
@@ -109,9 +108,8 @@ impl TransformConfig for LuaConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         input_definitions: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         match self {
             LuaConfig::V1(v1) => v1.config.outputs(input_definitions),

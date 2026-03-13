@@ -4,12 +4,13 @@ use futures::{FutureExt, Stream, StreamExt, TryFutureExt, poll};
 use tokio::{pin, select};
 use tower::Service;
 use tracing::Instrument;
-use vector_common::internal_event::emit;
-use vector_common::internal_event::{
-    ByteSize, BytesSent, CallError, InternalEventHandle as _, PollReadyError, Registered,
-    RegisteredEventCache, SharedString, TaggedEventsSent, register,
+use vector_common::{
+    internal_event::{
+        ByteSize, BytesSent, CallError, InternalEventHandle as _, PollReadyError, Registered,
+        RegisteredEventCache, SharedString, TaggedEventsSent, emit, register,
+    },
+    request_metadata::{GroupedCountByteSize, MetaDescriptive},
 };
-use vector_common::request_metadata::{GroupedCountByteSize, MetaDescriptive};
 use vector_core::event::{EventFinalizers, EventStatus, Finalizable};
 
 use super::FuturesUnorderedCount;
@@ -212,10 +213,10 @@ where
                 trace!(message = "Service call succeeded.", request_id);
                 finalizers.update_status(response.event_status());
                 if response.event_status() == EventStatus::Delivered {
-                    if let Some(bytes_sent) = bytes_sent {
-                        if let Some(byte_size) = response.bytes_sent() {
-                            bytes_sent.emit(ByteSize(byte_size));
-                        }
+                    if let Some(bytes_sent) = bytes_sent
+                        && let Some(byte_size) = response.bytes_sent()
+                    {
+                        bytes_sent.emit(ByteSize(byte_size));
                     }
 
                     response.events_sent().emit_event(events_sent);
@@ -246,7 +247,10 @@ mod tests {
     use std::{
         future::Future,
         pin::Pin,
-        sync::{Arc, atomic::AtomicUsize, atomic::Ordering},
+        sync::{
+            Arc,
+            atomic::{AtomicUsize, Ordering},
+        },
         task::{Context, Poll, ready},
         time::Duration,
     };
@@ -262,10 +266,10 @@ mod tests {
     use tower::Service;
     use vector_common::{
         finalization::{BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable},
+        internal_event::CountByteSize,
         json_size::JsonSize,
-        request_metadata::{GroupedCountByteSize, RequestMetadata},
+        request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
     };
-    use vector_common::{internal_event::CountByteSize, request_metadata::MetaDescriptive};
 
     use super::{Driver, DriverResponse};
 

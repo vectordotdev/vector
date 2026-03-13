@@ -1,4 +1,3 @@
-use crate::common::http::{ErrorMessage, server_auth::HttpServerAuthConfig};
 use std::{collections::HashMap, convert::Infallible, fmt, net::SocketAddr, time::Duration};
 
 use bytes::Bytes;
@@ -22,8 +21,10 @@ use warp::{
     reject::Rejection,
 };
 
+use super::encoding::decompress_body;
 use crate::{
     SourceSender,
+    common::http::{ErrorMessage, server_auth::HttpServerAuthConfig},
     config::SourceContext,
     http::{KeepaliveConfig, MaxConnectionAgeLayer, build_http_trace_layer},
     internal_events::{
@@ -32,8 +33,6 @@ use crate::{
     sources::util::http::HttpMethod,
     tls::{MaybeTlsIncomingStream, MaybeTlsSettings, TlsEnableableConfig},
 };
-
-use super::encoding::decode;
 
 pub trait HttpSource: Clone + Send + Sync + 'static {
     // This function can be defined to enrich events with additional HTTP
@@ -58,7 +57,7 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> Result<Vec<Event>, ErrorMessage>;
 
     fn decode(&self, encoding_header: Option<&str>, body: Bytes) -> Result<Bytes, ErrorMessage> {
-        decode(encoding_header, body)
+        decompress_body(encoding_header, body)
     }
 
     #[allow(clippy::too_many_arguments)]
@@ -77,7 +76,9 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
     ) -> crate::Result<crate::sources::Source> {
         let tls = MaybeTlsSettings::from_config(tls, true)?;
         let protocol = tls.http_protocol_name();
-        let auth_matcher = auth.map(|a| a.build(&cx.enrichment_tables)).transpose()?;
+        let auth_matcher = auth
+            .map(|a| a.build(&cx.enrichment_tables, &cx.metrics_storage))
+            .transpose()?;
         let path = path.to_owned();
         let acknowledgements = cx.do_acknowledgements(acknowledgements);
         let enable_source_ip = self.enable_source_ip();
@@ -129,7 +130,6 @@ pub trait HttpSource: Clone + Send + Sync + 'static {
                           addr: Option<PeerAddr>| {
                         debug!(message = "Handling HTTP request.", headers = ?headers);
                         let http_path = path.as_str();
-
                         let events = auth_matcher
                             .as_ref()
                             .map_or(Ok(()), |a| {

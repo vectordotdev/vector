@@ -5,8 +5,10 @@ use toml::Value;
 use vector_config_common::{attributes::CustomAttribute, constants};
 
 use super::{ComponentMarker, GenerateConfig};
-use crate::schema::{SchemaGenerator, SchemaObject};
-use crate::{Configurable, ConfigurableRef, GenerateError, Metadata, schema};
+use crate::{
+    Configurable, ConfigurableRef, GenerateError, Metadata, schema,
+    schema::{SchemaGenerator, SchemaObject},
+};
 
 #[derive(Debug, Snafu, Clone, PartialEq, Eq)]
 pub enum ExampleError {

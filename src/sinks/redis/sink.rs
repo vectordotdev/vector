@@ -1,4 +1,3 @@
-use snafu::prelude::*;
 use std::{future, sync::Arc, time::Duration};
 
 use redis::{
@@ -6,13 +5,12 @@ use redis::{
     aio::ConnectionManager,
     sentinel::{Sentinel, SentinelNodeConnectionInfo},
 };
+use snafu::prelude::*;
 use tokio::{
     sync::watch::{self, Receiver, Sender},
     task::JoinHandle,
     time::sleep,
 };
-
-use crate::sinks::{prelude::*, redis::RedisSinkError, util::retries::RetryAction};
 
 use super::{
     RedisEvent, RedisRequest, RepairChannelSnafu,
@@ -20,6 +18,7 @@ use super::{
     request_builder::request_builder,
     service::{RedisResponse, RedisService},
 };
+use crate::sinks::{prelude::*, redis::RedisSinkError, util::retries::RetryAction};
 
 pub(super) type GenerationCount = u64;
 
@@ -166,10 +165,7 @@ impl RedisConnection {
             if !repairing {
                 // Wait until a repair is needed
                 if let Err(error) = conn_recv.wait_for(|state| state.needs_repair()).await {
-                    warn!(
-                        internal_log_rate_limit = true,
-                        "Connection state channel was dropped {error:?}."
-                    );
+                    warn!("Connection state channel was dropped {error:?}.");
                     continue;
                 }
 
@@ -193,7 +189,6 @@ impl RedisConnection {
                 }
                 Err(error) => {
                     warn!(
-                        internal_log_rate_limit = true,
                         "Failed to repair ConnectionManager via sentinel (gen: {current_generation}): {error:?}."
                     );
                     sleep(Duration::from_millis(250)).await;
@@ -258,8 +253,8 @@ impl RedisConnection {
 
 pub(super) struct RedisSink {
     request: TowerRequestConfig<RedisTowerRequestConfigDefaults>,
-    encoder: crate::codecs::Encoder<()>,
-    transformer: crate::codecs::Transformer,
+    encoder: vector_lib::codecs::Encoder<()>,
+    transformer: vector_lib::codecs::Transformer,
     conn: RedisConnection,
     data_type: super::DataType,
     key: Template,
@@ -391,15 +386,15 @@ impl RetryLogic for RedisRetryLogic {
     }
 
     fn on_retriable_error(&self, error: &Self::Error) {
-        if let RedisSinkError::SendError { source, generation } = error {
-            if matches!(
+        if let RedisSinkError::SendError { source, generation } = error
+            && matches!(
                 source.kind(),
                 redis::ErrorKind::MasterDown
                     | redis::ErrorKind::ReadOnly
                     | redis::ErrorKind::IoError
-            ) {
-                self.connection.signal_broken(*generation);
-            }
+            )
+        {
+            self.connection.signal_broken(*generation);
         }
     }
 

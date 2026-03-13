@@ -1,11 +1,11 @@
 //! `RequestBuilder` implementation for the `gcp_stackdriver_logs` sink.
 
-use bytes::Bytes;
 use std::io;
 
-use crate::sinks::{prelude::*, util::http::HttpRequest};
+use bytes::Bytes;
 
 use super::encoder::StackdriverLogsEncoder;
+use crate::sinks::{prelude::*, util::http::HttpRequest};
 
 pub(super) struct StackdriverLogsRequestBuilder {
     pub(super) encoder: StackdriverLogsEncoder,

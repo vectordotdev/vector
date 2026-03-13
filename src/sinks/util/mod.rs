@@ -43,6 +43,7 @@ pub use buffer::{
     vec::{EncodedLength, VecBuffer},
 };
 pub use builder::SinkBuilderExt;
+use chrono::{FixedOffset, Offset, Utc};
 pub use compressor::Compressor;
 pub use normalizer::Normalizer;
 pub use request_builder::{IncrementalRequestBuilder, RequestBuilder};
@@ -56,7 +57,6 @@ pub use uri::UriSerde;
 use vector_lib::{TimeZone, json_size::JsonSize};
 
 use crate::event::EventFinalizers;
-use chrono::{FixedOffset, Offset, Utc};
 
 #[derive(Debug, Snafu)]
 enum SinkBuildError {

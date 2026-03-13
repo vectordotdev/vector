@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  clickhouse:
+    image: docker.io/clickhouse/clickhouse-server:${CONFIG_VERSION}
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

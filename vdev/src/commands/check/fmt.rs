@@ -9,7 +9,10 @@ pub struct Cli {}
 
 impl Cli {
     pub fn exec(self) -> Result<()> {
-        app::exec::<&str>("scripts/check-style.sh", [], true)?;
+        info!("Checking style (trailing spaces, line endings)...");
+        app::exec("scripts/check-style.sh", ["--all"], true)?;
+
+        info!("Checking Rust formatting...");
         app::exec("cargo", ["fmt", "--", "--check"], true)
     }
 }

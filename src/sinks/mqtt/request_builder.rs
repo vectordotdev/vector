@@ -3,9 +3,8 @@ use std::io;
 use bytes::{Bytes, BytesMut};
 use tokio_util::codec::Encoder as _;
 
-use crate::sinks::prelude::*;
-
 use super::{service::MqttRequest, sink::MqttEvent};
+use crate::sinks::prelude::*;
 
 pub(super) struct MqttMetadata {
     topic: String,
@@ -13,8 +12,8 @@ pub(super) struct MqttMetadata {
 }
 
 pub(super) struct MqttEncoder {
-    pub(super) encoder: crate::codecs::Encoder<()>,
-    pub(super) transformer: crate::codecs::Transformer,
+    pub(super) encoder: vector_lib::codecs::Encoder<()>,
+    pub(super) transformer: vector_lib::codecs::Transformer,
 }
 
 impl encoding::Encoder<Event> for MqttEncoder {

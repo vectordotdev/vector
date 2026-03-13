@@ -21,8 +21,7 @@ pub use vrl::value::{KeyString, ObjectMap, Value};
 #[cfg(feature = "vrl")]
 pub use vrl_target::{TargetEvents, VrlTarget};
 
-use crate::config::LogNamespace;
-use crate::config::OutputId;
+use crate::config::{LogNamespace, OutputId};
 
 pub mod array;
 pub mod discriminant;

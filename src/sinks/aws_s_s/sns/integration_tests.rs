@@ -8,14 +8,12 @@ use vector_lib::codecs::TextSerializerConfig;
 
 use super::{
     BaseSSSinkConfig,
-    config::SnsClientBuilder,
-    config::{SnsSinkConfig, healthcheck},
+    config::{SnsClientBuilder, SnsSinkConfig, healthcheck},
 };
-use crate::common::sqs::SqsClientBuilder;
-use crate::config::{SinkConfig, SinkContext};
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint, create_client},
-    config::ProxyConfig,
+    common::sqs::SqsClientBuilder,
+    config::{ProxyConfig, SinkConfig, SinkContext},
     test_util::{
         components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,

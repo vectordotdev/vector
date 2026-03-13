@@ -9,12 +9,15 @@
 name: Changelog
 
 on:
-  pull_request_target:
+  pull_request:
     types: [opened, synchronize, reopened, labeled, unlabeled]
 
   # Required by GitHub merge queue due to branch protection rules. Should always be successful
   merge_group:
     types: [checks_requested]
+
+permissions:
+  contents: read
 
 jobs:
   validate-changelog:
@@ -41,31 +44,14 @@ jobs:
           echo "merge_group event – passing without running changelog validation."
           exit 0
 
-      # Checkout changelog script and changelog.d/ from master
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+      # Checkout PR branch (includes script and changelog.d/)
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
         if: env.SHOULD_RUN == 'true'
         with:
-          ref: master
-          sparse-checkout: |
-            scripts/check_changelog_fragments.sh
-            changelog.d/
-          sparse-checkout-cone-mode: false
-
-      # Checkout PR's changelog.d/ into tmp/
-      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
-        if: env.SHOULD_RUN == 'true'
-        with:
-          repository: ${{ github.event.pull_request.head.repo.full_name }}
-          ref: ${{ github.event.pull_request.head.sha }}
-          path: tmp
-          sparse-checkout: changelog.d/
+          fetch-depth: 0
 
       - name: Run changelog fragment checker
         if: env.SHOULD_RUN == 'true'
         run: |
-          # Overwrite changelog.d/*.md
-          rm -rf changelog.d/*.md && mv tmp/changelog.d/*.md changelog.d/
-
-          # Add files and then compare with HEAD instead of origin/master
-          git add changelog.d/
-          MERGE_BASE=HEAD ./scripts/check_changelog_fragments.sh
+          # Compare against origin/master
+          ./scripts/check_changelog_fragments.sh

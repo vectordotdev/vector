@@ -4,7 +4,7 @@ description: Combine multi-line CSV rows into single events using the Lua transf
 authors: ["binarylogic"]
 domain: transforms
 transforms: ["lua"]
-weight: 3
+weight: 2
 tags: ["lua", "merge", "multiline", "multi-line", "advanced", "guides", "guide"]
 ---
 

@@ -1,3 +1,18 @@
+use async_nats::jetstream::consumer::pull::Stream as PullConsumerStream;
+use chrono::Utc;
+use futures::StreamExt;
+use snafu::ResultExt;
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::{DecoderFramedRead, decoding::StreamDecodingError},
+    config::{LegacyKey, LogNamespace},
+    internal_event::{
+        ByteSize, BytesReceived, CountByteSize, EventsReceived, EventsReceivedHandle,
+        InternalEventHandle as _, Protocol,
+    },
+    lookup::owned_value_path,
+};
+
 use crate::{
     SourceSender,
     codecs::Decoder,
@@ -5,21 +20,6 @@ use crate::{
     internal_events::StreamClosedError,
     shutdown::ShutdownSignal,
     sources::nats::config::{BuildError, NatsSourceConfig, SubscribeSnafu},
-};
-use async_nats::jetstream::consumer::pull::Stream as PullConsumerStream;
-use chrono::Utc;
-use futures::{StreamExt, pin_mut};
-use snafu::ResultExt;
-use tokio_util::codec::FramedRead;
-use vector_lib::{
-    EstimatedJsonEncodedSizeOf,
-    codecs::decoding::StreamDecodingError,
-    config::{LegacyKey, LogNamespace},
-    internal_event::{
-        ByteSize, BytesReceived, CountByteSize, EventsReceived, EventsReceivedHandle,
-        InternalEventHandle as _, Protocol,
-    },
-    lookup::owned_value_path,
 };
 
 /// The outcome of processing a single NATS message.
@@ -43,7 +43,7 @@ pub async fn process_message(
     out: &mut SourceSender,
     events_received: &EventsReceivedHandle,
 ) -> ProcessingStatus {
-    let mut framed = FramedRead::new(msg.payload.as_ref(), decoder.clone());
+    let mut framed = DecoderFramedRead::new(msg.payload.as_ref(), decoder.clone());
     let mut success = true;
 
     while let Some(next) = framed.next().await {
@@ -87,7 +87,7 @@ pub async fn process_message(
             }
             Err(error) => {
                 success = false;
-                // Error is logged by `crate::codecs::Decoder`, no further
+                // Error is logged by `vector_lib::codecs::Decoder`, no further
                 // handling is needed here.
                 if !error.can_continue() {
                     break;
@@ -151,34 +151,55 @@ pub async fn run_nats_jetstream(
 pub async fn run_nats_core(
     config: NatsSourceConfig,
     _connection: async_nats::Client,
-    subscriber: async_nats::Subscriber,
+    mut subscriber: async_nats::Subscriber,
     decoder: Decoder,
     log_namespace: LogNamespace,
-    shutdown: ShutdownSignal,
+    mut shutdown: ShutdownSignal,
     mut out: SourceSender,
 ) -> Result<(), ()> {
     let events_received = register!(EventsReceived);
     let bytes_received = register!(BytesReceived::from(Protocol::TCP));
-    let stream = subscriber.take_until(shutdown);
-    pin_mut!(stream);
 
-    while let Some(msg) = stream.next().await {
-        bytes_received.emit(ByteSize(msg.payload.len()));
-        let status = process_message(
-            &msg,
-            &config,
-            &decoder,
-            log_namespace,
-            &mut out,
-            &events_received,
-        )
-        .await;
+    loop {
+        tokio::select! {
+            biased;
 
-        if let ProcessingStatus::ChannelClosed = status {
-            // Downstream channel is closed, shut down the source.
-            return Err(());
+             _ = &mut shutdown => {
+                info!("Shutdown signal received. Draining NATS subscription...");
+                if let Err(err) = subscriber.drain().await {
+                    error!(message = "Failed to drain NATS subscription.", %err);
+                }
+            },
+
+            maybe_msg = subscriber.next() => {
+                match maybe_msg {
+                    Some(msg) => {
+                        bytes_received.emit(ByteSize(msg.payload.len()));
+                        let status = process_message(
+                            &msg,
+                            &config,
+                            &decoder,
+                            log_namespace,
+                            &mut out,
+                            &events_received,
+                        )
+                        .await;
+
+                        if let ProcessingStatus::ChannelClosed = status {
+                            return Err(());
+                        }
+                    },
+                    None => {
+                        // The stream has ended. This happens naturally after a successful
+                        // drain or if the connection is lost.
+                        break;
+                    }
+                }
+            }
         }
     }
+
+    info!("NATS source drained and shut down gracefully.");
     Ok(())
 }
 

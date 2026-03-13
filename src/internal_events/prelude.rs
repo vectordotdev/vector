@@ -8,6 +8,11 @@ pub(crate) fn http_error_code(code: u16) -> String {
     format!("http_response_{code}")
 }
 
+#[cfg(any(
+    feature = "sources-aws_kinesis_firehose",
+    feature = "sources-exec",
+    feature = "sources-heroku_logs",
+))]
 pub(crate) fn io_error_code(error: &std::io::Error) -> &'static str {
     use std::io::ErrorKind::*;
 

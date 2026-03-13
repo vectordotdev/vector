@@ -108,8 +108,9 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use futures_util::stream::StreamExt;
+
+    use super::*;
 
     #[tokio::test]
     async fn test_concurrent_map_on_empty_stream() {

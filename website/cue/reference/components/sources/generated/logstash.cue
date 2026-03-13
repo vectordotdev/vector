@@ -62,7 +62,7 @@ generated: components: sources: logstash: configuration: {
 		}
 	}
 	tls: {
-		description: "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
+		description: "`TlsEnableableConfig` for `sources`, adding metadata from the client certificate."
 		required:    false
 		type: object: options: {
 			alpn_protocols: {

@@ -9,9 +9,11 @@ use futures::FutureExt;
 use http::{StatusCode, Uri};
 use snafu::{ResultExt, Snafu};
 use tower::Service;
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::{KeyString, MetricTags};
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{
+    configurable::configurable_component,
+    event::{KeyString, MetricTags},
+    sensitive_string::SensitiveString,
+};
 
 use crate::http::HttpClient;
 

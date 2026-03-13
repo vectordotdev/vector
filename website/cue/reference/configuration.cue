@@ -1,12 +1,18 @@
 package metadata
 
 configuration: {
-	configuration: #Schema
-	how_it_works:  #HowItWorks
+	configuration: #Schema | {
+		enrichment_tables: #SchemaField | {
+			outputs: [components.#Output, ...components.#Output]
+		}
+	}
+	groups?:      _
+	how_it_works: #HowItWorks
 }
 
 configuration: {
 	configuration: generated.configuration.configuration
+	groups:        generated.configuration.groups
 
 	configuration: {
 		// expire_metrics's type is a little bit tricky, we could not generate `uint` from `docs::type_override` metadata macro easily.
@@ -21,6 +27,7 @@ configuration: {
 				"""
 			required: false
 			warnings: ["Deprecated, please use `expire_metrics_secs` instead."]
+			group: "global_options"
 			type: object: options: {
 				secs: {
 					common:      true
@@ -43,6 +50,23 @@ configuration: {
 					}
 				}
 			}
+		}
+
+		enrichment_tables: {
+			outputs: [
+				{
+					name: components._default_output.name
+					description: """
+						Default output stream. Only applies to memory enrichment table. Only active if `source_config.export_interval` is defined. Use `<source_config.source_key>` as an input to downstream transforms and sinks.
+						"""
+				},
+				{
+					name: "expired"
+					description: """
+						Output stream of expired items. Only applies to memory enrichment table. Only active if `source_config.export_expired_items` is enabled. Use `<source_config.source_key>.expired` as an input to downstream transforms and sinks.
+						"""
+				},
+			]
 		}
 	}
 }

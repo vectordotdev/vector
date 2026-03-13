@@ -1,19 +1,17 @@
-use std::pin::Pin;
+use std::{pin::Pin, time::Duration};
 
 use async_trait::async_trait;
-use futures_util::Stream;
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
+use futures_util::{Stream, StreamExt as _};
 use vector_lib::{
     config::{DataType, Input, TransformOutput},
+    configurable::configurable_component,
     event::{Event, EventContainer},
     schema::Definition,
     transform::{FunctionTransform, OutputBuffer, TaskTransform, Transform},
 };
 
-use crate::config::{GenerateConfig, OutputId, TransformConfig, TransformContext};
-
 use super::TransformType;
+use crate::config::{GenerateConfig, OutputId, TransformConfig, TransformContext};
 
 /// Configuration for the `test_noop` transform.
 #[configurable_component(transform("test_noop", "Test (no-op)"))]
@@ -21,14 +19,28 @@ use super::TransformType;
 pub struct NoopTransformConfig {
     #[configurable(derived)]
     transform_type: TransformType,
+
+    /// Optional per-event/array delay, in milliseconds.
+    ///
+    /// This is intended for tests that need deterministic, non-zero component latency.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    delay_ms: Option<u64>,
 }
 
 impl GenerateConfig for NoopTransformConfig {
     fn generate_config() -> toml::Value {
         toml::Value::try_from(&Self {
             transform_type: TransformType::Function,
+            delay_ms: None,
         })
         .unwrap()
+    }
+}
+
+impl NoopTransformConfig {
+    pub fn with_delay_ms(mut self, delay_ms: u64) -> Self {
+        self.delay_ms = Some(delay_ms);
+        self
     }
 }
 
@@ -41,9 +53,8 @@ impl TransformConfig for NoopTransformConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         definitions: &[(OutputId, Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(
             DataType::all_bits(),
@@ -55,37 +66,55 @@ impl TransformConfig for NoopTransformConfig {
     }
 
     async fn build(&self, _: &TransformContext) -> crate::Result<Transform> {
+        let delay = self.delay_ms.map(Duration::from_millis);
         match self.transform_type {
-            TransformType::Function => Ok(Transform::Function(Box::new(NoopTransform))),
-            TransformType::Synchronous => Ok(Transform::Synchronous(Box::new(NoopTransform))),
-            TransformType::Task => Ok(Transform::Task(Box::new(NoopTransform))),
+            TransformType::Function => Ok(Transform::Function(Box::new(NoopTransform { delay }))),
+            TransformType::Synchronous => {
+                Ok(Transform::Synchronous(Box::new(NoopTransform { delay })))
+            }
+            TransformType::Task => Ok(Transform::Task(Box::new(NoopTransform { delay }))),
         }
     }
 }
 
 impl From<TransformType> for NoopTransformConfig {
     fn from(transform_type: TransformType) -> Self {
-        Self { transform_type }
+        Self {
+            transform_type,
+            delay_ms: None,
+        }
     }
 }
 
 #[derive(Clone)]
-struct NoopTransform;
+struct NoopTransform {
+    delay: Option<Duration>,
+}
 
 impl FunctionTransform for NoopTransform {
     fn transform(&mut self, output: &mut OutputBuffer, event: Event) {
+        if let Some(delay) = self.delay {
+            std::thread::sleep(delay);
+        }
         output.push(event);
     }
 }
 
 impl<T> TaskTransform<T> for NoopTransform
 where
-    T: EventContainer + 'static,
+    T: EventContainer + Send + 'static,
 {
     fn transform(
         self: Box<Self>,
         task: Pin<Box<dyn futures_util::Stream<Item = T> + Send>>,
     ) -> Pin<Box<dyn Stream<Item = T> + Send>> {
-        Box::pin(task)
+        if let Some(delay) = self.delay {
+            Box::pin(task.then(move |item| async move {
+                tokio::time::sleep(delay).await;
+                item
+            }))
+        } else {
+            Box::pin(task)
+        }
     }
 }

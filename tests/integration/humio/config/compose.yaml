@@ -1,0 +1,10 @@
+version: '3'
+
+services:
+  humio:
+    image: docker.io/humio/humio-single-node-demo:${CONFIG_VERSION}
+
+networks:
+  default:
+    name: ${VECTOR_NETWORK}
+    external: true

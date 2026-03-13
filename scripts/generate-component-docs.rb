@@ -781,6 +781,16 @@ def resolve_schema(root_schema, schema)
     resolved['required'] = is_required_field
   end
 
+  # Resolve any warnings attached to this option.
+  #
+  # Warnings can be specified in Rust via `#[configurable(metadata(docs::warnings = "..."))]`.
+  # Multiple warnings can be specified by repeating the attribute, and they will be emitted as an
+  # array in the CUE output.
+  warnings = get_schema_metadata(schema, 'docs::warnings')
+  if !warnings.nil?
+    resolved['warnings'] = warnings.is_a?(Array) ? warnings : [warnings]
+  end
+
   # Reconcile the resolve schema, which essentially gives us a chance to, once the schema is
   # entirely resolved, check it for logical inconsistencies, fix up anything that we reasonably can,
   # and so on.
@@ -928,6 +938,13 @@ def resolve_bare_schema(root_schema, schema)
       fix_grouped_enums_if_numeric!(grouped)
       grouped.transform_values! { |values| { 'enum' => values } }
       grouped
+    when nil
+      # Unconstrained/empty schema (e.g., Value without constraints).
+      # Represent it as accepting any JSON type so downstream code can render it
+      # and attach defaults/examples based on actual values.
+      @logger.debug 'Resolving unconstrained schema (any type).'
+
+      { '*' => {} }
     else
       @logger.error "Failed to resolve the schema. Schema: #{schema}"
       exit 1
@@ -1715,44 +1732,134 @@ def render_and_import_component_schema(root_schema, schema_name, component_type,
   )
 end
 
-def render_and_import_generated_api_schema(root_schema, apis)
-  api_schema = {}
-  apis.each do |component_name, schema_name|
-    friendly_name = "'#{component_name}' #{schema_name} configuration"
-    resolved_schema = unwrap_resolved_schema(root_schema, schema_name, friendly_name)
-    api_schema[component_name] = resolved_schema
+def render_and_import_generated_top_level_config_schema(root_schema)
+  top_level_config_schema = {}
+
+  # Define logical groupings for top-level configuration fields
+  # These groups will be used to organize separate documentation pages
+  field_groups = {
+    # Pipeline component containers
+    'sources' => 'pipeline_components',
+    'transforms' => 'pipeline_components',
+    'sinks' => 'pipeline_components',
+    'enrichment_tables' => 'pipeline_components',
+
+    # Individual feature pages
+    'api' => 'api',
+    'schema' => 'schema',
+    'log_schema' => 'schema',
+    'secret' => 'secrets',
+
+    # Global options (everything else defaults to this)
+  }
+
+  group_metadata = {
+    'global_options' => {
+      'title' => 'Global Options',
+      'description' => 'Global configuration options that apply to Vector as a whole.',
+      'order' => 1
+    },
+    'pipeline_components' => {
+      'title' => 'Pipeline Components',
+      'description' => 'Configure sources, transforms, sinks, and enrichment tables for your observability pipeline.',
+      'order' => 2
+    },
+    'api' => {
+      'title' => 'API',
+      'description' => 'Configure Vector\'s observability API.',
+      'order' => 3
+    },
+    'schema' => {
+      'title' => 'Schema',
+      'description' => 'Configure Vector\'s internal schema system for type tracking and validation.',
+      'order' => 4
+    },
+    'secrets' => {
+      'title' => 'Secrets',
+      'description' => 'Configure secrets management for secure configuration.',
+      'order' => 5
+    }
+  }
+
+  # Usage of #[serde(flatten)] creates multiple schemas in the `allOf` array:
+  # - One or more schemas contain ConfigBuilder's direct fields
+  # - One or more schemas contain flattened GlobalOptions fields
+  all_of_schemas = root_schema['allOf'] || []
+
+  if all_of_schemas.empty?
+    @logger.error "Could not find ConfigBuilder allOf schemas in root schema"
+    return
   end
 
-  render_and_import_schema(
-    api_schema,
-    "configuration",
-    ["generated", "api"],
-    "generated/api.cue"
-  )
-end
+  # Collect all properties from all allOf schemas into a single hash.
+  # Since ConfigBuilder uses #[serde(flatten)], field names are unique across all schemas.
+  all_properties = all_of_schemas.reduce({}) do |acc, schema|
+    acc.merge(schema['properties'] || {})
+  end
 
-def render_and_import_generated_global_option_schema(root_schema, global_options)
-  global_option_schema = {}
+  @logger.info "[*] Found #{all_properties.keys.length} total properties across #{all_of_schemas.length} allOf schemas"
 
-  global_options.each do |component_name, schema_name|
-    friendly_name = "'#{component_name}' #{schema_name} configuration"
-
-    if component_name == "global_option"
-      # Flattening global options
-      unwrap_resolved_schema(root_schema, schema_name, friendly_name)
-        .each { |name, schema| global_option_schema[name] = schema }
-    else
-      # Resolving and assigning other global options
-      global_option_schema[component_name] = resolve_schema_by_name(root_schema, schema_name)
+  # Process each property once
+  all_properties.each do |field_name, field_schema|
+    # Skip fields marked with docs::hidden
+    metadata = field_schema['_metadata'] || {}
+    if metadata['docs::hidden']
+      @logger.info "[*] Skipping '#{field_name}' (marked as docs::hidden)"
+      next
     end
+
+    # Extract and resolve the field
+    @logger.info "[*] Extracting '#{field_name}' field from ConfigBuilder..."
+    resolved_field = resolve_schema(root_schema, field_schema)
+
+    # Assign group metadata to organize the documentation
+    if field_groups.key?(field_name)
+      group_name = field_groups[field_name]
+      resolved_field['group'] = group_name
+      @logger.debug "Assigned '#{field_name}' to group '#{group_name}'"
+    else
+      # Default to global_options for any fields not explicitly grouped
+      resolved_field['group'] = 'global_options'
+      @logger.debug "Assigned '#{field_name}' to default group 'global_options'"
+    end
+
+    top_level_config_schema[field_name] = resolved_field
+    @logger.info "[✓] Resolved '#{field_name}'"
   end
 
-  render_and_import_schema(
-    global_option_schema,
-    "configuration",
-    ["generated", "configuration"],
-    "generated/configuration.cue"
-  )
+  # Build the final data structure with both configuration and group metadata
+  friendly_name = "configuration"
+  config_map_path = ["generated", "configuration"]
+  cue_relative_path = "generated/configuration.cue"
+
+  # Set up the structure for the value based on the configuration map path
+  data = {}
+  last = data
+  config_map_path.each do |segment|
+    last[segment] = {} if last[segment].nil?
+    last = last[segment]
+  end
+
+  # Add both the configuration schema and the group metadata
+  last['configuration'] = top_level_config_schema
+  last['groups'] = group_metadata
+
+  config_map_path.prepend('config-schema-base')
+  tmp_file_prefix = config_map_path.join('-')
+  final_json = to_pretty_json(data)
+
+  # Write the resolved schema as JSON
+  json_output_file = write_to_temp_file(["config-schema-#{tmp_file_prefix}-", '.json'], final_json)
+  @logger.info "[✓]   Wrote #{friendly_name} schema to '#{json_output_file}'. (#{final_json.length} bytes)"
+
+  # Import it as Cue
+  @logger.info "[*] Importing #{friendly_name} schema as Cue file..."
+  cue_output_file = "website/cue/reference/#{cue_relative_path}"
+  unless system(@cue_binary_path, 'import', '-f', '-o', cue_output_file, '-p', 'metadata', json_output_file)
+    @logger.error "[!]   Failed to import #{friendly_name} schema as valid Cue."
+    exit 1
+  end
+  @logger.info "[✓]   Imported #{friendly_name} schema to '#{cue_output_file}'."
 end
 
 if ARGV.empty?
@@ -1801,22 +1908,7 @@ all_components.each do |component_type, components|
   end
 end
 
-apis = root_schema['definitions'].filter_map do |key, definition|
-  component_type = get_schema_metadata(definition, 'docs::component_type')
-  component_name = get_schema_metadata(definition, 'docs::component_name')
-  { component_name => key } if component_type == "api"
-end
-.reduce { |acc, item| nested_merge(acc, item) }
-
-render_and_import_generated_api_schema(root_schema, apis)
-
-
-# At last, we generate the global options configuration.
-global_options = root_schema['definitions'].filter_map do |key, definition|
-  component_type = get_schema_metadata(definition, 'docs::component_type')
-  component_name = get_schema_metadata(definition, 'docs::component_name')
-  { component_name => key } if component_type == "global_option"
-end
-.reduce { |acc, item| nested_merge(acc, item) }
-
-render_and_import_generated_global_option_schema(root_schema, global_options)
+# Finally, generate the top-level Vector configuration schema. We extract ALL top-level config fields directly from the
+# ConfigBuilder struct (defined in src/config/builder.rs) by processing its allOf schemas. ConfigBuilder is the single
+# source of truth for what's actually allowed at the top level of Vector's configuration file.
+render_and_import_generated_top_level_config_schema(root_schema)

@@ -192,5 +192,8 @@ fn test_from_cue_example(category: &'static str, name: String, example: Example)
         skip,
         read_only_paths: vec![],
         check_diagnostics: false,
+        check_type_only: false,
+        source_file: format!("website/cue/reference/remap/functions/{name}.cue"),
+        source_line: 1,
     }
 }

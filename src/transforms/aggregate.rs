@@ -6,10 +6,12 @@ use std::{
 
 use async_stream::stream;
 use futures::{Stream, StreamExt};
-use vector_lib::{config::LogNamespace, event::MetricValue};
 use vector_lib::{
     configurable::configurable_component,
-    event::metric::{Metric, MetricData, MetricKind, MetricSeries},
+    event::{
+        MetricValue,
+        metric::{Metric, MetricData, MetricKind, MetricSeries},
+    },
 };
 
 use crate::{
@@ -22,7 +24,7 @@ use crate::{
 
 /// Configuration for the `aggregate` transform.
 #[configurable_component(transform("aggregate", "Aggregate metrics passing through a topology."))]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[serde(deny_unknown_fields)]
 pub struct AggregateConfig {
     /// The interval between flushes, in milliseconds.
@@ -40,7 +42,7 @@ pub struct AggregateConfig {
 }
 
 #[configurable_component]
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Copy, Debug, Default, Eq, PartialEq)]
 #[configurable(description = "The aggregation mode to use.")]
 pub enum AggregationMode {
     /// Default mode. Sums incremental metrics and uses the latest value for absolute metrics.
@@ -95,9 +97,8 @@ impl TransformConfig for AggregateConfig {
 
     fn outputs(
         &self,
-        _: vector_lib::enrichment::TableRegistry,
+        _: &TransformContext,
         _: &[(OutputId, schema::Definition)],
-        _: LogNamespace,
     ) -> Vec<TransformOutput> {
         vec![TransformOutput::new(DataType::Metric, HashMap::new())]
     }
@@ -121,7 +122,7 @@ impl Aggregate {
             map: Default::default(),
             prev_map: Default::default(),
             multi_map: Default::default(),
-            mode: config.mode.clone(),
+            mode: config.mode,
         })
     }
 
@@ -223,16 +224,15 @@ impl Aggregate {
                         if let MetricValue::Gauge {
                             value: existing_value,
                         } = existing.0.value()
+                            && let MetricValue::Gauge { value: new_value } = data.value()
                         {
-                            if let MetricValue::Gauge { value: new_value } = data.value() {
-                                let should_update = match self.mode {
-                                    AggregationMode::Max => new_value > existing_value,
-                                    AggregationMode::Min => new_value < existing_value,
-                                    _ => false,
-                                };
-                                if should_update {
-                                    *existing = (data, metadata);
-                                }
+                            let should_update = match self.mode {
+                                AggregationMode::Max => new_value > existing_value,
+                                AggregationMode::Min => new_value < existing_value,
+                                _ => false,
+                            };
+                            if should_update {
+                                *existing = (data, metadata);
                             }
                         }
                     } else {
@@ -251,12 +251,12 @@ impl Aggregate {
         let map = std::mem::take(&mut self.map);
         for (series, entry) in map.clone().into_iter() {
             let mut metric = Metric::from_parts(series, entry.0, entry.1);
-            if matches!(self.mode, AggregationMode::Diff) {
-                if let Some(prev_entry) = self.prev_map.get(metric.series()) {
-                    if metric.data().kind == prev_entry.0.kind && !metric.subtract(&prev_entry.0) {
-                        emit!(AggregateUpdateFailed);
-                    }
-                }
+            if matches!(self.mode, AggregationMode::Diff)
+                && let Some(prev_entry) = self.prev_map.get(metric.series())
+                && metric.data().kind == prev_entry.0.kind
+                && !metric.subtract(&prev_entry.0)
+            {
+                emit!(AggregateUpdateFailed);
             }
             output.push(Event::Metric(metric));
         }
@@ -363,16 +363,16 @@ mod tests {
     use futures::stream;
     use tokio::sync::mpsc;
     use tokio_stream::wrappers::ReceiverStream;
-    use vector_lib::config::ComponentKey;
+    use vector_lib::config::{ComponentKey, LogNamespace};
     use vrl::value::Kind;
 
     use super::*;
-    use crate::schema::Definition;
     use crate::{
         event::{
             Event, Metric,
             metric::{MetricKind, MetricValue},
         },
+        schema::Definition,
         test_util::components::assert_transform_compliance,
         transforms::test::create_topology,
     };

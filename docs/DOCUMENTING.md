@@ -11,12 +11,13 @@ documentation in tandem with code changes.
 2. [Reference documentation](#reference-documentation)
    1. [Installing CUE](#installing-cue)
    2. [Generating from source code](#generating-from-source-code)
-   3. [Formatting](#formatting)
-   4. [Validating](#validating)
+   3. [Adding Documentation for New Components](#adding-documentation-for-new-components)
+   4. [Formatting](#formatting)
+   5. [Validating](#validating)
       1. [Tips & tricks](#tips--tricks)
          1. [Make small incremental changes](#make-small-incremental-changes)
-   5. [Changelog](#changelog)
-   6. [Release highlights](#release-highlights)
+   6. [Changelog](#changelog)
+   7. [Release highlights](#release-highlights)
       1. [FAQ](#faq)
          1. [What makes a release highlight noteworthy?](#what-makes-a-release-highlight-noteworthy)
          2. [How is a release highlight different from a blog post?](#how-is-a-release-highlight-different-from-a-blog-post)
@@ -61,8 +62,44 @@ Much of Vector's reference documentation is automatically compiled from source c
 To regenerate this content, run:
 
 ```bash
-make generate-component-docs
+make generate-docs
 ```
+
+### Adding Documentation for New Components
+
+When introducing a new source, sink, or transform, you need to create documentation in two steps:
+
+1. **Generate the base documentation** from your Rust configuration schema:
+
+   ```bash
+   make generate-component-docs
+   ```
+
+   This creates an auto-generated CUE file in `website/cue/reference/components/{sources,sinks,transforms}/generated/<component_name>.cue` containing all the configuration options from your Rust code.
+   Note that documentation for config parameters behavior should be part of the Rust docs. The above command will generate a CUE file populated with the Rust docs.
+
+2. **Create a manual CUE file** with additional metadata that cannot be auto-generated:
+   - Create a new file at `website/cue/reference/components/{sources,sinks,transforms}/<component_name>.cue`
+   - This file should include metadata like title, description, examples, feature classifications, and how-it-works sections. See existing CUE files for guidance.
+   - Look at existing components for examples, such as `website/cue/reference/components/transforms/remap.cue`
+
+3. **Format the CUE files**:
+
+   ```bash
+   ./scripts/cue.sh fmt
+   ```
+
+4. **Create a markdown documentation file** for the website:
+   - Create a new file at `website/content/en/docs/reference/configuration/{sources,sinks,transforms}/<component_name>.md`
+   - Look at existing examples e.g. `website/content/en/docs/reference/configuration/transforms/remap.md`
+
+5. **Verify your documentation** is correct:
+
+   ```bash
+   make check-generated-docs
+   ```
+
+6. It is recommended to `cd website && make serve` to view how the documentation renders on the Vector website.
 
 ### Formatting
 
@@ -72,7 +109,7 @@ properly formatted. To run CUE's autoformatting, first [install cue](https://cue
 then run this command from the `vector` root:
 
 ```bash
-./website/scripts/cue.sh fmt
+./scripts/cue.sh fmt
 ```
 
 If that rewrites any files, make sure to commit your changes or else you'll see

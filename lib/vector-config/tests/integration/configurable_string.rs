@@ -1,5 +1,7 @@
-use std::collections::{BTreeMap, HashMap};
-use std::fmt;
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt,
+};
 
 use indexmap::IndexMap;
 use vector_config::{ConfigurableString, configurable_component, schema::generate_root_schema};

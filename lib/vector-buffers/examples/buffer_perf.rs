@@ -23,9 +23,11 @@ use vector_buffers::{
         channel::{BufferReceiver, BufferSender},
     },
 };
-use vector_common::byte_size_of::ByteSizeOf;
-use vector_common::finalization::{
-    AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+use vector_common::{
+    byte_size_of::ByteSizeOf,
+    finalization::{
+        AddBatchNotifier, BatchNotifier, EventFinalizer, EventFinalizers, EventStatus, Finalizable,
+    },
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]

@@ -11,20 +11,21 @@ use tokio::{
     time::{self, Duration, Instant, sleep},
 };
 use tokio_stream::wrappers::IntervalStream;
-use tokio_util::codec::FramedRead;
-use vector_lib::codecs::{
-    StreamDecodingError,
-    decoding::{DeserializerConfig, FramingConfig},
+use vector_lib::{
+    EstimatedJsonEncodedSizeOf,
+    codecs::{
+        Decoder, DecoderFramedRead, DecodingConfig, StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
+    config::{LegacyKey, LogNamespace, log_schema},
+    configurable::configurable_component,
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol},
+    lookup::{owned_value_path, path},
 };
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{ByteSize, BytesReceived, InternalEventHandle as _, Protocol};
-use vector_lib::{EstimatedJsonEncodedSizeOf, config::LegacyKey};
-use vrl::path::OwnedValuePath;
-use vrl::value::Kind;
+use vrl::{path::OwnedValuePath, value::Kind};
 
 use crate::{
     SourceSender,
-    codecs::{Decoder, DecodingConfig},
     config::{SourceConfig, SourceContext, SourceOutput},
     event::Event,
     internal_events::{
@@ -34,8 +35,6 @@ use crate::{
     serde::default_decoding,
     shutdown::ShutdownSignal,
 };
-use vector_lib::config::{LogNamespace, log_schema};
-use vector_lib::lookup::{owned_value_path, path};
 
 #[cfg(test)]
 mod tests;
@@ -207,7 +206,7 @@ const COMMAND_KEY: &str = "command";
 impl_generate_config_from_default!(ExecConfig);
 
 impl ExecConfig {
-    fn validate(&self) -> Result<(), ExecConfigError> {
+    const fn validate(&self) -> Result<(), ExecConfigError> {
         if self.command.is_empty() {
             Err(ExecConfigError::CommandEmpty)
         } else if self.maximum_buffer_size_bytes == 0 {
@@ -728,7 +727,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
     drop(tokio::spawn(async move {
         debug!("Start capturing {} command output.", origin);
 
-        let mut stream = FramedRead::new(reader, decoder);
+        let mut stream = DecoderFramedRead::new(reader, decoder);
         while let Some(result) = stream.next().await {
             match result {
                 Ok(next) => {
@@ -740,7 +739,7 @@ fn spawn_reader_thread<R: 'static + AsyncRead + Unpin + std::marker::Send>(
                     }
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no further
+                    // Error is logged by `vector_lib::codecs::Decoder`, no further
                     // handling is needed here.
                     if !error.can_continue() {
                         break;

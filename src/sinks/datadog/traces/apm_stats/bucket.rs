@@ -7,7 +7,10 @@ use super::{
     aggregation::{AggregationKey, PayloadAggregationKey},
     ddsketch_full,
 };
-use crate::{event::ObjectMap, event::Value, metrics::AgentDDSketch};
+use crate::{
+    event::{ObjectMap, Value},
+    metrics::AgentDDSketch,
+};
 
 pub(crate) struct GroupedStats {
     hits: f64,

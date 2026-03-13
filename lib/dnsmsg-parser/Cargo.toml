@@ -6,8 +6,11 @@ edition = "2024"
 publish = false
 license = "MIT"
 
+[lints.clippy]
+unwrap-used = "forbid"
+
 [dependencies]
-data-encoding = "2.9"
+data-encoding = "2.10"
 hickory-proto.workspace = true
 snafu.workspace = true
 

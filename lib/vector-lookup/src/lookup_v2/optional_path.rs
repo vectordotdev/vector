@@ -1,9 +1,7 @@
 use vector_config::configurable_component;
-use vrl::owned_value_path;
-use vrl::path::PathPrefix;
+use vrl::{owned_value_path, path::PathPrefix};
 
-use crate::lookup_v2::PathParseError;
-use crate::{OwnedTargetPath, OwnedValuePath};
+use crate::{OwnedTargetPath, OwnedValuePath, lookup_v2::PathParseError};
 
 #[configurable_component]
 #[derive(Debug, Clone, PartialEq, Eq, Default, Hash, PartialOrd, Ord)]

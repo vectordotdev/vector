@@ -1,6 +1,6 @@
-use vector_lib::event::EventStatus;
-use vector_lib::request_metadata::GroupedCountByteSize;
-use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    event::EventStatus, request_metadata::GroupedCountByteSize, stream::DriverResponse,
+};
 
 pub struct HecResponse {
     pub event_status: EventStatus,

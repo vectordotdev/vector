@@ -162,6 +162,7 @@ generated: components: sources: prometheus_scrape: configuration: {
 
 						The bearer token value (OAuth2, JWT, etc.) is passed as-is.
 						"""
+					custom: "Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`"
 				}
 			}
 			token: {
@@ -175,6 +176,12 @@ generated: components: sources: prometheus_scrape: configuration: {
 				relevant_when: "strategy = \"basic\""
 				required:      true
 				type: string: examples: ["${USERNAME}", "username"]
+			}
+			value: {
+				description:   "Custom string value of the Authorization header"
+				relevant_when: "strategy = \"custom\""
+				required:      true
+				type: string: examples: ["${AUTH_HEADER_VALUE}", "CUSTOM_PREFIX ${TOKEN}"]
 			}
 		}
 	}
@@ -232,13 +239,13 @@ generated: components: sources: prometheus_scrape: configuration: {
 				type: {
 					object: options: {
 						type: {
-							description: "The type of the parameter, indicating how the `value` should be treated."
+							description: "The parameter type, indicating how the `value` should be treated."
 							required:    false
 							type: string: {
 								default: "string"
 								enum: {
 									string: "The parameter value is a plain string."
-									vrl:    "The parameter value is a VRL expression that will be evaluated before each request."
+									vrl:    "The parameter value is a VRL expression that is evaluated before each request."
 								}
 							}
 						}

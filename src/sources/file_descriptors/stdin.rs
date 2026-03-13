@@ -1,16 +1,17 @@
 use std::io;
 
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::config::LogNamespace;
-use vector_lib::configurable::configurable_component;
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::{
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::LogNamespace,
+    configurable::configurable_component,
+    lookup::lookup_v2::OptionalValuePath,
+};
 
+use super::{FileDescriptorConfig, outputs};
 use crate::{
     config::{Resource, SourceConfig, SourceContext, SourceOutput},
     serde::default_decoding,
 };
-
-use super::{FileDescriptorConfig, outputs};
 
 /// Configuration for the `stdin` source.
 #[configurable_component(source("stdin", "Collect logs sent via stdin."))]
@@ -109,14 +110,17 @@ impl SourceConfig for StdinConfig {
 mod tests {
     use std::io::Cursor;
 
-    use super::*;
-    use crate::{
-        SourceSender, config::log_schema, shutdown::ShutdownSignal,
-        test_util::components::SOURCE_TAGS, test_util::components::assert_source_compliance,
-    };
     use futures::StreamExt;
     use vector_lib::lookup::path;
     use vrl::value;
+
+    use super::*;
+    use crate::{
+        SourceSender,
+        config::log_schema,
+        shutdown::ShutdownSignal,
+        test_util::components::{SOURCE_TAGS, assert_source_compliance},
+    };
 
     #[test]
     fn generate_config() {

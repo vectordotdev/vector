@@ -1783,6 +1783,16 @@
     </span>
 
     <div class="flex flex-col space-y-2">
+      {{ with .ctx.input }}
+        <div>
+          <span class="font-light"> Input </span>
+
+          <div class="text-sm">
+            {{ template "code" . }}
+          </div>
+        </div>
+      {{ end }}
+
       <div>
         <span class="font-light"> Source </span>
 
@@ -1791,12 +1801,22 @@
         </div>
       </div>
 
-      {{ with .ctx.return }}
+      {{ if isset .ctx "return" }}
         <div>
           <span class="font-light"> Return </span>
 
           <div class="text-sm">
-            {{ template "code" . }}
+            {{ template "code" .ctx.return }}
+          </div>
+        </div>
+      {{ end }}
+
+      {{ if isset .ctx "raises" }}
+        <div>
+          <span class="font-light"> Raises </span>
+
+          <div class="text-sm">
+            {{ template "code" .ctx.raises }}
           </div>
         </div>
       {{ end }}
@@ -1945,12 +1965,12 @@
         </div>
       {{ end }}
 
-      {{ with .ctx.return }}
+      {{ if isset .ctx "return" }}
         <div>
           <span class="font-semibold text-gray-600 dark:text-gray-300"> Resulting event </span>
 
           <div class="mt-2">
-            {{ template "code" . }}
+            {{ template "code" .ctx.return }}
           </div>
         </div>
       {{ end }}

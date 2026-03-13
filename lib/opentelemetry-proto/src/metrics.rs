@@ -1,3 +1,9 @@
+use chrono::{TimeZone, Utc};
+use vector_core::event::{
+    Event, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
+    metric::{Bucket, Quantile, TagValue},
+};
+
 use super::proto::{
     common::v1::{InstrumentationScope, KeyValue},
     metrics::v1::{
@@ -6,11 +12,6 @@ use super::proto::{
         SummaryDataPoint, metric::Data, number_data_point::Value as NumberDataPointValue,
     },
     resource::v1::Resource,
-};
-use chrono::{TimeZone, Utc};
-use vector_core::event::{
-    Event, Metric as MetricEvent, MetricKind, MetricTags, MetricValue,
-    metric::{Bucket, Quantile, TagValue},
 };
 
 impl ResourceMetrics {
@@ -212,13 +213,13 @@ pub fn build_metric_tags(
 
     if let Some(res) = resource {
         for attr in res.attributes {
-            if let Some(value) = &attr.value {
-                if let Some(pb_value) = &value.value {
-                    tags.insert(
-                        format!("resource.{}", attr.key.clone()),
-                        TagValue::from(pb_value.clone()),
-                    );
-                }
+            if let Some(value) = &attr.value
+                && let Some(pb_value) = &value.value
+            {
+                tags.insert(
+                    format!("resource.{}", attr.key.clone()),
+                    TagValue::from(pb_value.clone()),
+                );
             }
         }
     }
@@ -231,22 +232,22 @@ pub fn build_metric_tags(
             tags.insert("scope.version".to_string(), scope.version);
         }
         for attr in scope.attributes {
-            if let Some(value) = &attr.value {
-                if let Some(pb_value) = &value.value {
-                    tags.insert(
-                        format!("scope.{}", attr.key.clone()),
-                        TagValue::from(pb_value.clone()),
-                    );
-                }
+            if let Some(value) = &attr.value
+                && let Some(pb_value) = &value.value
+            {
+                tags.insert(
+                    format!("scope.{}", attr.key.clone()),
+                    TagValue::from(pb_value.clone()),
+                );
             }
         }
     }
 
     for attr in attributes {
-        if let Some(value) = &attr.value {
-            if let Some(pb_value) = &value.value {
-                tags.insert(attr.key.clone(), TagValue::from(pb_value.clone()));
-            }
+        if let Some(value) = &attr.value
+            && let Some(pb_value) = &value.value
+        {
+            tags.insert(attr.key.clone(), TagValue::from(pb_value.clone()));
         }
     }
 

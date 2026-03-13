@@ -31,16 +31,19 @@ use tower::{
     retry::Retry,
     timeout::Timeout,
 };
-use vector_lib::stream::DriverResponse;
 use vector_lib::{
     finalization::EventStatus,
     request_metadata::{GroupedCountByteSize, MetaDescriptive},
+    stream::DriverResponse,
 };
 
 use crate::sinks::{
     aws_cloudwatch_logs::{
-        CloudwatchKey, config::CloudwatchLogsSinkConfig, config::Retention, request,
-        retry::CloudwatchRetryLogic, sink::BatchCloudwatchRequest,
+        CloudwatchKey,
+        config::{CloudwatchLogsSinkConfig, Retention},
+        request,
+        retry::CloudwatchRetryLogic,
+        sink::BatchCloudwatchRequest,
     },
     util::{EncodedLength, TowerRequestSettings, retries::FibonacciRetryPolicy},
 };

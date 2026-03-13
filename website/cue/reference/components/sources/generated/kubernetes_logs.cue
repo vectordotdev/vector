@@ -154,6 +154,17 @@ generated: components: sources: kubernetes_logs: configuration: {
 		required: false
 		type: string: examples: [".ingest_timestamp", "ingest_ts"]
 	}
+	insert_namespace_fields: {
+		description: """
+			Specifies whether or not to enrich logs with namespace fields.
+
+			Setting to `false` prevents Vector from pulling in namespaces and thus namespace label fields will not
+			be available. This helps reduce load on the `kube-apiserver` and lowers daemonset memory usage in clusters
+			with many namespaces.
+			"""
+		required: false
+		type: bool: default: true
+	}
 	internal_metrics: {
 		description: "Configuration of internal metrics for file-based components."
 		required:    false

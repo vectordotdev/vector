@@ -764,7 +764,10 @@ where
                 Ok(data_file) => data_file,
                 Err(e) => match e.kind() {
                     ErrorKind::NotFound => {
-                        if reader_file_id == writer_file_id {
+                        // reader is either waiting for writer to create the file which can be current writer_file_id or next writer_file_id (if writer has marked for skip)
+                        if reader_file_id == writer_file_id
+                            || reader_file_id == self.ledger.get_next_writer_file_id()
+                        {
                             debug!(
                                 data_file_path = data_file_path.to_string_lossy().as_ref(),
                                 "Data file does not yet exist. Waiting for writer to create."

@@ -25,10 +25,11 @@ use crate::{
 // - "SECRET[backend.secret_name]" will match and capture "backend" and "secret_name"
 // - "SECRET[backend.secret.name]" will match and capture "backend" and "secret.name"
 // - "SECRET[backend..secret.name]" will match and capture "backend" and ".secret.name"
+// - "SECRET[backend.path/to/secret]" will match and capture "backend" and "path/to/secret"
 // - "SECRET[secret_name]" will not match
 // - "SECRET[.secret.name]" will not match
 pub static COLLECTOR: LazyLock<Regex> =
-    LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].-]+)\]").unwrap());
+    LazyLock::new(|| Regex::new(r"SECRET\[([[:word:]]+)\.([[:word:].\-/]+)\]").unwrap());
 
 /// Helper type for specifically deserializing secrets backends.
 #[derive(Debug, Default, Deserialize, Serialize)]
@@ -38,38 +39,50 @@ pub(crate) struct SecretBackendOuter {
 }
 
 /// Loader for secrets backends.
-#[derive(Debug, Default, Deserialize, Serialize)]
+#[derive(Debug, Deserialize, Serialize)]
 pub struct SecretBackendLoader {
     backends: IndexMap<ComponentKey, SecretBackends>,
-    pub(crate) secret_keys: HashMap<String, HashSet<String>>,
+    secret_keys: HashMap<String, HashSet<String>>,
+    interpolate_env: bool,
 }
 
 impl SecretBackendLoader {
-    pub(crate) fn new() -> Self {
-        Self {
-            backends: IndexMap::new(),
-            secret_keys: HashMap::new(),
-        }
+    /// Sets whether to interpolate environment variables in the config.
+    pub const fn interpolate_env(mut self, interpolate: bool) -> Self {
+        self.interpolate_env = interpolate;
+        self
     }
 
-    pub(crate) async fn retrieve(
-        &mut self,
-        signal_rx: &mut signal::SignalRx,
+    /// Retrieve secrets from backends.
+    /// Returns an empty HashMap if there are no secrets to retrieve.
+    pub(crate) async fn retrieve_secrets(
+        mut self,
+        signal_handler: &mut signal::SignalHandler,
     ) -> Result<HashMap<String, String>, String> {
+        if self.secret_keys.is_empty() {
+            debug!(message = "No secret placeholder found, skipping secret resolution.");
+            return Ok(HashMap::new());
+        }
+
+        debug!(message = "Secret placeholders found, retrieving secrets from configured backends.");
         let mut secrets: HashMap<String, String> = HashMap::new();
+        let mut signal_rx = signal_handler.subscribe();
 
         for (backend_name, keys) in &self.secret_keys {
-            let backend = self.backends
+            let backend = self
+                .backends
                 .get_mut(&ComponentKey::from(backend_name.clone()))
                 .ok_or_else(|| {
-                    format!("Backend \"{backend_name}\" is required for secret retrieval but was not found in config.")
+                    format!(
+                        "Backend \"{backend_name}\" is required for secret retrieval but was not found in config."
+                    )
                 })?;
 
             debug!(message = "Retrieving secrets from a backend.", backend = ?backend_name, keys = ?keys);
             let backend_secrets = backend
-                .retrieve(keys.clone(), signal_rx)
+                .retrieve(keys.clone(), &mut signal_rx)
                 .map_err(|e| {
-                    format!("Error while retrieving secret from backend \"{backend_name}\": {e}.",)
+                    format!("Error while retrieving secret from backend \"{backend_name}\": {e}.")
                 })
                 .await?;
 
@@ -81,15 +94,23 @@ impl SecretBackendLoader {
 
         Ok(secrets)
     }
+}
 
-    pub(crate) fn has_secrets_to_retrieve(&self) -> bool {
-        !self.secret_keys.is_empty()
+impl Default for SecretBackendLoader {
+    /// Creates a new SecretBackendLoader with default settings.
+    /// By default, environment variable interpolation is enabled.
+    fn default() -> Self {
+        Self {
+            backends: IndexMap::new(),
+            secret_keys: HashMap::new(),
+            interpolate_env: true,
+        }
     }
 }
 
 impl Process for SecretBackendLoader {
     fn prepare<R: Read>(&mut self, input: R) -> Result<String, Vec<String>> {
-        let config_string = prepare_input(input)?;
+        let config_string = prepare_input(input, self.interpolate_env)?;
         // Collect secret placeholders just after env var processing
         collect_secret_keys(&config_string, &mut self.secret_keys);
         Ok(config_string)
@@ -162,6 +183,8 @@ mod tests {
         let secrets: HashMap<String, String> = vec![
             ("a.secret.key".into(), "value".into()),
             ("a...key".into(), "a...value".into()),
+            ("backend.path/to/secret".into(), "secret_value".into()),
+            ("backend.nested/dir/file".into(), "nested_value".into()),
         ]
         .into_iter()
         .collect();
@@ -182,6 +205,14 @@ mod tests {
         assert_eq!(
             Ok("a...value".into()),
             interpolate("SECRET[a...key]", &secrets)
+        );
+        assert_eq!(
+            Ok("secret_value".into()),
+            interpolate("SECRET[backend.path/to/secret]", &secrets)
+        );
+        assert_eq!(
+            Ok("nested_value".into()),
+            interpolate("SECRET[backend.nested/dir/file]", &secrets)
         );
         assert_eq!(
             Ok("xxxSECRET[non_matching_syntax]yyy".into()),
@@ -207,6 +238,8 @@ mod tests {
             SECRET[second_backend.secret.key]
             SECRET[first_backend.a_third.secret_key]
             SECRET[first_backend...an_extra_secret_key]
+            SECRET[first_backend.path/to/secret]
+            SECRET[second_backend.nested/dir/secret]
             SECRET[non_matching_syntax]
             SECRET[.non.matching.syntax]
         "},
@@ -217,17 +250,19 @@ mod tests {
         assert!(keys.contains_key("second_backend"));
 
         let first_backend_keys = keys.get("first_backend").unwrap();
-        assert_eq!(first_backend_keys.len(), 5);
+        assert_eq!(first_backend_keys.len(), 6);
         assert!(first_backend_keys.contains("secret_key"));
         assert!(first_backend_keys.contains("secret-key"));
         assert!(first_backend_keys.contains("another_secret_key"));
         assert!(first_backend_keys.contains("a_third.secret_key"));
         assert!(first_backend_keys.contains("..an_extra_secret_key"));
+        assert!(first_backend_keys.contains("path/to/secret"));
 
         let second_backend_keys = keys.get("second_backend").unwrap();
-        assert_eq!(second_backend_keys.len(), 2);
+        assert_eq!(second_backend_keys.len(), 3);
         assert!(second_backend_keys.contains("secret_key"));
         assert!(second_backend_keys.contains("secret.key"));
+        assert!(second_backend_keys.contains("nested/dir/secret"));
     }
 
     #[test]

@@ -5,15 +5,14 @@ use aws_sdk_sqs::{Client as SqsClient, types::QueueAttributeName};
 use tokio::time::{Duration, sleep};
 use vector_lib::codecs::TextSerializerConfig;
 
-use crate::config::{SinkConfig, SinkContext};
-use crate::sinks::aws_s_s::sqs::{
-    BaseSSSinkConfig,
-    config::{SqsSinkConfig, healthcheck},
-};
 use crate::{
     aws::{AwsAuthentication, RegionOrEndpoint, create_client},
     common::sqs::SqsClientBuilder,
-    config::ProxyConfig,
+    config::{ProxyConfig, SinkConfig, SinkContext},
+    sinks::aws_s_s::sqs::{
+        BaseSSSinkConfig,
+        config::{SqsSinkConfig, healthcheck},
+    },
     test_util::{
         components::{AWS_SINK_TAGS, run_and_assert_sink_compliance},
         random_lines_with_stream, random_string,

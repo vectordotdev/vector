@@ -101,7 +101,7 @@ generated: components: sources: fluent: configuration: {
 		type: uint: examples: [511, 384, 508]
 	}
 	tls: {
-		description:   "TlsEnableableConfig for `sources`, adding metadata from the client certificate."
+		description:   "`TlsEnableableConfig` for `sources`, adding metadata from the client certificate."
 		relevant_when: "mode = \"tcp\""
 		required:      false
 		type: object: options: {

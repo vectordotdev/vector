@@ -4,20 +4,18 @@ use async_stream::stream;
 use bytes::Bytes;
 use chrono::Utc;
 use futures::{SinkExt, StreamExt, channel::mpsc, executor};
-use tokio_util::{codec::FramedRead, io::StreamReader};
-use vector_lib::codecs::{
-    StreamDecodingError,
-    decoding::{DeserializerConfig, FramingConfig},
-};
-use vector_lib::configurable::NamedComponent;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol,
-};
-use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path};
+use tokio_util::io::StreamReader;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::{
+        DecoderFramedRead, StreamDecodingError,
+        decoding::{DeserializerConfig, FramingConfig},
+    },
     config::{LegacyKey, LogNamespace},
+    configurable::NamedComponent,
     event::Event,
+    internal_event::{ByteSize, BytesReceived, CountByteSize, InternalEventHandle as _, Protocol},
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath, owned_value_path, path},
 };
 use vrl::value::Kind;
 
@@ -133,7 +131,7 @@ async fn process_stream(
         }
     });
     let stream = StreamReader::new(stream);
-    let mut stream = FramedRead::new(stream, decoder).take_until(shutdown);
+    let mut stream = DecoderFramedRead::new(stream, decoder).take_until(shutdown);
     let mut stream = stream! {
         while let Some(result) = stream.next().await {
             match result {
@@ -176,7 +174,7 @@ async fn process_stream(
                     }
                 }
                 Err(error) => {
-                    // Error is logged by `crate::codecs::Decoder`, no
+                    // Error is logged by `vector_lib::codecs::Decoder`, no
                     // further handling is needed here.
                     if !error.can_continue() {
                         break;

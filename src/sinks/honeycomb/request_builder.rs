@@ -1,11 +1,11 @@
 //! `RequestBuilder` implementation for the `honeycomb` sink.
 
-use bytes::Bytes;
 use std::io;
 
-use crate::sinks::{prelude::*, util::http::HttpRequest};
+use bytes::Bytes;
 
 use super::encoder::HoneycombEncoder;
+use crate::sinks::{prelude::*, util::http::HttpRequest};
 
 pub(super) struct HoneycombRequestBuilder {
     pub(super) encoder: HoneycombEncoder,

@@ -1,7 +1,9 @@
 use std::time::Duration;
 
-use vector_lib::api_client::Client;
-use vector_lib::tap::{EventFormatter, OutputChannel, TapRunner};
+use vector_lib::{
+    api_client::Client,
+    tap::{EventFormatter, OutputChannel, TapRunner},
+};
 
 use crate::signal::{SignalRx, SignalTo};
 

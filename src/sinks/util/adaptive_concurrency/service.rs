@@ -233,7 +233,7 @@ mod tests {
             }
         }
 
-        fn inner(&self) -> MutexGuard<Inner> {
+        fn inner(&self) -> MutexGuard<'_, Inner> {
             self.inner.lock().unwrap()
         }
     }

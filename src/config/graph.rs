@@ -1,10 +1,14 @@
-use super::{
-    ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformOuter,
-    TransformOutput, WildcardMatching, schema,
+use std::{
+    collections::{HashMap, HashSet, VecDeque},
+    fmt,
 };
+
 use indexmap::{IndexMap, set::IndexSet};
-use std::collections::{HashMap, HashSet, VecDeque};
-use std::fmt;
+
+use super::{
+    ComponentKey, DataType, OutputId, SinkOuter, SourceOuter, SourceOutput, TransformContext,
+    TransformOuter, TransformOutput, WildcardMatching, schema,
+};
 
 #[derive(Debug, Clone)]
 pub enum Node {
@@ -108,9 +112,11 @@ impl Graph {
                 Node::Transform {
                     in_ty: transform.inner.input().data_type(),
                     outputs: transform.inner.outputs(
-                        vector_lib::enrichment::TableRegistry::default(),
+                        &TransformContext {
+                            schema,
+                            ..Default::default()
+                        },
                         &[(id.into(), schema::Definition::any())],
-                        schema.log_namespace(),
                     ),
                 },
             );

@@ -1,4 +1,4 @@
-FROM docker.io/ubuntu:24.04
+FROM docker.io/ubuntu:24.04@sha256:d1e2e92c075e5ca139d51a140fff46f84315c0fdce203eab2807c7e495eff4f9
 ENV DEBIAN_FRONTEND=noninteractive \
     TZ='America/New York' \
     PATH=/root/.cargo/bin:/root/.local/bin/:$PATH \
@@ -10,12 +10,15 @@ ENV DEBIAN_FRONTEND=noninteractive \
 # Container junk
 RUN echo $TZ > /etc/timezone
 
+RUN apt-get update && apt-get install -y git
+
+WORKDIR /git/vectordotdev/vector
+
 # Setup the env
-COPY scripts/environment/*.sh /git/vectordotdev/vector/scripts/environment/
-RUN cd git/vectordotdev/vector && ./scripts/environment/bootstrap-ubuntu-24.04.sh
+COPY scripts/environment/*.sh scripts/environment/
+RUN ./scripts/environment/bootstrap-ubuntu-24.04.sh
 
 # Setup the toolchain
-WORKDIR /git/vectordotdev/vector
 COPY scripts/Gemfile scripts/Gemfile.lock \
     /git/vectordotdev/vector/scripts/
 COPY rust-toolchain.toml \

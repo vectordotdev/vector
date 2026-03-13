@@ -1,15 +1,19 @@
 #![allow(missing_docs)]
-use std::fs::File;
-use std::io::prelude::*;
-use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::{
+    fs::File,
+    io::prelude::*,
+    path::PathBuf,
+    time::{Duration, Instant},
+};
 
 use clap::Parser;
 use colored::*;
 use quick_junit::{NonSuccessKind, Report, TestCase, TestCaseStatus, TestSuite};
 
-use crate::config::{self, UnitTestResult};
-use crate::signal;
+use crate::{
+    config::{self, UnitTestResult},
+    signal,
+};
 
 #[derive(Parser, Debug)]
 #[command(rename_all = "kebab-case")]
@@ -184,14 +188,17 @@ pub async fn cmd(opts: &Opts, signal_handler: &mut signal::SignalHandler) -> exi
                 match junit_reporter.write_reports(test_suite_elapsed) {
                     Ok(()) => {}
                     Err(error) => {
-                        error!("Failed to execute tests:\n{}.", error);
+                        error!("Failed to write test output:\n{}.", error);
                         return exitcode::CONFIG;
                     }
                 }
             }
         }
         Err(errors) => {
-            error!("Failed to execute tests:\n{}.", errors.join("\n"));
+            #[allow(clippy::print_stderr)]
+            {
+                eprintln!("Failed to execute tests:\n{}.", errors.join("\n"));
+            }
             return exitcode::CONFIG;
         }
     }

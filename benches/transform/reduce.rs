@@ -1,15 +1,15 @@
 use core::fmt;
 use std::{num::NonZeroUsize, time::Duration};
 
-use crate::common::{FixedLogStream, consume};
 use criterion::{
     BatchSize, BenchmarkGroup, BenchmarkId, Criterion, SamplingMode, Throughput, criterion_group,
     measurement::WallTime,
 };
 use indexmap::IndexMap;
-use vector::transforms::reduce::config::ReduceConfig;
-use vector::transforms::reduce::transform::Reduce;
+use vector::transforms::reduce::{config::ReduceConfig, transform::Reduce};
 use vector_lib::transform::Transform;
+
+use crate::common::{FixedLogStream, consume};
 
 #[derive(Debug)]
 struct Param {
@@ -54,7 +54,12 @@ fn reduce(c: &mut Criterion) {
                 .iter_batched(
                     || {
                         let reduce = Transform::event_task(
-                            Reduce::new(&param.reduce_config, &Default::default()).unwrap(),
+                            Reduce::new(
+                                &param.reduce_config,
+                                &Default::default(),
+                                &Default::default(),
+                            )
+                            .unwrap(),
                         )
                         .into_task();
                         (Box::new(reduce), Box::pin(param.input.clone()))

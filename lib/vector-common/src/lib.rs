@@ -12,6 +12,8 @@
 #![deny(unused_assignments)]
 #![deny(unused_comparisons)]
 
+pub use vector_common_macros::NamedInternalEvent;
+
 #[cfg(feature = "btreemap")]
 pub use vrl::btreemap;
 
@@ -57,6 +59,8 @@ pub mod shutdown;
 #[cfg(feature = "sensitive_string")]
 pub mod sensitive_string;
 
+pub mod atomic;
+pub mod stats;
 pub mod trigger;
 
 #[macro_use]

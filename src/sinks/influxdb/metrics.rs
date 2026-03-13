@@ -3,9 +3,9 @@ use std::{collections::HashMap, future::ready, task::Poll};
 use bytes::{Bytes, BytesMut};
 use futures::{SinkExt, future::BoxFuture, stream};
 use tower::Service;
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    configurable::configurable_component,
     event::metric::{MetricSketch, MetricTags, Quantile},
 };
 
@@ -182,7 +182,7 @@ impl InfluxDbSvc {
                         .map(|metric| Ok(EncodedEvent::new(metric, byte_size, json_size)))
                 })
             })
-            .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error));
+            .sink_map_err(|error| error!(message = "Fatal influxdb sink error.", %error, internal_log_rate_limit = false));
 
         #[allow(deprecated)]
         Ok(VectorSink::from_event_sink(sink))

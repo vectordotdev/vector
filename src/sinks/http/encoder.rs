@@ -1,11 +1,8 @@
 //! Encoding for the `http` sink.
 
-use crate::{
-    event::Event,
-    sinks::util::encoding::{Encoder as SinkEncoder, write_all},
-};
-use bytes::{BufMut, BytesMut};
 use std::io;
+
+use bytes::{BufMut, BytesMut};
 use tokio_util::codec::Encoder as _;
 use vector_lib::codecs::{
     CharacterDelimitedEncoder,
@@ -16,7 +13,13 @@ use vector_lib::codecs::{
     },
 };
 
-use crate::sinks::prelude::*;
+use crate::{
+    event::Event,
+    sinks::{
+        prelude::*,
+        util::encoding::{Encoder as SinkEncoder, write_all},
+    },
+};
 
 #[derive(Clone, Debug)]
 pub(super) struct HttpEncoder {

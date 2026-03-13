@@ -1,8 +1,9 @@
 ---
+date: "2021-01-20"
 title: Structuring, Shaping, and Transforming Data
 short: Transforming
 description: Use Vector to parse, structure, shape, and transform observability data
-author_github: lucperkins
+authors: ["lucperkins"]
 domain: processing
 weight: 2
 tags: ["transform", "observability", "level up", "guides", "guide"]

@@ -2,32 +2,38 @@ use std::path::PathBuf;
 
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use dnsmsg_parser::dns_message_parser::DnsParserOptions;
-use dnstap_parser::parser::DnstapParser;
-use dnstap_parser::schema::DnstapEventSchema;
-use vector_lib::event::{Event, LogEvent};
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered,
+use dnstap_parser::{
+    parser::DnstapParser,
+    schema::{DNSTAP_VALUE_PATHS, DnstapEventSchema},
 };
-use vector_lib::lookup::{owned_value_path, path};
-use vector_lib::{configurable::configurable_component, tls::MaybeTlsSettings};
-use vrl::path::{OwnedValuePath, PathPrefix};
-use vrl::value::{Kind, kind::Collection};
+use vector_lib::{
+    configurable::configurable_component,
+    event::{Event, LogEvent},
+    internal_event::{ByteSize, BytesReceived, InternalEventHandle, Protocol, Registered},
+    lookup::{owned_value_path, path},
+    tls::MaybeTlsSettings,
+};
+use vrl::{
+    path::{OwnedValuePath, PathPrefix},
+    value::{Kind, kind::Collection},
+};
 
 use super::util::framestream::{
     FrameHandler, build_framestream_tcp_source, build_framestream_unix_source,
 };
-use crate::internal_events::DnstapParseError;
 use crate::{
     Result,
     config::{DataType, SourceConfig, SourceContext, SourceOutput, log_schema},
+    internal_events::DnstapParseError,
 };
-use dnstap_parser::schema::DNSTAP_VALUE_PATHS;
 
 pub mod tcp;
 #[cfg(unix)]
 pub mod unix;
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::lookup::lookup_v2::OptionalValuePath;
+use vector_lib::{
+    config::{LegacyKey, LogNamespace},
+    lookup::lookup_v2::OptionalValuePath,
+};
 
 /// Configuration for the `dnstap` source.
 #[configurable_component(source("dnstap", "Collect DNS logs from a dnstap-compatible server."))]
@@ -116,14 +122,10 @@ impl DnstapConfig {
             LogNamespace::Legacy => {
                 let schema = vector_lib::schema::Definition::empty_legacy_namespace();
 
-                if self.raw_data_only() {
-                    if let Some(message_key) = log_schema().message_key() {
-                        return schema.with_event_field(
-                            message_key,
-                            Kind::bytes(),
-                            Some("message"),
-                        );
-                    }
+                if self.raw_data_only()
+                    && let Some(message_key) = log_schema().message_key()
+                {
+                    return schema.with_event_field(message_key, Kind::bytes(), Some("message"));
                 }
                 event_schema.schema_definition(schema)
             }
@@ -414,16 +416,16 @@ mod tests {
 mod integration_tests {
     #![allow(clippy::print_stdout)] // tests
 
-    use bollard::Docker;
-    use bollard::exec::{CreateExecOptions, StartExecOptions};
+    use bollard::{
+        Docker,
+        exec::{CreateExecOptions, StartExecOptions},
+    };
     use futures::StreamExt;
     use serde_json::json;
     use tokio::time;
-    use vector_lib::event::Event;
-    use vector_lib::lookup::lookup_v2::OptionalValuePath;
+    use vector_lib::{event::Event, lookup::lookup_v2::OptionalValuePath};
 
     use self::unix::UnixConfig;
-
     use super::*;
     use crate::{
         SourceSender,

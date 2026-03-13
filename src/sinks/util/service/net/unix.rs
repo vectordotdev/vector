@@ -2,12 +2,10 @@ use std::path::{Path, PathBuf};
 
 use snafu::ResultExt;
 use tokio::net::{UnixDatagram, UnixStream};
-
 use vector_lib::configurable::configurable_component;
 
-use crate::{net, sinks::util::unix::UnixEither};
-
 use super::{ConnectorType, NetError, NetworkConnector, net_error::*};
+use crate::{net, sinks::util::unix::UnixEither};
 
 /// Unix socket modes.
 #[configurable_component]
@@ -93,10 +91,10 @@ impl UnixConnector {
                 .map(UnixEither::Stream)?,
         };
 
-        if let Some(send_buffer_size) = self.send_buffer_size {
-            if let Err(error) = net::set_send_buffer_size(&either_socket, send_buffer_size) {
-                warn!(%error, "Failed configuring send buffer size on Unix socket.");
-            }
+        if let Some(send_buffer_size) = self.send_buffer_size
+            && let Err(error) = net::set_send_buffer_size(&either_socket, send_buffer_size)
+        {
+            warn!(%error, "Failed configuring send buffer size on Unix socket.");
         }
 
         Ok((self.path.clone(), either_socket))

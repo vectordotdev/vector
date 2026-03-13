@@ -1,12 +1,21 @@
+mod licenses;
+mod publish_metadata;
+mod vector;
+mod vector_vrl_docs;
+mod vrl_docs;
+mod vrl_wasm;
+
 crate::cli_subcommands! {
     "Build, generate or regenerate components..."
     component_docs,
-    mod licenses,
+    licenses,
     manifests,
-    mod publish_metadata,
+    publish_metadata,
     release_cue,
-    mod vector,
-    mod vrl_wasm,
+    vector,
+    vrl_docs,
+    vector_vrl_docs,
+    vrl_wasm,
 }
 
 crate::script_wrapper! {

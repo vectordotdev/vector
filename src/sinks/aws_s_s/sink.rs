@@ -1,6 +1,5 @@
 use super::{client::Client, request_builder::SSRequestBuilder, service::SSService};
-use crate::sinks::aws_s_s::retry::SSRetryLogic;
-use crate::sinks::prelude::*;
+use crate::sinks::{aws_s_s::retry::SSRetryLogic, prelude::*};
 
 #[derive(Clone)]
 pub(super) struct SSSink<C, E>

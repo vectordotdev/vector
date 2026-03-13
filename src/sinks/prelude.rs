@@ -4,23 +4,21 @@
 pub use async_trait::async_trait;
 pub use futures::{FutureExt, StreamExt, future, future::BoxFuture, stream::BoxStream};
 pub use tower::{Service, ServiceBuilder};
-pub use vector_lib::buffers::EventCount;
-pub use vector_lib::configurable::configurable_component;
-pub use vector_lib::stream::{BatcherSettings, DriverResponse};
 pub use vector_lib::{
     ByteSizeOf, EstimatedJsonEncodedSizeOf,
+    buffers::EventCount,
     config::{AcknowledgementsConfig, Input, telemetry},
+    configurable::configurable_component,
     event::Value,
-    partition::Partitioner,
-    schema::Requirement,
-    sink::{StreamSink, VectorSink},
-    tls::TlsSettings,
-};
-pub use vector_lib::{
     finalization::{EventFinalizers, EventStatus, Finalizable},
     internal_event::{CountByteSize, TaggedEventsSent},
     json_size::JsonSize,
+    partition::Partitioner,
     request_metadata::{GetEventCountTags, GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    schema::Requirement,
+    sink::{StreamSink, VectorSink},
+    stream::{BatcherSettings, DriverResponse},
+    tls::TlsSettings,
 };
 
 pub use crate::{

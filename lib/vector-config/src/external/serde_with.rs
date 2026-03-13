@@ -2,11 +2,10 @@ use std::cell::RefCell;
 
 use vector_config_common::{attributes::CustomAttribute, constants};
 
-use crate::schema::generate_optional_schema;
 use crate::{
     Configurable, GenerateError, Metadata,
     num::NumberClass,
-    schema::{SchemaGenerator, SchemaObject, generate_number_schema},
+    schema::{SchemaGenerator, SchemaObject, generate_number_schema, generate_optional_schema},
 };
 
 // Blanket implementation of `Configurable` for any `serde_with` helper that is also `Configurable`.

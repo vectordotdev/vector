@@ -10,8 +10,10 @@ use k8s_openapi::{
 use k8s_test_framework::{
     CommandBuilder, Framework, Interface, Manager, Reader, test_pod, wait_for_resource::WaitFor,
 };
-use rand::distr::{Alphanumeric, SampleString};
-use rand::rng;
+use rand::{
+    distr::{Alphanumeric, SampleString},
+    rng,
+};
 use tracing::{debug, error, info};
 
 pub mod metrics;
@@ -184,6 +186,9 @@ pub fn make_test_pod_with_affinity<'a>(
                     label_selector: Some(selector),
                     namespaces: Some(vec![affinity_namespace.unwrap_or(namespace).to_string()]),
                     topology_key: "kubernetes.io/hostname".to_string(),
+                    match_label_keys: None,
+                    mismatch_label_keys: None,
+                    namespace_selector: None,
                 }]),
             }),
             pod_anti_affinity: None,

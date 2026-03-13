@@ -1,13 +1,13 @@
 //! Configuration for the `http` sink.
 
+use std::{collections::BTreeMap, path::PathBuf};
+
 #[cfg(feature = "aws-core")]
 use aws_config::meta::region::ProvideRegion;
 #[cfg(feature = "aws-core")]
 use aws_types::region::Region;
 use http::{HeaderName, HeaderValue, Method, Request, StatusCode, header::AUTHORIZATION};
 use hyper::Body;
-use std::collections::BTreeMap;
-use std::path::PathBuf;
 use vector_lib::codecs::{
     CharacterDelimitedEncoder,
     encoding::{Framer, Serializer},
@@ -270,6 +270,8 @@ impl SinkConfig for HttpSinkConfig {
                 (Json(_), CharacterDelimited(CharacterDelimitedEncoder { delimiter: b',' })) => {
                     Some(CONTENT_TYPE_JSON.to_owned())
                 }
+                #[cfg(feature = "codecs-opentelemetry")]
+                (Otlp(_), _) => Some("application/x-protobuf".to_owned()),
                 _ => None,
             }
         };
@@ -383,8 +385,11 @@ mod tests {
     impl ValidatableComponent for HttpSinkConfig {
         fn validation_configuration() -> ValidationConfiguration {
             use std::str::FromStr;
-            use vector_lib::codecs::{JsonSerializerConfig, MetricTagValues};
-            use vector_lib::config::LogNamespace;
+
+            use vector_lib::{
+                codecs::{JsonSerializerConfig, MetricTagValues},
+                config::LogNamespace,
+            };
 
             let endpoint = "http://127.0.0.1:9000/endpoint";
             let uri = UriSerde::from_str(endpoint).expect("should never fail to parse");

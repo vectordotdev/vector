@@ -13,5 +13,7 @@ pub(crate) const DEFINITIONS_PREFIX: &str = "#/definitions/";
 pub type Map<K, V> = std::collections::BTreeMap<K, V>;
 pub type Set<V> = std::collections::BTreeSet<V>;
 
-pub use self::generator::{SchemaGenerator, SchemaSettings};
-pub use self::json_schema::*;
+pub use self::{
+    generator::{SchemaGenerator, SchemaSettings},
+    json_schema::*,
+};

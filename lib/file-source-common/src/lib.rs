@@ -1,23 +1,20 @@
 #![deny(warnings)]
 #![deny(clippy::all)]
 
-#[macro_use]
-extern crate scan_fmt;
-
 pub mod buffer;
 pub mod checkpointer;
 mod fingerprinter;
 pub mod internal_events;
 mod metadata_ext;
 
+use vector_config::configurable_component;
+
 pub use self::{
     checkpointer::{CHECKPOINT_FILE_NAME, Checkpointer, CheckpointsView},
     fingerprinter::{FileFingerprint, FingerprintStrategy, Fingerprinter},
     internal_events::FileSourceInternalEvents,
-    metadata_ext::PortableFileExt,
+    metadata_ext::{AsyncFileInfo, PortableFileExt},
 };
-
-use vector_config::configurable_component;
 
 pub type FilePosition = u64;
 

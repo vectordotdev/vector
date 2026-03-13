@@ -58,11 +58,14 @@ impl MetricData {
 
     /// Consumes this metric, returning it as an absolute metric.
     ///
-    /// If the metric was already absolute, nothing is changed.
+    /// The `interval_ms` is set to `None`. If the metric was already absolute, nothing else is changed.
     #[must_use]
     pub fn into_absolute(self) -> Self {
         Self {
-            time: self.time,
+            time: MetricTime {
+                timestamp: self.time.timestamp,
+                interval_ms: None,
+            },
             kind: MetricKind::Absolute,
             value: self.value,
         }

@@ -1,6 +1,8 @@
 use criterion::{BatchSize, Criterion, criterion_group, criterion_main};
-use rand::distr::Distribution;
-use rand::{distr::Uniform, seq::SliceRandom};
+use rand::{
+    distr::{Distribution, Uniform},
+    seq::SliceRandom,
+};
 use vector::{event::metric::Sample, sinks::util::statistic::DistributionStatistic};
 
 fn generate_samples(mut size: u32, max_bin_count: u32) -> Vec<Sample> {

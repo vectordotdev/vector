@@ -1,13 +1,12 @@
 //! Configuration functionality for the `AMQP` sink.
-use super::channel::AmqpSinkChannels;
-use crate::{amqp::AmqpConfig, sinks::prelude::*};
 use lapin::{BasicProperties, types::ShortString};
 use vector_lib::{
     codecs::TextSerializerConfig,
     internal_event::{error_stage, error_type},
 };
 
-use super::sink::AmqpSink;
+use super::{channel::AmqpSinkChannels, sink::AmqpSink};
+use crate::{amqp::AmqpConfig, sinks::prelude::*};
 
 /// AMQP properties configuration.
 #[configurable_component]
@@ -46,7 +45,7 @@ impl AmqpPropertiesConfig {
                     error = %error,
                     error_type = error_type::TEMPLATE_FAILED,
                     stage = error_stage::PROCESSING,
-                    internal_log_rate_limit = true,
+                    internal_log_rate_limit = false,
                 );
                 Default::default()
             });

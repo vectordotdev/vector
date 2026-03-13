@@ -25,7 +25,7 @@ impl<'a> FileSourceMetricFile<'a> {
         Self { name, metrics }
     }
 
-    pub fn get_name(&self) -> &str {
+    pub const fn get_name(&self) -> &str {
         self.name.as_str()
     }
 }
@@ -215,7 +215,7 @@ mod tests {
             }
         }
 
-        fn get_metric(&self) -> FileSourceMetricFile {
+        fn get_metric(&self) -> FileSourceMetricFile<'_> {
             FileSourceMetricFile::from_tuple((
                 self.name.to_string(),
                 vec![&self.bytes_metric, &self.events_metric],

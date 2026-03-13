@@ -1,10 +1,12 @@
 use std::path::PathBuf;
 
-use vector_lib::codecs::{
-    NewlineDelimitedDecoder,
-    decoding::{Deserializer, Framer},
+use vector_lib::{
+    codecs::{
+        NewlineDelimitedDecoder,
+        decoding::{Deserializer, Framer},
+    },
+    configurable::configurable_component,
 };
-use vector_lib::configurable::configurable_component;
 
 use super::{ConversionUnit, StatsdDeserializer, default_convert_to, default_sanitize};
 use crate::{

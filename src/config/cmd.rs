@@ -3,9 +3,8 @@ use std::path::PathBuf;
 use clap::Parser;
 use serde_json::Value;
 
-use super::{ConfigBuilder, load_builder_from_paths, load_source_from_paths, process_paths};
-use crate::cli::handle_config_errors;
-use crate::config;
+use super::{ConfigBuilder, load_source_from_paths, loading::ConfigBuilderLoader, process_paths};
+use crate::{cli::handle_config_errors, config};
 
 #[derive(Parser, Debug, Clone)]
 #[command(rename_all = "kebab-case")]
@@ -55,6 +54,14 @@ pub struct Opts {
         value_delimiter(',')
     )]
     pub config_dirs: Vec<PathBuf>,
+
+    /// Disable interpolation of environment variables in configuration files.
+    #[arg(
+        long,
+        env = "VECTOR_DISABLE_ENV_VAR_INTERPOLATION",
+        default_value = "false"
+    )]
+    pub disable_env_var_interpolation: bool,
 }
 
 impl Opts {
@@ -167,10 +174,15 @@ pub fn cmd(opts: &Opts) -> exitcode::ExitCode {
     // Start by serializing to a `ConfigBuilder`. This will leverage validation in config
     // builder fields which we'll use to error out if required.
     let (paths, builder) = match process_paths(&paths) {
-        Some(paths) => match load_builder_from_paths(&paths) {
-            Ok(builder) => (paths, builder),
-            Err(errs) => return handle_config_errors(errs),
-        },
+        Some(paths) => {
+            match ConfigBuilderLoader::default()
+                .interpolate_env(!opts.disable_env_var_interpolation)
+                .load_from_paths(&paths)
+            {
+                Ok(builder) => (paths, builder),
+                Err(errs) => return handle_config_errors(errs),
+            }
+        }
         None => return exitcode::CONFIG,
     };
 
@@ -205,14 +217,12 @@ mod tests {
         SinkDescription, SourceDescription, TransformDescription,
     };
 
-    use crate::config::Format;
+    use super::merge_json;
     use crate::{
-        config::{ConfigBuilder, cmd::serialize_to_json, vars},
+        config::{ConfigBuilder, Format, cmd::serialize_to_json, vars},
         generate,
         generate::{TransformInputsStrategy, generate_example},
     };
-
-    use super::merge_json;
 
     #[test]
     fn test_array_override() {

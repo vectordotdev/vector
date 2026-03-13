@@ -1,3 +1,5 @@
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
+
 use crate::sinks::{
     greptimedb::{
         GreptimeDBDefaultBatchSettings, default_dbname,
@@ -10,7 +12,6 @@ use crate::sinks::{
     },
     prelude::*,
 };
-use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 /// Configuration for the `greptimedb` sink.
 #[configurable_component(sink("greptimedb", "Ingest metrics data into GreptimeDB."))]

@@ -1,8 +1,8 @@
 use std::{collections::HashMap, net::SocketAddr};
 
-use vector_lib::codecs::JsonSerializerConfig;
-use vector_lib::configurable::configurable_component;
+use vector_lib::{codecs::JsonSerializerConfig, configurable::configurable_component};
 
+use super::{buffering::MessageBufferingConfig, sink::WebSocketListenerSink};
 use crate::{
     codecs::EncodingConfig,
     common::http::server_auth::HttpServerAuthConfig,
@@ -10,9 +10,6 @@ use crate::{
     sinks::{Healthcheck, VectorSink},
     tls::TlsEnableableConfig,
 };
-
-use super::buffering::MessageBufferingConfig;
-use super::sink::WebSocketListenerSink;
 
 /// Configuration for the `websocket_server` sink.
 #[configurable_component(sink(

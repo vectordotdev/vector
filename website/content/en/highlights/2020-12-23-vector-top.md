@@ -9,8 +9,7 @@ release: "0.12.0"
 hide_on_release_notes: false
 badges:
   type: "new feature"
-  domains: ["cli"]
-  domains: ["observability"]
+  domains: ["cli", "observability"]
 ---
 
 [`vector top`][top] is a command for the Vector [CLI] that displays both metrics emitted by your Vector instance as well

@@ -1,10 +1,11 @@
 //! Batch settings for the `http` sink.
 
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::stream::batcher::limiter::ItemBatchSize;
-use vector_lib::{ByteSizeOf, EstimatedJsonEncodedSizeOf, event::Event};
+use vector_lib::{
+    ByteSizeOf, EstimatedJsonEncodedSizeOf, codecs::encoding::Framer, event::Event,
+    stream::batcher::limiter::ItemBatchSize,
+};
 
-use crate::codecs::Encoder;
+use vector_lib::codecs::Encoder;
 
 /// Uses the configured encoder to determine batch sizing.
 #[derive(Default, Clone)]

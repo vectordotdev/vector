@@ -1,6 +1,6 @@
 use std::fs;
 
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 
 use crate::app;
 
@@ -21,7 +21,7 @@ impl Cli {
             let entry = entry.with_context(|| format!("Could not read entry from {EXAMPLES:?}"))?;
             let filename = entry.path();
             let Some(filename) = filename.as_os_str().to_str() else {
-                bail!("Invalid filename {filename:?}");
+                bail!("Invalid filename {}", filename.display());
             };
 
             let mut command = vec![

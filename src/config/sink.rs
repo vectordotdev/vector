@@ -1,26 +1,28 @@
-use std::cell::RefCell;
-use std::time::Duration;
+use std::{cell::RefCell, path::PathBuf, time::Duration};
 
 use async_trait::async_trait;
 use dyn_clone::DynClone;
 use serde::Serialize;
 use serde_with::serde_as;
-use std::path::PathBuf;
-use vector_lib::buffers::{BufferConfig, BufferType};
-use vector_lib::configurable::attributes::CustomAttribute;
-use vector_lib::configurable::schema::{SchemaGenerator, SchemaObject};
-use vector_lib::configurable::{
-    Configurable, GenerateError, Metadata, NamedComponent, configurable_component,
-};
 use vector_lib::{
+    buffers::{BufferConfig, BufferType},
     config::{AcknowledgementsConfig, GlobalOptions, Input},
+    configurable::{
+        Configurable, GenerateError, Metadata, NamedComponent,
+        attributes::CustomAttribute,
+        configurable_component,
+        schema::{SchemaGenerator, SchemaObject},
+    },
     id::Inputs,
     sink::VectorSink,
 };
+use vector_vrl_metrics::MetricsStorage;
 
 use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
-use crate::extra_context::ExtraContext;
-use crate::sinks::{Healthcheck, util::UriSerde};
+use crate::{
+    extra_context::ExtraContext,
+    sinks::{Healthcheck, util::UriSerde},
+};
 
 pub type BoxedSink = Box<dyn SinkConfig>;
 
@@ -275,6 +277,7 @@ pub struct SinkContext {
     pub healthcheck: SinkHealthcheckOptions,
     pub globals: GlobalOptions,
     pub enrichment_tables: vector_lib::enrichment::TableRegistry,
+    pub metrics_storage: MetricsStorage,
     pub proxy: ProxyConfig,
     pub schema: schema::Options,
     pub app_name: String,
@@ -291,6 +294,7 @@ impl Default for SinkContext {
             healthcheck: Default::default(),
             globals: Default::default(),
             enrichment_tables: Default::default(),
+            metrics_storage: Default::default(),
             proxy: Default::default(),
             schema: Default::default(),
             app_name: crate::get_app_name().to_string(),

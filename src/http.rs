@@ -1,4 +1,12 @@
 #![allow(missing_docs)]
+use std::{
+    collections::HashMap,
+    fmt,
+    net::SocketAddr,
+    task::{Context, Poll},
+    time::Duration,
+};
+
 use futures::future::BoxFuture;
 use headers::{Authorization, HeaderMapExt};
 use http::{
@@ -15,13 +23,6 @@ use hyper_proxy::ProxyConnector;
 use rand::Rng;
 use serde_with::serde_as;
 use snafu::{ResultExt, Snafu};
-use std::{
-    collections::HashMap,
-    fmt,
-    net::SocketAddr,
-    task::{Context, Poll},
-    time::Duration,
-};
 use tokio::time::Instant;
 use tower::{Layer, Service};
 use tower_http::{
@@ -29,12 +30,10 @@ use tower_http::{
     trace::TraceLayer,
 };
 use tracing::{Instrument, Span};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 #[cfg(feature = "aws-core")]
 use crate::aws::AwsAuthentication;
-
 use crate::{
     config::ProxyConfig,
     internal_events::{HttpServerRequestReceived, HttpServerResponseSent, http_client},
@@ -309,6 +308,14 @@ pub enum Auth {
         /// The AWS service name to use for signing.
         service: String,
     },
+
+    /// Custom Authorization Header Value, will be inserted into the headers as `Authorization: < value >`
+    Custom {
+        /// Custom string value of the Authorization header
+        #[configurable(metadata(docs::examples = "${AUTH_HEADER_VALUE}"))]
+        #[configurable(metadata(docs::examples = "CUSTOM_PREFIX ${TOKEN}"))]
+        value: String,
+    },
 }
 
 pub trait MaybeAuth: Sized {
@@ -347,6 +354,18 @@ impl Auth {
                 Ok(auth) => map.typed_insert(auth),
                 Err(error) => error!(message = "Invalid bearer token.", token = %token, %error),
             },
+            Auth::Custom { value } => {
+                // The value contains just the value for the Authorization header
+                // Expected format: "SSWS token123" or "Bearer token123", etc.
+                match HeaderValue::from_str(value) {
+                    Ok(header_val) => {
+                        map.insert(http::header::AUTHORIZATION, header_val);
+                    }
+                    Err(error) => {
+                        error!(message = "Invalid custom auth header value.", value = %value, %error)
+                    }
+                }
+            }
             #[cfg(feature = "aws-core")]
             _ => {}
         }
@@ -577,7 +596,7 @@ pub enum ParamType {
     /// The parameter value is a plain string.
     #[default]
     String,
-    /// The parameter value is a VRL expression that will be evaluated before each request.
+    /// The parameter value is a VRL expression that is evaluated before each request.
     Vrl,
 }
 
@@ -599,7 +618,7 @@ pub enum ParameterValue {
     Typed {
         /// The raw value of the parameter.
         value: String,
-        /// The type of the parameter, indicating how the `value` should be treated.
+        /// The parameter type, indicating how the `value` should be treated.
         #[serde(
             default,
             skip_serializing_if = "ParamType::is_default",
@@ -686,9 +705,8 @@ mod tests {
     use proptest::prelude::*;
     use tower::ServiceBuilder;
 
-    use crate::test_util::next_addr;
-
     use super::*;
+    use crate::test_util::addr::next_addr;
 
     #[test]
     fn test_default_request_headers_defaults() {
@@ -876,7 +894,7 @@ mod tests {
     async fn test_max_connection_age_service_with_hyper_server() {
         // Create a hyper server with the max connection age layer.
         let max_connection_age = Duration::from_secs(1);
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let make_svc = make_service_fn(move |conn: &AddrStream| {
             let svc = ServiceBuilder::new()
                 .layer(MaxConnectionAgeLayer::new(

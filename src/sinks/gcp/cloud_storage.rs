@@ -2,20 +2,22 @@ use std::{collections::HashMap, convert::TryFrom, io};
 
 use bytes::Bytes;
 use chrono::{FixedOffset, Utc};
-use http::Uri;
-use http::header::{HeaderName, HeaderValue};
+use http::{
+    Uri,
+    header::{HeaderName, HeaderValue},
+};
 use indoc::indoc;
-use snafu::ResultExt;
-use snafu::Snafu;
+use snafu::{ResultExt, Snafu};
 use tower::ServiceBuilder;
 use uuid::Uuid;
-use vector_lib::codecs::encoding::Framer;
-use vector_lib::configurable::configurable_component;
-use vector_lib::event::{EventFinalizers, Finalizable};
-use vector_lib::{TimeZone, request_metadata::RequestMetadata};
+use vector_lib::{
+    TimeZone,
+    codecs::encoding::Framer,
+    configurable::configurable_component,
+    event::{EventFinalizers, Finalizable},
+    request_metadata::RequestMetadata,
+};
 
-use crate::sinks::util::metadata::RequestMetadataBuilder;
-use crate::sinks::util::service::TowerRequestConfigDefaults;
 use crate::{
     codecs::{Encoder, EncodingConfigWithFraming, SinkType, Transformer},
     config::{AcknowledgementsConfig, DataType, GenerateConfig, Input, SinkConfig, SinkContext},
@@ -35,8 +37,9 @@ use crate::{
         },
         util::{
             BulkSizeBasedDefaultBatchSettings, Compression, RequestBuilder, ServiceBuilderExt,
-            TowerRequestConfig, batch::BatchConfig, partitioner::KeyPartitioner,
-            request_builder::EncodeResult, timezone_to_offset,
+            TowerRequestConfig, batch::BatchConfig, metadata::RequestMetadataBuilder,
+            partitioner::KeyPartitioner, request_builder::EncodeResult,
+            service::TowerRequestConfigDefaults, timezone_to_offset,
         },
     },
     template::{Template, TemplateParseError},
@@ -158,6 +161,31 @@ pub struct GcsSinkConfig {
     #[serde(default)]
     compression: Compression,
 
+    /// Overrides the MIME type of the created objects.
+    ///
+    /// Directly comparable to the `Content-Type` HTTP header.
+    ///
+    /// If not specified, defaults to the encoder's content type.
+    #[configurable(metadata(
+        docs::examples = "text/plain; charset=utf-8",
+        docs::examples = "application/gzip"
+    ))]
+    content_type: Option<String>,
+
+    /// Overrides what content encoding has been applied to the object.
+    ///
+    /// Directly comparable to the `Content-Encoding` HTTP header.
+    ///
+    /// If not specified, the compression scheme used dictates this value.
+    #[configurable(metadata(docs::examples = "gzip", docs::examples = "zstd"))]
+    content_encoding: Option<String>,
+
+    /// Sets the `Cache-Control` header for the created objects.
+    ///
+    /// Directly comparable to the `Cache-Control` HTTP header.
+    #[configurable(metadata(docs::examples = "no-transform"))]
+    cache_control: Option<String>,
+
     #[configurable(derived)]
     #[serde(default)]
     batch: BatchConfig<BulkSizeBasedDefaultBatchSettings>,
@@ -206,6 +234,9 @@ fn default_config(encoding: EncodingConfigWithFraming) -> GcsSinkConfig {
         filename_time_format: default_time_format(),
         filename_append_uuid: true,
         filename_extension: Default::default(),
+        content_type: Default::default(),
+        content_encoding: Default::default(),
+        cache_control: Default::default(),
         encoding,
         compression: Compression::gzip_default(),
         batch: Default::default(),
@@ -304,6 +335,7 @@ struct RequestSettings {
     content_type: HeaderValue,
     content_encoding: Option<HeaderValue>,
     storage_class: HeaderValue,
+    cache_control: Option<HeaderValue>,
     headers: Vec<(HeaderName, HeaderValue)>,
     extension: String,
     time_format: String,
@@ -376,6 +408,7 @@ impl RequestBuilder<(String, Vec<Event>)> for RequestSettings {
                 content_type: self.content_type.clone(),
                 content_encoding: self.content_encoding.clone(),
                 storage_class: self.storage_class.clone(),
+                cache_control: self.cache_control.clone(),
                 headers: self.headers.clone(),
             },
             metadata,
@@ -391,13 +424,25 @@ impl RequestSettings {
         let acl = config
             .acl
             .map(|acl| HeaderValue::from_str(&to_string(acl)).unwrap());
-        let content_type = HeaderValue::from_str(encoder.content_type()).unwrap();
-        let content_encoding = config
-            .compression
-            .content_encoding()
-            .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap());
+        let content_type_str = config
+            .content_type
+            .as_deref()
+            .unwrap_or_else(|| encoder.content_type());
+        let content_type = HeaderValue::from_str(content_type_str)?;
+        let content_encoding = match &config.content_encoding {
+            Some(ce) => Some(HeaderValue::from_str(ce)?),
+            None => config
+                .compression
+                .content_encoding()
+                .map(|ce| HeaderValue::from_str(&to_string(ce)).unwrap()),
+        };
         let storage_class = config.storage_class.unwrap_or_default();
         let storage_class = HeaderValue::from_str(&to_string(storage_class)).unwrap();
+        let cache_control = config
+            .cache_control
+            .as_ref()
+            .map(|cc| HeaderValue::from_str(cc))
+            .transpose()?;
         let metadata = config
             .metadata
             .as_ref()
@@ -424,6 +469,7 @@ impl RequestSettings {
             content_type,
             content_encoding,
             storage_class,
+            cache_control,
             headers: metadata,
             extension,
             time_format,
@@ -446,21 +492,24 @@ fn make_header((name, value): (&String, &String)) -> crate::Result<(HeaderName, 
 #[cfg(test)]
 mod tests {
     use futures_util::{future::ready, stream};
-    use vector_lib::EstimatedJsonEncodedSizeOf;
-    use vector_lib::codecs::encoding::FramingConfig;
-    use vector_lib::codecs::{
-        JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
-    };
-    use vector_lib::partition::Partitioner;
-    use vector_lib::request_metadata::GroupedCountByteSize;
-
-    use crate::event::LogEvent;
-    use crate::test_util::{
-        components::{SINK_TAGS, run_and_assert_sink_compliance},
-        http::{always_200_response, spawn_blackhole_http_server},
+    use vector_lib::{
+        EstimatedJsonEncodedSizeOf,
+        codecs::{
+            JsonSerializerConfig, NewlineDelimitedEncoderConfig, TextSerializerConfig,
+            encoding::FramingConfig,
+        },
+        partition::Partitioner,
+        request_metadata::GroupedCountByteSize,
     };
 
     use super::*;
+    use crate::{
+        event::LogEvent,
+        test_util::{
+            components::{SINK_TAGS, run_and_assert_sink_compliance},
+            http::{always_200_response, spawn_blackhole_http_server},
+        },
+    };
 
     #[test]
     fn generate_config() {
@@ -565,5 +614,173 @@ mod tests {
 
         let req = build_request(None, true, Compression::gzip_default());
         assert_ne!(req.key, "key/date.log.gz".to_string());
+    }
+
+    #[test]
+    fn gcs_content_type_default() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            content_type: None,
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let request_settings = request_settings(&sink_config, context);
+        // Should default to encoder's content type which is "text/plain" for text codec
+        assert_eq!(
+            request_settings.content_type.to_str().unwrap(),
+            "text/plain"
+        );
+    }
+
+    #[test]
+    fn gcs_content_type_custom() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            content_type: Some("text/plain; charset=utf-8".to_string()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let request_settings = request_settings(&sink_config, context);
+        // Should use custom content type
+        assert_eq!(
+            request_settings.content_type.to_str().unwrap(),
+            "text/plain; charset=utf-8"
+        );
+    }
+
+    #[test]
+    fn gcs_content_type_invalid() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            // Invalid header value with newline character
+            content_type: Some("text/plain\nInvalid".to_string()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let result = RequestSettings::new(&sink_config, context);
+        // Should return an error, not panic
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn gcs_content_encoding_default() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            content_encoding: None,
+            compression: Compression::gzip_default(),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let request_settings = request_settings(&sink_config, context);
+        // Should default to compression's content encoding which is "gzip"
+        assert_eq!(
+            request_settings.content_encoding.unwrap().to_str().unwrap(),
+            "gzip"
+        );
+    }
+
+    #[test]
+    fn gcs_content_encoding_none_when_no_compression() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            content_encoding: None,
+            compression: Compression::None,
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let request_settings = request_settings(&sink_config, context);
+        // Should be None when compression is None
+        assert!(request_settings.content_encoding.is_none());
+    }
+
+    #[test]
+    fn gcs_content_encoding_custom() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            content_encoding: Some("gzip".to_string()),
+            compression: Compression::None,
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let request_settings = request_settings(&sink_config, context);
+        // Should use custom content encoding
+        assert_eq!(
+            request_settings.content_encoding.unwrap().to_str().unwrap(),
+            "gzip"
+        );
+    }
+
+    #[test]
+    fn gcs_content_encoding_invalid() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            // Invalid header value with newline character
+            content_encoding: Some("gzip\nInvalid".to_string()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let result = RequestSettings::new(&sink_config, context);
+        // Should return an error, not panic
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn gcs_content_encoding_empty() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            // Empty string to disable content encoding header even with compression
+            content_encoding: Some("".to_string()),
+            compression: Compression::gzip_default(),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let request_settings = request_settings(&sink_config, context);
+        // Should use empty content encoding (overriding the compression default)
+        assert_eq!(
+            request_settings.content_encoding.unwrap().to_str().unwrap(),
+            ""
+        );
+    }
+
+    #[test]
+    fn gcs_cache_control_default() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            cache_control: None,
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let request_settings = request_settings(&sink_config, context);
+        // Should be None by default
+        assert!(request_settings.cache_control.is_none());
+    }
+
+    #[test]
+    fn gcs_cache_control_custom() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            cache_control: Some("no-transform".to_string()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let request_settings = request_settings(&sink_config, context);
+        assert_eq!(
+            request_settings.cache_control.unwrap().to_str().unwrap(),
+            "no-transform"
+        );
+    }
+
+    #[test]
+    fn gcs_cache_control_invalid() {
+        let context = SinkContext::default();
+        let sink_config = GcsSinkConfig {
+            // Invalid header value with newline character
+            cache_control: Some("no-cache\nInvalid".to_string()),
+            ..default_config((None::<FramingConfig>, TextSerializerConfig::default()).into())
+        };
+
+        let result = RequestSettings::new(&sink_config, context);
+        // Should return an error, not panic
+        assert!(result.is_err());
     }
 }

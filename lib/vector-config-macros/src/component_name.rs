@@ -1,6 +1,5 @@
 use darling::util::path_to_string;
 use proc_macro::TokenStream;
-
 use quote::quote;
 use syn::{Attribute, DeriveInput, Error, LitStr, parse_macro_input, spanned::Spanned};
 

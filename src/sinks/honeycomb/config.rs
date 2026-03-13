@@ -3,10 +3,13 @@
 use bytes::Bytes;
 use futures::FutureExt;
 use http::{Request, StatusCode, Uri};
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 use vrl::value::Kind;
 
+use super::{
+    encoder::HoneycombEncoder, request_builder::HoneycombRequestBuilder,
+    service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
+};
 use crate::{
     http::HttpClient,
     sinks::{
@@ -16,11 +19,6 @@ use crate::{
             http::{HttpService, http_response_retry_logic},
         },
     },
-};
-
-use super::{
-    encoder::HoneycombEncoder, request_builder::HoneycombRequestBuilder,
-    service::HoneycombSvcRequestBuilder, sink::HoneycombSink,
 };
 
 pub(super) const HTTP_HEADER_HONEYCOMB: &str = "X-Honeycomb-Team";
@@ -169,7 +167,7 @@ async fn healthcheck(uri: Uri, api_key: SensitiveString, client: HttpClient) -> 
     let res = client.send(req).await?;
 
     let status = res.status();
-    let body = hyper::body::to_bytes(res.into_body()).await?;
+    let body = http_body::Body::collect(res.into_body()).await?.to_bytes();
 
     if status == StatusCode::BAD_REQUEST {
         Ok(())

@@ -13,8 +13,7 @@ use tokio::sync::{OwnedSemaphorePermit, Semaphore, mpsc, oneshot};
 use tokio_util::sync::PollSemaphore;
 use tower::Service;
 use uuid::Uuid;
-use vector_lib::event::EventStatus;
-use vector_lib::request_metadata::MetaDescriptive;
+use vector_lib::{event::EventStatus, request_metadata::MetaDescriptive};
 
 use super::{
     EndpointTarget,
@@ -178,6 +177,7 @@ impl ResponseExt for http::Response<Bytes> {
     }
 }
 
+#[derive(Clone)]
 pub struct HttpRequestBuilder {
     pub endpoint_target: EndpointTarget,
     pub endpoint: String,
@@ -280,12 +280,12 @@ mod tests {
     };
 
     use bytes::Bytes;
-    use futures_util::{StreamExt, poll, stream::FuturesUnordered};
-    use tower::{Service, ServiceExt, util::BoxService};
-    use vector_lib::internal_event::CountByteSize;
+    use futures_util::{StreamExt, future::BoxFuture, poll, stream::FuturesUnordered};
+    use tower::{Service, ServiceExt};
     use vector_lib::{
         config::proxy::ProxyConfig,
         event::{EventFinalizers, EventStatus},
+        internal_event::CountByteSize,
     };
     use wiremock::{
         Mock, MockServer, Request, Respond, ResponseTemplate,
@@ -304,7 +304,7 @@ mod tests {
                 request::HecRequest,
                 service::{HecAckResponseBody, HecService, HttpRequestBuilder},
             },
-            util::{Compression, metadata::RequestMetadataBuilder},
+            util::{Compression, http::HttpBatchService, metadata::RequestMetadataBuilder},
         },
     };
 
@@ -314,7 +314,12 @@ mod tests {
     fn get_hec_service(
         endpoint: String,
         acknowledgements_config: HecClientAcknowledgementsConfig,
-    ) -> HecService<BoxService<HecRequest, http::Response<Bytes>, crate::Error>> {
+    ) -> HecService<
+        HttpBatchService<
+            BoxFuture<'static, Result<http::Request<Bytes>, crate::Error>>,
+            HecRequest,
+        >,
+    > {
         let client = HttpClient::new(None, &ProxyConfig::default()).unwrap();
         let http_request_builder = Arc::new(HttpRequestBuilder::new(
             endpoint,
@@ -329,7 +334,7 @@ mod tests {
             false,
         );
         HecService::new(
-            BoxService::new(http_service),
+            http_service,
             Some(client),
             http_request_builder,
             acknowledgements_config,

@@ -1,6 +1,5 @@
-use ipnet::IpNet;
 #[cfg(unix)]
-use std::os::unix::{fs::PermissionsExt, io::AsRawFd};
+use std::os::unix::fs::PermissionsExt;
 use std::{
     convert::TryInto,
     fs,
@@ -22,6 +21,7 @@ use futures::{
     stream::{self, StreamExt, TryStreamExt},
 };
 use futures_util::{Future, FutureExt, future::BoxFuture};
+use ipnet::IpNet;
 use listenfd::ListenFd;
 use tokio::{
     self,
@@ -39,6 +39,7 @@ use vector_lib::{
     tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsSettings},
 };
 
+use super::net::{RequestLimiter, SocketListenAddr};
 use crate::{
     SourceSender,
     event::Event,
@@ -56,8 +57,6 @@ use crate::{
         },
     },
 };
-
-use super::net::{RequestLimiter, SocketListenAddr};
 
 const FSTRM_CONTROL_FRAME_LENGTH_MAX: usize = 512;
 const FSTRM_CONTROL_FIELD_CONTENT_TYPE_LENGTH_MAX: usize = 256;
@@ -544,16 +543,16 @@ async fn handle_stream(
         }
     };
 
-    if let Some(keepalive) = frame_handler.keepalive() {
-        if let Err(error) = socket.set_keepalive(keepalive) {
-            warn!(message = "Failed configuring TCP keepalive.", %error);
-        }
+    if let Some(keepalive) = frame_handler.keepalive()
+        && let Err(error) = socket.set_keepalive(keepalive)
+    {
+        warn!(message = "Failed configuring TCP keepalive.", %error);
     }
 
-    if let Some(receive_buffer_bytes) = frame_handler.receive_buffer_bytes() {
-        if let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes) {
-            warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
-        }
+    if let Some(receive_buffer_bytes) = frame_handler.receive_buffer_bytes()
+        && let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes)
+    {
+        warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
     }
 
     let socket = socket.after_read(move |byte_size| {
@@ -676,13 +675,10 @@ async fn handle_tcp_frame<T>(
             frame_handler.max_frame_handling_tasks(),
         )
         .await;
-    } else if let Some(event) = frame_handler.handle_event(received_from, frame) {
-        if let Err(e) = event_sink.send_event(event).await {
-            error!(
-                internal_log_rate_limit = true,
-                "Error sending event: {e:?}."
-            );
-        }
+    } else if let Some(event) = frame_handler.handle_event(received_from, frame)
+        && let Err(e) = event_sink.send_event(event).await
+    {
+        error!("Error sending event: {e:?}.");
     }
 }
 
@@ -717,12 +713,12 @@ pub fn build_framestream_unix_source(
     // system's 'net.core.rmem_max' might have to be changed if socket receive buffer is not updated properly
     if let Some(socket_receive_buffer_size) = frame_handler.socket_receive_buffer_size() {
         _ = nix::sys::socket::setsockopt(
-            listener.as_raw_fd(),
+            &listener,
             nix::sys::socket::sockopt::RcvBuf,
             &(socket_receive_buffer_size),
         );
         let rcv_buf_size =
-            nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::RcvBuf);
+            nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::RcvBuf);
         info!(
             "Unix socket receive buffer size modified to {}.",
             rcv_buf_size.unwrap()
@@ -732,12 +728,12 @@ pub fn build_framestream_unix_source(
     // system's 'net.core.wmem_max' might have to be changed if socket send buffer is not updated properly
     if let Some(socket_send_buffer_size) = frame_handler.socket_send_buffer_size() {
         _ = nix::sys::socket::setsockopt(
-            listener.as_raw_fd(),
+            &listener,
             nix::sys::socket::sockopt::SndBuf,
             &(socket_send_buffer_size),
         );
         let snd_buf_size =
-            nix::sys::socket::getsockopt(listener.as_raw_fd(), nix::sys::socket::sockopt::SndBuf);
+            nix::sys::socket::getsockopt(&listener, nix::sys::socket::sockopt::SndBuf);
         info!(
             "Unix socket buffer send size modified to {}.",
             snd_buf_size.unwrap()
@@ -867,10 +863,7 @@ fn build_framestream_source<T: Send + 'static>(
 
         let handler = async move {
             if let Err(e) = event_sink.send_event_stream(&mut events).await {
-                error!(
-                    internal_log_rate_limit = true,
-                    "Error sending event: {:?}.", e
-                );
+                error!("Error sending event: {:?}.", e);
             }
 
             info!("Finished sending.");
@@ -917,10 +910,10 @@ async fn spawn_event_handling_tasks(
 
     tokio::spawn(async move {
         future::ready({
-            if let Some(evt) = event_handler.handle_event(received_from, event_data) {
-                if event_sink.send_event(evt).await.is_err() {
-                    error!("Encountered error while sending event.");
-                }
+            if let Some(evt) = event_handler.handle_event(received_from, event_data)
+                && event_sink.send_event(evt).await.is_err()
+            {
+                error!("Encountered error while sending event.");
             }
             active_task_nums.fetch_sub(1, Ordering::AcqRel);
         })
@@ -937,7 +930,6 @@ async fn wait_for_task_quota(active_task_nums: &Arc<AtomicUsize>, max_tasks: usi
 
 #[cfg(test)]
 mod test {
-    use futures_util::Stream;
     use std::net::SocketAddr;
     #[cfg(unix)]
     use std::{
@@ -948,7 +940,6 @@ mod test {
         },
         thread,
     };
-    use tokio::net::TcpStream;
 
     use bytes::{Bytes, BytesMut, buf::Buf};
     use futures::{
@@ -956,22 +947,20 @@ mod test {
         sink::{Sink, SinkExt},
         stream::{self, StreamExt},
     };
+    use futures_util::Stream;
     use ipnet::IpNet;
     use tokio::{
         self,
-        net::UnixStream,
+        net::{TcpStream, UnixStream},
         task::JoinHandle,
         time::{Duration, Instant},
     };
     use tokio_util::codec::{Framed, length_delimited};
     use vector_lib::{
         config::{LegacyKey, LogNamespace},
-        tcp::TcpKeepaliveConfig,
-        tls::{CertificateMetadata, MaybeTls},
-    };
-    use vector_lib::{
         lookup::{OwnedValuePath, owned_value_path, path},
-        tls::MaybeTlsSettings,
+        tcp::TcpKeepaliveConfig,
+        tls::{CertificateMetadata, MaybeTls, MaybeTlsSettings},
     };
 
     use super::{
@@ -984,7 +973,7 @@ mod test {
         event::{Event, LogEvent},
         shutdown::SourceShutdownCoordinator,
         sources::util::net::SocketListenAddr,
-        test_util::{collect_n, collect_n_stream, next_addr},
+        test_util::{addr::next_addr, collect_n, collect_n_stream},
     };
 
     #[derive(Clone)]
@@ -1486,7 +1475,7 @@ mod test {
     async fn blocked_framestream_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1510,7 +1499,7 @@ mod test {
     async fn normal_framestream_singlethreaded_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1553,7 +1542,7 @@ mod test {
     async fn normal_framestream_multithreaded_tcp() {
         let source_name = "test_source";
         let (tx, rx) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,
@@ -1596,7 +1585,7 @@ mod test {
     async fn multiple_content_types_tcp() {
         let source_name = "test_source";
         let (tx, _) = SourceSender::new_test();
-        let addr = next_addr();
+        let (_guard, addr) = next_addr();
         let (source_handle, shutdown) = init_framestream_tcp(
             source_name,
             &addr,

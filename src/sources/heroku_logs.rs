@@ -9,22 +9,18 @@ use bytes::{Buf, BufMut, Bytes, BytesMut};
 use chrono::{DateTime, Utc};
 use smallvec::SmallVec;
 use tokio_util::codec::Decoder as _;
-use vector_lib::lookup::{lookup_v2::parse_value_path, owned_value_path, path};
 use vector_lib::{
     codecs::{
         StreamDecodingError,
         decoding::{DeserializerConfig, FramingConfig},
     },
-    config::DataType,
+    config::{DataType, LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    lookup::{lookup_v2::parse_value_path, owned_value_path, path},
+    schema::Definition,
 };
 use vrl::value::{Kind, kind::Collection};
 use warp::http::{HeaderMap, StatusCode};
-
-use vector_lib::configurable::configurable_component;
-use vector_lib::{
-    config::{LegacyKey, LogNamespace},
-    schema::Definition,
-};
 
 use crate::{
     codecs::{Decoder, DecodingConfig},
@@ -409,8 +405,7 @@ fn line_to_events(
     } else {
         warn!(
             message = "Line didn't match expected logplex format, so raw message is forwarded.",
-            fields = parts.len(),
-            internal_log_rate_limit = true
+            fields = parts.len()
         );
 
         events.push(LogEvent::from_str_legacy(line).into())
@@ -434,23 +429,24 @@ mod tests {
     use chrono::{DateTime, Utc};
     use futures::Stream;
     use similar_asserts::assert_eq;
-    use vector_lib::lookup::{OwnedTargetPath, owned_value_path};
     use vector_lib::{
         config::LogNamespace,
         event::{Event, EventStatus, Value},
+        lookup::{OwnedTargetPath, owned_value_path},
         schema::Definition,
     };
     use vrl::value::{Kind, kind::Collection};
 
     use super::LogplexConfig;
-    use crate::common::http::server_auth::HttpServerAuthConfig;
     use crate::{
         SourceSender,
+        common::http::server_auth::HttpServerAuthConfig,
         config::{SourceConfig, SourceContext, log_schema},
         serde::{default_decoding, default_framing_message_based},
         test_util::{
+            addr::{PortGuard, next_addr},
             components::{HTTP_PUSH_SOURCE_TAGS, assert_source_compliance},
-            next_addr, random_string, spawn_collect_n, wait_for_tcp,
+            random_string, spawn_collect_n, wait_for_tcp,
         },
     };
 
@@ -464,9 +460,9 @@ mod tests {
         query_parameters: Vec<String>,
         status: EventStatus,
         acknowledgements: bool,
-    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr) {
+    ) -> (impl Stream<Item = Event> + Unpin, SocketAddr, PortGuard) {
         let (sender, recv) = SourceSender::new_test_finalize(status);
-        let address = next_addr();
+        let (_guard, address) = next_addr();
         let context = SourceContext::new_test(sender, None);
         tokio::spawn(async move {
             LogplexConfig {
@@ -487,7 +483,7 @@ mod tests {
             .unwrap()
         });
         wait_for_tcp(address).await;
-        (recv, address)
+        (recv, address, _guard)
     }
 
     async fn send(
@@ -526,7 +522,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let auth = make_auth();
 
-            let (rx, addr) = source(
+            let (rx, addr, _guard) = source(
                 Some(auth.clone()),
                 vec!["appname".to_string(), "absent".to_string()],
                 EventStatus::Delivered,
@@ -572,7 +568,7 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let auth = make_auth();
 
-            let (rx, addr) = source(
+            let (rx, addr, _guard) = source(
                 Some(auth.clone()),
                 vec!["*".to_string()],
                 EventStatus::Delivered,
@@ -617,7 +613,8 @@ mod tests {
         assert_source_compliance(&HTTP_PUSH_SOURCE_TAGS, async {
             let auth = make_auth();
 
-            let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
+            let (rx, addr, _guard) =
+                source(Some(auth.clone()), vec![], EventStatus::Rejected, true).await;
 
             let events = spawn_collect_n(
                 async move {
@@ -640,7 +637,8 @@ mod tests {
     async fn logplex_ignores_disabled_acknowledgements() {
         let auth = make_auth();
 
-        let (rx, addr) = source(Some(auth.clone()), vec![], EventStatus::Rejected, false).await;
+        let (rx, addr, _guard) =
+            source(Some(auth.clone()), vec![], EventStatus::Rejected, false).await;
 
         let events = spawn_collect_n(
             async move {
@@ -659,7 +657,8 @@ mod tests {
 
     #[tokio::test]
     async fn logplex_auth_failure() {
-        let (_rx, addr) = source(Some(make_auth()), vec![], EventStatus::Delivered, true).await;
+        let (_rx, addr, _guard) =
+            source(Some(make_auth()), vec![], EventStatus::Delivered, true).await;
 
         assert_eq!(
             401,

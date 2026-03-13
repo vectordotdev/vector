@@ -192,19 +192,20 @@ components: {
 		}
 
 		if Args.kind == "transform" {
-			aggregate?:       #FeaturesAggregate
-			convert?:         #FeaturesConvert
-			enrich?:          #FeaturesEnrich
-			filter?:          #FeaturesFilter
-			parse?:           #FeaturesParse
-			program?:         #FeaturesProgram
-			proxy?:           #FeaturesProxy
-			reduce?:          #FeaturesReduce
-			route?:           #FeaturesRoute
-			exclusive_route?: #FeaturesExclusiveRoute
-			sanitize?:        #FeaturesSanitize
-			shape?:           #FeaturesShape
-			window?:          #FeaturesWindow
+			aggregate?:               #FeaturesAggregate
+			convert?:                 #FeaturesConvert
+			enrich?:                  #FeaturesEnrich
+			filter?:                  #FeaturesFilter
+			parse?:                   #FeaturesParse
+			program?:                 #FeaturesProgram
+			proxy?:                   #FeaturesProxy
+			reduce?:                  #FeaturesReduce
+			route?:                   #FeaturesRoute
+			exclusive_route?:         #FeaturesExclusiveRoute
+			sanitize?:                #FeaturesSanitize
+			shape?:                   #FeaturesShape
+			window?:                  #FeaturesWindow
+			incremental_to_absolute?: #FeaturesIncrementalToAbsolute
 		}
 
 		if Args.kind == "sink" {
@@ -338,6 +339,8 @@ components: {
 
 	#FeaturesWindow: {}
 
+	#FeaturesIncrementalToAbsolute: {}
+
 	#FeaturesSend: {
 		_args: {
 			egress_method: string
@@ -466,8 +469,12 @@ components: {
 	}
 
 	#MetricOutput: [Name=string]: {
-		description:        string
-		relevant_when?:     string
+		description:    string
+		relevant_when?: string
+		deprecated:     bool | *false
+		if deprecated {
+			deprecated_message?: string
+		}
 		tags?:              #MetricTags
 		name?:              Name
 		type?:              #MetricType

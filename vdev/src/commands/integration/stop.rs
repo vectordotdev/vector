@@ -9,10 +9,6 @@ use crate::testing::integration::ComposeTestLocalConfig;
 pub struct Cli {
     /// The integration name to stop
     integration: String,
-
-    /// If true, remove the runner container compiled with all integration test features
-    #[arg(short = 'a', long)]
-    all_features: bool,
 }
 
 impl Cli {
@@ -20,7 +16,6 @@ impl Cli {
         crate::commands::compose_tests::stop::exec(
             ComposeTestLocalConfig::integration(),
             &self.integration,
-            self.all_features,
         )
     }
 }

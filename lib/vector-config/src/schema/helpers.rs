@@ -8,13 +8,12 @@ use indexmap::IndexMap;
 use serde_json::{Map, Value};
 use vector_config_common::{attributes::CustomAttribute, constants, schema::*};
 
-use crate::{
-    Configurable, ConfigurableRef, GenerateError, Metadata, ToValue, num::ConfigurableNumber,
-};
-
 use super::visitors::{
     DisallowUnevaluatedPropertiesVisitor, GenerateHumanFriendlyNameVisitor,
     InlineSingleUseReferencesVisitor,
+};
+use crate::{
+    Configurable, ConfigurableRef, GenerateError, Metadata, ToValue, num::ConfigurableNumber,
 };
 
 /// Applies metadata to the given schema.

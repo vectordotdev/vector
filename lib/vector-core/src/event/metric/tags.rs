@@ -1,11 +1,13 @@
 #[cfg(test)]
 use std::borrow::Borrow;
-
-use std::borrow::Cow;
-use std::collections::{BTreeMap, hash_map::DefaultHasher};
-use std::fmt::Display;
-use std::hash::{Hash, Hasher};
-use std::{cmp::Ordering, mem};
+use std::{
+    borrow::Cow,
+    cmp::Ordering,
+    collections::{BTreeMap, hash_map::DefaultHasher},
+    fmt::Display,
+    hash::{Hash, Hasher},
+    mem,
+};
 
 use indexmap::IndexSet;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, ser::SerializeSeq};
@@ -92,9 +94,10 @@ type TagValueRef<'a> = Option<&'a str>;
 
 /// Tag values for a metric series.  This may be empty, a single value, or a set of values. This is
 /// used to provide the storage for `TagValueSet`.
-#[derive(Clone, Configurable, Debug, Eq, PartialEq)]
+#[derive(Clone, Configurable, Debug, Eq, PartialEq, Default)]
 pub enum TagValueSet {
     /// This represents a set containing no value.
+    #[default]
     Empty,
 
     /// This represents a set containing a single value. This is stored separately to avoid the
@@ -107,12 +110,6 @@ pub enum TagValueSet {
     /// elements. This allows us to retrieve the last element inserted which in turn allows us to
     /// emulate the set having a single value.
     Set(IndexSet<TagValue>),
-}
-
-impl Default for TagValueSet {
-    fn default() -> Self {
-        Self::Empty
-    }
 }
 
 impl Display for TagValueSet {

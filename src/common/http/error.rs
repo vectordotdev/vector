@@ -40,7 +40,7 @@ impl ErrorMessage {
     }
 
     /// Returns the error message
-    pub fn message(&self) -> &str {
+    pub const fn message(&self) -> &str {
         self.message.as_str()
     }
 }

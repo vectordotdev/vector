@@ -1,6 +1,14 @@
-use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
-use std::sync::{Arc, LazyLock};
-use std::{error::Error as _, future::Future, pin::Pin, task::Context, task::Poll, time::Duration};
+use std::{
+    error::Error as _,
+    future::Future,
+    pin::Pin,
+    sync::{
+        Arc, LazyLock,
+        atomic::{AtomicBool, AtomicUsize, Ordering},
+    },
+    task::{Context, Poll},
+    time::Duration,
+};
 
 use chrono::DateTime;
 use derivative::Derivative;
@@ -15,16 +23,21 @@ use tonic::{
     metadata::MetadataValue,
     transport::{Certificate, ClientTlsConfig, Endpoint, Identity},
 };
-use vector_lib::codecs::decoding::{DeserializerConfig, FramingConfig};
-use vector_lib::config::{LegacyKey, LogNamespace};
-use vector_lib::configurable::configurable_component;
-use vector_lib::internal_event::{
-    ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
+use vector_lib::{
+    byte_size_of::ByteSizeOf,
+    codecs::decoding::{DeserializerConfig, FramingConfig},
+    config::{LegacyKey, LogNamespace},
+    configurable::configurable_component,
+    finalizer::UnorderedFinalizer,
+    internal_event::{
+        ByteSize, BytesReceived, EventsReceived, InternalEventHandle as _, Protocol, Registered,
+    },
+    lookup::owned_value_path,
 };
-use vector_lib::lookup::owned_value_path;
-use vector_lib::{byte_size_of::ByteSizeOf, finalizer::UnorderedFinalizer};
-use vrl::path;
-use vrl::value::{Kind, kind::Collection};
+use vrl::{
+    path,
+    value::{Kind, kind::Collection},
+};
 
 use crate::{
     SourceSender,
@@ -740,8 +753,7 @@ impl Future for Task {
 
 #[cfg(test)]
 mod tests {
-    use vector_lib::lookup::OwnedTargetPath;
-    use vector_lib::schema::Definition;
+    use vector_lib::{lookup::OwnedTargetPath, schema::Definition};
 
     use super::*;
 
@@ -831,8 +843,10 @@ mod tests {
 
 #[cfg(all(test, feature = "gcp-integration-tests"))]
 mod integration_tests {
-    use std::collections::{BTreeMap, HashSet};
-    use std::sync::LazyLock;
+    use std::{
+        collections::{BTreeMap, HashSet},
+        sync::LazyLock,
+    };
 
     use base64::prelude::{BASE64_STANDARD, Engine as _};
     use chrono::{DateTime, Utc};
@@ -844,16 +858,26 @@ mod integration_tests {
     use vrl::btreemap;
 
     use super::*;
-    use crate::config::{ComponentKey, ProxyConfig};
-    use crate::test_util::components::{SOURCE_TAGS, assert_source_compliance};
-    use crate::test_util::{self, components, random_string};
-    use crate::{SourceSender, event::EventStatus, gcp, http::HttpClient, shutdown};
+    use crate::{
+        SourceSender,
+        config::{ComponentKey, ProxyConfig},
+        event::EventStatus,
+        gcp,
+        http::HttpClient,
+        shutdown,
+        test_util::{
+            self, components,
+            components::{SOURCE_TAGS, assert_source_compliance},
+            random_string,
+        },
+    };
 
     const PROJECT: &str = "sourceproject";
     static PROJECT_URI: LazyLock<String> =
         LazyLock::new(|| format!("{}/v1/projects/{}", *gcp::PUBSUB_ADDRESS, PROJECT));
     static ACK_DEADLINE: LazyLock<Duration> = LazyLock::new(|| Duration::from_secs(10)); // Minimum custom deadline allowed by Pub/Sub
 
+    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn oneshot() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -865,6 +889,7 @@ mod integration_tests {
         .await;
     }
 
+    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn shuts_down_before_data_received() {
         let (tester, mut rx, shutdown) = setup(EventStatus::Delivered).await;
@@ -877,6 +902,7 @@ mod integration_tests {
         assert_eq!(tester.pull_count(1).await, 1);
     }
 
+    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn shuts_down_after_data_received() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -900,6 +926,7 @@ mod integration_tests {
         .await;
     }
 
+    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn streams_data() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -913,6 +940,7 @@ mod integration_tests {
         .await;
     }
 
+    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn sends_attributes() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -929,6 +957,7 @@ mod integration_tests {
         .await;
     }
 
+    #[ignore = "https://github.com/vectordotdev/vector/issues/24133"]
     #[tokio::test]
     async fn acks_received() {
         assert_source_compliance(&SOURCE_TAGS, async move {
@@ -1111,7 +1140,10 @@ mod integration_tests {
                 .unwrap();
             let response = self.client.send(request).await.unwrap();
             assert_eq!(response.status(), StatusCode::OK);
-            let body = hyper::body::to_bytes(response.into_body()).await.unwrap();
+            let body = http_body::Body::collect(response.into_body())
+                .await
+                .unwrap()
+                .to_bytes();
             serde_json::from_str(core::str::from_utf8(&body).unwrap()).unwrap()
         }
 

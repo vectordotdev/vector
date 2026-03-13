@@ -1,6 +1,7 @@
+use std::cell::RefCell;
+
 use http::StatusCode;
 use serde_json::Value;
-use std::cell::RefCell;
 
 use crate::{
     Configurable, GenerateError, Metadata, ToValue,

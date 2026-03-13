@@ -1,22 +1,23 @@
 use openssl::{base64, pkey};
-use vector_lib::lookup::{OwnedValuePath, lookup_v2::OptionalValuePath};
-
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
-use vector_lib::{config::log_schema, schema};
+use vector_lib::{
+    config::log_schema,
+    configurable::configurable_component,
+    lookup::{OwnedValuePath, lookup_v2::OptionalValuePath},
+    schema,
+    sensitive_string::SensitiveString,
+};
 use vrl::value::Kind;
 
+use super::{
+    service::{AzureMonitorLogsResponse, AzureMonitorLogsService},
+    sink::AzureMonitorLogsSink,
+};
 use crate::{
     http::{HttpClient, get_http_scheme_from_uri},
     sinks::{
         prelude::*,
         util::{RealtimeSizeBasedDefaultBatchSettings, UriSerde, http::HttpStatusRetryLogic},
     },
-};
-
-use super::{
-    service::{AzureMonitorLogsResponse, AzureMonitorLogsService},
-    sink::AzureMonitorLogsSink,
 };
 
 /// Max number of bytes in request body
@@ -29,7 +30,7 @@ pub(super) fn default_host() -> String {
 /// Configuration for the `azure_monitor_logs` sink.
 #[configurable_component(sink(
     "azure_monitor_logs",
-    "Publish log events to the Azure Monitor Logs service."
+    "Publish log events to the Azure Monitor Data Collector API."
 ))]
 #[derive(Clone, Debug)]
 #[serde(deny_unknown_fields)]

@@ -1,7 +1,6 @@
 use std::convert::TryFrom;
 
 use snafu::{ResultExt, Snafu};
-
 use vector_lib::configurable::configurable_component;
 
 use crate::{

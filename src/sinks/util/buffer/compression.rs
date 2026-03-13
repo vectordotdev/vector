@@ -3,9 +3,9 @@ use std::{cell::RefCell, collections::BTreeSet, fmt};
 use indexmap::IndexMap;
 use serde::{de, ser};
 use serde_json::Value;
-use vector_lib::configurable::attributes::CustomAttribute;
 use vector_lib::configurable::{
     Configurable, GenerateError, Metadata, ToValue,
+    attributes::CustomAttribute,
     schema::{
         SchemaGenerator, SchemaObject, apply_base_metadata, generate_const_string_schema,
         generate_enum_schema, generate_one_of_schema, generate_struct_schema,

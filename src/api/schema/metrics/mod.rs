@@ -42,6 +42,7 @@ pub enum MetricType {
     Uptime(Uptime),
 }
 
+#[cfg(feature = "sources-host_metrics")]
 #[derive(Default)]
 pub struct MetricsQuery;
 

@@ -3,9 +3,9 @@ use std::sync::Arc;
 use futures::{Sink, Stream, stream};
 use futures_util::{FutureExt, StreamExt, future, stream::BoxStream};
 use tokio::sync::{Mutex, oneshot};
-use vector_lib::configurable::configurable_component;
 use vector_lib::{
     config::{DataType, Input, LogNamespace},
+    configurable::configurable_component,
     event::Event,
     schema,
     sink::{StreamSink, VectorSink},
@@ -261,10 +261,10 @@ impl StreamSink<Event> for UnitTestSink {
             UnitTestSinkCheck::NoOp => {}
         }
 
-        if let Some(tx) = self.result_tx {
-            if tx.send(result).is_err() {
-                error!(message = "Sending unit test results failed in unit test sink.");
-            }
+        if let Some(tx) = self.result_tx
+            && tx.send(result).is_err()
+        {
+            error!(message = "Sending unit test results failed in unit test sink.");
         }
         Ok(())
     }

@@ -1,8 +1,8 @@
 #![allow(clippy::print_stdout)]
-use std::collections::HashSet;
-use std::{fs::read_dir, process::Command};
+use std::{collections::HashSet, fs::read_dir, process::Command};
 
 use assert_cmd::prelude::*;
+use indoc::indoc;
 
 use crate::{create_directory, create_file, overwrite_file};
 
@@ -129,6 +129,56 @@ fn validate_ignore_healthcheck() {
         "#
         )),
         exitcode::OK
+    );
+}
+
+#[test]
+fn test_command_no_escape_codes_in_output() {
+    // A config with an unhandled fallible VRL function call (missing `!`).
+    // This triggers a VRL compilation error reported through the test runner.
+    let config = create_file(indoc! {"
+        transforms:
+          broken:
+            inputs: []
+            type: remap
+            source: .foo = to_int(.bar)
+        tests:
+          - name: broken_test
+            input:
+              insert_at: broken
+              type: log
+              log_fields:
+                bar: not_an_int
+            outputs:
+              - extract_from: broken
+                conditions:
+                  - type: vrl
+                    source: 'true'
+    "});
+
+    let mut cmd = Command::cargo_bin("vector").unwrap();
+    // Force colors on so VRL diagnostics contain ANSI codes. Without this,
+    // the subprocess detects a non-TTY and disables colors, which would make
+    // the test pass even if error! was used instead of eprintln!.
+    cmd.arg("--color").arg("always").arg("test").arg(config);
+
+    let output = cmd.output().expect("Failed to execute process");
+    let stdout = String::from_utf8(output.stdout).expect("stdout isn't valid utf8");
+    let stderr = String::from_utf8(output.stderr).expect("stderr isn't valid utf8");
+
+    // The command should fail
+    assert_ne!(output.status.code(), Some(0));
+
+    // Neither stdout nor stderr should contain literal escape code text.
+    // The error! macro escapes ANSI escape bytes into literal "\x1b" text,
+    // while eprintln! passes them through as raw bytes.
+    assert!(
+        !stdout.contains(r"\x1b"),
+        "stdout contains literal \\x1b escape codes: {stdout}"
+    );
+    assert!(
+        !stderr.contains(r"\x1b"),
+        "stderr contains literal \\x1b escape codes: {stderr}"
     );
 }
 

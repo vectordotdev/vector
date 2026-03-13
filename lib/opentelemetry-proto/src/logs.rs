@@ -1,17 +1,17 @@
-use super::common::{kv_list_into_value, to_hex};
-use crate::proto::{
-    common::v1::{InstrumentationScope, any_value::Value as PBValue},
-    logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
-    resource::v1::Resource,
-};
 use bytes::Bytes;
 use chrono::{DateTime, TimeZone, Utc};
 use vector_core::{
     config::{LegacyKey, LogNamespace, log_schema},
     event::{Event, LogEvent},
 };
-use vrl::core::Value;
-use vrl::path;
+use vrl::{core::Value, path};
+
+use super::common::{kv_list_into_value, to_hex};
+use crate::proto::{
+    common::v1::{InstrumentationScope, any_value::Value as PBValue},
+    logs::v1::{LogRecord, ResourceLogs, SeverityNumber},
+    resource::v1::Resource,
+};
 
 const SOURCE_NAME: &str = "opentelemetry";
 pub const RESOURCE_KEY: &str = "resources";
@@ -116,16 +116,16 @@ impl ResourceLog {
         }
 
         // Optional fields
-        if let Some(resource) = self.resource {
-            if !resource.attributes.is_empty() {
-                log_namespace.insert_source_metadata(
-                    SOURCE_NAME,
-                    &mut log,
-                    Some(LegacyKey::Overwrite(path!(RESOURCE_KEY))),
-                    path!(RESOURCE_KEY),
-                    kv_list_into_value(resource.attributes),
-                );
-            }
+        if let Some(resource) = self.resource
+            && !resource.attributes.is_empty()
+        {
+            log_namespace.insert_source_metadata(
+                SOURCE_NAME,
+                &mut log,
+                Some(LegacyKey::Overwrite(path!(RESOURCE_KEY))),
+                path!(RESOURCE_KEY),
+                kv_list_into_value(resource.attributes),
+            );
         }
         if !self.log_record.attributes.is_empty() {
             log_namespace.insert_source_metadata(

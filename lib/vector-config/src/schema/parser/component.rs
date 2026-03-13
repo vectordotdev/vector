@@ -61,7 +61,7 @@ impl ComponentSchema<'_> {
 }
 
 impl QueryableSchema for ComponentSchema<'_> {
-    fn schema_type(&self) -> SchemaType {
+    fn schema_type(&self) -> SchemaType<'_> {
         self.schema.schema_type()
     }
 

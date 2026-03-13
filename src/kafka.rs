@@ -4,11 +4,11 @@ use std::path::{Path, PathBuf};
 use rdkafka::{ClientConfig, ClientContext, Statistics, consumer::ConsumerContext};
 use snafu::Snafu;
 use tracing::Span;
-use vector_lib::configurable::configurable_component;
-use vector_lib::sensitive_string::SensitiveString;
+use vector_lib::{configurable::configurable_component, sensitive_string::SensitiveString};
 
 use crate::{
-    internal_events::KafkaStatisticsReceived, tls::PEM_START_MARKER, tls::TlsEnableableConfig,
+    internal_events::KafkaStatisticsReceived,
+    tls::{PEM_START_MARKER, TlsEnableableConfig},
 };
 
 #[derive(Debug, Snafu)]

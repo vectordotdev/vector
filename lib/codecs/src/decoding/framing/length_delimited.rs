@@ -3,9 +3,8 @@ use derivative::Derivative;
 use tokio_util::codec::Decoder;
 use vector_config::configurable_component;
 
-use crate::common::length_delimited::LengthDelimitedCoderOptions;
-
 use super::BoxedFramingError;
+use crate::common::length_delimited::LengthDelimitedCoderOptions;
 
 /// Config used to build a `LengthDelimitedDecoder`.
 #[configurable_component]

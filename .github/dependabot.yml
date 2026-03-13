@@ -25,6 +25,10 @@ updates:
       aws:
         patterns:
         - "aws-*"
+      aws-security:
+        applies-to: security-updates
+        patterns:
+        - "aws-*"
       azure:
         patterns:
         - "azure_*"
@@ -41,14 +45,17 @@ updates:
         patterns:
         - "futures"
         - "futures-util"
+      graphql:
+        patterns:
+        - "async-graphql*"
       metrics:
         patterns:
         - "metrics"
         - "metrics-tracing-context"
         - "metrics-util"
-      graphql:
+      netlink:
         patterns:
-        - "async-graphql*"
+        - "netlink-*"
       phf:
         patterns:
         - "phf*"
@@ -56,6 +63,14 @@ updates:
         patterns:
         - "prost"
         - "prost-*"
+      serde:
+        patterns:
+          - "serde"
+          - "serde_*"
+      tokio:
+        patterns:
+          - "tokio"
+          - "tokio-*"
       tonic:
         patterns:
         - "tonic"
@@ -64,6 +79,10 @@ updates:
         patterns:
         - "tower"
         - "tower-*"
+      tracing:
+        patterns:
+          - "tracing"
+          - "tracing-*"
       wasm-bindgen:
         patterns:
         - "wasm-bindgen-*"
@@ -71,7 +90,7 @@ updates:
         patterns:
         - "zstd*"
   - package-ecosystem: "docker"
-    directory: "/distribution/docker/"
+    directory: "/distribution/docker/alpine"
     schedule:
       interval: "monthly"
       time: "04:00" # UTC
@@ -81,6 +100,55 @@ updates:
     commit-message:
       prefix: "chore(deps)"
     open-pull-requests-limit: 100
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+  - package-ecosystem: "docker"
+    directory: "/distribution/docker/debian"
+    schedule:
+      interval: "monthly"
+      time: "04:00" # UTC
+    labels:
+      - "domain: releasing"
+      - "no-changelog"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 100
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+  - package-ecosystem: "docker"
+    directory: "/distribution/docker/distroless-static"
+    schedule:
+      interval: "monthly"
+      time: "04:00" # UTC
+    labels:
+      - "domain: releasing"
+      - "no-changelog"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 100
+    groups:
+      docker-images:
+        patterns:
+          - "*"
+  - package-ecosystem: "docker"
+    directory: "/distribution/docker/distroless-libc"
+    schedule:
+      interval: "monthly"
+      time: "04:00" # UTC
+    labels:
+      - "domain: releasing"
+      - "no-changelog"
+    commit-message:
+      prefix: "chore(deps)"
+    open-pull-requests-limit: 100
+    groups:
+      docker-images:
+        patterns:
+          - "*"
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:

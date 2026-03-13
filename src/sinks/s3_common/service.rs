@@ -1,9 +1,7 @@
 use std::task::{Context, Poll};
 
-use aws_sdk_s3::Client as S3Client;
-use aws_sdk_s3::operation::put_object::PutObjectError;
-use aws_smithy_runtime_api::client::orchestrator::HttpResponse;
-use aws_smithy_runtime_api::client::result::SdkError;
+use aws_sdk_s3::{Client as S3Client, operation::put_object::PutObjectError};
+use aws_smithy_runtime_api::client::{orchestrator::HttpResponse, result::SdkError};
 use aws_smithy_types::byte_stream::ByteStream;
 use base64::prelude::{BASE64_STANDARD, Engine as _};
 use bytes::Bytes;
@@ -11,12 +9,13 @@ use futures::future::BoxFuture;
 use md5::Digest;
 use tower::Service;
 use tracing::Instrument;
-use vector_lib::event::{EventFinalizers, EventStatus, Finalizable};
-use vector_lib::request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata};
-use vector_lib::stream::DriverResponse;
+use vector_lib::{
+    event::{EventFinalizers, EventStatus, Finalizable},
+    request_metadata::{GroupedCountByteSize, MetaDescriptive, RequestMetadata},
+    stream::DriverResponse,
+};
 
-use super::config::S3Options;
-use super::partitioner::S3PartitionKey;
+use super::{config::S3Options, partitioner::S3PartitionKey};
 
 #[derive(Debug, Clone)]
 pub struct S3Request {

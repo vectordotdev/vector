@@ -2,13 +2,11 @@ use core::fmt;
 use std::collections::BTreeSet;
 
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
-
 use vector_common::byte_size_of::ByteSizeOf;
 use vector_config::configurable_component;
 
-use crate::{float_eq, metrics::AgentDDSketch};
-
 use super::{samples_to_buckets, write_list, write_word};
+use crate::{float_eq, metrics::AgentDDSketch};
 
 const INFINITY: &str = "inf";
 const NEG_INFINITY: &str = "-inf";
@@ -329,6 +327,11 @@ impl MetricValue {
             // fewer values -- would not make sense, since buckets should never be able to have negative counts... and
             // it's not clear that a saturating subtraction is technically correct either.  Instead, we avoid having to
             // make that decision, and simply force the metric to be reinitialized.
+            //
+            // We also check that each individual bucket count is >= the corresponding count in the
+            // other histogram, since bucket value redistribution (e.g., after a source restart or
+            // cache eviction) can cause individual buckets to have lower counts even when the total
+            // count is higher. Failing here leads to the metric being reinitialized.
             (
                 Self::AggregatedHistogram {
                     buckets,
@@ -345,7 +348,7 @@ impl MetricValue {
                 && buckets
                     .iter()
                     .zip(buckets2.iter())
-                    .all(|(b1, b2)| b1.upper_limit == b2.upper_limit) =>
+                    .all(|(b1, b2)| b1.upper_limit == b2.upper_limit && b1.count >= b2.count) =>
             {
                 for (b1, b2) in buckets.iter_mut().zip(buckets2) {
                     b1.count -= b2.count;
@@ -536,7 +539,7 @@ pub enum StatisticKind {
 pub enum MetricSketch {
     /// [DDSketch][ddsketch] implementation based on the [Datadog Agent][ddagent].
     ///
-    /// While DDSketch has open-source implementations based on the white paper, the version used in
+    /// While `DDSketch` has open-source implementations based on the white paper, the version used in
     /// the Datadog Agent itself is subtly different. This version is suitable for sending directly
     /// to Datadog's sketch ingest endpoint.
     ///

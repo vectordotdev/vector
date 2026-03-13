@@ -3,10 +3,12 @@ use std::collections::{HashMap, HashSet};
 use aws_sdk_secretsmanager::{Client, config};
 use vector_lib::configurable::{component::GenerateConfig, configurable_component};
 
-use crate::aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client};
-use crate::config::ProxyConfig;
-use crate::tls::TlsConfig;
-use crate::{config::SecretBackend, signal};
+use crate::{
+    aws::{AwsAuthentication, ClientBuilder, RegionOrEndpoint, create_client},
+    config::{ProxyConfig, SecretBackend},
+    signal,
+    tls::TlsConfig,
+};
 
 pub(crate) struct SecretsManagerClientBuilder;
 

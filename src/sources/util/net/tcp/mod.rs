@@ -14,33 +14,32 @@ use tokio::{
     net::{TcpListener, TcpStream},
     time::sleep,
 };
-use tokio_util::codec::{Decoder, FramedRead};
+use tokio_util::codec::Decoder;
 use tracing::Instrument;
-use vector_lib::codecs::StreamDecodingError;
-use vector_lib::finalization::AddBatchNotifier;
-use vector_lib::lookup::{OwnedValuePath, path};
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
+    codecs::{ReadyFrames, StreamDecodingError, internal_events::DecoderFramingError},
     config::{LegacyKey, LogNamespace, SourceAcknowledgementsConfig},
+    event::{BatchNotifier, BatchStatus, Event},
+    finalization::AddBatchNotifier,
+    lookup::{OwnedValuePath, path},
+    shutdown::ShutdownSignal,
+    source_sender::SourceSender,
+    tcp::TcpKeepaliveConfig,
+    tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
 };
 use vrl::value::ObjectMap;
 
 use self::request_limiter::RequestLimiter;
 use super::SocketListenAddr;
 use crate::{
-    SourceSender,
-    codecs::ReadyFrames,
     config::SourceContext,
-    event::{BatchNotifier, BatchStatus, Event},
     internal_events::{
-        ConnectionOpen, DecoderFramingError, OpenGauge, SocketBindError, SocketEventsReceived,
-        SocketMode, SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
+        ConnectionOpen, OpenGauge, SocketBindError, SocketEventsReceived, SocketMode,
+        SocketReceiveError, StreamClosedError, TcpBytesReceived, TcpSendAckError,
         TcpSocketTlsConnectionError,
     },
-    shutdown::ShutdownSignal,
-    sources::util::AfterReadExt,
-    tcp::TcpKeepaliveConfig,
-    tls::{CertificateMetadata, MaybeTlsIncomingStream, MaybeTlsListener, MaybeTlsSettings},
+    sources::util::{AfterReadExt, LenientFramedRead},
 };
 
 pub const MAX_IN_FLIGHT_EVENTS_TARGET: usize = 100_000;
@@ -266,16 +265,16 @@ async fn handle_stream<T>(
         }
     };
 
-    if let Some(keepalive) = keepalive {
-        if let Err(error) = socket.set_keepalive(keepalive) {
-            warn!(message = "Failed configuring TCP keepalive.", %error);
-        }
+    if let Some(keepalive) = keepalive
+        && let Err(error) = socket.set_keepalive(keepalive)
+    {
+        warn!(message = "Failed configuring TCP keepalive.", %error);
     }
 
-    if let Some(receive_buffer_bytes) = receive_buffer_bytes {
-        if let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes) {
-            warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
-        }
+    if let Some(receive_buffer_bytes) = receive_buffer_bytes
+        && let Err(error) = socket.set_receive_buffer_bytes(receive_buffer_bytes)
+    {
+        warn!(message = "Failed configuring receive buffer size on TCP socket.", %error);
     }
 
     let socket = socket.after_read(move |byte_size| {
@@ -291,7 +290,8 @@ async fn handle_stream<T>(
         .and_then(|stream| stream.ssl().peer_certificate())
         .map(CertificateMetadata::from);
 
-    let reader = FramedRead::new(socket, source.decoder());
+    let reader = LenientFramedRead::new(socket, source.decoder());
+
     let mut reader = ReadyFrames::new(reader);
 
     let connection_close_timeout = OptionFuture::from(

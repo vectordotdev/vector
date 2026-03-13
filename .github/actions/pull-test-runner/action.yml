@@ -1,0 +1,30 @@
+name: Pull Test Runner Image
+description: Login to GHCR and pull the pre-built test runner image for integration/e2e tests
+
+inputs:
+  github_token:
+    description: 'GitHub token for GHCR authentication'
+    required: true
+  commit_sha:
+    description: 'Commit SHA used to tag the test runner image'
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Login to GitHub Container Registry
+      uses: docker/login-action@5e57cd118135c172c3672efd75eb46360885c0ef # v3.6.0
+      with:
+        registry: ghcr.io
+        username: ${{ github.actor }}
+        password: ${{ inputs.github_token }}
+
+    - name: Pull and tag test runner image
+      shell: bash
+      run: |
+        RUST_VERSION=$(grep '^channel = ' rust-toolchain.toml | cut -d'"' -f2)
+        REMOTE_IMAGE="ghcr.io/${{ github.repository }}/test-runner:${{ inputs.commit_sha }}"
+        LOCAL_IMAGE="vector-test-runner-${RUST_VERSION}:latest"
+
+        docker pull "${REMOTE_IMAGE}"
+        docker tag "${REMOTE_IMAGE}" "${LOCAL_IMAGE}"

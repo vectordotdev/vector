@@ -1,9 +1,9 @@
-use crate::components::validation::{
-    ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent, component_names::*,
-};
 use vector_lib::event::{Event, Metric, MetricKind};
 
 use super::{ComponentMetricType, Validator};
+use crate::components::validation::{
+    ComponentType, RunnerMetrics, TestCaseExpectation, TestEvent, component_names::*,
+};
 
 /// Validates that the component meets the requirements of the [Component Specification][component_spec].
 ///
@@ -220,10 +220,10 @@ fn filter_events_by_metric_and_component<'a>(
         .filter(|&m| {
             if m.name() == metric.to_string() {
                 debug!("{}", m);
-                if let Some(tags) = m.tags() {
-                    if tags.get("component_id").unwrap_or("") == component_id {
-                        return true;
-                    }
+                if let Some(tags) = m.tags()
+                    && tags.get("component_id").unwrap_or("") == component_id
+                {
+                    return true;
                 }
             }
 

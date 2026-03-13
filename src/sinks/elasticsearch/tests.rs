@@ -1,19 +1,19 @@
 use std::{convert::TryFrom, iter::zip};
+
 use vector_common::sensitive_string::SensitiveString;
 use vector_lib::lookup::PathPrefix;
 
-use crate::config::ProxyConfig;
-use crate::sinks::elasticsearch::ElasticsearchAuthConfig;
-use crate::sinks::util::auth::Auth;
 use crate::{
     codecs::Transformer,
+    config::ProxyConfig,
     event::{LogEvent, Metric, MetricKind, MetricValue, ObjectMap, Value},
     sinks::{
         elasticsearch::{
-            BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion, ElasticsearchCommon,
-            ElasticsearchConfig, ElasticsearchMode, VersionType, sink::process_log,
+            BulkAction, BulkConfig, DataStreamConfig, ElasticsearchApiVersion,
+            ElasticsearchAuthConfig, ElasticsearchCommon, ElasticsearchConfig, ElasticsearchMode,
+            VersionType, sink::process_log,
         },
-        util::encoding::Encoder,
+        util::{auth::Auth, encoding::Encoder},
     },
     template::Template,
 };
@@ -90,8 +90,9 @@ async fn encoding_with_external_versioning_without_version_set_does_not_include_
 
 #[tokio::test]
 async fn encoding_with_external_versioning_with_version_set_includes_version() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
+
+    use crate::config::log_schema;
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {
@@ -139,8 +140,9 @@ async fn encoding_with_external_versioning_with_version_set_includes_version() {
 
 #[tokio::test]
 async fn encoding_with_external_gte_versioning_with_version_set_includes_version() {
-    use crate::config::log_schema;
     use chrono::{TimeZone, Utc};
+
+    use crate::config::log_schema;
 
     let config = ElasticsearchConfig {
         bulk: BulkConfig {

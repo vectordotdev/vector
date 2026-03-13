@@ -1,11 +1,10 @@
 //! Implementation of the `keep` sink.
 
+use super::request_builder::KeepRequestBuilder;
 use crate::sinks::{
     prelude::*,
     util::http::{HttpJsonBatchSizer, HttpRequest},
 };
-
-use super::request_builder::KeepRequestBuilder;
 
 pub(super) struct KeepSink<S> {
     service: S,

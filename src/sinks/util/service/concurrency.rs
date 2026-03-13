@@ -1,26 +1,24 @@
 use std::{cell::RefCell, fmt};
 
-use serde::Serializer;
+use serde::{
+    Deserialize, Deserializer, Serialize, Serializer,
+    de::{self, Unexpected, Visitor},
+};
 use serde_json::Value;
-use vector_lib::configurable::attributes::CustomAttribute;
 use vector_lib::configurable::{
     Configurable, GenerateError, Metadata, ToValue,
+    attributes::CustomAttribute,
     schema::{
         SchemaGenerator, SchemaObject, apply_base_metadata, generate_const_string_schema,
         generate_number_schema, generate_one_of_schema,
     },
 };
 
-use serde::{
-    Deserialize, Deserializer, Serialize,
-    de::{self, Unexpected, Visitor},
-};
-
 /// Configuration for outbound request concurrency.
 ///
 /// This can be set either to one of the below enum values or to a positive integer, which denotes
 /// a fixed concurrency limit.
-#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq)]
+#[derive(Clone, Copy, Debug, Derivative, Eq, PartialEq, Default)]
 pub enum Concurrency {
     /// A fixed concurrency of 1.
     ///
@@ -30,6 +28,7 @@ pub enum Concurrency {
     /// Concurrency is managed by the [Adaptive Request Concurrency][arc] feature.
     ///
     /// [arc]: https://vector.dev/docs/architecture/arc/
+    #[default]
     Adaptive,
 
     /// A fixed amount of concurrency is allowed.
@@ -46,12 +45,6 @@ impl Serialize for Concurrency {
             Concurrency::Adaptive => serializer.serialize_str("adaptive"),
             Concurrency::Fixed(i) => serializer.serialize_u64(*i as u64),
         }
-    }
-}
-
-impl Default for Concurrency {
-    fn default() -> Self {
-        Self::Adaptive
     }
 }
 

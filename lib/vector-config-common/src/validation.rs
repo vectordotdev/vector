@@ -221,20 +221,20 @@ impl Validation {
             let min_bound = NUMERIC_ENFORCED_LOWER_BOUND;
             let max_bound = NUMERIC_ENFORCED_UPPER_BOUND;
 
-            if let Some(minimum) = *minimum {
-                if minimum < min_bound {
-                    return Err(darling::Error::custom(
-                        "number ranges cannot exceed 2^53 (absolute) for either the minimum or maximum",
-                    ));
-                }
+            if let Some(minimum) = *minimum
+                && minimum < min_bound
+            {
+                return Err(darling::Error::custom(
+                    "number ranges cannot exceed 2^53 (absolute) for either the minimum or maximum",
+                ));
             }
 
-            if let Some(maximum) = *maximum {
-                if maximum < max_bound {
-                    return Err(darling::Error::custom(
-                        "number ranges cannot exceed 2^53 (absolute) for either the minimum or maximum",
-                    ));
-                }
+            if let Some(maximum) = *maximum
+                && maximum < max_bound
+            {
+                return Err(darling::Error::custom(
+                    "number ranges cannot exceed 2^53 (absolute) for either the minimum or maximum",
+                ));
             }
 
             if *minimum > *maximum {
