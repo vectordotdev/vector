@@ -3,7 +3,8 @@ use std::net::SocketAddr;
 
 use chrono::Utc;
 use futures::TryFutureExt;
-use tonic::{Request, Response, Status};
+use tonic::{Request, Response, Status, transport::server::RoutesBuilder};
+use tonic_health::server::health_reporter;
 use vector_lib::{
     EstimatedJsonEncodedSizeOf,
     codecs::NativeDeserializerConfig,
@@ -22,7 +23,7 @@ use crate::{
     internal_events::{EventsReceived, StreamClosedError},
     proto::vector as proto,
     serde::bool_or_struct,
-    sources::{Source, util::grpc::run_grpc_server},
+    sources::{Source, util::grpc::run_grpc_server_with_routes},
     tls::{MaybeTlsSettings, TlsEnableableConfig},
 };
 
@@ -176,7 +177,8 @@ impl SourceConfig for VectorConfig {
         let acknowledgements = cx.do_acknowledgements(self.acknowledgements);
         let log_namespace = cx.log_namespace(self.log_namespace);
 
-        let service = proto::Server::new(Service {
+        // Create the custom Vector service (existing)
+        let vector_service = proto::Server::new(Service {
             pipeline: cx.out,
             acknowledgements,
             log_namespace,
@@ -185,10 +187,28 @@ impl SourceConfig for VectorConfig {
         // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
         .max_decoding_message_size(usize::MAX);
 
+        // Create the standard gRPC health service
+        let (mut health_reporter, health_service) = health_reporter();
+
+        // Register the Vector service as serving in the health reporter
+        health_reporter
+            .set_service_status(
+                "vector.Vector",
+                tonic_health::ServingStatus::Serving,
+            )
+            .await;
+
+        // Combine both services using RoutesBuilder
+        let mut builder = RoutesBuilder::default();
+        builder
+            .add_service(health_service)
+            .add_service(vector_service);
+
         let source =
-            run_grpc_server(self.address, tls_settings, service, cx.shutdown).map_err(|error| {
-                error!(message = "Source future failed.", %error);
-            });
+            run_grpc_server_with_routes(self.address, tls_settings, builder.routes(), cx.shutdown)
+                .map_err(|error| {
+                    error!(message = "Source future failed.", %error);
+                });
 
         Ok(Box::pin(source))
     }
@@ -336,5 +356,92 @@ mod tests {
             compression=true"#
         );
         run_test(&config, addr).await;
+    }
+
+    #[tokio::test]
+    async fn custom_health_check_works() {
+        use tonic::transport::Channel;
+
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let config = format!(r#"address = "{addr}""#);
+        let source: VectorConfig = toml::from_str(&config).unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        // Test the custom Vector health check endpoint
+        let endpoint = format!("http://{addr}");
+        let channel = Channel::from_shared(endpoint)
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+
+        let mut client = proto::Client::new(channel);
+        let response = client
+            .health_check(proto::HealthCheckRequest {})
+            .await
+            .unwrap();
+
+        assert_eq!(
+            response.into_inner().status,
+            proto::ServingStatus::Serving as i32
+        );
+    }
+
+    #[tokio::test]
+    async fn standard_grpc_health_check_works() {
+        use tonic::transport::Channel;
+        use tonic_health::pb::{HealthCheckRequest, health_client::HealthClient};
+
+        let (_guard, addr) = test_util::addr::next_addr();
+
+        let config = format!(r#"address = "{addr}""#);
+        let source: VectorConfig = toml::from_str(&config).unwrap();
+
+        let (tx, _rx) = SourceSender::new_test();
+        let server = source
+            .build(SourceContext::new_test(tx, None))
+            .await
+            .unwrap();
+        tokio::spawn(server);
+        test_util::wait_for_tcp(addr).await;
+
+        // Test the standard gRPC health check protocol
+        let endpoint = format!("http://{addr}");
+        let channel = Channel::from_shared(endpoint)
+            .unwrap()
+            .connect()
+            .await
+            .unwrap();
+
+        let mut client = HealthClient::new(channel);
+
+        // Check aggregate server health (empty service string)
+        let response = client
+            .check(HealthCheckRequest {
+                service: String::new(),
+            })
+            .await
+            .unwrap();
+
+        use tonic_health::pb::health_check_response::ServingStatus;
+        assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
+
+        // Check the named Vector service health
+        let response = client
+            .check(HealthCheckRequest {
+                service: "vector.Vector".to_string(),
+            })
+            .await
+            .unwrap();
+
+        assert_eq!(response.into_inner().status, ServingStatus::Serving as i32);
     }
 }
