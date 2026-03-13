@@ -6,6 +6,7 @@ use vector_core::{config::DataType, event::Event, schema};
 
 #[cfg(feature = "arrow")]
 use super::format::{ArrowStreamSerializer, ArrowStreamSerializerConfig};
+use super::format::{ProtoBatchSerializer, ProtoBatchSerializerConfig};
 #[cfg(feature = "opentelemetry")]
 use super::format::{OtlpSerializer, OtlpSerializerConfig};
 #[cfg(feature = "syslog")]
@@ -160,17 +161,31 @@ pub enum BatchSerializerConfig {
     #[cfg(feature = "arrow")]
     #[serde(rename = "arrow_stream")]
     ArrowStream(ArrowStreamSerializerConfig),
+
+    /// Encodes each event individually as a [Protocol Buffers][protobuf] message.
+    ///
+    /// Each event in the batch is serialized to protobuf bytes independently,
+    /// producing a list of byte buffers (one per event).
+    ///
+    /// [protobuf]: https://protobuf.dev/
+    #[serde(rename = "proto_batch")]
+    ProtoBatch(ProtoBatchSerializerConfig),
 }
 
-#[cfg(feature = "arrow")]
 impl BatchSerializerConfig {
-    /// Build the `ArrowStreamSerializer` from this configuration.
+    /// Build the `BatchSerializer` from this configuration.
     pub fn build(
         &self,
-    ) -> Result<ArrowStreamSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
+    ) -> Result<super::BatchSerializer, Box<dyn std::error::Error + Send + Sync + 'static>> {
         match self {
+            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => {
-                Ok(ArrowStreamSerializer::new(arrow_config.clone())?)
+                let serializer = ArrowStreamSerializer::new(arrow_config.clone())?;
+                Ok(super::BatchSerializer::Arrow(serializer))
+            }
+            BatchSerializerConfig::ProtoBatch(proto_config) => {
+                let serializer = ProtoBatchSerializer::new(proto_config.clone())?;
+                Ok(super::BatchSerializer::ProtoBatch(serializer))
             }
         }
     }
@@ -178,14 +193,18 @@ impl BatchSerializerConfig {
     /// The data type of events that are accepted by this batch serializer.
     pub fn input_type(&self) -> DataType {
         match self {
+            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.input_type(),
+            BatchSerializerConfig::ProtoBatch(proto_config) => proto_config.input_type(),
         }
     }
 
     /// The schema required by the batch serializer.
     pub fn schema_requirement(&self) -> schema::Requirement {
         match self {
+            #[cfg(feature = "arrow")]
             BatchSerializerConfig::ArrowStream(arrow_config) => arrow_config.schema_requirement(),
+            BatchSerializerConfig::ProtoBatch(proto_config) => proto_config.schema_requirement(),
         }
     }
 }
