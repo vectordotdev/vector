@@ -618,15 +618,15 @@ dependencies = [
 
 [[package]]
 name = "async-executor"
-version = "1.6.0"
+version = "1.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4b0c4a4f319e45986f347ee47fef8bf5e81c9abc3f6f58dc2391439f30df65f0"
+checksum = "c96bf972d85afc50bf5ab8fe2d54d1586b4e0b46c97c50a0c9e71e2f7bcd812a"
 dependencies = [
- "async-lock 2.8.0",
  "async-task",
  "concurrent-queue",
  "fastrand 2.3.0",
- "futures-lite 1.13.0",
+ "futures-lite 2.6.0",
+ "pin-project-lite",
  "slab",
 ]
 
@@ -4344,7 +4344,10 @@ version = "2.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f5edaec856126859abb19ed65f39e90fea3a9574b9707f13539acf4abf7eb532"
 dependencies = [
+ "fastrand 2.3.0",
  "futures-core",
+ "futures-io",
+ "parking",
  "pin-project-lite",
 ]
 
