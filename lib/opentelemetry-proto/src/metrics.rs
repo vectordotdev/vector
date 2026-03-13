@@ -274,7 +274,11 @@ impl SumMetric {
         scope_schema_url: &str,
         resource_schema_url: &str,
     ) -> Event {
-        let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
+        let timestamp = if self.point.time_unix_nano == 0 {
+            None
+        } else {
+            Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64))
+        };
         let value = self.point.value.to_f64().unwrap_or(0.0);
         let attributes = build_metric_tags(
             self.resource,
@@ -310,7 +314,11 @@ impl GaugeMetric {
         scope_schema_url: &str,
         resource_schema_url: &str,
     ) -> Event {
-        let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
+        let timestamp = if self.point.time_unix_nano == 0 {
+            None
+        } else {
+            Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64))
+        };
         let value = self.point.value.to_f64().unwrap_or(0.0);
         let attributes = build_metric_tags(
             self.resource,
@@ -338,7 +346,11 @@ impl HistogramMetric {
         scope_schema_url: &str,
         resource_schema_url: &str,
     ) -> Event {
-        let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
+        let timestamp = if self.point.time_unix_nano == 0 {
+            None
+        } else {
+            Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64))
+        };
         let attributes = build_metric_tags(
             self.resource,
             self.scope,
@@ -395,7 +407,11 @@ impl ExpHistogramMetric {
         resource_schema_url: &str,
     ) -> Event {
         // we have to convert Exponential Histogram to agg histogram using scale and base
-        let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
+        let timestamp = if self.point.time_unix_nano == 0 {
+            None
+        } else {
+            Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64))
+        };
         let attributes = build_metric_tags(
             self.resource,
             self.scope,
@@ -461,7 +477,11 @@ impl SummaryMetric {
         scope_schema_url: &str,
         resource_schema_url: &str,
     ) -> Event {
-        let timestamp = Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64));
+        let timestamp = if self.point.time_unix_nano == 0 {
+            None
+        } else {
+            Some(Utc.timestamp_nanos(self.point.time_unix_nano as i64))
+        };
         let attributes = build_metric_tags(
             self.resource,
             self.scope,
