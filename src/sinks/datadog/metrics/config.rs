@@ -44,6 +44,7 @@ pub enum SeriesApiVersion {
     /// Use the v1 series endpoint (`/api/v1/series`).
     ///
     /// This is a legacy endpoint. Prefer `v2` unless you have a specific reason to use v1.
+    #[configurable(deprecated)]
     V1,
 
     /// Use the v2 series endpoint (`/api/v2/series`).
