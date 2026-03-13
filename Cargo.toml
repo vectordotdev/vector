@@ -501,8 +501,8 @@ ntapi = { git = "https://github.com/MSxDOS/ntapi.git", rev = "24fc1e47677fc9f6e3
 [features]
 # Default features for *-unknown-linux-gnu and *-apple-darwin
 default = ["enable-unix", "rdkafka?/gssapi"]
-# Default features for `cargo docs`. We're not using `vendored` which would require installing libsasl in our doc build environment.
-docs = ["enable-unix", "rdkafka?/gssapi"]
+# Default features for `cargo docs`. We're not using `gssapi` which would require installing libsasl2 in our doc environment.
+docs = ["enable-unix"]
 # Default features for *-unknown-linux-* which make use of `cmake` for dependencies
 default-cmake = ["enable-unix", "vendored", "rdkafka?/cmake_build"]
 
