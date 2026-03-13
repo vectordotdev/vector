@@ -1,5 +1,5 @@
-The `kafka_consumed_messages_total` and `kafka_consumed_messages_bytes_total` metrics emitted by
-the Kafka source now include `topic` and `partition` labels, allowing users to monitor consumption
-metrics per topic and partition when multiple topics are configured for a source.
+The `kafka_consumed_messages_total`, `kafka_consumed_messages_bytes_total`, `kafka_produced_messages_total`,
+and `kafka_produced_messages_bytes_total` metrics now include `topic` and `partition` labels, allowing users
+to monitor both consumption and production metrics per topic and partition when multiple topics are configured.
 
 authors: jpds
