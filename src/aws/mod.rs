@@ -320,6 +320,62 @@ pub async fn sign_request(
     Ok(())
 }
 
+/// Sign the request prior to sending to AWS.
+/// The signature is added to the provided `request`.
+pub async fn sign_request_http_1(
+    service_name: &str,
+    request: &mut http_1::Request<Bytes>,
+    credentials_provider: &SharedCredentialsProvider,
+    region: Option<&Region>,
+    payload_checksum_sha256: bool,
+) -> crate::Result<()> {
+    let headers = request
+        .headers()
+        .iter()
+        .map(|(k, v)| {
+            Ok((
+                k.as_str(),
+                std::str::from_utf8(v.as_bytes()).map_err(|_| SigningError::NotUTF8Header)?,
+            ))
+        })
+        .collect::<Result<Vec<_>, SigningError>>()?;
+
+    let signable_request = SignableRequest::new(
+        request.method().as_str(),
+        request.uri().to_string(),
+        headers.into_iter(),
+        SignableBody::Bytes(request.body().as_ref()),
+    )?;
+
+    let credentials = credentials_provider.provide_credentials().await?;
+    let identity = Identity::new(credentials, None);
+
+    let mut signing_settings = SigningSettings::default();
+
+    // Include the x-amz-content-sha256 header when calculating the AWS v4 signature;
+    // this is required by some AWS services, e.g. S3 and OpenSearch Serverless
+    if payload_checksum_sha256 {
+        signing_settings.payload_checksum_kind = PayloadChecksumKind::XAmzSha256;
+    }
+
+    let signing_params_builder = v4::SigningParams::builder()
+        .identity(&identity)
+        .region(region.as_ref().map(|r| r.as_ref()).unwrap_or(""))
+        .name(service_name)
+        .time(SystemTime::now())
+        .settings(signing_settings);
+
+    let signing_params = signing_params_builder
+        .build()
+        .expect("all signing params set");
+
+    let (signing_instructions, _signature) =
+        aws_sigv4::http_request::sign(signable_request, &signing_params.into())?.into_parts();
+    signing_instructions.apply_to_request_http1x(request);
+
+    Ok(())
+}
+
 #[derive(Debug)]
 struct AwsHttpClient<T> {
     http: T,

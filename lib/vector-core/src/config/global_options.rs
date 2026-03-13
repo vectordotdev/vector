@@ -7,6 +7,7 @@ use vector_config::{configurable_component, impl_generate_config_from_default};
 use super::{
     super::default_data_dir, AcknowledgementsConfig, LogSchema, Telemetry,
     metrics_expiration::PerMetricSetExpiration, proxy::ProxyConfig,
+    proxy_http_1::ProxyConfig as Http1ProxyConfig,
 };
 use crate::serde::bool_or_struct;
 
@@ -111,6 +112,11 @@ pub struct GlobalOptions {
     #[serde(default, skip_serializing_if = "crate::serde::is_default")]
     #[configurable(metadata(docs::common = false, docs::required = false))]
     pub proxy: ProxyConfig,
+
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "crate::serde::is_default")]
+    #[configurable(metadata(docs::common = false, docs::required = false))]
+    pub http_1_proxy: Http1ProxyConfig,
 
     /// Controls how acknowledgements are handled for all sinks by default.
     ///
@@ -335,6 +341,7 @@ impl GlobalOptions {
                 acknowledgements: self.acknowledgements.merge_default(&with.acknowledgements),
                 timezone: self.timezone.or(with.timezone),
                 proxy: self.proxy.merge(&with.proxy),
+                http_1_proxy: self.http_1_proxy.merge(&with.http_1_proxy),
                 expire_metrics: self.expire_metrics.or(with.expire_metrics),
                 expire_metrics_secs: self.expire_metrics_secs.or(with.expire_metrics_secs),
                 expire_metrics_per_metric_set: merged_expire_metrics_per_metric_set,
@@ -447,6 +454,25 @@ mod tests {
         // We use the `.http` settings as a proxy for the other settings, as they are all compared
         // for equality above.
         let merge = |a, b| merge("proxy.http", a, b, |result| result.proxy.http);
+
+        assert_eq!(merge(None, None), Ok(None));
+        assert_eq!(merge(Some("test1"), None), Ok(Some("test1".into())));
+        assert_eq!(merge(None, Some("test2")), Ok(Some("test2".into())));
+        assert_eq!(
+            merge(Some("test3"), Some("test3")),
+            Ok(Some("test3".into()))
+        );
+        assert_eq!(
+            merge(Some("test4"), Some("test5")),
+            Err(vec!["conflicting values for 'proxy.http' found".into()])
+        );
+    }
+
+    #[test]
+    fn merges_http_1_proxy() {
+        // We use the `.http` settings as a proxy for the other settings, as they are all compared
+        // for equality above.
+        let merge = |a, b| merge("proxy.http", a, b, |result| result.http_1_proxy.http);
 
         assert_eq!(merge(None, None), Ok(None));
         assert_eq!(merge(Some("test1"), None), Ok(Some("test1".into())));

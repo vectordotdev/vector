@@ -18,7 +18,10 @@ use vector_lib::{
 };
 use vector_vrl_metrics::MetricsStorage;
 
-use super::{ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig, schema};
+use super::{
+    ComponentKey, ProxyConfig, Resource, dot_graph::GraphConfig,
+    http_1::ProxyConfig as Http1ProxyConfig, schema,
+};
 use crate::{
     extra_context::ExtraContext,
     sinks::{Healthcheck, util::UriSerde},
@@ -86,6 +89,10 @@ where
     #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
     pub proxy: ProxyConfig,
 
+    #[configurable(derived)]
+    #[serde(default, skip_serializing_if = "vector_lib::serde::is_default")]
+    pub http_1_proxy: Http1ProxyConfig,
+
     #[serde(flatten)]
     #[configurable(metadata(docs::hidden))]
     pub inner: BoxedSink,
@@ -107,6 +114,7 @@ where
             healthcheck_uri: None,
             inner: inner.into(),
             proxy: Default::default(),
+            http_1_proxy: Default::default(),
             graph: Default::default(),
         }
     }
@@ -146,6 +154,10 @@ where
         &self.proxy
     }
 
+    pub const fn http_1_proxy(&self) -> &Http1ProxyConfig {
+        &self.http_1_proxy
+    }
+
     pub(super) fn map_inputs<U>(self, f: impl Fn(&T) -> U) -> SinkOuter<U>
     where
         U: Configurable + Serialize,
@@ -166,6 +178,7 @@ where
             healthcheck: self.healthcheck,
             healthcheck_uri: self.healthcheck_uri,
             proxy: self.proxy,
+            http_1_proxy: self.http_1_proxy,
             graph: self.graph,
         }
     }
@@ -279,6 +292,7 @@ pub struct SinkContext {
     pub enrichment_tables: vector_lib::enrichment::TableRegistry,
     pub metrics_storage: MetricsStorage,
     pub proxy: ProxyConfig,
+    pub http_1_proxy: Http1ProxyConfig,
     pub schema: schema::Options,
     pub app_name: String,
     pub app_name_slug: String,
@@ -296,6 +310,7 @@ impl Default for SinkContext {
             enrichment_tables: Default::default(),
             metrics_storage: Default::default(),
             proxy: Default::default(),
+            http_1_proxy: Default::default(),
             schema: Default::default(),
             app_name: crate::get_app_name().to_string(),
             app_name_slug: crate::get_slugified_app_name(),
@@ -311,5 +326,9 @@ impl SinkContext {
 
     pub const fn proxy(&self) -> &ProxyConfig {
         &self.proxy
+    }
+
+    pub const fn http_1_proxy(&self) -> &Http1ProxyConfig {
+        &self.http_1_proxy
     }
 }
