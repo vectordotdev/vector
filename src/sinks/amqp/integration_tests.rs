@@ -73,7 +73,7 @@ async fn amqp_happy_path() {
     };
     channel
         .exchange_declare(
-            exchange.clone().into(),
+            exchange.clone(),
             lapin::ExchangeKind::Fanout,
             exchange_opts,
             lapin::types::FieldTable::default(),

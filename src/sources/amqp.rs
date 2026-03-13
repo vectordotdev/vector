@@ -760,7 +760,7 @@ mod integration_test {
         let now = Utc::now();
         send_event(
             &channel,
-            &exchange.as_str(),
+            exchange.as_str(),
             routing_key,
             "my message",
             now.timestamp_millis(),
