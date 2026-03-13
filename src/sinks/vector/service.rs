@@ -19,7 +19,7 @@ use crate::{
     event::{EventFinalizers, EventStatus, Finalizable},
     internal_events::EndpointBytesSent,
     proto::vector as proto_vector,
-    sinks::util::uri,
+    sinks::util::{buffer::compression::Compression, uri},
 };
 
 #[derive(Clone, Debug)]
@@ -70,22 +70,40 @@ impl VectorService {
     pub fn new(
         hyper_client: hyper::Client<ProxyConnector<HttpsConnector<HttpConnector>>, BoxBody>,
         uri: Uri,
-        compression: bool,
-    ) -> Self {
+        compression: Compression,
+    ) -> crate::Result<Self> {
         let (protocol, endpoint) = uri::protocol_endpoint(uri.clone());
         let mut proto_client = proto_vector::Client::new(HyperSvc {
             uri,
             client: hyper_client,
         });
 
-        if compression {
-            proto_client = proto_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);
+        // Apply compression based on the algorithm
+        match compression {
+            Compression::Gzip(_) => {
+                proto_client =
+                    proto_client.send_compressed(tonic::codec::CompressionEncoding::Gzip);
+            }
+            Compression::Zstd(_) => {
+                proto_client =
+                    proto_client.send_compressed(tonic::codec::CompressionEncoding::Zstd);
+            }
+            Compression::None => {
+                // No compression
+            }
+            _ => {
+                return Err(format!(
+                    "Compression '{}' is not supported for the Vector sink. Supported options: 'gzip', 'zstd', or 'none'.",
+                    compression
+                ).into());
+            }
         }
-        Self {
+
+        Ok(Self {
             client: proto_client,
             protocol,
             endpoint,
-        }
+        })
     }
 }
 
