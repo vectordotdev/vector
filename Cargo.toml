@@ -337,6 +337,7 @@ smpl_jwt = { version = "0.8.0", default-features = false, optional = true }
 
 # AMQP
 lapin = { version = "4.3.0", default-features = false, features = ["tokio", "native-tls"], optional = true }
+async-rs = { version = "0.8", default-features = false, features = ["tokio"], optional = true }
 deadpool = { version = "0.12.2", default-features = false, features = ["managed", "rt_tokio_1"], optional = true }
 
 # API
@@ -661,7 +662,7 @@ sources-metrics = [
   "sources-websocket",
 ]
 
-sources-amqp = ["lapin"]
+sources-amqp = ["lapin", "async-rs"]
 sources-apache_metrics = ["sources-utils-http-client"]
 sources-aws_ecs_metrics = ["sources-utils-http-client"]
 sources-aws_kinesis_firehose = ["dep:base64"]
@@ -855,7 +856,7 @@ sinks-metrics = [
   "sinks-splunk_hec"
 ]
 
-sinks-amqp = ["deadpool", "lapin"]
+sinks-amqp = ["deadpool", "lapin", "async-rs"]
 sinks-appsignal = []
 sinks-aws_cloudwatch_logs = ["aws-core", "dep:aws-sdk-cloudwatchlogs", "dep:aws-sdk-kms"]
 sinks-aws_cloudwatch_metrics = ["aws-core", "dep:aws-sdk-cloudwatch"]

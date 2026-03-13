@@ -91,6 +91,7 @@ impl AmqpConfig {
                     &addr,
                     lapin::ConnectionProperties::default(),
                     tls_config,
+                    async_rs::Runtime::tokio_current(),
                 )
                 .await
             }

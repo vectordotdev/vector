@@ -12457,6 +12457,7 @@ dependencies = [
  "async-graphql",
  "async-graphql-warp",
  "async-nats",
+ "async-rs",
  "async-stream",
  "async-trait",
  "aws-config",
