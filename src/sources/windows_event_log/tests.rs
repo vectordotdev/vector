@@ -1421,6 +1421,7 @@ mod message_rendering_tests {
         let mut event = create_test_event();
         event.rendered_message = None;
         event.event_data.clear(); // No message in event_data either
+        event.string_inserts.clear(); // Clear string inserts to reach fallback path
 
         let log_event = parser.parse_event(event.clone()).unwrap();
 
