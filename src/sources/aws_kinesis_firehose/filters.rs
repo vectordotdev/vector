@@ -1,4 +1,4 @@
-use std::{convert::Infallible, io};
+use std::{collections::HashMap, convert::Infallible, io};
 
 use bytes::{Buf, Bytes};
 use chrono::Utc;
@@ -14,14 +14,16 @@ use super::{
     Compression,
     errors::{ParseSnafu, RequestError},
     handlers,
-    models::{FirehoseRequest, FirehoseResponse},
+    models::{FirehoseCommonAttributesHeader, FirehoseRequest, FirehoseResponse},
 };
 use crate::{
     SourceSender, codecs,
     internal_events::{AwsKinesisFirehoseRequestError, AwsKinesisFirehoseRequestReceived},
+    sources::http_server::HttpConfigParamKind,
 };
 
 /// Handles routing of incoming HTTP requests from AWS Kinesis Firehose
+#[allow(clippy::too_many_arguments)]
 pub fn firehose(
     access_keys: Vec<String>,
     store_access_key: bool,
@@ -30,6 +32,7 @@ pub fn firehose(
     acknowledgements: bool,
     out: SourceSender,
     log_namespace: LogNamespace,
+    common_attributes: Vec<HttpConfigParamKind>,
 ) -> impl Filter<Extract = (impl warp::Reply,), Error = Infallible> + Clone {
     let bytes_received = register!(BytesReceived::from(Protocol::HTTP));
     let context = handlers::Context {
@@ -40,6 +43,7 @@ pub fn firehose(
         bytes_received,
         out,
         log_namespace,
+        common_attributes,
     };
     warp::post()
         .and(emit_received())
@@ -58,6 +62,7 @@ pub fn firehose(
                 })
                 .untuple_one(),
         )
+        .and(parse_common_attributes_header())
         .and(parse_body())
         .and(warp::any().map(move || context.clone()))
         .and_then(handlers::firehose)
@@ -102,6 +107,29 @@ fn parse_body() -> impl Filter<Extract = (FirehoseRequest,), Error = warp::rejec
                         })
                         .map_err(warp::reject::custom)
                 })
+            },
+        )
+}
+
+/// Parse AWS Kinesis Firehose X-Amz-Firehose-Common-Attributes header
+fn parse_common_attributes_header()
+-> impl Filter<Extract = (HashMap<String, String>,), Error = warp::reject::Rejection> + Clone {
+    warp::any()
+        .and(warp::header("X-Amz-Firehose-Request-Id"))
+        .and(warp::header::optional("X-Amz-Firehose-Common-Attributes"))
+        .and_then(
+            |request_id: String, common_attributes: Option<String>| async move {
+                match common_attributes {
+                    Some(common_attributes) => serde_json::from_str(&common_attributes)
+                        .context(ParseSnafu {
+                            request_id: request_id.clone(),
+                        })
+                        .map(|common_attributes_header: FirehoseCommonAttributesHeader| {
+                            common_attributes_header.common_attributes
+                        })
+                        .map_err(warp::reject::custom),
+                    None => Ok(HashMap::new()),
+                }
             },
         )
 }

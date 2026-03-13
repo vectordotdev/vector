@@ -1,5 +1,17 @@
 use chrono::{DateTime, Utc, serde::ts_milliseconds};
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
+
+/// Represents AWS Kinesis Firehose X-Amz-Firehose-Common-Attributes header
+///
+/// Represents protocol v1.0 (the only protocol as of writing)
+///
+/// <https://docs.aws.amazon.com/firehose/latest/dev/httpdeliveryrequestresponse.html>
+#[derive(Debug, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct FirehoseCommonAttributesHeader {
+    pub common_attributes: HashMap<String, String>,
+}
 
 /// Represents an AWS Kinesis Firehose request
 ///
