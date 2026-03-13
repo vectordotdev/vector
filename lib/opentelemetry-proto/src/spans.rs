@@ -272,9 +272,9 @@ mod tests {
         }
     }
 
-    // ========================================================================
+    //
     // Tests for InstrumentationScope decode
-    // ========================================================================
+    //
 
     #[test]
     fn test_scope_name_version_decoded() {
@@ -345,9 +345,9 @@ mod tests {
         assert!(trace.get(event_path!("scope", "version")).is_none());
     }
 
-    // ========================================================================
+    //
     // Tests for schema_url decode
-    // ========================================================================
+    //
 
     #[test]
     fn test_scope_schema_url_decoded() {
@@ -400,9 +400,9 @@ mod tests {
         assert!(trace.get(event_path!("schema_url")).is_none());
     }
 
-    // ========================================================================
+    //
     // Tests for resource.dropped_attributes_count
-    // ========================================================================
+    //
 
     #[test]
     fn test_resource_dropped_attributes_count() {
@@ -443,9 +443,9 @@ mod tests {
         );
     }
 
-    // ========================================================================
+    //
     // Combined: all new fields
-    // ========================================================================
+    //
 
     #[test]
     fn test_all_new_fields_together() {

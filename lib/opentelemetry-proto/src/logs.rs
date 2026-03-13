@@ -148,7 +148,8 @@ impl ResourceLog {
             }
             // Resource dropped_attributes_count: only written when > 0 (optional metadata).
             // Legacy namespace: stored at root as "resource_dropped_attributes_count".
-            // Vector namespace: stored under metadata at "resources.dropped_attributes_count".
+            // Vector namespace: stored as "resource_dropped_attributes_count" (separate from
+            // "resources" to avoid colliding with user-supplied resource attributes).
             if resource.dropped_attributes_count > 0 {
                 log_namespace.insert_source_metadata(
                     SOURCE_NAME,
@@ -156,22 +157,21 @@ impl ResourceLog {
                     Some(LegacyKey::Overwrite(path!(
                         RESOURCE_DROPPED_ATTRIBUTES_COUNT_KEY
                     ))),
-                    path!(RESOURCE_KEY, DROPPED_ATTRIBUTES_COUNT_KEY),
+                    path!("resource_dropped_attributes_count"),
                     resource.dropped_attributes_count,
                 );
             }
         }
         // Resource-level schema_url (from ResourceLogs).
-        // Legacy namespace: stored at root as "schema_url" (flat, alongside other top-level fields).
-        // Vector namespace: stored under metadata at "resources.schema_url" (grouped with resource data).
-        // Must come AFTER the resources insert above, which overwrites the entire "resources"
-        // key in Vector namespace — inserting schema_url before would be lost.
+        // Legacy namespace: stored at root as "schema_url".
+        // Vector namespace: stored as "resource_schema_url" (separate from "resources" to
+        // avoid colliding with user-supplied resource attributes that may use the same key).
         if !self.resource_schema_url.is_empty() {
             log_namespace.insert_source_metadata(
                 SOURCE_NAME,
                 &mut log,
                 Some(LegacyKey::Overwrite(path!(SCHEMA_URL_KEY))),
-                path!(RESOURCE_KEY, SCHEMA_URL_KEY),
+                path!("resource_schema_url"),
                 self.resource_schema_url,
             );
         }
@@ -351,9 +351,9 @@ mod tests {
         }
     }
 
-    // ========================================================================
+    //
     // Tests for schema_url decode (Legacy namespace)
-    // ========================================================================
+    //
 
     #[test]
     fn test_scope_schema_url_decoded_legacy() {
@@ -424,9 +424,9 @@ mod tests {
         assert!(log.get("schema_url").is_none());
     }
 
-    // ========================================================================
+    //
     // Tests for schema_url decode (Vector namespace)
-    // ========================================================================
+    //
 
     #[test]
     fn test_scope_schema_url_decoded_vector() {
@@ -467,8 +467,7 @@ mod tests {
         let metadata = log.metadata().value();
         let res_schema = metadata
             .get("opentelemetry")
-            .and_then(|v| v.get("resources"))
-            .and_then(|v| v.get("schema_url"));
+            .and_then(|v| v.get("resource_schema_url"));
         assert!(res_schema.is_some());
         assert_eq!(
             res_schema.unwrap().to_string_lossy(),
@@ -476,9 +475,9 @@ mod tests {
         );
     }
 
-    // ========================================================================
+    //
     // Tests for resource.dropped_attributes_count
-    // ========================================================================
+    //
 
     #[test]
     fn test_resource_dropped_attributes_count_legacy() {
@@ -528,15 +527,14 @@ mod tests {
         let metadata = log.metadata().value();
         let dropped = metadata
             .get("opentelemetry")
-            .and_then(|v| v.get("resources"))
-            .and_then(|v| v.get("dropped_attributes_count"));
+            .and_then(|v| v.get("resource_dropped_attributes_count"));
         assert!(dropped.is_some());
         assert_eq!(*dropped.unwrap(), Value::Integer(3));
     }
 
-    // ========================================================================
+    //
     // Tests for scope fields (verify existing behavior still works)
-    // ========================================================================
+    //
 
     #[test]
     fn test_scope_name_version_decoded() {
@@ -551,9 +549,9 @@ mod tests {
         assert_eq!(log.get("scope.version").unwrap().to_string_lossy(), "1.2.3");
     }
 
-    // ========================================================================
+    //
     // Combined: all new fields populated together
-    // ========================================================================
+    //
 
     #[test]
     fn test_all_new_fields_together() {
@@ -627,18 +625,18 @@ mod tests {
             "https://scope.schema/1.0"
         );
 
-        // Resource schema_url must survive even when resource attributes are present.
-        // This is the key assertion: the resources insert (which sets the attributes
-        // object) must not overwrite schema_url that was inserted earlier.
-        let res_meta = otel.get("resources").expect("resources metadata");
+        // Resource schema_url is stored as a flat key (not nested under "resources")
+        // to avoid colliding with user-supplied resource attributes.
         assert_eq!(
-            res_meta.get("schema_url").unwrap().to_string_lossy(),
+            otel.get("resource_schema_url")
+                .unwrap()
+                .to_string_lossy(),
             "https://resource.schema/1.0"
         );
 
-        // Resource dropped attributes count
+        // Resource dropped attributes count (also flat, not under "resources")
         assert_eq!(
-            *res_meta.get("dropped_attributes_count").unwrap(),
+            *otel.get("resource_dropped_attributes_count").unwrap(),
             Value::Integer(2)
         );
     }
