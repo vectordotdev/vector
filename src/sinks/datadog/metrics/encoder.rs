@@ -1583,6 +1583,77 @@ mod tests {
     }
 
     #[test]
+    fn default_payload_limits_are_endpoint_aware() {
+        let v1 = DatadogMetricsEndpoint::Series(SeriesApiVersion::V1).payload_limits();
+        assert_eq!(v1.uncompressed, 62_914_560);
+        assert_eq!(v1.compressed, 3_200_000);
+
+        let v2 = DatadogMetricsEndpoint::Series(SeriesApiVersion::V2).payload_limits();
+        assert_eq!(v2.uncompressed, 5_242_880);
+        assert_eq!(v2.compressed, 512_000);
+
+        let sketches = DatadogMetricsEndpoint::Sketches.payload_limits();
+        assert_eq!(sketches.uncompressed, 62_914_560);
+        assert_eq!(sketches.compressed, 3_200_000);
+    }
+
+    #[test]
+    fn v2_series_default_limits_split_large_batches() {
+        // Simulate a large send and validate that default V2 limits split payloads into multiple
+        // requests, while still making forward progress each pass.
+        let mut pending = vec![get_simple_counter(); 120_000];
+        let mut encoded_batches = 0;
+        let mut encoded_metrics = 0;
+
+        while !pending.is_empty() {
+            let mut encoder = DatadogMetricsEncoder::new(
+                DatadogMetricsEndpoint::Series(SeriesApiVersion::V2),
+                None,
+            )
+            .expect("default payload size limits should be valid");
+
+            let mut next_pending = Vec::new();
+            let mut hit_limit = false;
+            for metric in pending.drain(..) {
+                match encoder.try_encode(metric.clone()) {
+                    Ok(None) => {}
+                    Ok(Some(returned_metric)) => {
+                        hit_limit = true;
+                        next_pending.push(returned_metric);
+                    }
+                    Err(error) => panic!("unexpected encoding error: {error}"),
+                }
+            }
+
+            let finish_result = encoder.finish();
+            assert!(finish_result.is_ok());
+            let (_payload, processed) = finish_result.unwrap();
+            assert!(
+                !processed.is_empty(),
+                "encoder should always make progress for a non-empty batch"
+            );
+
+            encoded_metrics += processed.len();
+            encoded_batches += 1;
+
+            if hit_limit {
+                assert!(
+                    !next_pending.is_empty(),
+                    "hitting limits should leave metrics to process in the next batch"
+                );
+            }
+
+            pending = next_pending;
+        }
+
+        assert_eq!(encoded_metrics, 120_000);
+        assert!(
+            encoded_batches > 1,
+            "expected multiple batches for V2 default limits"
+        );
+    }
+
+    #[test]
     fn encode_series_breaks_out_when_limit_reached_uncompressed() {
         // We manually create the encoder with an arbitrarily low "uncompressed" limit but high
         // "compressed" limit to exercise the codepath that should avoid encoding a metric when the
