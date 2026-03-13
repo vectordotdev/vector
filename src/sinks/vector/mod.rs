@@ -1,6 +1,7 @@
 use snafu::Snafu;
 use vector_lib::configurable::configurable_component;
 
+mod compression;
 mod config;
 mod service;
 mod sink;
