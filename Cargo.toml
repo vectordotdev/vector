@@ -204,6 +204,7 @@ tokio-tungstenite = { version = "0.20.1", default-features = false }
 toml = { version = "0.9.8", default-features = false, features = ["serde", "display", "parse"] }
 tonic = { version = "0.11", default-features = false, features = ["transport", "codegen", "prost", "tls", "tls-roots", "gzip"] }
 tonic-build = { version = "0.11", default-features = false, features = ["transport", "prost"] }
+tonic-health = { version = "0.11", default-features = false }
 tracing = { version = "0.1.44", default-features = false }
 tracing-subscriber = { version = "0.3.22", default-features = false, features = ["fmt"]  }
 url = { version = "2.5.4", default-features = false, features = ["serde"] }
@@ -437,6 +438,7 @@ tokio-tungstenite = { workspace = true, features = ["connect"], optional = true 
 toml.workspace = true
 hickory-proto = { workspace = true, optional = true }
 tonic = { workspace = true, optional = true }
+tonic-health = { workspace = true, optional = true }
 thread_local = { version = "1.1.9", default-features = false, optional = true }
 typetag = { version = "0.2.20", default-features = false }
 url.workspace = true
@@ -455,6 +457,8 @@ byteorder = "1.5.0"
 
 [target.'cfg(windows)'.dependencies]
 windows-service = "0.8.0"
+windows = { version = "0.58", features = ["Win32_System_EventLog", "Win32_Foundation", "Win32_System_Com", "Win32_Security", "Win32_Security_Authorization", "Win32_System_Threading", "Win32_Storage_FileSystem"], optional = true }
+quick-xml = { version = "0.31", default-features = false, features = ["serialize"], optional = true }
 
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", default-features = false, features = ["socket", "signal", "fs"] }
@@ -644,6 +648,7 @@ sources-logs = [
   "sources-syslog",
   "sources-vector",
   "sources-websocket",
+  "sources-windows_event_log",
 ]
 sources-metrics = [
   "dep:prost",
@@ -730,8 +735,10 @@ sources-utils-net-tcp = ["listenfd", "dep:ipnet"]
 sources-utils-net-udp = ["listenfd"]
 sources-utils-net-unix = []
 sources-websocket = ["dep:tokio-tungstenite"]
+sources-windows_event_log = ["dep:windows", "dep:quick-xml", "dep:governor"]
+sources-windows_event_log-integration-tests = ["sources-windows_event_log"]
 
-sources-vector = ["dep:prost", "dep:tonic", "protobuf-build"]
+sources-vector = ["dep:prost", "dep:tonic", "dep:tonic-health", "protobuf-build"]
 
 # Transforms
 transforms = ["transforms-logs", "transforms-metrics"]
@@ -959,6 +966,7 @@ all-integration-tests = [
   "splunk-integration-tests",
   "vector-api-tests",
   "webhdfs-integration-tests",
+  "windows-event-log-integration-tests",
 ]
 
 amqp-integration-tests = ["sources-amqp", "sinks-amqp"]
@@ -1026,6 +1034,7 @@ redis-integration-tests = ["sinks-redis", "sources-redis"]
 splunk-integration-tests = ["sinks-splunk_hec"]
 dnstap-integration-tests = ["sources-dnstap", "dep:bollard"]
 webhdfs-integration-tests = ["sinks-webhdfs"]
+windows-event-log-integration-tests = ["sources-windows_event_log-integration-tests"]
 disable-resolv-conf = []
 shutdown-tests = ["api", "sinks-blackhole", "sinks-console", "sinks-prometheus", "sources", "transforms-lua", "transforms-remap", "unix"]
 cli-tests = ["sinks-blackhole", "sinks-socket", "sources-demo_logs", "sources-file", "transforms-remap"]
