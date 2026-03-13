@@ -16,8 +16,10 @@ use vector_lib::{
 };
 
 use super::{
-    config::DatadogMetricsEndpoint, normalizer::DatadogMetricsNormalizer,
-    request_builder::DatadogMetricsRequestBuilder, service::DatadogMetricsRequest,
+    config::{DatadogMetricsEndpoint, SeriesApiVersion},
+    normalizer::DatadogMetricsNormalizer,
+    request_builder::DatadogMetricsRequestBuilder,
+    service::DatadogMetricsRequest,
 };
 use crate::{
     internal_events::DatadogMetricsEncodingError,
@@ -33,21 +35,24 @@ use crate::{
 /// Generally speaking, all "basic" metrics -- counter, gauge, set, aggregated summary-- are sent to
 /// the Series API, while distributions, aggregated histograms, and sketches (hehe) are sent to the
 /// Sketches API.
-struct DatadogMetricsTypePartitioner;
+struct DatadogMetricsTypePartitioner {
+    series_api_version: SeriesApiVersion,
+}
 
 impl Partitioner for DatadogMetricsTypePartitioner {
     type Item = Metric;
     type Key = (Option<Arc<str>>, DatadogMetricsEndpoint);
 
     fn partition(&self, item: &Self::Item) -> Self::Key {
+        let series = DatadogMetricsEndpoint::Series(self.series_api_version);
         let endpoint = match item.data().value() {
-            MetricValue::Counter { .. } => DatadogMetricsEndpoint::series(),
-            MetricValue::Gauge { .. } => DatadogMetricsEndpoint::series(),
-            MetricValue::Set { .. } => DatadogMetricsEndpoint::series(),
+            MetricValue::Counter { .. } => series,
+            MetricValue::Gauge { .. } => series,
+            MetricValue::Set { .. } => series,
             MetricValue::Distribution { .. } => DatadogMetricsEndpoint::Sketches,
             MetricValue::AggregatedHistogram { .. } => DatadogMetricsEndpoint::Sketches,
             // NOTE: AggregatedSummary will be split into counters and gauges during normalization
-            MetricValue::AggregatedSummary { .. } => DatadogMetricsEndpoint::series(),
+            MetricValue::AggregatedSummary { .. } => series,
             MetricValue::Sketch { .. } => DatadogMetricsEndpoint::Sketches,
         };
         (item.metadata().datadog_api_key(), endpoint)
@@ -60,6 +65,7 @@ pub(crate) struct DatadogMetricsSink<S> {
     series_batch_settings: BatcherSettings,
     sketches_batch_settings: BatcherSettings,
     protocol: String,
+    series_api_version: SeriesApiVersion,
 }
 
 impl<S> DatadogMetricsSink<S>
@@ -76,6 +82,7 @@ where
         series_batch_settings: BatcherSettings,
         sketches_batch_settings: BatcherSettings,
         protocol: String,
+        series_api_version: SeriesApiVersion,
     ) -> Self {
         DatadogMetricsSink {
             service,
@@ -83,6 +90,7 @@ where
             series_batch_settings,
             sketches_batch_settings,
             protocol,
+            series_api_version,
         }
     }
 
@@ -90,6 +98,9 @@ where
         let mut splitter: MetricSplitter<AggregatedSummarySplitter> = MetricSplitter::default();
         let series_batch_settings = self.series_batch_settings;
         let sketches_batch_settings = self.sketches_batch_settings;
+        let partitioner = DatadogMetricsTypePartitioner {
+            series_api_version: self.series_api_version,
+        };
 
         input
             // Convert `Event` to `Metric` so we don't have to deal with constant conversions.
@@ -106,7 +117,7 @@ where
             // distributions, aggregated histograms, and sketches. Each endpoint uses its own byte size
             // limit: 5 MiB for Series v2 and 60 MiB for Sketches.
             .batched_partitioned(
-                DatadogMetricsTypePartitioner,
+                partitioner,
                 series_batch_settings.timeout,
                 |(_api_key, endpoint)| match endpoint {
                     DatadogMetricsEndpoint::Series(_) => {

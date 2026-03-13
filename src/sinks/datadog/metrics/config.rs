@@ -1,5 +1,3 @@
-use std::sync::OnceLock;
-
 use http::Uri;
 use snafu::ResultExt;
 use tower::ServiceBuilder;
@@ -38,12 +36,20 @@ pub(super) const SERIES_V1_PATH: &str = "/api/v1/series";
 pub(super) const SERIES_V2_PATH: &str = "/api/v2/series";
 pub(super) const SKETCHES_PATH: &str = "/api/beta/sketches";
 
-// TODO: the series V1 endpoint support is considered deprecated and should be removed in a future release.
-// At that time when the V1 support is removed, the SeriesApiVersion stops being useful and can be removed.
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// The API version to use when submitting series metrics to Datadog.
+#[configurable_component]
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+#[serde(rename_all = "snake_case")]
 pub enum SeriesApiVersion {
+    /// Use the v1 series endpoint (`/api/v1/series`).
+    ///
+    /// This is a legacy endpoint. Prefer `v2` unless you have a specific reason to use v1.
     V1,
+
+    /// Use the v2 series endpoint (`/api/v2/series`).
+    ///
+    /// This is the recommended and default endpoint.
+    #[default]
     V2,
 }
 
@@ -53,21 +59,6 @@ impl SeriesApiVersion {
             Self::V1 => SERIES_V1_PATH,
             Self::V2 => SERIES_V2_PATH,
         }
-    }
-    fn get_api_version_backwards_compatible() -> Self {
-        static API_VERSION: OnceLock<SeriesApiVersion> = OnceLock::new();
-        *API_VERSION.get_or_init(|| {
-            if std::env::var("VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API").is_ok() {
-                warn!(
-                    "VECTOR_TEMP_USE_DD_METRICS_SERIES_V2_API is deprecated and has no effect. \
-                     The v2 series endpoint is now the default — you can safely remove this variable."
-                );
-            }
-            match std::env::var("VECTOR_TEMP_USE_DD_METRICS_SERIES_V1_API") {
-                Ok(_) => Self::V1,
-                Err(_) => Self::V2,
-            }
-        })
     }
 }
 
@@ -98,11 +89,6 @@ impl DatadogMetricsEndpoint {
     // Gets whether or not this is a series endpoint.
     pub const fn is_series(self) -> bool {
         matches!(self, Self::Series { .. })
-    }
-
-    // Creates an instance of the `Series` variant with the default API version.
-    pub fn series() -> Self {
-        Self::Series(SeriesApiVersion::get_api_version_backwards_compatible())
     }
 
     pub(super) const fn payload_limits(self) -> DatadogMetricsPayloadLimits {
@@ -167,6 +153,13 @@ pub struct DatadogMetricsConfig {
     #[serde(default)]
     pub default_namespace: Option<String>,
 
+    /// Controls which Datadog series API endpoint is used to submit metrics.
+    ///
+    /// Defaults to `v2` (`/api/v2/series`). Set to `v1` (`/api/v1/series`) only if you need to
+    /// fall back to the legacy endpoint.
+    #[serde(default)]
+    pub series_api_version: SeriesApiVersion,
+
     #[configurable(derived)]
     #[serde(default)]
     pub batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
@@ -227,12 +220,7 @@ impl DatadogMetricsConfig {
     ) -> crate::Result<DatadogMetricsEndpointConfiguration> {
         let base_uri = self.get_base_agent_endpoint(dd_common);
 
-        // TODO: the V1 endpoint support is considered deprecated and should be removed in a future release.
-        // At that time, the get_api_version_backwards_compatible() should be replaced with statically using the v2.
-        let series_endpoint = build_uri(
-            &base_uri,
-            SeriesApiVersion::get_api_version_backwards_compatible().get_path(),
-        )?;
+        let series_endpoint = build_uri(&base_uri, self.series_api_version.get_path())?;
         let sketches_endpoint = build_uri(&base_uri, SKETCHES_PATH)?;
 
         Ok(DatadogMetricsEndpointConfiguration::new(
@@ -264,7 +252,7 @@ impl DatadogMetricsConfig {
         client: HttpClient,
     ) -> crate::Result<VectorSink> {
         let (batcher_settings, sketches_batcher_settings) =
-            resolve_endpoint_batch_settings(self.batch)?;
+            resolve_endpoint_batch_settings(self.batch, self.series_api_version)?;
 
         // TODO: revisit our concurrency and batching defaults
         let request_limits = self.request.into_settings();
@@ -280,6 +268,7 @@ impl DatadogMetricsConfig {
         let request_builder = DatadogMetricsRequestBuilder::new(
             endpoint_configuration,
             self.default_namespace.clone(),
+            self.series_api_version,
         )?;
 
         let protocol = self.get_protocol(dd_common);
@@ -289,6 +278,7 @@ impl DatadogMetricsConfig {
             batcher_settings,
             sketches_batcher_settings,
             protocol,
+            self.series_api_version,
         );
 
         Ok(VectorSink::from_event_streamsink(sink))
@@ -311,11 +301,11 @@ impl DatadogMetricsConfig {
 /// limit is configured, both endpoints share it.
 fn resolve_endpoint_batch_settings(
     batch: BatchConfig<DatadogMetricsDefaultBatchSettings>,
+    series_version: SeriesApiVersion,
 ) -> crate::Result<(BatcherSettings, BatcherSettings)> {
     let mut series = batch.into_batcher_settings()?;
     let mut sketches = series;
     if series.size_limit == usize::MAX {
-        let series_version = SeriesApiVersion::get_api_version_backwards_compatible();
         series.size_limit = DatadogMetricsEndpoint::Series(series_version)
             .payload_limits()
             .uncompressed;
@@ -345,9 +335,19 @@ mod tests {
     // When max_bytes is unset, each endpoint gets its own API payload limit.
     #[test]
     fn default_batch_config_uses_endpoint_specific_size_limits() {
-        let (series, sketches) = resolve_endpoint_batch_settings(BatchConfig::default()).unwrap();
+        let (series, sketches) =
+            resolve_endpoint_batch_settings(BatchConfig::default(), SeriesApiVersion::V2).unwrap();
 
         assert_eq!(series.size_limit, 5_242_880); // 5 MiB — Series v2 limit
+        assert_eq!(sketches.size_limit, 62_914_560); // 60 MiB — Sketches limit
+    }
+
+    #[test]
+    fn v1_batch_config_uses_v1_size_limit() {
+        let (series, sketches) =
+            resolve_endpoint_batch_settings(BatchConfig::default(), SeriesApiVersion::V1).unwrap();
+
+        assert_eq!(series.size_limit, 62_914_560); // 60 MiB — Series v1 limit
         assert_eq!(sketches.size_limit, 62_914_560); // 60 MiB — Sketches limit
     }
 
@@ -357,7 +357,8 @@ mod tests {
         let mut config = BatchConfig::<DatadogMetricsDefaultBatchSettings>::default();
         config.max_bytes = Some(1_000_000);
 
-        let (series, sketches) = resolve_endpoint_batch_settings(config).unwrap();
+        let (series, sketches) =
+            resolve_endpoint_batch_settings(config, SeriesApiVersion::V2).unwrap();
 
         assert_eq!(series.size_limit, 1_000_000);
         assert_eq!(sketches.size_limit, 1_000_000);
