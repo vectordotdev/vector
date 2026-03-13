@@ -23,7 +23,7 @@ futures.workspace = true
 memmap2 = { version = "0.9.10", default-features = false }
 metrics.workspace = true
 num-traits = { version = "0.2.19", default-features = false }
-paste.workspace = true
+pastey.workspace = true
 rkyv = { version = "0.7.46", default-features = false, features = ["size_32", "std", "strict", "validation"] }
 serde.workspace = true
 snafu.workspace = true
