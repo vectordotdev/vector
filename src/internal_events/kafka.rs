@@ -132,9 +132,24 @@ impl InternalEvent for KafkaStatisticsReceived<'_> {
         counter!("kafka_produced_messages_total").absolute(self.statistics.txmsgs as u64);
         counter!("kafka_produced_messages_bytes_total")
             .absolute(self.statistics.txmsg_bytes as u64);
-        counter!("kafka_consumed_messages_total").absolute(self.statistics.rxmsgs as u64);
-        counter!("kafka_consumed_messages_bytes_total")
-            .absolute(self.statistics.rxmsg_bytes as u64);
+
+        // Emit per-topic, per-partition consumed message metrics
+        for (topic_id, topic) in &self.statistics.topics {
+            for (partition_id, partition) in &topic.partitions {
+                counter!(
+                    "kafka_consumed_messages_total",
+                    "topic" => topic_id.clone(),
+                    "partition" => partition_id.to_string(),
+                )
+                .absolute(partition.rxmsgs);
+                counter!(
+                    "kafka_consumed_messages_bytes_total",
+                    "topic" => topic_id.clone(),
+                    "partition" => partition_id.to_string(),
+                )
+                .absolute(partition.rxbytes);
+            }
+        }
 
         if self.expose_lag_metrics {
             for (topic_id, topic) in &self.statistics.topics {
