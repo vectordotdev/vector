@@ -56,7 +56,7 @@ impl deadpool::managed::Manager for AmqpSinkChannelManager {
             Ok(())
         } else {
             Err((AmqpError::ChannelClosed {
-                status: status.clone(), // This is a wrapper around an Arc, cloning is cheap
+                status: status.clone(),
             })
             .into())
         }
