@@ -192,10 +192,7 @@ impl SourceConfig for VectorConfig {
 
         // Register the Vector service as serving in the health reporter
         health_reporter
-            .set_service_status(
-                "vector.Vector",
-                tonic_health::ServingStatus::Serving,
-            )
+            .set_service_status("vector.Vector", tonic_health::ServingStatus::Serving)
             .await;
 
         // Combine both services using RoutesBuilder
