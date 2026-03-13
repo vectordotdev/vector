@@ -215,7 +215,7 @@ pub fn build_metric_tags(
         }
         if res.dropped_attributes_count > 0 {
             tags.insert(
-                "resource.dropped_attributes_count".to_string(),
+                "resource_dropped_attributes_count".to_string(),
                 res.dropped_attributes_count.to_string(),
             );
         }
@@ -230,7 +230,7 @@ pub fn build_metric_tags(
         }
         if scope.dropped_attributes_count > 0 {
             tags.insert(
-                "scope.dropped_attributes_count".to_string(),
+                "scope_dropped_attributes_count".to_string(),
                 scope.dropped_attributes_count.to_string(),
             );
         }
@@ -246,12 +246,18 @@ pub fn build_metric_tags(
         }
     }
 
+    // Use underscore-separated names for metadata tags to avoid colliding
+    // with user-supplied resource/scope attributes that use dot-separated
+    // "resource.{key}" / "scope.{key}" format.
     if !scope_schema_url.is_empty() {
-        tags.insert("scope.schema_url".to_string(), scope_schema_url.to_string());
+        tags.insert(
+            "scope_schema_url".to_string(),
+            scope_schema_url.to_string(),
+        );
     }
     if !resource_schema_url.is_empty() {
         tags.insert(
-            "resource.schema_url".to_string(),
+            "resource_schema_url".to_string(),
             resource_schema_url.to_string(),
         );
     }
@@ -585,9 +591,9 @@ mod tests {
         event.as_metric().tags().unwrap()
     }
 
-    // ========================================================================
+    //
     // Tests for schema_url tags
-    // ========================================================================
+    //
 
     #[test]
     fn test_scope_schema_url_as_tag() {
@@ -596,7 +602,7 @@ mod tests {
         assert_eq!(events.len(), 1);
         let tags = get_tags(&events[0]);
         assert_eq!(
-            tags.get("scope.schema_url").unwrap(),
+            tags.get("scope_schema_url").unwrap(),
             "https://scope.schema"
         );
     }
@@ -607,7 +613,7 @@ mod tests {
         let events: Vec<Event> = rm.into_event_iter().collect();
         let tags = get_tags(&events[0]);
         assert_eq!(
-            tags.get("resource.schema_url").unwrap(),
+            tags.get("resource_schema_url").unwrap(),
             "https://resource.schema"
         );
     }
@@ -617,13 +623,13 @@ mod tests {
         let rm = make_resource_metrics(vec![], 0, None, "", "");
         let events: Vec<Event> = rm.into_event_iter().collect();
         let tags = get_tags(&events[0]);
-        assert!(tags.get("scope.schema_url").is_none());
-        assert!(tags.get("resource.schema_url").is_none());
+        assert!(tags.get("scope_schema_url").is_none());
+        assert!(tags.get("resource_schema_url").is_none());
     }
 
-    // ========================================================================
+    //
     // Tests for dropped_attributes_count tags
-    // ========================================================================
+    //
 
     #[test]
     fn test_scope_dropped_attributes_count_tag() {
@@ -636,7 +642,7 @@ mod tests {
         let rm = make_resource_metrics(vec![], 0, Some(scope), "", "");
         let events: Vec<Event> = rm.into_event_iter().collect();
         let tags = get_tags(&events[0]);
-        assert_eq!(tags.get("scope.dropped_attributes_count").unwrap(), "5");
+        assert_eq!(tags.get("scope_dropped_attributes_count").unwrap(), "5");
     }
 
     #[test]
@@ -650,7 +656,7 @@ mod tests {
         let rm = make_resource_metrics(vec![], 0, Some(scope), "", "");
         let events: Vec<Event> = rm.into_event_iter().collect();
         let tags = get_tags(&events[0]);
-        assert!(tags.get("scope.dropped_attributes_count").is_none());
+        assert!(tags.get("scope_dropped_attributes_count").is_none());
     }
 
     #[test]
@@ -658,7 +664,7 @@ mod tests {
         let rm = make_resource_metrics(vec![make_kv("host", "server")], 3, None, "", "");
         let events: Vec<Event> = rm.into_event_iter().collect();
         let tags = get_tags(&events[0]);
-        assert_eq!(tags.get("resource.dropped_attributes_count").unwrap(), "3");
+        assert_eq!(tags.get("resource_dropped_attributes_count").unwrap(), "3");
     }
 
     #[test]
@@ -666,12 +672,12 @@ mod tests {
         let rm = make_resource_metrics(vec![make_kv("host", "server")], 0, None, "", "");
         let events: Vec<Event> = rm.into_event_iter().collect();
         let tags = get_tags(&events[0]);
-        assert!(tags.get("resource.dropped_attributes_count").is_none());
+        assert!(tags.get("resource_dropped_attributes_count").is_none());
     }
 
-    // ========================================================================
+    //
     // Combined: all new tags
-    // ========================================================================
+    //
 
     #[test]
     fn test_all_new_tags_together() {
@@ -699,14 +705,14 @@ mod tests {
 
         // New tags
         assert_eq!(
-            tags.get("scope.schema_url").unwrap(),
+            tags.get("scope_schema_url").unwrap(),
             "https://scope.schema"
         );
         assert_eq!(
-            tags.get("resource.schema_url").unwrap(),
+            tags.get("resource_schema_url").unwrap(),
             "https://resource.schema"
         );
-        assert_eq!(tags.get("scope.dropped_attributes_count").unwrap(), "1");
-        assert_eq!(tags.get("resource.dropped_attributes_count").unwrap(), "2");
+        assert_eq!(tags.get("scope_dropped_attributes_count").unwrap(), "1");
+        assert_eq!(tags.get("resource_dropped_attributes_count").unwrap(), "2");
     }
 }
