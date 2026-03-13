@@ -42,6 +42,12 @@ pub struct PostgresConfig {
     /// as table names as parameters in prepared statements are not allowed in PostgreSQL.
     pub table: String,
 
+    /// The columns to insert data into. If not specified, all columns from the input data will be used.
+    /// This allows you to exclude columns like serial/auto-increment columns that should be handled by PostgreSQL.
+    /// This parameter is vulnerable to SQL injection attacks as Vector does not validate or sanitize it, you must not use untrusted input.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub columns: Vec<String>,
+
     /// The postgres connection pool size. See [this](https://docs.rs/sqlx/latest/sqlx/struct.Pool.html#why-use-a-pool) for more
     /// information about why a connection pool should be used.
     #[serde(default = "default_pool_size")]
@@ -79,6 +85,7 @@ impl GenerateConfig for PostgresConfig {
         toml::from_str(
             r#"endpoint = "postgres://user:password@localhost/default"
             table = "table"
+            columns = ["column1", "column2"]
         "#,
         )
         .unwrap()
@@ -103,6 +110,7 @@ impl SinkConfig for PostgresConfig {
             connection_pool,
             self.table.clone(),
             endpoint_uri.to_string(),
+            self.columns.clone(),
         );
         let service = ServiceBuilder::new()
             .settings(request_settings, PostgresRetryLogic)
@@ -142,10 +150,12 @@ mod tests {
             r#"
             endpoint = "postgres://user:password@localhost/default"
             table = "mytable"
+            columns = ["column1", "column2"]
         "#,
         )
         .unwrap();
         assert_eq!(cfg.endpoint, "postgres://user:password@localhost/default");
         assert_eq!(cfg.table, "mytable");
+        assert_eq!(cfg.columns, vec!["column1", "column2"]);
     }
 }
