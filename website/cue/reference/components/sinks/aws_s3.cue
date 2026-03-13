@@ -330,7 +330,7 @@ components: sinks: aws_s3: components._aws & {
 				[sinks.s3_parquet.batch_encoding]
 				parquet.compression = "snappy"
 				parquet.proto_desc_file = "/etc/vector/schemas/logs.desc"
-				parquet.proto_message_type = "mypackage.LogRecord"
+				parquet.proto_message_type = "logs.LogRecord"
 				```
 
 				#### YAML Example (Inline with Nested Types)
