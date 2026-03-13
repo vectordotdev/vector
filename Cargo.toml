@@ -157,7 +157,7 @@ clap_complete = "4.5.66"
 colored = { version = "3.1.1", default-features = false }
 const-str = { version = "1.0.0", default-features = false }
 crossbeam-utils = { version = "0.8.21", default-features = false }
-darling = { version = "0.20.11", default-features = false, features = ["suggestions"] }
+darling = { version = "0.21.3", default-features = false, features = ["suggestions"] }
 dashmap = { version = "6.1.0", default-features = false }
 derivative = { version = "2.2.0", default-features = false }
 exitcode = { version = "1.1.2", default-features = false }
