@@ -167,6 +167,6 @@ sure a meaning exists for all required fields. If a source does not provide a re
 a meaning needs to be manually adjusted for any reason, the VRL function [set_semantic_meaning] can
 be used.
 
-[global log schema]: /docs/reference/configuration/global-options/#log_schema
+[global log schema]: /docs/reference/configuration/schema/#log_schema
 [set_semantic_meaning]: /docs/reference/vrl/functions/#set_semantic_meaning
 [remap]: /docs/reference/configuration/transforms/remap/
