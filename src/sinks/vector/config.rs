@@ -22,7 +22,7 @@ use crate::{
         Healthcheck, VectorSink as VectorSinkType,
         util::{
             BatchConfig, RealtimeEventBasedDefaultBatchSettings, ServiceBuilderExt,
-            TowerRequestConfig, retries::RetryLogic,
+            TowerRequestConfig, buffer::compression::Compression, retries::RetryLogic,
         },
     },
     tls::{MaybeTlsSettings, TlsEnableableConfig},
@@ -49,14 +49,16 @@ pub struct VectorConfig {
     #[configurable(metadata(docs::examples = "https://somehost:6000"))]
     address: String,
 
-    /// Whether or not to compress requests.
+    /// Compression algorithm for requests.
     ///
-    /// If set to `true`, requests are compressed with [`gzip`][gzip_docs].
+    /// Supports `"none"`, `"gzip"`, or `"zstd"`.
     ///
-    /// [gzip_docs]: https://www.gzip.org/
-    #[configurable(metadata(docs::advanced))]
-    #[serde(default)]
-    compression: bool,
+    /// For backward compatibility, boolean values are still accepted:
+    /// - `true` defaults to gzip compression
+    /// - `false` disables compression (deprecated syntax)
+    #[configurable(derived)]
+    #[serde(default, deserialize_with = "crate::serde::bool_or_compression")]
+    compression: Compression,
 
     #[configurable(derived)]
     #[serde(default)]
@@ -97,7 +99,7 @@ fn default_config(address: &str) -> VectorConfig {
     VectorConfig {
         version: None,
         address: address.to_owned(),
-        compression: false,
+        compression: Compression::None,
         batch: BatchConfig::default(),
         request: TowerRequestConfig::default(),
         tls: None,
@@ -120,9 +122,10 @@ impl SinkConfig for VectorConfig {
             .clone()
             .map(|uri| uri.uri)
             .unwrap_or_else(|| uri.clone());
-        let healthcheck_client = VectorService::new(client.clone(), healthcheck_uri, false);
+        let healthcheck_client =
+            VectorService::new(client.clone(), healthcheck_uri, Compression::None)?;
         let healthcheck = healthcheck(healthcheck_client, cx.healthcheck);
-        let service = VectorService::new(client, uri, self.compression);
+        let service = VectorService::new(client, uri, self.compression)?;
         let request_settings = self.request.into_settings();
         let batch_settings = self.batch.into_batcher_settings()?;
 

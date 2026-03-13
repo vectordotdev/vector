@@ -182,6 +182,7 @@ impl SourceConfig for VectorConfig {
             log_namespace,
         })
         .accept_compressed(tonic::codec::CompressionEncoding::Gzip)
+        .accept_compressed(tonic::codec::CompressionEncoding::Zstd)
         // Tonic added a default of 4MB in 0.9. This replaces the old behavior.
         .max_decoding_message_size(usize::MAX);
 

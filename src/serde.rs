@@ -1,6 +1,6 @@
 #![allow(missing_docs)]
 use indexmap::map::IndexMap;
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Deserializer, Serialize, de};
 pub use vector_lib::serde::{bool_or_struct, is_default};
 use vector_lib::{
     codecs::{
@@ -9,6 +9,63 @@ use vector_lib::{
     },
     configurable::configurable_component,
 };
+
+use crate::sinks::util::buffer::compression::Compression;
+
+/// Enables deserializing compression from a bool (legacy) or Compression enum (new).
+///
+/// For backward compatibility:
+/// - `true` maps to `Compression::gzip_default()`
+/// - `false` maps to `Compression::None`
+///
+/// New syntax:
+/// - `"none"`, `"gzip"`, `"zstd"` as strings
+/// - `{ algorithm: "gzip", level: 6 }` as objects
+///
+/// # Errors
+///
+/// Returns the error from deserializing the underlying Compression type.
+pub fn bool_or_compression<'de, D>(deserializer: D) -> Result<Compression, D::Error>
+where
+    D: Deserializer<'de>,
+{
+    struct BoolOrCompression;
+
+    impl<'de> de::Visitor<'de> for BoolOrCompression {
+        type Value = Compression;
+
+        fn expecting(&self, formatter: &mut std::fmt::Formatter) -> std::fmt::Result {
+            formatter.write_str("boolean (deprecated), string, or compression configuration object")
+        }
+
+        fn visit_bool<E>(self, value: bool) -> Result<Compression, E>
+        where
+            E: de::Error,
+        {
+            if value {
+                Ok(Compression::gzip_default())
+            } else {
+                Ok(Compression::None)
+            }
+        }
+
+        fn visit_str<E>(self, value: &str) -> Result<Compression, E>
+        where
+            E: de::Error,
+        {
+            Compression::deserialize(de::value::StrDeserializer::new(value))
+        }
+
+        fn visit_map<M>(self, map: M) -> Result<Compression, M::Error>
+        where
+            M: de::MapAccess<'de>,
+        {
+            Compression::deserialize(de::value::MapAccessDeserializer::new(map))
+        }
+    }
+
+    deserializer.deserialize_any(BoolOrCompression)
+}
 
 pub const fn default_true() -> bool {
     true
@@ -126,5 +183,64 @@ impl<T> From<T> for OneOrMany<T> {
 impl<T> From<Vec<T>> for OneOrMany<T> {
     fn from(value: Vec<T>) -> Self {
         Self::Many(value)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::sinks::util::buffer::compression::{Compression, CompressionLevel};
+    use serde::Deserialize;
+
+    // Test struct that uses the bool_or_compression deserializer
+    #[derive(Deserialize)]
+    struct TestConfig {
+        #[serde(deserialize_with = "bool_or_compression")]
+        compression: Compression,
+    }
+
+    #[test]
+    fn test_bool_or_compression_legacy_true() {
+        let json = r#"{"compression": true}"#;
+        let result: TestConfig = serde_json::from_str(json).unwrap();
+        assert!(matches!(result.compression, Compression::Gzip(_)));
+    }
+
+    #[test]
+    fn test_bool_or_compression_legacy_false() {
+        let json = r#"{"compression": false}"#;
+        let result: TestConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(result.compression, Compression::None);
+    }
+
+    #[test]
+    fn test_bool_or_compression_string_gzip() {
+        let json = r#"{"compression": "gzip"}"#;
+        let result: TestConfig = serde_json::from_str(json).unwrap();
+        assert!(matches!(result.compression, Compression::Gzip(_)));
+    }
+
+    #[test]
+    fn test_bool_or_compression_string_zstd() {
+        let json = r#"{"compression": "zstd"}"#;
+        let result: TestConfig = serde_json::from_str(json).unwrap();
+        assert!(matches!(result.compression, Compression::Zstd(_)));
+    }
+
+    #[test]
+    fn test_bool_or_compression_string_none() {
+        let json = r#"{"compression": "none"}"#;
+        let result: TestConfig = serde_json::from_str(json).unwrap();
+        assert_eq!(result.compression, Compression::None);
+    }
+
+    #[test]
+    fn test_bool_or_compression_object_with_level() {
+        let json = r#"{"compression": {"algorithm": "zstd", "level": 3}}"#;
+        let result: TestConfig = serde_json::from_str(json).unwrap();
+        assert!(matches!(
+            result.compression,
+            Compression::Zstd(CompressionLevel::Val(3))
+        ));
     }
 }
